@@ -1,0 +1,16 @@
+FROM node:24-alpine
+RUN corepack enable && corepack prepare pnpm@latest --activate
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+COPY packages/types/package.json ./packages/types/
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 3000 5173
+
+CMD ["pnpm", "dev"]

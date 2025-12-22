@@ -1,0 +1,20 @@
+{
+  "name": "projectx",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "cd client && npm run dev -- --host",
+    "dev:server": "cd server && npm run start:dev",
+    "build:client": "pnpm --filter client build",
+    "build:server": "pnpm --filter server build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=9"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

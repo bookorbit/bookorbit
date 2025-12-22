@@ -1,0 +1,13 @@
+import { Controller, Param, ParseIntPipe, Post } from '@nestjs/common';
+
+import { ScannerService } from './scanner.service';
+
+@Controller('scanner')
+export class ScannerController {
+  constructor(private readonly scannerService: ScannerService) {}
+
+  @Post('libraries/:id/scan')
+  scan(@Param('id', ParseIntPipe) libraryId: number) {
+    return this.scannerService.scan(libraryId, 'manual');
+  }
+}

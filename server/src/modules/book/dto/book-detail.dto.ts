@@ -1,0 +1,27 @@
+export class BookFileDto {
+  id: number;
+  format: string | null;
+  role: string;
+  sizeBytes: number | null;
+  absolutePath: string;
+}
+
+export class BookDetailDto {
+  id: number;
+  status: string;
+  folderPath: string;
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  language: string | null;
+  pageCount: number | null;
+  seriesName: string | null;
+  seriesIndex: number | null;
+  authors: { id: number; name: string; sortName: string | null }[];
+  tags: string[];
+  files: BookFileDto[];
+}
