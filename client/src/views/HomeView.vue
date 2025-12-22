@@ -48,7 +48,7 @@ watch(search, () => {
   <SidebarProvider>
     <AppSidebar />
 
-    <SidebarInset class="flex flex-col min-h-screen">
+    <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
       <AppHeader
         title="Library"
         :total="total"

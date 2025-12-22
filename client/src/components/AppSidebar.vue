@@ -22,7 +22,11 @@ const navItems = [
 </script>
 
 <template>
-  <Sidebar collapsible="icon" style="--sidebar-border: color-mix(in oklch, var(--primary) 18%, transparent)">
+  <Sidebar
+    collapsible="icon"
+    style="--sidebar-border: color-mix(in oklch, var(--primary) 18%, transparent)"
+    class="[&>div:last-child]:shadow-[4px_0_12px_-2px_oklch(0_0_0/0.08)]"
+  >
     <SidebarHeader class="border-b border-sidebar-border">
       <div class="flex items-center gap-2.5 px-1 py-1">
         <!-- Logo mark -->

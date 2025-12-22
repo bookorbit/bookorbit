@@ -327,6 +327,15 @@ html.radius-rounded {
   --shadow-2xl: var(--elevation-2xl);
 }
 
+.glow-wrapper {
+  background-image:
+    url('/topbar.png'), radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
+  background-blend-mode: hard-light, color-dodge;
+  background-position: top;
+  background-repeat: no-repeat;
+  background-size: auto 12rem;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
