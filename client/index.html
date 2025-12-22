@@ -1,10 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="">
   <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vite App</title>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Projectx</title>
+    <!-- Blocking theme init — must run before first paint to prevent FOUC -->
+    <script>
+      ;(function () {
+        var theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        var accent = localStorage.getItem('accent') || 'neutral'
+        var radius = localStorage.getItem('radius') || 'default'
+        if (theme === 'dark') document.documentElement.classList.add('dark')
+        if (accent !== 'neutral') document.documentElement.classList.add('accent-' + accent)
+        if (radius !== 'default') document.documentElement.classList.add('radius-' + radius)
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>
