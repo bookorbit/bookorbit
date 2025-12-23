@@ -5,10 +5,9 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBooks } from '@/features/book/composables/useBooks'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const coverSize = ref(150)
-const gridGap = ref(16)
-const viewMode = ref<'grid' | 'list'>('grid')
+const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const libraryId = ref<number | null>(null)
 
 async function loadLibrary() {

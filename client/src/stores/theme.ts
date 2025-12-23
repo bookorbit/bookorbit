@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { storage } from '@/services/storage'
 
 type Theme = 'light' | 'dark'
 export type Accent = 'neutral' | 'violet' | 'blue' | 'cyan' | 'green' | 'amber' | 'orange' | 'rose'
@@ -26,15 +27,14 @@ const ACCENT_IDS = ACCENT_OPTIONS.map((a) => a.id)
 const RADIUS_IDS = RADIUS_OPTIONS.map((r) => r.id)
 
 export const useThemeStore = defineStore('theme', () => {
-  const storedTheme = localStorage.getItem('theme') as Theme | null
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const theme = ref<Theme>(storedTheme ?? (prefersDark ? 'dark' : 'light'))
+  const theme = ref<Theme>(storage.get<Theme>('theme', prefersDark ? 'dark' : 'light'))
 
-  const storedAccent = localStorage.getItem('accent') as Accent | null
-  const accent = ref<Accent>(storedAccent && ACCENT_IDS.includes(storedAccent) ? storedAccent : 'neutral')
+  const storedAccent = storage.get<Accent>('accent', 'neutral')
+  const accent = ref<Accent>(ACCENT_IDS.includes(storedAccent) ? storedAccent : 'neutral')
 
-  const storedRadius = localStorage.getItem('radius') as Radius | null
-  const radius = ref<Radius>(storedRadius && RADIUS_IDS.includes(storedRadius) ? storedRadius : 'default')
+  const storedRadius = storage.get<Radius>('radius', 'default')
+  const radius = ref<Radius>(RADIUS_IDS.includes(storedRadius) ? storedRadius : 'default')
 
   function applyTheme(t: Theme) {
     document.documentElement.classList.toggle('dark', t === 'dark')
@@ -66,7 +66,7 @@ export const useThemeStore = defineStore('theme', () => {
     theme,
     (t) => {
       applyTheme(t)
-      localStorage.setItem('theme', t)
+      storage.set('theme', t)
     },
     { immediate: true },
   )
@@ -74,7 +74,7 @@ export const useThemeStore = defineStore('theme', () => {
     accent,
     (a) => {
       applyAccent(a)
-      localStorage.setItem('accent', a)
+      storage.set('accent', a)
     },
     { immediate: true },
   )
@@ -82,7 +82,7 @@ export const useThemeStore = defineStore('theme', () => {
     radius,
     (r) => {
       applyRadius(r)
-      localStorage.setItem('radius', r)
+      storage.set('radius', r)
     },
     { immediate: true },
   )
