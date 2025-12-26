@@ -3,7 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 
 import { appConfig, authConfig, dbConfig, storageConfig } from './config/config';
 import { DbModule } from './db/db.module';
+import { AnnotationModule } from './modules/annotation/annotation.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookModule } from './modules/book/book.module';
 import { KoboModule } from './modules/kobo/kobo.module';
 import { LibraryModule } from './modules/library/library.module';
@@ -25,6 +27,8 @@ import { UserModule } from './modules/user/user.module';
     ScannerModule,
     MetadataModule,
     KoboModule,
+    BookmarkModule,
+    AnnotationModule,
   ],
 })
 export class AppModule {}

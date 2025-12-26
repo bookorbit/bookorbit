@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { readdir } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { readdir, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
 import { BookRepository } from './book.repository';
@@ -55,6 +56,21 @@ export class BookService {
     } catch {
       return null;
     }
+  }
+
+  async getFileStream(id: number): Promise<{ stream: ReturnType<typeof createReadStream>; size: number; format: string }> {
+    const file = await this.bookRepo.findPrimaryFile(id);
+    if (!file) throw new NotFoundException(`No file for book ${id}`);
+    const { size } = await stat(file.absolutePath);
+    return { stream: createReadStream(file.absolutePath), size, format: file.format ?? 'unknown' };
+  }
+
+  async getProgress(id: number) {
+    return this.bookRepo.findProgress(id);
+  }
+
+  async saveProgress(id: number, cfi: string | null | undefined, percentage: number) {
+    await this.bookRepo.upsertProgress(id, cfi ?? null, percentage);
   }
 
   async getDetail(id: number): Promise<BookDetailDto> {

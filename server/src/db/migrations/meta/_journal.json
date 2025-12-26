@@ -5,8 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1766495233494,
+      "when": 1766774395691,
       "tag": "0000_init_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1766774395691,
+      "tag": "0001_lethal_pixie",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766774395691,
+      "tag": "0002_powerful_thundra",
       "breakpoints": true
     }
   ]

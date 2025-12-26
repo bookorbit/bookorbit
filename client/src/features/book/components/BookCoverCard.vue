@@ -2,6 +2,9 @@
 import type { Book } from '../composables/useBooks'
 import { bookCoverStyle } from '../composables/useBooks'
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps<{ book: Book }>()
 
@@ -21,7 +24,7 @@ const coverFailed = ref(false)
 </script>
 
 <template>
-  <div class="group cursor-pointer flex flex-col gap-1.5">
+  <div class="group cursor-pointer flex flex-col gap-1.5" @click="router.push(`/read/${props.book.id}`)">
     <!-- Cover -->
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md group-hover:shadow-xl group-hover:scale-[1.02] transition-all duration-150"

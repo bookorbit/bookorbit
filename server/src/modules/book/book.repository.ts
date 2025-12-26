@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, ilike, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, tags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, readingProgress, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -79,5 +79,29 @@ export class BookRepository {
     ]);
 
     return { book, authorRows, tagRows, fileRows };
+  }
+
+  async findPrimaryFile(bookId: number) {
+    const [file] = await this.db
+      .select({ absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')))
+      .limit(1);
+    return file ?? null;
+  }
+
+  async findProgress(bookId: number) {
+    const [row] = await this.db.select().from(readingProgress).where(eq(readingProgress.bookId, bookId)).limit(1);
+    return row ?? null;
+  }
+
+  async upsertProgress(bookId: number, cfi: string | null, percentage: number) {
+    await this.db
+      .insert(readingProgress)
+      .values({ bookId, cfi, percentage })
+      .onConflictDoUpdate({
+        target: readingProgress.bookId,
+        set: { cfi, percentage, updatedAt: sql`now()` },
+      });
   }
 }

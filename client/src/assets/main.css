@@ -80,6 +80,8 @@
 
   /* Shape */
   --radius: 0.625rem;
+
+  --dot-color: oklch(0.82 0.01 var(--tint-h));
 }
 
 .dark {
@@ -141,6 +143,8 @@
   --elevation-lg: 0 10px 20px -3px oklch(0 0 0 / 0.5), 0 4px 8px -4px oklch(0 0 0 / 0.4);
   --elevation-xl: 0 20px 30px -5px oklch(0 0 0 / 0.6), 0 8px 12px -6px oklch(0 0 0 / 0.4);
   --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.7);
+
+  --dot-color: oklch(0.3 0.01 var(--tint-h));
 }
 
 /* ── Accent presets ──────────────────────────────────────────
@@ -325,6 +329,11 @@ html.radius-rounded {
   --shadow-lg: var(--elevation-lg);
   --shadow-xl: var(--elevation-xl);
   --shadow-2xl: var(--elevation-2xl);
+}
+
+.dot-grid {
+  background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .glow-wrapper {

@@ -58,7 +58,7 @@ watch(search, () => {
         v-model:viewMode="viewMode"
       />
 
-      <main class="flex-1 overflow-y-auto px-4 py-4">
+      <main class="flex-1 overflow-y-auto px-4 py-4 dot-grid">
         <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
         <!-- Grid view -->
