@@ -22,7 +22,9 @@ import type { FoliateRenderer } from './composables/useFoliate'
 
 const route = useRoute()
 const router = useRouter()
-const bookId = Number(route.params.id)
+const bookId = Number(route.params.bookId)
+const fileId = Number(route.params.fileId)
+const fileFormat = (route.query.format as string) || 'epub'
 
 const containerRef = ref<HTMLElement | null>(null)
 const showSidebar = ref(false)
@@ -51,7 +53,7 @@ const {
   setFlow,
 } = readerState
 
-const progress = useReaderProgress(bookId)
+const progress = useReaderProgress(bookId, fileId)
 const { cfi, chapterTitle, sectionIndex, totalSections, fraction, updateHeadsFeet } = progress
 
 const visibility = useVisibility()
@@ -115,7 +117,7 @@ onMounted(async () => {
   onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
   await progress.load()
-  await open(bookId, progress.cfi.value)
+  await open(fileId, fileFormat, progress.cfi.value)
   setChapters(getChapters())
   sectionFractions.value = getSectionFractions()
   await bookmarks.load(bookId)
@@ -306,7 +308,13 @@ function navigateSearch(cfiTarget: string) {
       @search="onSearchQuery"
       @clear="onSearchClear"
       @navigate="navigateSearch($event)"
-      @close="() => { onSearchClear(); searchInitialQuery = ''; showSearch = false }"
+      @close="
+        () => {
+          onSearchClear()
+          searchInitialQuery = ''
+          showSearch = false
+        }
+      "
     />
 
     <ReaderSettingsPanel v-if="showSettings" :state="state" @update="applyUpdate" @close="showSettings = false" />

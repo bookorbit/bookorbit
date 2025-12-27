@@ -40,17 +40,25 @@ export class BookRepository {
     ]);
 
     const bookIds = rows.map((r) => r.id);
-    const authorRows =
+
+    const [authorRows, fileRows] = await Promise.all([
       bookIds.length > 0
-        ? await this.db
+        ? this.db
             .select({ bookId: bookAuthors.bookId, name: authors.name })
             .from(bookAuthors)
             .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
             .where(inArray(bookAuthors.bookId, bookIds))
             .orderBy(bookAuthors.displayOrder)
-        : [];
+        : [],
+      bookIds.length > 0
+        ? this.db
+            .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+            .from(bookFiles)
+            .where(inArray(bookFiles.bookId, bookIds))
+        : [],
+    ]);
 
-    return { rows, authorRows, total: Number(total) };
+    return { rows, authorRows, fileRows, total: Number(total) };
   }
 
   async findById(id: number) {
@@ -81,27 +89,27 @@ export class BookRepository {
     return { book, authorRows, tagRows, fileRows };
   }
 
-  async findPrimaryFile(bookId: number) {
+  async findFileById(fileId: number) {
     const [file] = await this.db
-      .select({ absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .select({ id: bookFiles.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format, bookId: bookFiles.bookId })
       .from(bookFiles)
-      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')))
+      .where(eq(bookFiles.id, fileId))
       .limit(1);
     return file ?? null;
   }
 
-  async findProgress(bookId: number) {
-    const [row] = await this.db.select().from(readingProgress).where(eq(readingProgress.bookId, bookId)).limit(1);
+  async findProgress(fileId: number) {
+    const [row] = await this.db.select().from(readingProgress).where(eq(readingProgress.bookFileId, fileId)).limit(1);
     return row ?? null;
   }
 
-  async upsertProgress(bookId: number, cfi: string | null, percentage: number) {
+  async upsertProgress(fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {
     await this.db
       .insert(readingProgress)
-      .values({ bookId, cfi, percentage })
+      .values({ bookFileId: fileId, cfi, pageNumber, percentage })
       .onConflictDoUpdate({
-        target: readingProgress.bookId,
-        set: { cfi, percentage, updatedAt: sql`now()` },
+        target: readingProgress.bookFileId,
+        set: { cfi, pageNumber, percentage, updatedAt: sql`now()` },
       });
   }
 }

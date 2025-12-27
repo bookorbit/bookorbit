@@ -1,9 +1,13 @@
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class SaveProgressDto {
   @IsOptional()
   @IsString()
-  cfi?: string;
+  cfi?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  pageNumber?: number | null;
 
   @IsNumber()
   @Min(0)

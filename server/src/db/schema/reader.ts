@@ -1,13 +1,16 @@
 import { integer, pgTable, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
-import { books } from './books';
+import { bookFiles, books } from './books';
 
 export const readingProgress = pgTable('reading_progress', {
-  bookId: integer('book_id')
+  bookFileId: integer('book_file_id')
     .primaryKey()
-    .references(() => books.id, { onDelete: 'cascade' }),
-  cfi: varchar('cfi', { length: 2000 }),
+    .references(() => bookFiles.id, { onDelete: 'cascade' }),
   percentage: real('percentage').notNull().default(0),
+  // EPUB: CFI string pinpoints exact location
+  cfi: varchar('cfi', { length: 2000 }),
+  // PDF / CBX / CBR: zero-based page index
+  pageNumber: integer('page_number'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

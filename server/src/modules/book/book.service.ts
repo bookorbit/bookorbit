@@ -22,13 +22,20 @@ export class BookService {
 
   async getCards(dto: GetBooksDto): Promise<{ items: BookCardDto[]; total: number; page: number; size: number }> {
     const { libraryId, page = 0, size = 50, search } = dto;
-    const { rows, authorRows, total } = await this.bookRepo.findCards(libraryId, { page, size, search });
+    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards(libraryId, { page, size, search });
 
     const authorsByBook = new Map<number, string[]>();
     for (const row of authorRows) {
       const list = authorsByBook.get(row.bookId) ?? [];
       list.push(row.name);
       authorsByBook.set(row.bookId, list);
+    }
+
+    const filesByBook = new Map<number, { id: number; format: string | null; role: string }[]>();
+    for (const row of fileRows) {
+      const list = filesByBook.get(row.bookId) ?? [];
+      list.push({ id: row.id, format: row.format, role: row.role });
+      filesByBook.set(row.bookId, list);
     }
 
     const items: BookCardDto[] = rows.map((row) => ({
@@ -38,15 +45,12 @@ export class BookService {
       seriesName: row.seriesName ?? null,
       seriesIndex: row.seriesIndex ?? null,
       authors: authorsByBook.get(row.id) ?? [],
+      files: filesByBook.get(row.id) ?? [],
     }));
 
     return { items, total, page, size };
   }
 
-  /**
-   * Returns the absolute path of the stored cover file for a book,
-   * or null if no cover exists on disk.
-   */
   async getCoverPath(id: number): Promise<string | null> {
     const dir = join(this.booksPath, 'covers', String(id));
     try {
@@ -58,19 +62,19 @@ export class BookService {
     }
   }
 
-  async getFileStream(id: number): Promise<{ stream: ReturnType<typeof createReadStream>; size: number; format: string }> {
-    const file = await this.bookRepo.findPrimaryFile(id);
-    if (!file) throw new NotFoundException(`No file for book ${id}`);
+  async getFileStream(fileId: number): Promise<{ stream: ReturnType<typeof createReadStream>; size: number; format: string }> {
+    const file = await this.bookRepo.findFileById(fileId);
+    if (!file) throw new NotFoundException(`No file with id ${fileId}`);
     const { size } = await stat(file.absolutePath);
     return { stream: createReadStream(file.absolutePath), size, format: file.format ?? 'unknown' };
   }
 
-  async getProgress(id: number) {
-    return this.bookRepo.findProgress(id);
+  async getProgress(fileId: number) {
+    return this.bookRepo.findProgress(fileId);
   }
 
-  async saveProgress(id: number, cfi: string | null | undefined, percentage: number) {
-    await this.bookRepo.upsertProgress(id, cfi ?? null, percentage);
+  async saveProgress(fileId: number, cfi: string | null | undefined, pageNumber: number | null | undefined, percentage: number) {
+    await this.bookRepo.upsertProgress(fileId, cfi ?? null, pageNumber ?? null, percentage);
   }
 
   async getDetail(id: number): Promise<BookDetailDto> {

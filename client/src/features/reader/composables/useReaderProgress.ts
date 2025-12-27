@@ -1,8 +1,9 @@
 import { ref } from 'vue'
 import type { FoliateRenderer, RelocateDetail } from './useFoliate'
 
-export function useReaderProgress(bookId: number) {
+export function useReaderProgress(bookId: number, fileId: number) {
   const cfi = ref<string | null>(null)
+  const pageNumber = ref<number | null>(null)
   const percentage = ref(0)
   const chapterTitle = ref('')
   const sectionIndex = ref(0)
@@ -12,10 +13,11 @@ export function useReaderProgress(bookId: number) {
   let saveTimer: ReturnType<typeof setTimeout> | null = null
 
   async function load() {
-    const res = await fetch(`/api/books/${bookId}/progress`)
+    const res = await fetch(`/api/books/files/${fileId}/progress`)
     if (!res.ok) return
     const data = await res.json()
     cfi.value = data.cfi ?? null
+    pageNumber.value = data.pageNumber ?? null
     percentage.value = data.percentage ?? 0
   }
 
@@ -32,10 +34,10 @@ export function useReaderProgress(bookId: number) {
   }
 
   async function save() {
-    await fetch(`/api/books/${bookId}/progress`, {
+    await fetch(`/api/books/files/${fileId}/progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cfi: cfi.value, percentage: percentage.value }),
+      body: JSON.stringify({ cfi: cfi.value, pageNumber: pageNumber.value, percentage: percentage.value }),
     })
   }
 
@@ -122,6 +124,7 @@ export function useReaderProgress(bookId: number) {
 
   return {
     cfi,
+    pageNumber,
     percentage,
     chapterTitle,
     sectionIndex,

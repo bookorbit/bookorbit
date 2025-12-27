@@ -48,7 +48,7 @@ export function useFoliate(
     await customElements.whenDefined('foliate-view')
   }
 
-  async function open(bookId: number, cfi?: string | null) {
+  async function open(fileId: number, format: string, cfi?: string | null) {
     const el = container()
     if (!el) return
 
@@ -103,10 +103,12 @@ export function useFoliate(
         loading.value = false
       })
 
-      const res = await fetch(`/api/books/${bookId}/file`)
-      if (!res.ok) throw new Error(`Failed to fetch book: ${res.status}`)
+      const mimeType = format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip'
+      const ext = format === 'pdf' ? 'pdf' : format === 'cbz' ? 'cbz' : 'epub'
+      const res = await fetch(`/api/books/files/${fileId}/serve`)
+      if (!res.ok) throw new Error(`Failed to fetch book file: ${res.status}`)
       const blob = await res.blob()
-      const file = new File([blob], `book-${bookId}.epub`, { type: 'application/epub+zip' })
+      const file = new File([blob], `book-file-${fileId}.${ext}`, { type: mimeType })
       await view.open(file)
       if (onApplyStyles) onApplyStyles(view.renderer)
       await view.goTo(cfi ?? 0).catch(() => {})

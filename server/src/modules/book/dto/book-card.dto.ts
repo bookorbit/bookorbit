@@ -1,3 +1,9 @@
+export class BookFileRefDto {
+  id: number;
+  format: string | null;
+  role: string;
+}
+
 export class BookCardDto {
   id: number;
   status: string;
@@ -5,4 +11,5 @@ export class BookCardDto {
   authors: string[];
   seriesName: string | null;
   seriesIndex: number | null;
+  files: BookFileRefDto[];
 }

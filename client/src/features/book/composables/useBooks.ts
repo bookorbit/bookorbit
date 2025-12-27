@@ -1,5 +1,11 @@
 import { ref, computed, type Ref } from 'vue'
 
+export interface BookFile {
+  id: number
+  format: string | null
+  role: string
+}
+
 export interface Book {
   id: number
   status: string
@@ -7,6 +13,7 @@ export interface Book {
   authors: string[]
   seriesName: string | null
   seriesIndex: number | null
+  files: BookFile[]
 }
 
 interface BooksPage {

@@ -10,7 +10,7 @@ const router = createRouter({
       component: HomeView,
     },
     {
-      path: '/read/:id',
+      path: '/read/:bookId/:fileId',
       name: 'reader',
       component: () => import('@/features/reader/ReaderView.vue'),
     },
