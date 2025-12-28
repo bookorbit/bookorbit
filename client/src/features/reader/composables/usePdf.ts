@@ -1,4 +1,4 @@
-import { onUnmounted, ref } from 'vue'
+import { onUnmounted, shallowRef, ref } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -6,23 +6,19 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 export type ZoomMode = 'fit-width' | 'fit-page' | 'custom'
 
-// Renders one page onto the given canvas at the given scale (pdfjs-dist v5 API).
-async function renderPageToCanvas(doc: pdfjsLib.PDFDocumentProxy, pageNum: number, canvas: HTMLCanvasElement, scale: number) {
-  const page = await doc.getPage(pageNum)
-  const viewport = page.getViewport({ scale })
-  canvas.width = viewport.width
-  canvas.height = viewport.height
-  await page.render({ canvas, viewport }).promise
-  page.cleanup()
+export interface PageDim {
+  width: number
+  height: number
 }
 
 export function usePdf() {
-  const pdfDoc = ref<pdfjsLib.PDFDocumentProxy | null>(null)
+  // shallowRef is critical — Vue's deep proxy breaks PDF.js internal state
+  const pdfDoc = shallowRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const totalPages = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function load(fileId: number) {
+  async function load(fileId: number): Promise<void> {
     loading.value = true
     error.value = null
     try {
@@ -39,13 +35,47 @@ export function usePdf() {
     }
   }
 
-  // Returns the natural width/height of a page at scale=1 (used to size placeholder divs).
-  async function getPageViewport(pageNum: number, scale: number) {
-    if (!pdfDoc.value) return null
-    const page = await pdfDoc.value.getPage(pageNum)
-    const vp = page.getViewport({ scale })
+  // Fetch ALL page natural dims in parallel (capped at 10 concurrent).
+  async function getAllPageDims(): Promise<PageDim[]> {
+    const doc = pdfDoc.value
+    if (!doc) return []
+    const total = doc.numPages
+    const results: PageDim[] = new Array(total)
+    const CONCURRENCY = 10
+
+    async function fetchDim(i: number) {
+      const page = await doc.getPage(i + 1)
+      const vp = page.getViewport({ scale: 1 })
+      page.cleanup()
+      results[i] = { width: vp.width, height: vp.height }
+    }
+
+    for (let start = 0; start < total; start += CONCURRENCY) {
+      const batch = Array.from({ length: Math.min(CONCURRENCY, total - start) }, (_, k) => fetchDim(start + k))
+      await Promise.all(batch)
+    }
+    return results
+  }
+
+  async function renderPage(pageNum: number, canvas: HTMLCanvasElement, scale: number): Promise<void> {
+    const doc = pdfDoc.value
+    if (!doc) return
+    const page = await doc.getPage(pageNum)
+    const viewport = page.getViewport({ scale })
+    canvas.width = viewport.width
+    canvas.height = viewport.height
+    await page.render({ canvas, viewport }).promise
     page.cleanup()
-    return vp
+  }
+
+  async function getTextContent(pageNum: number) {
+    const doc = pdfDoc.value
+    if (!doc) return null
+    const page = await doc.getPage(pageNum)
+    const content = await page.getTextContent()
+    const viewport = page.getViewport({ scale: 1 })
+    page.cleanup()
+    return { content, viewport }
   }
 
   onUnmounted(() => {
@@ -53,5 +83,5 @@ export function usePdf() {
     pdfDoc.value = null
   })
 
-  return { pdfDoc, totalPages, loading, error, load, renderPageToCanvas, getPageViewport }
+  return { pdfDoc, totalPages, loading, error, load, getAllPageDims, renderPage, getTextContent }
 }
