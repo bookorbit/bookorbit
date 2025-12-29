@@ -500,6 +500,7 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
 </template>
 
 <style scoped>
+@reference "tailwindcss";
 .pdf-btn {
   @apply flex items-center justify-center w-7 h-7 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
 }
