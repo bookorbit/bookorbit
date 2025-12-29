@@ -419,10 +419,7 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
         <span v-if="findQuery" class="text-xs text-white/40 tabular-nums shrink-0">{{ findMatches }} match{{ findMatches !== 1 ? 'es' : '' }}</span>
         <button
           class="pdf-btn w-6 h-6"
-          @click="
-            showFind = false
-            findQuery = ''
-          "
+          @click="showFind = false; findQuery = ''"
         >
           <X :size="12" />
         </button>
