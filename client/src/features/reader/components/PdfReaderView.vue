@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { AlignJustify, ArrowLeft, ChevronLeft, ChevronRight, Maximize2, Minus, Plus, RotateCw, Search, X } from 'lucide-vue-next'
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Minus, Plus, RotateCw, Search, X } from 'lucide-vue-next'
 import { usePdf } from '../composables/usePdf'
 import { useReaderProgress } from '../composables/useReaderProgress'
 import { useVisibility } from '../composables/useVisibility'
@@ -58,10 +58,40 @@ const scale = computed(() => {
 
 const zoomPct = computed(() => Math.round(scale.value * 100))
 
+const showZoomMenu = ref(false)
+
+const ZOOM_PRESETS = [
+  { label: 'Fit Page', value: 'fit-page' },
+  { label: 'Fit Width', value: 'fit-width' },
+  { label: 'Actual Size', value: '1' },
+  { label: '50%', value: '0.5' },
+  { label: '75%', value: '0.75' },
+  { label: '100%', value: '1' },
+  { label: '125%', value: '1.25' },
+  { label: '150%', value: '1.5' },
+  { label: '200%', value: '2' },
+] as const
+
+function applyZoomPreset(value: string) {
+  showZoomMenu.value = false
+  if (value === 'fit-width' || value === 'fit-page') {
+    zoomMode.value = value
+  } else {
+    customScale.value = parseFloat(value)
+    zoomMode.value = 'custom'
+  }
+}
+
 function adjustZoom(delta: number) {
   customScale.value = Math.round(Math.max(0.25, Math.min(4, (zoomMode.value === 'custom' ? customScale.value : scale.value) + delta) * 20) / 20)
   zoomMode.value = 'custom'
 }
+
+const zoomLabel = computed(() => {
+  if (zoomMode.value === 'fit-width') return 'Fit Width'
+  if (zoomMode.value === 'fit-page') return 'Fit Page'
+  return `${zoomPct.value}%`
+})
 
 // ── Spread pages into rows ────────────────────────────────────────────────────
 // Returns array of rows, each row = [pageNum] or [pageNum, pageNum+1]
@@ -251,7 +281,10 @@ function onKeyDown(e: KeyboardEvent) {
   else if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
     e.preventDefault()
     showFind.value = true
-  } else if (e.key === 'Escape') showFind.value = false
+  } else if (e.key === 'Escape') {
+    showFind.value = false
+    showZoomMenu.value = false
+  }
 }
 
 // ── Rotation ──────────────────────────────────────────────────────────────────
@@ -326,7 +359,7 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
 </script>
 
 <template>
-  <div class="fixed inset-0 bg-[#525659] flex flex-col overflow-hidden select-none" @mousemove="showHeader()">
+  <div class="fixed inset-0 bg-[#525659] flex flex-col overflow-hidden select-none" @mousemove="showHeader()" @click="showZoomMenu = false">
     <!-- ── Header ─────────────────────────────────────────────────────────── -->
     <div
       class="absolute top-0 left-0 right-0 z-50 flex flex-col transition-all duration-300"
@@ -334,15 +367,18 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
     >
       <!-- Main toolbar -->
       <div
-        class="h-12 flex items-center px-2 gap-0.5"
+        class="h-12 flex items-center px-2 gap-0.5 overflow-x-auto"
         style="background: rgba(50, 54, 57, 0.96); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255, 255, 255, 0.08)"
       >
+        <!-- Back -->
         <button class="pdf-btn" @click="router.back()" title="Back"><ArrowLeft :size="16" /></button>
-        <div class="w-px h-5 mx-1 bg-white/15 shrink-0" />
+        <div class="sep" />
 
-        <!-- Page nav -->
-        <button class="pdf-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)"><ChevronLeft :size="16" /></button>
-        <div class="flex items-center gap-1 text-sm text-white/80">
+        <!-- Page navigation -->
+        <button class="pdf-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)" title="Previous page">
+          <ChevronLeft :size="16" />
+        </button>
+        <div class="flex items-center gap-1 text-sm text-white/80 shrink-0">
           <input
             v-model.number="pageInput"
             type="number"
@@ -355,48 +391,73 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
           <span class="text-white/40">/</span>
           <span class="tabular-nums">{{ totalPages }}</span>
         </div>
-        <button class="pdf-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)"><ChevronRight :size="16" /></button>
-
-        <div class="w-px h-5 mx-1 bg-white/15 shrink-0" />
-
-        <!-- Zoom -->
-        <button class="pdf-btn" @click="adjustZoom(-0.1)" title="Zoom out"><Minus :size="14" /></button>
-        <span class="w-12 text-center text-xs text-white/60 font-mono tabular-nums">{{ zoomPct }}%</span>
-        <button class="pdf-btn" @click="adjustZoom(0.1)" title="Zoom in"><Plus :size="14" /></button>
-        <button class="pdf-btn" :class="zoomMode === 'fit-width' ? 'bg-white/20 text-white' : ''" @click="zoomMode = 'fit-width'" title="Fit width">
-          <AlignJustify :size="14" />
+        <button class="pdf-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)" title="Next page">
+          <ChevronRight :size="16" />
         </button>
-        <button class="pdf-btn" :class="zoomMode === 'fit-page' ? 'bg-white/20 text-white' : ''" @click="zoomMode = 'fit-page'" title="Fit page">
-          <Maximize2 :size="14" />
-        </button>
+        <div class="sep" />
 
-        <div class="w-px h-5 mx-1 bg-white/15 shrink-0" />
+        <!-- Zoom: −  [label/dropdown]  + -->
+        <button class="pdf-btn" @click="adjustZoom(-0.1)" title="Zoom out (−)"><Minus :size="14" /></button>
+        <div class="relative shrink-0">
+          <button
+            class="flex items-center gap-1 px-2 py-1 rounded text-xs text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[80px] justify-center font-mono"
+            @click="showZoomMenu = !showZoomMenu"
+            title="Zoom level — click to pick preset"
+          >
+            {{ zoomLabel }}
+            <span class="text-white/30 text-[10px]">▾</span>
+          </button>
+          <!-- Dropdown -->
+          <div
+            v-if="showZoomMenu"
+            class="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-36 rounded-lg shadow-2xl z-50 py-1 overflow-hidden"
+            style="background: rgba(35, 38, 41, 0.98); border: 1px solid rgba(255, 255, 255, 0.1)"
+          >
+            <button
+              v-for="preset in ZOOM_PRESETS"
+              :key="preset.label"
+              class="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              @click="applyZoomPreset(preset.value)"
+            >
+              {{ preset.label }}
+            </button>
+          </div>
+        </div>
+        <button class="pdf-btn" @click="adjustZoom(0.1)" title="Zoom in (+)"><Plus :size="14" /></button>
+        <div class="sep" />
+
+        <!-- Fit shortcuts -->
+        <button class="pdf-btn-label" :class="zoomMode === 'fit-width' ? 'active' : ''" @click="zoomMode = 'fit-width'" title="Fit Width">
+          Fit Width
+        </button>
+        <button class="pdf-btn-label" :class="zoomMode === 'fit-page' ? 'active' : ''" @click="zoomMode = 'fit-page'" title="Fit Page">
+          Fit Page
+        </button>
+        <button
+          class="pdf-btn-label"
+          :class="zoomMode === 'custom' && customScale === 1 ? 'active' : ''"
+          @click="applyZoomPreset('1')"
+          title="Actual size (100%)"
+        >
+          Actual
+        </button>
+        <div class="sep" />
 
         <!-- Rotation -->
-        <button class="pdf-btn" @click="rotate" title="Rotate 90°"><RotateCw :size="14" /></button>
+        <button class="pdf-btn" @click="rotate" title="Rotate 90° clockwise"><RotateCw :size="14" /></button>
+        <div class="sep" />
 
-        <!-- Spread -->
-        <div class="flex items-center gap-0.5 ml-0.5">
-          <button
-            v-for="s in [
-              ['none', '▬'],
-              ['odd', '▬▬'],
-              ['even', '▬▬'],
-            ] as const"
-            :key="s[0]"
-            class="pdf-btn text-[10px] font-bold px-1.5"
-            :class="spread === s[0] ? 'bg-white/20 text-white' : ''"
-            :title="s[0] === 'none' ? 'Single page' : s[0] === 'odd' ? 'Spread (cover)' : 'Spread'"
-            @click="spread = s[0]"
-          >
-            {{ s[1] }}
-          </button>
-        </div>
-
-        <div class="flex-1" />
+        <!-- Spread / page layout -->
+        <button class="pdf-btn-label" :class="spread === 'none' ? 'active' : ''" @click="spread = 'none'" title="Single page">
+          <BookOpen :size="13" class="mr-1" />Single
+        </button>
+        <button class="pdf-btn-label" :class="spread === 'odd' ? 'active' : ''" @click="spread = 'odd'" title="Two-page spread (book with cover)">
+          Spread
+        </button>
+        <div class="sep" />
 
         <!-- Find -->
-        <button class="pdf-btn" :class="showFind ? 'bg-white/20 text-white' : ''" @click="showFind = !showFind" title="Find (⌘F)">
+        <button class="pdf-btn" :class="showFind ? 'bg-white/20 text-white' : ''" @click="showFind = !showFind" title="Find in document (⌘F)">
           <Search :size="14" />
         </button>
       </div>
@@ -419,7 +480,10 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
         <span v-if="findQuery" class="text-xs text-white/40 tabular-nums shrink-0">{{ findMatches }} match{{ findMatches !== 1 ? 'es' : '' }}</span>
         <button
           class="pdf-btn w-6 h-6"
-          @click="showFind = false; findQuery = ''"
+          @click="
+            showFind = false
+            findQuery = ''
+          "
         >
           <X :size="12" />
         </button>
@@ -503,5 +567,14 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
 @reference "tailwindcss";
 .pdf-btn {
   @apply flex items-center justify-center w-7 h-7 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
+}
+.pdf-btn-label {
+  @apply flex items-center px-2 py-1 rounded text-xs text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 whitespace-nowrap;
+}
+.pdf-btn-label.active {
+  @apply bg-white/20 text-white;
+}
+.sep {
+  @apply w-px h-5 mx-1 bg-white/15 shrink-0;
 }
 </style>
