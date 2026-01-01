@@ -282,7 +282,7 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault()
     showFind.value = true
   } else if (e.key === 'Escape') {
-    showFind.value = false
+    closeFind()
     showZoomMenu.value = false
   }
 }
@@ -290,6 +290,11 @@ function onKeyDown(e: KeyboardEvent) {
 // ── Rotation ──────────────────────────────────────────────────────────────────
 function rotate() {
   rotation.value = ((rotation.value + 90) % 360) as 0 | 90 | 180 | 270
+}
+
+function closeFind() {
+  showFind.value = false
+  findQuery.value = ''
 }
 
 // ── Find ──────────────────────────────────────────────────────────────────────
@@ -478,13 +483,7 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
           @keydown.escape="showFind = false"
         />
         <span v-if="findQuery" class="text-xs text-white/40 tabular-nums shrink-0">{{ findMatches }} match{{ findMatches !== 1 ? 'es' : '' }}</span>
-        <button
-          class="pdf-btn w-6 h-6"
-          @click="
-            showFind = false
-            findQuery = ''
-          "
-        >
+        <button class="pdf-btn w-6 h-6" @click="closeFind">
           <X :size="12" />
         </button>
       </div>
