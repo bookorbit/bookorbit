@@ -1,6 +1,5 @@
 import { readFile } from 'fs/promises';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse: (buf: Buffer, opts?: { max?: number }) => Promise<{ info: unknown; numpages: number }> = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 export interface PdfParsed {
   title: string | null;
@@ -52,9 +51,9 @@ function extractFirstJpeg(buf: Buffer): Buffer | null {
 export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | null> {
   try {
     const buf = await readFile(absolutePath);
-
-    // pdf-parse can throw on malformed PDFs; run without text extraction for speed
-    const data = await pdfParse(buf, { max: 1 });
+    const parser = new PDFParse({ data: buf });
+    const data = await parser.getInfo();
+    await parser.destroy();
 
     const info = (data.info ?? {}) as Record<string, unknown>;
 
@@ -65,7 +64,7 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
     // PDFs rarely store publisher; some use 'Creator' for the authoring app
     // and 'Producer' for the PDF engine — neither is a publisher field.
     const publisher: string | null = null;
-    const pageCount = typeof data.numpages === 'number' ? data.numpages : null;
+    const pageCount = typeof data.total === 'number' ? data.total : null;
 
     const authors: PdfParsed['authors'] = authorRaw
       ? authorRaw

@@ -9,6 +9,7 @@ import { authors, bookAuthors, bookMetadata, bookTags, tags } from '../../db/sch
 import { extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
+import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
 import { parsePdfFile } from './lib/pdf-parser';
 
@@ -92,14 +93,15 @@ export class MetadataService {
     } else if (format === 'pdf') {
       const pdf = await parsePdfFile(absolutePath);
       if (pdf) {
+        const fb = !pdf.title ? parseBookFilename(absolutePath) : null;
         parsed = {
-          title: pdf.title,
+          title: pdf.title ?? fb?.title ?? null,
           subtitle: null,
           description: pdf.subject,
           isbn10: null,
           isbn13: null,
           publisher: null,
-          publishedYear: null,
+          publishedYear: fb?.publishedYear ?? null,
           language: null,
           seriesName: null,
           seriesIndex: null,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, NotFoundException, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import type { FastifyReply } from 'fastify';
 import { BookService } from './book.service';
@@ -29,14 +29,32 @@ export class BookController {
   // These MUST come before `:id/*` routes to avoid NestJS matching 'files' as :id.
 
   @Get('files/:fileId/serve')
-  async serveFile(@Param('fileId', ParseIntPipe) fileId: number, @Res() reply: FastifyReply) {
-    const { stream, size, format } = await this.bookService.getFileStream(fileId);
+  async serveFile(
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @Headers('range') rangeHeader: string | undefined,
+    @Res() reply: FastifyReply,
+  ) {
+    const { path, size, format } = await this.bookService.getFileInfo(fileId);
     const mimeType = format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip';
-    reply.header('Content-Length', size);
-    reply.header('Content-Disposition', 'inline');
     reply.header('Accept-Ranges', 'bytes');
+    reply.header('Content-Disposition', 'inline');
     reply.type(mimeType);
-    reply.send(stream);
+
+    if (rangeHeader) {
+      const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
+      if (match) {
+        const start = parseInt(match[1]);
+        const end = match[2] ? parseInt(match[2]) : size - 1;
+        reply.status(206);
+        reply.header('Content-Range', `bytes ${start}-${end}/${size}`);
+        reply.header('Content-Length', end - start + 1);
+        reply.send(createReadStream(path, { start, end }));
+        return;
+      }
+    }
+
+    reply.header('Content-Length', size);
+    reply.send(createReadStream(path));
   }
 
   @Get('files/:fileId/progress')

@@ -22,10 +22,13 @@ export function usePdf() {
     loading.value = true
     error.value = null
     try {
-      const res = await fetch(`/api/books/files/${fileId}/serve`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.arrayBuffer()
-      const doc = await pdfjsLib.getDocument({ data }).promise
+      // Pass URL directly so PDF.js can use HTTP range requests (206 Partial Content).
+      // This avoids downloading the entire file upfront and allows rendering to start immediately.
+      const doc = await pdfjsLib.getDocument({
+        url: `/api/books/files/${fileId}/serve`,
+        rangeChunkSize: 512 * 1024,
+        disableAutoFetch: true,
+      }).promise
       pdfDoc.value = doc
       totalPages.value = doc.numPages
     } catch (e) {

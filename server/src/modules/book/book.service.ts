@@ -62,11 +62,11 @@ export class BookService {
     }
   }
 
-  async getFileStream(fileId: number): Promise<{ stream: ReturnType<typeof createReadStream>; size: number; format: string }> {
+  async getFileInfo(fileId: number): Promise<{ path: string; size: number; format: string }> {
     const file = await this.bookRepo.findFileById(fileId);
     if (!file) throw new NotFoundException(`No file with id ${fileId}`);
     const { size } = await stat(file.absolutePath);
-    return { stream: createReadStream(file.absolutePath), size, format: file.format ?? 'unknown' };
+    return { path: file.absolutePath, size, format: file.format ?? 'unknown' };
   }
 
   async getProgress(fileId: number) {
