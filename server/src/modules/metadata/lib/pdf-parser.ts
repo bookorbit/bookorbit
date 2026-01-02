@@ -1,5 +1,11 @@
-import { readFile } from 'fs/promises';
+import { exec } from 'child_process';
+import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { promisify } from 'util';
 import { PDFParse } from 'pdf-parse';
+
+const execAsync = promisify(exec);
 
 export interface PdfParsed {
   title: string | null;
@@ -25,27 +31,21 @@ function splitKeywords(value: string | null): string[] {
     .filter(Boolean);
 }
 
-/**
- * Extracts the cover image (first page rendered to JPEG) is not feasible
- * without a headless browser. Instead we extract the first embedded image
- * from the PDF binary using a lightweight xref scan.
- *
- * Looks for the first inline JPEG stream (SOI marker FF D8) embedded in
- * the binary. Returns null if none found within a reasonable scan.
- */
-function extractFirstJpeg(buf: Buffer): Buffer | null {
-  const MAX_SCAN = Math.min(buf.length, 5 * 1024 * 1024); // scan first 5 MB
-  for (let i = 0; i < MAX_SCAN - 1; i++) {
-    if (buf[i] === 0xff && buf[i + 1] === 0xd8) {
-      // Find matching EOI (FF D9)
-      for (let j = i + 2; j < buf.length - 1; j++) {
-        if (buf[j] === 0xff && buf[j + 1] === 0xd9) {
-          return buf.subarray(i, j + 2);
-        }
-      }
-    }
+/** Renders the first page of a PDF to JPEG using pdftoppm. */
+async function extractPdfCover(absolutePath: string): Promise<Buffer | null> {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'pdf-cover-'));
+  try {
+    const outPrefix = join(tmpDir, 'cover');
+    await execAsync(`pdftoppm -jpeg -r 150 -f 1 -l 1 "${absolutePath}" "${outPrefix}"`);
+    const files = await readdir(tmpDir);
+    const coverFile = files.find((f) => f.endsWith('.jpg'));
+    if (!coverFile) return null;
+    return await readFile(join(tmpDir, coverFile));
+  } catch {
+    return null;
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true });
   }
-  return null;
 }
 
 export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | null> {
@@ -74,7 +74,7 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
           .map((name) => ({ name, sortName: null }))
       : [];
 
-    const coverBuffer = extractFirstJpeg(buf);
+    const coverBuffer = await extractPdfCover(absolutePath);
 
     return { title, authors, subject, keywords, publisher, pageCount, coverBuffer };
   } catch {
