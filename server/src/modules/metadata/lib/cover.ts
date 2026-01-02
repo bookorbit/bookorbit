@@ -1,9 +1,13 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import sharp from 'sharp';
 
 import { extractCbzCover } from './cover-cbz';
 import { extractEpubCover } from './cover-epub';
 import { extractMobiCover } from './mobi-parser';
+
+const THUMBNAIL_WIDTH = 400;
+const THUMBNAIL_HEIGHT = 600;
 
 /** Returns extension based on magic bytes, defaulting to 'jpg'. */
 function imageExt(bytes: Buffer): string {
@@ -44,6 +48,10 @@ export async function extractAndSaveCover(absolutePath: string, format: string, 
   const ext = imageExt(bytes);
   const filePath = join(dir, `cover.${ext}`);
   await writeFile(filePath, bytes);
+
+  const thumbnail = await sharp(bytes).resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'cover', position: 'top' }).jpeg({ quality: 90 }).toBuffer();
+  await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+
   return filePath;
 }
 

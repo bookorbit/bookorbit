@@ -20,7 +20,7 @@ const primaryFile = computed(() => props.book.files.find((f) => f.role === 'prim
 // Only show format chips when there are multiple files
 const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.files : []))
 
-const coverUrl = `/api/books/${props.book.id}/cover`
+const coverUrl = `/api/books/${props.book.id}/thumbnail`
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
 

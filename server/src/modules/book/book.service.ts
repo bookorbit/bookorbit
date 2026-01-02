@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createReadStream } from 'fs';
-import { readdir, stat } from 'fs/promises';
+import { access, readdir, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
 import { BookRepository } from './book.repository';
@@ -60,6 +60,11 @@ export class BookService {
     } catch {
       return null;
     }
+  }
+
+  async getThumbnailPath(id: number): Promise<string | null> {
+    const path = join(this.booksPath, 'covers', String(id), 'thumbnail.jpg');
+    return access(path).then(() => path).catch(() => null);
   }
 
   async getFileInfo(fileId: number): Promise<{ path: string; size: number; format: string }> {

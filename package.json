@@ -16,5 +16,8 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@nestjs/core", "@swc/core", "esbuild", "sharp", "unrs-resolver"]
   }
 }

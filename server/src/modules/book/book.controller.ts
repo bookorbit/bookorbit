@@ -25,6 +25,15 @@ export class BookController {
     reply.send(createReadStream(coverPath));
   }
 
+  @Get(':id/thumbnail')
+  async getThumbnail(@Param('id', ParseIntPipe) id: number, @Res() reply: FastifyReply) {
+    const thumbnailPath = await this.bookService.getThumbnailPath(id);
+    if (!thumbnailPath) throw new NotFoundException(`No thumbnail for book ${id}`);
+
+    reply.type('image/jpeg');
+    reply.send(createReadStream(thumbnailPath));
+  }
+
   // Flat file routes — no bookId needed since fileId is globally unique.
   // These MUST come before `:id/*` routes to avoid NestJS matching 'files' as :id.
 

@@ -6,6 +6,8 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, bookTags, tags } from '../../db/schema';
+import sharp from 'sharp';
+
 import { extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
@@ -164,6 +166,8 @@ export class MetadataService {
       const dir = join(this.booksPath, 'covers', String(bookId));
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, 'cover.jpg'), jpeg);
+      const thumbnail = await sharp(jpeg).resize(400, 600, { fit: 'cover', position: 'top' }).jpeg({ quality: 90 }).toBuffer();
+      await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
       this.logger.debug(`PDF cover saved for book ${bookId}`);
     } catch (err) {
       this.logger.warn(`PDF cover save failed for book ${bookId}: ${err}`);
