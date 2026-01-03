@@ -236,9 +236,6 @@ function navigateSearch(cfiTarget: string) {
     <ReaderHeader
       :chapterTitle="chapterTitle"
       :isBookmarked="bookmarks.isCurrentCfiBookmarked.value"
-      :isDark="isDark"
-      :bgColor="activeMode.bg"
-      :fgColor="activeMode.fg"
       class="transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
       @back="router.back()"
@@ -275,8 +272,6 @@ function navigateSearch(cfiTarget: string) {
       :sectionIndex="sectionIndex"
       :totalSections="totalSections"
       :sectionFractions="sectionFractions"
-      :bgColor="activeMode.bg"
-      :fgColor="activeMode.fg"
       class="transition-all duration-300"
       :class="footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'"
       @prevSection="goToSection(sectionIndex - 1)"

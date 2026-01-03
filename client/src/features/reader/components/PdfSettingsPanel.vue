@@ -1,40 +1,27 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { AlignJustify, Image, Palette, X } from 'lucide-vue-next'
-import type { BgColor, Direction, FitMode, ScrollMode, ViewMode } from '../composables/useCbzSettings'
+import { LayoutGrid, RotateCw, X, ZoomIn } from 'lucide-vue-next'
+import { ZOOM_PRESETS } from '../composables/usePdfZoom'
 
-defineProps<{
-  fitMode: FitMode
-  viewMode: ViewMode
-  scrollMode: ScrollMode
-  direction: Direction
-  bgColor: BgColor
+const props = defineProps<{
+  zoomMode: string
+  customScale: number
+  zoomLabel: string
+  spread: 'none' | 'odd' | 'even'
+  scrollMode: 'continuous' | 'page'
+  rotation: 0 | 90 | 180 | 270
 }>()
 
 const emit = defineEmits<{
   close: []
-  'update:fitMode': [v: FitMode]
-  'update:viewMode': [v: ViewMode]
-  'update:scrollMode': [v: ScrollMode]
-  'update:direction': [v: Direction]
-  'update:bgColor': [v: BgColor]
+  applyZoomPreset: [value: string]
+  'update:spread': [v: 'none' | 'odd' | 'even']
+  'update:scrollMode': [v: 'continuous' | 'page']
+  rotate: []
 }>()
 
-type Tab = 'view' | 'scroll' | 'display'
-const activeTab = ref<Tab>('view')
-
-const FIT_OPTIONS: { value: FitMode; label: string }[] = [
-  { value: 'fit-page', label: 'Page' },
-  { value: 'fit-width', label: 'Width' },
-  { value: 'fit-height', label: 'Height' },
-  { value: 'actual', label: 'Actual' },
-]
-
-const SCROLL_OPTIONS: { value: ScrollMode; label: string }[] = [
-  { value: 'paginated', label: 'Paginated' },
-  { value: 'infinite', label: 'Infinite Scroll' },
-  { value: 'long-strip', label: 'Long Strip' },
-]
+type Tab = 'zoom' | 'layout' | 'display'
+const activeTab = ref<Tab>('zoom')
 </script>
 
 <template>
@@ -47,9 +34,9 @@ const SCROLL_OPTIONS: { value: ScrollMode; label: string }[] = [
         <div class="flex gap-1">
           <button
             v-for="tab in [
-              { id: 'view', icon: Image, label: 'View' },
-              { id: 'scroll', icon: AlignJustify, label: 'Scroll' },
-              { id: 'display', icon: Palette, label: 'Display' },
+              { id: 'zoom', icon: ZoomIn, label: 'Zoom' },
+              { id: 'layout', icon: LayoutGrid, label: 'Layout' },
+              { id: 'display', icon: RotateCw, label: 'Display' },
             ] as const"
             :key="tab.id"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
@@ -69,97 +56,101 @@ const SCROLL_OPTIONS: { value: ScrollMode; label: string }[] = [
       </div>
 
       <div class="px-5 py-5 space-y-6">
-        <template v-if="activeTab === 'view'">
+        <template v-if="activeTab === 'zoom'">
           <div>
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Fit Mode</p>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                v-for="opt in FIT_OPTIONS"
-                :key="opt.value"
-                class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
-                :class="
-                  fitMode === opt.value
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
-                "
-                @click="emit('update:fitMode', opt.value)"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-          </div>
-          <div>
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Pages</p>
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Preset</p>
             <div class="grid grid-cols-2 gap-2">
               <button
                 class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
                 :class="
-                  viewMode === 'single'
+                  zoomMode === 'fit-width'
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
                 "
-                @click="emit('update:viewMode', 'single')"
+                @click="emit('applyZoomPreset', 'fit-width')"
               >
-                Single
+                Fit Width
               </button>
               <button
                 class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
                 :class="
-                  viewMode === 'two-page'
+                  zoomMode === 'fit-page'
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
                 "
-                @click="emit('update:viewMode', 'two-page')"
+                @click="emit('applyZoomPreset', 'fit-page')"
               >
-                Two Page
+                Fit Page
+              </button>
+              <button
+                v-for="preset in ZOOM_PRESETS"
+                :key="preset.label"
+                class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
+                :class="
+                  zoomMode === 'custom' && customScale === parseFloat(preset.value)
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
+                "
+                @click="emit('applyZoomPreset', preset.value)"
+              >
+                {{ preset.label }}
               </button>
             </div>
           </div>
         </template>
 
-        <template v-if="activeTab === 'scroll'">
+        <template v-if="activeTab === 'layout'">
           <div>
             <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Scroll Mode</p>
-            <div class="flex flex-col gap-2">
-              <button
-                v-for="opt in SCROLL_OPTIONS"
-                :key="opt.value"
-                class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
-                :class="
-                  scrollMode === opt.value
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
-                "
-                @click="emit('update:scrollMode', opt.value)"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-          </div>
-          <div>
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Reading Direction</p>
             <div class="grid grid-cols-2 gap-2">
               <button
                 class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
                 :class="
-                  direction === 'ltr'
+                  scrollMode === 'continuous'
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
                 "
-                @click="emit('update:direction', 'ltr')"
+                @click="emit('update:scrollMode', 'continuous')"
               >
-                LTR →
+                Continuous
               </button>
               <button
                 class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
                 :class="
-                  direction === 'rtl'
+                  scrollMode === 'page'
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
                 "
-                @click="emit('update:direction', 'rtl')"
+                @click="emit('update:scrollMode', 'page')"
               >
-                ← RTL
+                Page by Page
+              </button>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Page Spread</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
+                :class="
+                  spread === 'none'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
+                "
+                @click="emit('update:spread', 'none')"
+              >
+                Single Page
+              </button>
+              <button
+                class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
+                :class="
+                  spread !== 'none'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
+                "
+                @click="emit('update:spread', 'odd')"
+              >
+                Two-Page
               </button>
             </div>
           </div>
@@ -167,24 +158,18 @@ const SCROLL_OPTIONS: { value: ScrollMode; label: string }[] = [
 
         <template v-if="activeTab === 'display'">
           <div>
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Background</p>
-            <div class="grid grid-cols-3 gap-2">
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Rotation</p>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium">Rotate Clockwise</p>
+                <p class="text-xs text-muted-foreground">Current: {{ rotation }}°</p>
+              </div>
               <button
-                v-for="opt in [
-                  { value: 'black', label: 'Black' },
-                  { value: 'gray', label: 'Gray' },
-                  { value: 'white', label: 'White' },
-                ] as const"
-                :key="opt.value"
-                class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
-                :class="
-                  bgColor === opt.value
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
-                "
-                @click="emit('update:bgColor', opt.value)"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border-2 border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground transition-colors"
+                @click="emit('rotate')"
               >
-                {{ opt.label }}
+                <RotateCw :size="16" />
+                Rotate 90°
               </button>
             </div>
           </div>

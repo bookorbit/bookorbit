@@ -208,13 +208,21 @@ onUnmounted(() => {
       class="absolute top-0 inset-x-0 z-50 transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
     >
-      <div class="h-12 flex items-center gap-2 px-3" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px)">
-        <button class="cbz-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
+      <div
+        class="h-12 flex items-center gap-2 px-3"
+        style="
+          background: rgba(18, 18, 20, 0.92);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        "
+      >
+        <button class="viewer-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
         <div class="flex-1 min-w-0 flex flex-col justify-center">
           <span v-if="bookTitle" class="text-sm text-white/90 truncate leading-tight">{{ bookTitle }}</span>
           <span class="text-xs text-white/40 tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
         </div>
-        <button class="cbz-btn" :class="showSettings ? 'bg-white/20 text-white' : ''" @click="showSettings = !showSettings">
+        <button class="viewer-btn" :class="showSettings ? 'bg-white/20 text-white' : ''" @click="showSettings = !showSettings">
           <Settings :size="15" />
         </button>
       </div>
@@ -275,9 +283,17 @@ onUnmounted(() => {
       class="absolute bottom-0 inset-x-0 z-50 transition-all duration-300"
       :class="footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'"
     >
-      <div class="h-16 flex items-center gap-3 px-4" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px)">
-        <button class="cbz-btn" title="First page" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
-        <button class="cbz-btn" :disabled="currentPage === 0" @click="prevPage"><ChevronLeft :size="16" /></button>
+      <div
+        class="h-14 flex items-center gap-3 px-4"
+        style="
+          background: rgba(18, 18, 20, 0.92);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        "
+      >
+        <button class="viewer-btn" title="First page" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
+        <button class="viewer-btn" :disabled="currentPage === 0" @click="prevPage"><ChevronLeft :size="16" /></button>
 
         <div class="flex-1 flex flex-col justify-center gap-0.5">
           <input
@@ -294,8 +310,8 @@ onUnmounted(() => {
           </datalist>
         </div>
 
-        <button class="cbz-btn" :disabled="currentPage >= pageCount - 1" @click="nextPage"><ChevronRight :size="16" /></button>
-        <button class="cbz-btn" title="Last page" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
+        <button class="viewer-btn" :disabled="currentPage >= pageCount - 1" @click="nextPage"><ChevronRight :size="16" /></button>
+        <button class="viewer-btn" title="Last page" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
       </div>
     </div>
 
@@ -337,10 +353,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "tailwindcss";
-.cbz-btn {
-  @apply flex items-center justify-center w-8 h-8 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
-}
-</style>

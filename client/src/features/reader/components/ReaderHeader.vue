@@ -5,9 +5,6 @@ import { ArrowLeft, BookOpen, Bookmark, BookmarkCheck, Maximize, Minimize, Searc
 defineProps<{
   chapterTitle: string
   isBookmarked: boolean
-  isDark: boolean
-  bgColor: string
-  fgColor: string
 }>()
 
 const emit = defineEmits<{
@@ -32,74 +29,42 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
 <template>
   <header
     class="fixed top-0 left-0 right-0 h-12 z-50 flex items-center px-3 gap-1"
-    :style="{
-      background: `color-mix(in srgb, ${bgColor} 92%, transparent)`,
-      color: fgColor,
-      backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)',
-      borderBottom: `1px solid color-mix(in srgb, ${fgColor} 12%, transparent)`,
-    }"
+    style="
+      background: rgba(18, 18, 20, 0.92);
+      color: white;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    "
   >
-    <button
-      class="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-      :style="{ color: fgColor }"
-      @click="emit('back')"
-      title="Go back"
-    >
+    <button class="viewer-btn" @click="emit('back')" title="Go back">
       <ArrowLeft :size="18" />
     </button>
 
-    <div class="w-px h-5 mx-1 shrink-0" :style="{ background: `color-mix(in srgb, ${fgColor} 20%, transparent)` }" />
+    <div class="viewer-sep" />
 
-    <button
-      class="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-      :style="{ color: fgColor }"
-      @click="emit('toggleSidebar')"
-      title="Table of contents"
-    >
+    <button class="viewer-btn" @click="emit('toggleSidebar')" title="Table of contents">
       <BookOpen :size="18" />
     </button>
 
-    <button
-      class="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-      :style="{ color: isBookmarked ? '#f87171' : fgColor }"
-      @click="emit('toggleBookmark')"
-      title="Toggle bookmark"
-    >
+    <button class="viewer-btn" :class="isBookmarked ? '!text-red-400' : ''" @click="emit('toggleBookmark')" title="Toggle bookmark">
       <BookmarkCheck v-if="isBookmarked" :size="18" />
       <Bookmark v-else :size="18" />
     </button>
 
-    <button
-      class="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-      :style="{ color: fgColor }"
-      @click="emit('toggleSearch')"
-      title="Search"
-    >
+    <button class="viewer-btn" @click="emit('toggleSearch')" title="Search">
       <Search :size="18" />
     </button>
 
     <div class="flex-1 min-w-0 px-3">
-      <p class="text-sm font-medium truncate text-center" :style="{ color: `color-mix(in srgb, ${fgColor} 70%, transparent)` }">
-        {{ chapterTitle }}
-      </p>
+      <p class="text-sm font-medium truncate text-center text-white/60">{{ chapterTitle }}</p>
     </div>
 
-    <button
-      class="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-      :style="{ color: fgColor }"
-      @click="emit('toggleSettings')"
-      title="Settings"
-    >
+    <button class="viewer-btn" @click="emit('toggleSettings')" title="Settings">
       <Settings :size="18" />
     </button>
 
-    <button
-      class="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-      :style="{ color: fgColor }"
-      @click="emit('toggleFullscreen')"
-      :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-    >
+    <button class="viewer-btn" @click="emit('toggleFullscreen')" :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
       <Minimize v-if="isFullscreen" :size="18" />
       <Maximize v-else :size="18" />
     </button>
