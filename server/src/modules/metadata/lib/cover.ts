@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
 
+import { extractCb7Cover } from './cover-cb7';
+import { extractCbrCover } from './cover-cbr';
 import { extractCbzCover } from './cover-cbz';
 import { extractEpubCover } from './cover-epub';
 import { extractMobiCover } from './mobi-parser';
@@ -29,6 +31,10 @@ export async function extractCover(absolutePath: string, format: string): Promis
       return extractMobiCover(absolutePath);
     case 'cbz':
       return extractCbzCover(absolutePath);
+    case 'cbr':
+      return extractCbrCover(absolutePath);
+    case 'cb7':
+      return extractCb7Cover(absolutePath);
     default:
       return null;
   }

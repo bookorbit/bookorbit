@@ -8,7 +8,7 @@ import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, bookTags, tags } from '../../db/schema';
 import sharp from 'sharp';
 
-import { extractCbzMetadata } from './lib/cbz-metadata';
+import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
@@ -55,7 +55,7 @@ export class MetadataService {
 
     if (format === 'epub') {
       parsed = await extractEpubMetadata(absolutePath);
-    } else if (format === 'cbz' || format === 'cbr') {
+    } else if (format === 'cbz') {
       const cbz = await extractCbzMetadata(absolutePath);
       if (cbz) {
         parsed = {
@@ -71,6 +71,24 @@ export class MetadataService {
           seriesIndex: cbz.seriesIndex,
           authors: cbz.authors,
           tags: cbz.tags,
+        };
+      }
+    } else if (format === 'cbr' || format === 'cb7') {
+      const cbx = format === 'cbr' ? await extractCbrMetadata(absolutePath) : await extractCb7Metadata(absolutePath);
+      if (cbx) {
+        parsed = {
+          title: cbx.title,
+          subtitle: null,
+          description: cbx.description,
+          isbn10: null,
+          isbn13: null,
+          publisher: cbx.publisher,
+          publishedYear: cbx.publishedYear,
+          language: cbx.language,
+          seriesName: cbx.seriesName,
+          seriesIndex: cbx.seriesIndex,
+          authors: cbx.authors,
+          tags: cbx.tags,
         };
       }
     } else if (format === 'mobi' || format === 'azw3' || format === 'azw') {

@@ -222,7 +222,7 @@ function navigateSearch(cfiTarget: string) {
 
 <template>
   <PdfReaderView v-if="fileFormat === 'pdf'" :bookId="bookId" :fileId="fileId" />
-  <CbzReaderView v-else-if="fileFormat === 'cbz' || fileFormat === 'cbr'" :bookId="bookId" :fileId="fileId" />
+  <CbzReaderView v-else-if="fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'" :bookId="bookId" :fileId="fileId" />
   <div
     v-else
     class="fixed inset-0 overflow-hidden"

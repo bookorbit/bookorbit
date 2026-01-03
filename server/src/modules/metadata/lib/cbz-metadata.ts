@@ -1,6 +1,8 @@
 import { readFile } from 'fs/promises';
 import { XMLParser } from 'fast-xml-parser';
 import { inflateRawSync } from 'zlib';
+import { createExtractorFromData } from 'node-unrar-js';
+import { getSevenZip } from '../../../common/sevenzip';
 
 // ── ZIP binary constants ──────────────────────────────────────────────────────
 
@@ -143,6 +145,10 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+function toArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
 /**
  * Extract metadata from a CBZ file.
  * Tries ComicInfo.xml first (embedded file), then ComicBookInfo JSON (ZIP comment).
@@ -164,6 +170,74 @@ export async function extractCbzMetadata(absolutePath: string): Promise<ParsedCb
     }
 
     return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Extract ComicInfo.xml metadata from a CBR (RAR) file. */
+export async function extractCbrMetadata(absolutePath: string): Promise<ParsedCbzMetadata | null> {
+  try {
+    const buf = await readFile(absolutePath);
+    const ab = toArrayBuffer(buf);
+
+    const extractor = await createExtractorFromData({ data: ab });
+    const { files } = extractor.extract({ files: (h) => h.name.toLowerCase() === 'comicinfo.xml' });
+
+    let xmlBuf: Buffer | undefined;
+    for (const file of files) {
+      if (!file.fileHeader.flags.directory && file.extraction) xmlBuf = Buffer.from(file.extraction);
+    }
+
+    return xmlBuf ? parseComicInfoXml(xmlBuf) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Extract ComicInfo.xml metadata from a CB7 (7-Zip) file. */
+export async function extractCb7Metadata(absolutePath: string): Promise<ParsedCbzMetadata | null> {
+  try {
+    const sz = await getSevenZip();
+    const buf = await readFile(absolutePath);
+
+    const id = `meta_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const archPath = `/${id}`;
+    const outDir = `/${id}_out`;
+
+    const fd = sz.FS.open(archPath, 'w+');
+    sz.FS.write(fd, buf, 0, buf.length);
+    sz.FS.close(fd);
+
+    try {
+      sz.FS.mkdir(outDir);
+    } catch {
+      // already exists
+    }
+
+    // Extract only ComicInfo.xml — avoids decompressing the whole solid block.
+    sz.callMain(['e', archPath, `-o${outDir}`, 'ComicInfo.xml', '-y']);
+
+    let result: ParsedCbzMetadata | null = null;
+    try {
+      const xmlData = sz.FS.readFile(`${outDir}/ComicInfo.xml`);
+      result = parseComicInfoXml(Buffer.from(xmlData));
+    } catch {
+      // ComicInfo.xml not present — that's fine
+    }
+
+    // Clean up WASM VFS.
+    try {
+      for (const f of sz.FS.readdir(outDir).filter((f) => f !== '.' && f !== '..')) {
+        sz.FS.unlink(`${outDir}/${f}`);
+      }
+      sz.FS.rmdir(outDir);
+      sz.FS.unlink(archPath);
+    } catch {
+      // best-effort
+    }
+
+    return result;
   } catch {
     return null;
   }
