@@ -13,7 +13,7 @@ import type { PageDim } from '../composables/usePdf'
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
 
-const { pdfDoc, totalPages, loading, error, load, getAllPageDims, renderPage, getTextContent } = usePdf()
+const { pdfDoc, totalPages, loading, error, load, getPageDim, renderPage, getTextContent } = usePdf()
 const progress = useReaderProgress(props.bookId, props.fileId)
 const { headerVisible, showHeader } = useVisibility()
 
@@ -51,7 +51,13 @@ const { scale, zoomMode, customScale, zoomLabel, adjustZoom, applyZoomPreset } =
 const layout = usePdfLayout(scrollRef, totalPages, effectiveDims, scale, containerH, spread)
 const { scrollMode, currentPage, pageInput, pageRows, rowHeights, goToPage, onScroll } = layout
 
-const renderer = usePdfRenderer(renderPage, getTextContent, scale, rotation, totalPages)
+function onDimUpdate(pageNum: number, dim: PageDim) {
+  const prev = pageDims.value[pageNum - 1]
+  if (prev && prev.width === dim.width && prev.height === dim.height) return
+  pageDims.value = pageDims.value.map((d, i) => (i === pageNum - 1 ? dim : d))
+}
+
+const renderer = usePdfRenderer(renderPage, getTextContent, scale, rotation, totalPages, onDimUpdate)
 const { canvasMap, textLayerMap, invalidate, setupIO, reset, destroy } = renderer
 
 // ── Invalidation ──────────────────────────────────────────────────────────────
@@ -178,7 +184,11 @@ onMounted(async () => {
   await load(props.fileId)
   if (!pdfDoc.value) return
 
-  pageDims.value = await getAllPageDims()
+  // Load only page 1 to establish initial layout dims. All pages are seeded with
+  // page 1's size (uniform assumption). onDimUpdate corrects individual pages
+  // lazily as they are rendered — no upfront full-document traversal.
+  const firstDim = await getPageDim(1)
+  pageDims.value = Array.from({ length: totalPages.value }, () => ({ ...firstDim }))
   reset()
 
   await nextTick()

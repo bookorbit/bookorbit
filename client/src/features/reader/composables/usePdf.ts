@@ -22,11 +22,10 @@ export function usePdf() {
     loading.value = true
     error.value = null
     try {
-      // Pass URL directly so PDF.js can use HTTP range requests (206 Partial Content).
-      // This avoids downloading the entire file upfront and allows rendering to start immediately.
       const doc = await pdfjsLib.getDocument({
         url: `/api/books/files/${fileId}/serve`,
-        rangeChunkSize: 512 * 1024,
+        rangeChunkSize: 65536,
+        disableStream: true,
         disableAutoFetch: true,
       }).promise
       pdfDoc.value = doc
@@ -38,26 +37,13 @@ export function usePdf() {
     }
   }
 
-  // Fetch ALL page natural dims in parallel (capped at 10 concurrent).
-  async function getAllPageDims(): Promise<PageDim[]> {
+  async function getPageDim(pageNum: number): Promise<PageDim> {
     const doc = pdfDoc.value
-    if (!doc) return []
-    const total = doc.numPages
-    const results: PageDim[] = new Array(total)
-    const CONCURRENCY = 10
-
-    async function fetchDim(i: number) {
-      const page = await doc.getPage(i + 1)
-      const vp = page.getViewport({ scale: 1 })
-      page.cleanup()
-      results[i] = { width: vp.width, height: vp.height }
-    }
-
-    for (let start = 0; start < total; start += CONCURRENCY) {
-      const batch = Array.from({ length: Math.min(CONCURRENCY, total - start) }, (_, k) => fetchDim(start + k))
-      await Promise.all(batch)
-    }
-    return results
+    if (!doc) return { width: 595, height: 842 }
+    const page = await doc.getPage(pageNum)
+    const vp = page.getViewport({ scale: 1 })
+    page.cleanup()
+    return { width: vp.width, height: vp.height }
   }
 
   async function renderPage(pageNum: number, canvas: HTMLCanvasElement, scale: number): Promise<void> {
@@ -86,5 +72,5 @@ export function usePdf() {
     pdfDoc.value = null
   })
 
-  return { pdfDoc, totalPages, loading, error, load, getAllPageDims, renderPage, getTextContent }
+  return { pdfDoc, totalPages, loading, error, load, getPageDim, renderPage, getTextContent }
 }

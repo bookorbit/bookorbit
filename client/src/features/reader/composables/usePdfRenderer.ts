@@ -1,9 +1,11 @@
 import { nextTick, ref } from 'vue'
 import type * as pdfjsLib from 'pdfjs-dist'
 import type { ComputedRef, Ref } from 'vue'
+import type { PageDim } from './usePdf'
 
 type RenderPageFn = (pageNum: number, canvas: HTMLCanvasElement, scale: number) => Promise<void>
 type GetTextContentFn = (pageNum: number) => Promise<{ content: pdfjsLib.TextContent; viewport: pdfjsLib.PageViewport } | null>
+type OnDimUpdateFn = (pageNum: number, dim: PageDim) => void
 
 export function usePdfRenderer(
   renderPageFn: RenderPageFn,
@@ -11,6 +13,7 @@ export function usePdfRenderer(
   scale: ComputedRef<number>,
   rotation: Ref<0 | 90 | 180 | 270>,
   totalPages: Ref<number>,
+  onDimUpdate: OnDimUpdateFn,
 ) {
   const canvasMap = ref(new Map<number, HTMLCanvasElement>())
   const textLayerMap = ref(new Map<number, HTMLElement>())
@@ -35,6 +38,8 @@ export function usePdfRenderer(
       const canvas = canvasMap.value.get(pageNum)
       if (!canvas) continue
       await renderPageFn(pageNum, canvas, scale.value)
+      // Report natural dim back so layout can correct any initial estimate.
+      onDimUpdate(pageNum, { width: canvas.width / scale.value, height: canvas.height / scale.value })
       rendered.add(pageNum)
       await buildTextLayer(pageNum)
     }
