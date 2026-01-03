@@ -99,7 +99,10 @@ const findQuery = ref('')
 const findMatches = ref(0)
 
 watch(findQuery, (q) => {
-  if (!q.trim()) { findMatches.value = 0; return }
+  if (!q.trim()) {
+    findMatches.value = 0
+    return
+  }
   let count = 0
   scrollRef.value?.querySelectorAll('[data-text-layer] span').forEach((el) => {
     if (el.textContent?.toLowerCase().includes(q.toLowerCase())) count++
@@ -176,7 +179,9 @@ function onPageCommit() {
 // ── Mount / unmount ───────────────────────────────────────────────────────────
 onMounted(async () => {
   window.addEventListener('keydown', onKeyDown)
-  const onFsChange = () => { isFullscreen.value = !!document.fullscreenElement }
+  const onFsChange = () => {
+    isFullscreen.value = !!document.fullscreenElement
+  }
   document.addEventListener('fullscreenchange', onFsChange)
   onUnmounted(() => document.removeEventListener('fullscreenchange', onFsChange))
 
@@ -204,7 +209,10 @@ onMounted(async () => {
     ro.observe(scrollRef.value)
     setupIO(scrollRef.value)
   }
-  onUnmounted(() => { ro?.disconnect(); ro = null })
+  onUnmounted(() => {
+    ro?.disconnect()
+    ro = null
+  })
 
   if (progress.pageNumber.value && progress.pageNumber.value > 1) {
     await nextTick()
@@ -367,13 +375,21 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
           >
             <canvas
               class="block"
-              :ref="(el) => { if (el) canvasMap.set(pageNum, el as HTMLCanvasElement) }"
+              :ref="
+                (el) => {
+                  if (el) canvasMap.set(pageNum, el as HTMLCanvasElement)
+                }
+              "
             />
             <div
               data-text-layer
               class="absolute inset-0 overflow-hidden"
               style="pointer-events: none"
-              :ref="(el) => { if (el) textLayerMap.set(pageNum, el as HTMLElement) }"
+              :ref="
+                (el) => {
+                  if (el) textLayerMap.set(pageNum, el as HTMLElement)
+                }
+              "
             />
           </div>
         </div>
@@ -391,7 +407,14 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
     <div
       v-if="showZoomMenu"
       class="fixed w-40 rounded-lg shadow-2xl py-1 overflow-hidden"
-      :style="{ zIndex: 9999, background: 'rgba(35,38,41,0.98)', border: '1px solid rgba(255,255,255,0.1)', transform: 'translateX(-50%)', top: zoomMenuStyle.top, left: zoomMenuStyle.left }"
+      :style="{
+        zIndex: 9999,
+        background: 'rgba(35,38,41,0.98)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        transform: 'translateX(-50%)',
+        top: zoomMenuStyle.top,
+        left: zoomMenuStyle.left,
+      }"
       @click.stop
     >
       <button
@@ -412,7 +435,13 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
     <div
       v-if="showViewMenu"
       class="fixed w-44 rounded-lg shadow-2xl py-1 overflow-hidden"
-      :style="{ zIndex: 9999, background: 'rgba(35,38,41,0.98)', border: '1px solid rgba(255,255,255,0.1)', top: viewMenuStyle.top, right: viewMenuStyle.right }"
+      :style="{
+        zIndex: 9999,
+        background: 'rgba(35,38,41,0.98)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        top: viewMenuStyle.top,
+        right: viewMenuStyle.right,
+      }"
       @click.stop
     >
       <button

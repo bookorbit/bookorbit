@@ -24,6 +24,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "7zip-bin": "^5.2.0",
     "@fastify/static": "^9.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
@@ -36,6 +37,7 @@
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
     "fast-xml-parser": "^5.3.3",
+    "node-7z": "^3.0.0",
     "pdf-parse": "^2.4.5",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",

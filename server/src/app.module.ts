@@ -5,6 +5,7 @@ import { appConfig, authConfig, dbConfig, storageConfig } from './config/config'
 import { DbModule } from './db/db.module';
 import { AnnotationModule } from './modules/annotation/annotation.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CbzModule } from './modules/cbz/cbz.module';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookModule } from './modules/book/book.module';
 import { KoboModule } from './modules/kobo/kobo.module';
@@ -29,6 +30,7 @@ import { UserModule } from './modules/user/user.module';
     KoboModule,
     BookmarkModule,
     AnnotationModule,
+    CbzModule,
   ],
 })
 export class AppModule {}

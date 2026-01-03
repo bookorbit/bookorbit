@@ -42,9 +42,7 @@ export function usePdfLayout(
   // In page mode every row fills the viewport; in continuous mode rows have natural height.
   const rowHeights = computed(() => {
     if (scrollMode.value === 'page') return pageRows.value.map(() => containerH.value)
-    return pageRows.value.map((row) =>
-      Math.max(...row.map((n) => Math.round((effectiveDims.value[n - 1]?.height ?? 842) * scale.value))),
-    )
+    return pageRows.value.map((row) => Math.max(...row.map((n) => Math.round((effectiveDims.value[n - 1]?.height ?? 842) * scale.value))))
   })
 
   watch(currentPage, (v) => {

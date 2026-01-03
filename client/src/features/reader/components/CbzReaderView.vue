@@ -1,0 +1,346 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings } from 'lucide-vue-next'
+import { useVisibility } from '../composables/useVisibility'
+import { useReaderProgress } from '../composables/useReaderProgress'
+import { useCbz } from '../composables/useCbz'
+import { useCbzSettings } from '../composables/useCbzSettings'
+import CbzSettingsPanel from './CbzSettingsPanel.vue'
+
+const props = defineProps<{ bookId: number; fileId: number }>()
+const router = useRouter()
+
+const progress = useReaderProgress(props.bookId, props.fileId)
+const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter } = useVisibility()
+const { pageCount, bookTitle, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
+const { fitMode, viewMode, scrollMode, direction, bgColor, bgValue, isTwoPage, imgFitClass } = useCbzSettings()
+
+const currentPage = ref(0)
+const currentImageLoaded = ref(false)
+const showSettings = ref(false)
+const scrollContainer = ref<HTMLElement | null>(null)
+
+// ── Derived ────────────────────────────────────────────────────────────────────
+// Pages shown in paginated mode (1 or 2), in display order for RTL.
+const visiblePages = computed(() => {
+  if (!isTwoPage.value) return [currentPage.value]
+  const a = currentPage.value
+  const b = a + 1
+  if (direction.value === 'ltr') return b < pageCount.value ? [a, b] : [a]
+  return b < pageCount.value ? [b, a] : [a] // RTL: second page on left
+})
+
+// ── Preloading ─────────────────────────────────────────────────────────────────
+const preloadCache = new Map<number, HTMLImageElement>()
+
+function preload(n: number) {
+  if (n < 0 || n >= pageCount.value || preloadCache.has(n)) return
+  const img = new Image()
+  img.src = pageUrl(n)
+  preloadCache.set(n, img)
+}
+
+function schedulePreload(center: number) {
+  for (let i = center - 2; i <= center + 4; i++) preload(i)
+  for (const [k] of preloadCache) {
+    if (Math.abs(k - center) > 8) preloadCache.delete(k)
+  }
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function goToPage(n: number) {
+  const target = Math.max(0, Math.min(n, pageCount.value - 1))
+  if (target === currentPage.value) return
+  currentPage.value = target
+  currentImageLoaded.value = false
+}
+
+function nextPage() {
+  goToPage(currentPage.value + (isTwoPage.value ? 2 : 1))
+}
+
+function prevPage() {
+  goToPage(currentPage.value - (isTwoPage.value ? 2 : 1))
+}
+
+// ── Click zones (left / middle / right) ───────────────────────────────────────
+function handleImageClick(e: MouseEvent) {
+  if (showSettings.value) {
+    showSettings.value = false
+    return
+  }
+  const x = e.clientX / window.innerWidth
+  if (x < 0.25) direction.value === 'rtl' ? nextPage() : prevPage()
+  else if (x > 0.75) direction.value === 'rtl' ? prevPage() : nextPage()
+  else handleMiddleTap()
+}
+
+// ── Touch / swipe ──────────────────────────────────────────────────────────────
+let touchStartX = 0
+
+function onTouchStart(e: TouchEvent) {
+  touchStartX = e.touches[0].clientX
+}
+
+function onTouchEnd(e: TouchEvent) {
+  const dx = e.changedTouches[0].clientX - touchStartX
+  if (Math.abs(dx) < 50) return
+  if (dx < 0) direction.value === 'rtl' ? prevPage() : nextPage()
+  else direction.value === 'rtl' ? nextPage() : prevPage()
+}
+
+// ── Wheel (paginated mode only) ────────────────────────────────────────────────
+// Note: this handler is only attached on the paginated view div (v-if), so it is
+// never active during infinite/long-strip modes — no need to guard with scrollMode check.
+function onWheel(e: WheelEvent) {
+  e.preventDefault()
+  if (e.deltaY > 0) nextPage()
+  else if (e.deltaY < 0) prevPage()
+}
+
+// ── Keyboard ───────────────────────────────────────────────────────────────────
+function onKeyDown(e: KeyboardEvent) {
+  if ((e.target as HTMLElement).tagName === 'INPUT') return
+  const isRtl = direction.value === 'rtl'
+  switch (e.key) {
+    case 'ArrowRight':
+    case 'PageDown':
+      e.preventDefault()
+      isRtl ? prevPage() : nextPage()
+      break
+    case 'ArrowLeft':
+    case 'PageUp':
+      e.preventDefault()
+      isRtl ? nextPage() : prevPage()
+      break
+    case ' ':
+      e.preventDefault()
+      e.shiftKey ? prevPage() : nextPage()
+      break
+    case 'Home':
+      goToPage(0)
+      break
+    case 'End':
+      goToPage(pageCount.value - 1)
+      break
+    case 'Escape':
+      showSettings.value = false
+      break
+  }
+}
+
+// ── Infinite scroll page tracking ─────────────────────────────────────────────
+let io: IntersectionObserver | null = null
+
+function setupScrollObserver() {
+  io?.disconnect()
+  if (!scrollContainer.value) return
+  io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          currentPage.value = parseInt((entry.target as HTMLElement).dataset.page ?? '0')
+        }
+      }
+    },
+    { root: scrollContainer.value, threshold: 0.5 },
+  )
+  nextTick(() => {
+    scrollContainer.value?.querySelectorAll('[data-page]').forEach((el) => io!.observe(el))
+  })
+}
+
+watch(scrollMode, async (mode) => {
+  if (mode !== 'paginated') {
+    await nextTick()
+    setupScrollObserver()
+    scrollContainer.value?.querySelector(`[data-page="${currentPage.value}"]`)?.scrollIntoView()
+  } else {
+    io?.disconnect()
+  }
+})
+
+// ── Slider ticks (max 20, evenly spaced) ──────────────────────────────────────
+const sliderTicks = computed(() => {
+  const max = pageCount.value - 1
+  if (max <= 0) return []
+  const count = Math.min(20, max)
+  const ticks = new Set<number>()
+  for (let i = 0; i <= count; i++) ticks.add(Math.round((i / count) * max))
+  return [...ticks]
+})
+
+// ── Progress save ──────────────────────────────────────────────────────────────
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(currentPage, (page) => {
+  schedulePreload(page)
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    progress.pageNumber.value = page + 1
+    progress.percentage.value = pageCount.value ? ((page + 1) / pageCount.value) * 100 : 0
+    progress.save()
+  }, 2000)
+})
+
+// ── Mount / unmount ────────────────────────────────────────────────────────────
+onMounted(async () => {
+  window.addEventListener('keydown', onKeyDown)
+  await progress.load()
+  await load()
+  const saved = progress.pageNumber.value
+  if (saved && saved > 1) currentPage.value = Math.min(saved - 1, pageCount.value - 1)
+  schedulePreload(currentPage.value)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown)
+  io?.disconnect()
+  if (saveTimer) clearTimeout(saveTimer)
+})
+</script>
+
+<template>
+  <div class="fixed inset-0 select-none overflow-hidden" :style="{ background: bgValue }">
+    <!-- ── Header ──────────────────────────────────────────────────────────── -->
+    <div
+      class="absolute top-0 inset-x-0 z-50 transition-all duration-300"
+      :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
+    >
+      <div class="h-12 flex items-center gap-2 px-3" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px)">
+        <button class="cbz-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
+        <div class="flex-1 min-w-0 flex flex-col justify-center">
+          <span v-if="bookTitle" class="text-sm text-white/90 truncate leading-tight">{{ bookTitle }}</span>
+          <span class="text-xs text-white/40 tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
+        </div>
+        <button class="cbz-btn" :class="showSettings ? 'bg-white/20 text-white' : ''" @click="showSettings = !showSettings">
+          <Settings :size="15" />
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Paginated view ──────────────────────────────────────────────────── -->
+    <div
+      v-if="scrollMode === 'paginated'"
+      class="absolute inset-0 flex items-center justify-center overflow-hidden"
+      @click="handleImageClick"
+      @touchstart.passive="onTouchStart"
+      @touchend.passive="onTouchEnd"
+      @wheel.prevent="onWheel"
+    >
+      <div v-if="!currentImageLoaded && !error" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+        <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
+      </div>
+
+      <div
+        class="flex items-center justify-center h-full w-full"
+        :class="isTwoPage ? 'gap-0.5' : ''"
+        :style="isTwoPage && direction === 'rtl' ? { flexDirection: 'row-reverse' } : {}"
+      >
+        <img
+          v-for="pg in visiblePages"
+          :key="pg"
+          :src="pageUrl(pg)"
+          :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+          :style="isTwoPage ? { maxWidth: '50%', maxHeight: '100%' } : {}"
+          draggable="false"
+          @load="currentImageLoaded = true"
+        />
+      </div>
+    </div>
+
+    <!-- ── Infinite / long-strip view ─────────────────────────────────────── -->
+    <div
+      v-else
+      ref="scrollContainer"
+      class="absolute inset-0 overflow-y-auto overflow-x-hidden"
+      :class="scrollMode === 'long-strip' ? '' : 'flex flex-col items-center'"
+    >
+      <div :class="scrollMode === 'long-strip' ? '' : 'flex flex-col items-center w-full gap-2 py-4 px-2'">
+        <img
+          v-for="i in pageCount"
+          :key="i - 1"
+          :data-page="i - 1"
+          :src="pageUrl(i - 1)"
+          :class="scrollMode === 'long-strip' ? 'w-full block' : 'max-w-full'"
+          loading="lazy"
+          draggable="false"
+        />
+      </div>
+    </div>
+
+    <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+    <div
+      class="absolute bottom-0 inset-x-0 z-50 transition-all duration-300"
+      :class="footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'"
+    >
+      <div class="h-16 flex items-center gap-3 px-4" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px)">
+        <button class="cbz-btn" title="First page" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
+        <button class="cbz-btn" :disabled="currentPage === 0" @click="prevPage"><ChevronLeft :size="16" /></button>
+
+        <div class="flex-1 flex flex-col justify-center gap-0.5">
+          <input
+            type="range"
+            :min="0"
+            :max="Math.max(0, pageCount - 1)"
+            :value="currentPage"
+            list="cbz-ticks"
+            class="flex-1 w-full accent-blue-400 cursor-pointer"
+            @input="goToPage(Number(($event.target as HTMLInputElement).value))"
+          />
+          <datalist id="cbz-ticks">
+            <option v-for="t in sliderTicks" :key="t" :value="t" />
+          </datalist>
+        </div>
+
+        <button class="cbz-btn" :disabled="currentPage >= pageCount - 1" @click="nextPage"><ChevronRight :size="16" /></button>
+        <button class="cbz-btn" title="Last page" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
+      </div>
+    </div>
+
+    <!-- Hover zones to reveal header / footer -->
+    <div class="absolute top-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showHeader()" />
+    <div class="absolute bottom-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showFooter()" />
+
+    <!-- ── Loading / error overlays ─────────────────────────────────────────── -->
+    <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-50">
+      <div class="flex flex-col items-center gap-3">
+        <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
+        <p class="text-sm text-white/50">Loading…</p>
+      </div>
+    </div>
+
+    <div v-if="error" class="absolute inset-0 flex items-center justify-center z-50 p-8 text-center">
+      <p class="text-sm text-white/70">{{ error }}</p>
+    </div>
+
+    <!-- ── Settings panel ────────────────────────────────────────────────────── -->
+    <CbzSettingsPanel
+      v-if="showSettings"
+      :fitMode="fitMode"
+      :viewMode="viewMode"
+      :scrollMode="scrollMode"
+      :direction="direction"
+      :bgColor="bgColor"
+      @close="showSettings = false"
+      @update:fitMode="fitMode = $event"
+      @update:viewMode="viewMode = $event"
+      @update:scrollMode="scrollMode = $event"
+      @update:direction="direction = $event"
+      @update:bgColor="bgColor = $event"
+    />
+
+    <!-- Progress bar -->
+    <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 z-30">
+      <div class="h-full bg-blue-400/60 transition-all duration-300" :style="{ width: `${((currentPage + 1) / pageCount) * 100}%` }" />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+@reference "tailwindcss";
+.cbz-btn {
+  @apply flex items-center justify-center w-8 h-8 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
+}
+</style>

@@ -18,6 +18,7 @@ import SelectionPopup from './components/SelectionPopup.vue'
 import ReaderSearchPanel from './components/ReaderSearchPanel.vue'
 import NoteDialog from './components/NoteDialog.vue'
 import PdfReaderView from './components/PdfReaderView.vue'
+import CbzReaderView from './components/CbzReaderView.vue'
 import type { ReaderState } from './composables/useReaderState'
 import type { FoliateRenderer } from './composables/useFoliate'
 
@@ -221,6 +222,7 @@ function navigateSearch(cfiTarget: string) {
 
 <template>
   <PdfReaderView v-if="fileFormat === 'pdf'" :bookId="bookId" :fileId="fileId" />
+  <CbzReaderView v-else-if="fileFormat === 'cbz' || fileFormat === 'cbr'" :bookId="bookId" :fileId="fileId" />
   <div
     v-else
     class="fixed inset-0 overflow-hidden"
