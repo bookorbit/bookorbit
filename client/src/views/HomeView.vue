@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBooks } from '@/features/book/composables/useBooks'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -44,6 +45,7 @@ watch(search, () => {
 </script>
 
 <template>
+  <SettingsDrawer />
   <SidebarProvider>
     <AppSidebar />
 

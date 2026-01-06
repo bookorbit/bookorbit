@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Library, BookMarked, Clock, BookOpen } from 'lucide-vue-next'
+import { Library, BookMarked, Clock, BookOpen, Settings } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -12,6 +13,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
+
+const { open: openSettings } = useSettingsDrawer()
 
 const navItems = [
   { id: 'library', label: 'All Books', icon: Library, active: true },
@@ -75,6 +79,17 @@ const navItems = [
         </SidebarGroupContent>
       </SidebarGroup>
     </SidebarContent>
+
+    <SidebarFooter class="border-t border-sidebar-border">
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton tooltip="Settings" class="gap-2.5" @click="openSettings">
+            <Settings :size="15" class="text-sidebar-foreground/50" />
+            <span class="text-sidebar-foreground/70">Settings</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarFooter>
 
     <SidebarRail />
   </Sidebar>
