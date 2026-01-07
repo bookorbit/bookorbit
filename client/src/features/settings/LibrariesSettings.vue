@@ -37,7 +37,7 @@ async function scanAll() {
 </script>
 
 <template>
-  <div class="px-10 py-8 max-w-3xl">
+  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl">
     <!-- Header -->
     <div class="flex items-start justify-between mb-8">
       <div>

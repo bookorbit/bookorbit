@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch } from 'vue'
-import { X, Library, ScanLine, Paintbrush, BookOpen, FileText, BookImage, Info, ChevronLeft } from 'lucide-vue-next'
+import { X, ChevronLeft, ChevronRight, Library, ScanLine, Paintbrush, BookOpen, FileText, BookImage, Info } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import LibrariesSettings from './LibrariesSettings.vue'
 import ScannerSettings from './ScannerSettings.vue'
@@ -39,22 +39,32 @@ const navGroups = [
 
 const allItems = navGroups.flatMap((g) => g.items)
 const activeId = ref<SectionId>('libraries')
+const activeLabel = ref('Libraries')
 const ActiveComponent = shallowRef(LibrariesSettings)
+const mobileView = ref<'nav' | 'content'>('nav')
 
 function navigate(id: SectionId) {
+  const item = allItems.find((i) => i.id === id)!
   activeId.value = id
-  ActiveComponent.value = allItems.find((i) => i.id === id)!.component
+  activeLabel.value = item.label
+  ActiveComponent.value = item.component
+  mobileView.value = 'content'
 }
 
 watch(isOpen, (v) => {
-  if (v) navigate('libraries')
+  if (v) {
+    activeId.value = 'libraries'
+    activeLabel.value = 'Libraries'
+    ActiveComponent.value = LibrariesSettings
+    mobileView.value = 'nav'
+  }
 })
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="drawer-fade">
-      <div v-if="isOpen" class="fixed inset-0 z-50 flex justify-end" @click.self="close">
+      <div v-if="isOpen" class="fixed inset-0 z-50 flex justify-end">
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" @click="close" />
 
@@ -62,11 +72,65 @@ watch(isOpen, (v) => {
         <Transition name="drawer-slide">
           <div
             v-if="isOpen"
-            class="relative flex h-full w-full max-w-[900px] shadow-2xl overflow-hidden"
+            class="relative flex h-full w-full md:max-w-[900px] shadow-2xl overflow-hidden bg-background"
             style="border-left: 1px solid var(--border)"
           >
-            <!-- Left nav -->
-            <nav class="flex flex-col w-52 shrink-0 bg-muted/40 border-r border-border h-full">
+            <!-- ── MOBILE: Nav list ─────────────────────────── -->
+            <Transition name="mobile-nav">
+              <div v-if="mobileView === 'nav'" class="md:hidden absolute inset-0 flex flex-col bg-background z-10">
+                <div class="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
+                  <span class="text-base font-semibold text-foreground font-serif">Settings</span>
+                  <button
+                    class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    @click="close"
+                  >
+                    <X :size="16" />
+                  </button>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                  <div v-for="group in navGroups" :key="group.label" class="mt-6 mb-1">
+                    <p class="px-4 pb-1 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                      {{ group.label }}
+                    </p>
+                    <button
+                      v-for="item in group.items"
+                      :key="item.id"
+                      class="w-full flex items-center gap-3 px-4 py-3.5 border-b border-border/60 hover:bg-muted/50 active:bg-muted transition-colors"
+                      @click="navigate(item.id)"
+                    >
+                      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 shrink-0">
+                        <component :is="item.icon" :size="15" class="text-primary" />
+                      </div>
+                      <span class="flex-1 text-sm font-medium text-foreground text-left">{{ item.label }}</span>
+                      <ChevronRight :size="15" class="text-muted-foreground/40" />
+                    </button>
+                  </div>
+                  <p class="px-4 py-6 text-[11px] text-muted-foreground/40">projectx · v0.1.0</p>
+                </div>
+              </div>
+            </Transition>
+
+            <!-- ── MOBILE: Content view ─────────────────────── -->
+            <Transition name="mobile-content">
+              <div v-if="mobileView === 'content'" class="md:hidden absolute inset-0 flex flex-col bg-background z-10">
+                <div class="flex items-center gap-1 px-2 h-14 border-b border-border shrink-0">
+                  <button
+                    class="flex items-center gap-1 px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    @click="mobileView = 'nav'"
+                  >
+                    <ChevronLeft :size="18" />
+                    <span class="text-sm">Settings</span>
+                  </button>
+                  <span class="flex-1 text-sm font-medium text-foreground text-center pr-16">{{ activeLabel }}</span>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                  <component :is="ActiveComponent" />
+                </div>
+              </div>
+            </Transition>
+
+            <!-- ── DESKTOP: Two-column ─────────────────────── -->
+            <nav class="hidden md:flex flex-col w-52 shrink-0 bg-muted/40 border-r border-border h-full">
               <div class="px-4 pt-5 pb-4 border-b border-border flex items-center justify-between">
                 <span class="text-sm font-semibold text-foreground font-serif">Settings</span>
                 <button
@@ -76,7 +140,6 @@ watch(isOpen, (v) => {
                   <X :size="14" />
                 </button>
               </div>
-
               <div class="flex-1 overflow-y-auto py-3 px-2">
                 <div v-for="group in navGroups" :key="group.label" class="mb-4">
                   <p class="px-2 mb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
@@ -99,14 +162,12 @@ watch(isOpen, (v) => {
                   </button>
                 </div>
               </div>
-
               <div class="px-4 py-3 border-t border-border">
                 <p class="text-[10px] text-muted-foreground/40">projectx · v0.1.0</p>
               </div>
             </nav>
 
-            <!-- Content -->
-            <main class="flex-1 overflow-y-auto bg-background">
+            <main class="hidden md:block flex-1 overflow-y-auto">
               <component :is="ActiveComponent" />
             </main>
           </div>
@@ -133,5 +194,29 @@ watch(isOpen, (v) => {
 .drawer-slide-enter-from,
 .drawer-slide-leave-to {
   transform: translateX(100%);
+}
+
+/* Mobile nav → content: nav slides left, content enters from right */
+.mobile-nav-leave-active,
+.mobile-content-enter-active {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mobile-nav-leave-to {
+  transform: translateX(-30%);
+}
+.mobile-content-enter-from {
+  transform: translateX(100%);
+}
+
+/* Mobile content → nav: content slides right, nav enters from left */
+.mobile-content-leave-active,
+.mobile-nav-enter-active {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mobile-content-leave-to {
+  transform: translateX(100%);
+}
+.mobile-nav-enter-from {
+  transform: translateX(-30%);
 }
 </style>

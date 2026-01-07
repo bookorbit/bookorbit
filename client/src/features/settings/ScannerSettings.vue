@@ -18,7 +18,7 @@ const fileTypes = ref([
 </script>
 
 <template>
-  <div class="px-10 py-8 max-w-3xl">
+  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl">
     <div class="mb-8">
       <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Scanner</h2>
       <p class="mt-1 text-sm text-muted-foreground">Configure when and how your libraries are scanned for new content.</p>
