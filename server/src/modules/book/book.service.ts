@@ -74,12 +74,12 @@ export class BookService {
     return { path: file.absolutePath, size, format: file.format ?? 'unknown' };
   }
 
-  async getProgress(fileId: number) {
-    return this.bookRepo.findProgress(fileId);
+  async getProgress(userId: number, fileId: number) {
+    return this.bookRepo.findProgress(userId, fileId);
   }
 
-  async saveProgress(fileId: number, cfi: string | null | undefined, pageNumber: number | null | undefined, percentage: number) {
-    await this.bookRepo.upsertProgress(fileId, cfi ?? null, pageNumber ?? null, percentage);
+  async saveProgress(userId: number, fileId: number, cfi: string | null | undefined, pageNumber: number | null | undefined, percentage: number) {
+    await this.bookRepo.upsertProgress(userId, fileId, cfi ?? null, pageNumber ?? null, percentage);
   }
 
   async getDetail(id: number): Promise<BookDetailDto> {

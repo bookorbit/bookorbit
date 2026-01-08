@@ -15,7 +15,8 @@ export class AnnotationController {
 
   @Post()
   createAnnotation(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateAnnotationDto) {
-    return this.annotationService.createAnnotation(bookId, dto);
+    // TODO: replace with real userId from auth guard once auth is wired up
+    return this.annotationService.createAnnotation(1, bookId, dto);
   }
 
   @Patch(':annotationId')

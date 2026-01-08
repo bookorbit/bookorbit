@@ -11,8 +11,8 @@ export class BookmarkService {
     return this.bookmarkRepo.findByBookId(bookId);
   }
 
-  async createBookmark(bookId: number, dto: CreateBookmarkDto) {
-    return this.bookmarkRepo.create(bookId, dto.cfi, dto.title);
+  async createBookmark(userId: number, bookId: number, dto: CreateBookmarkDto) {
+    return this.bookmarkRepo.create(userId, bookId, dto.cfi, dto.title);
   }
 
   async deleteBookmark(bookId: number, bookmarkId: number) {

@@ -14,7 +14,8 @@ export class BookmarkController {
 
   @Post()
   createBookmark(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateBookmarkDto) {
-    return this.bookmarkService.createBookmark(bookId, dto);
+    // TODO: replace with real userId from auth guard once auth is wired up
+    return this.bookmarkService.createBookmark(1, bookId, dto);
   }
 
   @Delete(':bookmarkId')

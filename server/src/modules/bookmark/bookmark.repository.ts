@@ -16,8 +16,8 @@ export class BookmarkRepository {
     return this.db.select().from(bookmarks).where(eq(bookmarks.bookId, bookId));
   }
 
-  async create(bookId: number, cfi: string, title: string) {
-    const [row] = await this.db.insert(bookmarks).values({ bookId, cfi, title }).returning();
+  async create(userId: number, bookId: number, cfi: string, title: string) {
+    const [row] = await this.db.insert(bookmarks).values({ userId, bookId, cfi, title }).returning();
     return row;
   }
 

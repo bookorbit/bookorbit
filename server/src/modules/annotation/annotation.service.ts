@@ -12,8 +12,9 @@ export class AnnotationService {
     return this.annotationRepo.findByBookId(bookId);
   }
 
-  async createAnnotation(bookId: number, dto: CreateAnnotationDto) {
+  async createAnnotation(userId: number, bookId: number, dto: CreateAnnotationDto) {
     return this.annotationRepo.create({
+      userId,
       bookId,
       cfi: dto.cfi,
       text: dto.text,

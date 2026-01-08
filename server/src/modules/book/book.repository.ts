@@ -98,17 +98,21 @@ export class BookRepository {
     return file ?? null;
   }
 
-  async findProgress(fileId: number) {
-    const [row] = await this.db.select().from(readingProgress).where(eq(readingProgress.bookFileId, fileId)).limit(1);
+  async findProgress(userId: number, fileId: number) {
+    const [row] = await this.db
+      .select()
+      .from(readingProgress)
+      .where(and(eq(readingProgress.bookFileId, fileId), eq(readingProgress.userId, userId)))
+      .limit(1);
     return row ?? null;
   }
 
-  async upsertProgress(fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {
+  async upsertProgress(userId: number, fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {
     await this.db
       .insert(readingProgress)
-      .values({ bookFileId: fileId, cfi, pageNumber, percentage })
+      .values({ userId, bookFileId: fileId, cfi, pageNumber, percentage })
       .onConflictDoUpdate({
-        target: readingProgress.bookFileId,
+        target: [readingProgress.bookFileId, readingProgress.userId],
         set: { cfi, pageNumber, percentage, updatedAt: sql`now()` },
       });
   }

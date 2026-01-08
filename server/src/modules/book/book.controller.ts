@@ -68,12 +68,14 @@ export class BookController {
 
   @Get('files/:fileId/progress')
   async getFileProgress(@Param('fileId', ParseIntPipe) fileId: number) {
-    return (await this.bookService.getProgress(fileId)) ?? { cfi: null, pageNumber: null, percentage: 0 };
+    // TODO: replace with real userId from auth guard once auth is wired up
+    return (await this.bookService.getProgress(1, fileId)) ?? { cfi: null, pageNumber: null, percentage: 0 };
   }
 
   @Post('files/:fileId/progress')
   async saveFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @Body() dto: SaveProgressDto) {
-    await this.bookService.saveProgress(fileId, dto.cfi, dto.pageNumber, dto.percentage);
+    // TODO: replace with real userId from auth guard once auth is wired up
+    await this.bookService.saveProgress(1, fileId, dto.cfi, dto.pageNumber, dto.percentage);
   }
 
   @Get(':id')

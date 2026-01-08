@@ -1,3 +1,4 @@
+export * from './auth';
 export * from './libraries';
 export * from './books';
 export * from './metadata';

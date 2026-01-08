@@ -12,7 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate --name",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "scan:test": "ts-node -r tsconfig-paths/register src/scripts/scan-test.ts",

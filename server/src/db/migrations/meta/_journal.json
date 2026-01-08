@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1767889071823,
+      "when": 1767927442636,
       "tag": "0000_init_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1767889071823,
-      "tag": "0001_lethal_pixie",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1767889071823,
-      "tag": "0002_powerful_thundra",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1767889071823,
-      "tag": "0003_reading_progress_by_file",
       "breakpoints": true
     }
   ]
