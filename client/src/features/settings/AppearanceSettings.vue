@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ACCENT_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
+import { ACCENT_OPTIONS, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Moon, Sun } from 'lucide-vue-next'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
@@ -95,6 +95,40 @@ const { coverSize, gridGap } = useDisplaySettings()
     <!-- Library view -->
     <div>
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Library View</p>
+
+      <!-- Background pattern -->
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4">
+        <div class="px-5 py-4 bg-card">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <p class="text-sm font-medium text-foreground">Background pattern</p>
+              <p class="text-xs text-muted-foreground mt-0.5">Pattern shown behind the book grid</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 flex-wrap">
+            <button
+              v-for="opt in BACKGROUND_OPTIONS"
+              :key="opt.id"
+              :title="opt.label"
+              type="button"
+              class="flex flex-col items-center gap-1.5 cursor-pointer"
+              @click="themeStore.setBackground(opt.id)"
+            >
+              <div
+                class="w-14 h-10 rounded-md overflow-hidden transition-all ring-2"
+                :class="themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'"
+              >
+                <div class="w-full h-full bg-background" :class="opt.cssClass" />
+              </div>
+              <span
+                class="text-[10px] font-medium transition-colors"
+                :class="themeStore.background === opt.id ? 'text-primary' : 'text-muted-foreground'"
+                >{{ opt.label }}</span
+              >
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Cover size -->
         <div class="px-5 py-4 bg-card">

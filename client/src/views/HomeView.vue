@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
@@ -7,7 +7,10 @@ import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBooks } from '@/features/book/composables/useBooks'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 
+const themeStore = useThemeStore()
+const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const libraryId = ref<number | null>(null)
 
@@ -60,7 +63,7 @@ watch(search, () => {
         v-model:viewMode="viewMode"
       />
 
-      <main class="flex-1 overflow-y-auto px-4 py-4 dot-grid">
+      <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
         <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
         <!-- Grid view -->
