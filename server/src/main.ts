@@ -20,6 +20,21 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
+  await app.register(require('@fastify/cookie'));
+
+  // Global IP-based rate limit; tighten per-route as needed
+  await app.register(require('@fastify/rate-limit'), {
+    max: 100,
+    timeWindow: '1 minute',
+  });
+
+  if (process.env.NODE_ENV !== 'production') {
+    app.enableCors({
+      origin: process.env.CLIENT_URL ?? 'http://localhost:5173',
+      credentials: true,
+    });
+  }
+
   if (process.env.NODE_ENV === 'production') {
     await app.register(require('@fastify/static'), {
       root: join(__dirname, '..', 'public'),

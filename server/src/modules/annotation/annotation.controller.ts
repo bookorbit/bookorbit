@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../common/types/request-user';
 import { AnnotationService } from './annotation.service';
 import { CreateAnnotationDto } from './dto/create-annotation.dto';
 import { UpdateAnnotationDto } from './dto/update-annotation.dto';
@@ -9,14 +11,13 @@ export class AnnotationController {
   constructor(private readonly annotationService: AnnotationService) {}
 
   @Get()
-  getAnnotations(@Param('bookId', ParseIntPipe) bookId: number) {
-    return this.annotationService.getAnnotations(bookId);
+  getAnnotations(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
+    return this.annotationService.getAnnotations(bookId, user.id);
   }
 
   @Post()
-  createAnnotation(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateAnnotationDto) {
-    // TODO: replace with real userId from auth guard once auth is wired up
-    return this.annotationService.createAnnotation(1, bookId, dto);
+  createAnnotation(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateAnnotationDto, @CurrentUser() user: RequestUser) {
+    return this.annotationService.createAnnotation(user.id, bookId, dto);
   }
 
   @Patch(':annotationId')
@@ -24,13 +25,18 @@ export class AnnotationController {
     @Param('bookId', ParseIntPipe) bookId: number,
     @Param('annotationId', ParseIntPipe) annotationId: number,
     @Body() dto: UpdateAnnotationDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.annotationService.updateAnnotation(bookId, annotationId, dto);
+    return this.annotationService.updateAnnotation(bookId, annotationId, user.id, dto);
   }
 
   @Delete(':annotationId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteAnnotation(@Param('bookId', ParseIntPipe) bookId: number, @Param('annotationId', ParseIntPipe) annotationId: number) {
-    await this.annotationService.deleteAnnotation(bookId, annotationId);
+  async deleteAnnotation(
+    @Param('bookId', ParseIntPipe) bookId: number,
+    @Param('annotationId', ParseIntPipe) annotationId: number,
+    @CurrentUser() user: RequestUser,
+  ) {
+    await this.annotationService.deleteAnnotation(bookId, annotationId, user.id);
   }
 }

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { api } from '@/lib/api'
+import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
@@ -15,7 +17,7 @@ const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const libraryId = ref<number | null>(null)
 
 async function loadLibrary() {
-  const res = await fetch('/api/libraries')
+  const res = await api('/api/libraries')
   if (!res.ok) return
   const libs: { id: number }[] = await res.json()
   if (libs.length > 0) libraryId.value = libs[0]!.id
@@ -82,9 +84,9 @@ watch(search, () => {
             :key="book.id"
             class="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
           >
-            <img :src="`/api/books/${book.id}/cover`" class="h-12 w-9 object-cover rounded shrink-0 bg-muted" :alt="book.title ?? ''" />
+            <BookCoverImage :book-id="book.id" type="cover" class="h-12 w-9 object-cover rounded shrink-0 bg-muted" :alt="book.title ?? ''" />
             <div class="flex flex-col min-w-0">
-              <span class="text-sm font-medium text-foreground truncate">{{ book.title ?? '—' }}</span>
+              <span class="text-sm font-medium text-foreground truncate">{{ book.title ?? '-' }}</span>
               <span v-if="book.authors.length" class="text-xs text-muted-foreground truncate">{{ book.authors.join(', ') }}</span>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { ref, computed, type Ref } from 'vue'
+import { api } from '@/lib/api'
 
 export interface BookFile {
   id: number
@@ -62,7 +63,7 @@ export function useBooks(libraryId: Ref<number | null>) {
       })
       if (search.value.trim()) params.set('search', search.value.trim())
 
-      const res = await fetch(`/api/books?${params}`)
+      const res = await api(`/api/books?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: BooksPage = await res.json()

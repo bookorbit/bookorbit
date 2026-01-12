@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post } from '@nestjs/common';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../common/types/request-user';
 import { BookmarkService } from './bookmark.service';
 import { CreateBookmarkDto } from './dto/create-bookmark.dto';
 
@@ -8,19 +10,22 @@ export class BookmarkController {
   constructor(private readonly bookmarkService: BookmarkService) {}
 
   @Get()
-  getBookmarks(@Param('bookId', ParseIntPipe) bookId: number) {
-    return this.bookmarkService.getBookmarks(bookId);
+  getBookmarks(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
+    return this.bookmarkService.getBookmarks(bookId, user.id);
   }
 
   @Post()
-  createBookmark(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateBookmarkDto) {
-    // TODO: replace with real userId from auth guard once auth is wired up
-    return this.bookmarkService.createBookmark(1, bookId, dto);
+  createBookmark(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateBookmarkDto, @CurrentUser() user: RequestUser) {
+    return this.bookmarkService.createBookmark(user.id, bookId, dto);
   }
 
   @Delete(':bookmarkId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteBookmark(@Param('bookId', ParseIntPipe) bookId: number, @Param('bookmarkId', ParseIntPipe) bookmarkId: number) {
-    await this.bookmarkService.deleteBookmark(bookId, bookmarkId);
+  async deleteBookmark(
+    @Param('bookId', ParseIntPipe) bookId: number,
+    @Param('bookmarkId', ParseIntPipe) bookmarkId: number,
+    @CurrentUser() user: RequestUser,
+  ) {
+    await this.bookmarkService.deleteBookmark(bookId, bookmarkId, user.id);
   }
 }

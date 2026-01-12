@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { api } from '@/lib/api'
 import type { FoliateRenderer, RelocateDetail } from './useFoliate'
 
 export function useReaderProgress(bookId: number, fileId: number) {
@@ -13,7 +14,7 @@ export function useReaderProgress(bookId: number, fileId: number) {
   let saveTimer: ReturnType<typeof setTimeout> | null = null
 
   async function load() {
-    const res = await fetch(`/api/books/files/${fileId}/progress`)
+    const res = await api(`/api/books/files/${fileId}/progress`)
     if (!res.ok) return
     const data = await res.json()
     cfi.value = data.cfi ?? null
@@ -34,7 +35,7 @@ export function useReaderProgress(bookId: number, fileId: number) {
   }
 
   async function save() {
-    await fetch(`/api/books/files/${fileId}/progress`, {
+    await api(`/api/books/files/${fileId}/progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cfi: cfi.value, pageNumber: pageNumber.value, percentage: percentage.value }),

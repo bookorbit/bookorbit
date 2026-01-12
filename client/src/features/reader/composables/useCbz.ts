@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { api } from '@/lib/api'
 
 export function useCbz(fileId: number, bookId: number) {
   const pageCount = ref(0)
@@ -11,7 +12,7 @@ export function useCbz(fileId: number, bookId: number) {
   }
 
   async function load(): Promise<void> {
-    const [pagesRes, bookRes] = await Promise.all([fetch(`/api/cbz/files/${fileId}/pages`), fetch(`/api/books/${bookId}`)])
+    const [pagesRes, bookRes] = await Promise.all([api(`/api/cbz/files/${fileId}/pages`), api(`/api/books/${bookId}`)])
     if (!pagesRes.ok) {
       error.value = 'Failed to load comic'
       loading.value = false

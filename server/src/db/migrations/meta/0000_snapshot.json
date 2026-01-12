@@ -1,5 +1,5 @@
 {
-  "id": "f65aa508-f4aa-4dc3-bd34-e2a1d8ac3a61",
+  "id": "746052d2-4cc0-4eb3-83bc-4c488e8c6506",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -159,6 +159,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_system": {
+          "name": "is_system",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -567,6 +574,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "token_version": {
+          "name": "token_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         },
         "settings": {
           "name": "settings",

@@ -11,7 +11,7 @@ const stack = [
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl">
+  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
       <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">About</h2>
       <p class="mt-1 text-sm text-muted-foreground">Information about this application.</p>
@@ -25,7 +25,7 @@ const stack = [
         </div>
         <div>
           <p class="text-base font-semibold text-foreground font-serif">projectx</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Version 0.1.0 — early development</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Version 0.1.0 (early development)</p>
           <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-lg">
             A self-hosted book and library management application with support for EPUB, PDF, and comic formats.
           </p>

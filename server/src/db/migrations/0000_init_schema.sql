@@ -21,6 +21,7 @@ CREATE TABLE "permissions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(100) NOT NULL,
 	"description" text,
+	"is_system" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "permissions_name_unique" UNIQUE("name")
 );
@@ -72,6 +73,7 @@ CREATE TABLE "users" (
 	"password_hash" varchar(255) NOT NULL,
 	"active" boolean DEFAULT true NOT NULL,
 	"is_default_password" boolean DEFAULT false NOT NULL,
+	"token_version" integer DEFAULT 1 NOT NULL,
 	"settings" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,

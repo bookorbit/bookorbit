@@ -8,8 +8,8 @@ import { UpdateAnnotationDto } from './dto/update-annotation.dto';
 export class AnnotationService {
   constructor(private readonly annotationRepo: AnnotationRepository) {}
 
-  async getAnnotations(bookId: number) {
-    return this.annotationRepo.findByBookId(bookId);
+  async getAnnotations(bookId: number, userId: number) {
+    return this.annotationRepo.findByBookId(bookId, userId);
   }
 
   async createAnnotation(userId: number, bookId: number, dto: CreateAnnotationDto) {
@@ -25,8 +25,8 @@ export class AnnotationService {
     });
   }
 
-  async updateAnnotation(bookId: number, annotationId: number, dto: UpdateAnnotationDto) {
-    const row = await this.annotationRepo.update(bookId, annotationId, {
+  async updateAnnotation(bookId: number, annotationId: number, userId: number, dto: UpdateAnnotationDto) {
+    const row = await this.annotationRepo.update(bookId, annotationId, userId, {
       ...(dto.note !== undefined && { note: dto.note }),
       ...(dto.color !== undefined && { color: dto.color }),
       ...(dto.style !== undefined && { style: dto.style }),
@@ -35,8 +35,8 @@ export class AnnotationService {
     return row;
   }
 
-  async deleteAnnotation(bookId: number, annotationId: number) {
-    const deleted = await this.annotationRepo.delete(bookId, annotationId);
+  async deleteAnnotation(bookId: number, annotationId: number, userId: number) {
+    const deleted = await this.annotationRepo.delete(bookId, annotationId, userId);
     if (!deleted) throw new NotFoundException(`Annotation ${annotationId} not found for book ${bookId}`);
   }
 }

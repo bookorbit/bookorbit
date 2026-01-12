@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { api } from '@/lib/api'
 
 export interface Bookmark {
   id: number
@@ -24,7 +25,7 @@ export function useBookmarks() {
 
   async function load(bookId: number) {
     loadError.value = null
-    const res = await fetch(`/api/books/${bookId}/bookmarks`)
+    const res = await api(`/api/books/${bookId}/bookmarks`)
     if (!res.ok) {
       loadError.value = 'Failed to load'
       return
@@ -37,7 +38,7 @@ export function useBookmarks() {
     if (existing) {
       await remove(bookId, existing.id)
     } else {
-      const res = await fetch(`/api/books/${bookId}/bookmarks`, {
+      const res = await api(`/api/books/${bookId}/bookmarks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cfi, title }),
@@ -50,7 +51,7 @@ export function useBookmarks() {
   }
 
   async function remove(bookId: number, bookmarkId: number) {
-    const res = await fetch(`/api/books/${bookId}/bookmarks/${bookmarkId}`, {
+    const res = await api(`/api/books/${bookId}/bookmarks/${bookmarkId}`, {
       method: 'DELETE',
     })
     if (res.ok) {

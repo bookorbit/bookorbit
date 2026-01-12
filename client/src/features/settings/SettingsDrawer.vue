@@ -1,7 +1,22 @@
 <script setup lang="ts">
-import { ref, shallowRef, watch } from 'vue'
-import { X, ChevronLeft, ChevronRight, Library, ScanLine, Paintbrush, BookOpen, FileText, BookImage, Info } from 'lucide-vue-next'
+import { ref, shallowRef, watch, computed } from 'vue'
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Library,
+  ScanLine,
+  Paintbrush,
+  BookOpen,
+  FileText,
+  BookImage,
+  Info,
+  Users,
+  ShieldCheck,
+  KeyRound,
+} from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import LibrariesSettings from './LibrariesSettings.vue'
 import ScannerSettings from './ScannerSettings.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
@@ -9,42 +24,63 @@ import EbookSettings from './EbookSettings.vue'
 import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
 import AboutSettings from './AboutSettings.vue'
+import UsersPage from '@/features/admin/UsersPage.vue'
+import RolesPage from '@/features/admin/RolesPage.vue'
+import PermissionsPage from '@/features/admin/PermissionsPage.vue'
 
 const { isOpen, close } = useSettingsDrawer()
+const { isSuperuser, hasPermission, userPermissions } = usePermissions()
 
-type SectionId = 'libraries' | 'scanner' | 'appearance' | 'ebook' | 'pdf' | 'comics' | 'about'
+type SectionId = 'libraries' | 'scanner' | 'appearance' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions'
 
-const navGroups = [
-  {
-    label: 'General',
-    items: [
-      { id: 'libraries' as SectionId, label: 'Libraries', icon: Library, component: LibrariesSettings },
-      { id: 'scanner' as SectionId, label: 'Scanner', icon: ScanLine, component: ScannerSettings },
-      { id: 'appearance' as SectionId, label: 'Appearance', icon: Paintbrush, component: AppearanceSettings },
-    ],
-  },
-  {
-    label: 'Reader',
-    items: [
-      { id: 'ebook' as SectionId, label: 'eBook', icon: BookOpen, component: EbookSettings },
-      { id: 'pdf' as SectionId, label: 'PDF', icon: FileText, component: PdfSettings },
-      { id: 'comics' as SectionId, label: 'Comics', icon: BookImage, component: ComicsSettings },
-    ],
-  },
-  {
-    label: 'System',
-    items: [{ id: 'about' as SectionId, label: 'About', icon: Info, component: AboutSettings }],
-  },
-]
+const navGroups = computed(() => {
+  const groups = [
+    {
+      label: 'General',
+      items: [
+        { id: 'libraries' as SectionId, label: 'Libraries', icon: Library, component: LibrariesSettings },
+        { id: 'scanner' as SectionId, label: 'Scanner', icon: ScanLine, component: ScannerSettings },
+        { id: 'appearance' as SectionId, label: 'Appearance', icon: Paintbrush, component: AppearanceSettings },
+      ],
+    },
+    {
+      label: 'Reader',
+      items: [
+        { id: 'ebook' as SectionId, label: 'eBook', icon: BookOpen, component: EbookSettings },
+        { id: 'pdf' as SectionId, label: 'PDF', icon: FileText, component: PdfSettings },
+        { id: 'comics' as SectionId, label: 'Comics', icon: BookImage, component: ComicsSettings },
+      ],
+    },
+    {
+      label: 'System',
+      items: [{ id: 'about' as SectionId, label: 'About', icon: Info, component: AboutSettings }],
+    },
+  ]
+  // Explicitly reference userPermissions.value so Vue tracks it as a dependency
+  const perms = userPermissions.value
+  const su = isSuperuser.value
+  const adminItems: { id: SectionId; label: string; icon: unknown; component: unknown }[] = []
+  if (su || perms.includes('manage_users')) {
+    adminItems.push({ id: 'users', label: 'Users', icon: Users, component: UsersPage })
+  }
+  if (su || perms.includes('manage_roles')) {
+    adminItems.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, component: RolesPage })
+    adminItems.push({ id: 'permissions', label: 'Permissions', icon: KeyRound, component: PermissionsPage })
+  }
+  if (adminItems.length) {
+    groups.push({ label: 'Administration', items: adminItems })
+  }
+  return groups
+})
 
-const allItems = navGroups.flatMap((g) => g.items)
+const allItems = computed(() => navGroups.value.flatMap((g) => g.items))
 const activeId = ref<SectionId>('libraries')
 const activeLabel = ref('Libraries')
 const ActiveComponent = shallowRef(LibrariesSettings)
 const mobileView = ref<'nav' | 'content'>('nav')
 
 function navigate(id: SectionId) {
-  const item = allItems.find((i) => i.id === id)!
+  const item = allItems.value.find((i) => i.id === id)!
   activeId.value = id
   activeLabel.value = item.label
   ActiveComponent.value = item.component
@@ -72,7 +108,7 @@ watch(isOpen, (v) => {
         <Transition name="drawer-slide">
           <div
             v-if="isOpen"
-            class="relative flex h-full w-full md:max-w-[900px] shadow-2xl overflow-hidden bg-background"
+            class="relative flex h-full w-full md:max-w-[66.666vw] shadow-2xl overflow-hidden bg-background"
             style="border-left: 1px solid var(--border)"
           >
             <!-- ── MOBILE: Nav list ─────────────────────────── -->

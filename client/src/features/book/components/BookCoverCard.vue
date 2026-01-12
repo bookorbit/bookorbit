@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Book, BookFile } from '../composables/useBooks'
 import { bookCoverStyle } from '../composables/useBooks'
-import { computed, ref } from 'vue'
+import { useBookCover } from '../composables/useBookCover'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -20,9 +21,10 @@ const primaryFile = computed(() => props.book.files.find((f) => f.role === 'prim
 // Only show format chips when there are multiple files
 const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.files : []))
 
-const coverUrl = `/api/books/${props.book.id}/thumbnail`
-const coverLoaded = ref(false)
-const coverFailed = ref(false)
+const { src: coverUrl, failed: coverFailed, load: loadCover } = useBookCover(props.book.id, 'thumbnail')
+const coverLoaded = computed(() => coverUrl.value !== null)
+
+onMounted(loadCover)
 
 function openFile(file: BookFile) {
   router.push({
@@ -45,15 +47,7 @@ function openFile(file: BookFile) {
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
-      <img
-        v-if="!coverFailed"
-        :src="coverUrl"
-        class="absolute inset-0 w-full h-full object-cover"
-        :class="{ 'opacity-0': !coverLoaded }"
-        @load="coverLoaded = true"
-        @error="coverFailed = true"
-        :alt="book.title ?? ''"
-      />
+      <img v-if="coverUrl && !coverFailed" :src="coverUrl" class="absolute inset-0 w-full h-full object-cover" :alt="book.title ?? ''" />
 
       <!-- Series badge -->
       <div v-if="seriesLine" class="absolute top-1.5 left-1.5 right-1.5">
@@ -89,7 +83,7 @@ function openFile(file: BookFile) {
       <!-- Title + author (shown when no real cover) -->
       <div v-if="!coverLoaded" class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
         <p class="text-xs font-bold leading-tight line-clamp-3" :style="{ color: coverStyle.color }">
-          {{ book.title ?? '—' }}
+          {{ book.title ?? '-' }}
         </p>
         <p v-if="authorLine" class="text-[10px] mt-0.5 opacity-80 truncate" :style="{ color: coverStyle.color }">
           {{ authorLine }}
@@ -100,7 +94,7 @@ function openFile(file: BookFile) {
     <!-- Text below -->
     <div class="px-0.5">
       <p class="text-xs font-medium text-foreground truncate leading-tight">
-        {{ book.title ?? '—' }}
+        {{ book.title ?? '-' }}
       </p>
       <p v-if="authorLine" class="text-[11px] text-muted-foreground truncate">
         {{ authorLine }}

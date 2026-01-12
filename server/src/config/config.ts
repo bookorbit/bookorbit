@@ -18,3 +18,13 @@ export const authConfig = registerAs('auth', () => ({
 export const storageConfig = registerAs('storage', () => ({
   booksPath: process.env.BOOKS_PATH ?? '/data/books',
 }));
+
+export const mailerConfig = registerAs('mailer', () => ({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+  secure: process.env.SMTP_SECURE === 'true',
+  user: process.env.SMTP_USER,
+  pass: process.env.SMTP_PASS,
+  from: process.env.SMTP_FROM ?? 'noreply@projectx.local',
+  appUrl: process.env.APP_URL ?? 'http://localhost:5173',
+}));

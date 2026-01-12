@@ -1,16 +1,4 @@
-import {
-  boolean,
-  index,
-  integer,
-  jsonb,
-  pgEnum,
-  pgTable,
-  primaryKey,
-  serial,
-  text,
-  timestamp,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 import { libraries } from './libraries';
 
@@ -22,6 +10,7 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   active: boolean('active').notNull().default(true),
   isDefaultPassword: boolean('is_default_password').notNull().default(false),
+  tokenVersion: integer('token_version').notNull().default(1),
   settings: jsonb('settings').notNull().default({}),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at')
@@ -34,6 +23,7 @@ export const permissions = pgTable('permissions', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 100 }).notNull().unique(),
   description: text('description'),
+  isSystem: boolean('is_system').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -72,11 +62,7 @@ export const userRoles = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.roleId] })],
 );
 
-export const libraryAccessLevelEnum = pgEnum('library_access_level', [
-  'viewer',
-  'editor',
-  'owner',
-]);
+export const libraryAccessLevelEnum = pgEnum('library_access_level', ['viewer', 'editor', 'owner']);
 
 export const userLibraryAccess = pgTable(
   'user_library_access',

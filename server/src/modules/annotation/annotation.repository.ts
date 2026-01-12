@@ -12,8 +12,11 @@ type Db = NodePgDatabase<typeof schema>;
 export class AnnotationRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async findByBookId(bookId: number) {
-    return this.db.select().from(annotations).where(eq(annotations.bookId, bookId));
+  async findByBookId(bookId: number, userId: number) {
+    return this.db
+      .select()
+      .from(annotations)
+      .where(and(eq(annotations.bookId, bookId), eq(annotations.userId, userId)));
   }
 
   async create(data: NewAnnotation) {
@@ -21,19 +24,19 @@ export class AnnotationRepository {
     return row;
   }
 
-  async update(bookId: number, annotationId: number, data: Partial<Pick<NewAnnotation, 'note' | 'color' | 'style'>>) {
+  async update(bookId: number, annotationId: number, userId: number, data: Partial<Pick<NewAnnotation, 'note' | 'color' | 'style'>>) {
     const [row] = await this.db
       .update(annotations)
       .set({ ...data, updatedAt: sql`now()` })
-      .where(and(eq(annotations.id, annotationId), eq(annotations.bookId, bookId)))
+      .where(and(eq(annotations.id, annotationId), eq(annotations.bookId, bookId), eq(annotations.userId, userId)))
       .returning();
     return row ?? null;
   }
 
-  async delete(bookId: number, annotationId: number) {
+  async delete(bookId: number, annotationId: number, userId: number) {
     const result = await this.db
       .delete(annotations)
-      .where(and(eq(annotations.id, annotationId), eq(annotations.bookId, bookId)))
+      .where(and(eq(annotations.id, annotationId), eq(annotations.bookId, bookId), eq(annotations.userId, userId)))
       .returning({ id: annotations.id });
     return result.length > 0;
   }

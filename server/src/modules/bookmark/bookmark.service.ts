@@ -7,16 +7,16 @@ import { CreateBookmarkDto } from './dto/create-bookmark.dto';
 export class BookmarkService {
   constructor(private readonly bookmarkRepo: BookmarkRepository) {}
 
-  async getBookmarks(bookId: number) {
-    return this.bookmarkRepo.findByBookId(bookId);
+  async getBookmarks(bookId: number, userId: number) {
+    return this.bookmarkRepo.findByBookId(bookId, userId);
   }
 
   async createBookmark(userId: number, bookId: number, dto: CreateBookmarkDto) {
     return this.bookmarkRepo.create(userId, bookId, dto.cfi, dto.title);
   }
 
-  async deleteBookmark(bookId: number, bookmarkId: number) {
-    const deleted = await this.bookmarkRepo.delete(bookId, bookmarkId);
+  async deleteBookmark(bookId: number, bookmarkId: number, userId: number) {
+    const deleted = await this.bookmarkRepo.delete(bookId, bookmarkId, userId);
     if (!deleted) throw new NotFoundException(`Bookmark ${bookmarkId} not found for book ${bookId}`);
   }
 }

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { api } from '@/lib/api'
 
 export interface Annotation {
   id: number
@@ -18,7 +19,7 @@ export function useAnnotations() {
 
   async function load(bookId: number) {
     loadError.value = null
-    const res = await fetch(`/api/books/${bookId}/annotations`)
+    const res = await api(`/api/books/${bookId}/annotations`)
     if (!res.ok) {
       loadError.value = 'Failed to load'
       return
@@ -30,7 +31,7 @@ export function useAnnotations() {
     bookId: number,
     data: { cfi: string; text: string; color: string; style: string; note?: string | null; chapterTitle?: string | null },
   ): Promise<Annotation | null> {
-    const res = await fetch(`/api/books/${bookId}/annotations`, {
+    const res = await api(`/api/books/${bookId}/annotations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -42,7 +43,7 @@ export function useAnnotations() {
   }
 
   async function updateNote(bookId: number, id: number, note: string | null) {
-    const res = await fetch(`/api/books/${bookId}/annotations/${id}`, {
+    const res = await api(`/api/books/${bookId}/annotations/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ note }),
@@ -54,7 +55,7 @@ export function useAnnotations() {
   }
 
   async function remove(bookId: number, id: number) {
-    const res = await fetch(`/api/books/${bookId}/annotations/${id}`, {
+    const res = await api(`/api/books/${bookId}/annotations/${id}`, {
       method: 'DELETE',
     })
     if (res.ok) {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { FolderOpen, Plus, RefreshCw } from 'lucide-vue-next'
+import { api } from '@/lib/api'
 
 interface Library {
   id: number
@@ -13,14 +14,14 @@ const scanning = ref<Record<number, boolean>>({})
 const scanningAll = ref(false)
 
 onMounted(async () => {
-  const res = await fetch('/api/libraries')
+  const res = await api('/api/libraries')
   if (res.ok) libraries.value = await res.json()
 })
 
 async function scan(lib: Library) {
   scanning.value[lib.id] = true
   try {
-    await fetch(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+    await api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
   } finally {
     scanning.value[lib.id] = false
   }
@@ -29,7 +30,7 @@ async function scan(lib: Library) {
 async function scanAll() {
   scanningAll.value = true
   try {
-    await Promise.all(libraries.value.map((lib) => fetch(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
+    await Promise.all(libraries.value.map((lib) => api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
   } finally {
     scanningAll.value = false
   }
@@ -37,7 +38,7 @@ async function scanAll() {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl">
+  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <!-- Header -->
     <div class="flex items-start justify-between mb-8">
       <div>

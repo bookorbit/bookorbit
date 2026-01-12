@@ -89,10 +89,22 @@ export class BookRepository {
     return { book, authorRows, tagRows, fileRows };
   }
 
+  async findLibraryIdByBookId(bookId: number): Promise<number | null> {
+    const [row] = await this.db.select({ libraryId: books.libraryId }).from(books).where(eq(books.id, bookId)).limit(1);
+    return row?.libraryId ?? null;
+  }
+
   async findFileById(fileId: number) {
     const [file] = await this.db
-      .select({ id: bookFiles.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format, bookId: bookFiles.bookId })
+      .select({
+        id: bookFiles.id,
+        absolutePath: bookFiles.absolutePath,
+        format: bookFiles.format,
+        bookId: bookFiles.bookId,
+        libraryId: books.libraryId,
+      })
       .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
       .where(eq(bookFiles.id, fileId))
       .limit(1);
     return file ?? null;
