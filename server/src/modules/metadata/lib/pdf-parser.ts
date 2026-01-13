@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
-import { PDFParse } from 'pdf-parse';
+import { PDFDocument } from 'pdf-lib';
 
 const execAsync = promisify(exec);
 
@@ -17,8 +17,8 @@ export interface PdfParsed {
   coverBuffer: Buffer | null;
 }
 
-function clean(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
+function clean(value: string | undefined): string | null {
+  if (!value) return null;
   const s = value.trim();
   return s.length > 0 ? s : null;
 }
@@ -51,22 +51,16 @@ async function extractPdfCover(absolutePath: string): Promise<Buffer | null> {
 export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | null> {
   try {
     const buf = await readFile(absolutePath);
-    const parser = new PDFParse({ data: buf });
-    const data = await parser.getInfo();
-    await parser.destroy();
+    const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
 
-    const info = (data.info ?? {}) as Record<string, unknown>;
-
-    const title = clean(info['Title']);
-    const authorRaw = clean(info['Author']);
-    const subject = clean(info['Subject']);
-    const keywords = splitKeywords(clean(info['Keywords']));
-    // PDFs rarely store publisher; some use 'Creator' for the authoring app
-    // and 'Producer' for the PDF engine — neither is a publisher field.
+    const title = clean(doc.getTitle());
+    const authorRaw = clean(doc.getAuthor());
+    const subject = clean(doc.getSubject());
+    const keywords = splitKeywords(clean(doc.getKeywords()));
     const publisher: string | null = null;
-    const pageCount = typeof data.total === 'number' ? data.total : null;
+    const pageCount = doc.getPageCount();
 
-    const authors: PdfParsed['authors'] = authorRaw
+    const authors = authorRaw
       ? authorRaw
           .split(/[,;]/)
           .map((s) => s.trim())

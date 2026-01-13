@@ -4,8 +4,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Pool } from 'pg';
 
 async function bootstrap() {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  await migrate(drizzle(pool), { migrationsFolder: join(__dirname, '..', 'src', 'db', 'migrations') });
+  await pool.end();
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: true }));
 
   app.setGlobalPrefix('api');
