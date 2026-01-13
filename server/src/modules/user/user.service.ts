@@ -29,6 +29,22 @@ export class UserService {
     return this.userRepo.findByEmail(email);
   }
 
+  findByOidcSubject(subject: string, issuer: string) {
+    return this.userRepo.findByOidcSubject(subject, issuer);
+  }
+
+  linkOidcIdentity(userId: number, oidcSubject: string, oidcIssuer: string, avatarUrl?: string) {
+    return this.userRepo.linkOidcIdentity(userId, oidcSubject, oidcIssuer, avatarUrl);
+  }
+
+  createOidcUser(data: Parameters<UserRepository['createOidcUser']>[0]) {
+    return this.userRepo.createOidcUser(data);
+  }
+
+  assignRoleDirectly(userId: number, roleId: number) {
+    return this.userRepo.assignRole(userId, roleId);
+  }
+
   generatePasswordResetToken(userId: number): Promise<string> {
     return this.userRepo.generateResetToken(userId);
   }

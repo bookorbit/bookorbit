@@ -5,8 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1768298523076,
-      "tag": "0000_init_schema",
+      "when": 1768360764570,
+      "tag": "0000_add_oidc_schema",
       "breakpoints": true
     }
   ]

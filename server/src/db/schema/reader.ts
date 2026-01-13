@@ -1,14 +1,4 @@
-import {
-  index,
-  integer,
-  pgTable,
-  primaryKey,
-  real,
-  serial,
-  text,
-  timestamp,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { index, integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 import { bookFiles, books } from './books';
 import { users } from './auth';
@@ -29,10 +19,7 @@ export const readingProgress = pgTable(
     pageNumber: integer('page_number'),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
-  (t) => [
-    primaryKey({ columns: [t.bookFileId, t.userId] }),
-    index('reading_progress_user_id_idx').on(t.userId),
-  ],
+  (t) => [primaryKey({ columns: [t.bookFileId, t.userId] }), index('reading_progress_user_id_idx').on(t.userId)],
 );
 
 export type ReadingProgress = typeof readingProgress.$inferSelect;

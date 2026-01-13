@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import type { OidcPublicConfig } from '@projectx/types'
 import { useAuth } from './composables/useAuth'
+import { useOidc } from './composables/useOidc'
 
 const { login } = useAuth()
+const { getPublicConfig, initiateLogin } = useOidc()
 
 const username = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
 const loading = ref(false)
+const oidcConfig = ref<OidcPublicConfig | null>(null)
+const oidcLoading = ref(false)
+
+onMounted(async () => {
+  oidcConfig.value = await getPublicConfig()
+})
 
 async function handleSubmit() {
   error.value = null
@@ -18,6 +27,17 @@ async function handleSubmit() {
     error.value = 'Invalid username or password'
   } finally {
     loading.value = false
+  }
+}
+
+async function handleOidcLogin() {
+  error.value = null
+  oidcLoading.value = true
+  try {
+    await initiateLogin()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'OIDC login failed'
+    oidcLoading.value = false
   }
 }
 </script>
@@ -62,9 +82,29 @@ async function handleSubmit() {
           :disabled="loading"
           class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {{ loading ? 'Signing in…' : 'Sign in' }}
+          {{ loading ? 'Signing in...' : 'Sign in' }}
         </button>
       </form>
+
+      <template v-if="oidcConfig?.enabled">
+        <div class="relative my-6">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-border" />
+          </div>
+          <div class="relative flex justify-center text-xs">
+            <span class="bg-background px-2 text-muted-foreground">or</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          :disabled="oidcLoading"
+          class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+          @click="handleOidcLogin"
+        >
+          {{ oidcLoading ? 'Redirecting...' : `Sign in with ${oidcConfig.providerName || 'SSO'}` }}
+        </button>
+      </template>
 
       <p class="mt-4 text-center text-sm text-muted-foreground">
         <RouterLink to="/forgot-password" class="text-primary hover:underline">Forgot password?</RouterLink>

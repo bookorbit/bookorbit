@@ -21,12 +21,15 @@ import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import type { RequestUser } from '../../common/types/request-user';
 import { MailerService } from '../../common/services/mailer.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserService } from '../user/user.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { OidcDiscoveryService } from './oidc/oidc-discovery.service';
+import { OidcSessionRepository } from './oidc/oidc-session.repository';
 
 function parseDurationMs(duration: string): number {
   const match = duration.match(/^(\d+)([smhd])$/);
@@ -49,6 +52,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly mailerService: MailerService,
+    private readonly appSettings: AppSettingsService,
+    private readonly oidcSessionRepo: OidcSessionRepository,
+    private readonly oidcDiscovery: OidcDiscoveryService,
     @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
@@ -116,6 +122,8 @@ export class AuthService {
       active: user.active,
       isDefaultPassword: user.isDefaultPassword,
       settings: user.settings,
+      avatarUrl: user.avatarUrl,
+      provisioningMethod: user.provisioningMethod,
       roles: user.roles.map((r) => ({
         id: r.id,
         name: r.name,
@@ -126,6 +134,14 @@ export class AuthService {
       })),
       permissions,
     };
+  }
+
+  async issueTokensForUser(userId: number, reply: FastifyReply) {
+    const user = await this.userService.findByIdWithRolesAndPermissions(userId);
+    if (!user || !user.active) throw new UnauthorizedException();
+    const { accessToken, rawRefreshToken } = await this.issueTokenPair(userId, user.tokenVersion);
+    this.setRefreshCookie(reply, rawRefreshToken);
+    return { accessToken, user: this.buildUserResponse(user) };
   }
 
   async refresh(req: FastifyRequest, reply: FastifyReply) {
@@ -163,19 +179,48 @@ export class AuthService {
     return { accessToken };
   }
 
-  async logout(req: FastifyRequest, reply: FastifyReply) {
+  async logout(req: FastifyRequest, reply: FastifyReply): Promise<{ logoutUrl?: string }> {
+    let userId: number | undefined;
+
     const rawToken: string | undefined = req.cookies?.refresh_token;
     if (rawToken) {
       const tokenHash = sha256(rawToken);
       const row = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, tokenHash) });
       if (row) {
+        userId = row.userId;
         await Promise.all([
           this.userService.incrementTokenVersion(row.userId),
           this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id)),
         ]);
       }
     }
+
     this.clearRefreshCookie(reply);
+
+    if (!userId) return {};
+
+    const oidcSession = await this.oidcSessionRepo.findActiveByUserId(userId);
+    if (!oidcSession?.idTokenHint) return {};
+
+    try {
+      const config = await this.appSettings.getOidcConfig();
+      if (!config.enabled) return {};
+
+      const disc = await this.oidcDiscovery.getDiscoveryDoc(config.issuerUri);
+      if (!disc.endSessionEndpoint) return {};
+
+      const origin = (req.headers['origin'] as string | undefined) ?? (req.headers['referer'] as string | undefined);
+      const postLogoutUri = origin ? new URL('/login', origin).toString() : undefined;
+
+      const params = new URLSearchParams({ id_token_hint: oidcSession.idTokenHint });
+      if (postLogoutUri) params.set('post_logout_redirect_uri', postLogoutUri);
+
+      await this.oidcSessionRepo.revokeByUserId(userId);
+
+      return { logoutUrl: `${disc.endSessionEndpoint}?${params.toString()}` };
+    } catch {
+      return {};
+    }
   }
 
   async validateUser(userId: number, tokenVersion: number) {
@@ -246,6 +291,10 @@ export class AuthService {
       where: eq(schema.users.id, userId),
     });
     if (!user) throw new UnauthorizedException();
+
+    if (user.provisioningMethod === 'oidc') {
+      throw new BadRequestException('OIDC accounts cannot change their password here');
+    }
 
     const valid = await compare(dto.currentPassword, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Current password is incorrect');

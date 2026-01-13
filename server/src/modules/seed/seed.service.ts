@@ -93,6 +93,20 @@ export class SeedService implements OnApplicationBootstrap {
       .insert(schema.appSettings)
       .values({ key: 'allow_registration', value: 'false' })
       .onConflictDoNothing({ target: schema.appSettings.key });
+
+    const defaultOidcConfig = JSON.stringify({
+      enabled: false,
+      issuerUri: '',
+      clientId: '',
+      clientSecret: '',
+      scopes: 'openid profile email',
+      claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
+      autoProvision: { enabled: false, allowLocalLinking: true, defaultRoleId: null },
+    });
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'oidc_config', value: defaultOidcConfig })
+      .onConflictDoNothing({ target: schema.appSettings.key });
   }
 
   private async seedDefaultAdmin() {

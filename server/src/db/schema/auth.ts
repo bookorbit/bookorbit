@@ -12,6 +12,10 @@ export const users = pgTable('users', {
   isDefaultPassword: boolean('is_default_password').notNull().default(false),
   tokenVersion: integer('token_version').notNull().default(1),
   settings: jsonb('settings').notNull().default({}),
+  oidcSubject: text('oidc_subject'),
+  oidcIssuer: text('oidc_issuer'),
+  avatarUrl: text('avatar_url'),
+  provisioningMethod: varchar('provisioning_method', { length: 20 }).notNull().default('local'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at')
     .notNull()

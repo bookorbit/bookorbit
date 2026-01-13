@@ -91,7 +91,9 @@ function onSaved() {
               <span v-else class="text-muted-foreground text-xs">Standard</span>
             </td>
             <td class="px-4 py-3">
-              <span v-if="role.isSuperuser" class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">All</span>
+              <span v-if="role.isSuperuser" class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                >All</span
+              >
               <span v-else class="text-muted-foreground text-sm">{{ role.permissions.length }}</span>
             </td>
             <td class="px-4 py-3">

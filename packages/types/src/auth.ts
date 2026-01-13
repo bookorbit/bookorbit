@@ -22,8 +22,18 @@ export interface AuthUser {
   active: boolean
   isDefaultPassword: boolean
   settings: Record<string, unknown>
+  avatarUrl?: string | null
+  provisioningMethod: 'local' | 'oidc'
   roles: Role[]
   permissions: string[] // flat list; '*' means superuser
+}
+
+export interface OidcPublicConfig {
+  enabled: boolean
+  providerName: string
+  issuerUri: string
+  clientId: string
+  scopes: string
 }
 
 export interface AuthResponse {

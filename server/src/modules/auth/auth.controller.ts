@@ -8,12 +8,17 @@ import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { OidcCallbackDto } from './dto/oidc-callback.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { OidcService } from './oidc/oidc.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly oidcService: OidcService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -37,7 +42,7 @@ export class AuthController {
 
   @Public()
   @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   logout(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     return this.authService.logout(req, reply);
   }
@@ -76,5 +81,28 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   changePassword(@CurrentUser() user: RequestUser, @Body() dto: ChangePasswordDto, @Res({ passthrough: true }) reply: FastifyReply) {
     return this.authService.changePassword(user.id, dto, reply);
+  }
+
+  @Public()
+  @Post('oidc/state')
+  @HttpCode(HttpStatus.OK)
+  oidcGenerateState() {
+    return { state: this.oidcService.generateState() };
+  }
+
+  @Public()
+  @Post('oidc/callback')
+  @HttpCode(HttpStatus.OK)
+  oidcCallback(@Body() dto: OidcCallbackDto, @Res({ passthrough: true }) reply: FastifyReply) {
+    return this.oidcService.handleCallback(dto, reply);
+  }
+
+  @Public()
+  @Post('oidc/backchannel-logout')
+  @HttpCode(HttpStatus.OK)
+  oidcBackchannelLogout(@Req() req: FastifyRequest) {
+    const body = req.body as Record<string, string> | undefined;
+    const logoutToken = body?.['logout_token'] ?? '';
+    return this.oidcService.handleBackchannelLogout(logoutToken);
   }
 }

@@ -4,7 +4,7 @@ import { useThemeStore } from '@/stores/theme'
 const themeStore = useThemeStore()
 
 const shapes = [
-  { id: 'sharp' as const,   rx: '1' },
+  { id: 'sharp' as const, rx: '1' },
   { id: 'default' as const, rx: '4' },
   { id: 'rounded' as const, rx: '9' },
 ]

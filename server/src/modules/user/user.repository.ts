@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { hash } from 'bcryptjs';
 
 import { RequestUser, RequestUserRole } from '../../common/types/request-user';
 import { DB } from '../../db';
@@ -94,6 +95,8 @@ export class UserRepository {
         isDefaultPassword: schema.users.isDefaultPassword,
         tokenVersion: schema.users.tokenVersion,
         settings: schema.users.settings,
+        avatarUrl: schema.users.avatarUrl,
+        provisioningMethod: schema.users.provisioningMethod,
         roleId: schema.roles.id,
         roleName: schema.roles.name,
         roleDescription: schema.roles.description,
@@ -143,6 +146,8 @@ export class UserRepository {
       isDefaultPassword: first.isDefaultPassword,
       tokenVersion: first.tokenVersion,
       settings: first.settings as Record<string, unknown>,
+      avatarUrl: first.avatarUrl,
+      provisioningMethod: first.provisioningMethod,
       roles: Array.from(rolesMap.values()),
     };
   }
@@ -213,5 +218,37 @@ export class UserRepository {
     });
 
     return rawToken;
+  }
+
+  async findByOidcSubject(subject: string, issuer: string) {
+    return this.db.query.users.findFirst({
+      where: and(eq(schema.users.oidcSubject, subject), eq(schema.users.oidcIssuer, issuer)),
+    });
+  }
+
+  async linkOidcIdentity(userId: number, oidcSubject: string, oidcIssuer: string, avatarUrl?: string) {
+    await this.db
+      .update(schema.users)
+      .set({ oidcSubject, oidcIssuer, ...(avatarUrl ? { avatarUrl } : {}) })
+      .where(eq(schema.users.id, userId));
+  }
+
+  async createOidcUser(data: { username: string; name: string; email?: string; oidcSubject: string; oidcIssuer: string; avatarUrl?: string }) {
+    const passwordHash = await hash(`OIDC_USER_${randomUUID()}`, 12);
+    const [user] = await this.db
+      .insert(schema.users)
+      .values({
+        username: data.username,
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        isDefaultPassword: false,
+        oidcSubject: data.oidcSubject,
+        oidcIssuer: data.oidcIssuer,
+        avatarUrl: data.avatarUrl,
+        provisioningMethod: 'oidc',
+      })
+      .returning();
+    return user;
   }
 }

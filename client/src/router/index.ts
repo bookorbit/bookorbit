@@ -33,6 +33,12 @@ const router = createRouter({
       component: () => import('@/features/auth/ResetPasswordPage.vue'),
       meta: { public: true },
     },
+    {
+      path: '/oauth2-callback',
+      name: 'oidc-callback',
+      component: () => import('@/features/auth/OidcCallbackPage.vue'),
+      meta: { public: true },
+    },
   ],
 })
 

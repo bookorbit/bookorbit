@@ -14,9 +14,11 @@ import {
   Users,
   ShieldCheck,
   KeyRound,
+  LogIn,
 } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useThemeStore, BACKGROUND_OPTIONS } from '@/stores/theme'
 import LibrariesSettings from './LibrariesSettings.vue'
 import ScannerSettings from './ScannerSettings.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
@@ -27,11 +29,14 @@ import AboutSettings from './AboutSettings.vue'
 import UsersPage from '@/features/admin/UsersPage.vue'
 import RolesPage from '@/features/admin/RolesPage.vue'
 import PermissionsPage from '@/features/admin/PermissionsPage.vue'
+import OidcSettings from './OidcSettings.vue'
 
 const { isOpen, close } = useSettingsDrawer()
 const { isSuperuser, hasPermission, userPermissions } = usePermissions()
+const themeStore = useThemeStore()
+const bgClass = computed(() => BACKGROUND_OPTIONS.find((o) => o.id === themeStore.background)?.cssClass ?? '')
 
-type SectionId = 'libraries' | 'scanner' | 'appearance' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions'
+type SectionId = 'libraries' | 'scanner' | 'appearance' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
 
 const navGroups = computed(() => {
   const groups = [
@@ -66,6 +71,9 @@ const navGroups = computed(() => {
   if (su || perms.includes('manage_roles')) {
     adminItems.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, component: RolesPage })
     adminItems.push({ id: 'permissions', label: 'Permissions', icon: KeyRound, component: PermissionsPage })
+  }
+  if (su || perms.includes('manage_app_settings')) {
+    adminItems.push({ id: 'oidc', label: 'OIDC / SSO', icon: LogIn, component: OidcSettings })
   }
   if (adminItems.length) {
     groups.push({ label: 'Administration', items: adminItems })
@@ -159,7 +167,7 @@ watch(isOpen, (v) => {
                   </button>
                   <span class="flex-1 text-sm font-medium text-foreground text-center pr-16">{{ activeLabel }}</span>
                 </div>
-                <div class="flex-1 overflow-y-auto">
+                <div class="flex-1 overflow-y-auto" :class="bgClass">
                   <component :is="ActiveComponent" />
                 </div>
               </div>
@@ -203,7 +211,7 @@ watch(isOpen, (v) => {
               </div>
             </nav>
 
-            <main class="hidden md:block flex-1 overflow-y-auto">
+            <main class="hidden md:block flex-1 overflow-y-auto" :class="bgClass">
               <component :is="ActiveComponent" />
             </main>
           </div>

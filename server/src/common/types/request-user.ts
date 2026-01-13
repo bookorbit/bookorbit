@@ -21,5 +21,7 @@ export interface RequestUser {
   isDefaultPassword: boolean;
   tokenVersion: number;
   settings: Record<string, unknown>;
+  avatarUrl: string | null;
+  provisioningMethod: string;
   roles: RequestUserRole[];
 }

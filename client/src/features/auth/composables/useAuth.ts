@@ -64,8 +64,19 @@ export function useAuth() {
   }
 
   async function logout(): Promise<void> {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
-    clearAuth()
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      clearAuth()
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        if (data?.logoutUrl) {
+          window.location.href = data.logoutUrl
+          return
+        }
+      }
+    } catch {
+      clearAuth()
+    }
     router.push('/login')
   }
 

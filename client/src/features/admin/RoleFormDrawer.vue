@@ -131,7 +131,8 @@ async function handleSubmit() {
         </div>
 
         <div v-if="role?.isSuperuser" class="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          This is a superuser role. It implicitly has all permissions, including any added in the future. Individual permission assignments are not applicable.
+          This is a superuser role. It implicitly has all permissions, including any added in the future. Individual permission assignments are not
+          applicable.
         </div>
 
         <div v-else class="space-y-2">
