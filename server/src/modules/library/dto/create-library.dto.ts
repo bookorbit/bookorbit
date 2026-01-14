@@ -1,0 +1,67 @@
+import { ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+
+export class CreateLibraryDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  icon?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  displayOrder?: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  folders: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  watch?: boolean;
+
+  @IsOptional()
+  @IsString()
+  autoScanCronExpression?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  metadataPrecedence?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  formatPriority?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedFormats?: string[];
+
+  @IsOptional()
+  @IsIn(['auto', 'book_per_file', 'book_per_folder'])
+  organizationMode?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludePatterns?: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  markAsFinishedSecondsRemaining?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  markAsFinishedPercentComplete?: number | null;
+}

@@ -1,11 +1,33 @@
-import { integer, pgTable, serial, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 export const libraries = pgTable('libraries', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
   icon: varchar('icon', { length: 100 }),
+  displayOrder: integer('display_order').notNull().default(0),
+
+  // File watching & scheduling
+  watch: boolean('watch').notNull().default(false),
+  autoScanCronExpression: text('auto_scan_cron_expression'),
+
+  // Scanner behaviour
+  metadataPrecedence: jsonb('metadata_precedence')
+    .$type<string[]>()
+    .notNull()
+    .default(['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar']),
+  formatPriority: jsonb('format_priority').$type<string[]>().notNull().default(['epub', 'pdf', 'cbz', 'cbr', 'mobi', 'azw3', 'fb2']),
+  allowedFormats: jsonb('allowed_formats').$type<string[]>().notNull().default([]),
+  organizationMode: varchar('organization_mode', { length: 20 }).notNull().default('auto'),
+  excludePatterns: jsonb('exclude_patterns').$type<string[]>().notNull().default([]),
+
+  // Reading progress thresholds
+  markAsFinishedSecondsRemaining: integer('mark_as_finished_seconds_remaining'),
+  markAsFinishedPercentComplete: integer('mark_as_finished_percent_complete'),
+
+  // Legacy — kept for scanner compatibility
   scanMode: varchar('scan_mode', { length: 20 }).notNull().default('auto'),
   pollInterval: integer('poll_interval_seconds').default(300),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

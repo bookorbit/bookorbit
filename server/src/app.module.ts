@@ -17,6 +17,7 @@ import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookModule } from './modules/book/book.module';
 import { KoboModule } from './modules/kobo/kobo.module';
 import { LibraryModule } from './modules/library/library.module';
+import { PathModule } from './modules/path/path.module';
 import { MetadataModule } from './modules/metadata/metadata.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
@@ -38,6 +39,7 @@ import { UserModule } from './modules/user/user.module';
     UserModule,
     RoleModule,
     LibraryModule,
+    PathModule,
     BookModule,
     ScannerModule,
     MetadataModule,

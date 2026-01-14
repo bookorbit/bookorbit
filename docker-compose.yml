@@ -8,6 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-projectx}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-projectx}
       POSTGRES_DB: ${POSTGRES_DB:-projectx}
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:

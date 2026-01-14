@@ -1,24 +1,37 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { FolderOpen, Plus, RefreshCw } from 'lucide-vue-next'
+import { FolderOpen, Plus, RefreshCw, Pencil, Library } from 'lucide-vue-next'
 import { api } from '@/lib/api'
+import type { Library as LibraryType, LibraryStats } from '@projectx/types'
+import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 
-interface Library {
-  id: number
-  name: string
-  createdAt: string
-}
-
-const libraries = ref<Library[]>([])
+const libraries = ref<LibraryType[]>([])
+const stats = ref<Record<number, LibraryStats>>({})
 const scanning = ref<Record<number, boolean>>({})
 const scanningAll = ref(false)
+const creatorOpen = ref(false)
+const editingLibrary = ref<LibraryType | null>(null)
 
-onMounted(async () => {
+async function loadLibraries() {
   const res = await api('/api/libraries')
-  if (res.ok) libraries.value = await res.json()
-})
+  if (res.ok) {
+    libraries.value = await res.json()
+    loadAllStats()
+  }
+}
 
-async function scan(lib: Library) {
+async function loadAllStats() {
+  await Promise.all(
+    libraries.value.map(async (lib) => {
+      const res = await api(`/api/libraries/${lib.id}/stats`)
+      if (res.ok) stats.value[lib.id] = await res.json()
+    }),
+  )
+}
+
+onMounted(loadLibraries)
+
+async function scan(lib: LibraryType) {
   scanning.value[lib.id] = true
   try {
     await api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
@@ -34,6 +47,35 @@ async function scanAll() {
   } finally {
     scanningAll.value = false
   }
+}
+
+function openCreate() {
+  editingLibrary.value = null
+  creatorOpen.value = true
+}
+
+function openEdit(lib: LibraryType) {
+  editingLibrary.value = lib
+  creatorOpen.value = true
+}
+
+async function onSaved(library: LibraryType) {
+  creatorOpen.value = false
+  editingLibrary.value = null
+  await loadLibraries()
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+function iconComponent(iconName: string | null | undefined) {
+  // Dynamic Lucide icon lookup via pre-imported default
+  return iconName ? null : Library
 }
 </script>
 
@@ -55,9 +97,8 @@ async function scanAll() {
           {{ scanningAll ? 'Scanning…' : 'Scan All' }}
         </button>
         <button
-          class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity opacity-50 cursor-not-allowed"
-          disabled
-          title="Coming soon"
+          class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          @click="openCreate"
         >
           <Plus :size="12" />
           Add Library
@@ -73,37 +114,51 @@ async function scanAll() {
             <FolderOpen :size="17" class="text-primary" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <p class="text-sm font-medium text-foreground truncate">{{ lib.name }}</p>
+            <p class="text-sm font-medium text-foreground truncate">{{ lib.name }}</p>
+            <div class="flex items-center gap-3 mt-0.5">
+              <span v-if="stats[lib.id]" class="text-xs text-muted-foreground">
+                {{ stats[lib.id].totalBooks }} book{{ stats[lib.id].totalBooks === 1 ? '' : 's' }}
+                <span v-if="stats[lib.id].totalSizeBytes > 0"> &middot; {{ formatBytes(stats[lib.id].totalSizeBytes) }}</span>
+              </span>
+              <span v-else class="text-xs text-muted-foreground">
+                Added {{ new Date(lib.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) }}
+              </span>
+              <span v-if="lib.watch" class="text-xs text-primary/70">Watching</span>
             </div>
-            <p class="text-xs text-muted-foreground mt-0.5">
-              Added {{ new Date(lib.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) }}
-            </p>
           </div>
-          <button
-            class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50 shrink-0"
-            :disabled="scanning[lib.id]"
-            @click="scan(lib)"
-          >
-            <RefreshCw :size="12" :class="scanning[lib.id] ? 'animate-spin' : ''" />
-            {{ scanning[lib.id] ? 'Scanning…' : 'Scan' }}
-          </button>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button
+              class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Edit library"
+              @click="openEdit(lib)"
+            >
+              <Pencil :size="13" />
+            </button>
+            <button
+              class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+              :disabled="scanning[lib.id]"
+              @click="scan(lib)"
+            >
+              <RefreshCw :size="12" :class="scanning[lib.id] ? 'animate-spin' : ''" />
+              {{ scanning[lib.id] ? 'Scanning…' : 'Scan' }}
+            </button>
+          </div>
         </div>
       </div>
 
       <div v-if="libraries.length === 0" class="bg-card px-5 py-12 text-center">
         <FolderOpen :size="28" class="text-muted-foreground/30 mx-auto mb-3" />
-        <p class="text-sm text-muted-foreground">No libraries configured yet.</p>
+        <p class="text-sm text-muted-foreground">No libraries yet.</p>
+        <button class="mt-3 text-xs text-primary hover:underline" @click="openCreate">Create your first library</button>
       </div>
     </div>
 
-    <!-- Info note -->
-    <div class="mt-6 rounded-lg border border-border bg-muted/40 px-5 py-4">
-      <p class="text-xs font-medium text-foreground mb-1">Library folders</p>
-      <p class="text-xs text-muted-foreground leading-relaxed">
-        Libraries are configured via the server environment and database. Folder path management and adding new libraries from the UI will be
-        available in a future update.
-      </p>
-    </div>
+    <!-- Library creator/editor modal -->
+    <LibraryCreatorModal
+      v-if="creatorOpen"
+      :library="editingLibrary"
+      @close="creatorOpen = false; editingLibrary = null"
+      @saved="onSaved"
+    />
   </div>
 </template>

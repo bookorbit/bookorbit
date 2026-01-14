@@ -1,5 +1,5 @@
 {
-  "id": "8b1e1a78-207d-4b60-8237-1d13069c26e0",
+  "id": "05501c4f-0a30-4fac-961f-d84a298725a2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -877,6 +877,73 @@
         "icon": {
           "name": "icon",
           "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "watch": {
+          "name": "watch",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "auto_scan_cron_expression": {
+          "name": "auto_scan_cron_expression",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata_precedence": {
+          "name": "metadata_precedence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[\"folderStructure\",\"embedded\",\"nfoFile\",\"opfFile\",\"sidecar\"]'::jsonb"
+        },
+        "format_priority": {
+          "name": "format_priority",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[\"epub\",\"pdf\",\"cbz\",\"cbr\",\"mobi\",\"azw3\",\"fb2\"]'::jsonb"
+        },
+        "allowed_formats": {
+          "name": "allowed_formats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "organization_mode": {
+          "name": "organization_mode",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'auto'"
+        },
+        "exclude_patterns": {
+          "name": "exclude_patterns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "mark_as_finished_seconds_remaining": {
+          "name": "mark_as_finished_seconds_remaining",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mark_as_finished_percent_complete": {
+          "name": "mark_as_finished_percent_complete",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

@@ -197,10 +197,13 @@ export class MetadataService {
   private async saveAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
     if (parsedAuthors.length === 0) return;
 
+    // Deduplicate by name to avoid inserting the same author twice for one book
+    const unique = parsedAuthors.filter((a, i, arr) => arr.findIndex((b) => b.name === a.name) === i);
+
     await this.db.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
 
-    for (let i = 0; i < parsedAuthors.length; i++) {
-      const { name, sortName } = parsedAuthors[i]!;
+    for (let i = 0; i < unique.length; i++) {
+      const { name, sortName } = unique[i]!;
 
       let [author] = await this.db.select().from(authors).where(eq(authors.name, name)).limit(1);
 
@@ -208,7 +211,7 @@ export class MetadataService {
         [author] = await this.db.insert(authors).values({ name, sortName }).returning();
       }
 
-      await this.db.insert(bookAuthors).values({ bookId, authorId: author!.id, displayOrder: i });
+      await this.db.insert(bookAuthors).values({ bookId, authorId: author!.id, displayOrder: i }).onConflictDoNothing();
     }
   }
 
@@ -227,7 +230,7 @@ export class MetadataService {
         [tag] = await this.db.insert(tags).values({ name }).returning();
       }
 
-      await this.db.insert(bookTags).values({ bookId, tagId: tag!.id });
+      await this.db.insert(bookTags).values({ bookId, tagId: tag!.id }).onConflictDoNothing();
     }
   }
 }
