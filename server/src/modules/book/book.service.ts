@@ -97,6 +97,12 @@ export class BookService {
     return { path: file.absolutePath, size, format: file.format ?? 'unknown' };
   }
 
+  async searchAcrossLibraries(q: string, limit: number, user: RequestUser) {
+    const libs = await this.libraryService.findAll(user);
+    const libraryIds = libs.map((l) => l.id);
+    return this.bookRepo.searchAcrossLibraries(libraryIds, q, limit);
+  }
+
   async getProgress(userId: number, fileId: number, user: RequestUser) {
     await this.verifyFileAccess(fileId, user);
     return this.bookRepo.findProgress(userId, fileId);

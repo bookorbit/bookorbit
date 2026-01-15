@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Search, X } from 'lucide-vue-next'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
@@ -87,7 +88,6 @@ watch(search, () => {
         :title="title"
         :total="total"
         :loaded="books.length"
-        v-model:search="search"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"
         v-model:viewMode="viewMode"
@@ -95,6 +95,19 @@ watch(search, () => {
 
       <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
         <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
+
+        <!-- Library filter -->
+        <div class="relative mb-4 max-w-xs">
+          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" :size="13" />
+          <input
+            v-model="search"
+            placeholder="Filter library..."
+            class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+          />
+          <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <X :size="13" />
+          </button>
+        </div>
 
         <!-- Grid view -->
         <div

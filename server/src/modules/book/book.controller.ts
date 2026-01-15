@@ -7,6 +7,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from './book.service';
 import { GetBooksDto } from './dto/get-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
+import { SearchBooksDto } from './dto/search-books.dto';
 
 @Controller('books')
 export class BookController {
@@ -15,6 +16,12 @@ export class BookController {
   @Get()
   getCards(@Query() dto: GetBooksDto, @CurrentUser() user: RequestUser) {
     return this.bookService.getCards(dto, user);
+  }
+
+  // Must be before @Get(':id') so NestJS does not treat 'search' as an :id param
+  @Get('search')
+  searchBooks(@Query() dto: SearchBooksDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.searchAcrossLibraries(dto.q, dto.limit ?? 10, user);
   }
 
   @Get(':id/cover')
