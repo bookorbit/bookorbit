@@ -2,6 +2,7 @@
 import { useThemeStore } from '@/stores/theme'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import ChangePasswordDialog from '@/features/auth/ChangePasswordDialog.vue'
+import { Toaster } from '@/components/ui/sonner'
 
 useThemeStore()
 const { isOpen } = useChangePasswordDialog()
@@ -10,4 +11,5 @@ const { isOpen } = useChangePasswordDialog()
 <template>
   <RouterView />
   <ChangePasswordDialog v-if="isOpen" />
+  <Toaster rich-colors />
 </template>

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { Book, BookFile } from '../composables/useBooks'
 import { bookCoverStyle } from '../composables/useBooks'
-import { useBookCover } from '../composables/useBookCover'
-import { computed, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -21,10 +20,8 @@ const primaryFile = computed(() => props.book.files.find((f) => f.role === 'prim
 // Only show format chips when there are multiple files
 const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.files : []))
 
-const { src: coverUrl, failed: coverFailed, load: loadCover } = useBookCover(props.book.id, 'thumbnail')
-const coverLoaded = computed(() => coverUrl.value !== null)
-
-onMounted(loadCover)
+const coverLoaded = ref(false)
+const coverFailed = ref(false)
 
 function openFile(file: BookFile) {
   router.push({
@@ -47,7 +44,16 @@ function openFile(file: BookFile) {
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
-      <img v-if="coverUrl && !coverFailed" :src="coverUrl" class="absolute inset-0 w-full h-full object-cover" :alt="book.title ?? ''" />
+      <img
+        v-if="!coverFailed"
+        :src="`/api/books/${book.id}/thumbnail`"
+        class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        loading="lazy"
+        :alt="book.title ?? ''"
+        @load="coverLoaded = true"
+        @error="coverFailed = true"
+      />
 
       <!-- Series badge -->
       <div v-if="seriesLine" class="absolute top-1.5 left-1.5 right-1.5">

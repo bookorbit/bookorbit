@@ -2,6 +2,7 @@
 import { ref, shallowRef, onMounted, onUnmounted, computed } from 'vue'
 import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users } from 'lucide-vue-next'
 import type { Library } from '@projectx/types'
+import { api } from '@/lib/api'
 import { useLibraryCreator } from '../composables/useLibraryCreator'
 import LibraryCreatorDetails from './LibraryCreatorDetails.vue'
 import LibraryCreatorFolders from './LibraryCreatorFolders.vue'
@@ -76,9 +77,11 @@ const mobileView = ref<'nav' | 'content'>('nav')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   if (props.library) {
-    creator.initEdit(props.library)
+    const res = await api(`/api/libraries/${props.library.id}`)
+    const full: Library = res.ok ? await res.json() : props.library
+    creator.initEdit(full)
     visitedUpTo.value = ALL_SECTIONS.length - 1 // all unlocked in edit
   } else {
     creator.initCreate()

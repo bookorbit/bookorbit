@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { api } from '@/lib/api'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
@@ -9,28 +9,45 @@ import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBooks } from '@/features/book/composables/useBooks'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useLibraries } from '@/features/library/composables/useLibraries'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 
+const route = useRoute()
+const router = useRouter()
 const themeStore = useThemeStore()
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
-const libraryId = ref<number | null>(null)
+const { libraries, fetchLibraries } = useLibraries()
 
-async function loadLibrary() {
-  const res = await api('/api/libraries')
-  if (!res.ok) return
-  const libs: { id: number }[] = await res.json()
-  if (libs.length > 0) libraryId.value = libs[0]!.id
-}
+const libraryId = computed<number | null>(() => {
+  const id = route.params.id
+  return id ? Number(id) : null
+})
+
+const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
 const { books, total, loading, error, search, hasMore, load, onSearch } = useBooks(libraryId)
 
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
+function loadIfSentinelVisible() {
+  if (!hasMore.value || loading.value) return
+  const el = sentinel.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  if (rect.top < window.innerHeight + 300) load()
+}
+
 onMounted(async () => {
-  await loadLibrary()
-  load()
+  await fetchLibraries()
+
+  if (!libraryId.value && libraries.value.length > 0) {
+    router.replace({ name: 'library', params: { id: libraries.value[0]!.id } })
+  } else {
+    load()
+  }
+
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0]?.isIntersecting && !loading.value) load()
@@ -41,6 +58,17 @@ onMounted(async () => {
 })
 
 onUnmounted(() => observer?.disconnect())
+
+watch(libraryId, (newId, oldId) => {
+  if (newId !== null && newId !== oldId) {
+    search.value = ''
+    load(true)
+  }
+})
+
+watch(loading, (isLoading) => {
+  if (!isLoading) loadIfSentinelVisible()
+})
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 watch(search, () => {
@@ -56,7 +84,7 @@ watch(search, () => {
 
     <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
       <AppHeader
-        title="Library"
+        :title="title"
         :total="total"
         :loaded="books.length"
         v-model:search="search"
