@@ -28,10 +28,11 @@ async function bootstrap() {
 
   await app.register(require('@fastify/cookie'));
 
-  // Global IP-based rate limit; tighten per-route as needed
+  // Global IP-based rate limit; image/cover endpoints are exempt (high volume, cheap reads)
   await app.register(require('@fastify/rate-limit'), {
     max: 100,
     timeWindow: '1 minute',
+    allowList: (req: { url: string }) => /^\/api\/books\/\d+\/(thumbnail|cover)/.test(req.url),
   });
 
   if (process.env.NODE_ENV !== 'production') {

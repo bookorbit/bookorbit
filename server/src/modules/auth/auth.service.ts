@@ -107,6 +107,7 @@ export class AuthService {
     const fullUser = await this.userService.findByIdWithRolesAndPermissions(user.id);
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(user.id, user.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
+    this.setAccessCookie(reply, accessToken);
 
     return { accessToken, user: this.buildUserResponse(fullUser!) };
   }
@@ -141,6 +142,7 @@ export class AuthService {
     if (!user || !user.active) throw new UnauthorizedException();
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(userId, user.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
+    this.setAccessCookie(reply, accessToken);
     return { accessToken, user: this.buildUserResponse(user) };
   }
 
@@ -175,6 +177,7 @@ export class AuthService {
 
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(row.userId, userForToken.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
+    this.setAccessCookie(reply, accessToken);
 
     return { accessToken };
   }
@@ -196,6 +199,7 @@ export class AuthService {
     }
 
     this.clearRefreshCookie(reply);
+    this.clearAccessCookie(reply);
 
     if (!userId) return {};
 
@@ -314,6 +318,7 @@ export class AuthService {
     });
 
     this.clearRefreshCookie(reply);
+    this.clearAccessCookie(reply);
   }
 
   private async issueTokenPair(userId: number, tokenVersion: number) {
@@ -346,6 +351,27 @@ export class AuthService {
       httpOnly: true,
       sameSite: 'strict',
       path: '/api/auth',
+      maxAge: 0,
+      secure: this.config.get('app.nodeEnv') === 'production',
+    });
+  }
+
+  private setAccessCookie(reply: FastifyReply, accessToken: string) {
+    const ttlSeconds = parseDurationMs(this.config.get<string>('auth.jwtExpiresIn') ?? '15m') / 1000;
+    reply.setCookie('access_token', accessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/api',
+      maxAge: ttlSeconds,
+      secure: this.config.get('app.nodeEnv') === 'production',
+    });
+  }
+
+  private clearAccessCookie(reply: FastifyReply) {
+    reply.setCookie('access_token', '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/api',
       maxAge: 0,
       secure: this.config.get('app.nodeEnv') === 'production',
     });

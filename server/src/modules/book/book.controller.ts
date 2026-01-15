@@ -24,6 +24,7 @@ export class BookController {
 
     const ext = coverPath.split('.').pop()?.toLowerCase();
     const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
+    reply.header('Cache-Control', 'private, max-age=86400');
     reply.type(contentType);
     reply.send(createReadStream(coverPath));
   }
@@ -33,6 +34,7 @@ export class BookController {
     const thumbnailPath = await this.bookService.getThumbnailPath(id, user);
     if (!thumbnailPath) throw new NotFoundException(`No thumbnail for book ${id}`);
 
+    reply.header('Cache-Control', 'private, max-age=86400');
     reply.type('image/jpeg');
     reply.send(createReadStream(thumbnailPath));
   }

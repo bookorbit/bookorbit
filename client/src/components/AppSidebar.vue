@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Library, BookMarked, Clock, BookOpen, Settings, LogOut, KeyRound } from 'lucide-vue-next'
-import { useRouter } from 'vue-router'
+import * as Icons from 'lucide-vue-next'
+import { BookMarked, Clock, BookOpen, Settings, LogOut, KeyRound } from 'lucide-vue-next'
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Sidebar,
   SidebarContent,
@@ -18,18 +20,26 @@ import {
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { useLibraries } from '@/features/library/composables/useLibraries'
 
 const { open: openSettings } = useSettingsDrawer()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { user, logout } = useAuth()
 const router = useRouter()
+const route = useRoute()
+const { libraries, fetchLibraries } = useLibraries()
 
-const navItems = [
-  { id: 'library', label: 'All Books', icon: Library, active: true },
-  { id: 'reading', label: 'Reading', icon: BookOpen, active: false },
-  { id: 'bookmarks', label: 'Bookmarks', icon: BookMarked, active: false },
-  { id: 'recent', label: 'Recently Added', icon: Clock, active: false },
-]
+const activeLibraryId = computed(() => {
+  const id = route.params.id
+  return id ? Number(id) : null
+})
+
+function getLibraryIcon(name: string | null | undefined) {
+  if (name && name in Icons) return (Icons as Record<string, unknown>)[name]
+  return Icons.BookCopy
+}
+
+onMounted(fetchLibraries)
 </script>
 
 <template>
@@ -68,18 +78,59 @@ const navItems = [
     </SidebarHeader>
 
     <SidebarContent>
+      <!-- Libraries -->
       <SidebarGroup class="pt-2">
         <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
-          Library
+          Libraries
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            <SidebarMenuItem v-for="item in navItems" :key="item.id">
-              <SidebarMenuButton :is-active="item.active" :tooltip="item.label" class="gap-2.5">
-                <component :is="item.icon" :size="15" :class="item.active ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
-                <span :class="item.active ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
-                  {{ item.label }}
+            <SidebarMenuItem v-for="lib in libraries" :key="lib.id">
+              <SidebarMenuButton
+                :is-active="activeLibraryId === lib.id"
+                :tooltip="lib.name"
+                class="gap-2.5"
+                @click="router.push({ name: 'library', params: { id: lib.id } })"
+              >
+                <component
+                  :is="getLibraryIcon(lib.icon)"
+                  :size="15"
+                  :class="activeLibraryId === lib.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'"
+                />
+                <span :class="activeLibraryId === lib.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
+                  {{ lib.name }}
                 </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+
+      <!-- Browse -->
+      <SidebarGroup>
+        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
+          Browse
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Reading" class="gap-2.5 opacity-40 cursor-not-allowed">
+                <BookOpen :size="15" class="text-sidebar-foreground/50" />
+                <span class="text-sidebar-foreground/70">Reading</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Bookmarks" class="gap-2.5 opacity-40 cursor-not-allowed">
+                <BookMarked :size="15" class="text-sidebar-foreground/50" />
+                <span class="text-sidebar-foreground/70">Bookmarks</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Recently Added" class="gap-2.5 opacity-40 cursor-not-allowed">
+                <Clock :size="15" class="text-sidebar-foreground/50" />
+                <span class="text-sidebar-foreground/70">Recently Added</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

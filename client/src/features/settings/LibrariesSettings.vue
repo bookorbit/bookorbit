@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { FolderOpen, Plus, RefreshCw, Pencil, Library } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
@@ -34,7 +35,14 @@ onMounted(loadLibraries)
 async function scan(lib: LibraryType) {
   scanning.value[lib.id] = true
   try {
-    await api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+    const res = await api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+    if (res.ok) {
+      toast.success(`Scan started for "${lib.name}"`)
+    } else {
+      toast.error(`Failed to start scan for "${lib.name}"`)
+    }
+  } catch {
+    toast.error(`Failed to start scan for "${lib.name}"`)
   } finally {
     scanning.value[lib.id] = false
   }
@@ -43,7 +51,17 @@ async function scan(lib: LibraryType) {
 async function scanAll() {
   scanningAll.value = true
   try {
-    await Promise.all(libraries.value.map((lib) => api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
+    const results = await Promise.all(
+      libraries.value.map((lib) => api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })),
+    )
+    const failed = results.filter((r) => !r.ok).length
+    if (failed === 0) {
+      toast.success('Scan started for all libraries')
+    } else {
+      toast.error(`${failed} librar${failed === 1 ? 'y' : 'ies'} failed to start`)
+    }
+  } catch {
+    toast.error('Failed to start scans')
   } finally {
     scanningAll.value = false
   }
