@@ -158,7 +158,13 @@ export class UserRepository {
   }
 
   async update(id: number, data: Partial<Pick<typeof schema.users.$inferInsert, 'name' | 'email' | 'active' | 'settings'>>) {
-    const [user] = await this.db.update(schema.users).set(data).where(eq(schema.users.id, id)).returning({
+    const { settings, ...rest } = data;
+    const setData: Record<string, unknown> = { ...rest };
+    if (settings !== undefined) {
+      // Merge into existing settings rather than replacing the whole object
+      setData.settings = sql`${schema.users.settings} || ${JSON.stringify(settings)}::jsonb`;
+    }
+    const [user] = await this.db.update(schema.users).set(setData).where(eq(schema.users.id, id)).returning({
       id: schema.users.id,
       username: schema.users.username,
       name: schema.users.name,

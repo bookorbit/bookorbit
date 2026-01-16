@@ -7,15 +7,18 @@ import { usePdfZoom, ZOOM_PRESETS } from '../composables/usePdfZoom'
 import { usePdfLayout, PAGE_GAP } from '../composables/usePdfLayout'
 import { usePdfRenderer } from '../composables/usePdfRenderer'
 import { useReaderProgress } from '../composables/useReaderProgress'
+import { useReaderSettings } from '../composables/useReaderSettings'
 import { useVisibility } from '../composables/useVisibility'
 import PdfSettingsPanel from './PdfSettingsPanel.vue'
 import type { PageDim } from '../composables/usePdf'
+import type { PdfReaderSettings } from '@projectx/types'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
 
 const { pdfDoc, totalPages, loading, error, load, getPageDim, renderPage, getTextContent } = usePdf()
 const progress = useReaderProgress(props.bookId, props.fileId)
+const bookSettings = useReaderSettings(props.fileId, 'pdf')
 const { headerVisible, showHeader } = useVisibility()
 
 // ── Container & scroll ────────────────────────────────────────────────────────
@@ -61,6 +64,7 @@ function onDimUpdate(pageNum: number, dim: PageDim) {
 const renderer = usePdfRenderer(renderPage, getTextContent, scale, rotation, totalPages, onDimUpdate)
 const { canvasMap, textLayerMap, invalidate, setupIO, reset, destroy } = renderer
 
+// ── Per-book settings save ─────────────────────────────────────────────────────
 // ── Invalidation ──────────────────────────────────────────────────────────────
 watch([scale, rotation], invalidate)
 
@@ -159,6 +163,21 @@ onMounted(async () => {
   onUnmounted(() => document.removeEventListener('fullscreenchange', onFsChange))
 
   await progress.load()
+  await bookSettings.load()
+
+  // Seed from effective (hardcoded fallback → format defaults → per-book delta)
+  const ps = bookSettings.effective.value as PdfReaderSettings
+  spread.value = ps.spread
+  zoomMode.value = ps.zoomMode
+  customScale.value = ps.customScale
+  scrollMode.value = ps.scrollMode
+
+  // Register per-field watches AFTER seeding so assignments above don't trigger saves.
+  watch(spread, (v) => bookSettings.updateBookSettings({ spread: v }))
+  watch(zoomMode, (v) => bookSettings.updateBookSettings({ zoomMode: v }))
+  watch(customScale, (v) => bookSettings.updateBookSettings({ customScale: v }))
+  watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v }))
+
   await load(props.fileId)
   if (!pdfDoc.value) return
 

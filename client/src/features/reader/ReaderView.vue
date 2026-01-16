@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useFoliate, type RelocateDetail } from './composables/useFoliate'
 import { useReaderProgress } from './composables/useReaderProgress'
 import { useReaderState } from './composables/useReaderState'
+import { useReaderSettings } from './composables/useReaderSettings'
 import { useVisibility } from './composables/useVisibility'
 import { useBookmarks } from './composables/useBookmarks'
 import { useAnnotations } from './composables/useAnnotations'
@@ -21,6 +22,7 @@ import PdfReaderView from './components/PdfReaderView.vue'
 import CbzReaderView from './components/CbzReaderView.vue'
 import type { ReaderState } from './composables/useReaderState'
 import type { FoliateRenderer } from './composables/useFoliate'
+import type { EpubReaderSettings } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,6 +38,11 @@ const searchInitialQuery = ref('')
 const isFullscreen = ref(false)
 const sectionFractions = ref<number[]>([])
 
+const bookSettings = useReaderSettings(fileId, fileFormat)
+// False when overrideBookFormatting is off and the book has no per-book delta.
+// Prevents injecting any CSS so the book renders with its own embedded styles.
+const shouldApplyStyles = ref(true)
+
 const readerState = useReaderState()
 const {
   state,
@@ -48,6 +55,7 @@ const {
   setMaxColumnCount,
   setGap,
   setMaxInlineSize,
+  setMaxBlockSize,
   setJustify,
   setHyphenate,
   setIsDark,
@@ -83,7 +91,9 @@ function onRelocateHandler(detail: RelocateDetail) {
 }
 
 function onApplyStylesHandler(renderer: FoliateRenderer) {
-  applyToRenderer(renderer)
+  if (shouldApplyStyles.value) {
+    applyToRenderer(renderer)
+  }
 }
 
 function onMiddleTapHandler() {
@@ -119,6 +129,18 @@ onMounted(async () => {
   onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
   await progress.load()
+
+  // Only epub-group formats use the epub reader; PDF/CBZ are rendered by child components
+  const isEpubFormat = !['pdf', 'cbz', 'cbr', 'cb7'].includes(fileFormat)
+  if (isEpubFormat) {
+    await bookSettings.load()
+    const effective = bookSettings.effective.value as EpubReaderSettings
+    shouldApplyStyles.value = effective.overrideBookFormatting || bookSettings.isCustomized.value
+    if (shouldApplyStyles.value) {
+      seedState(effective)
+    }
+  }
+
   await open(fileId, fileFormat, progress.cfi.value)
   setChapters(getChapters())
   sectionFractions.value = getSectionFractions()
@@ -129,25 +151,37 @@ onMounted(async () => {
   }
 })
 
-function applyUpdate(partial: Partial<ReaderState>) {
-  const setters: Record<string, (v: unknown) => void> = {
-    fontSize: (v) => setFontSize(v as number),
-    lineHeight: (v) => setLineHeight(v as number),
-    fontFamily: (v) => setFontFamily(v as string | null),
-    maxColumnCount: (v) => setMaxColumnCount(v as number),
-    gap: (v) => setGap(v as number),
-    maxInlineSize: (v) => setMaxInlineSize(v as number),
-    justify: (v) => setJustify(v as boolean),
-    hyphenate: (v) => setHyphenate(v as boolean),
-    isDark: (v) => setIsDark(v as boolean),
-    themeName: (v) => setThemeName(v as string),
-    flow: (v) => setFlow(v as 'paginated' | 'scrolled'),
-  }
+const epubSetters: Record<string, (v: unknown) => void> = {
+  fontSize: (v) => setFontSize(v as number),
+  lineHeight: (v) => setLineHeight(v as number),
+  fontFamily: (v) => setFontFamily(v as string | null),
+  maxColumnCount: (v) => setMaxColumnCount(v as number),
+  gap: (v) => setGap(v as number),
+  maxInlineSize: (v) => setMaxInlineSize(v as number),
+  maxBlockSize: (v) => setMaxBlockSize(v as number),
+  justify: (v) => setJustify(v as boolean),
+  hyphenate: (v) => setHyphenate(v as boolean),
+  isDark: (v) => setIsDark(v as boolean),
+  themeName: (v) => setThemeName(v as string),
+  flow: (v) => setFlow(v as 'paginated' | 'scrolled'),
+}
+
+// Applies settings to reactive refs (and renderer if open) without touching the delta.
+// Used for initial seeding on mount.
+function seedState(partial: Partial<ReaderState>) {
   for (const [key, value] of Object.entries(partial)) {
-    setters[key]?.(value)
+    epubSetters[key]?.(value)
   }
   const renderer = getRenderer()
   if (renderer) applyToRenderer(renderer)
+}
+
+// Applies a user-initiated change: updates reactive refs AND saves the changed field to delta.
+// Also enables style injection from this point forward (user has opted in by changing something).
+function applyUpdate(partial: Partial<ReaderState>) {
+  shouldApplyStyles.value = true
+  seedState(partial)
+  bookSettings.updateBookSettings(partial)
 }
 
 function toggleFullscreen() {
@@ -226,10 +260,9 @@ function navigateSearch(cfiTarget: string) {
   <div
     v-else
     class="fixed inset-0 overflow-hidden"
-    :style="{
-      background: activeMode.bg,
-      colorScheme: isDark ? 'dark' : 'light',
-    }"
+    :style="
+      shouldApplyStyles ? { background: activeMode.bg, colorScheme: isDark ? 'dark' : 'light' } : { background: '#ffffff', colorScheme: 'light' }
+    "
   >
     <div class="absolute top-0 left-0 right-0 z-40 h-20 pointer-events-auto" @mouseenter="showHeader()" />
 

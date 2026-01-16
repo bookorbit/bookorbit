@@ -51,9 +51,7 @@ async function scan(lib: LibraryType) {
 async function scanAll() {
   scanningAll.value = true
   try {
-    const results = await Promise.all(
-      libraries.value.map((lib) => api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })),
-    )
+    const results = await Promise.all(libraries.value.map((lib) => api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
     const failed = results.filter((r) => !r.ok).length
     if (failed === 0) {
       toast.success('Scan started for all libraries')

@@ -11,9 +11,7 @@
  */
 export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null, bookType = null) => {
   // Build a map of file paths to their manifest info for quick lookup
-  const manifestMap = new Map(
-    bookInfo.manifest.map(item => [item.href, item])
-  )
+  const manifestMap = new Map(bookInfo.manifest.map((item) => [item.href, item]))
 
   // Build URL for fetching a file
   const getFileUrl = (name) => {
@@ -32,8 +30,8 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     if (!authToken) return {}
     return {
       headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
+        Authorization: `Bearer ${authToken}`,
+      },
     }
   }
 
@@ -89,7 +87,7 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
       const blob = await response.blob()
       // Return with specified type or detected type
       if (type) {
-        return new Blob([blob], {type})
+        return new Blob([blob], { type })
       }
       return blob
     } catch (e) {
@@ -126,7 +124,7 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     getDirectUrl, // For lazy loading of fonts/images in CSS
     // Expose for debugging
     _bookInfo: bookInfo,
-    _manifestMap: manifestMap
+    _manifestMap: manifestMap,
   }
 }
 

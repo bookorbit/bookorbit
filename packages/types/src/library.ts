@@ -1,5 +1,5 @@
-export type OrganizationMode = 'auto' | 'book_per_file' | 'book_per_folder';
-export type AccessLevel = 'viewer' | 'editor' | 'owner';
+export type OrganizationMode = "auto" | "book_per_file" | "book_per_folder";
+export type AccessLevel = "viewer" | "editor" | "owner";
 
 export interface LibraryFolder {
   id: number;

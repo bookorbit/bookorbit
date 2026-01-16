@@ -1,5 +1,4 @@
-import { computed, ref, watch } from 'vue'
-import { storage } from '../../../services/storage'
+import { computed, ref } from 'vue'
 import { themes } from '../constants/themes'
 import type { ThemeMode } from '../constants/themes'
 import type { FoliateRenderer } from './useFoliate'
@@ -19,8 +18,6 @@ export interface ReaderState {
   flow: 'paginated' | 'scrolled'
 }
 
-const STORAGE_KEY = 'readerState'
-
 const defaults: ReaderState = {
   fontSize: 16,
   lineHeight: 1.5,
@@ -37,20 +34,18 @@ const defaults: ReaderState = {
 }
 
 export function useReaderState() {
-  const saved = storage.get<Partial<ReaderState>>(STORAGE_KEY, {})
-
-  const fontSize = ref(saved.fontSize ?? defaults.fontSize)
-  const lineHeight = ref(saved.lineHeight ?? defaults.lineHeight)
-  const fontFamily = ref<string | null>(saved.fontFamily ?? defaults.fontFamily)
-  const maxColumnCount = ref(saved.maxColumnCount ?? defaults.maxColumnCount)
-  const gap = ref(saved.gap ?? defaults.gap)
-  const maxInlineSize = ref(saved.maxInlineSize ?? defaults.maxInlineSize)
-  const maxBlockSize = ref(saved.maxBlockSize ?? defaults.maxBlockSize)
-  const justify = ref(saved.justify ?? defaults.justify)
-  const hyphenate = ref(saved.hyphenate ?? defaults.hyphenate)
-  const isDark = ref(saved.isDark ?? defaults.isDark)
-  const themeName = ref(saved.themeName ?? defaults.themeName)
-  const flow = ref<'paginated' | 'scrolled'>(saved.flow ?? defaults.flow)
+  const fontSize = ref(defaults.fontSize)
+  const lineHeight = ref(defaults.lineHeight)
+  const fontFamily = ref<string | null>(defaults.fontFamily)
+  const maxColumnCount = ref(defaults.maxColumnCount)
+  const gap = ref(defaults.gap)
+  const maxInlineSize = ref(defaults.maxInlineSize)
+  const maxBlockSize = ref(defaults.maxBlockSize)
+  const justify = ref(defaults.justify)
+  const hyphenate = ref(defaults.hyphenate)
+  const isDark = ref(defaults.isDark)
+  const themeName = ref(defaults.themeName)
+  const flow = ref<'paginated' | 'scrolled'>(defaults.flow)
 
   const state = computed<ReaderState>(() => ({
     fontSize: fontSize.value,
@@ -265,19 +260,6 @@ export function useReaderState() {
   function setFlow(v: 'paginated' | 'scrolled') {
     flow.value = v
   }
-
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-
-  watch(
-    state,
-    (val) => {
-      if (saveTimer) clearTimeout(saveTimer)
-      saveTimer = setTimeout(() => {
-        storage.set(STORAGE_KEY, val)
-      }, 500)
-    },
-    { deep: true },
-  )
 
   return {
     state,

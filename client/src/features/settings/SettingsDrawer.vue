@@ -10,6 +10,7 @@ import {
   BookOpen,
   FileText,
   BookImage,
+  Settings,
   Info,
   Users,
   ShieldCheck,
@@ -22,6 +23,7 @@ import { useThemeStore, BACKGROUND_OPTIONS } from '@/stores/theme'
 import LibrariesSettings from './LibrariesSettings.vue'
 import ScannerSettings from './ScannerSettings.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
+import ReaderSettings from './ReaderSettings.vue'
 import EbookSettings from './EbookSettings.vue'
 import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
@@ -36,7 +38,7 @@ const { isSuperuser, hasPermission, userPermissions } = usePermissions()
 const themeStore = useThemeStore()
 const bgClass = computed(() => BACKGROUND_OPTIONS.find((o) => o.id === themeStore.background)?.cssClass ?? '')
 
-type SectionId = 'libraries' | 'scanner' | 'appearance' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
+type SectionId = 'libraries' | 'scanner' | 'appearance' | 'reader' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
 
 const navGroups = computed(() => {
   const groups = [
@@ -51,6 +53,7 @@ const navGroups = computed(() => {
     {
       label: 'Reader',
       items: [
+        { id: 'reader' as SectionId, label: 'General', icon: Settings, component: ReaderSettings },
         { id: 'ebook' as SectionId, label: 'eBook', icon: BookOpen, component: EbookSettings },
         { id: 'pdf' as SectionId, label: 'PDF', icon: FileText, component: PdfSettings },
         { id: 'comics' as SectionId, label: 'Comics', icon: BookImage, component: ComicsSettings },

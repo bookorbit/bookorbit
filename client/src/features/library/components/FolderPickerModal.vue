@@ -84,21 +84,32 @@ function selectEntry(entry: DirEntry) {
     <div class="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="emit('close')" />
 
-      <div class="relative flex flex-col w-full max-w-lg bg-background rounded-xl shadow-2xl border border-border overflow-hidden" style="height: min(80vh, 560px)">
+      <div
+        class="relative flex flex-col w-full max-w-lg bg-background rounded-xl shadow-2xl border border-border overflow-hidden"
+        style="height: min(80vh, 560px)"
+      >
         <!-- Header -->
         <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div class="flex items-center gap-2">
             <HardDrive :size="15" class="text-primary" />
             <span class="text-sm font-semibold text-foreground">Browse folders</span>
           </div>
-          <button class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" @click="emit('close')">
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            @click="emit('close')"
+          >
             <X :size="14" />
           </button>
         </div>
 
         <!-- Breadcrumb -->
         <div class="flex items-center gap-1 px-4 py-2 border-b border-border bg-muted/30 shrink-0 overflow-x-auto">
-          <button v-if="canGoUp" class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-1" :title="'Go up'" @click="goUp">
+          <button
+            v-if="canGoUp"
+            class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-1"
+            :title="'Go up'"
+            @click="goUp"
+          >
             <ChevronUp :size="13" />
           </button>
           <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
@@ -116,7 +127,12 @@ function selectEntry(entry: DirEntry) {
         <!-- Search -->
         <div class="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
           <Search :size="13" class="text-muted-foreground shrink-0" />
-          <input v-model="search" type="text" placeholder="Filter folders…" class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Filter folders…"
+            class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+          />
           <button v-if="search" class="text-muted-foreground hover:text-foreground" @click="search = ''">
             <X :size="12" />
           </button>
@@ -155,10 +171,16 @@ function selectEntry(entry: DirEntry) {
         <div class="shrink-0 border-t border-border px-4 py-3 flex items-center justify-between gap-3 bg-muted/20">
           <p class="text-xs text-muted-foreground font-mono truncate">{{ currentPath }}</p>
           <div class="flex items-center gap-2 shrink-0">
-            <button class="px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" @click="emit('close')">
+            <button
+              class="px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="emit('close')"
+            >
               Cancel
             </button>
-            <button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity" @click="selectCurrent">
+            <button
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+              @click="selectCurrent"
+            >
               <Check :size="12" />
               Select this folder
             </button>

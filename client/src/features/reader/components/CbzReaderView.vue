@@ -6,7 +6,9 @@ import { useVisibility } from '../composables/useVisibility'
 import { useReaderProgress } from '../composables/useReaderProgress'
 import { useCbz } from '../composables/useCbz'
 import { useCbzSettings } from '../composables/useCbzSettings'
+import { useReaderSettings } from '../composables/useReaderSettings'
 import CbzSettingsPanel from './CbzSettingsPanel.vue'
+import type { CbxReaderSettings } from '@projectx/types'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
@@ -15,6 +17,7 @@ const progress = useReaderProgress(props.bookId, props.fileId)
 const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter } = useVisibility()
 const { pageCount, bookTitle, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
 const { fitMode, viewMode, scrollMode, direction, bgColor, bgValue, isTwoPage, imgFitClass } = useCbzSettings()
+const bookSettings = useReaderSettings(props.fileId, 'cbz')
 
 const currentPage = ref(0)
 const currentImageLoaded = ref(false)
@@ -188,6 +191,24 @@ watch(currentPage, (page) => {
 onMounted(async () => {
   window.addEventListener('keydown', onKeyDown)
   await progress.load()
+  await bookSettings.load()
+
+  // Seed refs from effective (hardcoded fallback → format defaults → per-book delta)
+  const s = bookSettings.effective.value as CbxReaderSettings
+  fitMode.value = s.fitMode
+  viewMode.value = s.viewMode
+  scrollMode.value = s.scrollMode
+  direction.value = s.direction
+  bgColor.value = s.bgColor
+
+  // Register per-field watches AFTER seeding so the assignments above don't trigger saves.
+  // Each watch sends only the one changed field to keep the delta minimal.
+  watch(fitMode, (v) => bookSettings.updateBookSettings({ fitMode: v }))
+  watch(viewMode, (v) => bookSettings.updateBookSettings({ viewMode: v }))
+  watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v }))
+  watch(direction, (v) => bookSettings.updateBookSettings({ direction: v }))
+  watch(bgColor, (v) => bookSettings.updateBookSettings({ bgColor: v }))
+
   await load()
   const saved = progress.pageNumber.value
   if (saved && saved > 1) currentPage.value = Math.min(saved - 1, pageCount.value - 1)

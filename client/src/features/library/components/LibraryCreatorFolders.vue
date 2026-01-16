@@ -74,7 +74,10 @@ function addManual() {
 }
 
 function onManualKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') { e.preventDefault(); addManual() }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    addManual()
+  }
 }
 </script>
 

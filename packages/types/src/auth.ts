@@ -1,52 +1,56 @@
 export interface Permission {
-  id: number
-  name: string
-  description?: string
-  isSystem: boolean
+  id: number;
+  name: string;
+  description?: string;
+  isSystem: boolean;
 }
 
 export interface Role {
-  id: number
-  name: string
-  description?: string
-  isSuperuser: boolean
-  isSystem: boolean
-  permissions: Permission[]
+  id: number;
+  name: string;
+  description?: string;
+  isSuperuser: boolean;
+  isSystem: boolean;
+  permissions: Permission[];
+}
+
+export interface UserSettings {
+  syncReaderPreferences?: boolean;
 }
 
 export interface AuthUser {
-  id: number
-  username: string
-  name: string
-  email?: string
-  active: boolean
-  isDefaultPassword: boolean
-  settings: Record<string, unknown>
-  avatarUrl?: string | null
-  provisioningMethod: 'local' | 'oidc'
-  roles: Role[]
-  permissions: string[] // flat list; '*' means superuser
+  id: number;
+  username: string;
+  name: string;
+  email?: string;
+  active: boolean;
+  isDefaultPassword: boolean;
+  settings: UserSettings;
+  avatarUrl?: string | null;
+  provisioningMethod: "local" | "oidc";
+  roles: Role[];
+  permissions: string[]; // flat list; '*' means superuser
 }
 
 export interface OidcPublicConfig {
-  enabled: boolean
-  providerName: string
-  issuerUri: string
-  clientId: string
-  scopes: string
+  enabled: boolean;
+  providerName: string;
+  issuerUri: string;
+  clientId: string;
+  scopes: string;
 }
 
 export interface AuthResponse {
-  accessToken: string
-  user: AuthUser
+  accessToken: string;
+  user: AuthUser;
 }
 
 export interface RefreshResponse {
-  accessToken: string
+  accessToken: string;
 }
 
 export interface Session {
-  id: number
-  createdAt: string
-  expiresAt: string
+  id: number;
+  createdAt: string;
+  expiresAt: string;
 }

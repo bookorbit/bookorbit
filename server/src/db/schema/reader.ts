@@ -1,4 +1,4 @@
-import { index, integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { bookFiles, books } from './books';
 import { users } from './auth';
@@ -69,3 +69,39 @@ export const annotations = pgTable(
 
 export type AnnotationRow = typeof annotations.$inferSelect;
 export type NewAnnotation = typeof annotations.$inferInsert;
+
+export const readerDefaultPreferences = pgTable(
+  'reader_default_preferences',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    formatGroup: varchar('format_group', { length: 10 }).notNull(),
+    settings: jsonb('settings').notNull(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('rdp_user_format_idx').on(t.userId, t.formatGroup)],
+);
+
+export type ReaderDefaultPreference = typeof readerDefaultPreferences.$inferSelect;
+export type NewReaderDefaultPreference = typeof readerDefaultPreferences.$inferInsert;
+
+export const readerPreferences = pgTable(
+  'reader_preferences',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    settings: jsonb('settings').notNull(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('rp_user_file_idx').on(t.userId, t.bookFileId)],
+);
+
+export type ReaderPreference = typeof readerPreferences.$inferSelect;
+export type NewReaderPreference = typeof readerPreferences.$inferInsert;

@@ -1,83 +1,87 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
+import { Monitor, Cloud } from 'lucide-vue-next'
+import { api } from '@/lib/api'
+import { useAuth } from '@/features/auth/composables/useAuth'
 
-const defaultFlow = ref('paginated')
-const rememberPosition = ref(true)
-const preloadPages = ref(true)
+const { user } = useAuth()
+
+const syncEnabled = computed(() => user.value?.settings?.syncReaderPreferences ?? false)
+
+async function setStorageMode(sync: boolean) {
+  if (!user.value || syncEnabled.value === sync) return
+  const res = await api('/api/users/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings: { syncReaderPreferences: sync } }),
+  })
+  if (res.ok) {
+    user.value = { ...user.value, settings: { ...user.value.settings, syncReaderPreferences: sync } }
+  }
+}
 </script>
 
 <template>
   <div class="px-5 py-6 sm:px-10 sm:py-8">
     <div class="mb-8">
       <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Reading</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Default behavior and preferences for the reader.</p>
+      <p class="mt-1 text-sm text-muted-foreground">General behavior that applies across all reader types.</p>
     </div>
 
-    <div class="border border-border rounded-lg overflow-hidden">
-      <!-- Remember position -->
-      <div class="flex items-center justify-between px-5 py-4 bg-card border-b border-border">
-        <div>
-          <p class="text-sm font-medium text-foreground">Remember position</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Resume from where you left off</p>
-        </div>
-        <button
-          class="w-11 h-6 rounded-full transition-colors relative shrink-0"
-          :class="rememberPosition ? 'bg-primary' : 'bg-muted'"
-          @click="rememberPosition = !rememberPosition"
+    <!-- Preference storage -->
+    <div class="mb-2">
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Where to save reader preferences</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- This device only -->
+        <div
+          class="flex items-start gap-4 px-5 py-4 rounded-xl border-2 cursor-pointer transition-colors"
+          :class="!syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'"
+          @click="setStorageMode(false)"
         >
           <div
-            class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
-            :class="rememberPosition ? 'translate-x-6' : 'translate-x-1'"
-          />
-        </button>
-      </div>
-
-      <!-- Preload pages -->
-      <div class="flex items-center justify-between px-5 py-4 bg-card border-b border-border">
-        <div>
-          <p class="text-sm font-medium text-foreground">Preload pages</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Load upcoming pages in the background (comic reader)</p>
-        </div>
-        <button
-          class="w-11 h-6 rounded-full transition-colors relative shrink-0"
-          :class="preloadPages ? 'bg-primary' : 'bg-muted'"
-          @click="preloadPages = !preloadPages"
-        >
-          <div
-            class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
-            :class="preloadPages ? 'translate-x-6' : 'translate-x-1'"
-          />
-        </button>
-      </div>
-
-      <!-- Default comic flow -->
-      <div class="flex items-center justify-between px-5 py-4 bg-card">
-        <div>
-          <p class="text-sm font-medium text-foreground">Default comic layout</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Starting scroll mode for CBZ / CBR / CB7</p>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <button
-            v-for="opt in [
-              { value: 'paginated', label: 'Paginated' },
-              { value: 'infinite', label: 'Infinite' },
-              { value: 'long-strip', label: 'Strip' },
-            ]"
-            :key="opt.value"
-            class="h-7 px-3 text-xs rounded-md border-2 transition-colors"
-            :class="
-              defaultFlow === opt.value
-                ? 'border-primary text-primary bg-primary/8'
-                : 'border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground'
-            "
-            @click="defaultFlow = opt.value"
+            class="mt-0.5 flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors"
+            :class="!syncEnabled ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
           >
-            {{ opt.label }}
-          </button>
+            <Monitor :size="16" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-sm font-medium text-foreground">This device only</span>
+              <span v-if="!syncEnabled" class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+                Active
+              </span>
+            </div>
+            <span class="block text-xs text-muted-foreground leading-relaxed">
+              Preferences stay in your browser. Best if you always read on this device, or want different settings per device.
+            </span>
+          </div>
+        </div>
+
+        <!-- My account -->
+        <div
+          class="flex items-start gap-4 px-5 py-4 rounded-xl border-2 cursor-pointer transition-colors"
+          :class="syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'"
+          @click="setStorageMode(true)"
+        >
+          <div
+            class="mt-0.5 flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors"
+            :class="syncEnabled ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
+          >
+            <Cloud :size="16" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-sm font-medium text-foreground">My account</span>
+              <span v-if="syncEnabled" class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+                Active
+              </span>
+            </div>
+            <span class="block text-xs text-muted-foreground leading-relaxed">
+              Preferences are saved to your account. Best if you log in from multiple devices and want a consistent experience everywhere.
+            </span>
+          </div>
         </div>
       </div>
     </div>
-
-    <p class="mt-4 text-xs text-muted-foreground">Reader preferences will be persisted in a future update.</p>
   </div>
 </template>
