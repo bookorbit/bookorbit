@@ -75,6 +75,10 @@ export class LibraryRepository {
     return this.db.insert(libraryFolders).values(data).returning();
   }
 
+  findBookIdsByLibrary(libraryId: number) {
+    return this.db.select({ id: books.id }).from(books).where(eq(books.libraryId, libraryId));
+  }
+
   delete(id: number) {
     return this.db.delete(libraries).where(eq(libraries.id, id));
   }

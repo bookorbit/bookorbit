@@ -1,5 +1,6 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { access, readdir, stat } from 'fs/promises';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { access, readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -13,7 +14,15 @@ import { LibraryRepository } from './library.repository';
 
 @Injectable()
 export class LibraryService {
-  constructor(private readonly libraryRepo: LibraryRepository) {}
+  private readonly logger = new Logger(LibraryService.name);
+  private readonly booksPath: string;
+
+  constructor(
+    private readonly libraryRepo: LibraryRepository,
+    private readonly config: ConfigService,
+  ) {
+    this.booksPath = this.config.get<string>('storage.booksPath')!;
+  }
 
   async verifyUserAccess(userId: number, libraryId: number, isSuperuser: boolean): Promise<void> {
     if (isSuperuser) return;
@@ -81,7 +90,15 @@ export class LibraryService {
   async remove(id: number) {
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
+
+    const bookRows = await this.libraryRepo.findBookIdsByLibrary(id);
     await this.libraryRepo.delete(id);
+
+    // Clean up cover/thumbnail directories for all deleted books (best-effort, non-blocking)
+    for (const { id: bookId } of bookRows) {
+      const coverDir = join(this.booksPath, 'covers', String(bookId));
+      rm(coverDir, { recursive: true, force: true }).catch((err) => this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`));
+    }
   }
 
   async prescan(dto: PrescanLibraryDto) {

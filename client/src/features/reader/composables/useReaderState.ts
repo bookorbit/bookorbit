@@ -28,7 +28,7 @@ const defaults: ReaderState = {
   maxBlockSize: 1440,
   justify: true,
   hyphenate: true,
-  isDark: true,
+  isDark: false,
   themeName: 'default',
   flow: 'paginated',
 }

@@ -6,7 +6,7 @@ export const scanJobs = pgTable('scan_jobs', {
   id: serial('id').primaryKey(),
   libraryId: integer('library_id')
     .notNull()
-    .references(() => libraries.id),
+    .references(() => libraries.id, { onDelete: 'cascade' }),
   status: varchar('status', { length: 20 }).notNull().default('running'),
   triggeredBy: varchar('triggered_by', { length: 20 }).notNull(),
   addedCount: integer('added_count').notNull().default(0),

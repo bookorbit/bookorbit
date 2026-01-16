@@ -134,6 +134,7 @@ export function useReaderSettings(bookFileId: number, format: string) {
 
   return {
     effective,
+    bookDelta,
     isCustomized,
     load,
     updateBookSettings,

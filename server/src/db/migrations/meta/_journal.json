@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1768596999296,
+      "when": 1768599599999,
       "tag": "0000_baseline",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768599599999,
+      "tag": "0001_add_scan_jobs_cascade",
       "breakpoints": true
     }
   ]

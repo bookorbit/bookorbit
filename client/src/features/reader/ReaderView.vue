@@ -135,9 +135,15 @@ onMounted(async () => {
   if (isEpubFormat) {
     await bookSettings.load()
     const effective = bookSettings.effective.value as EpubReaderSettings
-    shouldApplyStyles.value = effective.overrideBookFormatting || bookSettings.isCustomized.value
-    if (shouldApplyStyles.value) {
+    if (effective.overrideBookFormatting) {
+      shouldApplyStyles.value = true
       seedState(effective)
+    } else if (bookSettings.isCustomized.value) {
+      // Only apply the per-book delta - don't bleed global defaults like dark theme into the book
+      shouldApplyStyles.value = true
+      seedState(bookSettings.bookDelta.value as Partial<ReaderState>)
+    } else {
+      shouldApplyStyles.value = false
     }
   }
 

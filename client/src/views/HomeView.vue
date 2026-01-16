@@ -27,7 +27,7 @@ const libraryId = computed<number | null>(() => {
 
 const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
-const { books, total, loading, error, search, hasMore, load, onSearch } = useBooks(libraryId)
+const { books, total, loading, error, search, hasMore, load, onSearch, clear } = useBooks(libraryId)
 
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -61,7 +61,10 @@ onMounted(async () => {
 onUnmounted(() => observer?.disconnect())
 
 watch(libraryId, (newId, oldId) => {
-  if (newId !== null && newId !== oldId) {
+  if (newId === oldId) return
+  if (newId === null) {
+    clear()
+  } else {
     search.value = ''
     load(true)
   }

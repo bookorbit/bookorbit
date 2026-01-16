@@ -83,9 +83,15 @@ export function useBooks(libraryId: Ref<number | null>) {
     }
   }
 
+  function clear() {
+    books.value = []
+    total.value = 0
+    page.value = 0
+  }
+
   function onSearch() {
     load(true)
   }
 
-  return { books, total, loading, error, search, hasMore, load, onSearch }
+  return { books, total, loading, error, search, hasMore, load, onSearch, clear }
 }
