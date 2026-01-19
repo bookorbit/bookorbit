@@ -24,6 +24,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@projectx/types": "workspace:*",
     "7z-wasm": "^1.2.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/formbody": "^8.0.2",
@@ -34,8 +35,10 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/platform-fastify": "^11.1.11",
+    "@nestjs/platform-fastify": "^11.1.12",
+    "@nestjs/platform-socket.io": "^11.1.12",
     "@nestjs/schedule": "^6.1.0",
+    "@nestjs/websockets": "^11.1.12",
     "bcryptjs": "^3.0.3",
     "chokidar": "^4.0.3",
     "class-transformer": "^0.5.1",
@@ -48,10 +51,11 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-lib": "^1.17.1",
-    "pg": "^8.16.3",
+    "pg": "^8.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
     "unzipper": "^0.12.3"
   },
   "devDependencies": {
@@ -60,8 +64,8 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
-    "@swc/cli": "^0.7.9",
-    "@swc/core": "^1.15.8",
+    "@swc/cli": "^0.7.10",
+    "@swc/core": "^1.15.10",
     "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/chokidar": "^1.7.5",

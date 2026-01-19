@@ -5,6 +5,7 @@ import { join } from 'path';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { isPrimaryFormat } from '../scanner/lib/classify';
+import { ScannerService } from '../scanner/scanner.service';
 import { CreateLibraryDto } from './dto/create-library.dto';
 import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
@@ -20,6 +21,7 @@ export class LibraryService {
   constructor(
     private readonly libraryRepo: LibraryRepository,
     private readonly config: ConfigService,
+    private readonly scannerService: ScannerService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -61,6 +63,8 @@ export class LibraryService {
     });
 
     const folders = await Promise.all(dto.folders.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));
+
+    this.scannerService.startScanAsync(library.id);
 
     return { ...library, folders: folders.map(([f]) => f) };
   }

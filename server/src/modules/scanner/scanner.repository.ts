@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -28,6 +28,13 @@ export class ScannerRepository {
 
   async failScanJob(id: number, errorMessage: string) {
     await this.db.update(scanJobs).set({ status: 'failed', errorMessage, completedAt: new Date() }).where(eq(scanJobs.id, id));
+  }
+
+  async failAllRunningJobs(errorMessage: string): Promise<void> {
+    await this.db
+      .update(scanJobs)
+      .set({ status: 'failed', errorMessage, completedAt: new Date() })
+      .where(eq(scanJobs.status, 'running'));
   }
 
   // ── Library Folders ────────────────────────────────────────────────────────

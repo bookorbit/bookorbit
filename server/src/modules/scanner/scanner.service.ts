@@ -1,13 +1,17 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 
-const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'pdf']);
-
+import type { ScanProgressEvent } from '@projectx/types';
 import { MetadataService } from '../metadata/metadata.service';
+import { ScanGateway } from './scan.gateway';
+import { ScanJobStore } from './scan-job-store.service';
 import { classifyFile } from './lib/classify';
 import { sha256File } from './lib/hash';
 import { waitForStability } from './lib/stability';
 import { BookCandidate, FileStat, findBookCandidates } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
+
+const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'pdf']);
+const BATCH_SIZE = 5;
 
 interface ScanCounts {
   addedCount: number;
@@ -16,84 +20,205 @@ interface ScanCounts {
 }
 
 @Injectable()
-export class ScannerService {
+export class ScannerService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ScannerService.name);
 
   constructor(
     private readonly scannerRepo: ScannerRepository,
     private readonly metadataService: MetadataService,
+    private readonly scanJobStore: ScanJobStore,
+    private readonly scanGateway: ScanGateway,
   ) {}
 
-  async scan(libraryId: number, triggeredBy: 'manual' | 'watcher' | 'schedule' = 'manual') {
+  async onApplicationBootstrap(): Promise<void> {
+    await this.scannerRepo.failAllRunningJobs('Server restarted during scan');
+  }
+
+  async startScan(libraryId: number, triggeredBy: 'manual' | 'watcher' | 'schedule'): Promise<{ jobId: number }> {
+    if (this.scanJobStore.isRunning(libraryId)) {
+      throw new ConflictException(`A scan is already running for library ${libraryId}`);
+    }
+
     const folders = await this.scannerRepo.findLibraryFolders(libraryId);
     if (folders.length === 0) throw new NotFoundException(`Library ${libraryId} has no folders`);
 
     const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
-    this.logger.log(`Scan job ${job.id} started for library ${libraryId}`);
+
+    this.scanJobStore.create(job.id, libraryId, 0);
+    this.emitFromStore(libraryId, job.id, 'running');
+
+    this.runScan(libraryId, job.id, folders).catch((err) =>
+      this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`),
+    );
+
+    return { jobId: job.id };
+  }
+
+  startScanAsync(libraryId: number): void {
+    if (this.scanJobStore.isRunning(libraryId)) return;
+    this.startScan(libraryId, 'manual').catch((err) =>
+      this.logger.error(`Auto-scan failed to start for library ${libraryId}: ${(err as Error).message}`),
+    );
+  }
+
+  private async runScan(
+    libraryId: number,
+    jobId: number,
+    folders: Awaited<ReturnType<ScannerRepository['findLibraryFolders']>>,
+  ): Promise<void> {
+    this.logger.log(`Scan job ${jobId} started for library ${libraryId}`);
+
+    type FolderWork = {
+      id: number;
+      libraryId: number;
+      path: string;
+      candidates: BookCandidate[];
+      knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>;
+      knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>;
+    };
+
+    const folderWork: FolderWork[] = [];
+    let totalCandidates = 0;
+
+    for (const folder of folders) {
+      let candidates: BookCandidate[] = [];
+      try {
+        candidates = await findBookCandidates(folder.path);
+      } catch (err) {
+        this.logger.warn(`Cannot walk ${folder.path}: ${err}`);
+      }
+
+      const [knownBooks, knownFiles] = await Promise.all([
+        this.scannerRepo.findBooksByLibraryFolder(folder.id),
+        this.scannerRepo.findBookFilesByLibraryFolder(folder.id),
+      ]);
+
+      folderWork.push({ ...folder, candidates, knownBooks, knownFiles });
+      totalCandidates += candidates.length;
+    }
+
+    this.scanJobStore.setTotal(libraryId, totalCandidates);
+    this.emitFromStore(libraryId, jobId, 'running');
 
     const totals: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
     try {
-      for (const folder of folders) {
-        this.logger.log(`Scanning folder: ${folder.path}`);
-        const counts = await this.scanFolder(folder.id, folder.libraryId, folder.path);
+      for (const { id: folderId, path: folderPath, candidates, knownBooks, knownFiles } of folderWork) {
+        const counts = await this.scanFolderCandidates(
+          folderId,
+          libraryId,
+          folderPath,
+          candidates,
+          knownBooks,
+          knownFiles,
+          jobId,
+        );
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;
       }
 
-      await this.scannerRepo.completeScanJob(job.id, totals);
-      this.logger.log(`Scan job ${job.id} completed — ${JSON.stringify(totals)}`);
+      await this.scannerRepo.completeScanJob(jobId, totals);
+      this.logger.log(`Scan job ${jobId} completed — ${JSON.stringify(totals)}`);
+      this.emitFromStore(libraryId, jobId, 'completed');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await this.scannerRepo.failScanJob(job.id, message);
-      this.logger.error(`Scan job ${job.id} failed: ${message}`);
-      throw err;
+      await this.scannerRepo.failScanJob(jobId, message).catch(() => {
+        // Job row may have been cascade-deleted if library was deleted.
+      });
+      this.logger.error(`Scan job ${jobId} failed: ${message}`);
+      this.emitFromStore(libraryId, jobId, 'failed', message);
+    } finally {
+      this.scanJobStore.delete(libraryId);
     }
-
-    return { jobId: job.id, ...totals };
   }
 
-  private async scanFolder(libraryFolderId: number, libraryId: number, folderPath: string): Promise<ScanCounts> {
+  private async scanFolderCandidates(
+    libraryFolderId: number,
+    libraryId: number,
+    folderPath: string,
+    candidates: BookCandidate[],
+    knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>,
+    knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>,
+    jobId: number,
+  ): Promise<ScanCounts> {
     const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
-
-    const [knownBooks, knownFiles] = await Promise.all([
-      this.scannerRepo.findBooksByLibraryFolder(libraryFolderId),
-      this.scannerRepo.findBookFilesByLibraryFolder(libraryFolderId),
-    ]);
 
     const bookByFolderPath = new Map(knownBooks.map((b) => [b.folderPath, b]));
     const fileByPath = new Map(knownFiles.map((f) => [f.absolutePath, f]));
     const fileByIno = new Map(knownFiles.map((f) => [f.ino, f]));
     const seenBookIds = new Set<number>();
 
-    let candidates: BookCandidate[];
-    try {
-      candidates = await findBookCandidates(folderPath);
-    } catch (err) {
-      this.logger.warn(`Cannot walk ${folderPath}: ${err}`);
-      return counts;
-    }
+    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+      const batch = candidates.slice(i, i + BATCH_SIZE);
 
-    for (const candidate of candidates) {
-      const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, counts);
-      seenBookIds.add(book.id);
+      const results = await Promise.all(
+        batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, bookByFolderPath, fileByPath, fileByIno)),
+      );
 
-      for (const fileStat of candidate.files) {
-        const { format } = classifyFile(fileStat.absolutePath);
-        const isNew = await this.processFile(fileStat, book.id, libraryFolderId, fileByPath, fileByIno, counts);
-        if (isNew && format && METADATA_FORMATS.has(format)) {
-          await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
-        }
+      for (const r of results) {
+        seenBookIds.add(r.bookId);
+        counts.addedCount += r.added;
+        counts.updatedCount += r.updated;
+      }
+
+      const entry = this.scanJobStore.increment(libraryId, { processed: batch.length });
+      if (entry && this.scanJobStore.shouldEmit(entry)) {
+        this.emitFromStore(libraryId, jobId, 'running');
+        this.scanJobStore.markEmitted(entry);
       }
     }
 
     const missingIds = knownBooks.filter((b) => !seenBookIds.has(b.id)).map((b) => b.id);
-
-    await this.scannerRepo.markBooksAsMissing(missingIds);
-    counts.missingCount += missingIds.length;
+    if (missingIds.length > 0) {
+      await this.scannerRepo.markBooksAsMissing(missingIds);
+      counts.missingCount += missingIds.length;
+      this.scanJobStore.increment(libraryId, { missing: missingIds.length });
+    }
 
     return counts;
+  }
+
+  private async processCandidate(
+    candidate: BookCandidate,
+    libraryId: number,
+    libraryFolderId: number,
+    bookByFolderPath: Map<string, { id: number; status: string; folderPath: string }>,
+    fileByPath: Map<string, { id: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
+    fileByIno: Map<number, { id: number; absolutePath: string }>,
+  ): Promise<{ bookId: number; added: number; updated: number }> {
+    const counts = { added: 0, updated: 0 };
+    const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
+
+    const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, fileCounts);
+    counts.added += fileCounts.addedCount;
+    counts.updated += fileCounts.updatedCount;
+
+    for (const fileStat of candidate.files) {
+      const { format } = classifyFile(fileStat.absolutePath);
+      const fileCount: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
+      let isNew: boolean;
+
+      try {
+        isNew = await this.processFile(fileStat, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
+      } catch (err) {
+        this.logger.warn(`Failed to process file ${fileStat.absolutePath}: ${err}`);
+        continue;
+      }
+
+      counts.added += fileCount.addedCount;
+      counts.updated += fileCount.updatedCount;
+
+      if (isNew && format && METADATA_FORMATS.has(format)) {
+        try {
+          await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
+        } catch (err) {
+          this.logger.warn(`Metadata extraction failed for ${fileStat.absolutePath}: ${err}`);
+        }
+      }
+    }
+
+    return { bookId: book.id, ...counts };
   }
 
   private async upsertBook(
@@ -124,7 +249,6 @@ export class ScannerService {
     return existing;
   }
 
-  // Returns true if a new file record was created (triggers metadata extraction).
   private async processFile(
     fileStat: FileStat,
     bookId: number,
@@ -141,7 +265,6 @@ export class ScannerService {
     const byPath = fileByPath.get(fileStat.absolutePath);
     if (byPath) {
       const changed = fileStat.sizeBytes !== byPath.sizeBytes || fileStat.mtime.getTime() !== byPath.mtime?.getTime();
-
       if (changed) {
         await this.scannerRepo.updateBookFile(byPath.id, {
           ino: fileStat.ino,
@@ -202,5 +325,21 @@ export class ScannerService {
     });
     counts.addedCount++;
     return true;
+  }
+
+  private emitFromStore(libraryId: number, jobId: number, status: 'running' | 'completed' | 'failed', errorMessage?: string): void {
+    const entry = this.scanJobStore.get(libraryId);
+    const event: ScanProgressEvent = {
+      jobId,
+      libraryId,
+      status,
+      processed: entry?.processed ?? 0,
+      total: entry?.total ?? 0,
+      added: entry?.added ?? 0,
+      updated: entry?.updated ?? 0,
+      missing: entry?.missing ?? 0,
+      errorMessage,
+    };
+    this.scanGateway.emitProgress(event);
   }
 }

@@ -1,14 +1,29 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 
+import { AuthModule } from '../auth/auth.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { ScanGateway } from './scan.gateway';
+import { ScanJobStore } from './scan-job-store.service';
 import { ScannerController } from './scanner.controller';
 import { ScannerRepository } from './scanner.repository';
 import { ScannerService } from './scanner.service';
 
 @Module({
-  imports: [MetadataModule],
+  imports: [
+    MetadataModule,
+    AuthModule,
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('auth.jwtSecret'),
+        signOptions: { expiresIn: config.get('auth.jwtExpiresIn') as any },
+      }),
+    }),
+  ],
   controllers: [ScannerController],
-  providers: [ScannerService, ScannerRepository],
+  providers: [ScannerService, ScannerRepository, ScanGateway, ScanJobStore],
   exports: [ScannerService],
 })
 export class ScannerModule {}

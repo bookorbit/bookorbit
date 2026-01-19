@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Library } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -7,16 +7,18 @@ import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 
 const route = useRoute()
 const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
+const { subscribeLibrary, getProgress, isScanning, progressMap } = useScanProgress()
 
 const stats = ref<Record<number, LibraryStats>>({})
-const scanning = ref<Record<number, boolean>>({})
 const scanningAll = ref(false)
 const creatorOpen = ref(false)
 const editingLibrary = ref<LibraryType | null>(null)
+const pendingNavigateLibraryId = ref<number | null>(null)
 const deletingLibrary = ref<LibraryType | null>(null)
 const deleteConfirmName = ref('')
 const deleting = ref(false)
@@ -30,24 +32,48 @@ async function loadAllStats() {
   )
 }
 
+function subscribeAll() {
+  for (const lib of libraries.value) {
+    subscribeLibrary(lib.id)
+  }
+}
+
 onMounted(async () => {
+  getSocket()
   await fetchLibraries()
+  subscribeAll()
   loadAllStats()
 })
 
+const statsReloadedFor = new Set<number>()
+
+watch(progressMap, (map) => {
+  for (const [libraryId, event] of map) {
+    if (event.status === 'completed' && !statsReloadedFor.has(libraryId)) {
+      statsReloadedFor.add(libraryId)
+      api(`/api/libraries/${libraryId}/stats`).then(async (res) => {
+        if (res.ok) stats.value[libraryId] = await res.json()
+        setTimeout(() => statsReloadedFor.delete(libraryId), 5000)
+      })
+      if (pendingNavigateLibraryId.value === libraryId) {
+        pendingNavigateLibraryId.value = null
+        router.push({ name: 'library', params: { id: libraryId } })
+      }
+    }
+  }
+})
+
 async function scan(lib: LibraryType) {
-  scanning.value[lib.id] = true
   try {
     const res = await api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
     if (res.ok) {
       toast.success(`Scan started for "${lib.name}"`)
+      subscribeLibrary(lib.id)
     } else {
       toast.error(`Failed to start scan for "${lib.name}"`)
     }
   } catch {
     toast.error(`Failed to start scan for "${lib.name}"`)
-  } finally {
-    scanning.value[lib.id] = false
   }
 }
 
@@ -58,6 +84,7 @@ async function scanAll() {
     const failed = results.filter((r) => !r.ok).length
     if (failed === 0) {
       toast.success('Scan started for all libraries')
+      subscribeAll()
     } else {
       toast.error(`${failed} librar${failed === 1 ? 'y' : 'ies'} failed to start`)
     }
@@ -79,8 +106,11 @@ function openEdit(lib: LibraryType) {
 }
 
 async function onSaved(library: LibraryType) {
+  const isNew = !editingLibrary.value
   creatorOpen.value = false
   editingLibrary.value = null
+  subscribeLibrary(library.id)
+  if (isNew) pendingNavigateLibraryId.value = library.id
   await fetchLibraries()
   loadAllStats()
 }
@@ -129,8 +159,20 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
+function scanProgressLabel(libraryId: number): string {
+  const p = getProgress(libraryId)
+  if (!p) return ''
+  if (p.status === 'running') {
+    if (p.total === 0) return 'Scanning...'
+    const pct = Math.floor((p.processed / p.total) * 100)
+    return `Scanning ${pct}% (${p.processed}/${p.total})`
+  }
+  if (p.status === 'completed') return `Done - ${p.added} added, ${p.updated} updated`
+  if (p.status === 'failed') return p.errorMessage ? `Failed: ${p.errorMessage}` : 'Scan failed'
+  return ''
+}
+
 function iconComponent(iconName: string | null | undefined) {
-  // Dynamic Lucide icon lookup via pre-imported default
   return iconName ? null : Library
 }
 </script>
@@ -150,7 +192,7 @@ function iconComponent(iconName: string | null | undefined) {
           @click="scanAll"
         >
           <RefreshCw :size="12" :class="scanningAll ? 'animate-spin' : ''" />
-          {{ scanningAll ? 'Scanning…' : 'Scan All' }}
+          {{ scanningAll ? 'Scanning...' : 'Scan All' }}
         </button>
         <button
           class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
@@ -166,11 +208,18 @@ function iconComponent(iconName: string | null | undefined) {
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
       <div v-for="lib in libraries" :key="lib.id" class="bg-card px-5 py-4">
         <div class="flex items-center gap-4">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <RouterLink
+            :to="{ name: 'library', params: { id: lib.id } }"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
+          >
             <FolderOpen :size="17" class="text-primary" />
-          </div>
+          </RouterLink>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-foreground truncate">{{ lib.name }}</p>
+            <RouterLink
+              :to="{ name: 'library', params: { id: lib.id } }"
+              class="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block"
+              >{{ lib.name }}</RouterLink
+            >
             <div class="flex items-center gap-3 mt-0.5">
               <span v-if="stats[lib.id]" class="text-xs text-muted-foreground">
                 {{ stats[lib.id].totalBooks }} book{{ stats[lib.id].totalBooks === 1 ? '' : 's' }}
@@ -180,6 +229,24 @@ function iconComponent(iconName: string | null | undefined) {
                 Added {{ new Date(lib.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) }}
               </span>
               <span v-if="lib.watch" class="text-xs text-primary/70">Watching</span>
+            </div>
+            <!-- Scan progress bar -->
+            <div v-if="getProgress(lib.id)" class="mt-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs" :class="getProgress(lib.id)?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'">
+                  {{ scanProgressLabel(lib.id) }}
+                </span>
+              </div>
+              <div v-if="getProgress(lib.id)?.status === 'running'" class="h-1 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-primary transition-all duration-300"
+                  :style="{
+                    width:
+                      getProgress(lib.id)!.total > 0 ? `${Math.floor((getProgress(lib.id)!.processed / getProgress(lib.id)!.total) * 100)}%` : '100%',
+                    animation: getProgress(lib.id)!.total === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                  }"
+                />
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
@@ -199,11 +266,11 @@ function iconComponent(iconName: string | null | undefined) {
             </button>
             <button
               class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
-              :disabled="scanning[lib.id]"
+              :disabled="isScanning(lib.id)"
               @click="scan(lib)"
             >
-              <RefreshCw :size="12" :class="scanning[lib.id] ? 'animate-spin' : ''" />
-              {{ scanning[lib.id] ? 'Scanning…' : 'Scan' }}
+              <RefreshCw :size="12" :class="isScanning(lib.id) ? 'animate-spin' : ''" />
+              {{ isScanning(lib.id) ? 'Scanning...' : 'Scan' }}
             </button>
           </div>
         </div>
