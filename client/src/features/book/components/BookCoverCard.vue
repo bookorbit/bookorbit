@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { Book, BookFile } from '../composables/useBooks'
-import { bookCoverStyle } from '../composables/useBooks'
+import type { BookCard, BookFileRef } from '@projectx/types'
+import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const props = defineProps<{ book: Book }>()
+const props = defineProps<{ book: BookCard }>()
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -23,7 +23,7 @@ const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.file
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
 
-function openFile(file: BookFile) {
+function openFile(file: BookFileRef) {
   router.push({
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },

@@ -1,8 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 
+import type { BookQuery } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { BookQueryPipe } from '../book/pipes/book-query.pipe';
+import { BookService } from '../book/book.service';
 import { CreateLibraryDto } from './dto/create-library.dto';
 import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
@@ -13,7 +16,10 @@ import { LibraryService } from './library.service';
 
 @Controller('libraries')
 export class LibraryController {
-  constructor(private readonly libraryService: LibraryService) {}
+  constructor(
+    private readonly libraryService: LibraryService,
+    private readonly bookService: BookService,
+  ) {}
 
   @Get()
   findAll(@CurrentUser() user: RequestUser) {
@@ -24,6 +30,11 @@ export class LibraryController {
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     const isSuperuser = user.roles.some((r) => r.isSuperuser);
     return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.findOne(id));
+  }
+
+  @Post(':id/books')
+  queryBooks(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+    return this.bookService.queryForLibrary(user, libraryId, query);
   }
 
   @Post()

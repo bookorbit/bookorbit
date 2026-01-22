@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { access, readdir, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
+import type { BookCard, BookQuery, BooksPage } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { LibraryService } from '../library/library.service';
+import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
-import { BookCardDto } from './dto/book-card.dto';
 import { BookDetailDto } from './dto/book-detail.dto';
-import { GetBooksDto } from './dto/get-books.dto';
+import { SaveProgressDto } from './dto/save-progress.dto';
 
 @Injectable()
 export class BookService {
@@ -17,6 +18,7 @@ export class BookService {
   constructor(
     private readonly bookRepo: BookRepository,
     private readonly libraryService: LibraryService,
+    private readonly queryBuilder: BookQueryBuilder,
     private readonly config: ConfigService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
@@ -39,11 +41,11 @@ export class BookService {
     return file;
   }
 
-  async getCards(dto: GetBooksDto, user: RequestUser): Promise<{ items: BookCardDto[]; total: number; page: number; size: number }> {
-    await this.libraryService.verifyUserAccess(user.id, dto.libraryId, this.isSuperuser(user));
-    const { libraryId, page = 0, size = 50, search } = dto;
-    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards(libraryId, { page, size, search });
-
+  private assembleBookCards(
+    rows: { id: number; status: string; folderPath: string; title: string | null; seriesName: string | null; seriesIndex: number | null }[],
+    authorRows: { bookId: number; name: string }[],
+    fileRows: { bookId: number; id: number; format: string | null; role: string }[],
+  ): BookCard[] {
     const authorsByBook = new Map<number, string[]>();
     for (const row of authorRows) {
       const list = authorsByBook.get(row.bookId) ?? [];
@@ -58,7 +60,7 @@ export class BookService {
       filesByBook.set(row.bookId, list);
     }
 
-    const items: BookCardDto[] = rows.map((row) => ({
+    return rows.map((row) => ({
       id: row.id,
       status: row.status,
       title: row.title ?? basename(row.folderPath),
@@ -67,8 +69,33 @@ export class BookService {
       authors: authorsByBook.get(row.id) ?? [],
       files: filesByBook.get(row.id) ?? [],
     }));
+  }
 
-    return { items, total, page, size };
+  async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
+    await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId });
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort);
+    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards({
+      where,
+      orderBy,
+      limit: query.pagination.size,
+      offset: query.pagination.page * query.pagination.size,
+    });
+    return { items: this.assembleBookCards(rows, authorRows, fileRows), total, page: query.pagination.page, size: query.pagination.size };
+  }
+
+  async globalQuery(user: RequestUser, query: BookQuery): Promise<BooksPage> {
+    const libs = await this.libraryService.findAll(user);
+    const accessibleLibraryIds = libs.map((l) => l.id);
+    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds });
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort);
+    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards({
+      where,
+      orderBy,
+      limit: query.pagination.size,
+      offset: query.pagination.page * query.pagination.size,
+    });
+    return { items: this.assembleBookCards(rows, authorRows, fileRows), total, page: query.pagination.page, size: query.pagination.size };
   }
 
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
@@ -108,12 +135,7 @@ export class BookService {
     return this.bookRepo.findProgress(userId, fileId);
   }
 
-  async saveProgress(
-    userId: number,
-    fileId: number,
-    dto: { cfi?: string | null; pageNumber?: number | null; percentage: number },
-    user: RequestUser,
-  ) {
+  async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     await this.verifyFileAccess(fileId, user);
     await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage);
   }

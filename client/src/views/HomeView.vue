@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, X } from 'lucide-vue-next'
+import { ArrowDownAZ, ArrowUpAZ, Filter, X } from 'lucide-vue-next'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
+import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { useBooks } from '@/features/book/composables/useBooks'
+import { useBookQuery } from '@/features/book/composables/useBookQuery'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
+import type { SortField } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,7 +29,38 @@ const libraryId = computed<number | null>(() => {
 
 const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
-const { books, total, loading, error, search, hasMore, load, onSearch, clear } = useBooks(libraryId)
+const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+
+const filterOpen = ref(false)
+
+const SORT_FIELD_LABELS: Record<SortField, string> = {
+  title: 'Title',
+  addedAt: 'Date Added',
+  publishedYear: 'Published Year',
+  pageCount: 'Page Count',
+  seriesIndex: 'Series Index',
+}
+
+const sortField = computed({
+  get: () => sort.value[0]?.field ?? 'title',
+  set: (field: SortField) => {
+    sort.value = [{ field, dir: sort.value[0]?.dir ?? 'asc' }]
+    load(true)
+  },
+})
+
+const sortDir = computed(() => sort.value[0]?.dir ?? 'asc')
+
+function toggleSortDir() {
+  sort.value = [{ field: sortField.value, dir: sortDir.value === 'asc' ? 'desc' : 'asc' }]
+  load(true)
+}
+
+const activeFilterCount = computed(() => filter.value?.rules?.length ?? 0)
+
+function clearFilters() {
+  filter.value = undefined
+}
 
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -46,7 +79,7 @@ onMounted(async () => {
   if (!libraryId.value && libraries.value.length > 0) {
     router.replace({ name: 'library', params: { id: libraries.value[0]!.id } })
   } else {
-    load()
+    load(true)
   }
 
   observer = new IntersectionObserver(
@@ -60,24 +93,14 @@ onMounted(async () => {
 
 onUnmounted(() => observer?.disconnect())
 
-watch(libraryId, (newId, oldId) => {
-  if (newId === oldId) return
-  if (newId === null) {
-    clear()
-  } else {
-    search.value = ''
-    load(true)
-  }
+watch(libraryId, (newId) => {
+  if (newId === null) clear()
 })
+
+watch(filter, () => load(true), { deep: true })
 
 watch(loading, (isLoading) => {
   if (!isLoading) loadIfSentinelVisible()
-})
-
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-watch(search, () => {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(onSearch, 300)
 })
 </script>
 
@@ -99,17 +122,60 @@ watch(search, () => {
       <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
         <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
-        <!-- Library filter -->
-        <div class="relative mb-4 max-w-xs">
-          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" :size="13" />
-          <input
-            v-model="search"
-            placeholder="Filter library..."
-            class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-          />
-          <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-            <X :size="13" />
+        <!-- Sort + filter toolbar -->
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <!-- Sort field -->
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-muted-foreground">Sort:</span>
+            <select
+              :value="sortField"
+              @change="sortField = ($event.target as HTMLSelectElement).value as SortField"
+              class="h-8 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option v-for="(label, field) in SORT_FIELD_LABELS" :key="field" :value="field">{{ label }}</option>
+            </select>
+            <button
+              @click="toggleSortDir"
+              class="h-8 w-8 flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              :title="sortDir === 'asc' ? 'Ascending' : 'Descending'"
+            >
+              <ArrowDownAZ v-if="sortDir === 'asc'" :size="15" />
+              <ArrowUpAZ v-else :size="15" />
+            </button>
+          </div>
+
+          <div class="w-px h-5 bg-border" />
+
+          <!-- Filter toggle -->
+          <button
+            @click="filterOpen = !filterOpen"
+            class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
+            :class="
+              activeFilterCount > 0
+                ? 'border-primary text-primary bg-primary/10'
+                : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+            "
+          >
+            <Filter :size="13" />
+            <span>Filters</span>
+            <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
           </button>
+
+          <!-- Clear filters -->
+          <button
+            v-if="activeFilterCount > 0"
+            @click="clearFilters"
+            class="flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
+            title="Clear all filters"
+          >
+            <X :size="13" />
+            Clear
+          </button>
+        </div>
+
+        <!-- Filter builder panel -->
+        <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
+          <BookFilterBuilder v-model="filter" />
         </div>
 
         <!-- Grid view -->
@@ -137,8 +203,8 @@ watch(search, () => {
         </div>
 
         <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-          <span v-if="loading" class="text-xs text-muted-foreground">Loading…</span>
-          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
+          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
         </div>
       </main>
     </SidebarInset>

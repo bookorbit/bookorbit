@@ -1,14 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
+import { BookModule } from '../book/book.module';
 import { ScannerModule } from '../scanner/scanner.module';
 import { LibraryController } from './library.controller';
 import { LibraryRepository } from './library.repository';
 import { LibraryService } from './library.service';
 
 @Module({
-  imports: [ScannerModule],
+  imports: [ScannerModule, forwardRef(() => BookModule)],
   controllers: [LibraryController],
   providers: [LibraryService, LibraryRepository],
-  exports: [LibraryService],
+  exports: [LibraryService, LibraryRepository],
 })
 export class LibraryModule {}

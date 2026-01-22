@@ -191,6 +191,8 @@ function navigateToResult(result: GlobalSearchResult) {
 
       <!-- Right: actions -->
       <div class="ml-auto flex items-center gap-1">
+        <slot name="actions" />
+
         <!-- Mobile: search icon -->
         <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground" @click="mobileSearchOpen = true">
           <Search :size="15" />

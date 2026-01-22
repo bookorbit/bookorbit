@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, ilike, inArray, sql } from 'drizzle-orm';
+import { SQL, and, count, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -12,13 +12,8 @@ type Db = NodePgDatabase<typeof schema>;
 export class BookRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async findCards(libraryId: number, opts: { page: number; size: number; search?: string }) {
-    const { page, size, search } = opts;
-    const offset = page * size;
-
-    const searchFilter = search?.trim() ? ilike(bookMetadata.title, `%${search.trim()}%`) : undefined;
-
-    const where = and(eq(books.libraryId, libraryId), searchFilter);
+  async findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number }) {
+    const { where, orderBy, limit, offset } = opts;
 
     const [rows, [{ total }]] = await Promise.all([
       this.db
@@ -33,8 +28,8 @@ export class BookRepository {
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(where)
-        .orderBy(bookMetadata.title)
-        .limit(size)
+        .orderBy(...orderBy)
+        .limit(limit)
         .offset(offset),
       this.db.select({ total: count() }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where),
     ]);
@@ -132,7 +127,7 @@ export class BookRepository {
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .innerJoin(libraries, eq(libraries.id, books.libraryId))
-      .where(and(inArray(books.libraryId, libraryIds), ilike(bookMetadata.title, `%${q}%`)))
+      .where(and(inArray(books.libraryId, libraryIds), sql`${bookMetadata.title} ILIKE ${'%' + q + '%'}`))
       .orderBy(bookMetadata.title)
       .limit(limit);
 

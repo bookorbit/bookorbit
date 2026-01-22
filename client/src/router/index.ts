@@ -16,6 +16,11 @@ const router = createRouter({
       component: HomeView,
     },
     {
+      path: '/lens/:id',
+      name: 'lens',
+      component: () => import('@/views/LensView.vue'),
+    },
+    {
       path: '/read/:bookId/:fileId',
       name: 'reader',
       component: () => import('@/features/reader/ReaderView.vue'),

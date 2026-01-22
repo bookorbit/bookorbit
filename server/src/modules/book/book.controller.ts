@@ -5,23 +5,24 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from './book.service';
-import { GetBooksDto } from './dto/get-books.dto';
+import { BookQueryPipe } from './pipes/book-query.pipe';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
+import type { BookQuery } from '@projectx/types';
 
 @Controller('books')
 export class BookController {
   constructor(private readonly bookService: BookService) {}
 
-  @Get()
-  getCards(@Query() dto: GetBooksDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.getCards(dto, user);
-  }
-
   // Must be before @Get(':id') so NestJS does not treat 'search' as an :id param
   @Get('search')
   searchBooks(@Query() dto: SearchBooksDto, @CurrentUser() user: RequestUser) {
     return this.bookService.searchAcrossLibraries(dto.q, dto.limit ?? 10, user);
+  }
+
+  @Post('query')
+  globalQuery(@Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+    return this.bookService.globalQuery(user, query);
   }
 
   @Get(':id/cover')

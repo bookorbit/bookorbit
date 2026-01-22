@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import * as Icons from 'lucide-vue-next'
-import { BookMarked, Clock, BookOpen, Settings, LogOut, KeyRound } from 'lucide-vue-next'
-import { computed, onMounted } from 'vue'
+import { Aperture, BookMarked, Clock, BookOpen, Plus, Settings, LogOut, KeyRound } from 'lucide-vue-next'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -21,6 +22,8 @@ import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLenses } from '@/features/lens/composables/useLenses'
+import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 
 const { open: openSettings } = useSettingsDrawer()
 const { open: openChangePassword } = useChangePasswordDialog()
@@ -28,10 +31,18 @@ const { user, logout } = useAuth()
 const router = useRouter()
 const route = useRoute()
 const { libraries, fetchLibraries } = useLibraries()
+const { lenses, fetchLenses } = useLenses()
+
+const createLensOpen = ref(false)
 
 const activeLibraryId = computed(() => {
   const id = route.params.id
-  return id ? Number(id) : null
+  return route.name === 'library' && id ? Number(id) : null
+})
+
+const activeLensId = computed(() => {
+  const id = route.params.id
+  return route.name === 'lens' && id ? Number(id) : null
 })
 
 function getLibraryIcon(name: string | null | undefined) {
@@ -39,10 +50,20 @@ function getLibraryIcon(name: string | null | undefined) {
   return Icons.BookCopy
 }
 
-onMounted(fetchLibraries)
+function getLensIcon(name: string | null | undefined) {
+  if (name && name in Icons) return (Icons as Record<string, unknown>)[name]
+  return Aperture
+}
+
+onMounted(() => {
+  fetchLibraries()
+  fetchLenses()
+})
 </script>
 
 <template>
+  <CreateLensDialog :open="createLensOpen" @close="createLensOpen = false" />
+
   <Sidebar
     collapsible="icon"
     style="--sidebar-border: color-mix(in oklch, var(--primary) 18%, transparent)"
@@ -101,6 +122,42 @@ onMounted(fetchLibraries)
                   {{ lib.name }}
                 </span>
               </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+
+      <!-- Lenses -->
+      <SidebarGroup>
+        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
+          Lenses
+        </SidebarGroupLabel>
+        <SidebarGroupAction tooltip="New Lens" @click="createLensOpen = true">
+          <Plus />
+        </SidebarGroupAction>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem v-for="lens in lenses" :key="lens.id">
+              <SidebarMenuButton
+                :is-active="activeLensId === lens.id"
+                :tooltip="lens.name"
+                class="gap-2.5"
+                @click="router.push({ name: 'lens', params: { id: lens.id } })"
+              >
+                <component
+                  :is="getLensIcon(lens.icon)"
+                  :size="15"
+                  :class="activeLensId === lens.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'"
+                />
+                <span :class="activeLensId === lens.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
+                  {{ lens.name }}
+                </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem v-if="lenses.length === 0">
+              <span class="px-2 py-1 text-xs text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
