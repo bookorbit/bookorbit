@@ -6,6 +6,7 @@ import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import AppHeader from '@/components/AppHeader.vue'
+import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -110,23 +111,18 @@ watch(loading, (isLoading) => {
     <AppSidebar />
 
     <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-      <AppHeader
+      <AppHeader />
+      <ViewHeader
         :title="title"
         :total="total"
         :loaded="books.length"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"
         v-model:viewMode="viewMode"
-      />
-
-      <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
-        <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
-
-        <!-- Sort + filter toolbar -->
-        <div class="flex items-center gap-2 mb-3 flex-wrap">
-          <!-- Sort field -->
+      >
+        <template #toolbar>
           <div class="flex items-center gap-1">
-            <span class="text-xs text-muted-foreground">Sort:</span>
+            <span class="text-xs text-muted-foreground hidden lg:block">Sort:</span>
             <select
               :value="sortField"
               @change="sortField = ($event.target as HTMLSelectElement).value as SortField"
@@ -143,25 +139,16 @@ watch(loading, (isLoading) => {
               <ArrowUpAZ v-else :size="15" />
             </button>
           </div>
-
-          <div class="w-px h-5 bg-border" />
-
-          <!-- Filter toggle -->
+          <div class="w-px h-5 bg-border shrink-0" />
           <button
             @click="filterOpen = !filterOpen"
             class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-            :class="
-              activeFilterCount > 0
-                ? 'border-primary text-primary bg-primary/10'
-                : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-            "
+            :class="activeFilterCount > 0 ? 'border-primary text-primary bg-primary/10' : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'"
           >
             <Filter :size="13" />
             <span>Filters</span>
             <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
           </button>
-
-          <!-- Clear filters -->
           <button
             v-if="activeFilterCount > 0"
             @click="clearFilters"
@@ -171,7 +158,11 @@ watch(loading, (isLoading) => {
             <X :size="13" />
             Clear
           </button>
-        </div>
+        </template>
+      </ViewHeader>
+
+      <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
+        <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
         <!-- Filter builder panel -->
         <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">

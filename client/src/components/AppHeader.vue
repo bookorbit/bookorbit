@@ -1,50 +1,21 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowLeft, LayoutGrid, List, Moon, MoreHorizontal, Search, SlidersHorizontal, Sun, X } from 'lucide-vue-next'
+import { ArrowLeft, Search, SlidersHorizontal, X } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import AccentPicker from '@/components/AccentPicker.vue'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
-import { useThemeStore } from '@/stores/theme'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 
-const props = defineProps<{
-  title: string
-  total: number
-  loaded: number
-  coverSize: number
-  gridGap: number
-  viewMode: 'grid' | 'list'
-}>()
-
-const emit = defineEmits<{
-  'update:coverSize': [value: number]
-  'update:gridGap': [value: number]
-  'update:viewMode': [value: 'grid' | 'list']
-}>()
-
 const router = useRouter()
-const themeStore = useThemeStore()
 
 const searchFocused = ref(false)
 const mobileSearchOpen = ref(false)
-const mobileDisplayOpen = ref(false)
 const mobileSearchInput = ref<HTMLInputElement | null>(null)
 
 const globalSearchQuery = ref('')
@@ -117,9 +88,7 @@ function navigateToResult(result: GlobalSearchResult) {
               <p class="text-sm font-medium text-foreground truncate">{{ result.title ?? 'Untitled' }}</p>
               <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate">{{ result.authors.join(', ') }}</p>
             </div>
-            <span
-              class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate"
-            >
+            <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate">
               {{ result.libraryName }}
             </span>
           </button>
@@ -129,19 +98,9 @@ function navigateToResult(result: GlobalSearchResult) {
 
     <!-- Normal state -->
     <template v-else>
-      <!-- Left: sidebar trigger + library context -->
+      <!-- Left: sidebar trigger -->
       <SidebarTrigger class="-ml-1 text-muted-foreground hover:text-foreground" />
       <Separator orientation="vertical" class="mx-1 h-4" />
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="font-serif font-semibold text-[15px] text-foreground tracking-tight truncate">
-          {{ title }}
-        </span>
-        <span
-          class="hidden md:inline-flex text-[11px] font-medium text-primary/70 bg-primary/8 px-2 py-0.5 rounded-full tabular-nums border border-primary/15 shrink-0"
-        >
-          {{ loaded.toLocaleString() }}<span class="text-muted-foreground/60 mx-0.5">/</span>{{ total.toLocaleString() }}
-        </span>
-      </div>
 
       <!-- Center: desktop global search -->
       <div
@@ -180,89 +139,30 @@ function navigateToResult(result: GlobalSearchResult) {
               <p class="text-sm font-medium text-foreground truncate">{{ result.title ?? 'Untitled' }}</p>
               <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate">{{ result.authors.join(', ') }}</p>
             </div>
-            <span
-              class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate"
-            >
+            <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate">
               {{ result.libraryName }}
             </span>
           </button>
         </div>
       </div>
 
-      <!-- Right: actions -->
+      <!-- Right -->
       <div class="ml-auto flex items-center gap-1">
-        <slot name="actions" />
-
         <!-- Mobile: search icon -->
         <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground" @click="mobileSearchOpen = true">
           <Search :size="15" />
         </Button>
 
-        <!-- Desktop: view toggle -->
-        <div class="hidden md:flex items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-8 w-8"
-            :class="props.viewMode === 'grid' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
-            @click="emit('update:viewMode', 'grid')"
-          >
-            <LayoutGrid :size="15" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-8 w-8"
-            :class="props.viewMode === 'list' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
-            @click="emit('update:viewMode', 'list')"
-          >
-            <List :size="15" />
-          </Button>
-        </div>
-
-        <Separator orientation="vertical" class="hidden md:block mx-1 h-4" />
-
-        <!-- Desktop: display settings popover -->
+        <!-- Desktop: appearance settings popover -->
         <Popover>
           <PopoverTrigger as-child>
             <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground">
               <SlidersHorizontal :size="15" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent class="w-64 p-4" align="end">
+          <PopoverContent class="w-56 p-4" align="end">
             <div class="space-y-4">
-              <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Display</p>
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs text-muted-foreground">Cover size</span>
-                  <span class="text-xs font-medium tabular-nums text-foreground">{{ props.coverSize }}px</span>
-                </div>
-                <input
-                  :value="props.coverSize"
-                  @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
-                  type="range"
-                  min="80"
-                  max="280"
-                  step="10"
-                  class="w-full accent-primary cursor-pointer"
-                />
-              </div>
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs text-muted-foreground">Grid gap</span>
-                  <span class="text-xs font-medium tabular-nums text-foreground">{{ props.gridGap }}px</span>
-                </div>
-                <input
-                  :value="props.gridGap"
-                  @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
-                  type="range"
-                  min="4"
-                  max="40"
-                  step="4"
-                  class="w-full accent-primary cursor-pointer"
-                />
-              </div>
-              <Separator />
+              <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
               <div class="space-y-1.5">
                 <span class="text-xs text-muted-foreground">Accent</span>
                 <AccentPicker />
@@ -277,87 +177,8 @@ function navigateToResult(result: GlobalSearchResult) {
 
         <Separator orientation="vertical" class="hidden md:block mx-1 h-4" />
 
-        <!-- Desktop: theme toggle -->
-        <div class="hidden md:flex">
-          <ThemeToggle />
-        </div>
-
-        <!-- Mobile: overflow dropdown -->
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground">
-              <MoreHorizontal :size="15" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-44">
-            <DropdownMenuLabel class="text-xs text-muted-foreground">View</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="props.viewMode" @update:model-value="emit('update:viewMode', $event as 'grid' | 'list')">
-              <DropdownMenuRadioItem value="grid">Grid</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="list">List</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem @click="mobileDisplayOpen = true">
-              <SlidersHorizontal :size="14" class="mr-2" />
-              Display
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem @click="themeStore.toggleTheme()">
-              <component :is="themeStore.theme === 'dark' ? Sun : Moon" :size="14" class="mr-2" />
-              {{ themeStore.theme === 'dark' ? 'Light mode' : 'Dark mode' }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ThemeToggle />
       </div>
     </template>
   </header>
-
-  <!-- Mobile display settings sheet (portaled to body) -->
-  <Sheet v-model:open="mobileDisplayOpen">
-    <SheetContent side="bottom">
-      <SheetHeader>
-        <SheetTitle>Display</SheetTitle>
-      </SheetHeader>
-      <div class="space-y-4 px-4 pb-6">
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-muted-foreground">Cover size</span>
-            <span class="text-xs font-medium tabular-nums text-foreground">{{ props.coverSize }}px</span>
-          </div>
-          <input
-            :value="props.coverSize"
-            @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
-            type="range"
-            min="80"
-            max="280"
-            step="10"
-            class="w-full accent-primary cursor-pointer"
-          />
-        </div>
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-muted-foreground">Grid gap</span>
-            <span class="text-xs font-medium tabular-nums text-foreground">{{ props.gridGap }}px</span>
-          </div>
-          <input
-            :value="props.gridGap"
-            @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
-            type="range"
-            min="4"
-            max="40"
-            step="4"
-            class="w-full accent-primary cursor-pointer"
-          />
-        </div>
-        <Separator />
-        <div class="space-y-1.5">
-          <span class="text-xs text-muted-foreground">Accent</span>
-          <AccentPicker />
-        </div>
-        <div class="space-y-1.5">
-          <span class="text-xs text-muted-foreground">Radius</span>
-          <RadiusPicker />
-        </div>
-      </div>
-    </SheetContent>
-  </Sheet>
 </template>

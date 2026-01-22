@@ -5,6 +5,7 @@ import { Settings2, Trash2 } from 'lucide-vue-next'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
+import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
@@ -118,8 +119,10 @@ watch(loading, (isLoading) => {
     <AppSidebar />
 
     <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-      <AppHeader
+      <AppHeader />
+      <ViewHeader
         :title="lens?.name ?? 'Lens'"
+        :icon="lens?.icon ?? undefined"
         :total="total"
         :loaded="books.length"
         v-model:coverSize="coverSize"
@@ -148,7 +151,7 @@ watch(loading, (isLoading) => {
             <span>{{ confirmDelete ? 'Confirm?' : 'Delete' }}</span>
           </button>
         </template>
-      </AppHeader>
+      </ViewHeader>
 
       <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
         <!-- Rule chips -->
