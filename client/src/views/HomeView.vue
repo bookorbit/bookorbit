@@ -2,8 +2,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDownAZ, ArrowUpAZ, Filter, X } from 'lucide-vue-next'
-import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
+import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
@@ -143,7 +143,11 @@ watch(loading, (isLoading) => {
           <button
             @click="filterOpen = !filterOpen"
             class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-            :class="activeFilterCount > 0 ? 'border-primary text-primary bg-primary/10' : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'"
+            :class="
+              activeFilterCount > 0
+                ? 'border-primary text-primary bg-primary/10'
+                : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+            "
           >
             <Filter :size="13" />
             <span>Filters</span>
@@ -180,17 +184,7 @@ watch(loading, (isLoading) => {
 
         <!-- List view -->
         <div v-else class="flex flex-col divide-y divide-border">
-          <div
-            v-for="book in books"
-            :key="book.id"
-            class="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
-          >
-            <BookCoverImage :book-id="book.id" type="cover" class="h-12 w-9 object-cover rounded shrink-0 bg-muted" :alt="book.title ?? ''" />
-            <div class="flex flex-col min-w-0">
-              <span class="text-sm font-medium text-foreground truncate">{{ book.title ?? '-' }}</span>
-              <span v-if="book.authors.length" class="text-xs text-muted-foreground truncate">{{ book.authors.join(', ') }}</span>
-            </div>
-          </div>
+          <BookListRow v-for="book in books" :key="book.id" :book="book" />
         </div>
 
         <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
