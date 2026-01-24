@@ -3,10 +3,15 @@ import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { BookOpen, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const router = useRouter()
 
 const props = defineProps<{ book: BookCard }>()
+
+type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+const emit = defineEmits<{ action: [type: BookActionType] }>()
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -58,24 +63,62 @@ function openFile(file: BookFileRef) {
       <span v-if="seriesLine" class="text-xs text-muted-foreground/70 truncate italic">{{ seriesLine }}</span>
     </div>
 
-    <!-- Right badges -->
-    <div class="flex flex-col items-end gap-1 shrink-0" @click.stop>
-      <span
-        v-if="book.status === 'missing'"
-        class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground"
-      >
-        Missing
-      </span>
+    <!-- Right badges + actions -->
+    <div class="flex items-center gap-2 shrink-0" @click.stop>
+      <div class="flex flex-col items-end gap-1">
+        <span
+          v-if="book.status === 'missing'"
+          class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground"
+        >
+          Missing
+        </span>
+        <button
+          v-for="file in extraFiles"
+          :key="file.id"
+          class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
+          :class="file.role === 'primary' ? 'text-foreground' : 'text-muted-foreground'"
+          :title="`Open as ${file.format?.toUpperCase() ?? 'unknown'}`"
+          @click="openFile(file)"
+        >
+          {{ file.format ?? '?' }}
+        </button>
+      </div>
+
       <button
-        v-for="file in extraFiles"
-        :key="file.id"
-        class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
-        :class="file.role === 'primary' ? 'text-foreground' : 'text-muted-foreground'"
-        :title="`Open as ${file.format?.toUpperCase() ?? 'unknown'}`"
-        @click="openFile(file)"
+        class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+        title="Quick view"
+        @click="emit('action', 'quick-view')"
       >
-        {{ file.format ?? '?' }}
+        <PanelRight class="size-4" />
       </button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <button class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+            <MoreHorizontal class="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem @click="primaryFile && openFile(primaryFile)">
+            <BookOpen class="size-4 mr-2" />
+            Open
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem @click="emit('action', 'edit-metadata')">
+            <Pencil class="size-4 mr-2" />
+            Edit Metadata
+          </DropdownMenuItem>
+          <DropdownMenuItem @click="emit('action', 'add-to-collection')">
+            <FolderPlus class="size-4 mr-2" />
+            Add to Collection
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem class="text-destructive focus:text-destructive" @click="emit('action', 'delete')">
+            <Trash2 class="size-4 mr-2" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   </div>
 </template>

@@ -4,13 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowDownAZ, ArrowUpAZ, Filter, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { useBookQuery } from '@/features/book/composables/useBookQuery'
+import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
@@ -103,6 +104,20 @@ watch(filter, () => load(true), { deep: true })
 watch(loading, (isLoading) => {
   if (!isLoading) loadIfSentinelVisible()
 })
+
+type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+
+const quickViewBookId = ref<number | null>(null)
+const quickViewOpen = ref(false)
+
+function handleBookAction(book: BookCard, action: BookActionType) {
+  if (action === 'quick-view') {
+    quickViewBookId.value = book.id
+    quickViewOpen.value = true
+    return
+  }
+  // TODO: implement remaining actions
+}
 </script>
 
 <template>
@@ -179,12 +194,12 @@ watch(loading, (isLoading) => {
           class="grid"
           :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
         >
-          <BookCoverCard v-for="book in books" :key="book.id" :book="book" />
+          <BookCoverCard v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
         </div>
 
         <!-- List view -->
         <div v-else class="flex flex-col divide-y divide-border">
-          <BookListRow v-for="book in books" :key="book.id" :book="book" />
+          <BookListRow v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
         </div>
 
         <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
@@ -194,4 +209,11 @@ watch(loading, (isLoading) => {
       </main>
     </SidebarInset>
   </SidebarProvider>
+
+  <BookQuickView
+    :book-id="quickViewBookId"
+    :open="quickViewOpen"
+    @update:open="quickViewOpen = $event"
+    @action="quickViewBookId !== null && handleBookAction({ id: quickViewBookId } as BookCard, $event)"
+  />
 </template>
