@@ -82,9 +82,15 @@ export class LibraryService {
     const [updated] = await this.libraryRepo.update(id, fields);
 
     if (folderPaths !== undefined) {
-      // Replace all folders: delete existing, insert new ones
-      await this.libraryRepo.deleteFoldersByLibrary(id);
-      await Promise.all(folderPaths.map((path) => this.libraryRepo.insertFolder({ libraryId: id, path })));
+      const existingFolders = await this.libraryRepo.findFoldersByLibrary(id);
+      const existingByPath = new Map(existingFolders.map((f) => [f.path, f]));
+      const newPathSet = new Set(folderPaths);
+
+      const toRemove = existingFolders.filter((f) => !newPathSet.has(f.path));
+      await Promise.all(toRemove.map((f) => this.libraryRepo.deleteFolder(f.id)));
+
+      const toAdd = folderPaths.filter((p) => !existingByPath.has(p));
+      await Promise.all(toAdd.map((path) => this.libraryRepo.insertFolder({ libraryId: id, path })));
     }
 
     const folders = await this.libraryRepo.findFoldersByLibrary(id);

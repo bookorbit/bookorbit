@@ -9,7 +9,7 @@ export const books = pgTable('books', {
     .references(() => libraries.id, { onDelete: 'cascade' }),
   libraryFolderId: integer('library_folder_id')
     .notNull()
-    .references(() => libraryFolders.id),
+    .references(() => libraryFolders.id, { onDelete: 'cascade' }),
   folderPath: varchar('folder_path', { length: 4096 }).notNull(),
   status: varchar('status', { length: 20 }).notNull().default('present'),
   addedAt: timestamp('added_at').defaultNow().notNull(),
@@ -23,7 +23,7 @@ export const bookFiles = pgTable('book_files', {
     .references(() => books.id, { onDelete: 'cascade' }),
   libraryFolderId: integer('library_folder_id')
     .notNull()
-    .references(() => libraryFolders.id),
+    .references(() => libraryFolders.id, { onDelete: 'cascade' }),
   absolutePath: varchar('absolute_path', { length: 4096 }).notNull(),
   relPath: varchar('rel_path', { length: 4096 }),
   ino: bigint('ino', { mode: 'number' }).notNull(),
