@@ -31,10 +31,7 @@ export class ScannerRepository {
   }
 
   async failAllRunningJobs(errorMessage: string): Promise<void> {
-    await this.db
-      .update(scanJobs)
-      .set({ status: 'failed', errorMessage, completedAt: new Date() })
-      .where(eq(scanJobs.status, 'running'));
+    await this.db.update(scanJobs).set({ status: 'failed', errorMessage, completedAt: new Date() }).where(eq(scanJobs.status, 'running'));
   }
 
   // ── Library Folders ────────────────────────────────────────────────────────
@@ -47,6 +44,14 @@ export class ScannerRepository {
 
   async findBooksByLibraryFolder(libraryFolderId: number) {
     return this.db.select().from(books).where(eq(books.libraryFolderId, libraryFolderId));
+  }
+
+  async findPrimaryBookFilesByLibrary(libraryId: number) {
+    return this.db
+      .select({ bookId: books.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(books)
+      .innerJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .where(and(eq(books.libraryId, libraryId), ne(books.status, 'missing')));
   }
 
   async findBookByFolderPath(folderPath: string) {

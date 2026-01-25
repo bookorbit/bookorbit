@@ -13,4 +13,11 @@ export class ScannerController {
   scan(@Param('id', ParseIntPipe) libraryId: number) {
     return this.scannerService.startScan(libraryId, 'manual');
   }
+
+  @Post('libraries/:id/refresh-covers')
+  @RequirePermission('manage_libraries')
+  @HttpCode(HttpStatus.ACCEPTED)
+  refreshCovers(@Param('id', ParseIntPipe) libraryId: number) {
+    return this.scannerService.refreshCovers(libraryId);
+  }
 }

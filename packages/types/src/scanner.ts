@@ -9,3 +9,15 @@ export interface ScanProgressEvent {
   missing: number;
   errorMessage?: string;
 }
+
+export interface CoverRefreshProgressEvent {
+  libraryId: number;
+  processed: number;
+  total: number;
+  status: 'running' | 'completed';
+}
+
+export interface CoverRefreshedEvent {
+  bookId: number;
+  libraryId: number;
+}

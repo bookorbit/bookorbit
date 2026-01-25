@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Library } from 'lucide-vue-next'
+import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Library, Images } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@projectx/types'
@@ -12,7 +12,7 @@ import { useScanProgress, getSocket } from '@/features/scanner/composables/useSc
 const route = useRoute()
 const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
-const { subscribeLibrary, getProgress, isScanning, progressMap } = useScanProgress()
+const { subscribeLibrary, getProgress, isScanning, progressMap, getCoverRefreshProgress, isRefreshingCovers } = useScanProgress()
 
 const stats = ref<Record<number, LibraryStats>>({})
 const scanningAll = ref(false)
@@ -74,6 +74,15 @@ async function scan(lib: LibraryType) {
     }
   } catch {
     toast.error(`Failed to start scan for "${lib.name}"`)
+  }
+}
+
+async function refreshCovers(lib: LibraryType) {
+  try {
+    const res = await api(`/api/scanner/libraries/${lib.id}/refresh-covers`, { method: 'POST' })
+    if (!res.ok) toast.error(`Failed to refresh covers for "${lib.name}"`)
+  } catch {
+    toast.error(`Failed to refresh covers for "${lib.name}"`)
   }
 }
 
@@ -172,6 +181,17 @@ function scanProgressLabel(libraryId: number): string {
   return ''
 }
 
+function coverRefreshLabel(libraryId: number): string {
+  const p = getCoverRefreshProgress(libraryId)
+  if (!p) return ''
+  if (p.status === 'running') {
+    const pct = p.total > 0 ? Math.floor((p.processed / p.total) * 100) : 0
+    return `Refreshing covers ${pct}% (${p.processed}/${p.total})`
+  }
+  if (p.status === 'completed') return `Covers refreshed (${p.total} processed)`
+  return ''
+}
+
 function iconComponent(iconName: string | null | undefined) {
   return iconName ? null : Library
 }
@@ -248,6 +268,23 @@ function iconComponent(iconName: string | null | undefined) {
                 />
               </div>
             </div>
+            <!-- Cover refresh progress bar -->
+            <div v-if="getCoverRefreshProgress(lib.id)" class="mt-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs text-muted-foreground">{{ coverRefreshLabel(lib.id) }}</span>
+              </div>
+              <div v-if="getCoverRefreshProgress(lib.id)?.status === 'running'" class="h-1 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-accent transition-all duration-300"
+                  :style="{
+                    width:
+                      getCoverRefreshProgress(lib.id)!.total > 0
+                        ? `${Math.floor((getCoverRefreshProgress(lib.id)!.processed / getCoverRefreshProgress(lib.id)!.total) * 100)}%`
+                        : '0%',
+                  }"
+                />
+              </div>
+            </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <button
@@ -263,6 +300,14 @@ function iconComponent(iconName: string | null | undefined) {
               @click="openDelete(lib)"
             >
               <Trash2 :size="13" />
+            </button>
+            <button
+              class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              title="Refresh covers"
+              :disabled="isRefreshingCovers(lib.id)"
+              @click="refreshCovers(lib)"
+            >
+              <Images :size="13" :class="isRefreshingCovers(lib.id) ? 'animate-pulse' : ''" />
             </button>
             <button
               class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"

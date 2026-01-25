@@ -18,7 +18,8 @@ export interface ParsedOpf {
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
-  isArray: (name) => ['dc:creator', 'dc:identifier', 'dc:subject', 'dc:title', 'meta', 'item'].includes(name),
+  removeNSPrefix: true,
+  isArray: (name) => ['creator', 'identifier', 'subject', 'title', 'meta', 'item'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
 });
@@ -98,7 +99,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let title: string | null = null;
   let subtitle: string | null = null;
 
-  const rawTitles = toArray(metadata['dc:title']);
+  const rawTitles = toArray(metadata['title']);
   if (rawTitles.length === 1) {
     title = getText(rawTitles[0]);
   } else if (rawTitles.length > 1) {
@@ -115,7 +116,7 @@ export function parseOpf(xml: string): ParsedOpf {
 
   // ── Authors ────────────────────────────────────────────────────────────────
   const authors: { name: string; sortName: string | null }[] = [];
-  const rawCreators = toArray(metadata['dc:creator']);
+  const rawCreators = toArray(metadata['creator']);
 
   for (const c of rawCreators) {
     const mo = (typeof c === 'object' && c !== null ? c : {}) as Record<string, unknown>;
@@ -140,7 +141,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let isbn10: string | null = null;
   let isbn13: string | null = null;
 
-  for (const ident of toArray(metadata['dc:identifier'])) {
+  for (const ident of toArray(metadata['identifier'])) {
     const mo = (typeof ident === 'object' && ident !== null ? ident : {}) as Record<string, unknown>;
     const scheme = ((mo['@_opf:scheme'] ?? mo['@_scheme'] ?? '') as string).toLowerCase();
     const value = getText(ident);
@@ -154,7 +155,7 @@ export function parseOpf(xml: string): ParsedOpf {
   }
 
   // ── Tags ───────────────────────────────────────────────────────────────────
-  const tags = toArray(metadata['dc:subject']).map(getText).filter(Boolean);
+  const tags = toArray(metadata['subject']).map(getText).filter(Boolean);
 
   // ── Series (Calibre EPUB2, then EPUB3) ────────────────────────────────────
   let seriesName: string | null = namedMeta('calibre:series');
@@ -180,11 +181,11 @@ export function parseOpf(xml: string): ParsedOpf {
   }
 
   // ── Scalar fields ──────────────────────────────────────────────────────────
-  const description = getText(metadata['dc:description']) || null;
-  const publisher = getText(metadata['dc:publisher']) || null;
-  const language = getText(metadata['dc:language']) || null;
+  const description = getText(metadata['description']) || null;
+  const publisher = getText(metadata['publisher']) || null;
+  const language = getText(metadata['language']) || null;
 
-  const rawDate = toArray(metadata['dc:date'])[0];
+  const rawDate = toArray(metadata['date'])[0];
   const publishedYear = rawDate ? parseYear(getText(rawDate)) : null;
 
   return {

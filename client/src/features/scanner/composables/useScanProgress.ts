@@ -1,10 +1,12 @@
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
-import type { ScanProgressEvent } from '@projectx/types'
+import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types'
 import { getAccessToken } from '@/lib/api'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 let socket: Socket | null = null
 const progressMap = ref<Map<number, ScanProgressEvent>>(new Map())
+const coverRefreshMap = ref<Map<number, CoverRefreshProgressEvent>>(new Map())
 const subscribedLibraries = new Set<number>()
 
 function getSocket(): Socket {
@@ -26,6 +28,20 @@ function getSocket(): Socket {
           progressMap.value = new Map(progressMap.value)
         }, 3000)
       }
+    })
+
+    socket.on('cover:refresh:progress', (event: CoverRefreshProgressEvent) => {
+      coverRefreshMap.value = new Map(coverRefreshMap.value).set(event.libraryId, event)
+      if (event.status === 'completed') {
+        setTimeout(() => {
+          coverRefreshMap.value.delete(event.libraryId)
+          coverRefreshMap.value = new Map(coverRefreshMap.value)
+        }, 3000)
+      }
+    })
+
+    socket.on('cover:refreshed', (event: CoverRefreshedEvent) => {
+      useCoverVersions().bumpVersion(event.bookId)
     })
 
     socket.on('disconnect', () => {
@@ -60,5 +76,13 @@ export function useScanProgress() {
     return progressMap.value.get(libraryId)?.status === 'running'
   }
 
-  return { subscribeLibrary, getProgress, isScanning, progressMap }
+  function getCoverRefreshProgress(libraryId: number): CoverRefreshProgressEvent | undefined {
+    return coverRefreshMap.value.get(libraryId)
+  }
+
+  function isRefreshingCovers(libraryId: number): boolean {
+    return coverRefreshMap.value.get(libraryId)?.status === 'running'
+  }
+
+  return { subscribeLibrary, getProgress, isScanning, progressMap, getCoverRefreshProgress, isRefreshingCovers, coverRefreshMap }
 }

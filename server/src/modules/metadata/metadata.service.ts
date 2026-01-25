@@ -35,6 +35,15 @@ export class MetadataService {
     await Promise.all([this.extractMetadata(bookId, absolutePath, format), this.extractCover(bookId, absolutePath, format)]);
   }
 
+  async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {
+    try {
+      const saved = await extractAndSaveCover(absolutePath, format, bookId, this.booksPath);
+      return !!saved;
+    } catch {
+      return false;
+    }
+  }
+
   // ── Metadata ─────────────────────────────────────────────────────────────────
 
   private async extractMetadata(bookId: number, absolutePath: string, format: string): Promise<void> {

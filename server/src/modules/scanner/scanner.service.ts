@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 
-import type { ScanProgressEvent } from '@projectx/types';
+import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
@@ -47,11 +47,36 @@ export class ScannerService implements OnApplicationBootstrap {
     this.scanJobStore.create(job.id, libraryId, 0);
     this.emitFromStore(libraryId, job.id, 'running');
 
-    this.runScan(libraryId, job.id, folders).catch((err) =>
-      this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`),
-    );
+    this.runScan(libraryId, job.id, folders).catch((err) => this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`));
 
     return { jobId: job.id };
+  }
+
+  async refreshCovers(libraryId: number): Promise<{ queued: number }> {
+    const rows = await this.scannerRepo.findPrimaryBookFilesByLibrary(libraryId);
+    const candidates = rows.filter((r) => r.format && METADATA_FORMATS.has(r.format));
+    const total = candidates.length;
+
+    this.scanGateway.emitCoverRefreshProgress({ libraryId, processed: 0, total, status: 'running' });
+
+    (async () => {
+      let processed = 0;
+      for (const row of candidates) {
+        const refreshed = await this.metadataService.refreshCoverForBook(row.bookId, row.absolutePath, row.format!);
+        processed++;
+        if (refreshed) {
+          this.scanGateway.emitCoverRefreshed({ bookId: row.bookId, libraryId } satisfies CoverRefreshedEvent);
+        }
+        this.scanGateway.emitCoverRefreshProgress({
+          libraryId,
+          processed,
+          total,
+          status: processed < total ? 'running' : 'completed',
+        } satisfies CoverRefreshProgressEvent);
+      }
+    })().catch((err) => this.logger.warn(`Cover refresh crashed for library ${libraryId}: ${(err as Error).message}`));
+
+    return { queued: total };
   }
 
   startScanAsync(libraryId: number): void {
@@ -61,11 +86,7 @@ export class ScannerService implements OnApplicationBootstrap {
     );
   }
 
-  private async runScan(
-    libraryId: number,
-    jobId: number,
-    folders: Awaited<ReturnType<ScannerRepository['findLibraryFolders']>>,
-  ): Promise<void> {
+  private async runScan(libraryId: number, jobId: number, folders: Awaited<ReturnType<ScannerRepository['findLibraryFolders']>>): Promise<void> {
     this.logger.log(`Scan job ${jobId} started for library ${libraryId}`);
 
     type FolderWork = {
@@ -104,15 +125,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     try {
       for (const { id: folderId, path: folderPath, candidates, knownBooks, knownFiles } of folderWork) {
-        const counts = await this.scanFolderCandidates(
-          folderId,
-          libraryId,
-          folderPath,
-          candidates,
-          knownBooks,
-          knownFiles,
-          jobId,
-        );
+        const counts = await this.scanFolderCandidates(folderId, libraryId, folderPath, candidates, knownBooks, knownFiles, jobId);
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;

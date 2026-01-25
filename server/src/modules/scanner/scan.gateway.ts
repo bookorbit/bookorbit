@@ -1,15 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import {
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
-} from '@nestjs/websockets';
+import { OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import type { ScanProgressEvent } from '@projectx/types';
+import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
 import { AuthService } from '../auth/auth.service';
 import { ScanJobStore } from './scan-job-store.service';
 
@@ -66,5 +60,13 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Called by ScannerService — not a WS message handler.
   emitProgress(event: ScanProgressEvent): void {
     this.server.to(`library:${event.libraryId}`).emit('scan:progress', event);
+  }
+
+  emitCoverRefreshProgress(event: CoverRefreshProgressEvent): void {
+    this.server.to(`library:${event.libraryId}`).emit('cover:refresh:progress', event);
+  }
+
+  emitCoverRefreshed(event: CoverRefreshedEvent): void {
+    this.server.to(`library:${event.libraryId}`).emit('cover:refreshed', event);
   }
 }

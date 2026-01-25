@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useCoverVersions } from '../composables/useCoverVersions'
 
 const router = useRouter()
 
@@ -24,8 +25,20 @@ const seriesLine = computed(() => {
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const extraFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
 
+const { getVersion } = useCoverVersions()
+const coverSrc = computed(() => {
+  const base = `/api/books/${props.book.id}/thumbnail`
+  const v = getVersion(props.book.id)
+  return v ? `${base}?t=${v}` : base
+})
+
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+
+watch(coverSrc, () => {
+  coverLoaded.value = false
+  coverFailed.value = false
+})
 
 function openFile(file: BookFileRef) {
   router.push({
@@ -50,7 +63,7 @@ function openFile(file: BookFileRef) {
     >
       <img
         v-if="!coverFailed"
-        :src="`/api/books/${book.id}/thumbnail`"
+        :src="coverSrc"
         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
         :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
         loading="lazy"
