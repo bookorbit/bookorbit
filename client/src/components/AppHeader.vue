@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowLeft, Search, SlidersHorizontal, X } from 'lucide-vue-next'
+import { ArrowLeft, Search, Palette, X } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -88,7 +88,9 @@ function navigateToResult(result: GlobalSearchResult) {
               <p class="text-sm font-medium text-foreground truncate">{{ result.title ?? 'Untitled' }}</p>
               <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate">{{ result.authors.join(', ') }}</p>
             </div>
-            <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate">
+            <span
+              class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-20 truncate"
+            >
               {{ result.libraryName }}
             </span>
           </button>
@@ -139,7 +141,9 @@ function navigateToResult(result: GlobalSearchResult) {
               <p class="text-sm font-medium text-foreground truncate">{{ result.title ?? 'Untitled' }}</p>
               <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate">{{ result.authors.join(', ') }}</p>
             </div>
-            <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate">
+            <span
+              class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate"
+            >
               {{ result.libraryName }}
             </span>
           </button>
@@ -157,10 +161,10 @@ function navigateToResult(result: GlobalSearchResult) {
         <Popover>
           <PopoverTrigger as-child>
             <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground">
-              <SlidersHorizontal :size="15" />
+              <Palette :size="15" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent class="w-56 p-4" align="end">
+          <PopoverContent class="w-72 p-4" align="end">
             <div class="space-y-4">
               <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
               <div class="space-y-1.5">

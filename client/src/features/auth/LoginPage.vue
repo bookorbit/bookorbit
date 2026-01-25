@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { OidcPublicConfig } from '@projectx/types'
 import { Moon, Sun } from 'lucide-vue-next'
-import { ACCENT_OPTIONS, useThemeStore } from '@/stores/theme'
+import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
 
@@ -66,20 +66,37 @@ async function handleOidcLogin() {
       <div class="relative">
         <!-- Colour popover -->
         <Transition name="popover">
-          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-xl flex items-center gap-3">
-            <button
-              v-for="opt in ACCENT_OPTIONS"
-              :key="opt.id"
-              :title="opt.label"
-              class="w-5 h-5 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
-              :style="{
-                backgroundColor: opt.color,
-                outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                outlineOffset: '2px',
-                transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
-              }"
-              @click="themeStore.setAccent(opt.id)"
-            />
+          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-xl space-y-2">
+            <div class="flex items-center gap-1.5">
+              <button
+                v-for="opt in ACCENT_VIVID"
+                :key="opt.id"
+                :title="opt.label"
+                class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
+                :style="{
+                  backgroundColor: opt.color,
+                  outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                  outlineOffset: '2px',
+                  transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
+                }"
+                @click="themeStore.setAccent(opt.id)"
+              />
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button
+                v-for="opt in ACCENT_PASTEL"
+                :key="opt.id"
+                :title="opt.label"
+                class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
+                :style="{
+                  backgroundColor: opt.color,
+                  outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                  outlineOffset: '2px',
+                  transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
+                }"
+                @click="themeStore.setAccent(opt.id)"
+              />
+            </div>
           </div>
         </Transition>
 

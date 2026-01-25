@@ -90,10 +90,9 @@ onMounted(() => {
         </div>
         <!-- Brand name -->
         <div class="flex flex-col leading-none group-data-[collapsible=icon]:hidden">
-          <span class="text-sm font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
-            project<span class="text-primary">x</span>
+          <span class="text-lg font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
+            Project<span class="text-primary"> X</span>
           </span>
-          <span class="text-[10px] text-sidebar-foreground/40 mt-0.5">your reading world</span>
         </div>
       </div>
     </SidebarHeader>

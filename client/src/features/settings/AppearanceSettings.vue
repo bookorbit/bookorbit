@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ACCENT_OPTIONS, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
+import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Moon, Sun } from 'lucide-vue-next'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
@@ -43,25 +43,40 @@ const { coverSize, gridGap } = useDisplaySettings()
         </div>
 
         <!-- Accent color -->
-        <div class="flex items-center justify-between px-5 py-4 bg-card">
-          <div>
-            <p class="text-sm font-medium text-foreground">Accent color</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Controls highlights and interactive elements</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              v-for="opt in ACCENT_OPTIONS"
-              :key="opt.id"
-              :title="opt.label"
-              class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none"
-              :style="{
-                backgroundColor: opt.color,
-                outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                outlineOffset: '2px',
-                transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
-              }"
-              @click="themeStore.setAccent(opt.id)"
-            />
+        <div class="px-5 py-4 bg-card">
+          <p class="text-sm font-medium text-foreground mb-0.5">Accent color</p>
+          <p class="text-xs text-muted-foreground mb-3">Controls highlights and interactive elements</p>
+          <div class="space-y-2">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button
+                v-for="opt in ACCENT_VIVID"
+                :key="opt.id"
+                :title="opt.label"
+                class="w-5 h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                :style="{
+                  backgroundColor: opt.color,
+                  outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                  outlineOffset: '2px',
+                  transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
+                }"
+                @click="themeStore.setAccent(opt.id)"
+              />
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button
+                v-for="opt in ACCENT_PASTEL"
+                :key="opt.id"
+                :title="opt.label"
+                class="w-5 h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                :style="{
+                  backgroundColor: opt.color,
+                  outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                  outlineOffset: '2px',
+                  transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
+                }"
+                @click="themeStore.setAccent(opt.id)"
+              />
+            </div>
           </div>
         </div>
 
@@ -77,7 +92,7 @@ const { coverSize, gridGap } = useDisplaySettings()
               :key="opt.id"
               :title="opt.label"
               class="h-7 px-3 text-xs border-2 transition-colors font-medium"
-              :style="{ borderRadius: opt.id === 'sharp' ? '2px' : opt.id === 'default' ? '6px' : '14px' }"
+              :style="{ borderRadius: opt.id === 'sharp' ? '2px' : opt.id === 'default' ? '6px' : opt.id === 'rounded' ? '14px' : '999px' }"
               :class="
                 themeStore.radius === opt.id
                   ? 'border-primary text-primary bg-primary/8'

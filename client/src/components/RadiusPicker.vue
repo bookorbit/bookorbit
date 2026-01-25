@@ -7,6 +7,7 @@ const shapes = [
   { id: 'sharp' as const, rx: '1' },
   { id: 'default' as const, rx: '4' },
   { id: 'rounded' as const, rx: '9' },
+  { id: 'pill' as const, rx: '999' },
 ]
 </script>
 
