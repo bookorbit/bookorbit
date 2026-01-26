@@ -4,10 +4,13 @@ export class BookFileDto {
   role: string;
   sizeBytes: number | null;
   absolutePath: string;
+  createdAt: Date;
+  filename: string | null;
 }
 
 export class BookDetailDto {
   id: number;
+  libraryId: number;
   status: string;
   folderPath: string;
   title: string | null;

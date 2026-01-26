@@ -3,7 +3,7 @@ import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
@@ -145,6 +145,10 @@ function openFile(file: BookFileRef) {
               <DropdownMenuItem v-for="file in extraFiles" :key="file.id" @click="openFile(file)">
                 <BookOpen class="size-4 mr-2" />
                 Open as {{ file.format?.toUpperCase() ?? '?' }}
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
+                <ExternalLink class="size-4 mr-2" />
+                Book Details
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem @click="emit('action', 'edit-metadata')">

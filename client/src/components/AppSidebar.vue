@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import * as Icons from 'lucide-vue-next'
-import { Aperture, BookMarked, Clock, BookOpen, Plus, Settings, LogOut, KeyRound } from 'lucide-vue-next'
+import { Aperture, BookMarked, Clock, BookOpen, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -18,16 +17,10 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
-import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
-import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
-import { useAuth } from '@/features/auth/composables/useAuth'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLenses } from '@/features/lens/composables/useLenses'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 
-const { open: openSettings } = useSettingsDrawer()
-const { open: openChangePassword } = useChangePasswordDialog()
-const { user, logout } = useAuth()
 const router = useRouter()
 const route = useRoute()
 const { libraries, fetchLibraries } = useLibraries()
@@ -193,44 +186,6 @@ onMounted(() => {
         </SidebarGroupContent>
       </SidebarGroup>
     </SidebarContent>
-
-    <SidebarFooter class="border-t border-sidebar-border">
-      <SidebarMenu>
-        <!-- User info -->
-        <SidebarMenuItem v-if="user">
-          <div class="flex items-center gap-2.5 px-2 py-1.5 group-data-[collapsible=icon]:hidden">
-            <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-semibold">
-              {{ user.name.charAt(0).toUpperCase() }}
-            </div>
-            <div class="flex flex-col min-w-0 leading-tight">
-              <span class="text-xs font-medium text-sidebar-foreground truncate">{{ user.name }}</span>
-              <span class="text-[10px] text-sidebar-foreground/40 truncate">{{ user.username }}</span>
-            </div>
-          </div>
-        </SidebarMenuItem>
-
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip="Change Password" class="gap-2.5" @click="openChangePassword()">
-            <KeyRound :size="15" class="text-sidebar-foreground/50" />
-            <span class="text-sidebar-foreground/70">Change Password</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip="Settings" class="gap-2.5" @click="openSettings">
-            <Settings :size="15" class="text-sidebar-foreground/50" />
-            <span class="text-sidebar-foreground/70">Settings</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip="Sign out" class="gap-2.5" @click="logout">
-            <LogOut :size="15" class="text-sidebar-foreground/50" />
-            <span class="text-sidebar-foreground/70">Sign out</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarFooter>
 
     <SidebarRail />
   </Sidebar>

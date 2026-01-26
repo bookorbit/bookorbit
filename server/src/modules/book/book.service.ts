@@ -150,6 +150,7 @@ export class BookService {
 
     return {
       id: book.books.id,
+      libraryId: book.books.libraryId,
       status: book.books.status,
       folderPath: book.books.folderPath,
       title: meta?.title ?? null,
@@ -165,7 +166,15 @@ export class BookService {
       seriesIndex: meta?.seriesIndex ?? null,
       authors: authorRows,
       tags: tagRows.map((t) => t.name),
-      files: fileRows,
+      files: fileRows.map((f) => ({
+        id: f.id,
+        format: f.format,
+        role: f.role,
+        sizeBytes: f.sizeBytes,
+        absolutePath: f.absolutePath,
+        createdAt: f.createdAt,
+        filename: basename(f.absolutePath),
+      })),
     };
   }
 }

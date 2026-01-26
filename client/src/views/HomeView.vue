@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDownAZ, ArrowUpAZ, Filter, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
@@ -9,7 +9,6 @@ import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
-import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -24,10 +23,7 @@ const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === t
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
 
-const libraryId = computed<number | null>(() => {
-  const id = route.params.id
-  return id ? Number(id) : null
-})
+const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
 
 const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
@@ -121,7 +117,6 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 </script>
 
 <template>
-  <SettingsDrawer />
   <SidebarProvider>
     <AppSidebar />
 

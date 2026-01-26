@@ -19,10 +19,13 @@ export type BookDetailFile = {
   format: string | null;
   role: string;
   sizeBytes: number | null;
+  createdAt: string;
+  filename: string | null;
 };
 
 export type BookDetail = {
   id: number;
+  libraryId: number;
   status: string;
   title: string | null;
   subtitle: string | null;

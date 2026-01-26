@@ -7,7 +7,6 @@ import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
-import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useLens } from '@/features/lens/composables/useLens'
@@ -112,7 +111,6 @@ watch(loading, (isLoading) => {
 </script>
 
 <template>
-  <SettingsDrawer />
   <LensEditorPanel :open="editorOpen" :lens="lens" @close="editorOpen = false" @saved="onSaved" />
 
   <SidebarProvider>

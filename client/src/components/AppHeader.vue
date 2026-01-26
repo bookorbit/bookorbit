@@ -1,18 +1,32 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowLeft, Search, Palette, X } from 'lucide-vue-next'
+import { ArrowLeft, Search, Palette, X, KeyRound, Settings, LogOut } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import AccentPicker from '@/components/AccentPicker.vue'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
+import { useAuth } from '@/features/auth/composables/useAuth'
+import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
+import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 
 const router = useRouter()
+const { user, logout } = useAuth()
+const { open: openSettings } = useSettingsDrawer()
+const { open: openChangePassword } = useChangePasswordDialog()
 
 const searchFocused = ref(false)
 const mobileSearchOpen = ref(false)
@@ -151,7 +165,7 @@ function navigateToResult(result: GlobalSearchResult) {
       </div>
 
       <!-- Right -->
-      <div class="ml-auto flex items-center gap-1">
+      <div class="ml-auto flex items-center gap-0.5">
         <!-- Mobile: search icon -->
         <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground" @click="mobileSearchOpen = true">
           <Search :size="15" />
@@ -179,9 +193,40 @@ function navigateToResult(result: GlobalSearchResult) {
           </PopoverContent>
         </Popover>
 
-        <Separator orientation="vertical" class="hidden md:block mx-1 h-4" />
+        <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground" @click="openSettings()">
+          <Settings :size="15" />
+        </Button>
 
         <ThemeToggle />
+
+        <!-- User avatar dropdown -->
+        <DropdownMenu v-if="user">
+          <DropdownMenuTrigger as-child>
+            <button
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-semibold hover:bg-primary/25 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {{ user.name.charAt(0).toUpperCase() }}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-48">
+            <DropdownMenuLabel class="font-normal">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-xs font-medium text-foreground">{{ user.name }}</span>
+                <span class="text-[10px] text-muted-foreground">{{ user.username }}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="openChangePassword()">
+              <KeyRound :size="13" class="mr-2 text-muted-foreground" />
+              Change Password
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="logout" class="text-destructive focus:text-destructive">
+              <LogOut :size="13" class="mr-2" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </template>
   </header>

@@ -76,6 +76,7 @@ export class BookRepository {
           role: bookFiles.role,
           sizeBytes: bookFiles.sizeBytes,
           absolutePath: bookFiles.absolutePath,
+          createdAt: bookFiles.createdAt,
         })
         .from(bookFiles)
         .where(eq(bookFiles.bookId, id)),

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, FolderPlus, Pencil, Trash2, X } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, FolderPlus, Pencil, Trash2, X } from 'lucide-vue-next'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose } from 'reka-ui'
@@ -155,9 +155,11 @@ function openBook() {
             <!-- Description -->
             <div class="border-t pt-4">
               <div v-if="detail.description">
-                <p class="text-sm leading-relaxed text-foreground/80 transition-all" :class="descriptionExpanded ? '' : 'line-clamp-4'">
-                  {{ detail.description }}
-                </p>
+                <div
+                  class="text-sm leading-relaxed text-foreground/80 transition-all"
+                  :class="descriptionExpanded ? '' : 'line-clamp-4'"
+                  v-html="detail.description"
+                />
                 <button
                   class="text-xs text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
                   @click="descriptionExpanded = !descriptionExpanded"
@@ -179,6 +181,13 @@ function openBook() {
           >
             <BookOpen class="size-4" />
             Read
+          </button>
+          <button
+            class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
+            @click="router.push({ name: 'book-detail', params: { bookId: detail!.id } }); emit('update:open', false)"
+          >
+            <ExternalLink class="size-4" />
+            Details
           </button>
           <button
             class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
