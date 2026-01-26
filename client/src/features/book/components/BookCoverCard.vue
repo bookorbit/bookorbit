@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@projectx/types'
+import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -22,8 +23,9 @@ const seriesLine = computed(() => {
   return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
 })
 
-const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
-const extraFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
+const readableFiles = computed(() => props.book.files.filter((f) => f.format && f.format in FORMAT_TO_GROUP))
+const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
+const extraFiles = computed(() => readableFiles.value.filter((f) => f !== primaryFile.value))
 
 const { getVersion } = useCoverVersions()
 const coverSrc = computed(() => {
