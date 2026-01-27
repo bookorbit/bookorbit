@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, NotFoundException, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
 import { createReadStream } from 'fs';
+import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -26,23 +27,49 @@ export class BookController {
   }
 
   @Get(':id/cover')
-  async getCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+  async getCover(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: RequestUser,
+    @Res() reply: FastifyReply,
+    @Headers('if-none-match') ifNoneMatch?: string,
+  ) {
     const coverPath = await this.bookService.getCoverPath(id, user);
     if (!coverPath) throw new NotFoundException(`No cover for book ${id}`);
 
+    const { mtimeMs } = await stat(coverPath);
+    const etag = `"${Math.floor(mtimeMs)}"`;
+    if (ifNoneMatch === etag) {
+      reply.status(304).send();
+      return;
+    }
+
     const ext = coverPath.split('.').pop()?.toLowerCase();
     const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
-    reply.header('Cache-Control', 'private, max-age=86400');
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('ETag', etag);
     reply.type(contentType);
     reply.send(createReadStream(coverPath));
   }
 
   @Get(':id/thumbnail')
-  async getThumbnail(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+  async getThumbnail(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: RequestUser,
+    @Res() reply: FastifyReply,
+    @Headers('if-none-match') ifNoneMatch?: string,
+  ) {
     const thumbnailPath = await this.bookService.getThumbnailPath(id, user);
     if (!thumbnailPath) throw new NotFoundException(`No thumbnail for book ${id}`);
 
-    reply.header('Cache-Control', 'private, max-age=86400');
+    const { mtimeMs } = await stat(thumbnailPath);
+    const etag = `"${Math.floor(mtimeMs)}"`;
+    if (ifNoneMatch === etag) {
+      reply.status(304).send();
+      return;
+    }
+
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('ETag', etag);
     reply.type('image/jpeg');
     reply.send(createReadStream(thumbnailPath));
   }

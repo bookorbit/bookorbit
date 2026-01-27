@@ -2,7 +2,7 @@ import { ref } from 'vue'
 
 const STORAGE_KEY = 'cover-versions'
 
-function loadFromStorage(): Map<number, number> {
+function load(): Map<number, number> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return new Map()
@@ -12,7 +12,7 @@ function loadFromStorage(): Map<number, number> {
   }
 }
 
-function saveToStorage(map: Map<number, number>) {
+function persist(map: Map<number, number>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...map]))
   } catch {
@@ -20,18 +20,24 @@ function saveToStorage(map: Map<number, number>) {
   }
 }
 
-const versions = ref<Map<number, number>>(loadFromStorage())
+const versions = ref<Map<number, number>>(load())
 
 export function useCoverVersions() {
   function bumpVersion(bookId: number) {
     const next = new Map(versions.value).set(bookId, Date.now())
     versions.value = next
-    saveToStorage(next)
+    persist(next)
   }
 
   function getVersion(bookId: number): number | undefined {
     return versions.value.get(bookId)
   }
 
-  return { getVersion, bumpVersion }
+  function coverUrl(bookId: number, type: 'thumbnail' | 'cover' = 'thumbnail'): string {
+    const base = `/api/books/${bookId}/${type}`
+    const v = versions.value.get(bookId)
+    return v ? `${base}?t=${v}` : base
+  }
+
+  return { getVersion, bumpVersion, coverUrl }
 }

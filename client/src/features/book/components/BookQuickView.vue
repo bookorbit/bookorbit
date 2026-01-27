@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose } from 'reka-ui'
 import { useBookDetail } from '../composables/useBookDetail'
+import { useCoverVersions } from '../composables/useCoverVersions'
 import { bookCoverStyle } from '../lib/book-cover'
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
@@ -32,6 +33,9 @@ watch(
   },
   { immediate: true },
 )
+
+const { coverUrl } = useCoverVersions()
+const coverSrc = computed(() => (detail.value ? coverUrl(detail.value.id, 'cover') : null))
 
 const coverStyle = computed(() => (detail.value ? bookCoverStyle(detail.value.title ?? String(detail.value.id)) : {}))
 
@@ -84,7 +88,7 @@ function openBook() {
             >
               <img
                 v-if="!coverFailed"
-                :src="`/api/books/${detail.id}/cover`"
+                :src="coverSrc!"
                 class="w-full h-full object-cover transition-opacity duration-200"
                 :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
                 :alt="detail.title ?? ''"
@@ -224,12 +228,7 @@ function openBook() {
       <DialogContent
         class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
       >
-        <img
-          v-if="detail"
-          :src="`/api/books/${detail.id}/cover`"
-          :alt="detail.title ?? ''"
-          class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain"
-        />
+        <img v-if="detail" :src="coverSrc!" :alt="detail.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
         <DialogClose
           class="absolute -top-3 -right-3 p-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"
         >

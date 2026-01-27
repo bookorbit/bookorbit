@@ -2,7 +2,7 @@
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -27,20 +27,11 @@ const readableFiles = computed(() => props.book.files.filter((f) => f.format && 
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
 const extraFiles = computed(() => readableFiles.value.filter((f) => f !== primaryFile.value))
 
-const { getVersion } = useCoverVersions()
-const coverSrc = computed(() => {
-  const base = `/api/books/${props.book.id}/thumbnail`
-  const v = getVersion(props.book.id)
-  return v ? `${base}?t=${v}` : base
-})
+const { coverUrl } = useCoverVersions()
+const coverSrc = computed(() => coverUrl(props.book.id))
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
-
-watch(coverSrc, () => {
-  coverLoaded.value = false
-  coverFailed.value = false
-})
 
 function openFile(file: BookFileRef) {
   router.push({

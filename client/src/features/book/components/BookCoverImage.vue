@@ -9,12 +9,8 @@ const props = defineProps<{
   alt?: string
 }>()
 
-const { getVersion } = useCoverVersions()
-const src = computed(() => {
-  const base = `/api/books/${props.bookId}/${props.type ?? 'thumbnail'}`
-  const v = getVersion(props.bookId)
-  return v ? `${base}?t=${v}` : base
-})
+const { coverUrl } = useCoverVersions()
+const src = computed(() => coverUrl(props.bookId, props.type ?? 'thumbnail'))
 </script>
 
 <template>

@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useCoverVersions } from '../composables/useCoverVersions'
 
 const router = useRouter()
 
@@ -27,6 +28,9 @@ const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.file
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
 
+const { coverUrl } = useCoverVersions()
+const coverSrc = computed(() => coverUrl(props.book.id))
+
 function openFile(file: BookFileRef) {
   router.push({
     name: 'reader',
@@ -46,7 +50,7 @@ function openFile(file: BookFileRef) {
     <div class="h-16 w-12 rounded shrink-0 overflow-hidden relative" :style="coverLoaded ? {} : coverStyle">
       <img
         v-if="!coverFailed"
-        :src="`/api/books/${book.id}/thumbnail`"
+        :src="coverSrc"
         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
         :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
         loading="lazy"

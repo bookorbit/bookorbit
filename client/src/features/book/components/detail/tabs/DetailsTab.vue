@@ -5,6 +5,7 @@ import { BookOpen, Download, FolderPlus, Trash2, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { Skeleton } from '@/components/ui/skeleton'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import type { BookDetail } from '@projectx/types'
 
 const props = defineProps<{ book: BookDetail }>()
@@ -17,6 +18,9 @@ const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
+
+const { coverUrl } = useCoverVersions()
+const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 
@@ -62,7 +66,7 @@ function downloadFile() {
         >
           <img
             v-if="!coverFailed"
-            :src="`/api/books/${book.id}/cover`"
+            :src="coverSrc"
             class="w-full h-full object-cover transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             :alt="book.title ?? ''"
@@ -177,7 +181,7 @@ function downloadFile() {
       <DialogContent
         class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
       >
-        <img :src="`/api/books/${book.id}/cover`" :alt="book.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
+        <img :src="coverSrc" :alt="book.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
         <DialogClose
           class="absolute -top-3 -right-3 p-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"
         >
