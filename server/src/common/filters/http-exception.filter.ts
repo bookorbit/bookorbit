@@ -10,12 +10,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const reply = ctx.getResponse<FastifyReply>();
     const request = ctx.getRequest<FastifyRequest>();
 
-    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : typeof (exception as any)?.statusCode === 'number'
+          ? (exception as any).statusCode
+          : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const raw = exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
-    const message = typeof raw === 'string' ? raw : ((raw as any).message ?? 'An error occurred');
+    const message = typeof raw === 'string' ? raw : ((raw as any).message ?? (exception as any)?.message ?? 'An error occurred');
 
-    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(exception);
     }
 

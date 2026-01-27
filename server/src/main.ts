@@ -31,11 +31,11 @@ async function bootstrap() {
 
   await app.register(require('@fastify/cookie'));
 
-  // Global IP-based rate limit; image/cover endpoints are exempt (high volume, cheap reads)
+  // Rate limit unauthenticated requests only (brute-force protection on public endpoints)
   await app.register(require('@fastify/rate-limit'), {
     max: 100,
     timeWindow: '1 minute',
-    allowList: (req: { url: string }) => /^\/api\/books\/\d+\/(thumbnail|cover)/.test(req.url),
+    allowList: (req: { cookies?: { access_token?: string } }) => !!req.cookies?.access_token,
   });
 
   if (process.env.NODE_ENV !== 'production') {
