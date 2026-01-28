@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import type { BookFileRemovedEvent, BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
 import { AuthService } from '../auth/auth.service';
 import { ScanJobStore } from './scan-job-store.service';
 
@@ -57,16 +57,25 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  // Called by ScannerService — not a WS message handler.
+  // Called by services — not WS message handlers. Guards against script/test
+  // contexts where no HTTP adapter starts and this.server is never populated.
   emitProgress(event: ScanProgressEvent): void {
-    this.server.to(`library:${event.libraryId}`).emit('scan:progress', event);
+    this.server?.to(`library:${event.libraryId}`).emit('scan:progress', event);
   }
 
   emitCoverRefreshProgress(event: CoverRefreshProgressEvent): void {
-    this.server.to(`library:${event.libraryId}`).emit('cover:refresh:progress', event);
+    this.server?.to(`library:${event.libraryId}`).emit('cover:refresh:progress', event);
   }
 
   emitCoverRefreshed(event: CoverRefreshedEvent): void {
-    this.server.to(`library:${event.libraryId}`).emit('cover:refreshed', event);
+    this.server?.to(`library:${event.libraryId}`).emit('cover:refreshed', event);
+  }
+
+  emitBookMissing(event: BookMissingEvent): void {
+    this.server?.to(`library:${event.libraryId}`).emit('book:missing', event);
+  }
+
+  emitBookFileRemoved(event: BookFileRemovedEvent): void {
+    this.server?.to(`library:${event.libraryId}`).emit('book:file:removed', event);
   }
 }

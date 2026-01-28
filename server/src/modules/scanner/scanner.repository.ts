@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, count, eq, inArray, like, ne, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -107,5 +107,36 @@ export class ScannerRepository {
       .where(eq(bookFiles.id, id))
       .returning();
     return file!;
+  }
+
+  async findBookFileByAbsolutePath(absolutePath: string) {
+    const [row] = await this.db
+      .select({ file: bookFiles, libraryId: books.libraryId })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(eq(bookFiles.absolutePath, absolutePath))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async deleteBookFile(id: number) {
+    await this.db.delete(bookFiles).where(eq(bookFiles.id, id));
+  }
+
+  async countBookFilesByBookId(bookId: number): Promise<number> {
+    const [result] = await this.db.select({ count: count() }).from(bookFiles).where(eq(bookFiles.bookId, bookId));
+    return result?.count ?? 0;
+  }
+
+  async findBooksByFolderPath(folderPath: string) {
+    return this.db
+      .select()
+      .from(books)
+      .where(or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%')));
+  }
+
+  async deleteBookFilesByBookIds(bookIds: number[]) {
+    if (bookIds.length === 0) return;
+    await this.db.delete(bookFiles).where(inArray(bookFiles.bookId, bookIds));
   }
 }

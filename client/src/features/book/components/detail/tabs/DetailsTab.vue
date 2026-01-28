@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, FolderPlus, Trash2, X } from 'lucide-vue-next'
+import { BookOpen, Download, FolderPlus, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
-import { Skeleton } from '@/components/ui/skeleton'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import type { BookDetail } from '@projectx/types'
 
 const props = defineProps<{ book: BookDetail }>()
-
 const router = useRouter()
 
 const coverLoaded = ref(false)
@@ -18,21 +16,18 @@ const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
-
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
-
 const authorLine = computed(() => props.book.authors.map((a) => a.name).join(', ') || null)
+const formats = computed(() => [...new Set(props.book.files.map((f) => f.format ?? '?'))])
 
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
   const idx = props.book.seriesIndex
   return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
 })
-
-const isbn = computed(() => props.book.isbn13 ?? props.book.isbn10 ?? null)
 
 function openBook() {
   if (!primaryFile.value) return
@@ -53,11 +48,20 @@ function downloadFile() {
 </script>
 
 <template>
+  <div v-if="book.status === 'missing'" class="mb-6 flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+    <TriangleAlert class="size-4 text-amber-500 shrink-0 mt-0.5" />
+    <div>
+      <p class="text-sm font-medium text-amber-600 dark:text-amber-400">Files not found</p>
+      <p class="text-xs text-muted-foreground mt-0.5">
+        The file(s) for this book can no longer be found on disk. Metadata is still available. Run a library scan to confirm, or remove the record.
+      </p>
+    </div>
+  </div>
+
   <div class="flex flex-col md:flex-row gap-8">
     <!-- Left column: cover + actions -->
     <div class="md:w-56 shrink-0 md:sticky md:top-4 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
-        <!-- Cover -->
         <div
           class="w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
           style="aspect-ratio: 2/3"
@@ -75,7 +79,6 @@ function downloadFile() {
           />
         </div>
 
-        <!-- Actions -->
         <div class="mt-4 space-y-2">
           <button
             class="flex w-full items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
@@ -111,63 +114,89 @@ function downloadFile() {
       </div>
     </div>
 
-    <!-- Right column: metadata -->
+    <!-- Right column -->
     <div class="flex-1 min-w-0">
-      <!-- Title block -->
+      <!-- Identity block -->
       <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
-      <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1">{{ book.subtitle }}</p>
-      <p v-if="authorLine" class="text-sm text-foreground/80 mt-2">{{ authorLine }}</p>
-      <p v-if="seriesLine" class="text-sm text-muted-foreground italic mt-0.5">{{ seriesLine }}</p>
+      <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
 
-      <!-- Badges -->
-      <div class="flex flex-wrap gap-1.5 mt-4">
+      <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
+        <p v-if="authorLine" class="text-sm">
+          <span class="text-muted-foreground">by</span>
+          <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
+        </p>
+        <template v-if="seriesLine">
+          <span class="text-muted-foreground/40 text-xs">·</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+        </template>
+      </div>
+
+      <!-- Format badges -->
+      <div v-if="formats.length" class="flex flex-wrap gap-1.5 mt-4">
         <span
-          v-for="file in book.files"
-          :key="file.id"
-          class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground"
+          v-for="fmt in formats"
+          :key="fmt"
+          class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-border text-muted-foreground"
         >
-          {{ file.format ?? '?' }}
-        </span>
-        <span v-if="book.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
-          {{ book.pageCount }} pages
-        </span>
-        <span v-if="book.publishedYear" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
-          {{ book.publishedYear }}
-        </span>
-        <span v-if="book.language" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground">
-          {{ book.language }}
+          {{ fmt }}
         </span>
       </div>
 
+      <!-- Metadata grid -->
+      <dl
+        v-if="book.publisher || book.publishedYear || book.language || book.pageCount || book.isbn13 || book.isbn10"
+        class="mt-5 pt-5 border-t border-border grid grid-cols-2 gap-x-8 gap-y-4"
+      >
+        <div v-if="book.publisher" class="min-w-0">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Publisher</dt>
+          <dd class="text-sm text-foreground mt-0.5 leading-snug">{{ book.publisher }}</dd>
+        </div>
+        <div v-if="book.publishedYear">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Published</dt>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedYear }}</dd>
+        </div>
+        <div v-if="book.language">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Language</dt>
+          <dd class="text-sm text-foreground mt-0.5 capitalize">{{ book.language }}</dd>
+        </div>
+        <div v-if="book.pageCount">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Pages</dt>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.pageCount }}</dd>
+        </div>
+        <div v-if="book.isbn13" class="min-w-0">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-13</dt>
+          <dd class="text-sm text-foreground mt-0.5 font-mono">{{ book.isbn13 }}</dd>
+        </div>
+        <div v-if="book.isbn10" class="min-w-0">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-10</dt>
+          <dd class="text-sm text-foreground mt-0.5 font-mono">{{ book.isbn10 }}</dd>
+        </div>
+      </dl>
+
       <!-- Tags -->
-      <div v-if="book.tags.length" class="flex flex-wrap gap-1.5 mt-3">
-        <span v-for="tag in book.tags" :key="tag" class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+      <div v-if="book.tags.length" class="flex flex-wrap gap-1.5 mt-5">
+        <span v-for="tag in book.tags" :key="tag" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
           {{ tag }}
         </span>
       </div>
 
-      <!-- Publisher + ISBN -->
-      <div class="mt-3 space-y-0.5">
-        <p v-if="book.publisher" class="text-xs text-muted-foreground">{{ book.publisher }}</p>
-        <p v-if="isbn" class="text-xs text-muted-foreground">ISBN: {{ isbn }}</p>
-      </div>
-
-      <!-- Description -->
-      <div class="border-t mt-4 pt-4">
+      <!-- Synopsis -->
+      <div class="mt-6 pt-5 border-t border-border">
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">Synopsis</p>
         <div v-if="book.description">
           <div
             class="text-sm leading-relaxed text-foreground/80 transition-all"
-            :class="descriptionExpanded ? '' : 'line-clamp-4'"
+            :class="descriptionExpanded ? '' : 'line-clamp-6'"
             v-html="book.description"
           />
           <button
-            class="text-xs text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
+            class="text-xs text-muted-foreground hover:text-foreground mt-2 transition-colors"
             @click="descriptionExpanded = !descriptionExpanded"
           >
             {{ descriptionExpanded ? 'Show less' : 'Show more' }}
           </button>
         </div>
-        <p v-else class="text-xs text-muted-foreground italic">No description available.</p>
+        <p v-else class="text-sm text-muted-foreground italic">No description available.</p>
       </div>
     </div>
   </div>

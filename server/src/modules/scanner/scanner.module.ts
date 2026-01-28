@@ -4,6 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 
 import { AuthModule } from '../auth/auth.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { FileEventProcessorService } from './file-event-processor.service';
+import { FileWatcherService } from './file-watcher.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
 import { ScannerController } from './scanner.controller';
@@ -23,7 +25,7 @@ import { ScannerService } from './scanner.service';
     }),
   ],
   controllers: [ScannerController],
-  providers: [ScannerService, ScannerRepository, ScanGateway, ScanJobStore],
+  providers: [ScannerService, ScannerRepository, ScanGateway, ScanJobStore, FileEventProcessorService, FileWatcherService],
   exports: [ScannerService],
 })
 export class ScannerModule {}

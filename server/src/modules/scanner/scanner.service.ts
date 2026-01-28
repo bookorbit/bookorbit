@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 
-import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
@@ -187,6 +187,7 @@ export class ScannerService implements OnApplicationBootstrap {
       await this.scannerRepo.markBooksAsMissing(missingIds);
       counts.missingCount += missingIds.length;
       this.scanJobStore.increment(libraryId, { missing: missingIds.length });
+      this.scanGateway.emitBookMissing({ libraryId, bookIds: missingIds } satisfies BookMissingEvent);
     }
 
     return counts;

@@ -21,3 +21,14 @@ export interface CoverRefreshedEvent {
   bookId: number;
   libraryId: number;
 }
+
+export interface BookMissingEvent {
+  libraryId: number;
+  bookIds: number[];
+}
+
+export interface BookFileRemovedEvent {
+  libraryId: number;
+  bookId: number;
+  fileId: number;
+}

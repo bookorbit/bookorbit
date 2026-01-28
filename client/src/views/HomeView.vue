@@ -11,6 +11,7 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
+import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
@@ -28,6 +29,14 @@ const libraryId = shallowRef<number | null>(route.params.id ? Number(route.param
 const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+
+const { onBookMissing } = useBookEvents()
+onBookMissing((bookIds) => {
+  const missing = new Set(bookIds)
+  for (const book of books.value) {
+    if (missing.has(book.id)) book.status = 'missing'
+  }
+})
 
 const filterOpen = ref(false)
 

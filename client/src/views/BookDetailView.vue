@@ -9,6 +9,7 @@ import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
+import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 
 const route = useRoute()
@@ -19,6 +20,16 @@ const activeTab = computed(() => (route.query.tab as string) || 'details')
 
 const { detail, loading, fetch } = useBookDetail()
 const { libraries, fetchLibraries } = useLibraries()
+
+const { onBookMissing, onBookFileRemoved } = useBookEvents()
+onBookMissing((bookIds) => {
+  if (detail.value && bookIds.includes(detail.value.id)) {
+    detail.value = { ...detail.value, status: 'missing', files: [] }
+  }
+})
+onBookFileRemoved((bookId) => {
+  if (detail.value?.id === bookId) fetch(bookId)
+})
 
 watch(bookId, (id) => fetch(id), { immediate: true })
 fetchLibraries()

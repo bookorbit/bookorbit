@@ -4,7 +4,7 @@ import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
@@ -32,6 +32,7 @@ const coverSrc = computed(() => coverUrl(props.book.id))
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+const isMissing = computed(() => props.book.status === 'missing')
 
 function openFile(file: BookFileRef) {
   router.push({
@@ -45,12 +46,13 @@ function openFile(file: BookFileRef) {
 <template>
   <div
     class="group flex flex-col @container"
-    :class="primaryFile ? 'cursor-pointer' : 'cursor-default opacity-60'"
-    @click="primaryFile && openFile(primaryFile)"
+    :class="primaryFile && !isMissing ? 'cursor-pointer' : 'cursor-default'"
+    @click="primaryFile && !isMissing && openFile(primaryFile)"
   >
     <!-- Cover -->
     <div
-      class="relative w-full rounded-sm overflow-hidden shadow-md group-hover:shadow-xl group-hover:scale-[1.02] transition-all duration-150"
+      class="relative w-full rounded-sm overflow-hidden shadow-md transition-all duration-150"
+      :class="isMissing ? 'grayscale opacity-60' : 'group-hover:shadow-xl group-hover:scale-[1.02]'"
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
@@ -75,9 +77,12 @@ function openFile(file: BookFileRef) {
         </span>
       </div>
 
-      <!-- Missing overlay -->
-      <div v-if="book.status === 'missing'" class="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-        <span class="text-[10px] font-semibold uppercase tracking-widest text-destructive-foreground bg-destructive px-2 py-0.5 rounded">
+      <!-- Missing badge -->
+      <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
+        <span
+          class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-500/90 text-white backdrop-blur-sm"
+        >
+          <TriangleAlert class="size-2.5 shrink-0" />
           Missing
         </span>
       </div>

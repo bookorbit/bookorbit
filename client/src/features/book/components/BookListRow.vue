@@ -3,7 +3,7 @@ import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
@@ -22,6 +22,7 @@ const seriesLine = computed(() => {
   return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
 })
 
+const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.files : []))
 
@@ -43,8 +44,8 @@ function openFile(file: BookFileRef) {
 <template>
   <div
     class="flex items-center gap-3 py-2 px-2 rounded-md transition-colors"
-    :class="primaryFile ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default opacity-60'"
-    @click="primaryFile && openFile(primaryFile)"
+    :class="[primaryFile && !isMissing ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default', isMissing ? 'opacity-60 grayscale' : '']"
+    @click="primaryFile && !isMissing && openFile(primaryFile)"
   >
     <!-- Cover -->
     <div class="h-16 w-12 rounded shrink-0 overflow-hidden relative" :style="coverLoaded ? {} : coverStyle">
@@ -71,9 +72,10 @@ function openFile(file: BookFileRef) {
     <div class="flex items-center gap-2 shrink-0" @click.stop>
       <div class="flex flex-col items-end gap-1">
         <span
-          v-if="book.status === 'missing'"
-          class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground"
+          v-if="isMissing"
+          class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
         >
+          <TriangleAlert class="size-3 shrink-0" />
           Missing
         </span>
         <button
