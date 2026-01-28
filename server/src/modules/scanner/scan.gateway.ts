@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import type { BookFileRemovedEvent, BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import type { BookMissingEvent, BookRestoredEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
 import { AuthService } from '../auth/auth.service';
 import { ScanJobStore } from './scan-job-store.service';
 
@@ -75,7 +75,7 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server?.to(`library:${event.libraryId}`).emit('book:missing', event);
   }
 
-  emitBookFileRemoved(event: BookFileRemovedEvent): void {
-    this.server?.to(`library:${event.libraryId}`).emit('book:file:removed', event);
+  emitBookRestored(event: BookRestoredEvent): void {
+    this.server?.to(`library:${event.libraryId}`).emit('book:restored', event);
   }
 }

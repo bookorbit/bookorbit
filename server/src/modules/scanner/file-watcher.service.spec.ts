@@ -2,20 +2,20 @@ import { FileWatcherService } from './file-watcher.service';
 import { FileEventProcessorService } from './file-event-processor.service';
 import { ScanGateway } from './scan.gateway';
 
-function makeService(processorResult: any = { type: 'noop' }) {
+function makeService() {
   const processor = {
-    handleUnlink: jest.fn().mockResolvedValue(processorResult),
-    handleUnlinkDir: jest.fn().mockResolvedValue(processorResult),
+    handleUnlink: jest.fn().mockResolvedValue({ type: 'noop' }),
+    handleUnlinkDir: jest.fn().mockResolvedValue({ type: 'noop' }),
+    handleCreate: jest.fn().mockResolvedValue({ type: 'noop' }),
+    reconcileMissingBooks: jest.fn().mockResolvedValue([]),
   } as unknown as FileEventProcessorService;
 
   const gateway = {
     emitBookMissing: jest.fn(),
-    emitBookFileRemoved: jest.fn(),
+    emitBookRestored: jest.fn(),
   } as unknown as ScanGateway;
 
-  // DB stub — onApplicationBootstrap queries libraries; tests don't call it so db is unused
   const db = {} as any;
-
   const service = new FileWatcherService(db, processor, gateway);
   return { service, processor, gateway };
 }
@@ -26,48 +26,47 @@ afterEach(() => jest.useRealTimers());
 // ── process() routing ─────────────────────────────────────────────────────────
 
 describe('process()', () => {
-  it('calls emitBookMissing when processor returns book-missing', async () => {
+  it('emits book-missing when handleUnlink returns book-missing', async () => {
+    const { service, processor, gateway } = makeService();
     const missing = { type: 'book-missing', libraryId: 1, bookIds: [10, 11] };
-    const { service, processor, gateway } = makeService(missing);
     processor.handleUnlink = jest.fn().mockResolvedValue(missing);
 
-    await (service as any).process('unlink', '/books/Author/book.epub');
+    await (service as any).process('delete', '/books/Author/book.epub');
 
     expect(gateway.emitBookMissing).toHaveBeenCalledWith({ libraryId: 1, bookIds: [10, 11] });
-    expect(gateway.emitBookFileRemoved).not.toHaveBeenCalled();
   });
 
-  it('calls emitBookFileRemoved when processor returns file-removed', async () => {
-    const removed = { type: 'file-removed', libraryId: 2, bookId: 5, fileId: 99 };
-    const { service, processor, gateway } = makeService(removed);
-    processor.handleUnlink = jest.fn().mockResolvedValue(removed);
-
-    await (service as any).process('unlink', '/books/Author/book.pdf');
-
-    expect(gateway.emitBookFileRemoved).toHaveBeenCalledWith({ libraryId: 2, bookId: 5, fileId: 99 });
-    expect(gateway.emitBookMissing).not.toHaveBeenCalled();
-  });
-
-  it('calls neither gateway method when processor returns noop', async () => {
-    const { service, processor, gateway } = makeService({ type: 'noop' });
-    processor.handleUnlink = jest.fn().mockResolvedValue({ type: 'noop' });
-
-    await (service as any).process('unlink', '/nowhere/file.epub');
-
-    expect(gateway.emitBookMissing).not.toHaveBeenCalled();
-    expect(gateway.emitBookFileRemoved).not.toHaveBeenCalled();
-  });
-
-  it('delegates unlinkDir to processor.handleUnlinkDir', async () => {
+  it('falls back to handleUnlinkDir when handleUnlink returns noop on delete', async () => {
+    const { service, processor, gateway } = makeService();
     const missing = { type: 'book-missing', libraryId: 3, bookIds: [20] };
-    const { service, processor, gateway } = makeService(missing);
+    processor.handleUnlink = jest.fn().mockResolvedValue({ type: 'noop' });
     processor.handleUnlinkDir = jest.fn().mockResolvedValue(missing);
 
-    await (service as any).process('unlinkDir', '/books/Author');
+    await (service as any).process('delete', '/books/Author');
 
+    expect(processor.handleUnlink).toHaveBeenCalledWith('/books/Author');
     expect(processor.handleUnlinkDir).toHaveBeenCalledWith('/books/Author');
-    expect(processor.handleUnlink).not.toHaveBeenCalled();
     expect(gateway.emitBookMissing).toHaveBeenCalledWith({ libraryId: 3, bookIds: [20] });
+  });
+
+  it('emits book-restored when handleCreate returns book-restored', async () => {
+    const { service, processor, gateway } = makeService();
+    const restored = { type: 'book-restored', libraryId: 1, bookIds: [7] };
+    processor.handleCreate = jest.fn().mockResolvedValue(restored);
+
+    await (service as any).process('create', '/books/Author/book.epub');
+
+    expect(processor.handleCreate).toHaveBeenCalledWith('/books/Author/book.epub');
+    expect((gateway as any).emitBookRestored).toHaveBeenCalledWith({ libraryId: 1, bookIds: [7] });
+    expect(gateway.emitBookMissing).not.toHaveBeenCalled();
+  });
+
+  it('emits nothing when both handlers return noop', async () => {
+    const { service, gateway } = makeService();
+
+    await (service as any).process('delete', '/nowhere/file.epub');
+
+    expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
 });
 
@@ -78,27 +77,78 @@ describe('schedule() debounce', () => {
     const { service } = makeService();
     const processSpy = jest.spyOn(service as any, 'process').mockResolvedValue(undefined);
 
-    (service as any).schedule('unlink', '/books/file.epub');
-    (service as any).schedule('unlink', '/books/file.epub'); // cancels previous
-    (service as any).schedule('unlink', '/books/file.epub'); // cancels previous
+    (service as any).schedule('delete', '/books/file.epub');
+    (service as any).schedule('delete', '/books/file.epub');
+    (service as any).schedule('delete', '/books/file.epub');
 
     jest.runAllTimers();
-    await Promise.resolve(); // flush microtasks
+    await Promise.resolve();
 
     expect(processSpy).toHaveBeenCalledTimes(1);
-    expect(processSpy).toHaveBeenCalledWith('unlink', '/books/file.epub');
+    expect(processSpy).toHaveBeenCalledWith('delete', '/books/file.epub');
+  });
+
+  it('last event type wins when delete and create race for the same path', async () => {
+    const { service } = makeService();
+    const processSpy = jest.spyOn(service as any, 'process').mockResolvedValue(undefined);
+
+    (service as any).schedule('delete', '/books/file.epub');
+    (service as any).schedule('create', '/books/file.epub'); // overrides delete
+
+    jest.runAllTimers();
+    await Promise.resolve();
+
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    expect(processSpy).toHaveBeenCalledWith('create', '/books/file.epub');
   });
 
   it('does not debounce events for different paths', async () => {
     const { service } = makeService();
     const processSpy = jest.spyOn(service as any, 'process').mockResolvedValue(undefined);
 
-    (service as any).schedule('unlink', '/books/file-a.epub');
-    (service as any).schedule('unlink', '/books/file-b.epub');
+    (service as any).schedule('delete', '/books/file-a.epub');
+    (service as any).schedule('delete', '/books/file-b.epub');
 
     jest.runAllTimers();
     await Promise.resolve();
 
     expect(processSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── reconcile() ───────────────────────────────────────────────────────────────
+
+describe('reconcile()', () => {
+  it('emits book-restored for each restored result from reconcileMissingBooks', async () => {
+    const { service, processor, gateway } = makeService();
+    (service as any).subscriptions.set(1, []);
+    (processor.reconcileMissingBooks as jest.Mock).mockResolvedValue([
+      { type: 'book-restored', libraryId: 1, bookIds: [10, 11] },
+      { type: 'book-restored', libraryId: 2, bookIds: [20] },
+    ]);
+
+    await (service as any).reconcile();
+
+    expect(gateway.emitBookRestored).toHaveBeenCalledTimes(2);
+    expect(gateway.emitBookRestored).toHaveBeenCalledWith({ libraryId: 1, bookIds: [10, 11] });
+    expect(gateway.emitBookRestored).toHaveBeenCalledWith({ libraryId: 2, bookIds: [20] });
+  });
+
+  it('does nothing when reconcileMissingBooks returns empty', async () => {
+    const { service, processor, gateway } = makeService();
+    (service as any).subscriptions.set(1, []);
+
+    await (service as any).reconcile();
+
+    expect(gateway.emitBookRestored).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when no libraries are being watched', async () => {
+    const { service, processor, gateway } = makeService();
+
+    await (service as any).reconcile();
+
+    expect(processor.reconcileMissingBooks).not.toHaveBeenCalled();
+    expect(gateway.emitBookRestored).not.toHaveBeenCalled();
   });
 });

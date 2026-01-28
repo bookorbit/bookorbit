@@ -128,6 +128,21 @@ export class ScannerRepository {
     return result?.count ?? 0;
   }
 
+  async countPrimaryBookFilesByBookId(bookId: number): Promise<number> {
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')));
+    return result?.count ?? 0;
+  }
+
+  async findPrimaryBookFilesByBookId(bookId: number) {
+    return this.db
+      .select()
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')));
+  }
+
   async findBooksByFolderPath(folderPath: string) {
     return this.db
       .select()
@@ -138,5 +153,34 @@ export class ScannerRepository {
   async deleteBookFilesByBookIds(bookIds: number[]) {
     if (bookIds.length === 0) return;
     await this.db.delete(bookFiles).where(inArray(bookFiles.bookId, bookIds));
+  }
+
+  async findMissingBookByFolderPath(folderPath: string) {
+    const [row] = await this.db
+      .select()
+      .from(books)
+      .where(and(eq(books.folderPath, folderPath), eq(books.status, 'missing')))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findMissingBooksByFolderPath(folderPath: string) {
+    return this.db
+      .select()
+      .from(books)
+      .where(and(or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%')), eq(books.status, 'missing')));
+  }
+
+  async findMissingBooksForLibraries(libraryIds: number[]) {
+    if (libraryIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(books)
+      .where(and(inArray(books.libraryId, libraryIds), eq(books.status, 'missing')));
+  }
+
+  async markBooksAsPresent(bookIds: number[]) {
+    if (bookIds.length === 0) return;
+    await this.db.update(books).set({ status: 'present', updatedAt: new Date() }).where(inArray(books.id, bookIds));
   }
 }

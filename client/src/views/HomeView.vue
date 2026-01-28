@@ -14,6 +14,7 @@ import { useBookQuery, type BookCard } from '@/features/book/composables/useBook
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import type { SortField } from '@projectx/types'
 
@@ -30,11 +31,20 @@ const title = computed(() => libraries.value.find((l) => l.id === libraryId.valu
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 
-const { onBookMissing } = useBookEvents()
+const { subscribeLibrary } = useScanProgress()
+watch(libraryId, (id) => { if (id !== null) subscribeLibrary(id) }, { immediate: true })
+
+const { onBookMissing, onBookRestored } = useBookEvents()
 onBookMissing((bookIds) => {
   const missing = new Set(bookIds)
   for (const book of books.value) {
     if (missing.has(book.id)) book.status = 'missing'
+  }
+})
+onBookRestored((bookIds) => {
+  const restored = new Set(bookIds)
+  for (const book of books.value) {
+    if (restored.has(book.id)) book.status = 'present'
   }
 })
 

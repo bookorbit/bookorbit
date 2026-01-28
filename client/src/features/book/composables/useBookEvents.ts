@@ -1,12 +1,12 @@
 import { toast } from 'vue-sonner'
-import type { BookFileRemovedEvent, BookMissingEvent } from '@projectx/types'
+import type { BookMissingEvent, BookRestoredEvent } from '@projectx/types'
 import { getSocket } from '@/features/scanner/composables/useScanProgress'
 
 type BookMissingCallback = (bookIds: number[]) => void
-type BookFileRemovedCallback = (bookId: number, fileId: number) => void
+type BookRestoredCallback = (bookIds: number[]) => void
 
 const missingCallbacks = new Set<BookMissingCallback>()
-const fileRemovedCallbacks = new Set<BookFileRemovedCallback>()
+const restoredCallbacks = new Set<BookRestoredCallback>()
 
 let pendingMissingCount = 0
 let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -34,8 +34,8 @@ function ensureInitialized() {
     toastTimer = setTimeout(flushMissingToast, 1000)
   })
 
-  socket.on('book:file:removed', (event: BookFileRemovedEvent) => {
-    for (const cb of fileRemovedCallbacks) cb(event.bookId, event.fileId)
+  socket.on('book:restored', (event: BookRestoredEvent) => {
+    for (const cb of restoredCallbacks) cb(event.bookIds)
   })
 }
 
@@ -47,10 +47,10 @@ export function useBookEvents() {
     return () => missingCallbacks.delete(cb)
   }
 
-  function onBookFileRemoved(cb: BookFileRemovedCallback): () => void {
-    fileRemovedCallbacks.add(cb)
-    return () => fileRemovedCallbacks.delete(cb)
+  function onBookRestored(cb: BookRestoredCallback): () => void {
+    restoredCallbacks.add(cb)
+    return () => restoredCallbacks.delete(cb)
   }
 
-  return { onBookMissing, onBookFileRemoved }
+  return { onBookMissing, onBookRestored }
 }

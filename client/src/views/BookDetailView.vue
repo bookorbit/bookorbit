@@ -11,6 +11,7 @@ import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,14 +22,17 @@ const activeTab = computed(() => (route.query.tab as string) || 'details')
 const { detail, loading, fetch } = useBookDetail()
 const { libraries, fetchLibraries } = useLibraries()
 
-const { onBookMissing, onBookFileRemoved } = useBookEvents()
+const { subscribeLibrary } = useScanProgress()
+watch(() => detail.value?.libraryId, (id) => { if (id !== undefined) subscribeLibrary(id) })
+
+const { onBookMissing, onBookRestored } = useBookEvents()
 onBookMissing((bookIds) => {
   if (detail.value && bookIds.includes(detail.value.id)) {
-    detail.value = { ...detail.value, status: 'missing', files: [] }
+    detail.value = { ...detail.value, status: 'missing' }
   }
 })
-onBookFileRemoved((bookId) => {
-  if (detail.value?.id === bookId) fetch(bookId)
+onBookRestored((bookIds) => {
+  if (detail.value && bookIds.includes(detail.value.id)) fetch(detail.value.id)
 })
 
 watch(bookId, (id) => fetch(id), { immediate: true })

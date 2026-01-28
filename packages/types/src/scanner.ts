@@ -27,8 +27,7 @@ export interface BookMissingEvent {
   bookIds: number[];
 }
 
-export interface BookFileRemovedEvent {
+export interface BookRestoredEvent {
   libraryId: number;
-  bookId: number;
-  fileId: number;
+  bookIds: number[];
 }

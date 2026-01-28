@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { FSWatcher } from 'chokidar';
+import type { AsyncSubscription } from '@parcel/watcher';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -10,14 +10,17 @@ import { ScanGateway } from './scan.gateway';
 import { FileEventProcessorService } from './file-event-processor.service';
 
 type Db = NodePgDatabase<typeof schema>;
+type EventType = 'delete' | 'create';
 
 const DEBOUNCE_MS = 500;
+const RECONCILE_MS = 30_000;
 
 @Injectable()
 export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(FileWatcherService.name);
-  private readonly watchers = new Map<number, FSWatcher>();
-  private readonly pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly subscriptions = new Map<number, AsyncSubscription[]>();
+  private readonly pendingTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; type: EventType }>();
+  private reconcileTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -34,56 +37,92 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
         folders.map((f) => f.path),
       );
     }
+
+    this.reconcileTimer = setInterval(() => {
+      this.reconcile().catch((err) => this.logger.error(`Reconcile error: ${(err as Error).message}`));
+    }, RECONCILE_MS);
   }
 
   async onModuleDestroy(): Promise<void> {
-    for (const timer of this.pendingTimers.values()) clearTimeout(timer);
+    if (this.reconcileTimer) clearInterval(this.reconcileTimer);
+    for (const entry of this.pendingTimers.values()) clearTimeout(entry.timer);
     this.pendingTimers.clear();
-    for (const watcher of this.watchers.values()) await watcher.close();
-    this.watchers.clear();
+    for (const subs of this.subscriptions.values()) {
+      for (const sub of subs) await sub.unsubscribe();
+    }
+    this.subscriptions.clear();
+  }
+
+  private async reconcile(): Promise<void> {
+    const libraryIds = [...this.subscriptions.keys()];
+    if (libraryIds.length === 0) return;
+
+    const results = await this.processor.reconcileMissingBooks(libraryIds);
+    for (const result of results) {
+      if (result.type === 'book-restored') {
+        this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
+      }
+    }
   }
 
   async startWatcher(libraryId: number, paths: string[]): Promise<void> {
     await this.stopWatcher(libraryId);
     if (paths.length === 0) return;
 
-    const { watch } = await import('chokidar');
-    const watcher = watch(paths, { ignoreInitial: true, persistent: true });
+    const { subscribe } = await import('@parcel/watcher');
+    const subs: AsyncSubscription[] = [];
 
-    watcher.on('unlink', (path) => this.schedule('unlink', path));
-    watcher.on('unlinkDir', (path) => this.schedule('unlinkDir', path));
-    watcher.on('error', (err) => this.logger.warn(`Watcher error for library ${libraryId}: ${err}`));
+    for (const path of paths) {
+      const sub = await subscribe(path, (err, events) => {
+        if (err) {
+          this.logger.warn(`Watcher error for library ${libraryId}: ${err.message}`);
+          return;
+        }
+        for (const event of events) {
+          if (event.type === 'delete' || event.type === 'create') {
+            this.schedule(event.type, event.path);
+          }
+        }
+      });
+      subs.push(sub);
+    }
 
-    this.watchers.set(libraryId, watcher);
+    this.subscriptions.set(libraryId, subs);
     this.logger.log(`Watching ${paths.length} folder(s) for library ${libraryId}`);
   }
 
   async stopWatcher(libraryId: number): Promise<void> {
-    const existing = this.watchers.get(libraryId);
+    const existing = this.subscriptions.get(libraryId);
     if (!existing) return;
-    await existing.close();
-    this.watchers.delete(libraryId);
+    for (const sub of existing) await sub.unsubscribe();
+    this.subscriptions.delete(libraryId);
   }
 
-  private schedule(type: 'unlink' | 'unlinkDir', path: string): void {
-    const key = `${type}:${path}`;
-    clearTimeout(this.pendingTimers.get(key));
-    this.pendingTimers.set(
-      key,
-      setTimeout(() => {
-        this.pendingTimers.delete(key);
-        this.process(type, path).catch((err) => this.logger.error(`Failed to process ${type} for ${path}: ${(err as Error).message}`));
-      }, DEBOUNCE_MS),
-    );
+  private schedule(type: EventType, path: string): void {
+    const existing = this.pendingTimers.get(path);
+    if (existing) clearTimeout(existing.timer);
+    const timer = setTimeout(() => {
+      this.pendingTimers.delete(path);
+      this.process(type, path).catch((err) => this.logger.error(`Failed to process ${type} for ${path}: ${(err as Error).message}`));
+    }, DEBOUNCE_MS);
+    this.pendingTimers.set(path, { timer, type });
   }
 
-  private async process(type: 'unlink' | 'unlinkDir', path: string): Promise<void> {
-    const result = type === 'unlink' ? await this.processor.handleUnlink(path) : await this.processor.handleUnlinkDir(path);
+  private async process(type: EventType, path: string): Promise<void> {
+    let result;
+    if (type === 'create') {
+      result = await this.processor.handleCreate(path);
+    } else {
+      result = await this.processor.handleUnlink(path);
+      if (result.type === 'noop') {
+        result = await this.processor.handleUnlinkDir(path);
+      }
+    }
 
     if (result.type === 'book-missing') {
       this.gateway.emitBookMissing({ libraryId: result.libraryId, bookIds: result.bookIds });
-    } else if (result.type === 'file-removed') {
-      this.gateway.emitBookFileRemoved({ libraryId: result.libraryId, bookId: result.bookId, fileId: result.fileId });
+    } else if (result.type === 'book-restored') {
+      this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
     }
   }
 }

@@ -94,29 +94,3 @@ describe('onBookMissing', () => {
   })
 })
 
-// ── onBookFileRemoved ──────────────────────────────────────────────────────────
-
-describe('onBookFileRemoved', () => {
-  it('fires the callback with bookId and fileId on book:file:removed event', () => {
-    const { onBookFileRemoved } = useBookEvents()
-    const cb = vi.fn()
-    const cleanup = onBookFileRemoved(cb)
-
-    mockSocket.emit('book:file:removed', { libraryId: 1, bookId: 42, fileId: 7 })
-
-    expect(cb).toHaveBeenCalledTimes(1)
-    expect(cb).toHaveBeenCalledWith(42, 7)
-    cleanup()
-  })
-
-  it('cleanup deregisters the callback', () => {
-    const { onBookFileRemoved } = useBookEvents()
-    const cb = vi.fn()
-    const cleanup = onBookFileRemoved(cb)
-    cleanup()
-
-    mockSocket.emit('book:file:removed', { libraryId: 1, bookId: 1, fileId: 1 })
-
-    expect(cb).not.toHaveBeenCalled()
-  })
-})
