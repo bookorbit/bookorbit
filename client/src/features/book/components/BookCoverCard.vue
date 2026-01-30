@@ -52,7 +52,7 @@ function openFile(file: BookFileRef) {
     <!-- Cover -->
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-all duration-150"
-      :class="isMissing ? 'grayscale opacity-60' : 'group-hover:shadow-xl group-hover:scale-[1.02]'"
+      :class="isMissing ? 'ring-2 ring-amber-500' : 'group-hover:shadow-xl group-hover:scale-[1.02]'"
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
@@ -60,7 +60,7 @@ function openFile(file: BookFileRef) {
         v-if="!coverFailed"
         :src="coverSrc"
         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
-        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        :class="coverLoaded ? (isMissing ? 'opacity-100 brightness-50' : 'opacity-100') : 'opacity-0'"
         loading="lazy"
         :alt="book.title ?? ''"
         @load="coverLoaded = true"
@@ -105,7 +105,7 @@ function openFile(file: BookFileRef) {
         <!-- Center: primary action buttons -->
         <div class="flex-1 flex flex-col items-center justify-center gap-[18cqi]">
           <button
-            v-if="primaryFile"
+            v-if="primaryFile && !isMissing"
             class="p-[7cqi] rounded-full bg-primary/50 hover:bg-primary transition-colors text-white"
             title="Read"
             @click="openFile(primaryFile)"

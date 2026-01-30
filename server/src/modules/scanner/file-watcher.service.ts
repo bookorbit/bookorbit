@@ -123,6 +123,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       this.gateway.emitBookMissing({ libraryId: result.libraryId, bookIds: result.bookIds });
     } else if (result.type === 'book-restored') {
       this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
+    } else if (result.type === 'book-moved') {
+      this.gateway.emitBookMoved({ libraryId: result.libraryId, bookIds: result.bookIds });
     }
   }
 }

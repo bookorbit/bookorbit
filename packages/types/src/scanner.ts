@@ -31,3 +31,8 @@ export interface BookRestoredEvent {
   libraryId: number;
   bookIds: number[];
 }
+
+export interface BookMovedEvent {
+  libraryId: number;
+  bookIds: number[];
+}

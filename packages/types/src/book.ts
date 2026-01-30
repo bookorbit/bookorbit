@@ -19,6 +19,7 @@ export type BookDetailFile = {
   format: string | null;
   role: string;
   sizeBytes: number | null;
+  absolutePath: string;
   createdAt: string;
   filename: string | null;
 };
@@ -27,6 +28,7 @@ export type BookDetail = {
   id: number;
   libraryId: number;
   status: string;
+  folderPath: string;
   title: string | null;
   subtitle: string | null;
   description: string | null;

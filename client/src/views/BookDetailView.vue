@@ -25,13 +25,16 @@ const { libraries, fetchLibraries } = useLibraries()
 const { subscribeLibrary } = useScanProgress()
 watch(() => detail.value?.libraryId, (id) => { if (id !== undefined) subscribeLibrary(id) })
 
-const { onBookMissing, onBookRestored } = useBookEvents()
+const { onBookMissing, onBookRestored, onBookMoved } = useBookEvents()
 onBookMissing((bookIds) => {
   if (detail.value && bookIds.includes(detail.value.id)) {
     detail.value = { ...detail.value, status: 'missing' }
   }
 })
 onBookRestored((bookIds) => {
+  if (detail.value && bookIds.includes(detail.value.id)) fetch(detail.value.id)
+})
+onBookMoved((bookIds) => {
   if (detail.value && bookIds.includes(detail.value.id)) fetch(detail.value.id)
 })
 
@@ -60,14 +63,14 @@ watch(activeTab, (tab) => visitedTabs.add(tab), { immediate: true })
 <template>
   <SidebarProvider>
     <AppSidebar />
-    <SidebarInset class="flex flex-col min-h-screen">
+    <SidebarInset class="flex flex-col min-h-screen overflow-x-hidden">
       <AppHeader />
       <div class="flex items-center border-b shrink-0 h-11">
         <BookDetailHeader :library-name="libraryName" :loading="loading" @back="goBack" />
         <BookDetailTabs :active-tab="activeTab" @update:active-tab="setTab" />
       </div>
 
-      <main class="flex-1 overflow-y-auto px-6 py-6">
+      <main class="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
         <template v-if="detail">
           <DetailsTab v-if="visitedTabs.has('details')" v-show="activeTab === 'details'" :book="detail" />
           <FilesTab v-if="visitedTabs.has('files')" v-show="activeTab === 'files'" :book="detail" />

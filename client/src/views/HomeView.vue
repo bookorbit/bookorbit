@@ -34,7 +34,7 @@ const { items: books, total, loading, error, filter, sort, hasMore, load, clear 
 const { subscribeLibrary } = useScanProgress()
 watch(libraryId, (id) => { if (id !== null) subscribeLibrary(id) }, { immediate: true })
 
-const { onBookMissing, onBookRestored } = useBookEvents()
+const { onBookMissing, onBookRestored, onBookMoved } = useBookEvents()
 onBookMissing((bookIds) => {
   const missing = new Set(bookIds)
   for (const book of books.value) {
@@ -45,6 +45,12 @@ onBookRestored((bookIds) => {
   const restored = new Set(bookIds)
   for (const book of books.value) {
     if (restored.has(book.id)) book.status = 'present'
+  }
+})
+onBookMoved((bookIds) => {
+  const moved = new Set(bookIds)
+  for (const book of books.value) {
+    if (moved.has(book.id)) book.status = 'present'
   }
 })
 

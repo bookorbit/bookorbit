@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { stat } from 'fs/promises';
-import { dirname } from 'path';
+import { readdir, stat } from 'fs/promises';
+import { dirname, join, relative } from 'path';
 
 import { classifyFile } from './lib/classify';
 import { ScannerRepository } from './scanner.repository';
@@ -8,6 +8,7 @@ import { ScannerRepository } from './scanner.repository';
 export type FileEventResult =
   | { type: 'book-missing'; libraryId: number; bookIds: number[] }
   | { type: 'book-restored'; libraryId: number; bookIds: number[] }
+  | { type: 'book-moved'; libraryId: number; bookIds: number[] }
   | { type: 'noop' };
 
 @Injectable()
@@ -68,22 +69,24 @@ export class FileEventProcessorService {
     const book =
       (await this.scannerRepo.findMissingBookByFolderPath(folderPath)) ??
       (await this.scannerRepo.findMissingBookByFolderPath(absolutePath));
-    if (!book) return { type: 'noop' };
+    if (book) {
+      await this.scannerRepo.createBookFile({
+        bookId: book.id,
+        libraryFolderId: book.libraryFolderId,
+        absolutePath,
+        ino: BigInt(fileStat.ino),
+        sizeBytes: BigInt(fileStat.size),
+        mtime: fileStat.mtime,
+        format,
+        role: 'primary',
+      });
 
-    await this.scannerRepo.createBookFile({
-      bookId: book.id,
-      libraryFolderId: book.libraryFolderId,
-      absolutePath,
-      ino: BigInt(fileStat.ino),
-      sizeBytes: BigInt(fileStat.size),
-      mtime: fileStat.mtime,
-      format,
-      role: 'primary',
-    });
+      await this.scannerRepo.markBooksAsPresent([book.id]);
+      this.logger.log(`Book ${book.id} restored — file returned: ${absolutePath}`);
+      return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
+    }
 
-    await this.scannerRepo.markBooksAsPresent([book.id]);
-    this.logger.log(`Book ${book.id} restored — file returned: ${absolutePath}`);
-    return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
+    return this.detectMovedFile(absolutePath, fileStat);
   }
 
   async reconcileMissingBooks(libraryIds: number[]): Promise<FileEventResult[]> {
@@ -125,21 +128,74 @@ export class FileEventProcessorService {
     return { type: 'noop' };
   }
 
-  private async handleCreateDir(absolutePath: string): Promise<FileEventResult> {
-    const missingBooks = await this.scannerRepo.findMissingBooksByFolderPath(absolutePath);
-    if (missingBooks.length === 0) return { type: 'noop' };
+  private async detectMovedFile(newAbsolutePath: string, fileStat: Awaited<ReturnType<typeof stat>>): Promise<FileEventResult> {
+    const match = await this.scannerRepo.findBookFileWithContextByIno(fileStat.ino);
+    if (!match || match.file.absolutePath === newAbsolutePath) return { type: 'noop' };
 
-    const restoredIds: number[] = [];
-    const libraryId = missingBooks[0]!.libraryId;
+    const { file, libraryId, folderPath: oldFolderPath, libraryFolderPath } = match;
+    const newFolderPath =
+      oldFolderPath === file.absolutePath ? newAbsolutePath : dirname(newAbsolutePath);
 
-    for (const book of missingBooks) {
-      const result = await this.tryRestoreBook(book);
-      if (result.type !== 'noop') restoredIds.push(book.id);
+    await this.scannerRepo.updateBookFile(file.id, {
+      absolutePath: newAbsolutePath,
+      relPath: relative(libraryFolderPath, newAbsolutePath),
+      ino: BigInt(fileStat.ino),
+      sizeBytes: BigInt(fileStat.size),
+      mtime: fileStat.mtime,
+    });
+
+    if (newFolderPath !== oldFolderPath) {
+      await this.scannerRepo.updateBookFolderPath(file.bookId, newFolderPath);
     }
 
-    if (restoredIds.length === 0) return { type: 'noop' };
+    await this.scannerRepo.markBooksAsPresent([file.bookId]);
+    this.logger.log(`Book ${file.bookId} moved: ${file.absolutePath} → ${newAbsolutePath}`);
+    return { type: 'book-moved', libraryId, bookIds: [file.bookId] };
+  }
 
-    this.logger.log(`${restoredIds.length} book(s) restored: folder returned: ${absolutePath}`);
-    return { type: 'book-restored', libraryId, bookIds: restoredIds };
+  private async detectMovedBooksInDir(dirPath: string): Promise<FileEventResult> {
+    const entries = await readdir(dirPath, { recursive: true, withFileTypes: true }).catch(() => []);
+    const movedBookIds: number[] = [];
+    let libraryId: number | null = null;
+
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const fullPath = join(entry.parentPath ?? entry.path, entry.name);
+      const { role } = classifyFile(fullPath);
+      if (role !== 'primary') continue;
+
+      const s = await stat(fullPath).catch(() => null);
+      if (!s) continue;
+
+      const result = await this.detectMovedFile(fullPath, s);
+      if (result.type === 'book-moved') {
+        movedBookIds.push(...result.bookIds);
+        libraryId = result.libraryId;
+      }
+    }
+
+    if (movedBookIds.length === 0 || !libraryId) return { type: 'noop' };
+    this.logger.log(`${movedBookIds.length} book(s) moved: folder appeared: ${dirPath}`);
+    return { type: 'book-moved', libraryId, bookIds: movedBookIds };
+  }
+
+  private async handleCreateDir(absolutePath: string): Promise<FileEventResult> {
+    const missingBooks = await this.scannerRepo.findMissingBooksByFolderPath(absolutePath);
+    if (missingBooks.length > 0) {
+      const restoredIds: number[] = [];
+      const libraryId = missingBooks[0]!.libraryId;
+
+      for (const book of missingBooks) {
+        const result = await this.tryRestoreBook(book);
+        if (result.type !== 'noop') restoredIds.push(book.id);
+      }
+
+      if (restoredIds.length > 0) {
+        this.logger.log(`${restoredIds.length} book(s) restored: folder returned: ${absolutePath}`);
+        return { type: 'book-restored', libraryId, bookIds: restoredIds };
+      }
+    }
+
+    return this.detectMovedBooksInDir(absolutePath);
   }
 }

@@ -50,6 +50,7 @@ function downloadFile(file: BookDetailFile) {
       <!-- File info -->
       <div class="flex-1 min-w-0">
         <p class="text-sm truncate">{{ file.filename ?? '-' }}</p>
+        <p class="text-xs text-muted-foreground font-mono truncate mt-0.5" :title="file.absolutePath">{{ file.absolutePath }}</p>
         <p class="text-xs text-muted-foreground mt-0.5">
           {{ formatBytes(file.sizeBytes) }}
           <span class="mx-1">·</span>

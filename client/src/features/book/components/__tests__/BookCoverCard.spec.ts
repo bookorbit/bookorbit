@@ -43,11 +43,11 @@ const presentBook: BookCard = {
 }
 
 describe('BookCoverCard — missing state', () => {
-  it('applies grayscale and opacity-60 to the cover container', () => {
+  it('applies amber ring to the cover container when missing', () => {
     const wrapper = mount(BookCoverCard, { props: { book: missingBook }, global: globalStubs })
     const coverDiv = wrapper.find('[style*="aspect-ratio"]')
-    expect(coverDiv.classes()).toContain('grayscale')
-    expect(coverDiv.classes()).toContain('opacity-60')
+    expect(coverDiv.classes()).toContain('ring-2')
+    expect(coverDiv.classes()).toContain('ring-amber-500')
   })
 
   it('does not apply hover-scale to the cover container', () => {

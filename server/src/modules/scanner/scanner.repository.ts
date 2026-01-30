@@ -183,4 +183,25 @@ export class ScannerRepository {
     if (bookIds.length === 0) return;
     await this.db.update(books).set({ status: 'present', updatedAt: new Date() }).where(inArray(books.id, bookIds));
   }
+
+  async findBookFileWithContextByIno(ino: number) {
+    const [row] = await this.db
+      .select({
+        file: bookFiles,
+        libraryId: books.libraryId,
+        bookStatus: books.status,
+        folderPath: books.folderPath,
+        libraryFolderPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
+      .where(eq(bookFiles.ino, ino))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async updateBookFolderPath(bookId: number, folderPath: string) {
+    await this.db.update(books).set({ folderPath, updatedAt: new Date() }).where(eq(books.id, bookId));
+  }
 }

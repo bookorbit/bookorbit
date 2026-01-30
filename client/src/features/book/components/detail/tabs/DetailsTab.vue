@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, FolderPlus, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { BookOpen, Download, Folder, FolderPlus, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -140,6 +140,14 @@ function downloadFile() {
         >
           {{ fmt }}
         </span>
+      </div>
+
+      <!-- Location -->
+      <div class="mt-5 pt-5 border-t border-border">
+        <div class="flex items-center gap-2 min-w-0">
+          <Folder class="size-3.5 text-muted-foreground shrink-0" />
+          <p class="text-xs text-muted-foreground font-mono truncate min-w-0" :title="book.folderPath">{{ book.folderPath }}</p>
+        </div>
       </div>
 
       <!-- Metadata grid -->
