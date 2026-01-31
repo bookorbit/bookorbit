@@ -73,27 +73,35 @@ watch(
   },
 )
 
+function isRuleComplete(r: EditableRule): boolean {
+  if (NO_VALUE_OPERATORS.includes(r.operator)) return true
+  if (COLLECTION_OPERATORS.includes(r.operator)) return r.value.split(',').some((s) => s.trim() !== '')
+  return r.value.trim() !== ''
+}
+
 function emitUpdate() {
   if (nodes.value.length === 0) {
     emit('update:modelValue', undefined)
     return
   }
-  const rules: (Rule | GroupRule)[] = nodes.value.map((n) => {
-    if (n.kind === 'group') return n.group
-    return {
-      type: 'rule' as const,
-      field: n.rule.field,
-      operator: n.rule.operator,
-      value: parseValue(n.rule.field, n.rule.operator, n.rule.value),
-      valueTo:
-        BETWEEN_OPERATORS.includes(n.rule.operator) && n.rule.valueTo !== ''
-          ? NUMERIC_FIELDS.includes(n.rule.field)
-            ? Number(n.rule.valueTo)
-            : n.rule.valueTo
-          : undefined,
-    }
-  })
-  emit('update:modelValue', { type: 'group', join: join.value, rules })
+  const rules: (Rule | GroupRule)[] = nodes.value
+    .filter((n) => n.kind === 'group' || isRuleComplete(n.rule))
+    .map((n) => {
+      if (n.kind === 'group') return n.group
+      return {
+        type: 'rule' as const,
+        field: n.rule.field,
+        operator: n.rule.operator,
+        value: parseValue(n.rule.field, n.rule.operator, n.rule.value),
+        valueTo:
+          BETWEEN_OPERATORS.includes(n.rule.operator) && n.rule.valueTo !== ''
+            ? NUMERIC_FIELDS.includes(n.rule.field)
+              ? Number(n.rule.valueTo)
+              : n.rule.valueTo
+            : undefined,
+      }
+    })
+  emit('update:modelValue', rules.length > 0 ? { type: 'group', join: join.value, rules } : undefined)
 }
 
 function setJoin(value: 'AND' | 'OR') {

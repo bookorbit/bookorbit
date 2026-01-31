@@ -89,6 +89,10 @@ export class BookQueryBuilder {
   }
 
   private textRuleToSql(col: AnyColumn, operator: string, value?: string): SQL {
+    const VALUE_REQUIRED = ['contains', 'notContains', 'startsWith', 'endsWith', 'eq', 'notEq'];
+    if (VALUE_REQUIRED.includes(operator) && !value) {
+      throw new BadRequestException(`Operator '${operator}' requires a non-empty value`);
+    }
     switch (operator) {
       case 'contains':
         return ilike(col, `%${value}%`);

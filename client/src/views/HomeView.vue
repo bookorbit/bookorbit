@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowDownAZ, ArrowUpAZ, Filter, X } from 'lucide-vue-next'
+import { ArrowDownAZ, ArrowUpAZ, Bookmark, BookmarkCheck, Filter, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -16,7 +16,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import type { SortField } from '@projectx/types'
+import type { GroupRule, SortField } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,6 +30,45 @@ const libraryId = shallowRef<number | null>(route.params.id ? Number(route.param
 const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+
+const FILTER_STORAGE_PREFIX = 'projectx:filter:library:'
+function getFilterKey(id: number) { return `${FILTER_STORAGE_PREFIX}${id}` }
+
+const savedFilter = ref<GroupRule | undefined>(undefined)
+const hasSavedFilter = computed(() => savedFilter.value !== undefined)
+const isFilterSaved = computed(() => JSON.stringify(filter.value) === JSON.stringify(savedFilter.value))
+
+watch(
+  libraryId,
+  (id) => {
+    if (id !== null) {
+      try {
+        const raw = localStorage.getItem(getFilterKey(id))
+        const saved: GroupRule | undefined = raw ? JSON.parse(raw) : undefined
+        savedFilter.value = saved
+        filter.value = saved
+      } catch {
+        savedFilter.value = undefined
+      }
+    } else {
+      savedFilter.value = undefined
+    }
+  },
+  { immediate: true },
+)
+
+function saveFilter() {
+  if (libraryId.value === null || !filter.value) return
+  const snapshot: GroupRule = JSON.parse(JSON.stringify(filter.value))
+  savedFilter.value = snapshot
+  localStorage.setItem(getFilterKey(libraryId.value), JSON.stringify(snapshot))
+}
+
+function forgetSavedFilter() {
+  if (libraryId.value === null) return
+  savedFilter.value = undefined
+  localStorage.removeItem(getFilterKey(libraryId.value))
+}
 
 const { subscribeLibrary } = useScanProgress()
 watch(libraryId, (id) => { if (id !== null) subscribeLibrary(id) }, { immediate: true })
@@ -205,6 +244,30 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 
         <!-- Filter builder panel -->
         <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-medium text-muted-foreground">Filter rules</span>
+            <div class="flex items-center gap-1.5">
+              <button
+                v-if="activeFilterCount > 0"
+                @click="saveFilter"
+                class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
+                :class="isFilterSaved ? 'border-primary/40 text-primary bg-primary/8' : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'"
+                :title="isFilterSaved ? 'Filter saved' : 'Save filter for this library'"
+              >
+                <BookmarkCheck v-if="isFilterSaved" :size="13" />
+                <Bookmark v-else :size="13" />
+                {{ isFilterSaved ? 'Saved' : 'Save filter' }}
+              </button>
+              <button
+                v-if="hasSavedFilter"
+                @click="forgetSavedFilter"
+                class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                title="Remove saved filter"
+              >
+                <X :size="11" />
+              </button>
+            </div>
+          </div>
           <BookFilterBuilder v-model="filter" />
         </div>
 
