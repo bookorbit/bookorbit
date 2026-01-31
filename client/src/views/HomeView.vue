@@ -34,6 +34,9 @@ const { items: books, total, loading, error, filter, sort, hasMore, load, clear 
 const FILTER_STORAGE_PREFIX = 'projectx:filter:library:'
 function getFilterKey(id: number) { return `${FILTER_STORAGE_PREFIX}${id}` }
 
+const SORT_STORAGE_PREFIX = 'projectx:sort:library:'
+function getSortKey(id: number) { return `${SORT_STORAGE_PREFIX}${id}` }
+
 const savedFilter = ref<GroupRule | undefined>(undefined)
 const hasSavedFilter = computed(() => savedFilter.value !== undefined)
 const isFilterSaved = computed(() => JSON.stringify(filter.value) === JSON.stringify(savedFilter.value))
@@ -49,6 +52,12 @@ watch(
         filter.value = saved
       } catch {
         savedFilter.value = undefined
+      }
+      try {
+        const rawSort = localStorage.getItem(getSortKey(id))
+        sort.value = rawSort ? JSON.parse(rawSort) : [{ field: 'title', dir: 'asc' }]
+      } catch {
+        sort.value = [{ field: 'title', dir: 'asc' }]
       }
     } else {
       savedFilter.value = undefined
@@ -103,18 +112,33 @@ const SORT_FIELD_LABELS: Record<SortField, string> = {
   seriesIndex: 'Series Index',
 }
 
+function saveSort() {
+  if (libraryId.value === null) return
+  localStorage.setItem(getSortKey(libraryId.value), JSON.stringify(sort.value))
+}
+
 const sortField = computed({
   get: () => sort.value[0]?.field ?? 'title',
   set: (field: SortField) => {
     sort.value = [{ field, dir: sort.value[0]?.dir ?? 'asc' }]
+    saveSort()
     load(true)
   },
 })
 
 const sortDir = computed(() => sort.value[0]?.dir ?? 'asc')
 
+const isDefaultSort = computed(() => sortField.value === 'title' && sortDir.value === 'asc')
+
 function toggleSortDir() {
   sort.value = [{ field: sortField.value, dir: sortDir.value === 'asc' ? 'desc' : 'asc' }]
+  saveSort()
+  load(true)
+}
+
+function resetSort() {
+  sort.value = [{ field: 'title', dir: 'asc' }]
+  if (libraryId.value !== null) localStorage.removeItem(getSortKey(libraryId.value))
   load(true)
 }
 
@@ -201,16 +225,26 @@ function handleBookAction(book: BookCard, action: BookActionType) {
               :value="sortField"
               @change="sortField = ($event.target as HTMLSelectElement).value as SortField"
               class="h-8 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
+              :class="!isDefaultSort ? 'border-primary/50 text-primary' : ''"
             >
               <option v-for="(label, field) in SORT_FIELD_LABELS" :key="field" :value="field">{{ label }}</option>
             </select>
             <button
               @click="toggleSortDir"
               class="h-8 w-8 flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              :class="!isDefaultSort ? 'border-primary/50 text-primary' : ''"
               :title="sortDir === 'asc' ? 'Ascending' : 'Descending'"
             >
               <ArrowDownAZ v-if="sortDir === 'asc'" :size="15" />
               <ArrowUpAZ v-else :size="15" />
+            </button>
+            <button
+              v-if="!isDefaultSort"
+              @click="resetSort"
+              class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Reset sort to default"
+            >
+              <X :size="13" />
             </button>
           </div>
           <div class="w-px h-5 bg-border shrink-0" />
