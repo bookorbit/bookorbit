@@ -113,6 +113,9 @@ onMounted(() => {
                 <span :class="activeLibraryId === lib.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
                   {{ lib.name }}
                 </span>
+                <span v-if="lib.bookCount !== undefined" class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
+                  {{ lib.bookCount.toLocaleString() }}
+                </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -145,6 +148,9 @@ onMounted(() => {
                 />
                 <span :class="activeLensId === lens.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
                   {{ lens.name }}
+                </span>
+                <span v-if="lens.bookCount !== undefined" class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
+                  {{ lens.bookCount.toLocaleString() }}
                 </span>
               </SidebarMenuButton>
             </SidebarMenuItem>

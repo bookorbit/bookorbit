@@ -54,8 +54,17 @@ export class LensService {
     }));
   }
 
-  findAll(user: RequestUser) {
-    return this.lensRepo.findAllForUser(user.id);
+  async findAll(user: RequestUser) {
+    const lenses = await this.lensRepo.findAllForUser(user.id);
+    const libs = await this.libraryService.findAll(user);
+    const accessibleLibraryIds = libs.map((l) => l.id);
+    return Promise.all(
+      lenses.map(async (lens) => {
+        const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds });
+        const bookCount = await this.bookRepo.countWhere(where);
+        return { ...lens, bookCount };
+      }),
+    );
   }
 
   async findOne(id: number, user: RequestUser) {

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -13,7 +13,15 @@ export class LibraryRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   findAll() {
-    return this.db.select().from(libraries).orderBy(libraries.displayOrder, libraries.name);
+    return this.db
+      .select({
+        ...getTableColumns(libraries),
+        bookCount: sql<number>`count(${books.id})::int`,
+      })
+      .from(libraries)
+      .leftJoin(books, eq(books.libraryId, libraries.id))
+      .groupBy(libraries.id)
+      .orderBy(libraries.displayOrder, libraries.name);
   }
 
   findAllForUser(userId: number) {
@@ -26,9 +34,12 @@ export class LibraryRepository {
         scanMode: libraries.scanMode,
         createdAt: libraries.createdAt,
         updatedAt: libraries.updatedAt,
+        bookCount: sql<number>`count(${books.id})::int`,
       })
       .from(libraries)
       .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
+      .leftJoin(books, eq(books.libraryId, libraries.id))
+      .groupBy(libraries.id)
       .orderBy(libraries.displayOrder, libraries.name);
   }
 

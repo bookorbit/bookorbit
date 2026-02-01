@@ -10,6 +10,7 @@ export interface Lens {
   filter: GroupRule | null
   defaultSort: SortSpec[]
   isPublic: boolean
+  bookCount?: number
   createdAt: string
   updatedAt: string
 }

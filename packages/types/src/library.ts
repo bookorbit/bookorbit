@@ -22,6 +22,7 @@ export interface Library {
   markAsFinishedSecondsRemaining?: number | null;
   markAsFinishedPercentComplete?: number | null;
   folders: LibraryFolder[];
+  bookCount?: number;
   createdAt: string;
   updatedAt: string;
 }
