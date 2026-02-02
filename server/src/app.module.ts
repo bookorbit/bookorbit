@@ -11,6 +11,7 @@ import { PermissionGuard } from './common/guards/permission.guard';
 import { DbModule } from './db/db.module';
 import { AnnotationModule } from './modules/annotation/annotation.module';
 import { AppSettingsModule } from './modules/app-settings/app-settings.module';
+import { CollectionModule } from './modules/collection/collection.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CbzModule } from './modules/cbz/cbz.module';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
@@ -43,6 +44,7 @@ import { UserModule } from './modules/user/user.module';
     LibraryModule,
     PathModule,
     BookModule,
+    CollectionModule,
     LensModule,
     ScannerModule,
     MetadataModule,

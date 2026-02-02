@@ -2,16 +2,19 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Settings2, Trash2 } from 'lucide-vue-next'
-import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
+import BookListRow from '@/features/book/components/BookListRow.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
+import SelectionActionBar from '@/components/SelectionActionBar.vue'
+import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useLens } from '@/features/lens/composables/useLens'
 import { useLenses } from '@/features/lens/composables/useLenses'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { FIELD_LABELS, ruleToLabel } from '@/features/book/lib/filter-labels'
 import type { GroupRule } from '@projectx/types'
@@ -52,6 +55,15 @@ const sortChip = computed(() => {
 })
 
 const joinLabel = computed(() => lens.value?.filter?.join ?? 'AND')
+
+const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, isSelected } = useBookSelection()
+
+function toggleSelectionMode() {
+  if (selectionMode.value) exitSelectionMode()
+  else enterSelectionMode()
+}
+
+const addToCollectionOpen = ref(false)
 
 const editorOpen = ref(false)
 const confirmDelete = ref(false)
@@ -113,6 +125,21 @@ watch(loading, (isLoading) => {
 <template>
   <LensEditorPanel :open="editorOpen" :lens="lens" @close="editorOpen = false" @saved="onSaved" />
 
+  <SelectionActionBar
+    :visible="selectionMode"
+    :count="selectedCount"
+    @add-to-collection="addToCollectionOpen = true"
+    @delete="() => {}"
+    @exit="exitSelectionMode"
+  />
+
+  <AddToCollectionSheet
+    :open="addToCollectionOpen"
+    :book-ids="[...selectedIds]"
+    @update:open="addToCollectionOpen = $event"
+    @added="exitSelectionMode"
+  />
+
   <SidebarProvider>
     <AppSidebar />
 
@@ -126,6 +153,8 @@ watch(loading, (isLoading) => {
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"
         v-model:viewMode="viewMode"
+        :selection-mode="selectionMode"
+        @toggle-selection="toggleSelectionMode"
       >
         <template #actions>
           <button
@@ -204,22 +233,26 @@ watch(loading, (isLoading) => {
           class="grid"
           :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
         >
-          <BookCoverCard v-for="book in books" :key="book.id" :book="book" />
+          <BookCoverCard
+            v-for="book in books"
+            :key="book.id"
+            :book="book"
+            :selection-mode="selectionMode"
+            :selected="isSelected(book.id)"
+            @select="toggleBook(book.id)"
+          />
         </div>
 
         <!-- List view -->
         <div v-else-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-          <div
+          <BookListRow
             v-for="book in books"
             :key="book.id"
-            class="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
-          >
-            <BookCoverImage :book-id="book.id" type="cover" class="h-12 w-9 object-cover rounded shrink-0 bg-muted" :alt="book.title ?? ''" />
-            <div class="flex flex-col min-w-0">
-              <span class="text-sm font-medium text-foreground truncate">{{ book.title ?? '-' }}</span>
-              <span v-if="book.authors.length" class="text-xs text-muted-foreground truncate">{{ book.authors.join(', ') }}</span>
-            </div>
-          </div>
+            :book="book"
+            :selection-mode="selectionMode"
+            :selected="isSelected(book.id)"
+            @select="toggleBook(book.id)"
+          />
         </div>
 
         <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">

@@ -3,16 +3,23 @@ import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { BookOpen, Check, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
 const router = useRouter()
 
-const props = defineProps<{ book: BookCard }>()
+const props = defineProps<{
+  book: BookCard
+  selectionMode?: boolean
+  selected?: boolean
+}>()
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
-const emit = defineEmits<{ action: [type: BookActionType] }>()
+const emit = defineEmits<{
+  action: [type: BookActionType]
+  select: []
+}>()
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -44,9 +51,22 @@ function openFile(file: BookFileRef) {
 <template>
   <div
     class="flex items-center gap-3 py-2 px-2 rounded-md transition-colors"
-    :class="[primaryFile && !isMissing ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default', isMissing ? 'opacity-60 grayscale' : '']"
-    @click="primaryFile && !isMissing && openFile(primaryFile)"
+    :class="[
+      selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
+      isMissing ? 'opacity-60 grayscale' : '',
+      selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
+    ]"
+    @click="selectionMode ? emit('select') : primaryFile && !isMissing && openFile(primaryFile)"
   >
+    <!-- Selection checkbox -->
+    <div
+      v-if="selectionMode"
+      class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
+      :class="selected ? 'bg-primary' : 'border border-border bg-background'"
+    >
+      <Check v-if="selected" class="text-primary-foreground" :size="12" />
+    </div>
+
     <!-- Cover -->
     <div class="h-16 w-12 rounded shrink-0 overflow-hidden relative" :style="coverLoaded ? {} : coverStyle">
       <img
@@ -69,7 +89,7 @@ function openFile(file: BookFileRef) {
     </div>
 
     <!-- Right badges + actions -->
-    <div class="flex items-center gap-2 shrink-0" @click.stop>
+    <div v-if="!selectionMode" class="flex items-center gap-2 shrink-0" @click.stop>
       <div class="flex flex-col items-end gap-1">
         <span
           v-if="isMissing"

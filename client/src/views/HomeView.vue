@@ -9,9 +9,12 @@ import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import SelectionActionBar from '@/components/SelectionActionBar.vue'
+import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
+import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
@@ -32,10 +35,14 @@ const title = computed(() => libraries.value.find((l) => l.id === libraryId.valu
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 
 const FILTER_STORAGE_PREFIX = 'projectx:filter:library:'
-function getFilterKey(id: number) { return `${FILTER_STORAGE_PREFIX}${id}` }
+function getFilterKey(id: number) {
+  return `${FILTER_STORAGE_PREFIX}${id}`
+}
 
 const SORT_STORAGE_PREFIX = 'projectx:sort:library:'
-function getSortKey(id: number) { return `${SORT_STORAGE_PREFIX}${id}` }
+function getSortKey(id: number) {
+  return `${SORT_STORAGE_PREFIX}${id}`
+}
 
 const savedFilter = ref<GroupRule | undefined>(undefined)
 const hasSavedFilter = computed(() => savedFilter.value !== undefined)
@@ -80,7 +87,13 @@ function forgetSavedFilter() {
 }
 
 const { subscribeLibrary } = useScanProgress()
-watch(libraryId, (id) => { if (id !== null) subscribeLibrary(id) }, { immediate: true })
+watch(
+  libraryId,
+  (id) => {
+    if (id !== null) subscribeLibrary(id)
+  },
+  { immediate: true },
+)
 
 const { onBookMissing, onBookRestored, onBookMoved } = useBookEvents()
 onBookMissing((bookIds) => {
@@ -189,6 +202,15 @@ watch(loading, (isLoading) => {
   if (!isLoading) loadIfSentinelVisible()
 })
 
+const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, isSelected } = useBookSelection()
+
+function toggleSelectionMode() {
+  if (selectionMode.value) exitSelectionMode()
+  else enterSelectionMode()
+}
+
+const addToCollectionOpen = ref(false)
+
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
 const quickViewBookId = ref<number | null>(null)
@@ -198,6 +220,14 @@ function handleBookAction(book: BookCard, action: BookActionType) {
   if (action === 'quick-view') {
     quickViewBookId.value = book.id
     quickViewOpen.value = true
+    return
+  }
+  if (action === 'add-to-collection') {
+    if (!selectionMode.value) {
+      enterSelectionMode()
+      toggleBook(book.id)
+    }
+    addToCollectionOpen.value = true
     return
   }
   // TODO: implement remaining actions
@@ -217,6 +247,8 @@ function handleBookAction(book: BookCard, action: BookActionType) {
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"
         v-model:viewMode="viewMode"
+        :selection-mode="selectionMode"
+        @toggle-selection="toggleSelectionMode"
       >
         <template #toolbar>
           <div class="flex items-center gap-1">
@@ -285,7 +317,11 @@ function handleBookAction(book: BookCard, action: BookActionType) {
                 v-if="activeFilterCount > 0"
                 @click="saveFilter"
                 class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
-                :class="isFilterSaved ? 'border-primary/40 text-primary bg-primary/8' : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'"
+                :class="
+                  isFilterSaved
+                    ? 'border-primary/40 text-primary bg-primary/8'
+                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                "
                 :title="isFilterSaved ? 'Filter saved' : 'Save filter for this library'"
               >
                 <BookmarkCheck v-if="isFilterSaved" :size="13" />
@@ -311,12 +347,28 @@ function handleBookAction(book: BookCard, action: BookActionType) {
           class="grid"
           :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
         >
-          <BookCoverCard v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
+          <BookCoverCard
+            v-for="book in books"
+            :key="book.id"
+            :book="book"
+            :selection-mode="selectionMode"
+            :selected="isSelected(book.id)"
+            @action="handleBookAction(book, $event)"
+            @select="toggleBook(book.id)"
+          />
         </div>
 
         <!-- List view -->
         <div v-else class="flex flex-col divide-y divide-border">
-          <BookListRow v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
+          <BookListRow
+            v-for="book in books"
+            :key="book.id"
+            :book="book"
+            :selection-mode="selectionMode"
+            :selected="isSelected(book.id)"
+            @action="handleBookAction(book, $event)"
+            @select="toggleBook(book.id)"
+          />
         </div>
 
         <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
@@ -332,5 +384,20 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     :open="quickViewOpen"
     @update:open="quickViewOpen = $event"
     @action="quickViewBookId !== null && handleBookAction({ id: quickViewBookId } as BookCard, $event)"
+  />
+
+  <SelectionActionBar
+    :visible="selectionMode"
+    :count="selectedCount"
+    @add-to-collection="addToCollectionOpen = true"
+    @delete="() => {}"
+    @exit="exitSelectionMode"
+  />
+
+  <AddToCollectionSheet
+    :open="addToCollectionOpen"
+    :book-ids="[...selectedIds]"
+    @update:open="addToCollectionOpen = $event"
+    @done="exitSelectionMode"
   />
 </template>

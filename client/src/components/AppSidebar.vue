@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import * as Icons from 'lucide-vue-next'
-import { Aperture, BookMarked, Clock, BookOpen, Plus } from 'lucide-vue-next'
+import { Aperture, BookMarked, Clock, BookOpen, FolderOpen, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -19,14 +19,18 @@ import {
 } from '@/components/ui/sidebar'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLenses } from '@/features/lens/composables/useLenses'
+import { useCollections } from '@/features/collection/composables/useCollections'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
+import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { libraries, fetchLibraries } = useLibraries()
 const { lenses, fetchLenses } = useLenses()
+const { collections, fetchCollections } = useCollections()
 
 const createLensOpen = ref(false)
+const createCollectionOpen = ref(false)
 
 const activeLibraryId = computed(() => {
   const id = route.params.id
@@ -48,14 +52,21 @@ function getLensIcon(name: string | null | undefined) {
   return Aperture
 }
 
+const activeCollectionId = computed(() => {
+  const id = route.params.id
+  return route.name === 'collection' && id ? Number(id) : null
+})
+
 onMounted(() => {
   fetchLibraries()
   fetchLenses()
+  fetchCollections()
 })
 </script>
 
 <template>
   <CreateLensDialog :open="createLensOpen" @close="createLensOpen = false" />
+  <CreateCollectionDialog :open="createCollectionOpen" @close="createCollectionOpen = false" />
 
   <Sidebar
     collapsible="icon"
@@ -113,7 +124,10 @@ onMounted(() => {
                 <span :class="activeLibraryId === lib.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
                   {{ lib.name }}
                 </span>
-                <span v-if="lib.bookCount !== undefined" class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
+                <span
+                  v-if="lib.bookCount !== undefined"
+                  class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                >
                   {{ lib.bookCount.toLocaleString() }}
                 </span>
               </SidebarMenuButton>
@@ -149,13 +163,53 @@ onMounted(() => {
                 <span :class="activeLensId === lens.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
                   {{ lens.name }}
                 </span>
-                <span v-if="lens.bookCount !== undefined" class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
+                <span
+                  v-if="lens.bookCount !== undefined"
+                  class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                >
                   {{ lens.bookCount.toLocaleString() }}
                 </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem v-if="lenses.length === 0">
               <span class="px-2 py-1 text-xs text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+
+      <!-- Collections -->
+      <SidebarGroup>
+        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
+          Collections
+        </SidebarGroupLabel>
+        <SidebarGroupAction tooltip="New Collection" @click="createCollectionOpen = true">
+          <Plus />
+        </SidebarGroupAction>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem v-for="collection in collections" :key="collection.id">
+              <SidebarMenuButton
+                :is-active="activeCollectionId === collection.id"
+                :tooltip="collection.name"
+                class="gap-2.5"
+                @click="router.push({ name: 'collection', params: { id: collection.id } })"
+              >
+                <FolderOpen :size="15" :class="activeCollectionId === collection.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
+                <span :class="activeCollectionId === collection.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
+                  {{ collection.name }}
+                </span>
+                <span
+                  class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                >
+                  {{ collection.bookCount.toLocaleString() }}
+                </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem v-if="collections.length === 0">
+              <span class="px-2 py-1 text-xs text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No collections yet</span>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>

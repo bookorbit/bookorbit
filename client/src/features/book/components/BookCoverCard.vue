@@ -4,16 +4,23 @@ import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { BookOpen, Check, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
 const router = useRouter()
 
-const props = defineProps<{ book: BookCard }>()
+const props = defineProps<{
+  book: BookCard
+  selectionMode?: boolean
+  selected?: boolean
+}>()
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
-const emit = defineEmits<{ action: [type: BookActionType] }>()
+const emit = defineEmits<{
+  action: [type: BookActionType]
+  select: []
+}>()
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -46,13 +53,16 @@ function openFile(file: BookFileRef) {
 <template>
   <div
     class="group flex flex-col @container"
-    :class="primaryFile && !isMissing ? 'cursor-pointer' : 'cursor-default'"
-    @click="primaryFile && !isMissing && openFile(primaryFile)"
+    :class="selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer' : 'cursor-default'"
+    @click="selectionMode ? emit('select') : primaryFile && !isMissing && openFile(primaryFile)"
   >
     <!-- Cover -->
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-all duration-150"
-      :class="isMissing ? 'ring-2 ring-amber-500' : 'group-hover:shadow-xl group-hover:scale-[1.02]'"
+      :class="[
+        isMissing ? 'ring-2 ring-amber-500' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]',
+        selected ? 'ring-2 ring-primary' : '',
+      ]"
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
@@ -77,6 +87,16 @@ function openFile(file: BookFileRef) {
         </span>
       </div>
 
+      <!-- Selection checkbox overlay -->
+      <div v-if="selectionMode" class="absolute inset-0 z-30 pointer-events-none" :class="selected ? 'bg-primary/20' : ''">
+        <div
+          class="absolute top-1.5 left-1.5 h-5 w-5 rounded flex items-center justify-center transition-colors"
+          :class="selected ? 'bg-primary' : 'bg-black/40 border border-white/50'"
+        >
+          <Check v-if="selected" class="text-primary-foreground" :size="12" />
+        </div>
+      </div>
+
       <!-- Missing badge -->
       <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
         <span
@@ -99,6 +119,7 @@ function openFile(file: BookFileRef) {
 
       <!-- Hover overlay -->
       <div
+        v-if="!selectionMode"
         class="absolute inset-0 flex flex-col p-2 bg-black/60 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
         @click.stop
       >

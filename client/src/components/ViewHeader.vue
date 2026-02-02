@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { LayoutGrid, List, MoreHorizontal, SlidersHorizontal } from 'lucide-vue-next'
+import { CheckSquare, LayoutGrid, List, MoreHorizontal, SlidersHorizontal, Square } from 'lucide-vue-next'
 import * as LucideIcons from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -24,12 +24,14 @@ const props = defineProps<{
   coverSize: number
   gridGap: number
   viewMode: 'grid' | 'list'
+  selectionMode?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:coverSize': [value: number]
   'update:gridGap': [value: number]
   'update:viewMode': [value: 'grid' | 'list']
+  'toggle-selection': []
 }>()
 
 const mobileDisplayOpen = ref(false)
@@ -56,6 +58,21 @@ function getIconComponent(name: string) {
     <div class="flex items-center gap-2 shrink-0">
       <slot name="toolbar" />
       <slot name="actions" />
+
+      <!-- Select mode toggle -->
+      <Button
+        variant="ghost"
+        size="sm"
+        class="hidden md:flex h-8 gap-1.5 text-xs px-2.5"
+        :class="selectionMode ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:text-foreground'"
+        @click="emit('toggle-selection')"
+      >
+        <CheckSquare v-if="selectionMode" :size="14" />
+        <Square v-else :size="14" />
+        Select
+      </Button>
+
+      <Separator orientation="vertical" class="hidden md:block mx-1 h-4" />
 
       <!-- Desktop: view mode toggle -->
       <div class="hidden md:flex items-center">
@@ -141,6 +158,12 @@ function getIconComponent(name: string) {
           <DropdownMenuItem @click="mobileDisplayOpen = true">
             <SlidersHorizontal :size="14" class="mr-2" />
             Display
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem @click="emit('toggle-selection')">
+            <CheckSquare v-if="selectionMode" :size="14" class="mr-2" />
+            <Square v-else :size="14" class="mr-2" />
+            {{ selectionMode ? 'Exit Select' : 'Select' }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

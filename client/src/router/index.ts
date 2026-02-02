@@ -21,6 +21,11 @@ const router = createRouter({
       component: () => import('@/views/LensView.vue'),
     },
     {
+      path: '/collection/:id',
+      name: 'collection',
+      component: () => import('@/views/CollectionView.vue'),
+    },
+    {
       path: '/read/:bookId/:fileId',
       name: 'reader',
       component: () => import('@/features/reader/ReaderView.vue'),
