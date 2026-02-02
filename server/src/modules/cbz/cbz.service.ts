@@ -6,7 +6,8 @@ import { createInflateRaw } from 'zlib';
 import { createExtractorFromData } from 'node-unrar-js';
 import { getSevenZip } from '../../common/sevenzip';
 
-import { BookRepository } from '../book/book.repository';
+import type { RequestUser } from '../../common/types/request-user';
+import { BookService } from '../book/book.service';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -97,12 +98,10 @@ export class CbzService {
   // CB7: sorted page names per fileId (extracted files live in WASM VFS)
   private readonly sevenZPages = new Map<number, string[]>();
 
-  constructor(private readonly bookRepo: BookRepository) {}
+  constructor(private readonly bookService: BookService) {}
 
-  private async getFile(fileId: number) {
-    const file = await this.bookRepo.findFileById(fileId);
-    if (!file) throw new NotFoundException(`File ${fileId} not found`);
-    return file;
+  private async getFile(fileId: number, user: RequestUser) {
+    return this.bookService.verifyFileAccess(fileId, user);
   }
 
   // ── CBZ ──────────────────────────────────────────────────────────────────────
@@ -180,8 +179,8 @@ export class CbzService {
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
-  async getPageCount(fileId: number): Promise<number> {
-    const file = await this.getFile(fileId);
+  async getPageCount(fileId: number, user: RequestUser): Promise<number> {
+    const file = await this.getFile(fileId, user);
     const fmt = file.format ?? '';
 
     if (fmt === 'cbz') return (await this.getCbzIndex(fileId, file.absolutePath)).length;
@@ -191,8 +190,8 @@ export class CbzService {
     throw new NotFoundException(`Unsupported comic format: ${fmt}`);
   }
 
-  async streamPage(fileId: number, pageIndex: number): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
-    const file = await this.getFile(fileId);
+  async streamPage(fileId: number, pageIndex: number, user: RequestUser): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+    const file = await this.getFile(fileId, user);
     const fmt = file.format ?? '';
 
     if (fmt === 'cbz') {

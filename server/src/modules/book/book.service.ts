@@ -34,7 +34,7 @@ export class BookService {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
   }
 
-  private async verifyFileAccess(fileId: number, user: RequestUser): Promise<NonNullable<Awaited<ReturnType<BookRepository['findFileById']>>>> {
+  async verifyFileAccess(fileId: number, user: RequestUser): Promise<NonNullable<Awaited<ReturnType<BookRepository['findFileById']>>>> {
     const file = await this.bookRepo.findFileById(fileId);
     if (!file) throw new NotFoundException(`No file with id ${fileId}`);
     await this.libraryService.verifyUserAccess(user.id, file.libraryId, this.isSuperuser(user));
