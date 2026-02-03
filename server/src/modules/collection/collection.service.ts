@@ -76,6 +76,7 @@ export class CollectionService {
     const [inserted] = await this.collectionRepo.insert({
       userId: user.id,
       name: dto.name,
+      icon: dto.icon?.trim() || null,
       description: dto.description ?? null,
     });
     const [collection] = await this.collectionRepo.findById(inserted.id);
@@ -89,6 +90,7 @@ export class CollectionService {
 
     const [updated] = await this.collectionRepo.update(id, existing.userId, {
       ...(dto.name !== undefined && { name: dto.name }),
+      ...(dto.icon !== undefined && { icon: dto.icon.trim() || null }),
       ...(dto.description !== undefined && { description: dto.description }),
     });
     return updated;

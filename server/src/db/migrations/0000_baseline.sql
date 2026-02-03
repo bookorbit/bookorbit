@@ -122,6 +122,7 @@ CREATE TABLE "collections" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
 	"name" text NOT NULL,
+	"icon" text,
 	"description" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL

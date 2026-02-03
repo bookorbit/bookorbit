@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderOpen } from 'lucide-vue-next'
+import { FolderOpen, Pencil } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -10,6 +10,7 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
@@ -39,6 +40,7 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+const editCollectionOpen = ref(false)
 let removingInProgress = false
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)
@@ -121,6 +123,8 @@ watch(loading, (isLoading) => {
     @done="exitSelectionMode"
   />
 
+  <EditCollectionDialog v-if="collection" :open="editCollectionOpen" :collection="collection" @close="editCollectionOpen = false" />
+
   <SidebarProvider>
     <AppSidebar />
 
@@ -128,7 +132,7 @@ watch(loading, (isLoading) => {
       <AppHeader />
       <ViewHeader
         :title="collection?.name ?? 'Collection'"
-        icon="FolderOpen"
+        :icon="collection?.icon || 'FolderOpen'"
         :total="total"
         :loaded="books.length"
         v-model:coverSize="coverSize"
@@ -136,7 +140,18 @@ watch(loading, (isLoading) => {
         v-model:viewMode="viewMode"
         :selection-mode="selectionMode"
         @toggle-selection="toggleSelectionMode"
-      />
+      >
+        <template #toolbar>
+          <button
+            v-if="collection"
+            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Edit collection"
+            @click="editCollectionOpen = true"
+          >
+            <Pencil :size="14" />
+          </button>
+        </template>
+      </ViewHeader>
 
       <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
         <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">

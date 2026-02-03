@@ -9,6 +9,7 @@ export const collections = pgTable('collections', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  icon: text('icon'),
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

@@ -12,6 +12,7 @@ const collectionFields = {
   id: collections.id,
   userId: collections.userId,
   name: collections.name,
+  icon: collections.icon,
   description: collections.description,
   createdAt: collections.createdAt,
   updatedAt: collections.updatedAt,

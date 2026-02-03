@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import * as Icons from 'lucide-vue-next'
 import { Aperture, FolderOpen, Plus } from 'lucide-vue-next'
+
+function getCollectionIcon(iconName: string | null) {
+  if (iconName) {
+    const found = (Icons as Record<string, unknown>)[iconName]
+    if (found) return found
+  }
+  return FolderOpen
+}
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -197,7 +205,11 @@ onMounted(() => {
                 class="gap-2.5"
                 @click="router.push({ name: 'collection', params: { id: collection.id } })"
               >
-                <FolderOpen :size="15" :class="activeCollectionId === collection.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
+                <component
+                  :is="getCollectionIcon(collection.icon)"
+                  :size="15"
+                  :class="activeCollectionId === collection.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'"
+                />
                 <span :class="activeCollectionId === collection.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
                   {{ collection.name }}
                 </span>
@@ -214,7 +226,6 @@ onMounted(() => {
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
-
     </SidebarContent>
 
     <SidebarRail />

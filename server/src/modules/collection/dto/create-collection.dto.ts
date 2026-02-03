@@ -7,6 +7,11 @@ export class CreateCollectionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(1000)
   description?: string;
 }
