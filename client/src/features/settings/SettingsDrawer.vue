@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Library,
-  ScanLine,
   Paintbrush,
   BookOpen,
   FileText,
@@ -21,7 +20,6 @@ import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useThemeStore, BACKGROUND_OPTIONS } from '@/stores/theme'
 import LibrariesSettings from './LibrariesSettings.vue'
-import ScannerSettings from './ScannerSettings.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
 import ReaderSettings from './ReaderSettings.vue'
 import EbookSettings from './EbookSettings.vue'
@@ -38,7 +36,7 @@ const { isSuperuser, hasPermission, userPermissions } = usePermissions()
 const themeStore = useThemeStore()
 const bgClass = computed(() => BACKGROUND_OPTIONS.find((o) => o.id === themeStore.background)?.cssClass ?? '')
 
-type SectionId = 'libraries' | 'scanner' | 'appearance' | 'reader' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
+type SectionId = 'libraries' | 'appearance' | 'reader' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
 
 const navGroups = computed(() => {
   const groups = [
@@ -46,7 +44,6 @@ const navGroups = computed(() => {
       label: 'General',
       items: [
         { id: 'libraries' as SectionId, label: 'Libraries', icon: Library, component: LibrariesSettings },
-        { id: 'scanner' as SectionId, label: 'Scanner', icon: ScanLine, component: ScannerSettings },
         { id: 'appearance' as SectionId, label: 'Appearance', icon: Paintbrush, component: AppearanceSettings },
       ],
     },
@@ -58,10 +55,6 @@ const navGroups = computed(() => {
         { id: 'pdf' as SectionId, label: 'PDF', icon: FileText, component: PdfSettings },
         { id: 'comics' as SectionId, label: 'Comics', icon: BookImage, component: ComicsSettings },
       ],
-    },
-    {
-      label: 'System',
-      items: [{ id: 'about' as SectionId, label: 'About', icon: Info, component: AboutSettings }],
     },
   ]
   // Explicitly reference userPermissions.value so Vue tracks it as a dependency
@@ -81,6 +74,7 @@ const navGroups = computed(() => {
   if (adminItems.length) {
     groups.push({ label: 'Administration', items: adminItems })
   }
+  groups.push({ label: 'System', items: [{ id: 'about' as SectionId, label: 'About', icon: Info, component: AboutSettings }] })
   return groups
 })
 

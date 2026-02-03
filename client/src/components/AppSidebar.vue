@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import * as Icons from 'lucide-vue-next'
-import { Aperture, BookMarked, Clock, BookOpen, FolderOpen, Plus } from 'lucide-vue-next'
+import { Aperture, FolderOpen, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -215,36 +215,6 @@ onMounted(() => {
         </SidebarGroupContent>
       </SidebarGroup>
 
-      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
-
-      <!-- Browse -->
-      <SidebarGroup>
-        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
-          Browse
-        </SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Reading" class="gap-2.5 opacity-40 cursor-not-allowed">
-                <BookOpen :size="15" class="text-sidebar-foreground/50" />
-                <span class="text-sidebar-foreground/70">Reading</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Bookmarks" class="gap-2.5 opacity-40 cursor-not-allowed">
-                <BookMarked :size="15" class="text-sidebar-foreground/50" />
-                <span class="text-sidebar-foreground/70">Bookmarks</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Recently Added" class="gap-2.5 opacity-40 cursor-not-allowed">
-                <Clock :size="15" class="text-sidebar-foreground/50" />
-                <span class="text-sidebar-foreground/70">Recently Added</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
     </SidebarContent>
 
     <SidebarRail />
