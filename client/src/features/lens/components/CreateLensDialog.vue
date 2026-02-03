@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { X } from 'lucide-vue-next'
 import { useLenses } from '@/features/lens/composables/useLenses'
+import IconPicker from '@/components/IconPicker.vue'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -66,13 +67,7 @@ async function submit() {
 
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-foreground"> Icon <span class="text-muted-foreground font-normal">(optional)</span> </label>
-            <input
-              v-model="icon"
-              type="text"
-              placeholder="e.g. Telescope"
-              class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
-            />
-            <p class="text-xs text-muted-foreground">Any Lucide icon name</p>
+            <IconPicker v-model="icon" placeholder="Choose an icon..." />
           </div>
 
           <label class="flex items-center gap-2.5 cursor-pointer select-none">

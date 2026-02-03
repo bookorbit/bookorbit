@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { Plus, Trash2 } from 'lucide-vue-next'
 import { FIELD_OPERATORS, RULE_FIELDS, type GroupRule, type Rule, type RuleField, type RuleOperator } from '@projectx/types'
 import { FIELD_LABELS, OPERATOR_LABELS } from '@/features/book/lib/filter-labels'
@@ -64,10 +64,12 @@ function parseValue(field: RuleField, operator: RuleOperator, raw: string): Rule
 
 const nodes = ref<LocalNode[]>(toLocalNodes(props.modelValue))
 const join = ref<'AND' | 'OR'>(props.modelValue?.join ?? 'AND')
+let selfEmitting = false
 
 watch(
   () => props.modelValue,
   (val) => {
+    if (selfEmitting) return
     nodes.value = toLocalNodes(val)
     join.value = val?.join ?? 'AND'
   },
@@ -80,6 +82,10 @@ function isRuleComplete(r: EditableRule): boolean {
 }
 
 function emitUpdate() {
+  selfEmitting = true
+  nextTick(() => {
+    selfEmitting = false
+  })
   if (nodes.value.length === 0) {
     emit('update:modelValue', undefined)
     return
@@ -111,7 +117,6 @@ function setJoin(value: 'AND' | 'OR') {
 
 function addRule() {
   nodes.value.push({ kind: 'rule', rule: makeEmptyRule() })
-  emitUpdate()
 }
 
 function addGroup() {
@@ -119,7 +124,6 @@ function addGroup() {
     kind: 'group',
     group: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains' }] },
   })
-  emitUpdate()
 }
 
 function removeNode(index: number) {
