@@ -12,4 +12,11 @@ export class BookCardDto {
   seriesName: string | null;
   seriesIndex: number | null;
   files: BookFileRefDto[];
+  publishedYear: number | null;
+  pageCount: number | null;
+  language: string | null;
+  tags: string[];
+  rating: number | null;
+  readingProgress: number | null;
+  addedAt: string;
 }

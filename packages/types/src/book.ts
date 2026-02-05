@@ -12,6 +12,13 @@ export type BookCard = {
   seriesName: string | null;
   seriesIndex: number | null;
   files: BookFileRef[];
+  publishedYear: number | null;
+  pageCount: number | null;
+  language: string | null;
+  tags: string[];
+  rating: number | null;
+  readingProgress: number | null;
+  addedAt: string;
 };
 
 export type BookDetailFile = {

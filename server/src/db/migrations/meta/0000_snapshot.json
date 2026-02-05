@@ -1,5 +1,5 @@
 {
-  "id": "b24abd51-bfb7-46d7-a788-d934fb481275",
+  "id": "4ca552ff-02e0-40e0-bb1f-2c1e53060015",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1439,6 +1439,12 @@
         "series_index": {
           "name": "series_index",
           "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rating": {
+          "name": "rating",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

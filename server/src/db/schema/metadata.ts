@@ -17,6 +17,7 @@ export const bookMetadata = pgTable('book_metadata', {
   pageCount: integer('page_count'),
   seriesName: varchar('series_name', { length: 500 }),
   seriesIndex: real('series_index'),
+  rating: integer('rating'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
