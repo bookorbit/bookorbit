@@ -31,7 +31,7 @@ const seriesLine = computed(() => {
 
 const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
-const extraFiles = computed(() => (props.book.files.length > 1 ? props.book.files : []))
+const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
@@ -89,20 +89,28 @@ function openFile(file: BookFileRef) {
     </div>
 
     <!-- Right badges + actions -->
-    <div v-if="!selectionMode" class="flex items-center gap-2 shrink-0" @click.stop>
-      <div class="flex flex-col items-end gap-1">
+    <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop>
+      <!-- Format badges -->
+      <div class="flex items-center gap-1">
         <span
           v-if="isMissing"
           class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
         >
           <TriangleAlert class="size-3 shrink-0" />
-          Missing
+          <span class="hidden sm:inline">Missing</span>
         </span>
         <button
-          v-for="file in extraFiles"
+          v-if="primaryFile && !isMissing"
+          class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+          :title="`Open as ${primaryFile.format?.toUpperCase() ?? 'unknown'}`"
+          @click="openFile(primaryFile)"
+        >
+          {{ primaryFile.format ?? '?' }}
+        </button>
+        <button
+          v-for="file in secondaryFiles"
           :key="file.id"
           class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
-          :class="file.role === 'primary' ? 'text-foreground' : 'text-muted-foreground'"
           :title="`Open as ${file.format?.toUpperCase() ?? 'unknown'}`"
           @click="openFile(file)"
         >
@@ -110,8 +118,19 @@ function openFile(file: BookFileRef) {
         </button>
       </div>
 
+      <!-- Open button -->
       <button
+        v-if="primaryFile && !isMissing"
         class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+        title="Open"
+        @click="openFile(primaryFile)"
+      >
+        <BookOpen class="size-4" />
+      </button>
+
+      <!-- Quick view (hidden on mobile) -->
+      <button
+        class="hidden sm:flex p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
         title="Quick view"
         @click="emit('action', 'quick-view')"
       >
