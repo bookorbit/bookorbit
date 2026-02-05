@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
+import { api } from '@/lib/api'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Check, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { BookOpen, Check, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Star, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
@@ -19,6 +20,7 @@ type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'de
 const emit = defineEmits<{
   action: [type: BookActionType]
   select: []
+  'rating-change': [rating: number | null]
 }>()
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
@@ -33,8 +35,29 @@ const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
 
+const metaLine = computed(() => {
+  const parts: string[] = []
+  if (props.book.publishedYear) parts.push(String(props.book.publishedYear))
+  if (props.book.pageCount) parts.push(`${props.book.pageCount}p`)
+  if (props.book.language) parts.push(props.book.language.toUpperCase())
+  return parts.length > 0 ? parts.join(' · ') : null
+})
+
+const visibleTags = computed(() => props.book.tags.slice(0, 2))
+
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+
+const localRating = ref<number | null>(props.book.rating)
+const hoverRating = ref<number | null>(null)
+const displayRating = computed(() => hoverRating.value ?? localRating.value)
+
+async function setRating(star: number) {
+  const newRating = localRating.value === star ? null : star
+  localRating.value = newRating
+  emit('rating-change', newRating)
+  await api(`/api/books/${props.book.id}/rating`, { method: 'PATCH', body: JSON.stringify({ rating: newRating }) })
+}
 
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
@@ -86,10 +109,38 @@ function openFile(file: BookFileRef) {
       <span class="text-sm font-medium text-foreground truncate leading-snug">{{ book.title ?? '-' }}</span>
       <span v-if="authorLine" class="text-xs text-muted-foreground truncate">{{ authorLine }}</span>
       <span v-if="seriesLine" class="text-xs text-muted-foreground/70 truncate italic">{{ seriesLine }}</span>
+      <span v-if="metaLine" class="text-xs text-muted-foreground/60 truncate">{{ metaLine }}</span>
+      <!-- Tags -->
+      <div v-if="visibleTags.length > 0" class="flex items-center gap-1 flex-wrap">
+        <span v-for="tag in visibleTags" :key="tag" class="text-[10px] px-1.5 py-0 rounded-full bg-muted text-muted-foreground leading-5">{{
+          tag
+        }}</span>
+      </div>
+      <!-- Reading progress -->
+      <div v-if="book.readingProgress != null && book.readingProgress > 0" class="flex items-center gap-1.5 mt-0.5">
+        <div class="h-1 flex-1 rounded-full bg-muted overflow-hidden max-w-24">
+          <div class="h-full rounded-full bg-primary/60 transition-all" :style="{ width: `${book.readingProgress}%` }" />
+        </div>
+        <span class="text-[10px] text-muted-foreground/70 tabular-nums">{{ Math.round(book.readingProgress) }}%</span>
+      </div>
     </div>
 
     <!-- Right badges + actions -->
     <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop>
+      <!-- Star rating -->
+      <div class="hidden sm:flex items-center gap-0.5" @mouseleave="hoverRating = null">
+        <button
+          v-for="star in 5"
+          :key="star"
+          class="p-0.5 transition-colors"
+          :title="`Rate ${star}`"
+          @mouseenter="hoverRating = star"
+          @click="setRating(star)"
+        >
+          <Star class="size-3" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
+        </button>
+      </div>
+
       <!-- Format badges -->
       <div class="flex items-center gap-1">
         <span

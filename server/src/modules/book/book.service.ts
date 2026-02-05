@@ -42,9 +42,23 @@ export class BookService {
   }
 
   private assembleBookCards(
-    rows: { id: number; status: string; folderPath: string; title: string | null; seriesName: string | null; seriesIndex: number | null }[],
+    rows: {
+      id: number;
+      status: string;
+      folderPath: string;
+      addedAt: Date;
+      title: string | null;
+      seriesName: string | null;
+      seriesIndex: number | null;
+      publishedYear: number | null;
+      pageCount: number | null;
+      language: string | null;
+      rating: number | null;
+    }[],
     authorRows: { bookId: number; name: string }[],
     fileRows: { bookId: number; id: number; format: string | null; role: string }[],
+    tagRows: { bookId: number; name: string }[],
+    progressRows: { bookFileId: number; percentage: number }[],
   ): BookCard[] {
     const authorsByBook = new Map<number, string[]>();
     for (const row of authorRows) {
@@ -60,28 +74,59 @@ export class BookService {
       filesByBook.set(row.bookId, list);
     }
 
-    return rows.map((row) => ({
-      id: row.id,
-      status: row.status,
-      title: row.title ?? basename(row.folderPath),
-      seriesName: row.seriesName ?? null,
-      seriesIndex: row.seriesIndex ?? null,
-      authors: authorsByBook.get(row.id) ?? [],
-      files: filesByBook.get(row.id) ?? [],
-    }));
+    const tagsByBook = new Map<number, string[]>();
+    for (const row of tagRows) {
+      const list = tagsByBook.get(row.bookId) ?? [];
+      list.push(row.name);
+      tagsByBook.set(row.bookId, list);
+    }
+
+    const progressByFileId = new Map<number, number>();
+    for (const row of progressRows) {
+      progressByFileId.set(row.bookFileId, row.percentage);
+    }
+
+    return rows.map((row) => {
+      const files = filesByBook.get(row.id) ?? [];
+      const primaryFile = files.find((f) => f.role === 'primary') ?? files[0] ?? null;
+      const readingProgress = primaryFile != null ? (progressByFileId.get(primaryFile.id) ?? null) : null;
+
+      return {
+        id: row.id,
+        status: row.status,
+        title: row.title ?? basename(row.folderPath),
+        seriesName: row.seriesName ?? null,
+        seriesIndex: row.seriesIndex ?? null,
+        authors: authorsByBook.get(row.id) ?? [],
+        files,
+        publishedYear: row.publishedYear ?? null,
+        pageCount: row.pageCount ?? null,
+        language: row.language ?? null,
+        tags: tagsByBook.get(row.id) ?? [],
+        rating: row.rating ?? null,
+        readingProgress,
+        addedAt: row.addedAt.toISOString(),
+      };
+    });
   }
 
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
       offset: query.pagination.page * query.pagination.size,
+      userId: user.id,
     });
-    return { items: this.assembleBookCards(rows, authorRows, fileRows), total, page: query.pagination.page, size: query.pagination.size };
+    return {
+      items: this.assembleBookCards(rows, authorRows, fileRows, tagRows, progressRows),
+      total,
+      page: query.pagination.page,
+      size: query.pagination.size,
+    };
   }
 
   async globalQuery(user: RequestUser, query: BookQuery): Promise<BooksPage> {
@@ -89,13 +134,19 @@ export class BookService {
     const accessibleLibraryIds = libs.map((l) => l.id);
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
       offset: query.pagination.page * query.pagination.size,
+      userId: user.id,
     });
-    return { items: this.assembleBookCards(rows, authorRows, fileRows), total, page: query.pagination.page, size: query.pagination.size };
+    return {
+      items: this.assembleBookCards(rows, authorRows, fileRows, tagRows, progressRows),
+      total,
+      page: query.pagination.page,
+      size: query.pagination.size,
+    };
   }
 
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
@@ -128,6 +179,11 @@ export class BookService {
     const libs = await this.libraryService.findAll(user);
     const libraryIds = libs.map((l) => l.id);
     return this.bookRepo.searchAcrossLibraries(libraryIds, q, limit);
+  }
+
+  async updateRating(id: number, rating: number | null, user: RequestUser): Promise<void> {
+    await this.verifyBookAccess(id, user);
+    await this.bookRepo.updateRating(id, rating);
   }
 
   async getProgress(userId: number, fileId: number, user: RequestUser) {

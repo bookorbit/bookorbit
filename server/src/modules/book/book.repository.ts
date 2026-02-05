@@ -12,8 +12,8 @@ type Db = NodePgDatabase<typeof schema>;
 export class BookRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number }) {
-    const { where, orderBy, limit, offset } = opts;
+  async findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }) {
+    const { where, orderBy, limit, offset, userId } = opts;
 
     const [rows, [{ total }]] = await Promise.all([
       this.db
@@ -21,9 +21,14 @@ export class BookRepository {
           id: books.id,
           status: books.status,
           folderPath: books.folderPath,
+          addedAt: books.addedAt,
           title: bookMetadata.title,
           seriesName: bookMetadata.seriesName,
           seriesIndex: bookMetadata.seriesIndex,
+          publishedYear: bookMetadata.publishedYear,
+          pageCount: bookMetadata.pageCount,
+          language: bookMetadata.language,
+          rating: bookMetadata.rating,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -36,7 +41,7 @@ export class BookRepository {
 
     const bookIds = rows.map((r) => r.id);
 
-    const [authorRows, fileRows] = await Promise.all([
+    const [authorRows, fileRows, tagRows] = await Promise.all([
       bookIds.length > 0
         ? this.db
             .select({ bookId: bookAuthors.bookId, name: authors.name })
@@ -51,9 +56,25 @@ export class BookRepository {
             .from(bookFiles)
             .where(inArray(bookFiles.bookId, bookIds))
         : [],
+      bookIds.length > 0
+        ? this.db
+            .select({ bookId: bookTags.bookId, name: tags.name })
+            .from(bookTags)
+            .innerJoin(tags, eq(tags.id, bookTags.tagId))
+            .where(inArray(bookTags.bookId, bookIds))
+        : [],
     ]);
 
-    return { rows, authorRows, fileRows, total: Number(total) };
+    const primaryFileIds = fileRows.filter((f) => f.role === 'primary').map((f) => f.id);
+    const progressRows =
+      primaryFileIds.length > 0
+        ? await this.db
+            .select({ bookFileId: readingProgress.bookFileId, percentage: readingProgress.percentage })
+            .from(readingProgress)
+            .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
+        : [];
+
+    return { rows, authorRows, fileRows, tagRows, progressRows, total: Number(total) };
   }
 
   async findById(id: number) {
@@ -161,12 +182,12 @@ export class BookRepository {
   }
 
   async countWhere(where: SQL | undefined): Promise<number> {
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(books)
-      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where);
     return total;
+  }
+
+  async updateRating(bookId: number, rating: number | null): Promise<void> {
+    await this.db.insert(bookMetadata).values({ bookId, rating }).onConflictDoUpdate({ target: bookMetadata.bookId, set: { rating } });
   }
 
   async upsertProgress(userId: number, fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {
