@@ -732,6 +732,10 @@ html.radius-pill {
     radial-gradient(ellipse 40% 35% at 50% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 100%);
 }
 
+.pattern-horizon {
+  background-image: linear-gradient(180deg, transparent 0%, color-mix(in oklch, var(--primary) 8%, transparent) 50%, transparent 100%);
+}
+
 .glow-wrapper {
   background-image:
     url('/topbar.png'), radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
