@@ -13,7 +13,6 @@ export class BookCardDto {
   seriesIndex: number | null;
   files: BookFileRefDto[];
   publishedYear: number | null;
-  pageCount: number | null;
   language: string | null;
   tags: string[];
   rating: number | null;

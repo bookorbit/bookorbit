@@ -51,7 +51,6 @@ export class BookService {
       seriesName: string | null;
       seriesIndex: number | null;
       publishedYear: number | null;
-      pageCount: number | null;
       language: string | null;
       rating: number | null;
     }[],
@@ -100,7 +99,6 @@ export class BookService {
         authors: authorsByBook.get(row.id) ?? [],
         files,
         publishedYear: row.publishedYear ?? null,
-        pageCount: row.pageCount ?? null,
         language: row.language ?? null,
         tags: tagsByBook.get(row.id) ?? [],
         rating: row.rating ?? null,

@@ -38,7 +38,6 @@ const secondaryFiles = computed(() => props.book.files.filter((f) => f !== prima
 const metaLine = computed(() => {
   const parts: string[] = []
   if (props.book.publishedYear) parts.push(String(props.book.publishedYear))
-  if (props.book.pageCount) parts.push(`${props.book.pageCount}p`)
   if (props.book.language) parts.push(props.book.language.toUpperCase())
   return parts.length > 0 ? parts.join(' · ') : null
 })
@@ -56,7 +55,7 @@ async function setRating(star: number) {
   const newRating = localRating.value === star ? null : star
   localRating.value = newRating
   emit('rating-change', newRating)
-  await api(`/api/books/${props.book.id}/rating`, { method: 'PATCH', body: JSON.stringify({ rating: newRating }) })
+  await api(`/api/books/${props.book.id}/rating`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating: newRating }) })
 }
 
 const { coverUrl } = useCoverVersions()
@@ -73,13 +72,12 @@ function openFile(file: BookFileRef) {
 
 <template>
   <div
-    class="flex items-center gap-3 py-2 px-2 rounded-md transition-colors"
+    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer hover:bg-muted/50"
     :class="[
-      selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
-      isMissing ? 'opacity-60 grayscale' : '',
+      selectionMode ? 'cursor-pointer' : '',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
     ]"
-    @click="selectionMode ? emit('select') : primaryFile && !isMissing && openFile(primaryFile)"
+    @click="selectionMode ? emit('select') : emit('action', 'quick-view')"
   >
     <!-- Selection checkbox -->
     <div
@@ -91,7 +89,11 @@ function openFile(file: BookFileRef) {
     </div>
 
     <!-- Cover -->
-    <div class="h-16 w-12 rounded shrink-0 overflow-hidden relative" :style="coverLoaded ? {} : coverStyle">
+    <div
+      class="h-24 w-16 rounded shrink-0 overflow-hidden relative"
+      :class="isMissing ? 'opacity-50 grayscale' : ''"
+      :style="coverLoaded ? {} : coverStyle"
+    >
       <img
         v-if="!coverFailed"
         :src="coverSrc"
@@ -106,22 +108,18 @@ function openFile(file: BookFileRef) {
 
     <!-- Main info -->
     <div class="flex flex-col min-w-0 flex-1 gap-0.5">
-      <span class="text-sm font-medium text-foreground truncate leading-snug">{{ book.title ?? '-' }}</span>
+      <span class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{ book.title ?? '-' }}</span>
       <span v-if="authorLine" class="text-xs text-muted-foreground truncate">{{ authorLine }}</span>
-      <span v-if="seriesLine" class="text-xs text-muted-foreground/70 truncate italic">{{ seriesLine }}</span>
-      <span v-if="metaLine" class="text-xs text-muted-foreground/60 truncate">{{ metaLine }}</span>
-      <!-- Tags -->
+      <span v-if="seriesLine" class="text-xs text-muted-foreground truncate italic">{{ seriesLine }}</span>
+      <span v-if="metaLine" class="text-xs text-muted-foreground truncate">{{ metaLine }}</span>
       <div v-if="visibleTags.length > 0" class="flex items-center gap-1 flex-wrap">
-        <span v-for="tag in visibleTags" :key="tag" class="text-[10px] px-1.5 py-0 rounded-full bg-muted text-muted-foreground leading-5">{{
-          tag
-        }}</span>
+        <span v-for="tag in visibleTags" :key="tag" class="text-[11px] px-1.5 py-0 rounded-full bg-muted text-muted-foreground leading-5">{{ tag }}</span>
       </div>
       <!-- Reading progress -->
-      <div v-if="book.readingProgress != null && book.readingProgress > 0" class="flex items-center gap-1.5 mt-0.5">
-        <div class="h-1 flex-1 rounded-full bg-muted overflow-hidden max-w-24">
+      <div v-if="book.readingProgress != null && book.readingProgress > 0" class="mt-1">
+        <div class="h-1 w-24 rounded-full bg-muted overflow-hidden">
           <div class="h-full rounded-full bg-primary/60 transition-all" :style="{ width: `${book.readingProgress}%` }" />
         </div>
-        <span class="text-[10px] text-muted-foreground/70 tabular-nums">{{ Math.round(book.readingProgress) }}%</span>
       </div>
     </div>
 
@@ -169,25 +167,6 @@ function openFile(file: BookFileRef) {
         </button>
       </div>
 
-      <!-- Open button -->
-      <button
-        v-if="primaryFile && !isMissing"
-        class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-        title="Open"
-        @click="openFile(primaryFile)"
-      >
-        <BookOpen class="size-4" />
-      </button>
-
-      <!-- Quick view (hidden on mobile) -->
-      <button
-        class="hidden sm:flex p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-        title="Quick view"
-        @click="emit('action', 'quick-view')"
-      >
-        <PanelRight class="size-4" />
-      </button>
-
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <button class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
@@ -195,9 +174,13 @@ function openFile(file: BookFileRef) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem @click="primaryFile && openFile(primaryFile)">
+          <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="primaryFile && !isMissing && openFile(primaryFile)">
             <BookOpen class="size-4 mr-2" />
             Open
+          </DropdownMenuItem>
+          <DropdownMenuItem @click="emit('action', 'quick-view')">
+            <PanelRight class="size-4 mr-2" />
+            Quick View
           </DropdownMenuItem>
           <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
             <ExternalLink class="size-4 mr-2" />

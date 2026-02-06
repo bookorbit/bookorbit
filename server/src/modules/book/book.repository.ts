@@ -26,7 +26,6 @@ export class BookRepository {
           seriesName: bookMetadata.seriesName,
           seriesIndex: bookMetadata.seriesIndex,
           publishedYear: bookMetadata.publishedYear,
-          pageCount: bookMetadata.pageCount,
           language: bookMetadata.language,
           rating: bookMetadata.rating,
         })

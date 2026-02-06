@@ -13,7 +13,6 @@ export type BookCard = {
   seriesIndex: number | null;
   files: BookFileRef[];
   publishedYear: number | null;
-  pageCount: number | null;
   language: string | null;
   tags: string[];
   rating: number | null;

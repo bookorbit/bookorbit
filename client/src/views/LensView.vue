@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Settings2, Trash2 } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
@@ -17,7 +18,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { FIELD_LABELS, ruleToLabel } from '@/features/book/lib/filter-labels'
-import type { GroupRule } from '@projectx/types'
+import type { BookCard, GroupRule } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,6 +65,27 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+
+type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+
+const quickViewBookId = ref<number | null>(null)
+const quickViewOpen = ref(false)
+
+function handleBookAction(book: BookCard, action: BookActionType) {
+  if (action === 'quick-view') {
+    quickViewBookId.value = book.id
+    quickViewOpen.value = true
+    return
+  }
+  if (action === 'add-to-collection') {
+    if (!selectionMode.value) {
+      enterSelectionMode()
+      toggleBook(book.id)
+    }
+    addToCollectionOpen.value = true
+    return
+  }
+}
 
 const editorOpen = ref(false)
 const confirmDelete = ref(false)
@@ -124,6 +146,13 @@ watch(loading, (isLoading) => {
 
 <template>
   <LensEditorPanel :open="editorOpen" :lens="lens" @close="editorOpen = false" @saved="onSaved" />
+
+  <BookQuickView
+    :book-id="quickViewBookId"
+    :open="quickViewOpen"
+    @update:open="quickViewOpen = $event"
+    @action="quickViewBookId !== null && handleBookAction({ id: quickViewBookId } as BookCard, $event)"
+  />
 
   <SelectionActionBar
     :visible="selectionMode"
@@ -252,6 +281,7 @@ watch(loading, (isLoading) => {
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
             @select="toggleBook(book.id)"
+            @action="handleBookAction(book, $event)"
           />
         </div>
 
