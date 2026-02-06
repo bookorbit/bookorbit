@@ -37,7 +37,7 @@ export type Accent =
   | 'orchid'
   | 'blush'
 export type Radius = 'sharp' | 'default' | 'rounded' | 'pill'
-export type Background = 'none' | 'dots' | 'grid' | 'cross' | 'gradient' | 'aurora' | 'rings' | 'noise'
+export type Background = 'none' | 'dots' | 'cross' | 'gradient' | 'aurora'
 
 export const ACCENT_VIVID: { id: Accent; label: string; color: string }[] = [
   { id: 'rose', label: 'Rose', color: '#e11d48' },
@@ -87,12 +87,9 @@ export const RADIUS_OPTIONS: { id: Radius; label: string }[] = [
 export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: string }[] = [
   { id: 'none', label: 'None', cssClass: '' },
   { id: 'dots', label: 'Dots', cssClass: 'pattern-dots' },
-  { id: 'grid', label: 'Grid', cssClass: 'pattern-grid' },
   { id: 'cross', label: 'Cross', cssClass: 'pattern-cross' },
   { id: 'gradient', label: 'Gradient', cssClass: 'pattern-gradient' },
   { id: 'aurora', label: 'Aurora', cssClass: 'pattern-aurora' },
-  { id: 'rings', label: 'Rings', cssClass: 'pattern-rings' },
-  { id: 'noise', label: 'Noise', cssClass: 'pattern-noise' },
 ]
 
 const ACCENT_IDS = ACCENT_OPTIONS.map((a) => a.id)

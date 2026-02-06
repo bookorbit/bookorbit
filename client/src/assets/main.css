@@ -713,11 +713,6 @@ html.radius-pill {
   background-size: 24px 24px;
 }
 
-.pattern-grid {
-  background-image: linear-gradient(var(--dot-color) 1px, transparent 1px), linear-gradient(90deg, var(--dot-color) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-
 .pattern-cross {
   background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px), radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -735,15 +730,6 @@ html.radius-pill {
     radial-gradient(ellipse 60% 45% at 0% 50%, color-mix(in oklch, var(--primary) 15%, transparent), transparent 100%),
     radial-gradient(ellipse 50% 40% at 100% 50%, color-mix(in oklch, var(--primary) 10%, transparent), transparent 100%),
     radial-gradient(ellipse 40% 35% at 50% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 100%);
-}
-
-.pattern-rings {
-  background-image: repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 28px, var(--dot-color) 29px, transparent 30px);
-}
-
-.pattern-noise {
-  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='0.05'/></svg>");
-  background-size: 200px 200px;
 }
 
 .glow-wrapper {

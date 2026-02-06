@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import AccentPicker from '@/components/AccentPicker.vue'
 import RadiusPicker from '@/components/RadiusPicker.vue'
+import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
@@ -188,6 +189,10 @@ function navigateToResult(result: GlobalSearchResult) {
               <div class="space-y-1.5">
                 <span class="text-xs text-muted-foreground">Radius</span>
                 <RadiusPicker />
+              </div>
+              <div class="space-y-1.5">
+                <span class="text-xs text-muted-foreground">Background</span>
+                <BackgroundPicker />
               </div>
             </div>
           </PopoverContent>
