@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, readFile, rm, writeFile } from 'fs/promises';
+import { basename, dirname, extname, join } from 'path';
 import sharp from 'sharp';
 
 import { extractCb7Cover } from './cover-cb7';
@@ -40,12 +40,24 @@ export async function extractCover(absolutePath: string, format: string): Promis
   }
 }
 
-/**
- * Extract cover from a book file and save it under {booksPath}/covers/{bookId}/cover.{ext}.
- * Returns the saved file path, or null if no cover was found.
- */
+async function readSidecarCover(absolutePath: string): Promise<Buffer | null> {
+  const dir = dirname(absolutePath);
+  const stem = basename(absolutePath, extname(absolutePath));
+  const candidates = ['cover.jpg', 'cover.jpeg', 'cover.png', `${stem}.jpg`, `${stem}.jpeg`, `${stem}.png`];
+  for (const name of candidates) {
+    try {
+      const buf = await readFile(join(dir, name));
+      if (buf.length > 0) return buf;
+    } catch {
+      // not found
+    }
+  }
+  return null;
+}
+
 export async function extractAndSaveCover(absolutePath: string, format: string, bookId: number, booksPath: string): Promise<string | null> {
-  const bytes = await extractCover(absolutePath, format);
+  let bytes = await extractCover(absolutePath, format);
+  if (!bytes || bytes.length === 0) bytes = await readSidecarCover(absolutePath);
   if (!bytes || bytes.length === 0) return null;
 
   const dir = join(booksPath, 'covers', String(bookId));
@@ -55,8 +67,16 @@ export async function extractAndSaveCover(absolutePath: string, format: string, 
   const filePath = join(dir, `cover.${ext}`);
   await writeFile(filePath, bytes);
 
-  const thumbnail = await sharp(bytes).resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'cover', position: 'top' }).jpeg({ quality: 90 }).toBuffer();
-  await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+  try {
+    const thumbnail = await sharp(bytes)
+      .resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'cover', position: 'top' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+  } catch (err) {
+    await rm(dir, { recursive: true, force: true });
+    throw err;
+  }
 
   return filePath;
 }

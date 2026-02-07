@@ -23,6 +23,23 @@ function findInZip(zip: unzipper.CentralDirectory, rawHref: string, opfDir: stri
   });
 }
 
+/** Extract the first <img src> from an HTML cover page and resolve it to a zip entry. */
+async function imageFromHtmlCoverPage(zip: unzipper.CentralDirectory, htmlItem: Record<string, unknown>, opfDir: string): Promise<Buffer | null> {
+  const htmlHref = String(htmlItem['@_href'] ?? '');
+  if (!htmlHref) return null;
+  const htmlFile = findInZip(zip, htmlHref, opfDir);
+  if (!htmlFile) return null;
+  const html = (await htmlFile.buffer()).toString('utf-8');
+  const srcMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (!srcMatch) return null;
+  const imgSrc = srcMatch[1];
+  // Resolve img src relative to the HTML file's directory
+  const htmlDir = htmlHref.includes('/') ? htmlHref.substring(0, htmlHref.lastIndexOf('/') + 1) : '';
+  const imgFile = findInZip(zip, imgSrc, resolvePath(opfDir, htmlDir));
+  if (!imgFile) return null;
+  return imgFile.buffer();
+}
+
 /**
  * Extract the cover image bytes from an EPUB file.
  * Tries EPUB3 cover-image property, EPUB2 meta cover, guide reference, and id-based fallbacks.
@@ -70,7 +87,12 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
       const coverMeta = metaList.find((m) => String(m['@_name'] ?? '').toLowerCase() === 'cover');
       if (coverMeta) {
         const coverId = String(coverMeta['@_content'] ?? '');
-        coverItem = itemList.find((i) => String(i['@_id'] ?? '') === coverId);
+        const found = itemList.find((i) => String(i['@_id'] ?? '') === coverId);
+        if (found) {
+          const mt = String(found['@_media-type'] ?? '').toLowerCase();
+          if (!mt.startsWith('image/')) return imageFromHtmlCoverPage(zip, found, opfDir);
+          coverItem = found;
+        }
       }
     }
 
@@ -90,20 +112,25 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
           const itemHref = decodeURIComponent(String(i['@_href'] ?? '').split('#')[0]);
           return itemHref === guideHref || resolvePath(opfDir, itemHref) === resolvePath(opfDir, guideHref);
         });
-        // If guide points to an HTML page, skip - we only want image items
+        // If guide points to an HTML cover page, follow the <img> inside it
         if (coverItem) {
           const mt = String(coverItem['@_media-type'] ?? '').toLowerCase();
-          if (!mt.startsWith('image/')) coverItem = undefined;
+          if (!mt.startsWith('image/')) return imageFromHtmlCoverPage(zip, coverItem, opfDir);
         }
       }
     }
 
     // Fallback: item whose id is "cover" or "cover-image"
     if (!coverItem) {
-      coverItem = itemList.find((i) => {
+      const found = itemList.find((i) => {
         const id = String(i['@_id'] ?? '').toLowerCase();
         return id === 'cover' || id === 'cover-image';
       });
+      if (found) {
+        const mt = String(found['@_media-type'] ?? '').toLowerCase();
+        if (!mt.startsWith('image/')) return imageFromHtmlCoverPage(zip, found, opfDir);
+        coverItem = found;
+      }
     }
 
     // Fallback: item whose href contains "cover" and is an image
