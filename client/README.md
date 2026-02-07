@@ -1,54 +1,56 @@
-# client
+# ProjectX - Client
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3 SPA built with Vite and Tailwind CSS v4.
 
-## Recommended IDE Setup
+## Running
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+From the repo root: `pnpm dev` (starts both server and client).
 
-## Recommended Browser Setup
+Client only: `pnpm dev` (from this directory). Runs at http://localhost:5173.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+The Vite dev server proxies `/api` and `/socket.io` requests to the backend at `localhost:3000`.
 
-## Type Support for `.vue` Imports in TS
+## IDE setup
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- **VS Code:** Install the [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) extension. Disable Vetur if installed.
+- **WebStorm / IntelliJ:** Vue support is built in. Enable TypeScript service for `.vue` files.
+- **Browser:** Install [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) and enable Custom Object Formatters in DevTools settings.
 
-## Customize configuration
+## Project layout
 
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
+```
+src/
+├── features/           Feature modules (one folder per domain)
+│   ├── auth/           Login, registration, password reset
+│   ├── book/           Book detail, covers, metadata
+│   ├── library/        Library management
+│   ├── collection/     Book collections
+│   ├── lens/           Saved search views
+│   ├── scanner/        Scan progress UI
+│   ├── reader/         Book reader (epub, pdf, cbz)
+│   ├── settings/       User settings
+│   └── admin/          Admin panel (users, roles, settings)
+├── components/         Shared components (header, sidebar, icons)
+│   └── ui/             Reusable UI primitives (button, dialog, etc.)
+├── composables/        Global composables
+├── views/              Route-level page components
+├── router/             Vue Router config and guards
+├── lib/                Utilities (api client, helpers)
+├── stores/             Pinia stores (theme only - prefer composables)
+└── assets/             CSS, fonts, static assets
 ```
 
-### Compile and Hot-Reload for Development
+## Testing
 
-```sh
-npm run dev
+```bash
+pnpm test:unit          # run Vitest
 ```
 
-### Type-Check, Compile and Minify for Production
+## Key conventions
 
-```sh
-npm run build
-```
-
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-npm run test:unit
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
+- All components use `<script setup lang="ts">` (Composition API only).
+- Feature state lives in composables (`features/<name>/composables/use*.ts`), not global stores.
+- HTTP calls use the native `fetch` API via `src/lib/api.ts`.
+- Styling with Tailwind CSS v4 utility classes. Theme tokens are CSS variables in `src/assets/main.css`.
+- Icons from `lucide-vue-next` only.
+- Shared types imported from `@projectx/types`.
