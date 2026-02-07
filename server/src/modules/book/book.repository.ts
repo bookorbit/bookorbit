@@ -185,6 +185,14 @@ export class BookRepository {
     return total;
   }
 
+  async findLibraryIdsByBookIds(bookIds: number[]): Promise<{ id: number; libraryId: number }[]> {
+    return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
+  }
+
+  async deleteByIds(bookIds: number[]): Promise<void> {
+    await this.db.delete(books).where(inArray(books.id, bookIds));
+  }
+
   async updateRating(bookId: number, rating: number | null): Promise<void> {
     await this.db.insert(bookMetadata).values({ bookId, rating }).onConflictDoUpdate({ target: bookMetadata.bookId, set: { rating } });
   }

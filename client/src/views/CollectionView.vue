@@ -13,6 +13,7 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
+import { api } from '@/lib/api'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { useCollectionBooks } from '@/features/collection/composables/useCollectionBooks'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
@@ -42,6 +43,7 @@ function toggleSelectionMode() {
 const addToCollectionOpen = ref(false)
 const editCollectionOpen = ref(false)
 let removingInProgress = false
+let deletingInProgress = false
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)
 
@@ -58,6 +60,27 @@ async function handleRemoveFromCollection() {
     toast.error('Failed to remove books from collection')
   } finally {
     removingInProgress = false
+  }
+}
+
+async function handleDeleteSelected() {
+  if (deletingInProgress || selectedIds.value.size === 0) return
+  deletingInProgress = true
+  try {
+    const ids = [...selectedIds.value]
+    const res = await api('/api/books', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookIds: ids }),
+    })
+    if (!res.ok) throw new Error('Failed to delete books')
+    load(true)
+    exitSelectionMode()
+    toast.success(`Deleted ${ids.length} book${ids.length === 1 ? '' : 's'}`)
+  } catch {
+    toast.error('Failed to delete books')
+  } finally {
+    deletingInProgress = false
   }
 }
 
@@ -112,7 +135,7 @@ watch(loading, (isLoading) => {
     :in-collection="true"
     @add-to-collection="addToCollectionOpen = true"
     @remove-from-collection="handleRemoveFromCollection"
-    @delete="() => {}"
+    @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
 

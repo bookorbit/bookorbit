@@ -1,4 +1,19 @@
-import { Body, Controller, Get, Headers, NotFoundException, Param, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
@@ -7,6 +22,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
+import { DeleteBooksDto } from './dto/delete-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpdateRatingDto } from './dto/update-rating.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
@@ -15,6 +31,13 @@ import type { BookQuery } from '@projectx/types';
 @Controller('books')
 export class BookController {
   constructor(private readonly bookService: BookService) {}
+
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('library_delete_books')
+  deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.deleteBooks(dto.bookIds, user);
+  }
 
   // Must be before @Get(':id') so NestJS does not treat 'search' as an :id param
   @Get('search')

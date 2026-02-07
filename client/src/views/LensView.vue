@@ -12,6 +12,8 @@ import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { toast } from 'vue-sonner'
+import { api } from '@/lib/api'
 import { useLens } from '@/features/lens/composables/useLens'
 import { useLenses } from '@/features/lens/composables/useLenses'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -65,6 +67,23 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+
+async function handleDeleteSelected() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const res = await api('/api/books', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids }),
+  })
+  if (!res.ok) {
+    toast.error('Failed to delete books')
+    return
+  }
+  load(true)
+  exitSelectionMode()
+  toast.success(`Deleted ${ids.length} book${ids.length === 1 ? '' : 's'}`)
+}
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
@@ -158,7 +177,7 @@ watch(loading, (isLoading) => {
     :visible="selectionMode"
     :count="selectedCount"
     @add-to-collection="addToCollectionOpen = true"
-    @delete="() => {}"
+    @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
 

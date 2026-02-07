@@ -12,6 +12,8 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { toast } from 'vue-sonner'
+import { api } from '@/lib/api'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
@@ -211,6 +213,24 @@ function toggleSelectionMode() {
 
 const addToCollectionOpen = ref(false)
 
+async function handleDeleteSelected() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const res = await api('/api/books', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids }),
+  })
+  if (!res.ok) {
+    toast.error('Failed to delete books')
+    return
+  }
+  const deleted = new Set(ids)
+  books.value = books.value.filter((b) => !deleted.has(b.id))
+  exitSelectionMode()
+  toast.success(`Deleted ${ids.length} book${ids.length === 1 ? '' : 's'}`)
+}
+
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
 const quickViewBookId = ref<number | null>(null)
@@ -390,7 +410,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     :visible="selectionMode"
     :count="selectedCount"
     @add-to-collection="addToCollectionOpen = true"
-    @delete="() => {}"
+    @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
 

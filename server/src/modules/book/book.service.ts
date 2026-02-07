@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, readdir, stat } from 'fs/promises';
+import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
 import type { BookCard, BookQuery, BooksPage } from '@projectx/types';
@@ -13,6 +13,7 @@ import { SaveProgressDto } from './dto/save-progress.dto';
 
 @Injectable()
 export class BookService {
+  private readonly logger = new Logger(BookService.name);
   private readonly booksPath: string;
 
   constructor(
@@ -177,6 +178,19 @@ export class BookService {
     const libs = await this.libraryService.findAll(user);
     const libraryIds = libs.map((l) => l.id);
     return this.bookRepo.searchAcrossLibraries(libraryIds, q, limit);
+  }
+
+  async deleteBooks(bookIds: number[], user: RequestUser): Promise<void> {
+    if (bookIds.length === 0) return;
+    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+    const isSuperuser = this.isSuperuser(user);
+    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+    await this.bookRepo.deleteByIds(bookIds);
+    for (const { id: bookId } of rows) {
+      const coverDir = join(this.booksPath, 'covers', String(bookId));
+      rm(coverDir, { recursive: true, force: true }).catch((err) => this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`));
+    }
   }
 
   async updateRating(id: number, rating: number | null, user: RequestUser): Promise<void> {
