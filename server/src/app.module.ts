@@ -19,6 +19,7 @@ import { BookModule } from './modules/book/book.module';
 import { KoboModule } from './modules/kobo/kobo.module';
 import { LibraryModule } from './modules/library/library.module';
 import { LensModule } from './modules/lens/lens.module';
+import { OpdsModule } from './modules/opds/opds.module';
 import { PathModule } from './modules/path/path.module';
 import { MetadataModule } from './modules/metadata/metadata.module';
 import { ReaderPreferencesModule } from './modules/reader-preferences/reader-preferences.module';
@@ -49,6 +50,7 @@ import { UserModule } from './modules/user/user.module';
     ScannerModule,
     MetadataModule,
     KoboModule,
+    OpdsModule,
     BookmarkModule,
     AnnotationModule,
     CbzModule,

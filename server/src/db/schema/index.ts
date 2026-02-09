@@ -7,3 +7,4 @@ export * from './metadata';
 export * from './scanner';
 export * from './reader';
 export * from './oidc';
+export * from './opds';

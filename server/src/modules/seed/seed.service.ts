@@ -16,6 +16,7 @@ const BUILT_IN_PERMISSIONS = [
   { name: 'library_edit_metadata', description: 'Edit book info', isSystem: true },
   { name: 'library_delete_books', description: 'Delete books from a library', isSystem: true },
   { name: 'kobo_sync', description: 'Sync with Kobo device', isSystem: true },
+  { name: 'opds_access', description: 'Access the OPDS catalog', isSystem: true },
 ];
 
 const ADMIN_PERMISSIONS = [
@@ -28,9 +29,10 @@ const ADMIN_PERMISSIONS = [
   'library_edit_metadata',
   'library_delete_books',
   'kobo_sync',
+  'opds_access',
 ];
 
-const USER_PERMISSIONS = ['library_upload', 'library_download', 'library_edit_metadata', 'library_delete_books', 'kobo_sync'];
+const USER_PERMISSIONS = ['library_upload', 'library_download', 'library_edit_metadata', 'library_delete_books', 'kobo_sync', 'opds_access'];
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
@@ -93,6 +95,8 @@ export class SeedService implements OnApplicationBootstrap {
       .insert(schema.appSettings)
       .values({ key: 'allow_registration', value: 'false' })
       .onConflictDoNothing({ target: schema.appSettings.key });
+
+    await this.db.insert(schema.appSettings).values({ key: 'opds_enabled', value: 'true' }).onConflictDoNothing({ target: schema.appSettings.key });
 
     const defaultOidcConfig = JSON.stringify({
       enabled: false,

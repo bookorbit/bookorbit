@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   KeyRound,
   LogIn,
+  Rss,
 } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -30,21 +31,25 @@ import UsersPage from '@/features/admin/UsersPage.vue'
 import RolesPage from '@/features/admin/RolesPage.vue'
 import PermissionsPage from '@/features/admin/PermissionsPage.vue'
 import OidcSettings from './OidcSettings.vue'
+import OpdsSettings from './OpdsSettings.vue'
 
 const { isOpen, close } = useSettingsDrawer()
 const { isSuperuser, hasPermission, userPermissions } = usePermissions()
 const themeStore = useThemeStore()
 const bgClass = computed(() => BACKGROUND_OPTIONS.find((o) => o.id === themeStore.background)?.cssClass ?? '')
 
-type SectionId = 'libraries' | 'appearance' | 'reader' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
+type SectionId = 'libraries' | 'appearance' | 'opds' | 'reader' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
 
 const navGroups = computed(() => {
+  const perms = userPermissions.value
+  const su = isSuperuser.value
   const groups = [
     {
       label: 'General',
       items: [
         { id: 'libraries' as SectionId, label: 'Libraries', icon: Library, component: LibrariesSettings },
         { id: 'appearance' as SectionId, label: 'Appearance', icon: Paintbrush, component: AppearanceSettings },
+        ...(su || perms.includes('opds_access') ? [{ id: 'opds' as SectionId, label: 'OPDS', icon: Rss, component: OpdsSettings }] : []),
       ],
     },
     {
@@ -57,9 +62,6 @@ const navGroups = computed(() => {
       ],
     },
   ]
-  // Explicitly reference userPermissions.value so Vue tracks it as a dependency
-  const perms = userPermissions.value
-  const su = isSuperuser.value
   const adminItems: { id: SectionId; label: string; icon: unknown; component: unknown }[] = []
   if (su || perms.includes('manage_users')) {
     adminItems.push({ id: 'users', label: 'Users', icon: Users, component: UsersPage })
