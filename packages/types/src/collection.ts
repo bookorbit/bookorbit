@@ -3,6 +3,7 @@ export type Collection = {
   name: string;
   icon: string | null;
   description: string | null;
+  syncToKobo: boolean;
   bookCount: number;
   memberCount?: number;
   createdAt: string;

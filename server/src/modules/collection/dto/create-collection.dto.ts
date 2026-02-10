@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateCollectionDto {
   @IsString()
@@ -14,4 +14,8 @@ export class CreateCollectionDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  syncToKobo?: boolean;
 }

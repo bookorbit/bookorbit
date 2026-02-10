@@ -125,6 +125,7 @@ CREATE TABLE "collections" (
 	"name" text NOT NULL,
 	"icon" text,
 	"description" text,
+	"sync_to_kobo" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -303,6 +304,66 @@ CREATE TABLE "opds_users" (
 	CONSTRAINT "opds_users_username_unique" UNIQUE("username")
 );
 --> statement-breakpoint
+CREATE TABLE "kobo_devices" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"token" varchar(64) NOT NULL,
+	"last_seen_at" timestamp,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "kobo_devices_token_unique" UNIQUE("token")
+);
+--> statement-breakpoint
+CREATE TABLE "kobo_library_snapshots" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "kobo_library_snapshots_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
+CREATE TABLE "kobo_reading_states" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"book_id" integer NOT NULL,
+	"entitlement_id" varchar(255) NOT NULL,
+	"created_at_kobo" varchar(50),
+	"last_modified_kobo" varchar(50),
+	"priority_timestamp" varchar(50),
+	"current_bookmark" jsonb,
+	"statistics" jsonb,
+	"status_info" jsonb,
+	"progress_synced_at" timestamp,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "kobo_reading_states_user_id_book_id_unique" UNIQUE("user_id","book_id")
+);
+--> statement-breakpoint
+CREATE TABLE "kobo_snapshot_books" (
+	"snapshot_id" integer NOT NULL,
+	"book_id" integer NOT NULL,
+	"synced" boolean DEFAULT false NOT NULL,
+	"pending_delete" boolean DEFAULT false NOT NULL,
+	"is_new" boolean DEFAULT true NOT NULL,
+	"removed_by_device" boolean DEFAULT false NOT NULL,
+	"file_hash" varchar(64),
+	"metadata_hash" varchar(64),
+	CONSTRAINT "kobo_snapshot_books_snapshot_id_book_id_pk" PRIMARY KEY("snapshot_id","book_id")
+);
+--> statement-breakpoint
+CREATE TABLE "kobo_sync_settings" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"reading_threshold" real DEFAULT 1 NOT NULL,
+	"finished_threshold" real DEFAULT 99 NOT NULL,
+	"convert_to_kepub" boolean DEFAULT true NOT NULL,
+	"two_way_progress_sync" boolean DEFAULT false NOT NULL,
+	"force_enable_hyphenation" boolean DEFAULT false NOT NULL,
+	"kepub_conversion_limit_mb" integer DEFAULT 100 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "kobo_sync_settings_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -338,6 +399,13 @@ ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_user_id_users_id
 ALTER TABLE "oidc_group_mappings" ADD CONSTRAINT "oidc_group_mappings_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oidc_sessions" ADD CONSTRAINT "oidc_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "opds_users" ADD CONSTRAINT "opds_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_devices" ADD CONSTRAINT "kobo_devices_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_library_snapshots" ADD CONSTRAINT "kobo_library_snapshots_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_reading_states" ADD CONSTRAINT "kobo_reading_states_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_reading_states" ADD CONSTRAINT "kobo_reading_states_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_snapshot_id_kobo_library_snapshots_id_fk" FOREIGN KEY ("snapshot_id") REFERENCES "public"."kobo_library_snapshots"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kobo_sync_settings" ADD CONSTRAINT "kobo_sync_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint

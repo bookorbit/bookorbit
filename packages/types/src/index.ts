@@ -6,3 +6,4 @@ export * from "./query";
 export * from "./reader-settings";
 export * from "./scanner";
 export * from "./opds";
+export * from "./kobo";

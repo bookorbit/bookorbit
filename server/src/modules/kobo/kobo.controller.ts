@@ -1,10 +1,3 @@
-import { Controller } from '@nestjs/common';
-
-import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { KoboService } from './kobo.service';
-
-@Controller('kobo')
-@RequirePermission('kobo_sync')
-export class KoboController {
-  constructor(private readonly koboService: KoboService) {}
-}
+// Barrel re-export — actual logic lives in kobo-user.controller.ts and kobo-device.controller.ts
+export { KoboUserController } from './kobo-user.controller';
+export { KoboDeviceController } from './kobo-device.controller';

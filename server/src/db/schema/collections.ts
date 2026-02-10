@@ -1,4 +1,4 @@
-import { integer, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 import { books } from './books';
 import { users } from './auth';
@@ -11,6 +11,7 @@ export const collections = pgTable('collections', {
   name: text('name').notNull(),
   icon: text('icon'),
   description: text('description'),
+  syncToKobo: boolean('sync_to_kobo').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

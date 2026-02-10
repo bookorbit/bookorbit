@@ -14,6 +14,7 @@ const collectionFields = {
   name: collections.name,
   icon: collections.icon,
   description: collections.description,
+  syncToKobo: collections.syncToKobo,
   createdAt: collections.createdAt,
   updatedAt: collections.updatedAt,
   bookCount: count(collectionBooks.bookId),

@@ -78,6 +78,7 @@ export class CollectionService {
       name: dto.name,
       icon: dto.icon?.trim() || null,
       description: dto.description ?? null,
+      syncToKobo: dto.syncToKobo ?? false,
     });
     const [collection] = await this.collectionRepo.findById(inserted.id);
     return collection;
@@ -92,6 +93,7 @@ export class CollectionService {
       ...(dto.name !== undefined && { name: dto.name }),
       ...(dto.icon !== undefined && { icon: dto.icon.trim() || null }),
       ...(dto.description !== undefined && { description: dto.description }),
+      ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
     });
     return updated;
   }

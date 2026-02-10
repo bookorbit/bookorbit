@@ -1,4 +1,1 @@
-import { Injectable } from '@nestjs/common';
-
-@Injectable()
-export class KoboService {}
+// Intentionally empty — see services/ directory for Kobo service implementations

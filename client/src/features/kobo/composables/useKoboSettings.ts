@@ -1,0 +1,35 @@
+import { ref } from 'vue'
+import { api } from '@/lib/api'
+import type { KoboSyncSettings } from '@projectx/types'
+
+const settings = ref<KoboSyncSettings>({
+  readingThreshold: 1,
+  finishedThreshold: 99,
+  convertToKepub: true,
+  twoWayProgressSync: false,
+  forceEnableHyphenation: false,
+  kepubConversionLimitMb: 100,
+})
+
+export function useKoboSettings() {
+  async function fetchSettings() {
+    const res = await api('/api/v1/kobo/settings')
+    if (!res.ok) throw new Error('Failed to fetch settings')
+    settings.value = await res.json()
+  }
+
+  async function updateSettings(patch: Partial<KoboSyncSettings>) {
+    const res = await api('/api/v1/kobo/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message ?? 'Failed to update settings')
+    }
+    settings.value = await res.json()
+  }
+
+  return { settings, fetchSettings, updateSettings }
+}

@@ -12,6 +12,7 @@ const { updateCollection } = useCollections()
 
 const name = ref('')
 const icon = ref('')
+const syncToKobo = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 
@@ -21,6 +22,7 @@ watch(
     if (isOpen) {
       name.value = props.collection.name
       icon.value = props.collection.icon ?? ''
+      syncToKobo.value = props.collection.syncToKobo
       error.value = null
     }
   },
@@ -31,7 +33,7 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    await updateCollection(props.collection.id, name.value.trim(), icon.value)
+    await updateCollection(props.collection.id, name.value.trim(), icon.value, syncToKobo.value)
     emit('close')
   } catch {
     error.value = 'Failed to update collection'
@@ -67,6 +69,24 @@ async function submit() {
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-foreground"> Icon <span class="text-muted-foreground font-normal">(optional)</span> </label>
             <IconPicker v-model="icon" placeholder="Choose an icon..." />
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <div>
+              <p class="text-sm font-medium text-foreground">Sync to Kobo</p>
+              <p class="text-xs text-muted-foreground mt-0.5">Books in this collection will appear on your Kobo device</p>
+            </div>
+            <button
+              type="button"
+              class="w-11 h-6 rounded-full transition-colors relative shrink-0"
+              :class="syncToKobo ? 'bg-primary' : 'bg-muted'"
+              @click="syncToKobo = !syncToKobo"
+            >
+              <div
+                class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
+                :class="syncToKobo ? 'translate-x-6' : 'translate-x-1'"
+              />
+            </button>
           </div>
 
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>

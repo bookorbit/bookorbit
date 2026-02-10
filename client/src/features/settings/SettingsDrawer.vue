@@ -16,6 +16,7 @@ import {
   KeyRound,
   LogIn,
   Rss,
+  Tablet,
 } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -32,13 +33,27 @@ import RolesPage from '@/features/admin/RolesPage.vue'
 import PermissionsPage from '@/features/admin/PermissionsPage.vue'
 import OidcSettings from './OidcSettings.vue'
 import OpdsSettings from './OpdsSettings.vue'
+import KoboSettings from './KoboSettings.vue'
 
 const { isOpen, close } = useSettingsDrawer()
-const { isSuperuser, hasPermission, userPermissions } = usePermissions()
+const { isSuperuser, userPermissions } = usePermissions()
 const themeStore = useThemeStore()
 const bgClass = computed(() => BACKGROUND_OPTIONS.find((o) => o.id === themeStore.background)?.cssClass ?? '')
 
-type SectionId = 'libraries' | 'appearance' | 'opds' | 'reader' | 'ebook' | 'pdf' | 'comics' | 'about' | 'users' | 'roles' | 'permissions' | 'oidc'
+type SectionId =
+  | 'libraries'
+  | 'appearance'
+  | 'opds'
+  | 'kobo'
+  | 'reader'
+  | 'ebook'
+  | 'pdf'
+  | 'comics'
+  | 'about'
+  | 'users'
+  | 'roles'
+  | 'permissions'
+  | 'oidc'
 
 const navGroups = computed(() => {
   const perms = userPermissions.value
@@ -50,6 +65,7 @@ const navGroups = computed(() => {
         { id: 'libraries' as SectionId, label: 'Libraries', icon: Library, component: LibrariesSettings },
         { id: 'appearance' as SectionId, label: 'Appearance', icon: Paintbrush, component: AppearanceSettings },
         ...(su || perms.includes('opds_access') ? [{ id: 'opds' as SectionId, label: 'OPDS', icon: Rss, component: OpdsSettings }] : []),
+        ...(su || perms.includes('kobo_sync') ? [{ id: 'kobo' as SectionId, label: 'Kobo', icon: Tablet, component: KoboSettings }] : []),
       ],
     },
     {

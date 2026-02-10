@@ -29,11 +29,11 @@ export function useCollections() {
     return created
   }
 
-  async function updateCollection(id: number, name: string, icon: string): Promise<Collection> {
+  async function updateCollection(id: number, name: string, icon: string, syncToKobo?: boolean): Promise<Collection> {
     const res = await api(`/api/collections/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, icon }),
+      body: JSON.stringify({ name, icon, ...(syncToKobo !== undefined && { syncToKobo }) }),
     })
     if (!res.ok) throw new Error('Failed to update collection')
     const updated: Collection = await res.json()
