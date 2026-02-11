@@ -84,7 +84,7 @@ export class BookQueryBuilder {
       case 'addedAt':
         return this.dateRuleToSql(operator, value as string | number, valueTo as string | undefined);
       default:
-        throw new BadRequestException(`Unknown filter field: ${field}`);
+        throw new BadRequestException(`Unknown filter field: ${String(field)}`);
     }
   }
 
@@ -147,13 +147,13 @@ export class BookQueryBuilder {
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => ilike(authors.name, `%${v}%`)))!));
+        return inArray(books.id, sq(or(...values.map((v) => ilike(authors.name, `%${v}%`)))));
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
         return and(...values.map((v) => inArray(books.id, sq(ilike(authors.name, `%${v}%`)))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => ilike(authors.name, `%${v}%`)))!)));
+        return not(inArray(books.id, sq(or(...values.map((v) => ilike(authors.name, `%${v}%`))))));
       case 'isEmpty':
         return not(inArray(books.id, sq()));
       case 'isNotEmpty':
@@ -170,13 +170,13 @@ export class BookQueryBuilder {
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v)))!));
+        return inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v)))));
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
         return and(...values.map((v) => inArray(books.id, sq(eq(tags.name, v)))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v)))!)));
+        return not(inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v))))));
       case 'isEmpty':
         return not(inArray(books.id, sq()));
       case 'isNotEmpty':

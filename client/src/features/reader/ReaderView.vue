@@ -73,7 +73,7 @@ const bookmarks = useBookmarks()
 const annotations = useAnnotations()
 
 const toc = useToc()
-const { chapters, expandedHrefs, activeHref, setChapters, setActiveHref, toggleExpand } = toc
+const { chapters, expandedHrefs, activeHref, setChapters, toggleExpand } = toc
 
 const search = useSearch()
 const { results: searchResults, isSearching, search: doSearch, clear: clearSearch } = search
@@ -104,8 +104,6 @@ const {
   loading,
   error,
   open,
-  prev,
-  next,
   goTo,
   goToFraction,
   goToSection,

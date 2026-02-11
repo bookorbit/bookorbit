@@ -6,7 +6,6 @@ import { getSevenZip } from '../../../common/sevenzip';
 
 // ── ZIP binary constants ──────────────────────────────────────────────────────
 
-const LFH_SIG = 0x04034b50; // local file header
 const EOCD_SIG = 0x06054b50; // end of central directory
 
 export interface ParsedCbzMetadata {
@@ -83,9 +82,11 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
     const ci = parsed['ComicInfo'] as Record<string, unknown> | undefined;
     if (!ci) return null;
 
-    const str = (key: string) => {
+    const str = (key: string): string | null => {
       const v = ci[key];
-      return v != null && v !== '' ? String(v).trim() : null;
+      if (v == null || v === '') return null;
+      const s = typeof v === 'string' ? v : JSON.stringify(v);
+      return s.trim() || null;
     };
     const num = (key: string) => {
       const v = parseFloat(str(key) ?? '');

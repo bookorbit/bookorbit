@@ -56,7 +56,8 @@ export class BackchannelLogoutService {
     }
 
     const subject = String(claims.sub ?? '');
-    const sid = claims.sid ? String(claims.sid) : undefined;
+    const rawSid = claims['sid'];
+    const sid = typeof rawSid === 'string' ? rawSid : undefined;
 
     let userId: number | undefined;
 

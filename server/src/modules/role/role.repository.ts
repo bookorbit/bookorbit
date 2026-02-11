@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DB } from '../../db/db.module';
+import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;

@@ -59,8 +59,7 @@ export class ScanJobStore {
     if (entry.total > 0 && entry.processed >= entry.total) return true;
     const pct = entry.total > 0 ? Math.floor((entry.processed / entry.total) * 100) : 0;
     if (pct >= entry.lastEmitPct + 1) return true;
-    if (Date.now() - entry.lastEmitMs >= 1000) return true;
-    return false;
+    return Date.now() - entry.lastEmitMs >= 1000;
   }
 
   markEmitted(entry: ScanEntry): void {

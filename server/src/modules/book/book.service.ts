@@ -189,7 +189,9 @@ export class BookService {
     await this.bookRepo.deleteByIds(bookIds);
     for (const { id: bookId } of rows) {
       const coverDir = join(this.booksPath, 'covers', String(bookId));
-      rm(coverDir, { recursive: true, force: true }).catch((err) => this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`));
+      rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
+        this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
+      );
     }
   }
 

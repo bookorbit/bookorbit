@@ -135,7 +135,7 @@ describe('reconcile()', () => {
   });
 
   it('does nothing when reconcileMissingBooks returns empty', async () => {
-    const { service, processor, gateway } = makeService();
+    const { service, gateway } = makeService();
     (service as any).subscriptions.set(1, []);
 
     await (service as any).reconcile();

@@ -3,7 +3,14 @@ import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import type { BookMissingEvent, BookMovedEvent, BookRestoredEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import type {
+  BookMissingEvent,
+  BookMovedEvent,
+  BookRestoredEvent,
+  CoverRefreshedEvent,
+  CoverRefreshProgressEvent,
+  ScanProgressEvent,
+} from '@projectx/types';
 import { AuthService } from '../auth/auth.service';
 import { ScanJobStore } from './scan-job-store.service';
 
@@ -25,7 +32,7 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = this.jwtService.verify<{ sub: number; ver: number }>(token);
       const user = await this.authService.validateUser(payload.sub, payload.ver);
       if (!user) throw new Error('User not found or token revoked');
-      client.data.user = user;
+      (client.data as Record<string, unknown>).user = user;
       this.logger.debug(`WS connected: user=${user.id} socket=${client.id}`);
     } catch (err) {
       this.logger.warn(`WS rejected: ${(err as Error).message} socket=${client.id}`);
@@ -39,7 +46,7 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('subscribe:library')
   handleSubscribeLibrary(client: Socket, libraryId: number): void {
-    client.join(`library:${libraryId}`);
+    void client.join(`library:${libraryId}`);
     // Send current snapshot immediately so reconnecting clients catch up.
     const entry = this.scanJobStore.get(libraryId);
     if (entry) {

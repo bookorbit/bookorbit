@@ -149,7 +149,7 @@ export class ScannerService implements OnApplicationBootstrap {
   private async scanFolderCandidates(
     libraryFolderId: number,
     libraryId: number,
-    folderPath: string,
+    _folderPath: string,
     candidates: BookCandidate[],
     knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>,
     knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>,

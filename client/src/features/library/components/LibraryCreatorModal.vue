@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users } from 'lucide-vue-next'
 import type { Library } from '@projectx/types'
 import { api } from '@/lib/api'

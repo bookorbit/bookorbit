@@ -20,7 +20,7 @@ import { ScannerService } from './scanner.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('auth.jwtSecret'),
-        signOptions: { expiresIn: config.get('auth.jwtExpiresIn') as any },
+        signOptions: { expiresIn: config.get<string>('auth.jwtExpiresIn') },
       }),
     }),
   ],

@@ -152,12 +152,14 @@ describe('handleCreate — file', () => {
       libraryId: 3,
     } as any);
     mockRepo.findMissingBookByFolderPath.mockResolvedValue({
-      id: 10, libraryId: 3, libraryFolderId: 5,
+      id: 10,
+      libraryId: 3,
+      libraryFolderId: 5,
     } as any);
 
     const result = await makeService().handleCreate('/books/Author/book.epub');
 
-    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(42, expect.objectContaining({ ino: BigInt(2000), sizeBytes: BigInt(50000) }));
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(42, expect.objectContaining({ ino: 2000, sizeBytes: 50000 }));
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([10]);
     expect(mockRepo.createBookFile).not.toHaveBeenCalled();
     expect(result).toEqual({ type: 'book-restored', libraryId: 3, bookIds: [10] });
@@ -179,7 +181,9 @@ describe('handleCreate — file', () => {
     mockStat.mockResolvedValue(fileStat);
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue(null);
     mockRepo.findMissingBookByFolderPath.mockResolvedValue({
-      id: 55, libraryId: 4, libraryFolderId: 10,
+      id: 55,
+      libraryId: 4,
+      libraryFolderId: 10,
     } as any);
 
     const result = await makeService().handleCreate('/books/Author/book.epub');
@@ -195,9 +199,7 @@ describe('handleCreate — file', () => {
     const fileStat = makeFileStat({ ino: 3000, size: 60000 });
     mockStat.mockResolvedValue(fileStat);
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue(null);
-    mockRepo.findMissingBookByFolderPath
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 60, libraryId: 5, libraryFolderId: 15 } as any);
+    mockRepo.findMissingBookByFolderPath.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 60, libraryId: 5, libraryFolderId: 15 } as any);
 
     const result = await makeService().handleCreate('/books/Audiobooks/book.pdf');
 
@@ -231,28 +233,20 @@ describe('handleCreate — directory (folder restoration)', () => {
     mockRepo.findMissingBooksByFolderPath.mockResolvedValue([
       { id: 70, libraryId: 6, libraryFolderId: 20, folderPath: '/books/Author/Title' } as any,
     ]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([
-      { id: 100, absolutePath: '/books/Author/Title/book.epub', bookId: 70 } as any,
-    ]);
+    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 100, absolutePath: '/books/Author/Title/book.epub', bookId: 70 } as any]);
 
     const result = await makeService().handleCreate('/books/Author/Title');
 
-    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(100, expect.objectContaining({ ino: BigInt(3000) }));
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(100, expect.objectContaining({ ino: 3000 }));
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([70]);
     expect(result).toEqual({ type: 'book-restored', libraryId: 6, bookIds: [70] });
   });
 
   it('returns noop when files for missing books no longer exist on disk', async () => {
-    mockStat
-      .mockResolvedValueOnce(makeFileStat({ isDirectory: true, isFile: false }))
-      .mockRejectedValueOnce(new Error('ENOENT'));
+    mockStat.mockResolvedValueOnce(makeFileStat({ isDirectory: true, isFile: false })).mockRejectedValueOnce(new Error('ENOENT'));
 
-    mockRepo.findMissingBooksByFolderPath.mockResolvedValue([
-      { id: 80, libraryId: 7, libraryFolderId: 30, folderPath: '/books/gone' } as any,
-    ]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([
-      { id: 200, absolutePath: '/books/gone/book.epub', bookId: 80 } as any,
-    ]);
+    mockRepo.findMissingBooksByFolderPath.mockResolvedValue([{ id: 80, libraryId: 7, libraryFolderId: 30, folderPath: '/books/gone' } as any]);
+    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 200, absolutePath: '/books/gone/book.epub', bookId: 80 } as any]);
 
     const result = await makeService().handleCreate('/books/gone');
 
@@ -355,9 +349,7 @@ describe('handleCreate — directory move detection', () => {
       .mockResolvedValueOnce(makeFileStat({ ino: 6000, size: 90000 }));
 
     mockRepo.findMissingBooksByFolderPath.mockResolvedValue([]);
-    mockReaddir.mockResolvedValue([
-      { isFile: () => true, name: 'book.epub', parentPath: '/books/NewAuthor' },
-    ] as any);
+    mockReaddir.mockResolvedValue([{ isFile: () => true, name: 'book.epub', parentPath: '/books/NewAuthor' }] as any);
     mockRepo.findBookFileWithContextByIno.mockResolvedValue({
       file: { id: 70, bookId: 50, absolutePath: '/books/OldAuthor/book.epub' },
       libraryId: 4,
@@ -368,10 +360,7 @@ describe('handleCreate — directory move detection', () => {
 
     const result = await makeService().handleCreate('/books/NewAuthor');
 
-    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(
-      70,
-      expect.objectContaining({ absolutePath: '/books/NewAuthor/book.epub' }),
-    );
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(70, expect.objectContaining({ absolutePath: '/books/NewAuthor/book.epub' }));
     expect(mockRepo.updateBookFolderPath).toHaveBeenCalledWith(50, '/books/NewAuthor');
     expect(result).toEqual({ type: 'book-moved', libraryId: 4, bookIds: [50] });
   });
@@ -399,28 +388,20 @@ describe('reconcileMissingBooks', () => {
   });
 
   it('restores books whose files reappear on disk', async () => {
-    mockRepo.findMissingBooksForLibraries.mockResolvedValue([
-      { id: 50, libraryId: 2, libraryFolderId: 10, folderPath: '/books/restored' } as any,
-    ]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([
-      { id: 300, absolutePath: '/books/restored/book.epub', bookId: 50 } as any,
-    ]);
+    mockRepo.findMissingBooksForLibraries.mockResolvedValue([{ id: 50, libraryId: 2, libraryFolderId: 10, folderPath: '/books/restored' } as any]);
+    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 300, absolutePath: '/books/restored/book.epub', bookId: 50 } as any]);
     mockStat.mockResolvedValue(makeFileStat({ ino: 5000, size: 99000 }));
 
     const results = await makeService().reconcileMissingBooks([2]);
 
-    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(300, expect.objectContaining({ ino: BigInt(5000) }));
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(300, expect.objectContaining({ ino: 5000 }));
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([50]);
     expect(results).toEqual([{ type: 'book-restored', libraryId: 2, bookIds: [50] }]);
   });
 
   it('skips books whose files are still gone', async () => {
-    mockRepo.findMissingBooksForLibraries.mockResolvedValue([
-      { id: 51, libraryId: 2, libraryFolderId: 10, folderPath: '/books/still-gone' } as any,
-    ]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([
-      { id: 301, absolutePath: '/books/still-gone/book.epub', bookId: 51 } as any,
-    ]);
+    mockRepo.findMissingBooksForLibraries.mockResolvedValue([{ id: 51, libraryId: 2, libraryFolderId: 10, folderPath: '/books/still-gone' } as any]);
+    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 301, absolutePath: '/books/still-gone/book.epub', bookId: 51 } as any]);
     mockStat.mockRejectedValue(new Error('ENOENT'));
 
     const results = await makeService().reconcileMissingBooks([2]);

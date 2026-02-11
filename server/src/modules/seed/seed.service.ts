@@ -3,7 +3,7 @@ import { hash } from 'bcryptjs';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DB } from '../../db/db.module';
+import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 const BUILT_IN_PERMISSIONS = [
@@ -14,7 +14,7 @@ const BUILT_IN_PERMISSIONS = [
   { name: 'library_upload', description: 'Add books to a library', isSystem: true },
   { name: 'library_download', description: 'Download book files', isSystem: true },
   { name: 'library_edit_metadata', description: 'Edit book info', isSystem: true },
-  { name: 'library_delete_books', description: 'Delete books from a library', isSystem: true },
+  { name: 'library_delete_books', description: 'Remove books from a library', isSystem: true },
   { name: 'kobo_sync', description: 'Sync with Kobo device', isSystem: true },
   { name: 'opds_access', description: 'Access the OPDS catalog', isSystem: true },
 ];

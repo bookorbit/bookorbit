@@ -3,6 +3,17 @@ import { XMLParser } from 'fast-xml-parser';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', removeNSPrefix: true });
 
+function attr(obj: Record<string, unknown>, key: string): string {
+  const v = obj[key];
+  return typeof v === 'string' ? v : '';
+}
+
+function toRecordArray(val: unknown): Record<string, unknown>[] {
+  if (Array.isArray(val)) return val as Record<string, unknown>[];
+  if (val != null && typeof val === 'object') return [val as Record<string, unknown>];
+  return [];
+}
+
 function resolvePath(base: string, rel: string): string {
   const parts = (base + rel).split('/');
   const resolved: string[] = [];
@@ -25,7 +36,7 @@ function findInZip(zip: unzipper.CentralDirectory, rawHref: string, opfDir: stri
 
 /** Extract the first <img src> from an HTML cover page and resolve it to a zip entry. */
 async function imageFromHtmlCoverPage(zip: unzipper.CentralDirectory, htmlItem: Record<string, unknown>, opfDir: string): Promise<Buffer | null> {
-  const htmlHref = String(htmlItem['@_href'] ?? '');
+  const htmlHref = attr(htmlItem, '@_href');
   if (!htmlHref) return null;
   const htmlFile = findInZip(zip, htmlHref, opfDir);
   if (!htmlFile) return null;
@@ -70,26 +81,24 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
 
     const pkg = opf['package'] as Record<string, unknown> | undefined;
     const manifest = pkg?.['manifest'] as Record<string, unknown> | undefined;
-    const items = manifest?.['item'];
-    const itemList: Record<string, unknown>[] = Array.isArray(items) ? items : items ? [items] : [];
+    const itemList = toRecordArray(manifest?.['item']);
 
     // Try EPUB3: item with properties="cover-image"
     let coverItem = itemList.find((i) => {
-      const props = String(i['@_properties'] ?? '');
+      const props = attr(i, '@_properties');
       return props.split(' ').includes('cover-image');
     });
 
     // Try EPUB2: <meta name="cover" content="id"/> → find item by that id
     if (!coverItem) {
       const metadata = pkg?.['metadata'] as Record<string, unknown> | undefined;
-      const metaRaw = metadata?.['meta'];
-      const metaList: Record<string, unknown>[] = Array.isArray(metaRaw) ? metaRaw : metaRaw ? [metaRaw] : [];
-      const coverMeta = metaList.find((m) => String(m['@_name'] ?? '').toLowerCase() === 'cover');
+      const metaList = toRecordArray(metadata?.['meta']);
+      const coverMeta = metaList.find((m) => attr(m, '@_name').toLowerCase() === 'cover');
       if (coverMeta) {
-        const coverId = String(coverMeta['@_content'] ?? '');
-        const found = itemList.find((i) => String(i['@_id'] ?? '') === coverId);
+        const coverId = attr(coverMeta, '@_content');
+        const found = itemList.find((i) => attr(i, '@_id') === coverId);
         if (found) {
-          const mt = String(found['@_media-type'] ?? '').toLowerCase();
+          const mt = attr(found, '@_media-type').toLowerCase();
           if (!mt.startsWith('image/')) return imageFromHtmlCoverPage(zip, found, opfDir);
           coverItem = found;
         }
@@ -99,22 +108,16 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
     // Try EPUB2 guide: <guide><reference type="cover" href="..."/></guide>
     if (!coverItem) {
       const guide = pkg?.['guide'] as Record<string, unknown> | undefined;
-      const refs = guide?.['reference'];
-      const refList: Record<string, unknown>[] = Array.isArray(refs) ? refs : refs ? [refs] : [];
-      const coverRef = refList.find((r) =>
-        String(r['@_type'] ?? '')
-          .toLowerCase()
-          .includes('cover'),
-      );
+      const refList = toRecordArray(guide?.['reference']);
+      const coverRef = refList.find((r) => attr(r, '@_type').toLowerCase().includes('cover'));
       if (coverRef) {
-        const guideHref = decodeURIComponent(String(coverRef['@_href'] ?? '').split('#')[0]);
+        const guideHref = decodeURIComponent(attr(coverRef, '@_href').split('#')[0]);
         coverItem = itemList.find((i) => {
-          const itemHref = decodeURIComponent(String(i['@_href'] ?? '').split('#')[0]);
+          const itemHref = decodeURIComponent(attr(i, '@_href').split('#')[0]);
           return itemHref === guideHref || resolvePath(opfDir, itemHref) === resolvePath(opfDir, guideHref);
         });
-        // If guide points to an HTML cover page, follow the <img> inside it
         if (coverItem) {
-          const mt = String(coverItem['@_media-type'] ?? '').toLowerCase();
+          const mt = attr(coverItem, '@_media-type').toLowerCase();
           if (!mt.startsWith('image/')) return imageFromHtmlCoverPage(zip, coverItem, opfDir);
         }
       }
@@ -123,11 +126,11 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
     // Fallback: item whose id is "cover" or "cover-image"
     if (!coverItem) {
       const found = itemList.find((i) => {
-        const id = String(i['@_id'] ?? '').toLowerCase();
+        const id = attr(i, '@_id').toLowerCase();
         return id === 'cover' || id === 'cover-image';
       });
       if (found) {
-        const mt = String(found['@_media-type'] ?? '').toLowerCase();
+        const mt = attr(found, '@_media-type').toLowerCase();
         if (!mt.startsWith('image/')) return imageFromHtmlCoverPage(zip, found, opfDir);
         coverItem = found;
       }
@@ -136,15 +139,15 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
     // Fallback: item whose href contains "cover" and is an image
     if (!coverItem) {
       coverItem = itemList.find((i) => {
-        const mt = String(i['@_media-type'] ?? '').toLowerCase();
-        const href = String(i['@_href'] ?? '').toLowerCase();
+        const mt = attr(i, '@_media-type').toLowerCase();
+        const href = attr(i, '@_href').toLowerCase();
         return mt.startsWith('image/') && href.includes('cover');
       });
     }
 
     if (!coverItem) return null;
 
-    const href = String(coverItem['@_href'] ?? '');
+    const href = attr(coverItem, '@_href');
     if (!href) return null;
 
     const imageFile = findInZip(zip, href, opfDir);

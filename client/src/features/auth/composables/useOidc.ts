@@ -101,7 +101,7 @@ export function useOidc() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error((err as any).message ?? 'OIDC login failed')
+      throw new Error((err as Record<string, unknown>).message as string ?? 'OIDC login failed')
     }
 
     return res.json()

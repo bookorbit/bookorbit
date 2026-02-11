@@ -116,7 +116,7 @@ export function parseMobiBuffer(buf: Buffer): MobiParsed {
   const recordOffsets = readRecords(buf);
   if (recordOffsets.length === 0) throw new Error('No records in PalmDB');
 
-  const rec0Start = recordOffsets[0]!;
+  const rec0Start = recordOffsets[0];
   const rec0End = recordOffsets[1] ?? buf.length;
   const rec0 = buf.slice(rec0Start, rec0End);
 
@@ -188,7 +188,7 @@ export async function extractMobiCover(absolutePath: string): Promise<Buffer | n
     const idx = parsed.coverRecordIndex;
     if (idx >= parsed.recordOffsets.length) return null;
 
-    const start = parsed.recordOffsets[idx]!;
+    const start = parsed.recordOffsets[idx];
     const end = parsed.recordOffsets[idx + 1] ?? buf.length;
     const imageData = buf.slice(start, end);
 

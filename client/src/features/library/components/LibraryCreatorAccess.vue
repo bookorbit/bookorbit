@@ -63,7 +63,6 @@ async function revoke(userId: number) {
   await loadAccess()
 }
 
-const ACCESS_LEVEL_LABELS = { viewer: 'Viewer', editor: 'Editor', owner: 'Owner' }
 
 onMounted(loadAccess)
 </script>

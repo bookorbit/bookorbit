@@ -7,6 +7,13 @@ export interface TokenResponse {
   expiresIn?: number;
 }
 
+interface TokenEndpointResponse {
+  access_token: string;
+  id_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+}
+
 @Injectable()
 export class OidcTokenClientService {
   private readonly logger = new Logger(OidcTokenClientService.name);
@@ -40,7 +47,7 @@ export class OidcTokenClientService {
       throw new InternalServerErrorException('Token exchange with OIDC provider failed');
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as TokenEndpointResponse;
     return {
       accessToken: data.access_token,
       idToken: data.id_token,
@@ -55,7 +62,7 @@ export class OidcTokenClientService {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) return {};
-      return res.json();
+      return (await res.json()) as Promise<Record<string, unknown>>;
     } catch {
       return {};
     }

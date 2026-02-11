@@ -57,7 +57,8 @@ export class AppSettingsController {
       const url = `${uri.replace(/\/$/, '')}/.well-known/openid-configuration`;
       const res = await fetch(url);
       if (!res.ok) return { success: false, error: `Provider returned HTTP ${res.status}` };
-      const doc = await res.json();
+      const json: unknown = await res.json();
+      const doc = json as { issuer: string; authorization_endpoint: string };
       return { success: true, issuer: doc.issuer, authorizationEndpoint: doc.authorization_endpoint };
     } catch (err) {
       return { success: false, error: String(err) };

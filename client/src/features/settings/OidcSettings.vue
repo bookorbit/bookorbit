@@ -59,7 +59,7 @@ async function save() {
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error((err as any).message ?? 'Failed to save')
+      throw new Error((err as Record<string, unknown>).message as string ?? 'Failed to save')
     }
     saveSuccess.value = true
     setTimeout(() => {
