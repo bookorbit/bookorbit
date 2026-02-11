@@ -49,7 +49,7 @@ function parseIsbn(raw: string): {
 
 function parseYear(raw: string): number | null {
   const match = raw.match(/\d{4}/);
-  return match ? parseInt(match[0]!, 10) : null;
+  return match ? parseInt(match[0], 10) : null;
 }
 
 // Build a map of id → array of refining meta nodes (EPUB 3).
@@ -90,7 +90,10 @@ export function parseOpf(xml: string): ParsedOpf {
     for (const m of rawMetas) {
       if (typeof m !== 'object' || m === null) continue;
       const mo = m as Record<string, unknown>;
-      if (mo['@_name'] === name) return String(mo['@_content'] ?? '').trim() || null;
+      if (mo['@_name'] === name) {
+        const content = mo['@_content'];
+        return (typeof content === 'string' ? content : '').trim() || null;
+      }
     }
     return null;
   }

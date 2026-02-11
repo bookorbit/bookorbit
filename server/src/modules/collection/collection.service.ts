@@ -29,9 +29,22 @@ export class CollectionService {
   }
 
   private assembleBookCards(
-    rows: { id: number; status: string; folderPath: string; title: string | null; seriesName: string | null; seriesIndex: number | null }[],
+    rows: {
+      id: number;
+      status: string;
+      folderPath: string;
+      addedAt: Date;
+      title: string | null;
+      seriesName: string | null;
+      seriesIndex: number | null;
+      publishedYear: number | null;
+      language: string | null;
+      rating: number | null;
+    }[],
     authorRows: { bookId: number; name: string }[],
     fileRows: { bookId: number; id: number; format: string | null; role: string }[],
+    tagRows: { bookId: number; name: string }[],
+    progressRows: { bookFileId: number; percentage: number | null }[],
   ): BookCard[] {
     const authorsByBook = new Map<number, string[]>();
     for (const row of authorRows) {
@@ -47,15 +60,37 @@ export class CollectionService {
       filesByBook.set(row.bookId, list);
     }
 
-    return rows.map((row) => ({
-      id: row.id,
-      status: row.status,
-      title: row.title ?? basename(row.folderPath),
-      seriesName: row.seriesName ?? null,
-      seriesIndex: row.seriesIndex ?? null,
-      authors: authorsByBook.get(row.id) ?? [],
-      files: filesByBook.get(row.id) ?? [],
-    }));
+    const tagsByBook = new Map<number, string[]>();
+    for (const row of tagRows) {
+      const list = tagsByBook.get(row.bookId) ?? [];
+      list.push(row.name);
+      tagsByBook.set(row.bookId, list);
+    }
+
+    const progressByFileId = new Map<number, number | null>();
+    for (const row of progressRows) {
+      progressByFileId.set(row.bookFileId, row.percentage);
+    }
+
+    return rows.map((row) => {
+      const primaryFile = (filesByBook.get(row.id) ?? []).find((f) => f.role === 'primary');
+      const readingProgress = primaryFile ? (progressByFileId.get(primaryFile.id) ?? null) : null;
+      return {
+        id: row.id,
+        status: row.status,
+        title: row.title ?? basename(row.folderPath),
+        seriesName: row.seriesName ?? null,
+        seriesIndex: row.seriesIndex ?? null,
+        publishedYear: row.publishedYear ?? null,
+        language: row.language ?? null,
+        rating: row.rating ?? null,
+        addedAt: row.addedAt.toISOString(),
+        authors: authorsByBook.get(row.id) ?? [],
+        files: filesByBook.get(row.id) ?? [],
+        tags: tagsByBook.get(row.id) ?? [],
+        readingProgress,
+      };
+    });
   }
 
   findAll(user: RequestUser, bookIds?: number[]) {
@@ -135,13 +170,14 @@ export class CollectionService {
 
     const bookIds = bookIdRows.map((r) => r.bookId);
     const where = inArray(books.id, bookIds);
-    const { rows, authorRows, fileRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy: [],
       limit: size,
       offset: page * size,
+      userId: user.id,
     });
 
-    return { items: this.assembleBookCards(rows, authorRows, fileRows), total, page, size };
+    return { items: this.assembleBookCards(rows, authorRows, fileRows, tagRows, progressRows), total, page, size };
   }
 }

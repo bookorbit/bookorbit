@@ -7,7 +7,14 @@ export interface TocItem {
   subitems?: TocItem[]
 }
 
-function mapTocItems(items: any[]): TocItem[] {
+interface RawTocItem {
+  label?: string
+  title?: string
+  href?: string
+  subitems?: RawTocItem[]
+}
+
+function mapTocItems(items: RawTocItem[]): TocItem[] {
   return items.map((item) => ({
     label: item.label ?? item.title ?? '',
     href: item.href ?? '',
@@ -20,7 +27,7 @@ export function useToc() {
   const expandedHrefs = ref<Set<string>>(new Set())
   const activeHref = ref<string>('')
 
-  function setChapters(toc: any[]) {
+  function setChapters(toc: RawTocItem[]) {
     chapters.value = mapTocItems(toc ?? [])
   }
 

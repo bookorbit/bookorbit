@@ -6,6 +6,7 @@ import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
 import { stripFragment, formatDate } from '../utils'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const props = defineProps<{
   chapters: TocItem[]
   bookmarks: BookmarkType[]
@@ -24,10 +25,6 @@ const emit = defineEmits<{
 
 type Tab = 'chapters' | 'bookmarks' | 'highlights'
 const activeTab = ref<Tab>('chapters')
-
-function isActive(href: string) {
-  return stripFragment(props.activeHref) === stripFragment(href)
-}
 </script>
 
 <template>

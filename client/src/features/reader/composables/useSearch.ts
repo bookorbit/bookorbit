@@ -12,6 +12,16 @@ export interface SearchResult {
   sectionTitle?: string
 }
 
+interface FoliateSearchSection {
+  label?: string
+  subitems?: { cfi?: string; excerpt?: SearchExcerpt }[]
+}
+
+interface FoliateView {
+  search(opts: { query: string }): AsyncIterable<FoliateSearchSection>
+  clearSearch?(): void
+}
+
 export function useSearch() {
   const query = ref('')
   const results = ref<SearchResult[]>([])
@@ -19,7 +29,7 @@ export function useSearch() {
 
   let cancelled = false
 
-  async function search(view: any, q: string) {
+  async function search(view: FoliateView, q: string) {
     if (!q.trim()) {
       results.value = []
       return
@@ -37,10 +47,9 @@ export function useSearch() {
       const generator = view.search({ query: q })
       for await (const section of generator) {
         if (cancelled) break
-        // Skip progress events and the 'done' sentinel
         if (!section || typeof section !== 'object' || !('subitems' in section)) continue
         const sectionTitle: string = section.label ?? ''
-        const newItems: SearchResult[] = (section.subitems ?? []).map((item: any) => ({
+        const newItems: SearchResult[] = (section.subitems ?? []).map((item) => ({
           cfi: item.cfi ?? '',
           sectionTitle,
           excerpt: item.excerpt ?? { pre: '', match: '', post: '' },
@@ -58,7 +67,7 @@ export function useSearch() {
     }
   }
 
-  function clear(view: any) {
+  function clear(view: FoliateView | null) {
     cancelled = true
     isSearching.value = false
     results.value = []

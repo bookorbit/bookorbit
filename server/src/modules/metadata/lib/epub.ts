@@ -21,7 +21,7 @@ async function findOpfPath(zip: unzipper.CentralDirectory): Promise<string> {
 
   const container = parsed['container'] as Record<string, unknown>;
   const rootfiles = (container?.['rootfiles'] as Record<string, unknown>)?.['rootfile'];
-  const rootfile = Array.isArray(rootfiles) ? rootfiles[0] : rootfiles;
+  const rootfile: unknown = Array.isArray(rootfiles) ? rootfiles[0] : rootfiles;
 
   const opfPath = (rootfile as Record<string, unknown> | undefined)?.['@_full-path'];
   if (typeof opfPath !== 'string' || !opfPath) {

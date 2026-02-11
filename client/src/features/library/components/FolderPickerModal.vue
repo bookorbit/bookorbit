@@ -73,10 +73,6 @@ watch(currentPath, (p) => loadEntries(p), { immediate: true })
 function selectCurrent() {
   emit('select', currentPath.value)
 }
-
-function selectEntry(entry: DirEntry) {
-  emit('select', entry.path)
-}
 </script>
 
 <template>

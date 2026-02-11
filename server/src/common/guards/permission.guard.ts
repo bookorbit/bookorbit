@@ -20,7 +20,7 @@ export class PermissionGuard implements CanActivate {
     const required = this.reflector.getAllAndOverride<string | undefined>(PERMISSION_KEY, [context.getHandler(), context.getClass()]);
     if (!required) return true;
 
-    const user: RequestUser = context.switchToHttp().getRequest().user;
+    const user = context.switchToHttp().getRequest<{ user: RequestUser }>().user;
     if (!this.permissionService.userHas(user, required)) {
       throw new ForbiddenException(`Missing permission: ${required}`);
     }

@@ -73,6 +73,8 @@ const groupRuleSchema = (maxDepth: number): z.ZodType<GroupRule> =>
     rules: z.array(maxDepth <= 1 ? ruleSchema : z.union([ruleSchema, z.lazy(() => groupRuleSchema(maxDepth - 1))])).min(1),
   }) as z.ZodType<GroupRule>;
 
+export { groupRuleSchema };
+
 export function validateGroupRule(value: unknown): GroupRule | null {
   if (value === null || value === undefined) return null;
   const result = groupRuleSchema(5).safeParse(value);

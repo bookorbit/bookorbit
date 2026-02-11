@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, inArray, like, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, like, ne, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -16,7 +16,7 @@ export class ScannerRepository {
 
   async createScanJob(libraryId: number, triggeredBy: string) {
     const [job] = await this.db.insert(scanJobs).values({ libraryId, triggeredBy }).returning();
-    return job!;
+    return job;
   }
 
   async completeScanJob(id: number, counts: { addedCount: number; updatedCount: number; missingCount: number }) {
@@ -54,16 +54,18 @@ export class ScannerRepository {
       .where(and(eq(books.libraryId, libraryId), ne(books.status, 'missing')));
   }
 
-  async findBookByFolderPath(folderPath: string) {
-    const [book] = await this.db.select().from(books).where(eq(books.folderPath, folderPath)).limit(1);
-    return book ?? null;
+  async findPrimaryBookFilesByBookId(bookId: number) {
+    return this.db
+      .select()
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')));
   }
 
   async createBook(data: typeof books.$inferInsert) {
     const [book] = await this.db.insert(books).values(data).returning();
     // Always create an empty metadata row so joins never return null.
-    await this.db.insert(bookMetadata).values({ bookId: book!.id });
-    return book!;
+    await this.db.insert(bookMetadata).values({ bookId: book.id });
+    return book;
   }
 
   async updateBookStatus(id: number, status: 'present' | 'missing') {
@@ -81,15 +83,6 @@ export class ScannerRepository {
     return this.db.select().from(bookFiles).where(eq(bookFiles.libraryFolderId, libraryFolderId));
   }
 
-  async findBookFileByIno(ino: number, libraryFolderId: number) {
-    const [file] = await this.db
-      .select()
-      .from(bookFiles)
-      .where(and(eq(bookFiles.ino, ino), eq(bookFiles.libraryFolderId, libraryFolderId)))
-      .limit(1);
-    return file ?? null;
-  }
-
   async findBookFileByHash(hash: string) {
     const [file] = await this.db.select().from(bookFiles).where(eq(bookFiles.hash, hash)).limit(1);
     return file ?? null;
@@ -97,7 +90,7 @@ export class ScannerRepository {
 
   async createBookFile(data: typeof bookFiles.$inferInsert) {
     const [file] = await this.db.insert(bookFiles).values(data).returning();
-    return file!;
+    return file;
   }
 
   async updateBookFile(id: number, data: Partial<typeof bookFiles.$inferInsert>) {
@@ -106,7 +99,7 @@ export class ScannerRepository {
       .set({ ...data, updatedAt: new Date() })
       .where(eq(bookFiles.id, id))
       .returning();
-    return file!;
+    return file;
   }
 
   async findBookFileByAbsolutePath(absolutePath: string) {
@@ -119,40 +112,11 @@ export class ScannerRepository {
     return row ?? null;
   }
 
-  async deleteBookFile(id: number) {
-    await this.db.delete(bookFiles).where(eq(bookFiles.id, id));
-  }
-
-  async countBookFilesByBookId(bookId: number): Promise<number> {
-    const [result] = await this.db.select({ count: count() }).from(bookFiles).where(eq(bookFiles.bookId, bookId));
-    return result?.count ?? 0;
-  }
-
-  async countPrimaryBookFilesByBookId(bookId: number): Promise<number> {
-    const [result] = await this.db
-      .select({ count: count() })
-      .from(bookFiles)
-      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')));
-    return result?.count ?? 0;
-  }
-
-  async findPrimaryBookFilesByBookId(bookId: number) {
-    return this.db
-      .select()
-      .from(bookFiles)
-      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')));
-  }
-
   async findBooksByFolderPath(folderPath: string) {
     return this.db
       .select()
       .from(books)
       .where(or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%')));
-  }
-
-  async deleteBookFilesByBookIds(bookIds: number[]) {
-    if (bookIds.length === 0) return;
-    await this.db.delete(bookFiles).where(inArray(bookFiles.bookId, bookIds));
   }
 
   async findMissingBookByFolderPath(folderPath: string) {

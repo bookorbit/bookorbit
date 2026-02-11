@@ -8,6 +8,9 @@ import { join } from 'path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+import fastifyCookie from '@fastify/cookie';
+import fastifyRateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 
 async function bootstrap() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -29,10 +32,10 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  await app.register(require('@fastify/cookie'));
+  await app.register(fastifyCookie);
 
   // Rate limit unauthenticated requests only (brute-force protection on public endpoints)
-  await app.register(require('@fastify/rate-limit'), {
+  await app.register(fastifyRateLimit, {
     max: 100,
     timeWindow: '1 minute',
     allowList: (req: { cookies?: { access_token?: string } }) => !!req.cookies?.access_token,
@@ -46,7 +49,7 @@ async function bootstrap() {
   }
 
   if (process.env.NODE_ENV === 'production') {
-    await app.register(require('@fastify/static'), {
+    await app.register(fastifyStatic, {
       root: join(__dirname, '..', 'public'),
       prefix: '/',
       decorateReply: false,
@@ -56,4 +59,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 
-bootstrap();
+void bootstrap();

@@ -21,12 +21,12 @@ export class LibraryAccessGuard implements CanActivate {
     const required = this.reflector.getAllAndOverride<string | undefined>(LIBRARY_ACCESS_KEY, [context.getHandler(), context.getClass()]);
     if (!required) return true;
 
-    const request = context.switchToHttp().getRequest();
-    const user: RequestUser = request.user;
+    const request = context.switchToHttp().getRequest<{ user: RequestUser; params?: Record<string, string> }>();
+    const user = request.user;
 
     if (user.roles.some((r) => r.isSuperuser)) return true;
 
-    const libraryId = parseInt(request.params?.libraryId, 10);
+    const libraryId = parseInt(request.params?.libraryId ?? '', 10);
     if (!libraryId) throw new ForbiddenException('Missing libraryId');
 
     const row = await this.db.query.userLibraryAccess.findFirst({

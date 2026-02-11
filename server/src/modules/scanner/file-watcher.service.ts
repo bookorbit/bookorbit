@@ -7,7 +7,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { libraries, libraryFolders } from '../../db/schema';
 import { ScanGateway } from './scan.gateway';
-import { FileEventProcessorService } from './file-event-processor.service';
+import { FileEventProcessorService, type FileEventResult } from './file-event-processor.service';
 
 type Db = NodePgDatabase<typeof schema>;
 type EventType = 'delete' | 'create';
@@ -109,7 +109,7 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
   }
 
   private async process(type: EventType, path: string): Promise<void> {
-    let result;
+    let result: FileEventResult;
     if (type === 'create') {
       result = await this.processor.handleCreate(path);
     } else {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
-const props = defineProps<{
+defineProps<{
   fraction: number
   sectionIndex: number
   totalSections: number

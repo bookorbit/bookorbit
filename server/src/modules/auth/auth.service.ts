@@ -213,7 +213,7 @@ export class AuthService {
       const disc = await this.oidcDiscovery.getDiscoveryDoc(config.issuerUri);
       if (!disc.endSessionEndpoint) return {};
 
-      const origin = (req.headers['origin'] as string | undefined) ?? (req.headers['referer'] as string | undefined);
+      const origin = req.headers['origin'] ?? req.headers['referer'];
       const postLogoutUri = origin ? new URL('/login', origin).toString() : undefined;
 
       const params = new URLSearchParams({ id_token_hint: oidcSession.idTokenHint });

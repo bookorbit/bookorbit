@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const props = defineProps<{
+defineProps<{
   title: string
   icon?: string
   total: number

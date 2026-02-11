@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { LayoutGrid, RotateCw, X, ZoomIn } from 'lucide-vue-next'
 import { ZOOM_PRESETS } from '../composables/usePdfZoom'
 
-const props = defineProps<{
+defineProps<{
   zoomMode: string
   customScale: number
   zoomLabel: string

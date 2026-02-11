@@ -1,12 +1,8 @@
 import { ScanGateway } from './scan.gateway';
-import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import type { BookMissingEvent, CoverRefreshedEvent, ScanProgressEvent } from '@projectx/types';
 
 function makeGateway() {
-  const gateway = new ScanGateway(
-    { verify: jest.fn() } as any,
-    { validateUser: jest.fn() } as any,
-    { get: jest.fn(), isRunning: jest.fn() } as any,
-  );
+  const gateway = new ScanGateway({ verify: jest.fn() } as any, { validateUser: jest.fn() } as any, { get: jest.fn(), isRunning: jest.fn() } as any);
   return gateway;
 }
 
@@ -48,8 +44,14 @@ describe('emitProgress', () => {
     gateway['server'] = server as any;
 
     const event: ScanProgressEvent = {
-      jobId: 1, libraryId: 4, status: 'running',
-      processed: 10, total: 20, added: 5, updated: 2, missing: 0,
+      jobId: 1,
+      libraryId: 4,
+      status: 'running',
+      processed: 10,
+      total: 20,
+      added: 5,
+      updated: 2,
+      missing: 0,
     };
     gateway.emitProgress(event);
 

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
@@ -32,7 +32,7 @@ export class LibraryService {
     if (!hasAccess) throw new ForbiddenException('No access to this library');
   }
 
-  findAll(user: RequestUser) {
+  async findAll(user: RequestUser): Promise<{ id: number }[]> {
     const isSuperuser = user.roles.some((r) => r.isSuperuser);
     return isSuperuser ? this.libraryRepo.findAll() : this.libraryRepo.findAllForUser(user.id);
   }
@@ -107,7 +107,9 @@ export class LibraryService {
     // Clean up cover/thumbnail directories for all deleted books (best-effort, non-blocking)
     for (const { id: bookId } of bookRows) {
       const coverDir = join(this.booksPath, 'covers', String(bookId));
-      rm(coverDir, { recursive: true, force: true }).catch((err) => this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`));
+      rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
+        this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
+      );
     }
   }
 

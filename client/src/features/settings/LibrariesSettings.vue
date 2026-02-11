@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Library, Images } from 'lucide-vue-next'
+import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Images } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@projectx/types'
@@ -190,10 +190,6 @@ function coverRefreshLabel(libraryId: number): string {
   }
   if (p.status === 'completed') return `Covers refreshed (${p.total} processed)`
   return ''
-}
-
-function iconComponent(iconName: string | null | undefined) {
-  return iconName ? null : Library
 }
 </script>
 

@@ -15,6 +15,16 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
+interface RawDiscoveryDoc {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  jwks_uri: string;
+  userinfo_endpoint?: string;
+  end_session_endpoint?: string;
+  backchannel_logout_supported?: boolean;
+}
+
 @Injectable()
 export class OidcDiscoveryService {
   private readonly logger = new Logger(OidcDiscoveryService.name);
@@ -34,7 +44,7 @@ export class OidcDiscoveryService {
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const raw = await res.json();
+      const raw = (await res.json()) as RawDiscoveryDoc;
 
       const doc: OidcDiscoveryDoc = {
         issuer: raw.issuer,
