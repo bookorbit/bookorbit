@@ -29,7 +29,7 @@ export class KoboDeviceController {
   ) {}
 
   @Post('v1/auth/device')
-  @HttpCode(HttpStatus.CREATED)
+  @HttpCode(HttpStatus.OK)
   authDevice(@Body() body: Record<string, unknown>) {
     return {
       AccessToken: randomUUID(),
@@ -95,7 +95,7 @@ export class KoboDeviceController {
       settings,
     );
 
-    reply.header('x-kobo-sync', hasMore ? 'continue' : 'done');
+    reply.header('x-kobo-sync', hasMore ? 'continue' : '');
     reply.header('x-kobo-synctoken', syncToken);
     reply.send(entitlements);
   }
@@ -116,7 +116,7 @@ export class KoboDeviceController {
   }
 
   @Delete('v1/library/:bookId')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async deleteFromLibrary(
     @Param('bookId') bookId: string,
     @CurrentUser() user: RequestUser,
@@ -127,7 +127,7 @@ export class KoboDeviceController {
     const id = parseInt(bookId, 10);
     if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
     await this.syncService.removeBookFromSync(user.id, id);
-    reply.status(HttpStatus.NO_CONTENT).send();
+    reply.status(HttpStatus.OK).send();
   }
 
   @Get('v1/library/:bookId/state')
@@ -141,7 +141,7 @@ export class KoboDeviceController {
     const id = parseInt(bookId, 10);
     if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
     const state = await this.readingStateService.getRawState(user.id, id);
-    reply.send(state);
+    reply.send(state ? [state] : []);
   }
 
   @Put('v1/library/:bookId/state')
@@ -155,8 +155,10 @@ export class KoboDeviceController {
   ) {
     const id = parseInt(bookId, 10);
     if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const states = body.ReadingStates as Record<string, unknown>[] | undefined;
+    const statePayload = states?.[0] ?? body;
     const settings = await this.settingsService.getSettings(user.id);
-    const result = await this.readingStateService.upsertState(user.id, id, body, settings.readingThreshold, settings.finishedThreshold);
+    const result = await this.readingStateService.upsertState(user.id, id, statePayload, settings.readingThreshold, settings.finishedThreshold);
     reply.send(result);
   }
 
