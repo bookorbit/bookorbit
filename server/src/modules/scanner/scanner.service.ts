@@ -4,7 +4,7 @@ import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, 
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
-import { classifyFile } from './lib/classify';
+import { classifyFile, FileRole } from './lib/classify';
 import { sha256File } from './lib/hash';
 import { waitForStability } from './lib/stability';
 import { BookCandidate, FileStat, findBookCandidates } from './lib/walk';
@@ -39,15 +39,20 @@ export class ScannerService implements OnApplicationBootstrap {
       throw new ConflictException(`A scan is already running for library ${libraryId}`);
     }
 
-    const folders = await this.scannerRepo.findLibraryFolders(libraryId);
+    const [folders, settings] = await Promise.all([this.scannerRepo.findLibraryFolders(libraryId), this.scannerRepo.findLibrarySettings(libraryId)]);
     if (folders.length === 0) throw new NotFoundException(`Library ${libraryId} has no folders`);
+
+    const allowedFormats = settings?.allowedFormats ?? [];
+    const formatPriority = settings?.formatPriority ?? ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2'];
 
     const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
 
     this.scanJobStore.create(job.id, libraryId, 0);
     this.emitFromStore(libraryId, job.id, 'running');
 
-    this.runScan(libraryId, job.id, folders).catch((err) => this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`));
+    this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority).catch((err) =>
+      this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`),
+    );
 
     return { jobId: job.id };
   }
@@ -86,7 +91,13 @@ export class ScannerService implements OnApplicationBootstrap {
     );
   }
 
-  private async runScan(libraryId: number, jobId: number, folders: Awaited<ReturnType<ScannerRepository['findLibraryFolders']>>): Promise<void> {
+  private async runScan(
+    libraryId: number,
+    jobId: number,
+    folders: Awaited<ReturnType<ScannerRepository['findLibraryFolders']>>,
+    allowedFormats: string[],
+    formatPriority: string[],
+  ): Promise<void> {
     this.logger.log(`Scan job ${jobId} started for library ${libraryId}`);
 
     type FolderWork = {
@@ -101,12 +112,26 @@ export class ScannerService implements OnApplicationBootstrap {
     const folderWork: FolderWork[] = [];
     let totalCandidates = 0;
 
+    const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
+
     for (const folder of folders) {
       let candidates: BookCandidate[] = [];
       try {
         candidates = await findBookCandidates(folder.path);
       } catch (err) {
         this.logger.warn(`Cannot walk ${folder.path}: ${err}`);
+      }
+
+      if (allowed) {
+        candidates = candidates
+          .map((c) => ({
+            ...c,
+            files: c.files.filter((f) => {
+              const { role, format } = classifyFile(f.absolutePath);
+              return role !== 'primary' || (format !== null && allowed.has(format));
+            }),
+          }))
+          .filter((c) => c.files.some((f) => classifyFile(f.absolutePath).role === 'primary'));
       }
 
       const [knownBooks, knownFiles] = await Promise.all([
@@ -125,7 +150,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     try {
       for (const { id: folderId, path: folderPath, candidates, knownBooks, knownFiles } of folderWork) {
-        const counts = await this.scanFolderCandidates(folderId, libraryId, folderPath, candidates, knownBooks, knownFiles, jobId);
+        const counts = await this.scanFolderCandidates(folderId, libraryId, folderPath, candidates, knownBooks, knownFiles, jobId, formatPriority);
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;
@@ -154,6 +179,7 @@ export class ScannerService implements OnApplicationBootstrap {
     knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>,
     knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>,
     jobId: number,
+    formatPriority: string[],
   ): Promise<ScanCounts> {
     const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
@@ -166,7 +192,7 @@ export class ScannerService implements OnApplicationBootstrap {
       const batch = candidates.slice(i, i + BATCH_SIZE);
 
       const results = await Promise.all(
-        batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, bookByFolderPath, fileByPath, fileByIno)),
+        batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, bookByFolderPath, fileByPath, fileByIno, formatPriority)),
       );
 
       for (const r of results) {
@@ -200,6 +226,7 @@ export class ScannerService implements OnApplicationBootstrap {
     bookByFolderPath: Map<string, { id: number; status: string; folderPath: string }>,
     fileByPath: Map<string, { id: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
     fileByIno: Map<number, { id: number; absolutePath: string }>,
+    formatPriority: string[],
   ): Promise<{ bookId: number; added: number; updated: number }> {
     const counts = { added: 0, updated: 0 };
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
@@ -208,13 +235,21 @@ export class ScannerService implements OnApplicationBootstrap {
     counts.added += fileCounts.addedCount;
     counts.updated += fileCounts.updatedCount;
 
+    // Determine which format gets the 'primary' role when multiple primary-format files exist.
+    const primaryFiles = candidate.files.filter((f) => classifyFile(f.absolutePath).role === 'primary');
+    const chosenFormat =
+      primaryFiles.length > 1 ? (formatPriority.find((fmt) => primaryFiles.some((f) => classifyFile(f.absolutePath).format === fmt)) ?? null) : null;
+
     for (const fileStat of candidate.files) {
-      const { format } = classifyFile(fileStat.absolutePath);
+      const { format, role: classifiedRole } = classifyFile(fileStat.absolutePath);
+      const role: FileRole =
+        chosenFormat !== null && classifiedRole === 'primary' ? (format === chosenFormat ? 'primary' : 'supplementary') : classifiedRole;
+
       const fileCount: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
       let isNew: boolean;
 
       try {
-        isNew = await this.processFile(fileStat, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
+        isNew = await this.processFile(fileStat, format, role, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
       } catch (err) {
         this.logger.warn(`Failed to process file ${fileStat.absolutePath}: ${err}`);
         continue;
@@ -265,6 +300,8 @@ export class ScannerService implements OnApplicationBootstrap {
 
   private async processFile(
     fileStat: FileStat,
+    format: string | null,
+    role: FileRole,
     bookId: number,
     libraryFolderId: number,
     fileByPath: Map<string, { id: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
@@ -272,8 +309,6 @@ export class ScannerService implements OnApplicationBootstrap {
     counts: ScanCounts,
   ): Promise<boolean> {
     await waitForStability(fileStat.absolutePath);
-
-    const { format, role } = classifyFile(fileStat.absolutePath);
 
     // 1. Path match — file didn't move.
     const byPath = fileByPath.get(fileStat.absolutePath);

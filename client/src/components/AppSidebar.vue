@@ -9,7 +9,7 @@ function getCollectionIcon(iconName: string | null) {
   }
   return FolderOpen
 }
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Sidebar,
@@ -28,17 +28,25 @@ import {
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLenses } from '@/features/lens/composables/useLenses'
 import { useCollections } from '@/features/collection/composables/useCollections'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
+import type { Library } from '@projectx/types'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
+import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { libraries, fetchLibraries } = useLibraries()
 const { lenses, fetchLenses } = useLenses()
 const { collections, fetchCollections } = useCollections()
+const { hasPermission } = usePermissions()
+const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
 
 const createLensOpen = ref(false)
 const createCollectionOpen = ref(false)
+const createLibraryOpen = ref(false)
+const scanningLibraryId = ref<number | null>(null)
 
 const activeLibraryId = computed(() => {
   const id = route.params.id
@@ -65,8 +73,35 @@ const activeCollectionId = computed(() => {
   return route.name === 'collection' && id ? Number(id) : null
 })
 
-onMounted(() => {
+function scanPct(libraryId: number): number {
+  const p = getProgress(libraryId)
+  if (!p || p.total === 0) return 0
+  return Math.floor((p.processed / p.total) * 100)
+}
+
+function onLibrarySaved(library: Library) {
+  createLibraryOpen.value = false
+  subscribeLibrary(library.id)
+  scanningLibraryId.value = library.id
   fetchLibraries()
+}
+
+watch(progressMap, (map) => {
+  if (scanningLibraryId.value === null) return
+  const event = map.get(scanningLibraryId.value)
+  if (event?.status === 'completed') {
+    const id = scanningLibraryId.value
+    scanningLibraryId.value = null
+    router.push({ name: 'library', params: { id } })
+  }
+})
+
+onMounted(async () => {
+  getSocket()
+  await fetchLibraries()
+  for (const lib of libraries.value) {
+    subscribeLibrary(lib.id)
+  }
   fetchLenses()
   fetchCollections()
 })
@@ -75,6 +110,7 @@ onMounted(() => {
 <template>
   <CreateLensDialog :open="createLensOpen" @close="createLensOpen = false" />
   <CreateCollectionDialog :open="createCollectionOpen" @close="createCollectionOpen = false" />
+  <LibraryCreatorModal v-if="createLibraryOpen" @close="createLibraryOpen = false" @saved="onLibrarySaved" />
 
   <Sidebar
     collapsible="icon"
@@ -115,30 +151,58 @@ onMounted(() => {
         <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
           Libraries
         </SidebarGroupLabel>
+        <SidebarGroupAction v-if="hasPermission('manage_libraries')" tooltip="New Library" @click="createLibraryOpen = true">
+          <Plus />
+        </SidebarGroupAction>
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem v-for="lib in libraries" :key="lib.id">
               <SidebarMenuButton
                 :is-active="activeLibraryId === lib.id"
-                :tooltip="lib.name"
+                :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
                 class="gap-2.5"
                 @click="router.push({ name: 'library', params: { id: lib.id } })"
               >
                 <component
                   :is="getLibraryIcon(lib.icon)"
                   :size="15"
-                  :class="activeLibraryId === lib.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'"
+                  :class="[
+                    activeLibraryId === lib.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50',
+                    getProgress(lib.id)?.status === 'running' ? 'animate-pulse' : '',
+                  ]"
                 />
                 <span :class="activeLibraryId === lib.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
                   {{ lib.name }}
                 </span>
                 <span
-                  v-if="lib.bookCount !== undefined"
+                  v-if="getProgress(lib.id)?.status === 'running'"
+                  class="ml-auto shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs tabular-nums text-primary group-data-[collapsible=icon]:hidden"
+                >
+                  {{ scanPct(lib.id) }}%
+                </span>
+                <span
+                  v-else-if="lib.bookCount !== undefined"
                   class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
                 >
                   {{ lib.bookCount.toLocaleString() }}
                 </span>
               </SidebarMenuButton>
+              <Transition name="scan-progress">
+                <div v-if="getProgress(lib.id)?.status === 'running'" class="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
+                  <div class="h-0.5 w-full rounded-full bg-sidebar-foreground/10 overflow-hidden">
+                    <div
+                      class="h-full rounded-full bg-primary transition-all duration-300"
+                      :style="{
+                        width: getProgress(lib.id)!.total > 0 ? `${scanPct(lib.id)}%` : '30%',
+                        animation: getProgress(lib.id)!.total === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                      }"
+                    />
+                  </div>
+                  <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
+                    {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
+                  </p>
+                </div>
+              </Transition>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
@@ -231,3 +295,26 @@ onMounted(() => {
     <SidebarRail />
   </Sidebar>
 </template>
+
+<style scoped>
+.scan-progress-enter-active {
+  transition:
+    opacity 0.25s ease,
+    max-height 0.25s ease;
+}
+.scan-progress-leave-active {
+  transition:
+    opacity 0.35s ease,
+    max-height 0.35s ease;
+}
+.scan-progress-enter-from,
+.scan-progress-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.scan-progress-enter-to,
+.scan-progress-leave-from {
+  opacity: 1;
+  max-height: 2.5rem;
+}
+</style>

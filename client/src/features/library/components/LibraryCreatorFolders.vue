@@ -180,7 +180,8 @@ function onManualKeydown(e: KeyboardEvent) {
       <!-- Prescan button -->
       <div class="flex items-center justify-between mt-4 pt-4 border-t border-border">
         <div v-if="prescanResult" class="text-xs text-muted-foreground">
-          {{ prescanResult.totalFiles }} total book file{{ prescanResult.totalFiles === 1 ? '' : 's' }} found across all folders
+          {{ prescanResult.totalFiles }} book file{{ prescanResult.totalFiles === 1 ? '' : 's' }} found - actual book count may be lower if multiple
+          formats of the same book exist
         </div>
         <div v-else class="text-xs text-muted-foreground">Run a prescan to validate paths before saving.</div>
         <button

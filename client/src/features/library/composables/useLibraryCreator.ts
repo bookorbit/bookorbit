@@ -3,7 +3,7 @@ import { api } from '@/lib/api'
 import type { Library, OrganizationMode, PrescanResult } from '@projectx/types'
 
 export const DEFAULT_METADATA_PRECEDENCE = ['embedded', 'opfFile']
-export const DEFAULT_FORMAT_PRIORITY = ['epub', 'pdf', 'cbz', 'cbr', 'mobi', 'azw3', 'fb2']
+export const DEFAULT_FORMAT_PRIORITY = ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2']
 
 export const METADATA_LABELS: Record<string, string> = {
   embedded: 'Embedded metadata',
@@ -15,8 +15,10 @@ export const FORMAT_LABELS: Record<string, string> = {
   pdf: 'PDF',
   cbz: 'CBZ',
   cbr: 'CBR',
+  cb7: 'CB7',
   mobi: 'MOBI',
   azw3: 'AZW3',
+  azw: 'AZW',
   fb2: 'FB2',
 }
 

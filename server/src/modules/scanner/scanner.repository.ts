@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, bookMetadata, books, libraryFolders, scanJobs } from '../../db/schema';
+import { bookFiles, bookMetadata, books, libraryFolders, libraries, scanJobs } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -38,6 +38,14 @@ export class ScannerRepository {
 
   async findLibraryFolders(libraryId: number) {
     return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+  }
+
+  async findLibrarySettings(libraryId: number) {
+    const [row] = await this.db
+      .select({ allowedFormats: libraries.allowedFormats, formatPriority: libraries.formatPriority })
+      .from(libraries)
+      .where(eq(libraries.id, libraryId));
+    return row ?? null;
   }
 
   // ── Books ──────────────────────────────────────────────────────────────────

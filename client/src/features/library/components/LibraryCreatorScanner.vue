@@ -141,6 +141,9 @@ function onPatternKeydown(e: KeyboardEvent) {
           @dragend="fmtDrag.onDragEnd()"
         >
           <GripVertical :size="14" class="text-muted-foreground/40 shrink-0" />
+          <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
+            {{ index + 1 }}
+          </span>
           <span class="flex-1 text-sm font-mono text-foreground uppercase">{{ fmt }}</span>
           <span class="text-xs text-muted-foreground">{{ FORMAT_LABELS[fmt] ?? fmt }}</span>
         </div>
