@@ -5,7 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { GroupRule, Rule, SortField, SortSpec } from '@projectx/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, tags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, readingProgress, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -21,7 +21,10 @@ const SORT_FIELD_MAP: Record<SortField, AnyColumn> = {
 export class BookQueryBuilder {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  buildWhere(filter: GroupRule | null | undefined, ctx: { accessibleLibraryIds: number[]; implicitLibraryId?: number }): SQL | undefined {
+  buildWhere(
+    filter: GroupRule | null | undefined,
+    ctx: { accessibleLibraryIds: number[]; implicitLibraryId?: number; userId?: number },
+  ): SQL | undefined {
     if (ctx.accessibleLibraryIds.length === 0) {
       return sql`1 = 0`;
     }
@@ -33,7 +36,7 @@ export class BookQueryBuilder {
     }
 
     if (filter) {
-      clauses.push(this.groupToSql(filter, 0));
+      clauses.push(this.groupToSql(filter, 0, ctx.userId));
     }
 
     return and(...clauses);
@@ -52,13 +55,13 @@ export class BookQueryBuilder {
     return result;
   }
 
-  private groupToSql(node: GroupRule, depth: number): SQL {
+  private groupToSql(node: GroupRule, depth: number, userId?: number): SQL {
     if (depth > 5) throw new BadRequestException('Filter nesting exceeds maximum depth of 5');
-    const clauses = node.rules.map((r) => (r.type === 'group' ? this.groupToSql(r, depth + 1) : this.ruleToSql(r)));
+    const clauses = node.rules.map((r) => (r.type === 'group' ? this.groupToSql(r, depth + 1, userId) : this.ruleToSql(r, userId)));
     return node.join === 'AND' ? and(...clauses)! : or(...clauses)!;
   }
 
-  private ruleToSql(rule: Rule): SQL {
+  private ruleToSql(rule: Rule, userId?: number): SQL {
     const { field, operator, value, valueTo } = rule;
     switch (field) {
       case 'title':
@@ -75,6 +78,8 @@ export class BookQueryBuilder {
         return this.numericRuleToSql(bookMetadata.seriesIndex, operator, value as number, valueTo as number | undefined);
       case 'pageCount':
         return this.numericRuleToSql(bookMetadata.pageCount, operator, value as number, valueTo as number | undefined);
+      case 'rating':
+        return this.numericRuleToSql(bookMetadata.rating, operator, value as number, valueTo as number | undefined);
       case 'author':
         return this.authorRuleToSql(operator, value as string[]);
       case 'tag':
@@ -83,6 +88,14 @@ export class BookQueryBuilder {
         return this.formatRuleToSql(operator, value as string[]);
       case 'addedAt':
         return this.dateRuleToSql(operator, value as string | number, valueTo as string | undefined);
+      case 'fileAvailability':
+        return this.statusRuleToSql(operator);
+      case 'readProgress':
+        return this.readProgressRuleToSql(operator, userId);
+      case 'description':
+        return this.textRuleToSql(bookMetadata.description, operator, value as string);
+      case 'isbn':
+        return this.isbnRuleToSql(operator, value as string | undefined);
       default:
         throw new BadRequestException(`Unknown filter field: ${String(field)}`);
     }
@@ -213,6 +226,55 @@ export class BookQueryBuilder {
         return sql`${books.addedAt} >= NOW() - (${value} * INTERVAL '1 day')`;
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for date field`);
+    }
+  }
+
+  private statusRuleToSql(operator: string): SQL {
+    switch (operator) {
+      case 'isMissing':
+        return eq(books.status, 'missing');
+      case 'isPresent':
+        return eq(books.status, 'present');
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for status field`);
+    }
+  }
+
+  private readProgressRuleToSql(operator: string, userId?: number): SQL {
+    if (userId === undefined) throw new BadRequestException('Reading progress filter requires an authenticated user');
+    const sq = (whereClause: SQL) =>
+      this.db
+        .select({ bookId: bookFiles.bookId })
+        .from(readingProgress)
+        .innerJoin(bookFiles, eq(readingProgress.bookFileId, bookFiles.id))
+        .where(whereClause);
+
+    switch (operator) {
+      case 'isUnread':
+        return not(inArray(books.id, sq(and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0))!)));
+      case 'isInProgress':
+        return inArray(
+          books.id,
+          sq(and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0), lt(readingProgress.percentage, 100))!),
+        );
+      case 'isFinished':
+        return inArray(books.id, sq(and(eq(readingProgress.userId, userId), gte(readingProgress.percentage, 100))!));
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for readProgress field`);
+    }
+  }
+
+  private isbnRuleToSql(operator: string, value?: string): SQL {
+    switch (operator) {
+      case 'isEmpty':
+        return and(isNull(bookMetadata.isbn13), isNull(bookMetadata.isbn10))!;
+      case 'isNotEmpty':
+        return or(isNotNull(bookMetadata.isbn13), isNotNull(bookMetadata.isbn10))!;
+      case 'eq':
+        if (!value) throw new BadRequestException("Operator 'eq' requires a non-empty value");
+        return or(eq(bookMetadata.isbn13, value), eq(bookMetadata.isbn10, value))!;
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for isbn field`);
     }
   }
 }

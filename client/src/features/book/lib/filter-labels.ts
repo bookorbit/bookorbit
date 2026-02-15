@@ -12,6 +12,11 @@ export const FIELD_LABELS: Record<RuleField, string> = {
   tag: 'Tag',
   format: 'Format',
   addedAt: 'Added Date',
+  fileAvailability: 'File Availability',
+  rating: 'Rating',
+  readProgress: 'Reading Progress',
+  description: 'Description',
+  isbn: 'ISBN',
 }
 
 export const OPERATOR_LABELS: Record<RuleOperator, string> = {
@@ -34,6 +39,11 @@ export const OPERATOR_LABELS: Record<RuleOperator, string> = {
   before: 'before',
   after: 'after',
   withinLast: 'within last (days)',
+  isMissing: 'is missing',
+  isPresent: 'is present',
+  isUnread: 'is unread',
+  isInProgress: 'is in progress',
+  isFinished: 'is finished',
 }
 
 const NO_VALUE_OPS: RuleOperator[] = ['isEmpty', 'isNotEmpty']

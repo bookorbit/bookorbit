@@ -10,6 +10,11 @@ export type RuleField =
   | 'tag'
   | 'format'
   | 'addedAt'
+  | 'fileAvailability'
+  | 'rating'
+  | 'readProgress'
+  | 'description'
+  | 'isbn'
 
 export type RuleOperator =
   | 'contains'
@@ -31,6 +36,11 @@ export type RuleOperator =
   | 'before'
   | 'after'
   | 'withinLast'
+  | 'isMissing'
+  | 'isPresent'
+  | 'isUnread'
+  | 'isInProgress'
+  | 'isFinished'
 
 export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   title: ['contains', 'notContains', 'startsWith', 'endsWith', 'eq', 'notEq', 'isEmpty', 'isNotEmpty'],
@@ -44,6 +54,11 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   seriesIndex: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
   pageCount: ['gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
   addedAt: ['before', 'after', 'between', 'withinLast'],
+  fileAvailability: ['isMissing', 'isPresent'],
+  rating: ['eq', 'gt', 'gte', 'lt', 'lte', 'isEmpty', 'isNotEmpty'],
+  readProgress: ['isUnread', 'isInProgress', 'isFinished'],
+  description: ['isEmpty', 'isNotEmpty'],
+  isbn: ['isEmpty', 'isNotEmpty', 'eq'],
 }
 
 export const RULE_FIELDS = Object.keys(FIELD_OPERATORS) as RuleField[]
@@ -68,6 +83,11 @@ export const RULE_OPERATORS: RuleOperator[] = [
   'before',
   'after',
   'withinLast',
+  'isMissing',
+  'isPresent',
+  'isUnread',
+  'isInProgress',
+  'isFinished',
 ]
 
 export type Rule = {

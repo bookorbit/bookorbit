@@ -14,9 +14,9 @@ const emit = defineEmits<{
 }>()
 
 const MAX_DEPTH = 2
-const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount']
+const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'rating']
 const DATE_FIELDS: RuleField[] = ['addedAt']
-const NO_VALUE_OPERATORS: RuleOperator[] = ['isEmpty', 'isNotEmpty']
+const NO_VALUE_OPERATORS: RuleOperator[] = ['isEmpty', 'isNotEmpty', 'isMissing', 'isPresent', 'isUnread', 'isInProgress', 'isFinished']
 const BETWEEN_OPERATORS: RuleOperator[] = ['between']
 const COLLECTION_OPERATORS: RuleOperator[] = ['includesAny', 'includesAll', 'excludesAll']
 

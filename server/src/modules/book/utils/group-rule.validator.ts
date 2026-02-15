@@ -17,6 +17,11 @@ const RULE_FIELDS = [
   'tag',
   'format',
   'addedAt',
+  'fileAvailability',
+  'rating',
+  'readProgress',
+  'description',
+  'isbn',
 ] as const;
 const RULE_OPERATORS = [
   'contains',
@@ -38,6 +43,11 @@ const RULE_OPERATORS = [
   'before',
   'after',
   'withinLast',
+  'isMissing',
+  'isPresent',
+  'isUnread',
+  'isInProgress',
+  'isFinished',
 ] as const;
 
 const VALID_OPERATORS_BY_FIELD: Record<string, string[]> = {
@@ -52,6 +62,11 @@ const VALID_OPERATORS_BY_FIELD: Record<string, string[]> = {
   seriesIndex: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
   pageCount: ['gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
   addedAt: ['before', 'after', 'between', 'withinLast'],
+  fileAvailability: ['isMissing', 'isPresent'],
+  rating: ['eq', 'gt', 'gte', 'lt', 'lte', 'isEmpty', 'isNotEmpty'],
+  readProgress: ['isUnread', 'isInProgress', 'isFinished'],
+  description: ['isEmpty', 'isNotEmpty'],
+  isbn: ['isEmpty', 'isNotEmpty', 'eq'],
 };
 
 const ruleSchema: z.ZodType<Rule> = z

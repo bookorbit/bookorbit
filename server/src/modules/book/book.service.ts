@@ -111,7 +111,7 @@ export class BookService {
 
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
-    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId });
+    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
     const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
@@ -131,7 +131,7 @@ export class BookService {
   async globalQuery(user: RequestUser, query: BookQuery): Promise<BooksPage> {
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = libs.map((l) => l.id);
-    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds });
+    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
     const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
