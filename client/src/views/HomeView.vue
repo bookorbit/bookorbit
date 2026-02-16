@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowDownAZ, ArrowUpAZ, Bookmark, BookmarkCheck, Filter, X } from 'lucide-vue-next'
+import { ArrowUpDown, Bookmark, BookmarkCheck, Filter, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
+import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
@@ -21,7 +23,8 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import type { GroupRule, SortField } from '@projectx/types'
+import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import type { GroupRule, SortSpec } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -119,37 +122,23 @@ onBookMoved((bookIds) => {
 
 const filterOpen = ref(false)
 
-const SORT_FIELD_LABELS: Record<SortField, string> = {
-  title: 'Title',
-  addedAt: 'Date Added',
-  publishedYear: 'Published Year',
-  pageCount: 'Page Count',
-  seriesIndex: 'Series Index',
-}
-
 function saveSort() {
   if (libraryId.value === null) return
   localStorage.setItem(getSortKey(libraryId.value), JSON.stringify(sort.value))
 }
 
-const sortField = computed({
-  get: () => sort.value[0]?.field ?? 'title',
-  set: (field: SortField) => {
-    sort.value = [{ field, dir: sort.value[0]?.dir ?? 'asc' }]
+const isDefaultSort = computed(() => sort.value.length === 1 && sort.value[0]?.field === 'title' && sort.value[0]?.dir === 'asc')
+
+const sortSummary = computed(() => sort.value.map((s) => `${SORT_FIELD_LABELS[s.field]} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', '))
+
+const sortModel = computed({
+  get: () => sort.value,
+  set: (v: SortSpec[]) => {
+    sort.value = v.length > 0 ? v : [{ field: 'title', dir: 'asc' }]
     saveSort()
     load(true)
   },
 })
-
-const sortDir = computed(() => sort.value[0]?.dir ?? 'asc')
-
-const isDefaultSort = computed(() => sortField.value === 'title' && sortDir.value === 'asc')
-
-function toggleSortDir() {
-  sort.value = [{ field: sortField.value, dir: sortDir.value === 'asc' ? 'desc' : 'asc' }]
-  saveSort()
-  load(true)
-}
 
 function resetSort() {
   sort.value = [{ field: 'title', dir: 'asc' }]
@@ -204,7 +193,16 @@ watch(loading, (isLoading) => {
   if (!isLoading) loadIfSentinelVisible()
 })
 
-const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, isSelected } = useBookSelection()
+const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
+
+function handleSelect(id: number, event: MouseEvent) {
+  if (event.shiftKey)
+    rangeSelectTo(
+      id,
+      books.value.map((b) => b.id),
+    )
+  else toggleBook(id)
+}
 
 function toggleSelectionMode() {
   if (selectionMode.value) exitSelectionMode()
@@ -272,24 +270,27 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       >
         <template #toolbar>
           <div class="flex items-center gap-1">
-            <span class="text-xs text-muted-foreground hidden lg:block">Sort:</span>
-            <select
-              :value="sortField"
-              @change="sortField = ($event.target as HTMLSelectElement).value as SortField"
-              class="h-8 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
-              :class="!isDefaultSort ? 'border-primary/50 text-primary' : ''"
-            >
-              <option v-for="(label, field) in SORT_FIELD_LABELS" :key="field" :value="field">{{ label }}</option>
-            </select>
-            <button
-              @click="toggleSortDir"
-              class="h-8 w-8 flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              :class="!isDefaultSort ? 'border-primary/50 text-primary' : ''"
-              :title="sortDir === 'asc' ? 'Ascending' : 'Descending'"
-            >
-              <ArrowDownAZ v-if="sortDir === 'asc'" :size="15" />
-              <ArrowUpAZ v-else :size="15" />
-            </button>
+            <Popover>
+              <PopoverTrigger as-child>
+                <button
+                  class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
+                  :class="
+                    !isDefaultSort
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                  "
+                >
+                  <ArrowUpDown :size="13" />
+                  <span class="hidden lg:inline">{{ sortSummary }}</span>
+                  <span class="lg:hidden"
+                    >Sort<template v-if="!isDefaultSort"> ({{ sort.length }})</template></span
+                  >
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" class="w-80 p-3">
+                <BookSortBuilder v-model="sortModel" />
+              </PopoverContent>
+            </Popover>
             <button
               v-if="!isDefaultSort"
               @click="resetSort"
@@ -374,7 +375,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
             @action="handleBookAction(book, $event)"
-            @select="toggleBook(book.id)"
+            @select="handleSelect(book.id, $event)"
           />
         </div>
 
@@ -387,7 +388,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
             @action="handleBookAction(book, $event)"
-            @select="toggleBook(book.id)"
+            @select="handleSelect(book.id, $event)"
           />
         </div>
 

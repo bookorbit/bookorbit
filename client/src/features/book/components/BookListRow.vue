@@ -19,7 +19,7 @@ const props = defineProps<{
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 const emit = defineEmits<{
   action: [type: BookActionType]
-  select: []
+  select: [event: MouseEvent]
   'rating-change': [rating: number | null]
 }>()
 
@@ -74,10 +74,10 @@ function openFile(file: BookFileRef) {
   <div
     class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer hover:bg-muted/50"
     :class="[
-      selectionMode ? 'cursor-pointer' : '',
+      selectionMode ? 'cursor-pointer select-none' : '',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
     ]"
-    @click="selectionMode ? emit('select') : emit('action', 'quick-view')"
+    @click="selectionMode ? emit('select', $event) : emit('action', 'quick-view')"
   >
     <!-- Selection checkbox -->
     <div

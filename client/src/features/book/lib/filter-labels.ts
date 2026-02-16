@@ -1,4 +1,14 @@
-import type { Rule, RuleField, RuleOperator } from '@projectx/types'
+import type { Rule, RuleField, RuleOperator, SortField } from '@projectx/types'
+
+export const SORT_FIELD_LABELS: Record<SortField, string> = {
+  author: 'Author',
+  title: 'Title',
+  series: 'Series',
+  seriesIndex: 'Series #',
+  addedAt: 'Date Added',
+  publishedYear: 'Published Year',
+  pageCount: 'Page Count',
+}
 
 export const FIELD_LABELS: Record<RuleField, string> = {
   title: 'Title',

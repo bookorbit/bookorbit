@@ -104,9 +104,9 @@ export type GroupRule = {
   rules: (Rule | GroupRule)[]
 }
 
-export type SortField = 'title' | 'addedAt' | 'publishedYear' | 'pageCount' | 'seriesIndex'
+export type SortField = 'author' | 'title' | 'series' | 'seriesIndex' | 'addedAt' | 'publishedYear' | 'pageCount'
 
-export const SORT_FIELDS: SortField[] = ['title', 'addedAt', 'publishedYear', 'pageCount', 'seriesIndex']
+export const SORT_FIELDS: SortField[] = ['author', 'title', 'series', 'seriesIndex', 'addedAt', 'publishedYear', 'pageCount']
 
 export type SortSpec = {
   field: SortField

@@ -9,12 +9,13 @@ import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, reading
 
 type Db = NodePgDatabase<typeof schema>;
 
-const SORT_FIELD_MAP: Record<SortField, AnyColumn> = {
+const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   title: bookMetadata.title,
+  series: bookMetadata.seriesName,
+  seriesIndex: bookMetadata.seriesIndex,
   addedAt: books.addedAt,
   publishedYear: bookMetadata.publishedYear,
   pageCount: bookMetadata.pageCount,
-  seriesIndex: bookMetadata.seriesIndex,
 };
 
 @Injectable()
@@ -46,10 +47,19 @@ export class BookQueryBuilder {
     if (sort.length === 0) return [sql`${bookMetadata.title} ASC NULLS LAST`];
     const result: SQL[] = [];
     for (const { field, dir } of sort) {
-      const col = SORT_FIELD_MAP[field];
-      result.push(sql`${col} ${sql.raw(dir.toUpperCase())} NULLS LAST`);
-      if (field === 'seriesIndex') {
-        result.push(sql`${bookMetadata.seriesName} ${sql.raw(dir.toUpperCase())} NULLS LAST`);
+      const D = dir.toUpperCase();
+      if (field === 'author') {
+        result.push(
+          sql.raw(
+            `(SELECT a.sort_name FROM book_authors ba INNER JOIN authors a ON ba.author_id = a.id WHERE ba.book_id = books.id ORDER BY ba.display_order LIMIT 1) ${D} NULLS LAST`,
+          ),
+        );
+      } else {
+        const col = SORT_FIELD_MAP[field]!;
+        result.push(sql`${col} ${sql.raw(D)} NULLS LAST`);
+        if (field === 'seriesIndex' && !sort.some((s) => s.field === 'series')) {
+          result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
+        }
       }
     }
     return result;

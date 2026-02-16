@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { Plus, Trash2 } from 'lucide-vue-next'
 import { FIELD_OPERATORS, RULE_FIELDS, type GroupRule, type Rule, type RuleField, type RuleOperator } from '@projectx/types'
 import { FIELD_LABELS, OPERATOR_LABELS } from '@/features/book/lib/filter-labels'
@@ -83,9 +83,9 @@ function isRuleComplete(r: EditableRule): boolean {
 
 function emitUpdate() {
   selfEmitting = true
-  nextTick(() => {
+  setTimeout(() => {
     selfEmitting = false
-  })
+  }, 0)
   if (nodes.value.length === 0) {
     emit('update:modelValue', undefined)
     return

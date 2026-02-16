@@ -19,8 +19,8 @@ import { useLenses } from '@/features/lens/composables/useLenses'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import { FIELD_LABELS, ruleToLabel } from '@/features/book/lib/filter-labels'
-import type { BookCard, GroupRule } from '@projectx/types'
+import { SORT_FIELD_LABELS, ruleToLabel } from '@/features/book/lib/filter-labels'
+import type { BookCard, GroupRule, SortField } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,15 +51,23 @@ const ruleChips = computed<string[]>(() => {
 })
 
 const sortChip = computed(() => {
-  const s = lens.value?.defaultSort?.[0]
-  if (!s) return null
-  const fieldLabel = FIELD_LABELS[s.field as keyof typeof FIELD_LABELS] ?? s.field
-  return `${fieldLabel} ${s.dir === 'asc' ? '↑' : '↓'}`
+  const specs = lens.value?.defaultSort
+  if (!specs?.length) return null
+  return specs.map((s) => `${SORT_FIELD_LABELS[s.field as SortField] ?? s.field} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', ')
 })
 
 const joinLabel = computed(() => lens.value?.filter?.join ?? 'AND')
 
-const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, isSelected } = useBookSelection()
+const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
+
+function handleSelect(id: number, event: MouseEvent) {
+  if (event.shiftKey)
+    rangeSelectTo(
+      id,
+      books.value.map((b) => b.id),
+    )
+  else toggleBook(id)
+}
 
 function toggleSelectionMode() {
   if (selectionMode.value) exitSelectionMode()
@@ -206,7 +214,10 @@ watch(loading, (isLoading) => {
       >
         <template #actions>
           <button
-            @click="editorOpen = true; confirmDelete = false"
+            @click="
+              editorOpen = true
+              confirmDelete = false
+            "
             class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings2 :size="13" />
@@ -287,7 +298,7 @@ watch(loading, (isLoading) => {
             :book="book"
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
-            @select="toggleBook(book.id)"
+            @select="handleSelect(book.id, $event)"
           />
         </div>
 
@@ -299,7 +310,7 @@ watch(loading, (isLoading) => {
             :book="book"
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
-            @select="toggleBook(book.id)"
+            @select="handleSelect(book.id, $event)"
             @action="handleBookAction(book, $event)"
           />
         </div>

@@ -19,7 +19,7 @@ const props = defineProps<{
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 const emit = defineEmits<{
   action: [type: BookActionType]
-  select: []
+  select: [event: MouseEvent]
 }>()
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
@@ -53,8 +53,8 @@ function openFile(file: BookFileRef) {
 <template>
   <div
     class="group flex flex-col @container"
-    :class="selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer' : 'cursor-default'"
-    @click="selectionMode ? emit('select') : primaryFile && !isMissing && openFile(primaryFile)"
+    :class="[selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
+    @click="selectionMode ? emit('select', $event) : primaryFile && !isMissing && openFile(primaryFile)"
   >
     <!-- Cover -->
     <div

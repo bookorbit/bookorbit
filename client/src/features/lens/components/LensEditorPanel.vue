@@ -1,20 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { X, Zap } from 'lucide-vue-next'
 import { api } from '@/lib/api'
-import type { GroupRule, Rule, SortField, SortSpec } from '@projectx/types'
+import type { GroupRule, Rule, SortSpec } from '@projectx/types'
 import type { Lens } from '@/features/lens/composables/useLenses'
 import { useLenses } from '@/features/lens/composables/useLenses'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
+import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import IconPicker from '@/components/IconPicker.vue'
-
-const SORT_FIELD_LABELS: Record<SortField, string> = {
-  title: 'Title',
-  addedAt: 'Date Added',
-  publishedYear: 'Published Year',
-  pageCount: 'Page Count',
-  seriesIndex: 'Series Index',
-}
 
 const TEMPLATES: { label: string; build: () => GroupRule }[] = [
   {
@@ -101,19 +94,6 @@ async function fetchPreview() {
   } finally {
     previewLoading.value = false
   }
-}
-
-const sortField = computed({
-  get: () => draftSort.value[0]?.field ?? 'title',
-  set: (field: SortField) => {
-    draftSort.value = [{ field, dir: draftSort.value[0]?.dir ?? 'asc' }]
-  },
-})
-
-const sortDir = computed(() => draftSort.value[0]?.dir ?? 'asc')
-
-function setSortDir(dir: 'asc' | 'desc') {
-  draftSort.value = [{ field: sortField.value, dir }]
 }
 
 function applyTemplate(t: (typeof TEMPLATES)[number]) {
@@ -247,35 +227,7 @@ async function save() {
           <!-- Sort card -->
           <div class="rounded-xl border border-border bg-background p-5 flex flex-col gap-4">
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Default Sort</h3>
-            <div class="flex items-center gap-3">
-              <select
-                :value="sortField"
-                @change="sortField = ($event.target as HTMLSelectElement).value as SortField"
-                class="flex-1 h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option v-for="(label, field) in SORT_FIELD_LABELS" :key="field" :value="field">{{ label }}</option>
-              </select>
-              <div class="flex rounded-lg border border-input overflow-hidden shrink-0">
-                <button
-                  @click="setSortDir('asc')"
-                  class="h-10 px-4 text-sm font-medium transition-colors"
-                  :class="
-                    sortDir === 'asc' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
-                  "
-                >
-                  A to Z
-                </button>
-                <button
-                  @click="setSortDir('desc')"
-                  class="h-10 px-4 text-sm font-medium border-l border-input transition-colors"
-                  :class="
-                    sortDir === 'desc' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
-                  "
-                >
-                  Z to A
-                </button>
-              </div>
-            </div>
+            <BookSortBuilder v-model="draftSort" />
           </div>
         </div>
 

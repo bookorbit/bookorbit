@@ -33,7 +33,12 @@ const collection = computed(() => collections.value.find((c) => c.id === collect
 
 const { items: books, total, loading, hasMore, load } = useCollectionBooks(collectionId)
 
-const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, isSelected } = useBookSelection()
+const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
+
+function handleSelect(id: number, event: MouseEvent) {
+  if (event.shiftKey) rangeSelectTo(id, books.value.map((b) => b.id))
+  else toggleBook(id)
+}
 
 function toggleSelectionMode() {
   if (selectionMode.value) exitSelectionMode()
@@ -197,7 +202,7 @@ watch(loading, (isLoading) => {
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
             @action="handleBookAction(book, $event)"
-            @select="toggleBook(book.id)"
+            @select="handleSelect(book.id, $event)"
           />
         </div>
 
@@ -209,7 +214,7 @@ watch(loading, (isLoading) => {
             :selection-mode="selectionMode"
             :selected="isSelected(book.id)"
             @action="handleBookAction(book, $event)"
-            @select="toggleBook(book.id)"
+            @select="handleSelect(book.id, $event)"
           />
         </div>
 
