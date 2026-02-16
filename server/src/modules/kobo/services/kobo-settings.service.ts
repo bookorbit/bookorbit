@@ -1,8 +1,8 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DB } from '../../../db/db.module';
+import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -30,7 +30,7 @@ export class KoboSettingsService {
       row = inserted ?? (await this.db.query.koboSyncSettings.findFirst({ where: eq(schema.koboSyncSettings.userId, userId) }));
     }
 
-    if (!row) throw new Error('Failed to create kobo settings row');
+    if (!row) throw new InternalServerErrorException('Failed to create kobo settings row');
     return {
       readingThreshold: row.readingThreshold,
       finishedThreshold: row.finishedThreshold,

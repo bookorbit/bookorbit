@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DB } from '../../../db/db.module';
+import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -24,6 +24,24 @@ export class KoboReadingStateService {
   async upsertState(userId: number, bookId: number, payload: Record<string, unknown>, readingThreshold: number, finishedThreshold: number) {
     const entitlementId = String(bookId);
     const now = new Date().toISOString();
+
+    const book = await this.db.query.books.findFirst({
+      where: eq(schema.books.id, bookId),
+      columns: { id: true },
+    });
+    if (!book) {
+      return {
+        RequestResult: 'Success',
+        UpdateResults: [
+          {
+            EntitlementId: entitlementId,
+            CurrentBookmarkResult: { Result: 'Ignored' },
+            StatisticsResult: { Result: 'Ignored' },
+            StatusInfoResult: { Result: 'Ignored' },
+          },
+        ],
+      };
+    }
 
     const created = (payload.Created as string | undefined) ?? now;
     const lastModified = (payload.LastModified as string | undefined) ?? now;

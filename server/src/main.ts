@@ -5,6 +5,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
+import { Readable } from 'stream';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
@@ -16,7 +17,26 @@ async function bootstrap() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   await migrate(drizzle(pool), { migrationsFolder: join(__dirname, '..', 'src', 'db', 'migrations') });
   await pool.end();
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: true }));
+
+  const adapter = new FastifyAdapter({ logger: true });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+
+  // Kobo devices send Content-Type: application/json with empty bodies on GET/DELETE.
+  // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
+  const fastify = adapter.getInstance();
+  fastify.addHook('preParsing', (request, _reply, payload, done) => {
+    const ct = request.headers['content-type'] ?? '';
+    const isJson = ct.startsWith('application/json');
+    const isEmpty = request.headers['content-length'] === '0' || request.headers['content-length'] === undefined;
+    if (isJson && isEmpty) {
+      const fake = new Readable();
+      fake.push('{}');
+      fake.push(null);
+      done(null, fake);
+      return;
+    }
+    done(null, payload);
+  });
 
   app.useWebSocketAdapter(new IoAdapter(app));
 

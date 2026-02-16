@@ -7,6 +7,7 @@ const FORWARD_HEADERS = [
   'accept',
   'accept-encoding',
   'accept-language',
+  'authorization',
   'content-type',
   'user-agent',
   'x-kobo-appversion',
@@ -35,10 +36,15 @@ export class KoboProxyService {
     }
 
     try {
+      let body: string | undefined;
+      if (!['GET', 'HEAD'].includes(req.method) && req.body != null) {
+        body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      }
+
       const upstream = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : (req.body as string | undefined),
+        body,
       });
 
       reply.status(upstream.status);
@@ -48,8 +54,8 @@ export class KoboProxyService {
         }
       });
 
-      const body = await upstream.arrayBuffer();
-      reply.send(Buffer.from(body));
+      const responseBody = await upstream.arrayBuffer();
+      reply.send(Buffer.from(responseBody));
     } catch (err) {
       this.logger.warn(`Proxy failed for ${targetUrl}: ${(err as Error).message}`);
       reply.status(502).send({ message: 'Upstream Kobo API unavailable' });
