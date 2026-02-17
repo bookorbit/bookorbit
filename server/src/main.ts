@@ -54,11 +54,14 @@ async function bootstrap() {
 
   await app.register(fastifyCookie);
 
-  // Rate limit unauthenticated requests only (brute-force protection on public endpoints)
+  // Rate limit unauthenticated requests only (brute-force protection on public endpoints).
+  // Bypass for: JWT cookie (web app), Authorization header (OPDS Basic Auth),
+  // and Kobo device endpoints (token-authenticated via URL).
   await app.register(fastifyRateLimit, {
     max: 100,
     timeWindow: '1 minute',
-    allowList: (req: { cookies?: { access_token?: string } }) => !!req.cookies?.access_token,
+    allowList: (req: { cookies?: { access_token?: string }; headers?: { authorization?: string }; url?: string }) =>
+      !!req.cookies?.access_token || !!req.headers?.authorization || /^\/api\/kobo\//.test(req.url ?? ''),
   });
 
   if (process.env.NODE_ENV !== 'production') {

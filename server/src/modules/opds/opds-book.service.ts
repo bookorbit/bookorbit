@@ -172,7 +172,7 @@ export class OpdsBookService {
       .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
       .innerJoin(books, and(eq(books.id, bookAuthors.bookId), eq(books.status, 'present')))
       .where(inArray(books.libraryId, accessibleIds))
-      .groupBy(authors.name)
+      .groupBy(authors.name, authors.sortName)
       .orderBy(sql`${authors.sortName} ASC NULLS LAST`);
   }
 
