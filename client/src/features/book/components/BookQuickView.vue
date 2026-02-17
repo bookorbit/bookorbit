@@ -61,6 +61,12 @@ function openBook() {
   })
   emit('update:open', false)
 }
+
+function editMetadata() {
+  if (!detail.value) return
+  router.push({ name: 'book-edit', params: { bookId: detail.value.id } })
+  emit('update:open', false)
+}
 </script>
 
 <template>
@@ -196,7 +202,7 @@ function openBook() {
           <button
             class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
             title="Edit Metadata"
-            @click="emit('action', 'edit-metadata')"
+            @click="editMetadata"
           >
             <Pencil class="size-3.5" />
           </button>

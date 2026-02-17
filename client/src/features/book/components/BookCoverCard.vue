@@ -170,7 +170,7 @@ function openFile(file: BookFileRef) {
                 Book Details
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="emit('action', 'edit-metadata')">
+              <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
                 <Pencil class="size-4 mr-2" />
                 Edit Metadata
               </DropdownMenuItem>

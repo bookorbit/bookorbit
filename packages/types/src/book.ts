@@ -46,6 +46,8 @@ export type BookDetail = {
   pageCount: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
+  rating: number | null;
+  coverSource: 'extracted' | 'custom' | null;
   authors: { id: number; name: string; sortName: string | null }[];
   tags: string[];
   files: BookDetailFile[];

@@ -193,8 +193,8 @@ export class BookRepository {
     await this.db.delete(books).where(inArray(books.id, bookIds));
   }
 
-  async updateRating(bookId: number, rating: number | null): Promise<void> {
-    await this.db.insert(bookMetadata).values({ bookId, rating }).onConflictDoUpdate({ target: bookMetadata.bookId, set: { rating } });
+  async updateMetadataFields(bookId: number, fields: Partial<typeof bookMetadata.$inferInsert>): Promise<void> {
+    await this.db.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
   }
 
   async upsertProgress(userId: number, fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {

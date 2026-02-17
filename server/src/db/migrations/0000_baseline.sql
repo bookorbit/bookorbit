@@ -197,6 +197,7 @@ CREATE TABLE "book_metadata" (
 	"series_name" varchar(500),
 	"series_index" real,
 	"rating" integer,
+	"cover_source" varchar(9),
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

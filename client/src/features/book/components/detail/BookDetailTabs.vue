@@ -1,31 +1,29 @@
 <script setup lang="ts">
-defineProps<{ activeTab: string }>()
-defineEmits<{ 'update:activeTab': [tab: string] }>()
+import { useRoute, useRouter } from 'vue-router'
+
+const props = defineProps<{ bookId: number }>()
+const route = useRoute()
+const router = useRouter()
 
 const tabs = [
-  { id: 'details', label: 'Details' },
-  { id: 'files', label: 'Files' },
+  { label: 'Details', routeName: 'book-detail' },
+  { label: 'Files', routeName: 'book-files' },
+  { label: 'Edit Metadata', routeName: 'book-edit' },
 ]
 
-const futureTabs = [{ id: 'edit', label: 'Edit Metadata' }]
+function navigate(routeName: string) {
+  router.push({ name: routeName, params: { bookId: props.bookId } })
+}
 </script>
 
 <template>
   <div class="flex items-center gap-0 overflow-x-auto flex-1 min-w-0">
     <button
       v-for="tab in tabs"
-      :key="tab.id"
+      :key="tab.routeName"
       class="px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
-      :class="activeTab === tab.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-      @click="$emit('update:activeTab', tab.id)"
-    >
-      {{ tab.label }}
-    </button>
-    <button
-      v-for="tab in futureTabs"
-      :key="tab.id"
-      class="px-3 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground/40 cursor-not-allowed whitespace-nowrap"
-      disabled
+      :class="route.name === tab.routeName ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+      @click="navigate(tab.routeName)"
     >
       {{ tab.label }}
     </button>

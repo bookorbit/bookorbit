@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -8,10 +8,8 @@ import { join } from 'path';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, bookTags, tags } from '../../db/schema';
-import sharp from 'sharp';
-
 import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
-import { extractAndSaveCover } from './lib/cover';
+import { extractAndSaveCover, generateThumbnail } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
@@ -40,6 +38,7 @@ export class MetadataService {
   async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {
     try {
       const saved = await extractAndSaveCover(absolutePath, format, bookId, this.booksPath);
+      if (saved) await this.setCoverSourceIfUnset(bookId, 'extracted');
       return !!saved;
     } catch {
       return false;
@@ -167,8 +166,8 @@ export class MetadataService {
       })
       .where(eq(bookMetadata.bookId, bookId));
 
-    await this.saveAuthors(bookId, parsed.authors);
-    await this.saveTags(bookId, parsed.tags);
+    await this.replaceAuthors(bookId, parsed.authors);
+    await this.replaceTags(bookId, parsed.tags);
 
     this.logger.debug(`Metadata saved for book ${bookId}: "${parsed.title}"`);
   }
@@ -179,6 +178,7 @@ export class MetadataService {
     try {
       const saved = await extractAndSaveCover(absolutePath, format, bookId, this.booksPath);
       if (saved) {
+        await this.setCoverSourceIfUnset(bookId, 'extracted');
         this.logger.debug(`Cover saved for book ${bookId}: ${saved}`);
       }
     } catch (err) {
@@ -192,23 +192,31 @@ export class MetadataService {
     try {
       const dir = join(this.booksPath, 'covers', String(bookId));
       await mkdir(dir, { recursive: true });
-      await writeFile(join(dir, 'cover.jpg'), jpeg);
-      const thumbnail = await sharp(jpeg).resize(400, 600, { fit: 'cover', position: 'top' }).jpeg({ quality: 90 }).toBuffer();
+      await writeFile(join(dir, 'cover_extracted.jpg'), jpeg);
+      const thumbnail = await generateThumbnail(jpeg);
       await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+      await this.setCoverSourceIfUnset(bookId, 'extracted');
       this.logger.debug(`PDF cover saved for book ${bookId}`);
     } catch (err) {
       this.logger.warn(`PDF cover save failed for book ${bookId}: ${err}`);
     }
   }
 
+  private async setCoverSourceIfUnset(bookId: number, source: 'extracted'): Promise<void> {
+    await this.db
+      .update(bookMetadata)
+      .set({ coverSource: source })
+      .where(and(eq(bookMetadata.bookId, bookId), isNull(bookMetadata.coverSource)));
+  }
+
   // ── Authors ──────────────────────────────────────────────────────────────────
 
-  private async saveAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
+  async replaceAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
+    await this.db.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
+
     if (parsedAuthors.length === 0) return;
 
     const unique = parsedAuthors.filter((a, i, arr) => arr.findIndex((b) => b.name === a.name) === i);
-
-    await this.db.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
 
     for (let i = 0; i < unique.length; i++) {
       const { name, sortName } = unique[i];
@@ -225,7 +233,7 @@ export class MetadataService {
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
 
-  private async saveTags(bookId: number, parsedTags: string[]) {
+  async replaceTags(bookId: number, parsedTags: string[]) {
     await this.db.delete(bookTags).where(eq(bookTags.bookId, bookId));
     const uniqueTags = [...new Set(parsedTags.map((t) => t.substring(0, 200)).filter(Boolean))];
     if (uniqueTags.length === 0) return;

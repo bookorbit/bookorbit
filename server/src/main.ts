@@ -10,8 +10,11 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import fastifyCookie from '@fastify/cookie';
+import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+
+const MAX_COVER_BYTES = 20 * 1024 * 1024;
 
 async function bootstrap() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -53,6 +56,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   await app.register(fastifyCookie);
+  await app.register(fastifyMultipart, { limits: { fileSize: MAX_COVER_BYTES } });
 
   // Rate limit unauthenticated requests only (brute-force protection on public endpoints).
   // Bypass for: JWT cookie (web app), Authorization header (OPDS Basic Auth),

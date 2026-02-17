@@ -18,6 +18,7 @@ export const bookMetadata = pgTable('book_metadata', {
   seriesName: varchar('series_name', { length: 500 }),
   seriesIndex: real('series_index'),
   rating: integer('rating'),
+  coverSource: varchar('cover_source', { length: 9 }),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

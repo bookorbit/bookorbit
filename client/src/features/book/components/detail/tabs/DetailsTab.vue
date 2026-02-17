@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, Folder, FolderPlus, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { BookOpen, Download, Folder, FolderPlus, Pencil, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -63,11 +63,18 @@ function downloadFile() {
     <div class="md:w-56 shrink-0 md:sticky md:top-4 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
-          class="w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
+          class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
           style="aspect-ratio: 2/3"
           :style="coverLoaded ? {} : coverStyle"
           @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
         >
+          <button
+            class="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Edit cover"
+            @click.stop="router.push({ name: 'book-edit', params: { bookId: book.id } })"
+          >
+            <Pencil class="size-3" />
+          </button>
           <img
             v-if="!coverFailed"
             :src="coverSrc"

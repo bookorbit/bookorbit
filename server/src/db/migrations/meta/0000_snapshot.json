@@ -1,5 +1,5 @@
 {
-  "id": "b9ef66fc-aec7-4d1e-841a-1429f7cd288f",
+  "id": "388fa65b-91c4-4c20-9bca-e95c235d5cf8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1452,6 +1452,12 @@
         "rating": {
           "name": "rating",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_source": {
+          "name": "cover_source",
+          "type": "varchar(9)",
           "primaryKey": false,
           "notNull": false
         },

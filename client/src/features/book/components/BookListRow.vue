@@ -55,7 +55,11 @@ async function setRating(star: number) {
   const newRating = localRating.value === star ? null : star
   localRating.value = newRating
   emit('rating-change', newRating)
-  await api(`/api/books/${props.book.id}/rating`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating: newRating }) })
+  await api(`/api/books/${props.book.id}/metadata`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating: newRating }),
+  })
 }
 
 const { coverUrl } = useCoverVersions()
@@ -73,10 +77,7 @@ function openFile(file: BookFileRef) {
 <template>
   <div
     class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer hover:bg-muted/50"
-    :class="[
-      selectionMode ? 'cursor-pointer select-none' : '',
-      selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
-    ]"
+    :class="[selectionMode ? 'cursor-pointer select-none' : '', selected ? 'bg-primary/8 ring-1 ring-primary/30' : '']"
     @click="selectionMode ? emit('select', $event) : emit('action', 'quick-view')"
   >
     <!-- Selection checkbox -->
@@ -113,7 +114,9 @@ function openFile(file: BookFileRef) {
       <span v-if="seriesLine" class="text-xs text-muted-foreground truncate italic">{{ seriesLine }}</span>
       <span v-if="metaLine" class="text-xs text-muted-foreground truncate">{{ metaLine }}</span>
       <div v-if="visibleTags.length > 0" class="flex items-center gap-1 flex-wrap">
-        <span v-for="tag in visibleTags" :key="tag" class="text-[11px] px-1.5 py-0 rounded-full bg-muted text-muted-foreground leading-5">{{ tag }}</span>
+        <span v-for="tag in visibleTags" :key="tag" class="text-[11px] px-1.5 py-0 rounded-full bg-muted text-muted-foreground leading-5">{{
+          tag
+        }}</span>
       </div>
       <!-- Reading progress -->
       <div v-if="book.readingProgress != null && book.readingProgress > 0" class="mt-1">
@@ -187,7 +190,7 @@ function openFile(file: BookFileRef) {
             Book Details
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem @click="emit('action', 'edit-metadata')">
+          <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
             <Pencil class="size-4 mr-2" />
             Edit Metadata
           </DropdownMenuItem>

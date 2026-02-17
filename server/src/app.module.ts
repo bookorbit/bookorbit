@@ -16,6 +16,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CbzModule } from './modules/cbz/cbz.module';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookModule } from './modules/book/book.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { CoverModule } from './modules/cover/cover.module';
 import { KoboModule } from './modules/kobo/kobo.module';
 import { LibraryModule } from './modules/library/library.module';
 import { LensModule } from './modules/lens/lens.module';
@@ -45,6 +47,8 @@ import { UserModule } from './modules/user/user.module';
     LibraryModule,
     PathModule,
     BookModule,
+    CatalogModule,
+    CoverModule,
     CollectionModule,
     LensModule,
     ScannerModule,

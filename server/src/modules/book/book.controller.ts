@@ -24,7 +24,7 @@ import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
 import { DeleteBooksDto } from './dto/delete-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
-import { UpdateRatingDto } from './dto/update-rating.dto';
+import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import type { BookQuery } from '@projectx/types';
 
@@ -142,9 +142,10 @@ export class BookController {
     await this.bookService.saveProgress(user.id, fileId, dto, user);
   }
 
-  @Patch(':id/rating')
-  updateRating(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRatingDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.updateRating(id, dto.rating ?? null, user);
+  @Patch(':id/metadata')
+  @RequirePermission('library_edit_metadata')
+  updateMetadata(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.updateMetadata(id, dto, user);
   }
 
   @Get(':id')

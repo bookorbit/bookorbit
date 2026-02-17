@@ -36,6 +36,16 @@ const router = createRouter({
       component: () => import('@/views/BookDetailView.vue'),
     },
     {
+      path: '/book/:bookId/files',
+      name: 'book-files',
+      component: () => import('@/views/BookFilesView.vue'),
+    },
+    {
+      path: '/book/:bookId/edit',
+      name: 'book-edit',
+      component: () => import('@/views/BookEditMetadataView.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('@/features/auth/LoginPage.vue'),

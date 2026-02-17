@@ -5,11 +5,13 @@ import { basename, join } from 'path';
 
 import type { BookCard, BookQuery, BooksPage } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { MetadataService } from '../metadata/metadata.service';
 import { LibraryService } from '../library/library.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
+import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 
 @Injectable()
 export class BookService {
@@ -20,6 +22,7 @@ export class BookService {
     private readonly bookRepo: BookRepository,
     private readonly libraryService: LibraryService,
     private readonly queryBuilder: BookQueryBuilder,
+    private readonly metadataService: MetadataService,
     private readonly config: ConfigService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
@@ -153,7 +156,7 @@ export class BookService {
     const dir = join(this.booksPath, 'covers', String(id));
     try {
       const files = await readdir(dir);
-      const cover = files.find((f) => f.startsWith('cover.'));
+      const cover = files.find((f) => f.startsWith('cover_custom.')) ?? files.find((f) => f.startsWith('cover_extracted.'));
       return cover ? join(dir, cover) : null;
     } catch {
       return null;
@@ -195,9 +198,39 @@ export class BookService {
     }
   }
 
-  async updateRating(id: number, rating: number | null, user: RequestUser): Promise<void> {
+  async updateMetadata(id: number, dto: UpdateBookMetadataDto, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    await this.bookRepo.updateRating(id, rating);
+
+    const scalarFields: Parameters<BookRepository['updateMetadataFields']>[1] = {};
+    if ('title' in dto) scalarFields.title = dto.title ?? null;
+    if ('subtitle' in dto) scalarFields.subtitle = dto.subtitle ?? null;
+    if ('description' in dto) scalarFields.description = dto.description ?? null;
+    if ('publisher' in dto) scalarFields.publisher = dto.publisher ?? null;
+    if ('publishedYear' in dto) scalarFields.publishedYear = dto.publishedYear ?? null;
+    if ('language' in dto) scalarFields.language = dto.language ?? null;
+    if ('pageCount' in dto) scalarFields.pageCount = dto.pageCount ?? null;
+    if ('seriesName' in dto) scalarFields.seriesName = dto.seriesName ?? null;
+    if ('seriesIndex' in dto) scalarFields.seriesIndex = dto.seriesIndex ?? null;
+    if ('isbn10' in dto) scalarFields.isbn10 = dto.isbn10 ?? null;
+    if ('isbn13' in dto) scalarFields.isbn13 = dto.isbn13 ?? null;
+    if ('rating' in dto) scalarFields.rating = dto.rating ?? null;
+
+    if (Object.keys(scalarFields).length > 0) {
+      scalarFields.updatedAt = new Date();
+      await this.bookRepo.updateMetadataFields(id, scalarFields);
+    }
+
+    if (dto.authors !== undefined) {
+      await this.metadataService.replaceAuthors(
+        id,
+        dto.authors.map((name) => ({ name, sortName: null })),
+      );
+    }
+    if (dto.tags !== undefined) {
+      await this.metadataService.replaceTags(id, dto.tags);
+    }
+
+    return this.getDetail(id, user);
   }
 
   async getProgress(userId: number, fileId: number, user: RequestUser) {
@@ -234,6 +267,8 @@ export class BookService {
       pageCount: meta?.pageCount ?? null,
       seriesName: meta?.seriesName ?? null,
       seriesIndex: meta?.seriesIndex ?? null,
+      rating: meta?.rating ?? null,
+      coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
       authors: authorRows,
       tags: tagRows.map((t) => t.name),
       files: fileRows.map((f) => ({
