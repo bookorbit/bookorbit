@@ -104,6 +104,32 @@ const { coverSize, gridGap } = useDisplaySettings()
             </button>
           </div>
         </div>
+
+        <!-- Dark mode brightness -->
+        <div v-if="themeStore.theme === 'dark'" class="px-5 py-4 bg-card">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <p class="text-sm font-medium text-foreground">Surface brightness</p>
+              <p class="text-xs text-muted-foreground mt-0.5">Lighten dark mode surfaces</p>
+            </div>
+            <button
+              v-if="themeStore.brightness > 0"
+              class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              @click="themeStore.setBrightness(0)"
+            >
+              Reset
+            </button>
+          </div>
+          <input
+            :value="themeStore.brightness"
+            @input="themeStore.setBrightness(Number(($event.target as HTMLInputElement).value))"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            class="w-full accent-primary cursor-pointer"
+          />
+        </div>
       </div>
     </div>
 

@@ -24,7 +24,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
   <div
     v-if="collapsible === 'none'"
     data-slot="sidebar"
-    :class="cn('bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col', props.class)"
+    :class="cn('bg-sidebar/80 backdrop-blur-xl backdrop-saturate-150 text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col', props.class)"
     v-bind="$attrs"
   >
     <slot />
@@ -36,7 +36,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
       data-slot="sidebar"
       data-mobile="true"
       :side="side"
-      class="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+      class="bg-sidebar/90 backdrop-blur-xl backdrop-saturate-150 text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
       :style="{
         '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
       }"
@@ -60,19 +60,8 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     :data-variant="variant"
     :data-side="side"
   >
-    <!-- This is what handles the sidebar gap on desktop  -->
-    <div
-      :class="
-        cn(
-          'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
-          'group-data-[collapsible=offcanvas]:w-0',
-          'group-data-[side=right]:rotate-180',
-          variant === 'floating' || variant === 'inset'
-            ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]'
-            : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
-        )
-      "
-    />
+    <!-- Zero-width sentinel — keeps the peer element in the DOM for CSS selectors -->
+    <div aria-hidden="true" class="w-0 shrink-0" />
     <div
       :class="
         cn(
@@ -83,7 +72,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
           // Adjust the padding for floating and inset variants.
           variant === 'floating' || variant === 'inset'
             ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
-            : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l',
+            : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
           props.class,
         )
       "
@@ -91,7 +80,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     >
       <div
         data-sidebar="sidebar"
-        class="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+        class="bg-sidebar/50 backdrop-blur-xl backdrop-saturate-150 border-r border-sidebar-border/60 shadow-[1px_0_0_0_oklch(1_0_0/0.04)] group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
       >
         <slot />
       </div>

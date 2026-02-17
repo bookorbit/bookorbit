@@ -86,26 +86,27 @@
 
 .dark {
   --tint-c: 0.01;
+  --bg-lift: 0;
 
-  --background: oklch(0.145 var(--tint-c) var(--tint-h));
+  --background: oklch(calc(0.145 + var(--bg-lift)) var(--tint-c) var(--tint-h));
   --foreground: oklch(0.985 0.004 var(--tint-h));
 
-  --card: oklch(0.205 0.012 var(--tint-h));
+  --card: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
   --card-foreground: oklch(0.985 0.004 var(--tint-h));
 
-  --popover: oklch(0.205 0.012 var(--tint-h));
+  --popover: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
   --popover-foreground: oklch(0.985 0.004 var(--tint-h));
 
   --primary: oklch(0.91 var(--tint-c) var(--tint-h));
   --primary-foreground: oklch(0.205 0.012 var(--tint-h));
 
-  --secondary: oklch(0.265 0.012 var(--tint-h));
+  --secondary: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
   --secondary-foreground: oklch(0.985 0.004 var(--tint-h));
 
-  --muted: oklch(0.265 0.012 var(--tint-h));
+  --muted: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
   --muted-foreground: oklch(0.68 0.008 var(--tint-h));
 
-  --accent: oklch(0.265 0.012 var(--tint-h));
+  --accent: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
   --accent-foreground: oklch(0.985 0.004 var(--tint-h));
 
   --destructive: oklch(0.704 0.191 22.216);
@@ -115,11 +116,11 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.52 0.008 var(--tint-h));
 
-  --sidebar: oklch(0.205 0.012 var(--tint-h));
+  --sidebar: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
   --sidebar-foreground: oklch(0.985 0.004 var(--tint-h));
   --sidebar-primary: oklch(0.91 var(--tint-c) var(--tint-h));
   --sidebar-primary-foreground: oklch(0.205 0.012 var(--tint-h));
-  --sidebar-accent: oklch(0.265 0.012 var(--tint-h));
+  --sidebar-accent: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
   --sidebar-accent-foreground: oklch(0.985 0.004 var(--tint-h));
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.52 0.008 var(--tint-h));
@@ -131,10 +132,10 @@
   --chart-5: oklch(0.645 0.246 16.439);
 
   /* Elevation surfaces */
-  --surface-1: oklch(0.205 0.012 var(--tint-h));
-  --surface-2: oklch(0.235 0.012 var(--tint-h));
-  --surface-3: oklch(0.265 0.012 var(--tint-h));
-  --surface-4: oklch(0.295 0.012 var(--tint-h));
+  --surface-1: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
+  --surface-2: oklch(calc(0.235 + var(--bg-lift)) 0.012 var(--tint-h));
+  --surface-3: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
+  --surface-4: oklch(calc(0.295 + var(--bg-lift)) 0.012 var(--tint-h));
 
   /* Shadows */
   --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.4);
@@ -144,7 +145,7 @@
   --elevation-xl: 0 20px 30px -5px oklch(0 0 0 / 0.6), 0 8px 12px -6px oklch(0 0 0 / 0.4);
   --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.7);
 
-  --dot-color: oklch(0.3 0.01 var(--tint-h));
+  --dot-color: oklch(calc(0.3 + var(--bg-lift)) 0.01 var(--tint-h));
 }
 
 /* ── Accent presets ──────────────────────────────────────────

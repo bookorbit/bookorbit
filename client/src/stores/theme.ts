@@ -110,6 +110,8 @@ export const useThemeStore = defineStore('theme', () => {
   const storedBackground = storage.get<Background>('background', 'dots')
   const background = ref<Background>(BACKGROUND_IDS.includes(storedBackground) ? storedBackground : 'dots')
 
+  const brightness = ref<number>(storage.get<number>('brightness', 0))
+
   function applyTheme(t: Theme) {
     document.documentElement.classList.toggle('dark', t === 'dark')
   }
@@ -124,6 +126,11 @@ export const useThemeStore = defineStore('theme', () => {
     if (r !== 'default') document.documentElement.classList.add(`radius-${r}`)
   }
 
+  function applyBrightness(b: number) {
+    const lift = (b / 100) * 0.12
+    document.documentElement.style.setProperty('--bg-lift', lift.toFixed(4))
+  }
+
   function toggleTheme() {
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
   }
@@ -136,8 +143,21 @@ export const useThemeStore = defineStore('theme', () => {
     radius.value = r
   }
 
+  function applyBackground(b: Background) {
+    BACKGROUND_IDS.forEach((id) => {
+      const cssClass = BACKGROUND_OPTIONS.find((o) => o.id === id)?.cssClass
+      if (cssClass) document.body.classList.remove(cssClass)
+    })
+    const cssClass = BACKGROUND_OPTIONS.find((o) => o.id === b)?.cssClass
+    if (cssClass) document.body.classList.add(cssClass)
+  }
+
   function setBackground(b: Background) {
     background.value = b
+  }
+
+  function setBrightness(b: number) {
+    brightness.value = Math.min(100, Math.max(0, b))
   }
 
   watch(
@@ -167,10 +187,19 @@ export const useThemeStore = defineStore('theme', () => {
   watch(
     background,
     (b) => {
+      applyBackground(b)
       storage.set('background', b)
     },
     { immediate: true },
   )
+  watch(
+    brightness,
+    (b) => {
+      applyBrightness(b)
+      storage.set('brightness', b)
+    },
+    { immediate: true },
+  )
 
-  return { theme, accent, radius, background, toggleTheme, setAccent, setRadius, setBackground }
+  return { theme, accent, radius, background, brightness, toggleTheme, setAccent, setRadius, setBackground, setBrightness }
 })

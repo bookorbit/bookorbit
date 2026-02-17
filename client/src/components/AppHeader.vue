@@ -65,7 +65,9 @@ function navigateToResult(result: GlobalSearchResult) {
 </script>
 
 <template>
-  <header class="flex h-14 shrink-0 items-center gap-2 border-b border-primary/20 bg-background/90 backdrop-blur-md px-3 shadow-sm sticky top-0 z-10">
+  <header
+    class="flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/70 backdrop-blur-xl backdrop-saturate-150 px-3 shadow-sm sticky top-0 z-10"
+  >
     <!-- Mobile: search active overlay -->
     <template v-if="mobileSearchOpen">
       <Button variant="ghost" size="icon" class="h-8 w-8 shrink-0" @click="closeMobileSearch()">

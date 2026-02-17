@@ -117,7 +117,7 @@ onMounted(async () => {
     style="--sidebar-border: color-mix(in oklch, var(--primary) 18%, transparent)"
     class="[&>div:last-child]:shadow-[4px_0_12px_-2px_oklch(0_0_0/0.08)]"
   >
-    <SidebarHeader class="border-b border-sidebar-border">
+    <SidebarHeader class="border-b border-sidebar-border bg-gradient-to-b from-primary/6 to-transparent">
       <div class="flex items-center gap-2.5 px-1 py-1">
         <!-- Logo mark -->
         <div
@@ -148,7 +148,9 @@ onMounted(async () => {
     <SidebarContent>
       <!-- Libraries -->
       <SidebarGroup class="pt-2">
-        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
+        <SidebarGroupLabel
+          class="text-[10px] uppercase tracking-widest text-sidebar-foreground/75 font-semibold group-data-[collapsible=icon]:hidden"
+        >
           Libraries
         </SidebarGroupLabel>
         <SidebarGroupAction v-if="hasPermission('manage_libraries')" tooltip="New Library" @click="createLibraryOpen = true">
@@ -182,7 +184,8 @@ onMounted(async () => {
                 </span>
                 <span
                   v-else-if="lib.bookCount !== undefined"
-                  class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
+                  :class="activeLibraryId === lib.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
                 >
                   {{ lib.bookCount.toLocaleString() }}
                 </span>
@@ -212,7 +215,9 @@ onMounted(async () => {
 
       <!-- Lenses -->
       <SidebarGroup>
-        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
+        <SidebarGroupLabel
+          class="text-[10px] uppercase tracking-widest text-sidebar-foreground/75 font-semibold group-data-[collapsible=icon]:hidden"
+        >
           Lenses
         </SidebarGroupLabel>
         <SidebarGroupAction tooltip="New Lens" @click="createLensOpen = true">
@@ -237,7 +242,8 @@ onMounted(async () => {
                 </span>
                 <span
                   v-if="lens.bookCount !== undefined"
-                  class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
+                  :class="activeLensId === lens.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
                 >
                   {{ lens.bookCount.toLocaleString() }}
                 </span>
@@ -254,7 +260,9 @@ onMounted(async () => {
 
       <!-- Collections -->
       <SidebarGroup>
-        <SidebarGroupLabel class="text-[10px] uppercase tracking-widest text-sidebar-foreground/35 font-medium group-data-[collapsible=icon]:hidden">
+        <SidebarGroupLabel
+          class="text-[10px] uppercase tracking-widest text-sidebar-foreground/75 font-semibold group-data-[collapsible=icon]:hidden"
+        >
           Collections
         </SidebarGroupLabel>
         <SidebarGroupAction tooltip="New Collection" @click="createCollectionOpen = true">
@@ -278,7 +286,8 @@ onMounted(async () => {
                   {{ collection.name }}
                 </span>
                 <span
-                  class="ml-auto shrink-0 rounded-full bg-sidebar-foreground/10 px-2 py-0.5 text-xs tabular-nums text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
+                  :class="activeCollectionId === collection.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
                 >
                   {{ collection.bookCount.toLocaleString() }}
                 </span>
