@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 
-import { appConfig, authConfig, dbConfig, mailerConfig, storageConfig } from './config/config';
+import { appConfig, authConfig, dbConfig, externalApiConfig, mailerConfig, storageConfig } from './config/config';
 import { CommonModule } from './common/common.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { LibraryAccessGuard } from './common/guards/library-access.guard';
@@ -23,6 +23,7 @@ import { LibraryModule } from './modules/library/library.module';
 import { LensModule } from './modules/lens/lens.module';
 import { OpdsModule } from './modules/opds/opds.module';
 import { PathModule } from './modules/path/path.module';
+import { MetadataFetchModule } from './modules/metadata-fetch/metadata-fetch.module';
 import { MetadataModule } from './modules/metadata/metadata.module';
 import { ReaderPreferencesModule } from './modules/reader-preferences/reader-preferences.module';
 import { RoleModule } from './modules/role/role.module';
@@ -34,7 +35,7 @@ import { UserModule } from './modules/user/user.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig],
+      load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig, externalApiConfig],
     }),
     ScheduleModule.forRoot(),
     DbModule,
@@ -53,6 +54,7 @@ import { UserModule } from './modules/user/user.module';
     LensModule,
     ScannerModule,
     MetadataModule,
+    MetadataFetchModule,
     KoboModule,
     OpdsModule,
     BookmarkModule,

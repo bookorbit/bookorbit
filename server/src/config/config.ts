@@ -19,6 +19,10 @@ export const storageConfig = registerAs('storage', () => ({
   booksPath: process.env.BOOKS_PATH ?? '/data/books',
 }));
 
+export const externalApiConfig = registerAs('externalApi', () => ({
+  googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? '',
+}));
+
 export const mailerConfig = registerAs('mailer', () => ({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT ?? '587', 10),

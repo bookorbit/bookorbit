@@ -139,7 +139,11 @@ importers:
         specifier: ^3.2.5
         version: 3.2.6(typescript@5.9.3)
 
-  packages/types: {}
+  packages/types:
+    devDependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   server:
     dependencies:

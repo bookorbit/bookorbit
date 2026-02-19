@@ -1,0 +1,1 @@
+export const METADATA_PROVIDERS = Symbol('METADATA_PROVIDERS');

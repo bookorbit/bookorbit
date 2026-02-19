@@ -198,6 +198,11 @@ CREATE TABLE "book_metadata" (
 	"series_index" real,
 	"rating" integer,
 	"cover_source" varchar(9),
+	"google_books_id" varchar(50),
+	"goodreads_id" varchar(50),
+	"amazon_id" varchar(20),
+	"hardcover_id" varchar(50),
+	"open_library_id" varchar(50),
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

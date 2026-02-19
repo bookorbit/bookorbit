@@ -214,10 +214,7 @@ watch(loading, (isLoading) => {
       >
         <template #actions>
           <button
-            @click="
-              editorOpen = true
-              confirmDelete = false
-            "
+            @click="editorOpen = true; confirmDelete = false"
             class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings2 :size="13" />

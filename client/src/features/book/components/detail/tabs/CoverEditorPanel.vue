@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
-import { ImagePlus, Link, RotateCcw, Upload } from 'lucide-vue-next'
+import { ImagePlus, Link, RotateCcw, Upload, X } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
@@ -46,13 +46,15 @@ async function handleRevert() {
   if (result !== false) emit('coverChanged', result)
 }
 
+const lightboxOpen = ref(false)
+
 onUnmounted(() => clearTimeout(debounceTimer))
 </script>
 
 <template>
   <div class="flex flex-col gap-3">
     <!-- Cover image -->
-    <div class="relative w-full overflow-hidden rounded-xl bg-muted shadow-md" style="aspect-ratio: 2/3">
+    <div class="relative w-full overflow-hidden rounded-xl bg-muted shadow-md cursor-zoom-in" style="aspect-ratio: 2/3" @click="lightboxOpen = true">
       <img
         :src="activeSrc"
         :alt="book.title ?? ''"
@@ -61,6 +63,25 @@ onUnmounted(() => clearTimeout(debounceTimer))
         @load="(e) => ((e.target as HTMLImageElement).style.visibility = 'visible')"
       />
     </div>
+
+    <!-- Lightbox -->
+    <Teleport to="body">
+      <div
+        v-if="lightboxOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        @click="lightboxOpen = false"
+      >
+        <button class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors" @click="lightboxOpen = false">
+          <X class="size-5" />
+        </button>
+        <img
+          :src="activeSrc"
+          :alt="book.title ?? ''"
+          class="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl object-contain"
+          @click.stop
+        />
+      </div>
+    </Teleport>
 
     <!-- Mode toggle -->
     <div class="flex gap-1 p-0.5 rounded-lg bg-muted">

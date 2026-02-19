@@ -19,6 +19,11 @@ export const bookMetadata = pgTable('book_metadata', {
   seriesIndex: real('series_index'),
   rating: integer('rating'),
   coverSource: varchar('cover_source', { length: 9 }),
+  googleBooksId: varchar('google_books_id', { length: 50 }),
+  goodreadsId: varchar('goodreads_id', { length: 50 }),
+  amazonId: varchar('amazon_id', { length: 20 }),
+  hardcoverId: varchar('hardcover_id', { length: 50 }),
+  openLibraryId: varchar('open_library_id', { length: 50 }),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

@@ -1,5 +1,5 @@
 {
-  "id": "388fa65b-91c4-4c20-9bca-e95c235d5cf8",
+  "id": "f572f92e-eb3a-4b8c-8a8a-bde7de427787",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1458,6 +1458,36 @@
         "cover_source": {
           "name": "cover_source",
           "type": "varchar(9)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "google_books_id": {
+          "name": "google_books_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "goodreads_id": {
+          "name": "goodreads_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amazon_id": {
+          "name": "amazon_id",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hardcover_id": {
+          "name": "hardcover_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "open_library_id": {
+          "name": "open_library_id",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
