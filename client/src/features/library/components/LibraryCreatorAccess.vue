@@ -63,7 +63,6 @@ async function revoke(userId: number) {
   await loadAccess()
 }
 
-
 onMounted(loadAccess)
 </script>
 

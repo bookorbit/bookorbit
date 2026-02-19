@@ -93,4 +93,3 @@ describe('onBookMissing', () => {
     cleanup()
   })
 })
-

@@ -151,10 +151,7 @@ function extractPageCount($: CheerioAPI): number | undefined {
 }
 
 function extractSeriesName($: CheerioAPI): string | undefined {
-  return (
-    $('#rpi-attribute-book_details-series .rpi-attribute-value a span').first().text().trim() ||
-    undefined
-  );
+  return $('#rpi-attribute-book_details-series .rpi-attribute-value a span').first().text().trim() || undefined;
 }
 
 function extractSeriesIndex($: CheerioAPI): number | undefined {
@@ -177,7 +174,10 @@ function extractCoverUrl($: CheerioAPI): string | undefined {
 function extractCategories($: CheerioAPI): string[] {
   const cats: string[] = [];
   $('#detailBullets_feature_div .zg_hrsr .a-list-item a').each((_, el) => {
-    const name = $(el).text().trim().replace(/\s*\(Books\)\s*$/i, '');
+    const name = $(el)
+      .text()
+      .trim()
+      .replace(/\s*\(Books\)\s*$/i, '');
     if (name) cats.push(name);
   });
   return cats;

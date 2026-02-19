@@ -39,7 +39,7 @@ export function mapOpenLibraryDoc(raw: OpenLibraryDoc): MetadataCandidate {
     publisher: raw.publisher?.[0],
     language: raw.language?.[0],
     pageCount: raw.number_of_pages_median,
-    tags: raw.subject?.slice(0, 10),
+    genres: raw.subject?.slice(0, 10),
     coverUrl: coverUrl(raw.cover_i),
     sourceUrl: `https://openlibrary.org${raw.key}`,
   };
@@ -55,7 +55,7 @@ export function mapOpenLibraryWork(raw: OpenLibraryWork): MetadataCandidate {
     title: raw.title,
     description: extractDescription(raw.description),
     publishedYear: parseYear(raw.first_publish_date),
-    tags: raw.subjects?.slice(0, 10),
+    genres: raw.subjects?.slice(0, 10),
     coverUrl: coverUrl(firstCover),
     sourceUrl: `https://openlibrary.org${raw.key}`,
   };

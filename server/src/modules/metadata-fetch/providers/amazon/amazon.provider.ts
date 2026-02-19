@@ -6,8 +6,7 @@ import { MetadataSearchParams } from '../metadata-search-params';
 import { extractAsins, parseBookPage } from './amazon.scraper';
 
 const HEADERS: HeadersInit = {
-  'user-agent':
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'accept-language': 'en-US,en;q=0.9',
   'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not_A Brand";v="24"',
@@ -75,7 +74,7 @@ export class AmazonProvider implements IdentifiableProvider {
       seriesName: data.seriesName,
       seriesIndex: data.seriesIndex,
       coverUrl: data.coverUrl,
-      tags: data.tags?.length ? data.tags : undefined,
+      genres: data.tags?.length ? data.tags : undefined,
       sourceUrl: `https://www.amazon.com/dp/${asin}`,
     };
   }

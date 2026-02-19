@@ -19,7 +19,7 @@ export const FIELD_LABELS: Record<RuleField, string> = {
   publishedYear: 'Published Year',
   pageCount: 'Page Count',
   author: 'Author',
-  tag: 'Tag',
+  genre: 'Genre',
   format: 'Format',
   addedAt: 'Added Date',
   fileAvailability: 'File Availability',

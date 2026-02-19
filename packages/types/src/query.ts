@@ -7,7 +7,7 @@ export type RuleField =
   | 'publishedYear'
   | 'pageCount'
   | 'author'
-  | 'tag'
+  | 'genre'
   | 'format'
   | 'addedAt'
   | 'fileAvailability'
@@ -48,7 +48,7 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   language: ['eq', 'notEq', 'isEmpty', 'isNotEmpty'],
   series: ['contains', 'notContains', 'isEmpty', 'isNotEmpty'],
   author: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  tag: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
+  genre: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
   format: ['includesAny', 'excludesAll'],
   publishedYear: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
   seriesIndex: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],

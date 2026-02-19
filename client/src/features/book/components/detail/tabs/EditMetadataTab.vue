@@ -8,14 +8,14 @@ import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
-import { useTagSearch } from '../../../composables/useTagSearch'
+import { useGenreSearch } from '../../../composables/useTagSearch'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ saved: [BookDetail]; coverChanged: ['extracted' | 'custom' | null] }>()
 
 const { form, saving, error, isDirty, load, reset, save } = useMetadataEditor()
 const { search: searchAuthors } = useAuthorSearch()
-const { search: searchTags } = useTagSearch()
+const { search: searchGenres } = useGenreSearch()
 
 const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 const searchOpen = ref(false)
@@ -30,20 +30,29 @@ const providerIdFields = [
 
 function setIntField(field: 'publishedYear' | 'pageCount', e: Event) {
   const val = (e.target as HTMLInputElement).value
-  if (val === '') { form[field] = null; return }
+  if (val === '') {
+    form[field] = null
+    return
+  }
   const n = parseInt(val, 10)
   form[field] = isNaN(n) ? null : n
 }
 
 function setFloatField(field: 'seriesIndex', e: Event) {
   const val = (e.target as HTMLInputElement).value
-  if (val === '') { form[field] = null; return }
+  if (val === '') {
+    form[field] = null
+    return
+  }
   const n = parseFloat(val)
   form[field] = isNaN(n) ? null : n
 }
 
 onMounted(() => load(props.book))
-watch(() => props.book.id, () => load(props.book))
+watch(
+  () => props.book.id,
+  () => load(props.book),
+)
 
 async function submit() {
   if (coverPanel.value?.hasPending) {
@@ -125,15 +134,15 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
         />
       </div>
 
-      <!-- Authors + Tags -->
+      <!-- Authors + Genres -->
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div class="space-y-1.5">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Authors</label>
           <ChipInput v-model="form.authors" placeholder="Add author..." :search-fn="searchAuthors" />
         </div>
         <div class="space-y-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</label>
-          <ChipInput v-model="form.tags" placeholder="Add tag..." :search-fn="searchTags" />
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Genres</label>
+          <ChipInput v-model="form.genres" placeholder="Add genre..." :search-fn="searchGenres" />
         </div>
       </div>
 
@@ -281,10 +290,5 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
     </div>
   </div>
 
-  <MetadataSearchDrawer
-    v-if="searchOpen"
-    :book="props.book"
-    @close="searchOpen = false"
-    @apply="handleApply"
-  />
+  <MetadataSearchDrawer v-if="searchOpen" :book="props.book" @close="searchOpen = false" @apply="handleApply" />
 </template>

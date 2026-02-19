@@ -1,15 +1,8 @@
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
-import {
-  GoodreadsApolloBook,
-  GoodreadsApolloContributor,
-  GoodreadsApolloSeries,
-} from './goodreads.types';
+import { GoodreadsApolloBook, GoodreadsApolloContributor, GoodreadsApolloSeries } from './goodreads.types';
 
-export function mapGoodreadsApolloState(
-  state: Record<string, unknown>,
-  bookId: string,
-): MetadataCandidate | null {
+export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: string): MetadataCandidate | null {
   const book = findByKeyPrefix<GoodreadsApolloBook>(state, 'Book:kca:');
   if (!book?.title) return null;
 
@@ -19,9 +12,7 @@ export function mapGoodreadsApolloState(
   const details = book.details;
   const firstSeries = book.bookSeries?.[0];
 
-  const tags = (book.bookGenres ?? [])
-    .map((g) => g.genre?.name)
-    .filter((n): n is string => !!n);
+  const genres = (book.bookGenres ?? []).map((g) => g.genre?.name).filter((n): n is string => !!n);
 
   const { title, subtitle } = splitTitle(book.title);
 
@@ -42,7 +33,7 @@ export function mapGoodreadsApolloState(
     pageCount,
     isbn10: normalize(details?.isbn),
     isbn13: normalize(details?.isbn13),
-    tags: tags.length ? tags : undefined,
+    genres: genres.length ? genres : undefined,
     coverUrl: book.imageUrl,
     sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
     seriesName: normalize(series?.title),

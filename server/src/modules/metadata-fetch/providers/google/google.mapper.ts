@@ -34,7 +34,7 @@ export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {
     pageCount: info.pageCount,
     isbn10,
     isbn13,
-    tags: info.categories,
+    genres: info.categories,
     coverUrl,
     sourceUrl: `https://books.google.com/books?id=${raw.id}`,
   };

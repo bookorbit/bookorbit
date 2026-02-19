@@ -30,6 +30,7 @@ export class BookDetailDto {
   coverSource: 'extracted' | 'custom' | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
+  genres: string[];
   tags: string[];
   files: BookFileDto[];
 }

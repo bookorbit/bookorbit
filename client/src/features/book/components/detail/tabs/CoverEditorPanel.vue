@@ -70,20 +70,14 @@ onUnmounted(() => clearTimeout(debounceTimer))
 
     <!-- Lightbox -->
     <Teleport to="body">
-      <div
-        v-if="lightboxOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-        @click="lightboxOpen = false"
-      >
-        <button class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors" @click="lightboxOpen = false">
+      <div v-if="lightboxOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" @click="lightboxOpen = false">
+        <button
+          class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          @click="lightboxOpen = false"
+        >
           <X class="size-5" />
         </button>
-        <img
-          :src="activeSrc"
-          :alt="book.title ?? ''"
-          class="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl object-contain"
-          @click.stop
-        />
+        <img :src="activeSrc" :alt="book.title ?? ''" class="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl object-contain" @click.stop />
       </div>
     </Teleport>
 

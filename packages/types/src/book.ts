@@ -16,6 +16,7 @@ export type BookCard = {
   files: BookFileRef[];
   publishedYear: number | null;
   language: string | null;
+  genres: string[];
   tags: string[];
   rating: number | null;
   readingProgress: number | null;
@@ -54,6 +55,7 @@ export type BookDetail = {
   coverSource: 'extracted' | 'custom' | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
+  genres: string[];
   tags: string[];
   files: BookDetailFile[];
 };

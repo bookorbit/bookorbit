@@ -3,7 +3,7 @@ import { computed, reactive } from 'vue'
 import { Search, BookOpen, Loader2 } from 'lucide-vue-next'
 import type { BookDetail, MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
 import MetadataResultCard from './MetadataResultCard.vue'
-import { providerBadgeStyle, providerActivePillStyle } from '../../../lib/metadata-fetch'
+import { providerActivePillStyle } from '../../../lib/metadata-fetch'
 
 const props = defineProps<{
   book: BookDetail
@@ -95,8 +95,12 @@ function runSearch() {
         v-for="p in providers"
         :key="p.key"
         class="h-6 px-2.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 active:scale-95"
-        :class="(selectedProviders.includes(p.key) || !selectedProviders.length) ? '' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'"
-        :style="(selectedProviders.includes(p.key) || !selectedProviders.length) ? providerActivePillStyle(p.key) : {}"
+        :class="
+          selectedProviders.includes(p.key) || !selectedProviders.length
+            ? ''
+            : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+        "
+        :style="selectedProviders.includes(p.key) || !selectedProviders.length ? providerActivePillStyle(p.key) : {}"
         @click="$emit('toggleProvider', p.key)"
       >
         {{ p.label }}
@@ -114,11 +118,7 @@ function runSearch() {
     <div class="flex-1 overflow-y-auto px-4 pb-4">
       <!-- Skeleton grid while loading with no results yet -->
       <div v-if="isStreaming && !filteredResults.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div
-          v-for="n in 8"
-          :key="n"
-          class="rounded-xl border border-border/40 bg-card overflow-hidden animate-pulse flex gap-3 p-2.5"
-        >
+        <div v-for="n in 8" :key="n" class="rounded-xl border border-border/40 bg-card overflow-hidden animate-pulse flex gap-3 p-2.5">
           <div class="rounded-lg bg-muted shrink-0" style="width: 64px; aspect-ratio: 2/3" />
           <div class="flex-1 flex flex-col justify-center gap-2 py-1">
             <div class="h-3 bg-muted rounded-md w-full" />

@@ -155,10 +155,10 @@ function editMetadata() {
               {{ detail.publisher }}
             </p>
 
-            <!-- Tags -->
-            <div v-if="detail.tags.length" class="flex flex-wrap gap-1.5">
-              <span v-for="tag in detail.tags" :key="tag" class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                {{ tag }}
+            <!-- Genres -->
+            <div v-if="detail.genres.length" class="flex flex-wrap gap-1.5">
+              <span v-for="genre in detail.genres" :key="genre" class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                {{ genre }}
               </span>
             </div>
 

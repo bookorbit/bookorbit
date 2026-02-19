@@ -83,31 +83,29 @@ export function useMetadataSearch() {
     }
   }
 
-const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'goodreads', 'hardcover', 'google', 'openLibrary']
+  const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'goodreads', 'hardcover', 'google', 'openLibrary']
 
-function sortResults(list: MetadataCandidate[]): MetadataCandidate[] {
-  const byProvider = new Map<string, MetadataCandidate[]>()
-  for (const r of list) {
-    const bucket = byProvider.get(r.provider) ?? []
-    bucket.push(r)
-    byProvider.set(r.provider, bucket)
+  function sortResults(list: MetadataCandidate[]): MetadataCandidate[] {
+    const byProvider = new Map<string, MetadataCandidate[]>()
+    for (const r of list) {
+      const bucket = byProvider.get(r.provider) ?? []
+      bucket.push(r)
+      byProvider.set(r.provider, bucket)
+    }
+
+    const orderedKeys = [
+      ...PROVIDER_ORDER.filter((p) => byProvider.has(p)),
+      ...[...byProvider.keys()].filter((p) => !PROVIDER_ORDER.includes(p as MetadataProviderKey)),
+    ]
+
+    const out: MetadataCandidate[] = []
+    for (const p of orderedKeys) out.push(...(byProvider.get(p)?.slice(0, 2) ?? []))
+    for (const p of orderedKeys) out.push(...(byProvider.get(p)?.slice(2) ?? []))
+    return out
   }
 
-  const orderedKeys = [
-    ...PROVIDER_ORDER.filter((p) => byProvider.has(p)),
-    ...[...byProvider.keys()].filter((p) => !PROVIDER_ORDER.includes(p as MetadataProviderKey)),
-  ]
-
-  const out: MetadataCandidate[] = []
-  for (const p of orderedKeys) out.push(...(byProvider.get(p)?.slice(0, 2) ?? []))
-  for (const p of orderedKeys) out.push(...(byProvider.get(p)?.slice(2) ?? []))
-  return out
-}
-
   const filteredResults = computed(() => {
-    const filtered = selectedProviders.value.length
-      ? results.value.filter((r) => selectedProviders.value.includes(r.provider))
-      : results.value
+    const filtered = selectedProviders.value.length ? results.value.filter((r) => selectedProviders.value.includes(r.provider)) : results.value
     return sortResults(filtered)
   })
 

@@ -42,7 +42,7 @@ const metaLine = computed(() => {
   return parts.length > 0 ? parts.join(' · ') : null
 })
 
-const visibleTags = computed(() => props.book.tags.slice(0, 2))
+const visibleTags = computed(() => props.book.genres.slice(0, 2))
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)

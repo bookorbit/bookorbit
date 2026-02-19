@@ -15,17 +15,19 @@ const lightboxSrc = ref<string | null>(null)
   <div v-if="field.isCover" class="py-3.5 border-b border-border/40">
     <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2.5">{{ field.label }}</p>
     <div class="grid grid-cols-[1fr_44px_1fr] gap-2 items-center">
-
       <!-- Current cover -->
       <div
         class="w-16 rounded-lg overflow-hidden bg-muted transition-all duration-300 shadow-sm ring-1 relative group"
         :class="field.isCopied ? 'ring-primary ring-2 cursor-zoom-in' : 'ring-border opacity-50'"
         style="aspect-ratio: 2/3"
-        @click="field.isCopied ? lightboxSrc = field.candidateDisplay : null"
+        @click="field.isCopied ? (lightboxSrc = field.candidateDisplay) : null"
       >
         <img v-if="field.isCopied" :src="field.candidateDisplay" alt="Preview" class="w-full h-full object-cover" @error="hideOnError" />
         <div v-else class="w-full h-full bg-linear-to-br from-muted to-muted-foreground/10" />
-        <div v-if="field.isCopied" class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div
+          v-if="field.isCopied"
+          class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+        >
           <ZoomIn class="size-4 text-white" />
         </div>
       </div>
@@ -34,7 +36,11 @@ const lightboxSrc = ref<string | null>(null)
       <div class="flex justify-center">
         <button
           class="size-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-sm"
-          :class="field.isCopied ? 'bg-primary text-primary-foreground shadow-primary/30' : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'"
+          :class="
+            field.isCopied
+              ? 'bg-primary text-primary-foreground shadow-primary/30'
+              : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'
+          "
           @click="$emit('toggle', field.key)"
         >
           <RotateCcw v-if="field.isCopied" class="size-3.5" />
@@ -62,23 +68,13 @@ const lightboxSrc = ref<string | null>(null)
     <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">{{ field.label }}</p>
 
     <div class="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_44px_1fr] sm:gap-1.5 sm:items-stretch">
-
       <!-- Current value: framed card to signal it's the active record -->
       <div
         class="min-w-0 rounded-lg px-3 py-2 transition-all duration-200"
-        :class="
-          !field.hasDiff
-            ? 'bg-muted/30 opacity-50'
-            : field.isCopied
-              ? 'bg-muted/30 opacity-40'
-              : 'bg-background ring-1 ring-border'
-        "
+        :class="!field.hasDiff ? 'bg-muted/30 opacity-50' : field.isCopied ? 'bg-muted/30 opacity-40' : 'bg-background ring-1 ring-border'"
       >
         <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">Current</p>
-        <p
-          class="wrap-break-word leading-snug text-sm w-full"
-          :class="!field.currentDisplay ? 'text-muted-foreground/40 italic' : 'text-foreground'"
-        >
+        <p class="wrap-break-word leading-snug text-sm w-full" :class="!field.currentDisplay ? 'text-muted-foreground/40 italic' : 'text-foreground'">
           {{ field.currentDisplay || 'empty' }}
         </p>
       </div>
@@ -88,7 +84,11 @@ const lightboxSrc = ref<string | null>(null)
         <button
           v-if="field.hasDiff"
           class="size-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-sm shrink-0"
-          :class="field.isCopied ? 'bg-primary text-primary-foreground shadow-primary/30' : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'"
+          :class="
+            field.isCopied
+              ? 'bg-primary text-primary-foreground shadow-primary/30'
+              : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'
+          "
           @click="$emit('toggle', field.key)"
         >
           <RotateCcw v-if="field.isCopied" class="size-3.5" />
@@ -102,33 +102,19 @@ const lightboxSrc = ref<string | null>(null)
       <!-- New value: muted by default, highlights when selected -->
       <div
         class="min-w-0 rounded-lg px-3 py-2 transition-all duration-200"
-        :class="
-          !field.hasDiff
-            ? 'bg-muted/30 opacity-50'
-            : field.isCopied
-              ? 'bg-primary/8 ring-1 ring-primary/20'
-              : 'bg-muted/40'
-        "
+        :class="!field.hasDiff ? 'bg-muted/30 opacity-50' : field.isCopied ? 'bg-primary/8 ring-1 ring-primary/20' : 'bg-muted/40'"
       >
         <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">New</p>
-        <p
-          class="wrap-break-word leading-snug text-sm w-full"
-          :class="field.isCopied ? 'text-primary font-medium' : 'text-muted-foreground'"
-        >
+        <p class="wrap-break-word leading-snug text-sm w-full" :class="field.isCopied ? 'text-primary font-medium' : 'text-muted-foreground'">
           {{ field.candidateDisplay }}
         </p>
       </div>
-
     </div>
   </div>
 
   <!-- Lightbox -->
   <Teleport to="body">
-    <div
-      v-if="lightboxSrc"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      @click="lightboxSrc = null"
-    >
+    <div v-if="lightboxSrc" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm" @click="lightboxSrc = null">
       <button
         class="absolute top-4 right-4 size-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
         @click="lightboxSrc = null"

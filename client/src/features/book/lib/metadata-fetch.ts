@@ -5,7 +5,7 @@ export function getProviderLabel(provider: MetadataProviderKey, providers: Metad
 }
 
 export function hideOnError(e: Event): void {
-  (e.target as HTMLImageElement).style.visibility = 'hidden'
+  ;(e.target as HTMLImageElement).style.visibility = 'hidden'
 }
 
 /** Brand colors for each provider - used for pill/badge tinting. */

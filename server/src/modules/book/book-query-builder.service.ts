@@ -5,7 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { GroupRule, Rule, SortField, SortSpec } from '@projectx/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, readingProgress, tags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, readingProgress, genres } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -92,8 +92,8 @@ export class BookQueryBuilder {
         return this.numericRuleToSql(bookMetadata.rating, operator, value as number, valueTo as number | undefined);
       case 'author':
         return this.authorRuleToSql(operator, value as string[]);
-      case 'tag':
-        return this.tagRuleToSql(operator, value as string[]);
+      case 'genre':
+        return this.genreRuleToSql(operator, value as string[]);
       case 'format':
         return this.formatRuleToSql(operator, value as string[]);
       case 'addedAt':
@@ -186,26 +186,26 @@ export class BookQueryBuilder {
     }
   }
 
-  private tagRuleToSql(operator: string, values?: string[]): SQL {
+  private genreRuleToSql(operator: string, values?: string[]): SQL {
     const sq = (whereClause?: SQL) =>
-      this.db.select({ bookId: bookTags.bookId }).from(bookTags).innerJoin(tags, eq(bookTags.tagId, tags.id)).where(whereClause);
+      this.db.select({ bookId: bookGenres.bookId }).from(bookGenres).innerJoin(genres, eq(bookGenres.genreId, genres.id)).where(whereClause);
 
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v)))));
+        return inArray(books.id, sq(or(...values.map((v) => eq(genres.name, v)))));
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
-        return and(...values.map((v) => inArray(books.id, sq(eq(tags.name, v)))))!;
+        return and(...values.map((v) => inArray(books.id, sq(eq(genres.name, v)))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v))))));
+        return not(inArray(books.id, sq(or(...values.map((v) => eq(genres.name, v))))));
       case 'isEmpty':
         return not(inArray(books.id, sq()));
       case 'isNotEmpty':
         return inArray(books.id, sq());
       default:
-        throw new BadRequestException(`Invalid operator '${operator}' for tag field`);
+        throw new BadRequestException(`Invalid operator '${operator}' for genre field`);
     }
   }
 

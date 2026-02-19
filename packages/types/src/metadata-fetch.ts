@@ -23,7 +23,7 @@ export interface MetadataCandidate {
   isbn13?: string;
   seriesName?: string;
   seriesIndex?: number;
-  tags?: string[];
+  genres?: string[];
   coverUrl?: string;
   sourceUrl?: string;
 }

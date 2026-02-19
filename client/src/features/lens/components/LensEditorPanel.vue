@@ -23,8 +23,8 @@ const TEMPLATES: { label: string; build: () => GroupRule }[] = [
     build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'format', operator: 'includesAny', value: ['pdf'] } as Rule] }),
   },
   {
-    label: 'No Tags',
-    build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'tag', operator: 'isEmpty' } as Rule] }),
+    label: 'No Genres',
+    build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'genre', operator: 'isEmpty' } as Rule] }),
   },
   {
     label: 'EPUB Only',

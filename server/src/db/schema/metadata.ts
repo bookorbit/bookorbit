@@ -47,6 +47,24 @@ export const bookAuthors = pgTable(
   (t) => [primaryKey({ columns: [t.bookId, t.authorId] })],
 );
 
+export const genres = pgTable('genres', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 200 }).notNull().unique(),
+});
+
+export const bookGenres = pgTable(
+  'book_genres',
+  {
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    genreId: integer('genre_id')
+      .notNull()
+      .references(() => genres.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.bookId, t.genreId] })],
+);
+
 export const tags = pgTable('tags', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 200 }).notNull().unique(),
@@ -70,6 +88,9 @@ export type NewBookMetadata = typeof bookMetadata.$inferInsert;
 
 export type Author = typeof authors.$inferSelect;
 export type NewAuthor = typeof authors.$inferInsert;
+
+export type Genre = typeof genres.$inferSelect;
+export type NewGenre = typeof genres.$inferInsert;
 
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;

@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { basename } from 'path';
 import { inArray } from 'drizzle-orm';
 
-import type { BookCard, BooksPage } from '@projectx/types';
+import type { BooksPage } from '@projectx/types';
+import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { books } from '../../db/schema';
 import { BookRepository } from '../book/book.repository';
@@ -26,71 +26,6 @@ export class CollectionService {
     if (ownerId !== user.id && !this.isSuperuser(user)) {
       throw new ForbiddenException('No access to this collection');
     }
-  }
-
-  private assembleBookCards(
-    rows: {
-      id: number;
-      status: string;
-      folderPath: string;
-      addedAt: Date;
-      title: string | null;
-      seriesName: string | null;
-      seriesIndex: number | null;
-      publishedYear: number | null;
-      language: string | null;
-      rating: number | null;
-    }[],
-    authorRows: { bookId: number; name: string }[],
-    fileRows: { bookId: number; id: number; format: string | null; role: string }[],
-    tagRows: { bookId: number; name: string }[],
-    progressRows: { bookFileId: number; percentage: number | null }[],
-  ): BookCard[] {
-    const authorsByBook = new Map<number, string[]>();
-    for (const row of authorRows) {
-      const list = authorsByBook.get(row.bookId) ?? [];
-      list.push(row.name);
-      authorsByBook.set(row.bookId, list);
-    }
-
-    const filesByBook = new Map<number, { id: number; format: string | null; role: string }[]>();
-    for (const row of fileRows) {
-      const list = filesByBook.get(row.bookId) ?? [];
-      list.push({ id: row.id, format: row.format, role: row.role });
-      filesByBook.set(row.bookId, list);
-    }
-
-    const tagsByBook = new Map<number, string[]>();
-    for (const row of tagRows) {
-      const list = tagsByBook.get(row.bookId) ?? [];
-      list.push(row.name);
-      tagsByBook.set(row.bookId, list);
-    }
-
-    const progressByFileId = new Map<number, number | null>();
-    for (const row of progressRows) {
-      progressByFileId.set(row.bookFileId, row.percentage);
-    }
-
-    return rows.map((row) => {
-      const primaryFile = (filesByBook.get(row.id) ?? []).find((f) => f.role === 'primary');
-      const readingProgress = primaryFile ? (progressByFileId.get(primaryFile.id) ?? null) : null;
-      return {
-        id: row.id,
-        status: row.status,
-        title: row.title ?? basename(row.folderPath),
-        seriesName: row.seriesName ?? null,
-        seriesIndex: row.seriesIndex ?? null,
-        publishedYear: row.publishedYear ?? null,
-        language: row.language ?? null,
-        rating: row.rating ?? null,
-        addedAt: row.addedAt.toISOString(),
-        authors: authorsByBook.get(row.id) ?? [],
-        files: filesByBook.get(row.id) ?? [],
-        tags: tagsByBook.get(row.id) ?? [],
-        readingProgress,
-      };
-    });
   }
 
   findAll(user: RequestUser, bookIds?: number[]) {
@@ -170,7 +105,7 @@ export class CollectionService {
 
     const bookIds = bookIdRows.map((r) => r.bookId);
     const where = inArray(books.id, bookIds);
-    const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy: [],
       limit: size,
@@ -178,6 +113,6 @@ export class CollectionService {
       userId: user.id,
     });
 
-    return { items: this.assembleBookCards(rows, authorRows, fileRows, tagRows, progressRows), total, page, size };
+    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows), total, page, size };
   }
 }

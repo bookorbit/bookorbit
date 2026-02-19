@@ -4,7 +4,8 @@ import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
 import { MetadataProviderKey } from '@projectx/types';
-import type { BookCard, BookQuery, BooksPage } from '@projectx/types';
+import type { BookQuery, BooksPage } from '@projectx/types';
+import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { MetadataService } from '../metadata/metadata.service';
 import { LibraryService } from '../library/library.service';
@@ -46,78 +47,11 @@ export class BookService {
     return file;
   }
 
-  private assembleBookCards(
-    rows: {
-      id: number;
-      status: string;
-      folderPath: string;
-      addedAt: Date;
-      title: string | null;
-      seriesName: string | null;
-      seriesIndex: number | null;
-      publishedYear: number | null;
-      language: string | null;
-      rating: number | null;
-    }[],
-    authorRows: { bookId: number; name: string }[],
-    fileRows: { bookId: number; id: number; format: string | null; role: string }[],
-    tagRows: { bookId: number; name: string }[],
-    progressRows: { bookFileId: number; percentage: number }[],
-  ): BookCard[] {
-    const authorsByBook = new Map<number, string[]>();
-    for (const row of authorRows) {
-      const list = authorsByBook.get(row.bookId) ?? [];
-      list.push(row.name);
-      authorsByBook.set(row.bookId, list);
-    }
-
-    const filesByBook = new Map<number, { id: number; format: string | null; role: string }[]>();
-    for (const row of fileRows) {
-      const list = filesByBook.get(row.bookId) ?? [];
-      list.push({ id: row.id, format: row.format, role: row.role });
-      filesByBook.set(row.bookId, list);
-    }
-
-    const tagsByBook = new Map<number, string[]>();
-    for (const row of tagRows) {
-      const list = tagsByBook.get(row.bookId) ?? [];
-      list.push(row.name);
-      tagsByBook.set(row.bookId, list);
-    }
-
-    const progressByFileId = new Map<number, number>();
-    for (const row of progressRows) {
-      progressByFileId.set(row.bookFileId, row.percentage);
-    }
-
-    return rows.map((row) => {
-      const files = filesByBook.get(row.id) ?? [];
-      const primaryFile = files.find((f) => f.role === 'primary') ?? files[0] ?? null;
-      const readingProgress = primaryFile != null ? (progressByFileId.get(primaryFile.id) ?? null) : null;
-
-      return {
-        id: row.id,
-        status: row.status,
-        title: row.title ?? basename(row.folderPath),
-        seriesName: row.seriesName ?? null,
-        seriesIndex: row.seriesIndex ?? null,
-        authors: authorsByBook.get(row.id) ?? [],
-        files,
-        publishedYear: row.publishedYear ?? null,
-        language: row.language ?? null,
-        tags: tagsByBook.get(row.id) ?? [],
-        rating: row.rating ?? null,
-        readingProgress,
-        addedAt: row.addedAt.toISOString(),
-      };
-    });
-  }
-
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
@@ -125,7 +59,7 @@ export class BookService {
       userId: user.id,
     });
     return {
-      items: this.assembleBookCards(rows, authorRows, fileRows, tagRows, progressRows),
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows),
       total,
       page: query.pagination.page,
       size: query.pagination.size,
@@ -137,7 +71,7 @@ export class BookService {
     const accessibleLibraryIds = libs.map((l) => l.id);
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
@@ -145,7 +79,7 @@ export class BookService {
       userId: user.id,
     });
     return {
-      items: this.assembleBookCards(rows, authorRows, fileRows, tagRows, progressRows),
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows),
       total,
       page: query.pagination.page,
       size: query.pagination.size,
@@ -232,6 +166,9 @@ export class BookService {
         dto.authors.map((name) => ({ name, sortName: null })),
       );
     }
+    if (dto.genres !== undefined) {
+      await this.metadataService.replaceGenres(id, dto.genres);
+    }
     if (dto.tags !== undefined) {
       await this.metadataService.replaceTags(id, dto.tags);
     }
@@ -254,7 +191,7 @@ export class BookService {
     const result = await this.bookRepo.findById(id);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
-    const { book, authorRows, tagRows, fileRows } = result;
+    const { book, authorRows, genreRows, tagRows, fileRows } = result;
     const meta = book.book_metadata;
 
     return {
@@ -283,6 +220,7 @@ export class BookService {
         [MetadataProviderKey.OPEN_LIBRARY]: meta?.openLibraryId ?? null,
       },
       authors: authorRows,
+      genres: genreRows.map((g) => g.name),
       tags: tagRows.map((t) => t.name),
       files: fileRows.map((f) => ({
         id: f.id,

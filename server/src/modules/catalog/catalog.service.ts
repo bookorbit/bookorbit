@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, tags } from '../../db/schema';
+import { authors, genres, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -12,23 +12,25 @@ type Db = NodePgDatabase<typeof schema>;
 export class CatalogService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async searchAuthors(q: string): Promise<{ id: number; name: string }[]> {
-    if (!q.trim()) return [];
-    return this.db
-      .select({ id: authors.id, name: authors.name })
-      .from(authors)
-      .where(ilike(authors.name, `%${q}%`))
-      .orderBy(authors.name)
-      .limit(15);
+  searchAuthors(q: string) {
+    return this.searchByName(q, authors);
   }
 
-  async searchTags(q: string): Promise<{ id: number; name: string }[]> {
-    if (!q.trim()) return [];
+  searchGenres(q: string) {
+    return this.searchByName(q, genres);
+  }
+
+  searchTags(q: string) {
+    return this.searchByName(q, tags);
+  }
+
+  private searchByName(q: string, table: typeof authors | typeof genres | typeof tags): Promise<{ id: number; name: string }[]> {
+    if (!q.trim()) return Promise.resolve([]);
     return this.db
-      .select({ id: tags.id, name: tags.name })
-      .from(tags)
-      .where(ilike(tags.name, `%${q}%`))
-      .orderBy(tags.name)
+      .select({ id: table.id, name: table.name })
+      .from(table)
+      .where(ilike(table.name, `%${q}%`))
+      .orderBy(table.name)
       .limit(15);
   }
 }

@@ -36,7 +36,11 @@ const { items: books, total, loading, hasMore, load } = useCollectionBooks(colle
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 
 function handleSelect(id: number, event: MouseEvent) {
-  if (event.shiftKey) rangeSelectTo(id, books.value.map((b) => b.id))
+  if (event.shiftKey)
+    rangeSelectTo(
+      id,
+      books.value.map((b) => b.id),
+    )
   else toggleBook(id)
 }
 

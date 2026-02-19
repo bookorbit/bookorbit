@@ -7,7 +7,7 @@ import { join } from 'path';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookMetadata, bookTags, tags } from '../../db/schema';
+import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
 import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover, generateThumbnail } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
@@ -167,7 +167,7 @@ export class MetadataService {
       .where(eq(bookMetadata.bookId, bookId));
 
     await this.replaceAuthors(bookId, parsed.authors);
-    await this.replaceTags(bookId, parsed.tags);
+    await this.replaceGenres(bookId, parsed.tags);
 
     this.logger.debug(`Metadata saved for book ${bookId}: "${parsed.title}"`);
   }
@@ -231,21 +231,34 @@ export class MetadataService {
     }
   }
 
+  // ── Genres ───────────────────────────────────────────────────────────────────
+
+  async replaceGenres(bookId: number, parsedGenres: string[]) {
+    await this.db.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
+    const unique = [...new Set(parsedGenres.map((g) => g.substring(0, 200)).filter(Boolean))];
+    if (unique.length === 0) return;
+
+    for (const name of unique) {
+      let [genre] = await this.db.select().from(genres).where(eq(genres.name, name)).limit(1);
+      if (!genre) {
+        [genre] = await this.db.insert(genres).values({ name }).returning();
+      }
+      await this.db.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
+    }
+  }
+
   // ── Tags ─────────────────────────────────────────────────────────────────────
 
-  async replaceTags(bookId: number, parsedTags: string[]) {
+  async replaceTags(bookId: number, userTags: string[]) {
     await this.db.delete(bookTags).where(eq(bookTags.bookId, bookId));
-    const uniqueTags = [...new Set(parsedTags.map((t) => t.substring(0, 200)).filter(Boolean))];
-    if (uniqueTags.length === 0) return;
+    const unique = [...new Set(userTags.map((t) => t.substring(0, 200)).filter(Boolean))];
+    if (unique.length === 0) return;
 
-    for (const rawName of uniqueTags) {
-      const name = rawName;
+    for (const name of unique) {
       let [tag] = await this.db.select().from(tags).where(eq(tags.name, name)).limit(1);
-
       if (!tag) {
         [tag] = await this.db.insert(tags).values({ name }).returning();
       }
-
       await this.db.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
     }
   }

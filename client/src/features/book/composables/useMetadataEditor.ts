@@ -20,6 +20,7 @@ export function useMetadataEditor() {
     isbn13: null as string | null,
     rating: null as number | null,
     authors: [] as string[],
+    genres: [] as string[],
     tags: [] as string[],
     googleBooksId: null as string | null,
     goodreadsId: null as string | null,
@@ -46,6 +47,7 @@ export function useMetadataEditor() {
     form.isbn13 = book.isbn13
     form.rating = book.rating ?? null
     form.authors = book.authors.map((a) => a.name)
+    form.genres = [...book.genres]
     form.tags = [...book.tags]
     form.googleBooksId = book.providerIds.google ?? null
     form.goodreadsId = book.providerIds.goodreads ?? null

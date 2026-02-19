@@ -188,10 +188,10 @@ function downloadFile() {
         </div>
       </dl>
 
-      <!-- Tags -->
-      <div v-if="book.tags.length" class="flex flex-wrap gap-1.5 mt-5">
-        <span v-for="tag in book.tags" :key="tag" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
-          {{ tag }}
+      <!-- Genres -->
+      <div v-if="book.genres.length" class="flex flex-wrap gap-1.5 mt-5">
+        <span v-for="genre in book.genres" :key="genre" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
+          {{ genre }}
         </span>
       </div>
 

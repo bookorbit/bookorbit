@@ -40,10 +40,7 @@ const providerLabel = computed(() => getProviderLabel(props.candidate.provider, 
         {{ candidate.authors.join(', ') }}
       </span>
       <span class="flex items-center gap-1.5 flex-wrap">
-        <span
-          class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-          :style="providerBadgeStyle(candidate.provider)"
-        >
+        <span class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md" :style="providerBadgeStyle(candidate.provider)">
           {{ providerLabel }}
         </span>
         <span v-if="candidate.publishedYear" class="text-[10px] text-muted-foreground tabular-nums">{{ candidate.publishedYear }}</span>

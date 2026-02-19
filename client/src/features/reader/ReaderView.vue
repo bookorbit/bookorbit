@@ -345,13 +345,7 @@ function navigateSearch(cfiTarget: string) {
       @search="onSearchQuery"
       @clear="onSearchClear"
       @navigate="navigateSearch($event)"
-      @close="
-        () => {
-          onSearchClear()
-          searchInitialQuery = ''
-          showSearch = false
-        }
-      "
+      @close="onSearchClear(); searchInitialQuery = ''; showSearch = false"
     />
 
     <ReaderSettingsPanel v-if="showSettings" :state="state" @update="applyUpdate" @close="showSettings = false" />

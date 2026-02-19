@@ -4,7 +4,19 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, bookTags, libraries, readingProgress, tags } from '../../db/schema';
+import {
+  authors,
+  bookAuthors,
+  bookFiles,
+  bookGenres,
+  bookMetadata,
+  books,
+  bookTags,
+  genres,
+  libraries,
+  readingProgress,
+  tags,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -40,7 +52,7 @@ export class BookRepository {
 
     const bookIds = rows.map((r) => r.id);
 
-    const [authorRows, fileRows, tagRows] = await Promise.all([
+    const [authorRows, fileRows, genreRows, tagRows] = await Promise.all([
       bookIds.length > 0
         ? this.db
             .select({ bookId: bookAuthors.bookId, name: authors.name })
@@ -54,6 +66,13 @@ export class BookRepository {
             .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
             .from(bookFiles)
             .where(inArray(bookFiles.bookId, bookIds))
+        : ([] as { bookId: number; id: number; format: string | null; role: string }[]),
+      bookIds.length > 0
+        ? this.db
+            .select({ bookId: bookGenres.bookId, name: genres.name })
+            .from(bookGenres)
+            .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+            .where(inArray(bookGenres.bookId, bookIds))
         : [],
       bookIds.length > 0
         ? this.db
@@ -73,7 +92,7 @@ export class BookRepository {
             .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
         : [];
 
-    return { rows, authorRows, fileRows, tagRows, progressRows, total: Number(total) };
+    return { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total: Number(total) };
   }
 
   async findById(id: number) {
@@ -81,13 +100,14 @@ export class BookRepository {
 
     if (!book) return null;
 
-    const [authorRows, tagRows, fileRows] = await Promise.all([
+    const [authorRows, genreRows, tagRows, fileRows] = await Promise.all([
       this.db
         .select({ id: authors.id, name: authors.name, sortName: authors.sortName })
         .from(bookAuthors)
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(eq(bookAuthors.bookId, id))
         .orderBy(bookAuthors.displayOrder),
+      this.db.select({ name: genres.name }).from(bookGenres).innerJoin(genres, eq(genres.id, bookGenres.genreId)).where(eq(bookGenres.bookId, id)),
       this.db.select({ name: tags.name }).from(bookTags).innerJoin(tags, eq(tags.id, bookTags.tagId)).where(eq(bookTags.bookId, id)),
       this.db
         .select({
@@ -102,7 +122,7 @@ export class BookRepository {
         .where(eq(bookFiles.bookId, id)),
     ]);
 
-    return { book, authorRows, tagRows, fileRows };
+    return { book, authorRows, genreRows, tagRows, fileRows };
   }
 
   async findLibraryIdByBookId(bookId: number): Promise<number | null> {

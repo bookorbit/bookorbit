@@ -7,8 +7,7 @@ import { mapGoodreadsApolloState } from './goodreads.mapper';
 import { GoodreadsNextData } from './goodreads.types';
 
 const HEADERS: HeadersInit = {
-  'user-agent':
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'accept-language': 'en-US,en;q=0.9',
 };
@@ -25,9 +24,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
   private readonly logger = new Logger(GoodreadsProvider.name);
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
-    const ids = params.isbn
-      ? await this.findIdByIsbn(params.isbn).then((id) => (id ? [id] : []))
-      : await this.searchIds(params);
+    const ids = params.isbn ? await this.findIdByIsbn(params.isbn).then((id) => (id ? [id] : [])) : await this.searchIds(params);
 
     const results: MetadataCandidate[] = [];
     for (const id of ids.slice(0, MAX_RESULTS)) {

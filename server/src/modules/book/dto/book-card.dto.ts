@@ -14,6 +14,7 @@ export class BookCardDto {
   files: BookFileRefDto[];
   publishedYear: number | null;
   language: string | null;
+  genres: string[];
   tags: string[];
   rating: number | null;
   readingProgress: number | null;

@@ -14,6 +14,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
   @IsOptional() @IsString() @MaxLength(50) goodreadsId?: string | null;

@@ -11,6 +11,11 @@ export class CatalogController {
     return this.catalogService.searchAuthors(q);
   }
 
+  @Get('genres')
+  searchGenres(@Query('q') q = '') {
+    return this.catalogService.searchGenres(q);
+  }
+
   @Get('tags')
   searchTags(@Query('q') q = '') {
     return this.catalogService.searchTags(q);

@@ -19,10 +19,7 @@ const emit = defineEmits<{
 
 const providerLabel = computed(() => getProviderLabel(props.candidate.provider, props.providers))
 
-const { fields, toggleField, copyAll, copyMissing, buildPatch, hasCopied } = useMetadataDiff(
-  props.book,
-  props.candidate,
-)
+const { fields, toggleField, copyAll, copyMissing, buildPatch, hasCopied } = useMetadataDiff(props.book, props.candidate)
 
 function apply() {
   emit('apply', buildPatch())
@@ -43,10 +40,7 @@ function apply() {
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold truncate leading-snug">{{ candidate.title }}</p>
         <div class="flex items-center gap-1.5 mt-0.5">
-          <span
-            class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-            :style="providerBadgeStyle(candidate.provider)"
-          >
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full" :style="providerBadgeStyle(candidate.provider)">
             {{ providerLabel }}
           </span>
         </div>
@@ -84,15 +78,8 @@ function apply() {
 
     <!-- Diff rows -->
     <div class="flex-1 overflow-y-auto px-4">
-      <MetadataDiffRow
-        v-for="field in fields"
-        :key="field.key"
-        :field="field"
-        @toggle="toggleField"
-      />
-      <p v-if="fields.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-        No metadata available from this source.
-      </p>
+      <MetadataDiffRow v-for="field in fields" :key="field.key" :field="field" @toggle="toggleField" />
+      <p v-if="fields.length === 0" class="py-8 text-center text-sm text-muted-foreground">No metadata available from this source.</p>
     </div>
 
     <!-- Footer -->
