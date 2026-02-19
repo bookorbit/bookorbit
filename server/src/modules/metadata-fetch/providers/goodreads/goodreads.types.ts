@@ -6,58 +6,30 @@ export interface GoodreadsNextData {
   };
 }
 
-export interface Ref {
-  __ref: string;
-}
-
+// Inline nested objects — NOT __ref pointers
 export interface GoodreadsApolloBook {
   title?: string;
+  description?: string;
   imageUrl?: string;
-  description?: Ref;
-  bookGenres?: Array<{ genre?: Ref }>;
-  details?: Ref;
-  primaryContributorEdge?: Ref;
-  secondaryContributorEdges?: Ref[];
-  bookSeries?: Ref[];
-  work?: Ref;
+  details?: GoodreadsApolloDetails;
+  bookGenres?: Array<{ genre?: { name?: string } }>;
+  bookSeries?: Array<{ userPosition?: string }>;
 }
 
-export interface GoodreadsApolloBookDetails {
+export interface GoodreadsApolloDetails {
+  numPages?: string | number;
+  publicationTime?: string | number;
   publisher?: string;
-  publicationTime?: number;
-  language?: { name?: string };
-  numPages?: number;
   isbn?: string;
   isbn13?: string;
+  language?: { name?: string };
 }
 
-export interface GoodreadsApolloContributorEdge {
-  node?: Ref;
-  role?: string;
-}
-
+// Found by scanning root apolloState for keys starting with these prefixes
 export interface GoodreadsApolloContributor {
   name?: string;
 }
 
-export interface GoodreadsApolloGenre {
-  name?: string;
-}
-
-export interface GoodreadsApolloBookSeries {
-  series?: Ref;
-  userPosition?: string;
-}
-
 export interface GoodreadsApolloSeries {
   title?: string;
-}
-
-export interface GoodreadsApolloWork {
-  stats?: Ref;
-}
-
-export interface GoodreadsApolloTruncatedHtml {
-  fullContent?: string;
-  truncatedContent?: string;
 }

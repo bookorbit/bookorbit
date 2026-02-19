@@ -2,110 +2,90 @@ import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import {
   GoodreadsApolloBook,
-  GoodreadsApolloBookDetails,
-  GoodreadsApolloBookSeries,
   GoodreadsApolloContributor,
-  GoodreadsApolloContributorEdge,
-  GoodreadsApolloGenre,
   GoodreadsApolloSeries,
-  GoodreadsApolloTruncatedHtml,
-  Ref,
 } from './goodreads.types';
-
-function deref<T>(state: Record<string, unknown>, ref: Ref | unknown): T | undefined {
-  if (!ref || typeof ref !== 'object') return undefined;
-  const r = ref as Ref;
-  if (!r.__ref) return undefined;
-  return state[r.__ref] as T | undefined;
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim();
-}
 
 export function mapGoodreadsApolloState(
   state: Record<string, unknown>,
   bookId: string,
 ): MetadataCandidate | null {
-  const bookKey = Object.keys(state).find((k) => k.startsWith('Book:'));
-  if (!bookKey) return null;
-  const book = state[bookKey] as GoodreadsApolloBook;
+  const book = findByKeyPrefix<GoodreadsApolloBook>(state, 'Book:kca:');
+  if (!book?.title) return null;
 
-  const details = deref<GoodreadsApolloBookDetails>(state, book.details);
+  const contributor = findByKeyPrefix<GoodreadsApolloContributor>(state, 'Contributor:kca');
+  const series = findByKeyPrefix<GoodreadsApolloSeries>(state, 'Series:kca');
 
-  const authors: string[] = [];
-  const primaryEdge = deref<GoodreadsApolloContributorEdge>(state, book.primaryContributorEdge);
-  const primaryAuthor = deref<GoodreadsApolloContributor>(state, primaryEdge?.node);
-  if (primaryAuthor?.name) authors.push(primaryAuthor.name);
-  for (const edgeRef of book.secondaryContributorEdges ?? []) {
-    const edge = deref<GoodreadsApolloContributorEdge>(state, edgeRef);
-    if (edge?.role?.toLowerCase() === 'author') {
-      const author = deref<GoodreadsApolloContributor>(state, edge.node);
-      if (author?.name) authors.push(author.name);
-    }
-  }
+  const details = book.details;
+  const firstSeries = book.bookSeries?.[0];
 
-  const descNode = deref<GoodreadsApolloTruncatedHtml>(state, book.description);
-  const descHtml = descNode?.fullContent ?? descNode?.truncatedContent ?? '';
-  const description = descHtml ? stripHtml(descHtml) : undefined;
+  const tags = (book.bookGenres ?? [])
+    .map((g) => g.genre?.name)
+    .filter((n): n is string => !!n);
 
-  const tags: string[] = [];
-  for (const entry of book.bookGenres ?? []) {
-    const genre = deref<GoodreadsApolloGenre>(state, entry.genre);
-    if (genre?.name) tags.push(genre.name);
-  }
+  const { title, subtitle } = splitTitle(book.title);
 
-  let seriesName: string | undefined;
-  let seriesIndex: number | undefined;
-  for (const bsRef of book.bookSeries ?? []) {
-    const bs = deref<GoodreadsApolloBookSeries>(state, bsRef);
-    const series = deref<GoodreadsApolloSeries>(state, bs?.series);
-    if (series?.title) {
-      seriesName = series.title;
-      if (bs?.userPosition) {
-        const idx = parseFloat(bs.userPosition);
-        if (!Number.isNaN(idx)) seriesIndex = idx;
-      }
-      break;
-    }
-  }
-
-  let publishedYear: number | undefined;
-  if (details?.publicationTime) {
-    publishedYear = new Date(details.publicationTime).getFullYear();
-  }
-
-  const fullTitle = book.title ?? '';
-  const colonIdx = fullTitle.indexOf(':');
-  const title = colonIdx > 0 ? fullTitle.substring(0, colonIdx).trim() : fullTitle;
-  const subtitle = colonIdx > 0 ? fullTitle.substring(colonIdx + 1).trim() : undefined;
+  const publishedYear = parseEpochYear(details?.publicationTime);
+  const pageCount = parsePositiveInt(details?.numPages);
+  const seriesIndex = parseSeriesIndex(firstSeries?.userPosition);
 
   return {
     provider: MetadataProviderKey.GOODREADS,
     providerId: bookId,
     title,
     subtitle,
-    authors: authors.length ? authors : undefined,
-    description,
-    publisher: details?.publisher,
+    authors: contributor?.name ? [contributor.name] : undefined,
+    description: normalize(book.description),
+    publisher: normalize(details?.publisher),
     publishedYear,
-    language: details?.language?.name,
-    pageCount: details?.numPages,
-    isbn10: details?.isbn,
-    isbn13: details?.isbn13,
+    language: normalize(details?.language?.name),
+    pageCount,
+    isbn10: normalize(details?.isbn),
+    isbn13: normalize(details?.isbn13),
     tags: tags.length ? tags : undefined,
     coverUrl: book.imageUrl,
     sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
-    seriesName,
+    seriesName: normalize(series?.title),
     seriesIndex,
   };
+}
+
+function findByKeyPrefix<T>(state: Record<string, unknown>, prefix: string): T | undefined {
+  const key = Object.keys(state).find((k) => k.includes(prefix));
+  return key ? (state[key] as T) : undefined;
+}
+
+function splitTitle(fullTitle: string): { title: string; subtitle?: string } {
+  const colon = fullTitle.indexOf(':');
+  if (colon > 0) {
+    return {
+      title: fullTitle.substring(0, colon).trim(),
+      subtitle: fullTitle.substring(colon + 1).trim(),
+    };
+  }
+  return { title: fullTitle };
+}
+
+function normalize(value: string | undefined | null): string | undefined {
+  if (!value || value === 'null') return undefined;
+  return value.trim() || undefined;
+}
+
+function parseEpochYear(value: string | number | undefined): number | undefined {
+  if (value == null) return undefined;
+  const ms = typeof value === 'string' ? parseFloat(value) : value;
+  if (!ms || Number.isNaN(ms)) return undefined;
+  return new Date(ms).getFullYear();
+}
+
+function parsePositiveInt(value: string | number | undefined): number | undefined {
+  if (value == null) return undefined;
+  const n = typeof value === 'string' ? parseInt(value, 10) : Math.round(value);
+  return n > 0 && !Number.isNaN(n) ? n : undefined;
+}
+
+function parseSeriesIndex(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const n = parseFloat(value);
+  return Number.isNaN(n) ? undefined : n;
 }
