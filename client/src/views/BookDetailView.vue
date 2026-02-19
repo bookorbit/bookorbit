@@ -1,25 +1,21 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/AppSidebar.vue'
 import AppHeader from '@/components/AppHeader.vue'
-import BookDetailHeader from '@/features/book/components/detail/BookDetailHeader.vue'
 import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
-import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
-const router = useRouter()
 
 const bookId = computed(() => Number(route.params.bookId))
 
 const { detail, loading, fetch } = useBookDetail()
-const { libraries, fetchLibraries } = useLibraries()
 
 const { subscribeLibrary } = useScanProgress()
 watch(
@@ -43,21 +39,9 @@ onBookMoved((bookIds) => {
 })
 
 watch(bookId, (id) => fetch(id), { immediate: true })
-fetchLibraries()
-
-const libraryName = computed(() => libraries.value.find((l) => l.id === detail.value?.libraryId)?.name ?? 'Library')
 
 const themeStore = useThemeStore()
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
-
-function goBack() {
-  if (window.history.state?.back) {
-    router.back()
-  } else {
-    const libId = detail.value?.libraryId
-    router.push(libId ? { name: 'library', params: { id: libId } } : { name: 'home' })
-  }
-}
 </script>
 
 <template>
@@ -66,7 +50,6 @@ function goBack() {
     <SidebarInset class="flex flex-col min-h-screen overflow-x-hidden">
       <AppHeader />
       <div class="flex items-center border-b shrink-0 h-11">
-        <BookDetailHeader :library-name="libraryName" :loading="loading" @back="goBack" />
         <BookDetailTabs :book-id="bookId" />
       </div>
 

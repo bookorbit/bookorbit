@@ -1,3 +1,5 @@
+import type { ProviderIds } from '@projectx/types';
+
 export class BookFileDto {
   id: number;
   format: string | null;
@@ -26,6 +28,7 @@ export class BookDetailDto {
   seriesIndex: number | null;
   rating: number | null;
   coverSource: 'extracted' | 'custom' | null;
+  providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
   tags: string[];
   files: BookFileDto[];

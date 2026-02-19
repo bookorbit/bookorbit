@@ -1,41 +1,25 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import type { BookDetail } from '@projectx/types'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/AppSidebar.vue'
 import AppHeader from '@/components/AppHeader.vue'
-import BookDetailHeader from '@/features/book/components/detail/BookDetailHeader.vue'
 import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue'
 import EditMetadataTab from '@/features/book/components/detail/tabs/EditMetadataTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
-import { useLibraries } from '@/features/library/composables/useLibraries'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
-const router = useRouter()
 
 const bookId = computed(() => Number(route.params.bookId))
 
 const { detail, loading, fetch } = useBookDetail()
-const { libraries, fetchLibraries } = useLibraries()
 
 watch(bookId, (id) => fetch(id), { immediate: true })
-fetchLibraries()
 
 const themeStore = useThemeStore()
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
-
-const libraryName = computed(() => libraries.value.find((l) => l.id === detail.value?.libraryId)?.name ?? 'Library')
-
-function goBack() {
-  if (window.history.state?.back) {
-    router.back()
-  } else {
-    const libId = detail.value?.libraryId
-    router.push(libId ? { name: 'library', params: { id: libId } } : { name: 'home' })
-  }
-}
 
 function onMetadataSaved(updated: BookDetail) {
   detail.value = updated
@@ -52,7 +36,6 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
     <SidebarInset class="flex flex-col min-h-screen overflow-x-hidden">
       <AppHeader />
       <div class="flex items-center border-b shrink-0 h-11">
-        <BookDetailHeader :library-name="libraryName" :loading="loading" @back="goBack" />
         <BookDetailTabs :book-id="bookId" />
       </div>
 

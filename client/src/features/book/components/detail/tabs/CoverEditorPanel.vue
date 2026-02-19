@@ -50,7 +50,7 @@ async function handleRevert() {
 
 const lightboxOpen = ref(false)
 
-defineExpose({ setUrl })
+defineExpose({ setUrl, hasPending, confirm })
 
 onUnmounted(() => clearTimeout(debounceTimer))
 </script>

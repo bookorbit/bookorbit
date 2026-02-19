@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
+import { MetadataProviderKey } from '@projectx/types';
 import type { BookCard, BookQuery, BooksPage } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { MetadataService } from '../metadata/metadata.service';
@@ -214,6 +215,11 @@ export class BookService {
     if ('isbn10' in dto) scalarFields.isbn10 = dto.isbn10 ?? null;
     if ('isbn13' in dto) scalarFields.isbn13 = dto.isbn13 ?? null;
     if ('rating' in dto) scalarFields.rating = dto.rating ?? null;
+    if ('googleBooksId' in dto) scalarFields.googleBooksId = dto.googleBooksId ?? null;
+    if ('goodreadsId' in dto) scalarFields.goodreadsId = dto.goodreadsId ?? null;
+    if ('amazonId' in dto) scalarFields.amazonId = dto.amazonId ?? null;
+    if ('hardcoverId' in dto) scalarFields.hardcoverId = dto.hardcoverId ?? null;
+    if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
 
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();
@@ -269,6 +275,13 @@ export class BookService {
       seriesIndex: meta?.seriesIndex ?? null,
       rating: meta?.rating ?? null,
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
+      providerIds: {
+        [MetadataProviderKey.GOOGLE]: meta?.googleBooksId ?? null,
+        [MetadataProviderKey.GOODREADS]: meta?.goodreadsId ?? null,
+        [MetadataProviderKey.AMAZON]: meta?.amazonId ?? null,
+        [MetadataProviderKey.HARDCOVER]: meta?.hardcoverId ?? null,
+        [MetadataProviderKey.OPEN_LIBRARY]: meta?.openLibraryId ?? null,
+      },
       authors: authorRows,
       tags: tagRows.map((t) => t.name),
       files: fileRows.map((f) => ({

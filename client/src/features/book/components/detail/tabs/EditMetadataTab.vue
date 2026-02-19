@@ -20,6 +20,14 @@ const { search: searchTags } = useTagSearch()
 const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 const searchOpen = ref(false)
 
+const providerIdFields = [
+  { field: 'googleBooksId' as const, label: 'Google Books' },
+  { field: 'goodreadsId' as const, label: 'Goodreads' },
+  { field: 'amazonId' as const, label: 'Amazon' },
+  { field: 'hardcoverId' as const, label: 'Hardcover' },
+  { field: 'openLibraryId' as const, label: 'OpenLibrary' },
+]
+
 function setIntField(field: 'publishedYear' | 'pageCount', e: Event) {
   const val = (e.target as HTMLInputElement).value
   if (val === '') { form[field] = null; return }
@@ -38,6 +46,10 @@ onMounted(() => load(props.book))
 watch(() => props.book.id, () => load(props.book))
 
 async function submit() {
+  if (coverPanel.value?.hasPending) {
+    const ok = await coverPanel.value.confirm()
+    if (ok) emit('coverChanged', 'custom')
+  }
   const updated = await save(props.book.id)
   if (updated) emit('saved', updated)
 }
@@ -212,6 +224,21 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
             placeholder="0000000000"
             maxlength="10"
           />
+        </div>
+      </div>
+
+      <!-- Provider IDs -->
+      <div class="space-y-2">
+        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Provider IDs</label>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div v-for="{ field, label } in providerIdFields" :key="field" class="flex items-center gap-2">
+            <span class="text-xs text-muted-foreground w-24 shrink-0">{{ label }}</span>
+            <input
+              v-model="form[field]"
+              class="flex-1 h-8 rounded-lg border border-input bg-background px-2.5 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
+              :placeholder="label + ' ID'"
+            />
+          </div>
         </div>
       </div>
 

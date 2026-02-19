@@ -21,6 +21,11 @@ export function useMetadataEditor() {
     rating: null as number | null,
     authors: [] as string[],
     tags: [] as string[],
+    googleBooksId: null as string | null,
+    goodreadsId: null as string | null,
+    amazonId: null as string | null,
+    hardcoverId: null as string | null,
+    openLibraryId: null as string | null,
   })
 
   let snapshot = JSON.stringify(form)
@@ -42,6 +47,11 @@ export function useMetadataEditor() {
     form.rating = book.rating ?? null
     form.authors = book.authors.map((a) => a.name)
     form.tags = [...book.tags]
+    form.googleBooksId = book.providerIds.google ?? null
+    form.goodreadsId = book.providerIds.goodreads ?? null
+    form.amazonId = book.providerIds.amazon ?? null
+    form.hardcoverId = book.providerIds.hardcover ?? null
+    form.openLibraryId = book.providerIds.openLibrary ?? null
     snapshot = JSON.stringify(form)
     error.value = null
   }

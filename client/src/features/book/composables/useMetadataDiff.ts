@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import type { BookDetail, MetadataCandidate } from '@projectx/types'
+import type { BookDetail, MetadataCandidate, MetadataProviderKey } from '@projectx/types'
 
 export type DiffFieldKey =
   | 'title'
@@ -42,9 +42,15 @@ export interface MetadataPatch {
   isbn13?: string | null
   authors?: string[]
   tags?: string[]
+  googleBooksId?: string | null
+  goodreadsId?: string | null
+  amazonId?: string | null
+  hardcoverId?: string | null
+  openLibraryId?: string | null
 }
 
 const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
+  { key: 'coverUrl', label: 'Cover' },
   { key: 'title', label: 'Title' },
   { key: 'subtitle', label: 'Subtitle' },
   { key: 'authors', label: 'Authors' },
@@ -58,8 +64,15 @@ const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'isbn13', label: 'ISBN-13' },
   { key: 'isbn10', label: 'ISBN-10' },
   { key: 'tags', label: 'Tags' },
-  { key: 'coverUrl', label: 'Cover' },
 ]
+
+const PROVIDER_ID_FIELD: Record<MetadataProviderKey, keyof MetadataPatch | undefined> = {
+  google: 'googleBooksId',
+  goodreads: 'goodreadsId',
+  amazon: 'amazonId',
+  hardcover: 'hardcoverId',
+  openLibrary: 'openLibraryId',
+}
 
 export function useMetadataDiff(book: BookDetail, candidate: MetadataCandidate) {
   const copiedFields = reactive(new Set<DiffFieldKey>())
@@ -127,6 +140,11 @@ export function useMetadataDiff(book: BookDetail, candidate: MetadataCandidate) 
       if (key === 'seriesIndex') { formPatch.seriesIndex = candidate.seriesIndex ?? null; continue }
       const val = candidate[key as keyof MetadataCandidate]
       ;(formPatch as Record<string, unknown>)[key] = val != null ? String(val) : null
+    }
+
+    if (copiedFields.size > 0) {
+      const idField = PROVIDER_ID_FIELD[candidate.provider]
+      if (idField) formPatch[idField] = candidate.providerId
     }
 
     return { formPatch, coverUrl }

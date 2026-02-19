@@ -1,3 +1,5 @@
+import type { MetadataProviderKey } from './metadata-fetch';
+
 export type BookFileRef = {
   id: number;
   format: string | null;
@@ -30,6 +32,8 @@ export type BookDetailFile = {
   filename: string | null;
 };
 
+export type ProviderIds = Partial<Record<MetadataProviderKey, string | null>>;
+
 export type BookDetail = {
   id: number;
   libraryId: number;
@@ -48,6 +52,7 @@ export type BookDetail = {
   seriesIndex: number | null;
   rating: number | null;
   coverSource: 'extracted' | 'custom' | null;
+  providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
   tags: string[];
   files: BookDetailFile[];
