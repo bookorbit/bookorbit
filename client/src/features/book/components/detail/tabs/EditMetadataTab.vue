@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Star } from 'lucide-vue-next'
+import { Search, Star } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
+import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
+import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
 import { useTagSearch } from '../../../composables/useTagSearch'
@@ -15,31 +17,25 @@ const { form, saving, error, isDirty, load, reset, save } = useMetadataEditor()
 const { search: searchAuthors } = useAuthorSearch()
 const { search: searchTags } = useTagSearch()
 
+const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
+const searchOpen = ref(false)
+
 function setIntField(field: 'publishedYear' | 'pageCount', e: Event) {
   const val = (e.target as HTMLInputElement).value
-  if (val === '') {
-    form[field] = null
-    return
-  }
+  if (val === '') { form[field] = null; return }
   const n = parseInt(val, 10)
   form[field] = isNaN(n) ? null : n
 }
 
 function setFloatField(field: 'seriesIndex', e: Event) {
   const val = (e.target as HTMLInputElement).value
-  if (val === '') {
-    form[field] = null
-    return
-  }
+  if (val === '') { form[field] = null; return }
   const n = parseFloat(val)
   form[field] = isNaN(n) ? null : n
 }
 
 onMounted(() => load(props.book))
-watch(
-  () => props.book.id,
-  () => load(props.book),
-)
+watch(() => props.book.id, () => load(props.book))
 
 async function submit() {
   const updated = await save(props.book.id)
@@ -52,13 +48,18 @@ const displayRating = computed(() => hoverRating.value ?? form.rating)
 function setRating(star: number) {
   form.rating = form.rating === star ? null : star
 }
+
+function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverUrl?: string }) {
+  Object.assign(form, formPatch)
+  if (coverUrl) coverPanel.value?.setUrl(coverUrl)
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
     <!-- Left: Cover panel -->
     <div class="w-full lg:w-52 lg:shrink-0 lg:sticky lg:top-6">
-      <CoverEditorPanel :book="props.book" @cover-changed="(src) => emit('coverChanged', src)" />
+      <CoverEditorPanel ref="coverPanel" :book="props.book" @cover-changed="(src) => emit('coverChanged', src)" />
     </div>
 
     <!-- Right: Form -->
@@ -68,6 +69,13 @@ function setRating(star: number) {
         <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
         <span v-else />
         <div class="flex gap-2">
+          <button
+            class="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            @click="searchOpen = true"
+          >
+            <Search class="size-3.5" />
+            Search online
+          </button>
           <button
             class="h-8 px-4 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
             :disabled="!isDirty || saving"
@@ -245,4 +253,11 @@ function setRating(star: number) {
       </div>
     </div>
   </div>
+
+  <MetadataSearchDrawer
+    v-if="searchOpen"
+    :book="props.book"
+    @close="searchOpen = false"
+    @apply="handleApply"
+  />
 </template>

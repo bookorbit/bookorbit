@@ -32,7 +32,7 @@ export class GoogleProvider implements IdentifiableProvider {
     const url = this.buildUrl(`/volumes/${providerId}`);
     const res = await fetch(url);
     if (!res.ok) {
-      this.logIfConfigError(res.status, `lookupById(${providerId})`);
+      this.logger.warn(`Google Books API returned ${res.status} for lookupById(${providerId})`);
       return null;
     }
     const item = (await res.json()) as GoogleVolumeItem;
@@ -40,17 +40,18 @@ export class GoogleProvider implements IdentifiableProvider {
   }
 
   private buildQuery(params: MetadataSearchParams): string | null {
+    const parts: string[] = [];
     if (params.isbn) return `isbn:${params.isbn}`;
-    if (params.title && params.author) return `intitle:${params.title}+inauthor:${params.author}`;
-    if (params.title) return `intitle:${params.title}`;
-    return null;
+    if (params.title) parts.push(`intitle:${params.title}`);
+    if (params.author) parts.push(`inauthor:${params.author}`);
+    return parts.length ? parts.join(' ') : null;
   }
 
   private async fetchVolumes(query: string): Promise<MetadataCandidate[]> {
     const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' });
     const res = await fetch(url);
     if (!res.ok) {
-      this.logIfConfigError(res.status, `search("${query}")`);
+      this.logger.warn(`Google Books API returned ${res.status} for search("${query}")`);
       return [];
     }
     const body = (await res.json()) as GoogleBooksResponse;
@@ -62,11 +63,5 @@ export class GoogleProvider implements IdentifiableProvider {
     if (this.apiKey) params.set('key', this.apiKey);
     const qs = params.toString();
     return `${BASE_URL}${path}${qs ? `?${qs}` : ''}`;
-  }
-
-  private logIfConfigError(status: number, context: string): void {
-    if (status === 400 || status === 403) {
-      this.logger.warn(`Google Books API config error (${status}) during ${context} - check GOOGLE_BOOKS_API_KEY`);
-    }
   }
 }

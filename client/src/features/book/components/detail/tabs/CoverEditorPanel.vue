@@ -2,6 +2,7 @@
 import { computed, ref, onUnmounted } from 'vue'
 import { ImagePlus, Link, RotateCcw, Upload, X } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
+import { hideOnError } from '../../../lib/metadata-fetch'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 
@@ -32,6 +33,7 @@ function onUrlInput() {
 
 function switchMode(m: 'file' | 'url') {
   mode.value = m
+  clearTimeout(debounceTimer)
   clearPending()
   urlInput.value = ''
 }
@@ -48,6 +50,8 @@ async function handleRevert() {
 
 const lightboxOpen = ref(false)
 
+defineExpose({ setUrl })
+
 onUnmounted(() => clearTimeout(debounceTimer))
 </script>
 
@@ -59,7 +63,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         :src="activeSrc"
         :alt="book.title ?? ''"
         class="w-full h-full object-cover"
-        @error="(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')"
+        @error="hideOnError"
         @load="(e) => ((e.target as HTMLImageElement).style.visibility = 'visible')"
       />
     </div>
