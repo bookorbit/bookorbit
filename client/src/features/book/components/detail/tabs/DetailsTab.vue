@@ -6,6 +6,7 @@ import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } f
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import type { BookDetail } from '@projectx/types'
+import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
@@ -201,7 +202,7 @@ function downloadFile() {
         <div v-if="book.description">
           <div
             class="text-sm leading-relaxed text-foreground/80 transition-all"
-            :class="descriptionExpanded ? '' : 'line-clamp-6'"
+            :class="descriptionExpanded ? '' : 'line-clamp-3'"
             v-html="book.description"
           />
           <button
@@ -215,6 +216,8 @@ function downloadFile() {
       </div>
     </div>
   </div>
+
+  <RecommendedBooksRow :book-id="book.id" />
 
   <!-- Cover lightbox -->
   <DialogRoot :open="coverLightboxOpen" @update:open="coverLightboxOpen = $event">

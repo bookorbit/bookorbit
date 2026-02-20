@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -7,6 +7,7 @@ import { join } from 'path';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
 import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover, generateThumbnail } from './lib/cover';
@@ -25,6 +26,7 @@ export class MetadataService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly config: ConfigService,
+    @Optional() private readonly embedder: BookEmbedderService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -170,6 +172,7 @@ export class MetadataService {
     await this.replaceGenres(bookId, parsed.tags);
 
     this.logger.debug(`Metadata saved for book ${bookId}: "${parsed.title}"`);
+    this.embedder?.embedBook(bookId).catch((err: Error) => this.logger.warn(`Embedding failed for book ${bookId}: ${err.message}`));
   }
 
   // ── Cover ────────────────────────────────────────────────────────────────────

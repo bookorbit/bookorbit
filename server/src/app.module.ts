@@ -26,6 +26,7 @@ import { PathModule } from './modules/path/path.module';
 import { MetadataFetchModule } from './modules/metadata-fetch/metadata-fetch.module';
 import { MetadataModule } from './modules/metadata/metadata.module';
 import { ReaderPreferencesModule } from './modules/reader-preferences/reader-preferences.module';
+import { RecommendationModule } from './modules/recommendation/recommendation.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
@@ -55,6 +56,7 @@ import { UserModule } from './modules/user/user.module';
     ScannerModule,
     MetadataModule,
     MetadataFetchModule,
+    RecommendationModule,
     KoboModule,
     OpdsModule,
     BookmarkModule,

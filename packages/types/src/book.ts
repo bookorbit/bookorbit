@@ -66,3 +66,8 @@ export type BooksPage = {
   page: number;
   size: number;
 };
+
+export type BookRecommendation = {
+  book: BookCard;
+  score: number;
+};

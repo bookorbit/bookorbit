@@ -17,6 +17,7 @@ import {
   LogIn,
   Rss,
   Tablet,
+  Wrench,
 } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -34,6 +35,7 @@ import PermissionsPage from '@/features/admin/PermissionsPage.vue'
 import OidcSettings from './OidcSettings.vue'
 import OpdsSettings from './OpdsSettings.vue'
 import KoboSettings from './KoboSettings.vue'
+import MaintenanceSettings from './MaintenanceSettings.vue'
 
 const { isOpen, close } = useSettingsDrawer()
 const { isSuperuser, userPermissions } = usePermissions()
@@ -54,6 +56,7 @@ type SectionId =
   | 'roles'
   | 'permissions'
   | 'oidc'
+  | 'maintenance'
 
 const navGroups = computed(() => {
   const perms = userPermissions.value
@@ -88,6 +91,7 @@ const navGroups = computed(() => {
   }
   if (su || perms.includes('manage_app_settings')) {
     adminItems.push({ id: 'oidc', label: 'OIDC / SSO', icon: LogIn, component: OidcSettings })
+    adminItems.push({ id: 'maintenance', label: 'Maintenance', icon: Wrench, component: MaintenanceSettings })
   }
   if (adminItems.length) {
     groups.push({ label: 'Administration', items: adminItems })

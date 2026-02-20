@@ -209,6 +209,11 @@ export class BookRepository {
     return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
   }
 
+  async findAllIds(): Promise<number[]> {
+    const rows = await this.db.select({ id: books.id }).from(books);
+    return rows.map((r) => r.id);
+  }
+
   async deleteByIds(bookIds: number[]): Promise<void> {
     await this.db.delete(books).where(inArray(books.id, bookIds));
   }
