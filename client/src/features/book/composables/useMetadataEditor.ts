@@ -29,9 +29,9 @@ export function useMetadataEditor() {
     openLibraryId: null as string | null,
   })
 
-  let snapshot = JSON.stringify(form)
+  const snapshot = ref(JSON.stringify(form))
 
-  const isDirty = computed(() => JSON.stringify(form) !== snapshot)
+  const isDirty = computed(() => JSON.stringify(form) !== snapshot.value)
 
   function load(book: BookDetail) {
     form.title = book.title
@@ -54,12 +54,12 @@ export function useMetadataEditor() {
     form.amazonId = book.providerIds.amazon ?? null
     form.hardcoverId = book.providerIds.hardcover ?? null
     form.openLibraryId = book.providerIds.openLibrary ?? null
-    snapshot = JSON.stringify(form)
+    snapshot.value = JSON.stringify(form)
     error.value = null
   }
 
   function reset() {
-    const s = JSON.parse(snapshot)
+    const s = JSON.parse(snapshot.value)
     Object.assign(form, s)
     error.value = null
   }
@@ -75,7 +75,7 @@ export function useMetadataEditor() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const updated: BookDetail = await res.json()
-      snapshot = JSON.stringify(form)
+      snapshot.value = JSON.stringify(form)
       return updated
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to save'
