@@ -32,6 +32,12 @@ import type { BookQuery } from '@projectx/types';
 export class BookController {
   constructor(private readonly bookService: BookService) {}
 
+  @Post('embed-all')
+  @RequirePermission('manage_app_settings')
+  embedAll() {
+    return this.bookService.embedAll();
+  }
+
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission('library_delete_books')

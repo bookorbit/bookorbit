@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
@@ -7,6 +7,7 @@ import { MetadataProviderKey } from '@projectx/types';
 import type { BookQuery, BooksPage } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
+import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { LibraryService } from '../library/library.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -26,6 +27,7 @@ export class BookService {
     private readonly queryBuilder: BookQueryBuilder,
     private readonly metadataService: MetadataService,
     private readonly config: ConfigService,
+    @Optional() private readonly embedder: BookEmbedderService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -173,7 +175,26 @@ export class BookService {
       await this.metadataService.replaceTags(id, dto.tags);
     }
 
+    this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
     return this.getDetail(id, user);
+  }
+
+  async embedAll(): Promise<{ queued: number }> {
+    const bookIds = await this.bookRepo.findAllIds();
+    this.runEmbeddings(bookIds).catch((err: Error) => this.logger.error(`Embed-all failed: ${err.message}`));
+    return { queued: bookIds.length };
+  }
+
+  private async runEmbeddings(bookIds: number[]): Promise<void> {
+    const BATCH = 10;
+    for (let i = 0; i < bookIds.length; i += BATCH) {
+      await Promise.all(
+        bookIds
+          .slice(i, i + BATCH)
+          .map((id) => this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Failed to embed book ${id}: ${err.message}`))),
+      );
+    }
+    this.logger.log(`Embeddings complete: ${bookIds.length} books processed`);
   }
 
   async getProgress(userId: number, fileId: number, user: RequestUser) {

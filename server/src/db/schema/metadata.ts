@@ -1,4 +1,10 @@
-import { integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { customType, integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+
+const embedding256 = customType<{ data: number[]; driverData: string }>({
+  dataType: () => 'vector(256)',
+  toDriver: (v) => `[${v.join(',')}]`,
+  fromDriver: (v) => v.slice(1, -1).split(',').map(Number),
+});
 
 import { books } from './books';
 
@@ -24,6 +30,7 @@ export const bookMetadata = pgTable('book_metadata', {
   amazonId: varchar('amazon_id', { length: 20 }),
   hardcoverId: varchar('hardcover_id', { length: 50 }),
   openLibraryId: varchar('open_library_id', { length: 50 }),
+  embedding: embedding256('embedding'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

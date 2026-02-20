@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1771545632263,
+      "when": 1771614528351,
       "tag": "0000_baseline",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771614528351,
+      "tag": "0001_add_embedding_column",
       "breakpoints": true
     }
   ]
