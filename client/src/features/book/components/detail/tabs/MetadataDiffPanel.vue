@@ -47,18 +47,18 @@ function apply() {
       </div>
       <div class="flex gap-1.5 shrink-0">
         <button
-          class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95"
+          class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-all active:scale-95"
           @click="copyMissing"
         >
           <Copy class="size-3" />
-          Missing
+          Copy Missing
         </button>
         <button
-          class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95"
+          class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-all active:scale-95"
           @click="copyAll"
         >
           <CopyCheck class="size-3" />
-          All
+          Copy All
         </button>
       </div>
     </div>

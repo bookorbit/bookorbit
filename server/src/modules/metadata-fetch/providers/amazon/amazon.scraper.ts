@@ -172,14 +172,28 @@ function extractCoverUrl($: CheerioAPI): string | undefined {
 }
 
 function extractCategories($: CheerioAPI): string[] {
+  const seen = new Set<string>();
   const cats: string[] = [];
-  $('#detailBullets_feature_div .zg_hrsr .a-list-item a').each((_, el) => {
-    const name = $(el)
-      .text()
+
+  const add = (raw: string) => {
+    const name = raw
       .trim()
-      .replace(/\s*\(Books\)\s*$/i, '');
-    if (name) cats.push(name);
-  });
+      .replace(/\s*\(Books\)\s*$/i, '')
+      .trim();
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      cats.push(name);
+    }
+  };
+
+  // Primary: bestseller rank categories
+  $('#detailBullets_feature_div .zg_hrsr .a-list-item a').each((_, el) => add($(el).text()));
+
+  // Fallback: breadcrumb navigation
+  if (cats.length === 0) {
+    $('#wayfinding-breadcrumbs_feature_div li:not(.a-breadcrumb-divider) a').each((_, el) => add($(el).text()));
+  }
+
   return cats;
 }
 
@@ -189,7 +203,7 @@ function detailBulletValue($: CheerioAPI, labelPattern: RegExp): string {
   let value = '';
   $('#detailBullets_feature_div .a-text-bold').each((_, el) => {
     if (labelPattern.test($(el).text())) {
-      value = $(el).next('span').text().trim();
+      value = $(el).next().text().trim();
       return false; // break
     }
   });
