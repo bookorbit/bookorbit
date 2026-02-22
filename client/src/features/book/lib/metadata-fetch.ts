@@ -11,7 +11,7 @@ export function hideOnError(e: Event): void {
 /** Brand colors for each provider - used for pill/badge tinting. */
 const PROVIDER_COLORS: Record<string, string> = {
   google: '#34A853',
-  goodreads: '#B8722A',
+  goodreads: '#06B6D4',
   amazon: '#FF9900',
   hardcover: '#4F47E5',
   openLibrary: '#E83B2A',

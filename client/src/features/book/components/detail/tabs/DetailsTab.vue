@@ -150,12 +150,11 @@ function downloadFile() {
         </span>
       </div>
 
-      <!-- Location -->
-      <div class="mt-5 pt-5 border-t border-border">
-        <div class="flex items-center gap-2 min-w-0">
-          <Folder class="size-3.5 text-muted-foreground shrink-0" />
-          <p class="text-xs text-muted-foreground font-mono truncate min-w-0" :title="book.folderPath">{{ book.folderPath }}</p>
-        </div>
+      <!-- Genres -->
+      <div v-if="book.genres.length" class="flex flex-wrap gap-1.5 mt-4">
+        <span v-for="genre in book.genres" :key="genre" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
+          {{ genre }}
+        </span>
       </div>
 
       <!-- Metadata grid -->
@@ -189,11 +188,12 @@ function downloadFile() {
         </div>
       </dl>
 
-      <!-- Genres -->
-      <div v-if="book.genres.length" class="flex flex-wrap gap-1.5 mt-5">
-        <span v-for="genre in book.genres" :key="genre" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
-          {{ genre }}
-        </span>
+      <!-- Location -->
+      <div class="mt-5 pt-5 border-t border-border">
+        <div class="flex items-center gap-2 min-w-0">
+          <Folder class="size-3.5 text-muted-foreground shrink-0" />
+          <p class="text-xs text-muted-foreground font-mono truncate min-w-0" :title="book.folderPath">{{ book.folderPath }}</p>
+        </div>
       </div>
 
       <!-- Synopsis -->
