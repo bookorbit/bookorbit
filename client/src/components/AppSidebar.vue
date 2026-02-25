@@ -1,16 +1,8 @@
 <script setup lang="ts">
-import * as Icons from 'lucide-vue-next'
-import { Aperture, FolderOpen, Plus } from 'lucide-vue-next'
-
-function getCollectionIcon(iconName: string | null) {
-  if (iconName) {
-    const found = (Icons as Record<string, unknown>)[iconName]
-    if (found) return found
-  }
-  return FolderOpen
-}
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import * as Icons from 'lucide-vue-next'
+import { Aperture, FolderOpen, LayoutDashboard, Plus } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
@@ -35,6 +27,14 @@ import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 
+function getCollectionIcon(iconName: string | null) {
+  if (iconName) {
+    const found = (Icons as Record<string, unknown>)[iconName]
+    if (found) return found
+  }
+  return FolderOpen
+}
+
 const router = useRouter()
 const route = useRoute()
 const { libraries, fetchLibraries } = useLibraries()
@@ -52,6 +52,8 @@ const activeLibraryId = computed(() => {
   const id = route.params.id
   return route.name === 'library' && id ? Number(id) : null
 })
+
+const isDashboardActive = computed(() => route.name === 'dashboard')
 
 const activeLensId = computed(() => {
   const id = route.params.id
@@ -146,6 +148,22 @@ onMounted(async () => {
     </SidebarHeader>
 
     <SidebarContent>
+      <!-- Dashboard -->
+      <SidebarGroup class="pt-2 pb-0">
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton :is-active="isDashboardActive" tooltip="Dashboard" class="gap-2.5" @click="router.push({ name: 'dashboard' })">
+                <LayoutDashboard :size="15" :class="isDashboardActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
+                <span :class="isDashboardActive ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'"> Dashboard </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+
       <!-- Libraries -->
       <SidebarGroup class="pt-2">
         <SidebarGroupLabel

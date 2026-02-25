@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./dashboard";
 export * from "./book";
 export * from "./collection";
 export * from "./library";

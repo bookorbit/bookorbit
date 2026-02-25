@@ -10,5 +10,6 @@ import { LensService } from './lens.service';
   imports: [BookModule, LibraryModule],
   controllers: [LensController],
   providers: [LensService, LensRepository],
+  exports: [LensService],
 })
 export class LensModule {}

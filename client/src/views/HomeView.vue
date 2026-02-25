@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ArrowUpDown, Bookmark, BookmarkCheck, Filter, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
@@ -27,7 +27,6 @@ import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import type { GroupRule, SortSpec } from '@projectx/types'
 
 const route = useRoute()
-const router = useRouter()
 const themeStore = useThemeStore()
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
@@ -165,12 +164,7 @@ function loadIfSentinelVisible() {
 
 onMounted(async () => {
   await fetchLibraries()
-
-  if (!libraryId.value && libraries.value.length > 0) {
-    router.replace({ name: 'library', params: { id: libraries.value[0]!.id } })
-  } else {
-    load(true)
-  }
+  load(true)
 
   observer = new IntersectionObserver(
     (entries) => {

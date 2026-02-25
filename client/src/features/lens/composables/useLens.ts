@@ -13,7 +13,7 @@ export function useLens(lensId: Ref<number>) {
   const hasMore = computed(() => items.value.length < total.value)
 
   async function load(reset = false) {
-    if (loading.value) return
+    if (loading.value || !lensId.value || isNaN(lensId.value)) return
     loading.value = true
 
     if (reset) {
@@ -39,7 +39,10 @@ export function useLens(lensId: Ref<number>) {
     }
   }
 
-  watch(lensId, () => load(true))
+  watch(lensId, (id) => {
+    if (!id || isNaN(id)) return
+    load(true)
+  })
 
   return { items, total, loading, hasMore, load }
 }

@@ -1,0 +1,129 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { and, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import type { BookCard } from '@projectx/types';
+import { DB } from '../../db';
+import * as schema from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, bookTags, genres, readingProgress, tags } from '../../db/schema';
+import { assembleBookCards } from '../book/utils/assemble-book-cards';
+
+type Db = NodePgDatabase<typeof schema>;
+
+const BOOK_CARD_FIELDS = {
+  id: books.id,
+  status: books.status,
+  folderPath: books.folderPath,
+  addedAt: books.addedAt,
+  title: bookMetadata.title,
+  seriesName: bookMetadata.seriesName,
+  seriesIndex: bookMetadata.seriesIndex,
+  publishedYear: bookMetadata.publishedYear,
+  language: bookMetadata.language,
+  rating: bookMetadata.rating,
+};
+
+@Injectable()
+export class DashboardRepository {
+  constructor(@Inject(DB) private readonly db: Db) {}
+
+  private async fetchSupplementary(bookIds: number[], userId: number) {
+    if (bookIds.length === 0) {
+      return { authorRows: [], fileRows: [], genreRows: [], tagRows: [], progressRows: [] };
+    }
+
+    const [authorRows, fileRows, genreRows, tagRows] = await Promise.all([
+      this.db
+        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, bookIds))
+        .orderBy(bookAuthors.displayOrder),
+      this.db
+        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+        .from(bookFiles)
+        .where(inArray(bookFiles.bookId, bookIds)),
+      this.db
+        .select({ bookId: bookGenres.bookId, name: genres.name })
+        .from(bookGenres)
+        .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+        .where(inArray(bookGenres.bookId, bookIds)),
+      this.db
+        .select({ bookId: bookTags.bookId, name: tags.name })
+        .from(bookTags)
+        .innerJoin(tags, eq(tags.id, bookTags.tagId))
+        .where(inArray(bookTags.bookId, bookIds)),
+    ]);
+
+    const primaryFileIds = fileRows.filter((f) => f.role === 'primary').map((f) => f.id);
+    const progressRows =
+      primaryFileIds.length > 0
+        ? await this.db
+            .select({ bookFileId: readingProgress.bookFileId, percentage: readingProgress.percentage })
+            .from(readingProgress)
+            .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
+        : [];
+
+    return { authorRows, fileRows, genreRows, tagRows, progressRows };
+  }
+
+  async findRecentlyAdded(accessibleLibraryIds: number[], userId: number, limit: number): Promise<BookCard[]> {
+    const rows = await this.db
+      .select(BOOK_CARD_FIELDS)
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(inArray(books.libraryId, accessibleLibraryIds))
+      .orderBy(desc(books.addedAt))
+      .limit(limit);
+
+    const bookIds = rows.map((r) => r.id);
+    const { authorRows, fileRows, genreRows, tagRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
+    return assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
+  }
+
+  async findContinueReading(accessibleLibraryIds: number[], userId: number, limit: number): Promise<BookCard[]> {
+    const rawRows = await this.db
+      .select(BOOK_CARD_FIELDS)
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .innerJoin(
+        readingProgress,
+        and(
+          eq(readingProgress.bookFileId, bookFiles.id),
+          eq(readingProgress.userId, userId),
+          gt(readingProgress.percentage, 0),
+          lt(readingProgress.percentage, 100),
+        ),
+      )
+      .where(inArray(books.libraryId, accessibleLibraryIds))
+      .orderBy(desc(readingProgress.updatedAt))
+      .limit(limit);
+
+    const seen = new Set<number>();
+    const rows = rawRows.filter((r) => !seen.has(r.id) && seen.add(r.id));
+
+    const bookIds = rows.map((r) => r.id);
+    const { authorRows, fileRows, genreRows, tagRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
+    return assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
+  }
+
+  async findRandom(accessibleLibraryIds: number[], userId: number, limit: number): Promise<BookCard[]> {
+    const rawRows = await this.db
+      .select(BOOK_CARD_FIELDS)
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .leftJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
+      .where(and(inArray(books.libraryId, accessibleLibraryIds), or(isNull(readingProgress.bookFileId), eq(readingProgress.percentage, 0))))
+      .orderBy(sql.raw('RANDOM()'))
+      .limit(limit);
+
+    const seen = new Set<number>();
+    const rows = rawRows.filter((r) => !seen.has(r.id) && seen.add(r.id));
+
+    const bookIds = rows.map((r) => r.id);
+    const { authorRows, fileRows, genreRows, tagRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
+    return assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
+  }
+}
