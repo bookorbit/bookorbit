@@ -31,6 +31,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
 
 @Module({
@@ -56,6 +57,7 @@ import { UserModule } from './modules/user/user.module';
     LensModule,
     ScannerModule,
     MetadataModule,
+    UploadModule,
     MetadataFetchModule,
     RecommendationModule,
     KoboModule,

@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class CreateLibraryDto {
   @IsString()
@@ -64,4 +64,10 @@ export class CreateLibraryDto {
   @Min(0)
   @Max(100)
   markAsFinishedPercentComplete?: number | null;
+
+  @IsOptional()
+  @ValidateIf((o: { fileNamingPattern?: unknown }) => o.fileNamingPattern !== null)
+  @IsString()
+  @MaxLength(500)
+  fileNamingPattern?: string | null;
 }

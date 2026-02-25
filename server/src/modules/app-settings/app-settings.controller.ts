@@ -5,6 +5,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { AppSettingsService } from './app-settings.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateOidcConfigDto } from './dto/update-oidc-config.dto';
+import { UpdateUploadPatternDto } from './dto/update-upload-pattern.dto';
 
 @Controller('app-settings')
 @RequirePermission('manage_app_settings')
@@ -20,6 +21,18 @@ export class AppSettingsController {
   @HttpCode(HttpStatus.OK)
   update(@Param('key') key: string, @Body() dto: UpdateAppSettingDto) {
     return this.appSettingsService.update(key, dto.value);
+  }
+
+  @Get('upload-pattern')
+  async getUploadPattern() {
+    return { pattern: await this.appSettingsService.getUploadPattern() };
+  }
+
+  @Put('upload-pattern')
+  @HttpCode(HttpStatus.OK)
+  async setUploadPattern(@Body() dto: UpdateUploadPatternDto) {
+    await this.appSettingsService.setUploadPattern(dto.pattern);
+    return { pattern: dto.pattern };
   }
 
   @Public()

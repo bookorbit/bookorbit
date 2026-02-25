@@ -21,6 +21,7 @@ export interface Library {
   excludePatterns: string[];
   markAsFinishedSecondsRemaining?: number | null;
   markAsFinishedPercentComplete?: number | null;
+  fileNamingPattern?: string | null;
   folders: LibraryFolder[];
   bookCount?: number;
   createdAt: string;

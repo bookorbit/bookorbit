@@ -60,6 +60,7 @@ export class LibraryService {
       excludePatterns: dto.excludePatterns ?? [],
       markAsFinishedSecondsRemaining: dto.markAsFinishedSecondsRemaining ?? null,
       markAsFinishedPercentComplete: dto.markAsFinishedPercentComplete ?? null,
+      fileNamingPattern: dto.fileNamingPattern ?? null,
     });
 
     const folders = await Promise.all(dto.folders.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));

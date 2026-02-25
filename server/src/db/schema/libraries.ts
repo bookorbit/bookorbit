@@ -24,6 +24,9 @@ export const libraries = pgTable('libraries', {
   markAsFinishedSecondsRemaining: integer('mark_as_finished_seconds_remaining'),
   markAsFinishedPercentComplete: integer('mark_as_finished_percent_complete'),
 
+  // File naming pattern for uploads (null = use global default)
+  fileNamingPattern: varchar('file_naming_pattern', { length: 500 }),
+
   // Legacy — kept for scanner compatibility
   scanMode: varchar('scan_mode', { length: 20 }).notNull().default('auto'),
   pollInterval: integer('poll_interval_seconds').default(300),

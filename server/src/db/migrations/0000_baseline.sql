@@ -144,6 +144,7 @@ CREATE TABLE "libraries" (
 	"exclude_patterns" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"mark_as_finished_seconds_remaining" integer,
 	"mark_as_finished_percent_complete" integer,
+	"file_naming_pattern" varchar(500),
 	"scan_mode" varchar(20) DEFAULT 'auto' NOT NULL,
 	"poll_interval_seconds" integer DEFAULT 300,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -209,6 +210,7 @@ CREATE TABLE "book_metadata" (
 	"amazon_id" varchar(20),
 	"hardcover_id" varchar(50),
 	"open_library_id" varchar(50),
+	"embedding" vector(256),
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

@@ -1,1 +1,0 @@
-ALTER TABLE "book_metadata" ADD COLUMN "embedding" vector(256);

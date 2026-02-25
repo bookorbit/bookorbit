@@ -2,8 +2,15 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
+
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+
+const APP_SETTING_KEYS = {
+  OIDC_CONFIG: 'oidc_config',
+  UPLOAD_FILE_PATTERN: 'upload_file_pattern',
+} as const;
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -54,13 +61,25 @@ export class AppSettingsService {
   }
 
   async getOidcConfig(): Promise<OidcFullConfig> {
-    const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, 'oidc_config') });
+    const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, APP_SETTING_KEYS.OIDC_CONFIG) });
     if (!row) return { ...DEFAULT_OIDC_CONFIG };
     try {
       return JSON.parse(row.value) as OidcFullConfig;
     } catch {
       return { ...DEFAULT_OIDC_CONFIG };
     }
+  }
+
+  async getUploadPattern(): Promise<string> {
+    const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, APP_SETTING_KEYS.UPLOAD_FILE_PATTERN) });
+    return row?.value ?? DEFAULT_UPLOAD_PATTERN;
+  }
+
+  async setUploadPattern(pattern: string): Promise<void> {
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: APP_SETTING_KEYS.UPLOAD_FILE_PATTERN, value: pattern })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: pattern } });
   }
 
   async updateOidcConfig(config: Partial<OidcFullConfig>): Promise<OidcFullConfig> {
@@ -75,7 +94,7 @@ export class AppSettingsService {
 
     await this.db
       .insert(schema.appSettings)
-      .values({ key: 'oidc_config', value })
+      .values({ key: APP_SETTING_KEYS.OIDC_CONFIG, value })
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
 
     return merged;

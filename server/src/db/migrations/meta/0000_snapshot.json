@@ -1,5 +1,5 @@
 {
-  "id": "0eeff5ae-6f70-4e72-b6f3-c06a1e702c9a",
+  "id": "6567aba8-023d-477f-aaf1-6b45d728860f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1006,6 +1006,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "file_naming_pattern": {
+          "name": "file_naming_pattern",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "scan_mode": {
           "name": "scan_mode",
           "type": "varchar(20)",
@@ -1429,6 +1435,12 @@
         "open_library_id": {
           "name": "open_library_id",
           "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "embedding": {
+          "name": "embedding",
+          "type": "vector(256)",
           "primaryKey": false,
           "notNull": false
         },

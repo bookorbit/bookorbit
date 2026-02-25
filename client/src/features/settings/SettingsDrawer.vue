@@ -18,6 +18,7 @@ import {
   Rss,
   Tablet,
   Wrench,
+  FolderPen,
 } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -32,6 +33,7 @@ import AboutSettings from './AboutSettings.vue'
 import UsersPage from '@/features/admin/UsersPage.vue'
 import RolesPage from '@/features/admin/RolesPage.vue'
 import PermissionsPage from '@/features/admin/PermissionsPage.vue'
+import FileNamingSettings from './FileNamingSettings.vue'
 import OidcSettings from './OidcSettings.vue'
 import OpdsSettings from './OpdsSettings.vue'
 import KoboSettings from './KoboSettings.vue'
@@ -56,6 +58,7 @@ type SectionId =
   | 'roles'
   | 'permissions'
   | 'oidc'
+  | 'file-naming'
   | 'maintenance'
 
 const navGroups = computed(() => {
@@ -91,6 +94,7 @@ const navGroups = computed(() => {
   }
   if (su || perms.includes('manage_app_settings')) {
     adminItems.push({ id: 'oidc', label: 'OIDC / SSO', icon: LogIn, component: OidcSettings })
+    adminItems.push({ id: 'file-naming', label: 'File Naming', icon: FolderPen, component: FileNamingSettings })
     adminItems.push({ id: 'maintenance', label: 'Maintenance', icon: Wrench, component: MaintenanceSettings })
   }
   if (adminItems.length) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowLeft, Search, Palette, X, KeyRound, Settings, LogOut } from 'lucide-vue-next'
+import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -23,11 +23,16 @@ import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 
 const router = useRouter()
 const { user, logout } = useAuth()
 const { open: openSettings } = useSettingsDrawer()
 const { open: openChangePassword } = useChangePasswordDialog()
+const { hasPermission } = usePermissions()
+
+const uploadOpen = ref(false)
 
 const searchFocused = ref(false)
 const mobileSearchOpen = ref(false)
@@ -174,6 +179,18 @@ function navigateToResult(result: GlobalSearchResult) {
           <Search :size="15" />
         </Button>
 
+        <!-- Upload button -->
+        <Button
+          v-if="hasPermission('library_upload')"
+          variant="ghost"
+          size="icon"
+          class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground"
+          title="Upload books"
+          @click="uploadOpen = true"
+        >
+          <Upload :size="15" />
+        </Button>
+
         <!-- Desktop: appearance settings popover -->
         <Popover>
           <PopoverTrigger as-child>
@@ -237,4 +254,6 @@ function navigateToResult(result: GlobalSearchResult) {
       </div>
     </template>
   </header>
+
+  <BookUploadModal v-if="uploadOpen" @close="uploadOpen = false" @uploaded="uploadOpen = false" />
 </template>
