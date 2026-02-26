@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { MetadataPreferencesModule } from '../metadata-preferences/metadata-preferences.module';
 import { METADATA_PROVIDERS } from './constants';
 import { MetadataFetchController } from './metadata-fetch.controller';
+import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataProvider } from './providers/metadata-provider';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
@@ -13,6 +15,7 @@ import { OpenLibraryProvider } from './providers/open-library/open-library.provi
 const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider];
 
 @Module({
+  imports: [MetadataPreferencesModule],
   providers: [
     ...PROVIDER_CLASSES,
     {
@@ -22,7 +25,9 @@ const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, Ope
     },
     ProviderRegistry,
     MetadataFetchService,
+    MetadataFetchPipeline,
   ],
   controllers: [MetadataFetchController],
+  exports: [MetadataFetchService, MetadataFetchPipeline, ProviderRegistry],
 })
 export class MetadataFetchModule {}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Sparkles, Star } from 'lucide-vue-next'
+import { Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
@@ -9,6 +9,7 @@ import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
 import { useGenreSearch } from '../../../composables/useTagSearch'
+import { useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ saved: [BookDetail]; coverChanged: ['extracted' | 'custom' | null] }>()
@@ -74,6 +75,25 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
   Object.assign(form, formPatch)
   if (coverUrl) coverPanel.value?.setUrl(coverUrl)
 }
+
+const { refreshing: autoFilling, previewRefresh } = useRefreshMetadata()
+
+async function autoFill() {
+  const preview = await previewRefresh(props.book.id)
+  if (!preview) return
+  if (preview.title != null) form.title = preview.title
+  if (preview.subtitle != null) form.subtitle = preview.subtitle
+  if (preview.description != null) form.description = preview.description
+  if (preview.authors?.length) form.authors = preview.authors
+  if (preview.genres?.length) form.genres = preview.genres
+  if (preview.publisher != null) form.publisher = preview.publisher
+  if (preview.publishedYear != null) form.publishedYear = preview.publishedYear
+  if (preview.language != null) form.language = preview.language
+  if (preview.pageCount != null) form.pageCount = preview.pageCount
+  if (preview.seriesName != null) form.seriesName = preview.seriesName
+  if (preview.seriesIndex != null) form.seriesIndex = preview.seriesIndex
+  if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
+}
 </script>
 
 <template>
@@ -91,7 +111,17 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
         <span v-else />
         <div class="flex gap-2">
           <button
-            class="flex items-center gap-1.5 h-8 px-3.5 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 text-white text-sm font-medium hover:from-violet-600 hover:to-indigo-600 transition-all shadow-[0_2px_10px_rgba(139,92,246,0.4)] hover:shadow-[0_2px_14px_rgba(139,92,246,0.55)]"
+            class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
+            :disabled="autoFilling"
+            :title="autoFilling ? 'Fetching metadata...' : 'Auto-fill fields using your metadata preferences'"
+            @click="autoFill"
+          >
+            <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
+            <RefreshCw v-else class="size-3.5" />
+            Auto-fill
+          </button>
+          <button
+            class="search-online-btn flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
             @click="searchOpen = true"
           >
             <Sparkles class="size-3.5" />
@@ -290,3 +320,26 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
 
   <MetadataSearchDrawer v-if="searchOpen" :book="props.book" @close="searchOpen = false" @apply="handleApply" />
 </template>
+
+<style scoped>
+.auto-fill-btn {
+  background: linear-gradient(to right, oklch(0.75 0.16 75), oklch(0.72 0.18 55));
+  color: oklch(0.2 0.04 75);
+  box-shadow: 0 2px 8px oklch(0.72 0.18 55 / 0.35);
+}
+.auto-fill-btn:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 2px 12px oklch(0.72 0.18 55 / 0.5);
+}
+.auto-fill-btn:disabled {
+  filter: none;
+}
+.search-online-btn {
+  background: linear-gradient(to right, var(--primary), color-mix(in oklch, var(--primary) 65%, oklch(0.7 0.25 280)));
+  box-shadow: 0 2px 10px color-mix(in oklch, var(--primary) 45%, transparent);
+}
+.search-online-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 14px color-mix(in oklch, var(--primary) 60%, transparent);
+}
+</style>

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
+import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
@@ -15,7 +16,11 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   readonly label = 'OpenLibrary';
   readonly identifiable = true as const;
 
+  constructor(private readonly providerConfig: ProviderConfigService) {}
+
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+    const { enabled } = await this.providerConfig.getConfig().then((c) => c.openLibrary);
+    if (!enabled) return [];
     const query = this.buildSearchParams(params);
     if (!query) return [];
 
@@ -30,6 +35,8 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   }
 
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+    const { enabled } = await this.providerConfig.getConfig().then((c) => c.openLibrary);
+    if (!enabled) return null;
     const res = await fetch(`${BASE_URL}/works/${providerId}.json`);
     if (!res.ok) return null;
 

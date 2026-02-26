@@ -14,6 +14,7 @@ export interface GoodreadsApolloBook {
   details?: GoodreadsApolloDetails;
   bookGenres?: Array<{ genre?: { name?: string } }>;
   bookSeries?: Array<{ userPosition?: string }>;
+  primaryContributorEdge?: { node?: { __ref?: string }; role?: string };
 }
 
 export interface GoodreadsApolloDetails {

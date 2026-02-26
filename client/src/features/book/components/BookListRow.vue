@@ -2,11 +2,25 @@
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { api } from '@/lib/api'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Check, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Star, Trash2, TriangleAlert } from 'lucide-vue-next'
+import {
+  BookOpen,
+  Check,
+  ExternalLink,
+  FolderPlus,
+  Loader2,
+  MoreHorizontal,
+  PanelRight,
+  Pencil,
+  RefreshCw,
+  Star,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
+import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 
 const router = useRouter()
 
@@ -64,6 +78,13 @@ async function setRating(star: number) {
 
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
+
+watch(coverSrc, () => {
+  coverLoaded.value = false
+  coverFailed.value = false
+})
+
+const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 
 function openFile(file: BookFileRef) {
   router.push({
@@ -193,6 +214,11 @@ function openFile(file: BookFileRef) {
           <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
             <Pencil class="size-4 mr-2" />
             Edit Metadata
+          </DropdownMenuItem>
+          <DropdownMenuItem :disabled="refreshing" @click="refreshWithFeedback(book.id)">
+            <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
+            <RefreshCw v-else class="size-4 mr-2" />
+            Refresh Metadata
           </DropdownMenuItem>
           <DropdownMenuItem @click="emit('action', 'add-to-collection')">
             <FolderPlus class="size-4 mr-2" />

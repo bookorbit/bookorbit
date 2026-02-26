@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
+import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapGoodreadsApolloState } from './goodreads.mapper';
@@ -23,7 +24,11 @@ export class GoodreadsProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(GoodreadsProvider.name);
 
+  constructor(private readonly providerConfig: ProviderConfigService) {}
+
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+    const { enabled } = await this.providerConfig.getConfig().then((c) => c.goodreads);
+    if (!enabled) return [];
     const ids = params.isbn ? await this.findIdByIsbn(params.isbn).then((id) => (id ? [id] : [])) : await this.searchIds(params);
 
     const results: MetadataCandidate[] = [];
@@ -32,10 +37,17 @@ export class GoodreadsProvider implements IdentifiableProvider {
       const candidate = await this.fetchBook(id);
       if (candidate) results.push(candidate);
     }
+
+    if (results.length > 1 && (params.title || params.author)) {
+      results.sort((a, b) => scoreRelevance(b, params) - scoreRelevance(a, params));
+    }
+
     return results;
   }
 
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+    const { enabled } = await this.providerConfig.getConfig().then((c) => c.goodreads);
+    if (!enabled) return null;
     return this.fetchBook(providerId);
   }
 
@@ -43,7 +55,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
     const query = [params.title, params.author].filter(Boolean).join(' ');
     const url = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}&search_type=books`;
     const html = await this.fetchHtml(url);
-    return html ? extractBookIds(html, MAX_RESULTS) : [];
+    return html ? extractBookIds(html, params.title, MAX_RESULTS) : [];
   }
 
   private async findIdByIsbn(isbn: string): Promise<string | null> {
@@ -90,19 +102,82 @@ function extractNextData(html: string): GoodreadsNextData | null {
   }
 }
 
-function extractBookIds(html: string, limit: number): string[] {
+function extractBookIds(html: string, titleHint: string | undefined, limit: number): string[] {
   const seen = new Set<string>();
-  const ids: string[] = [];
+  const entries: Array<{ id: string; slug: string }> = [];
+
+  // from_srp=true only appears on actual search result links, not nav/sidebar
+  const pattern = /href="(\/book\/show\/[^"]+)"/g;
   let m: RegExpExecArray | null;
-  const pattern = /href="\/book\/show\/(\d+)/g;
   while ((m = pattern.exec(html)) !== null) {
-    if (!seen.has(m[1])) {
-      seen.add(m[1]);
-      ids.push(m[1]);
-      if (ids.length >= limit) break;
+    const href = m[1];
+    if (!href.includes('from_srp=true')) continue;
+    const idMatch = /\/book\/show\/(\d+)([^?]*)/.exec(href);
+    if (!idMatch) continue;
+    const id = idMatch[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    entries.push({ id, slug: idMatch[2] ?? '' });
+  }
+
+  if (!titleHint || entries.length <= limit) {
+    return entries.slice(0, limit).map((e) => e.id);
+  }
+
+  // Score entries by how many title words appear in the URL slug so that
+  // companion books and study guides (with unrelated slugs) rank below actual matches.
+  const titleWords = titleHint
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((w) => w.length > 2);
+  const scored = entries.map((e) => ({
+    id: e.id,
+    score: titleWords.filter((w) => e.slug.toLowerCase().includes(w)).length,
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((s) => s.id);
+}
+
+function normalizeStr(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function scoreRelevance(candidate: MetadataCandidate, params: MetadataSearchParams): number {
+  let score = 0;
+
+  if (params.title && candidate.title) {
+    const qt = normalizeStr(params.title);
+    const ct = normalizeStr(candidate.title);
+    if (ct === qt) score += 10;
+    else if (ct.startsWith(qt)) score += 6;
+    else {
+      const queryWords = qt.split(' ').filter((w) => w.length > 1);
+      const candidateWords = new Set(ct.split(' '));
+      score += queryWords.filter((w) => candidateWords.has(w)).length * 2;
     }
   }
-  return ids;
+
+  if (params.author && candidate.authors?.length) {
+    const qa = normalizeStr(params.author);
+    const qaWords = new Set(qa.split(' ').filter((w) => w.length > 2));
+    for (const author of candidate.authors) {
+      const ca = normalizeStr(author);
+      if (ca.includes(qa) || qa.includes(ca)) {
+        score += 5;
+        break;
+      }
+      if (ca.split(' ').some((w) => qaWords.has(w))) {
+        score += 2;
+        break;
+      }
+    }
+  }
+
+  return score;
 }
 
 function sleep(ms: number): Promise<void> {

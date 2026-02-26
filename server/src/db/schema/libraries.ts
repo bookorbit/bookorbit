@@ -1,4 +1,5 @@
 import { boolean, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { FieldPreferenceOverrides } from '@projectx/types';
 
 export const libraries = pgTable('libraries', {
   id: serial('id').primaryKey(),
@@ -26,6 +27,9 @@ export const libraries = pgTable('libraries', {
 
   // File naming pattern for uploads (null = use global default)
   fileNamingPattern: varchar('file_naming_pattern', { length: 500 }),
+
+  // Metadata fetch preferences override (null = inherit global defaults)
+  metadataFetchPreferences: jsonb('metadata_fetch_preferences').$type<FieldPreferenceOverrides>(),
 
   // Legacy — kept for scanner compatibility
   scanMode: varchar('scan_mode', { length: 20 }).notNull().default('auto'),

@@ -4,12 +4,14 @@ import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
 import { MetadataProviderKey } from '@projectx/types';
-import type { BookQuery, BooksPage } from '@projectx/types';
+import type { BookQuery, BooksPage, MetadataField } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { LibraryService } from '../library/library.service';
+import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
+import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
@@ -26,6 +28,7 @@ export class BookService {
     private readonly libraryService: LibraryService,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly metadataService: MetadataService,
+    private readonly pipeline: MetadataFetchPipeline,
     private readonly config: ConfigService,
     @Optional() private readonly embedder: BookEmbedderService,
   ) {
@@ -205,6 +208,73 @@ export class BookService {
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     await this.verifyFileAccess(fileId, user);
     await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage);
+  }
+
+  async refreshMetadata(id: number, preview: boolean, user: RequestUser): Promise<BookDetailDto | ResolvedMetadataFields> {
+    const found = await this.bookRepo.findById(id);
+    if (!found) throw new NotFoundException(`Book ${id} not found`);
+
+    const { book, authorRows } = found;
+    await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
+    const meta = book.book_metadata;
+
+    const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
+    if (meta?.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
+    if (meta?.goodreadsId) providerIds[MetadataProviderKey.GOODREADS] = meta.goodreadsId;
+    if (meta?.amazonId) providerIds[MetadataProviderKey.AMAZON] = meta.amazonId;
+    if (meta?.hardcoverId) providerIds[MetadataProviderKey.HARDCOVER] = meta.hardcoverId;
+    if (meta?.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
+
+    const searchParams: MetadataSearchParams = {
+      title: meta?.title ?? undefined,
+      author: authorRows[0]?.name ?? undefined,
+      isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+      existingProviderIds: providerIds,
+    };
+
+    const existingFields: Partial<Record<MetadataField, unknown>> = {
+      title: meta?.title,
+      subtitle: meta?.subtitle,
+      description: meta?.description,
+      authors: authorRows.map((a) => a.name),
+      publisher: meta?.publisher,
+      publishedYear: meta?.publishedYear,
+      language: meta?.language,
+      pageCount: meta?.pageCount,
+      seriesName: meta?.seriesName,
+      seriesIndex: meta?.seriesIndex,
+      cover: meta?.coverSource,
+    };
+
+    const resolved = await this.pipeline.run(searchParams, existingFields, book.books.libraryId);
+
+    if (preview) return resolved;
+
+    const r = resolved as Record<string, unknown>;
+    const dto: UpdateBookMetadataDto = {};
+    if (r.title !== undefined) dto.title = r.title as string | null;
+    if (r.subtitle !== undefined) dto.subtitle = r.subtitle as string | null;
+    if (r.description !== undefined) dto.description = r.description as string | null;
+    if (r.authors !== undefined) dto.authors = r.authors as string[];
+    if (r.genres !== undefined) dto.genres = r.genres as string[];
+    if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
+    if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
+    if (r.language !== undefined) dto.language = r.language as string | null;
+    if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
+    if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
+    if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
+
+    let detail: BookDetailDto | undefined;
+    if (Object.keys(dto).length > 0) {
+      detail = await this.updateMetadata(id, dto, user);
+    }
+
+    if (resolved.coverUrl) {
+      await this.metadataService.downloadAndSaveCover(resolved.coverUrl, id);
+      detail = await this.getDetail(id, user);
+    }
+
+    return detail ?? this.getDetail(id, user);
   }
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {

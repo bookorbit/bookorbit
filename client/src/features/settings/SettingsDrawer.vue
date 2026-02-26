@@ -19,6 +19,7 @@ import {
   Tablet,
   Wrench,
   FolderPen,
+  DatabaseZap,
 } from 'lucide-vue-next'
 import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -38,6 +39,7 @@ import OidcSettings from './OidcSettings.vue'
 import OpdsSettings from './OpdsSettings.vue'
 import KoboSettings from './KoboSettings.vue'
 import MaintenanceSettings from './MaintenanceSettings.vue'
+import MetadataPreferencesSettings from './metadata-preferences/MetadataPreferencesSettings.vue'
 
 const { isOpen, close } = useSettingsDrawer()
 const { isSuperuser, userPermissions } = usePermissions()
@@ -60,6 +62,7 @@ type SectionId =
   | 'oidc'
   | 'file-naming'
   | 'maintenance'
+  | 'metadata-preferences'
 
 const navGroups = computed(() => {
   const perms = userPermissions.value
@@ -91,6 +94,9 @@ const navGroups = computed(() => {
   if (su || perms.includes('manage_roles')) {
     adminItems.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, component: RolesPage })
     adminItems.push({ id: 'permissions', label: 'Permissions', icon: KeyRound, component: PermissionsPage })
+  }
+  if (su || perms.includes('manage_metadata_config')) {
+    adminItems.push({ id: 'metadata-preferences', label: 'Metadata', icon: DatabaseZap, component: MetadataPreferencesSettings })
   }
   if (su || perms.includes('manage_app_settings')) {
     adminItems.push({ id: 'oidc', label: 'OIDC / SSO', icon: LogIn, component: OidcSettings })

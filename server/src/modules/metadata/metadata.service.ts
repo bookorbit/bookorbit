@@ -10,7 +10,7 @@ import * as schema from '../../db/schema';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
 import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
-import { extractAndSaveCover, generateThumbnail } from './lib/cover';
+import { extractAndSaveCover, generateThumbnail, imageExt } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
@@ -35,6 +35,27 @@ export class MetadataService {
 
   async extractAndSave(bookId: number, absolutePath: string, format: string): Promise<void> {
     await Promise.all([this.extractMetadata(bookId, absolutePath, format), this.extractCover(bookId, absolutePath, format)]);
+  }
+
+  async downloadAndSaveCover(url: string, bookId: number): Promise<void> {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) return;
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length === 0) return;
+
+      const ext = imageExt(buffer);
+      const dir = join(this.booksPath, 'covers', String(bookId));
+      await mkdir(dir, { recursive: true });
+      const [thumbnail] = await Promise.all([generateThumbnail(buffer), writeFile(join(dir, `cover_extracted.${ext}`), buffer)]);
+      await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+
+      await this.db.update(bookMetadata).set({ coverSource: 'extracted', updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId));
+
+      this.logger.debug(`Online cover saved for book ${bookId}`);
+    } catch (err) {
+      this.logger.warn(`Cover download failed for book ${bookId}: ${err}`);
+    }
   }
 
   async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {

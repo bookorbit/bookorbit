@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
+import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { extractAsins, parseBookPage } from './amazon.scraper';
@@ -28,33 +29,38 @@ export class AmazonProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(AmazonProvider.name);
 
+  constructor(private readonly providerConfig: ProviderConfigService) {}
+
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
-    const asins = params.isbn
-      ? [params.isbn] // try ASIN directly if ISBN provided
-      : await this.searchAsins(params);
+    const { enabled, domain, cookie } = await this.providerConfig.getConfig().then((c) => c.amazon);
+    if (!enabled) return [];
+
+    const asins = params.isbn ? [params.isbn] : await this.searchAsins(params, domain, cookie);
 
     const results: MetadataCandidate[] = [];
     for (const asin of asins.slice(0, MAX_RESULTS)) {
       if (results.length > 0) await sleep(BETWEEN_REQUESTS_MS);
-      const candidate = await this.fetchByAsin(asin);
+      const candidate = await this.fetchByAsin(asin, domain, cookie);
       if (candidate) results.push(candidate);
     }
     return results;
   }
 
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
-    return this.fetchByAsin(providerId);
+    const { enabled, domain, cookie } = await this.providerConfig.getConfig().then((c) => c.amazon);
+    if (!enabled) return null;
+    return this.fetchByAsin(providerId, domain, cookie);
   }
 
-  private async searchAsins(params: MetadataSearchParams): Promise<string[]> {
+  private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string): Promise<string[]> {
     const query = [params.title, params.author].filter(Boolean).join(' ');
-    const url = `https://www.amazon.com/s?k=${encodeURIComponent(query)}&i=stripbooks`;
-    const html = await this.fetchHtml(url);
+    const url = `https://www.${domain}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
+    const html = await this.fetchHtml(url, cookie);
     return html ? extractAsins(html, MAX_RESULTS) : [];
   }
 
-  private async fetchByAsin(asin: string): Promise<MetadataCandidate | null> {
-    const html = await this.fetchHtml(`https://www.amazon.com/dp/${asin}`);
+  private async fetchByAsin(asin: string, domain: string, cookie: string): Promise<MetadataCandidate | null> {
+    const html = await this.fetchHtml(`https://www.${domain}/dp/${asin}`, cookie);
     if (!html) return null;
     const data = parseBookPage(html);
     if (!data.title) return null;
@@ -75,13 +81,14 @@ export class AmazonProvider implements IdentifiableProvider {
       seriesIndex: data.seriesIndex,
       coverUrl: data.coverUrl,
       genres: data.tags?.length ? data.tags : undefined,
-      sourceUrl: `https://www.amazon.com/dp/${asin}`,
+      sourceUrl: `https://www.${domain}/dp/${asin}`,
     };
   }
 
-  private async fetchHtml(url: string): Promise<string | null> {
+  private async fetchHtml(url: string, cookie = ''): Promise<string | null> {
+    const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
     try {
-      const res = await fetch(url, { headers: HEADERS });
+      const res = await fetch(url, { headers });
       if (!res.ok) {
         this.logger.warn(`Amazon returned ${res.status} for ${url}`);
         return null;

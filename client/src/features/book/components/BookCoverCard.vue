@@ -2,11 +2,24 @@
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Check, ExternalLink, FolderPlus, MoreHorizontal, PanelRight, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
+import {
+  BookOpen,
+  Check,
+  ExternalLink,
+  FolderPlus,
+  Loader2,
+  MoreHorizontal,
+  PanelRight,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
+import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 
 const router = useRouter()
 
@@ -37,9 +50,16 @@ const extraFiles = computed(() => readableFiles.value.filter((f) => f !== primar
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
 
+const { refreshing, refreshWithFeedback } = useRefreshMetadata()
+
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
 const isMissing = computed(() => props.book.status === 'missing')
+
+watch(coverSrc, () => {
+  coverLoaded.value = false
+  coverFailed.value = false
+})
 
 function openFile(file: BookFileRef) {
   router.push({
@@ -117,6 +137,13 @@ function openFile(file: BookFileRef) {
         </p>
       </div>
 
+      <!-- Refresh spinner overlay -->
+      <Transition name="fade">
+        <div v-if="refreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-[1.5px]">
+          <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
+        </div>
+      </Transition>
+
       <!-- Hover overlay -->
       <div
         v-if="!selectionMode"
@@ -174,6 +201,11 @@ function openFile(file: BookFileRef) {
                 <Pencil class="size-4 mr-2" />
                 Edit Metadata
               </DropdownMenuItem>
+              <DropdownMenuItem :disabled="refreshing" @click="refreshWithFeedback(book.id)">
+                <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
+                <RefreshCw v-else class="size-4 mr-2" />
+                Refresh Metadata
+              </DropdownMenuItem>
               <DropdownMenuItem @click="emit('action', 'add-to-collection')">
                 <FolderPlus class="size-4 mr-2" />
                 Add to Collection
@@ -190,3 +222,14 @@ function openFile(file: BookFileRef) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

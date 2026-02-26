@@ -25,6 +25,7 @@ import { LensModule } from './modules/lens/lens.module';
 import { OpdsModule } from './modules/opds/opds.module';
 import { PathModule } from './modules/path/path.module';
 import { MetadataFetchModule } from './modules/metadata-fetch/metadata-fetch.module';
+import { MetadataPreferencesModule } from './modules/metadata-preferences/metadata-preferences.module';
 import { MetadataModule } from './modules/metadata/metadata.module';
 import { ReaderPreferencesModule } from './modules/reader-preferences/reader-preferences.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
@@ -59,6 +60,7 @@ import { UserModule } from './modules/user/user.module';
     MetadataModule,
     UploadModule,
     MetadataFetchModule,
+    MetadataPreferencesModule,
     RecommendationModule,
     KoboModule,
     OpdsModule,

@@ -18,7 +18,7 @@ export interface AmazonBookData {
   tags?: string[];
 }
 
-const SKIP_TITLE_PATTERNS = /box\s*set|collection\s*set|books\s*set|omnibus|summary\s*&\s*study/i;
+const SKIP_TITLE_PATTERNS = /box\s*set|collection\s*set|books\s*set|omnibus|summary\s*&\s*study|streamer|display\s*kit|bookstore\s*kit|shelf\s*kit/i;
 
 export function parseBookPage(html: string): AmazonBookData {
   const $ = cheerio.load(html);
@@ -41,22 +41,62 @@ export function parseBookPage(html: string): AmazonBookData {
   };
 }
 
+// Format preference: lower index = higher priority.
+const FORMAT_PREFERENCE = ['kindle', 'paperback', 'mass market paperback', 'hardcover', 'library binding'];
+
 export function extractAsins(html: string, limit: number): string[] {
   const $ = cheerio.load(html);
+  const results: string[] = [];
   const seen = new Set<string>();
-  const asins: string[] = [];
 
-  $('div[data-asin]').each((_, el) => {
-    const asin = $(el).attr('data-asin');
-    if (!asin || asin.length !== 10 || seen.has(asin)) return;
+  $('div[data-component-type="s-search-result"]').each((_, el) => {
+    if (results.length >= limit) return false;
+
     const titleText = $(el).find('[data-cy=title-recipe]').text().toLowerCase();
     if (SKIP_TITLE_PATTERNS.test(titleText)) return;
-    seen.add(asin);
-    asins.push(asin);
-    if (asins.length >= limit) return false;
+
+    // Collect all /dp/ASIN links with their visible label within this result block.
+    const formatMap = new Map<string, string>(); // asin -> label (lowercased)
+    $(el)
+      .find('a[href*="/dp/"]')
+      .each((_, a) => {
+        const href = $(a).attr('href') ?? '';
+        const m = /\/dp\/([A-Z0-9]{10})/i.exec(href);
+        if (!m) return;
+        const asin = m[1];
+        if (formatMap.has(asin)) return;
+        const label = $(a).text().trim().toLowerCase();
+        if (label) formatMap.set(asin, label);
+      });
+
+    let chosen: string | undefined;
+
+    if (formatMap.size > 0) {
+      // Pick the highest-priority format available.
+      let bestRank = Infinity;
+      for (const [asin, label] of formatMap) {
+        const rank = FORMAT_PREFERENCE.findIndex((f) => label.includes(f));
+        const effectiveRank = rank === -1 ? FORMAT_PREFERENCE.length : rank;
+        if (effectiveRank < bestRank) {
+          bestRank = effectiveRank;
+          chosen = asin;
+        }
+      }
+    }
+
+    // Fall back to the card's own data-asin when no format links were found.
+    if (!chosen) {
+      const cardAsin = $(el).attr('data-asin');
+      if (cardAsin && cardAsin.length === 10) chosen = cardAsin;
+    }
+
+    if (chosen && !seen.has(chosen)) {
+      seen.add(chosen);
+      results.push(chosen);
+    }
   });
 
-  return asins;
+  return results;
 }
 
 // --- Field extractors ---
@@ -164,10 +204,28 @@ function extractSeriesIndex($: CheerioAPI): number | undefined {
 
 function extractCoverUrl($: CheerioAPI): string | undefined {
   const img = $('#landingImage, #imgBlkFront').first();
+
+  // data-a-dynamic-image is a JSON map of url -> [width, height] with all available sizes.
+  // Cheerio decodes HTML entities in attr(), so &quot; becomes " automatically.
+  const dynamicRaw = img.attr('data-a-dynamic-image');
+  if (dynamicRaw) {
+    try {
+      const map = JSON.parse(dynamicRaw) as Record<string, [number, number]>;
+      const entries = Object.entries(map);
+      if (entries.length > 0) {
+        // Strip the size modifier (e.g. ._SY342_) from any variant URL to get
+        // the full-resolution original. All entries are the same image at different sizes.
+        const [sampleUrl] = entries[0];
+        return sampleUrl.replace(/\._[^.]+_\./, '.');
+      }
+    } catch {
+      // fall through
+    }
+  }
+
   const hires = img.attr('data-old-hires');
   if (hires) return hires;
   const src = img.attr('src');
-  // Strip Amazon's dimension modifier (e.g. ._SX260_) to get the original image
   return src ? src.replace(/\._[A-Z0-9_,]+_\./i, '.') : undefined;
 }
 

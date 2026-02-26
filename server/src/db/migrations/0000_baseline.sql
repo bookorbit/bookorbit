@@ -145,6 +145,7 @@ CREATE TABLE "libraries" (
 	"mark_as_finished_seconds_remaining" integer,
 	"mark_as_finished_percent_complete" integer,
 	"file_naming_pattern" varchar(500),
+	"metadata_fetch_preferences" jsonb,
 	"scan_mode" varchar(20) DEFAULT 'auto' NOT NULL,
 	"poll_interval_seconds" integer DEFAULT 300,
 	"created_at" timestamp DEFAULT now() NOT NULL,

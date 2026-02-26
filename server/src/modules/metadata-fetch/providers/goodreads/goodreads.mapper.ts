@@ -6,8 +6,10 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
   const book = findByKeyPrefix<GoodreadsApolloBook>(state, 'Book:kca:');
   if (!book?.title) return null;
 
-  const contributor = findByKeyPrefix<GoodreadsApolloContributor>(state, 'Contributor:kca');
   const series = findByKeyPrefix<GoodreadsApolloSeries>(state, 'Series:kca');
+  const primaryRef = book.primaryContributorEdge?.node?.__ref;
+  const contributor = primaryRef ? (state[primaryRef] as GoodreadsApolloContributor | undefined) : findContributorWithName(state);
+  const authorName = contributor?.name;
 
   const details = book.details;
   const firstSeries = book.bookSeries?.[0];
@@ -25,7 +27,7 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
     providerId: bookId,
     title,
     subtitle,
-    authors: contributor?.name ? [contributor.name] : undefined,
+    authors: authorName ? [authorName] : undefined,
     description: normalize(book.description),
     publisher: normalize(details?.publisher),
     publishedYear,
@@ -44,6 +46,11 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
 function findByKeyPrefix<T>(state: Record<string, unknown>, prefix: string): T | undefined {
   const key = Object.keys(state).find((k) => k.includes(prefix));
   return key ? (state[key] as T) : undefined;
+}
+
+function findContributorWithName(state: Record<string, unknown>): GoodreadsApolloContributor | undefined {
+  const key = Object.keys(state).find((k) => k.includes('Contributor:kca') && !!(state[k] as GoodreadsApolloContributor)?.name);
+  return key ? (state[key] as GoodreadsApolloContributor) : undefined;
 }
 
 function splitTitle(fullTitle: string): { title: string; subtitle?: string } {
