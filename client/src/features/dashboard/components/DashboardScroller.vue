@@ -28,36 +28,21 @@ const typeIcon = computed(() => {
   return Shuffle
 })
 
-const typeColor = computed(() => {
-  if (props.type === 'continue-reading') return 'text-emerald-500'
-  if (props.type === 'recently-added') return 'text-violet-500'
-  if (props.type === 'lens') return 'text-sky-500'
-  return 'text-amber-500'
-})
-
-const typeBg = computed(() => {
-  if (props.type === 'continue-reading') return 'bg-emerald-500/10'
-  if (props.type === 'recently-added') return 'bg-violet-500/10'
-  if (props.type === 'lens') return 'bg-sky-500/10'
-  return 'bg-amber-500/10'
-})
-
 const SKELETONS = Array.from({ length: 8 })
 </script>
 
 <template>
-  <section class="group/scroller overflow-hidden rounded-2xl border border-border/40 bg-card/30 shadow-sm backdrop-blur-[1px]">
+  <section class="group/scroller overflow-hidden rounded-2xl border border-primary/40 bg-card/30 shadow-sm backdrop-blur-[1px]">
     <!-- Header -->
     <div class="mb-2 flex items-center justify-between px-5 pt-4">
       <div class="flex items-center gap-2.5">
-        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" :class="typeBg">
-          <component :is="typeIcon" :size="14" :class="typeColor" />
+        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted/50">
+          <component :is="typeIcon" :size="14" class="text-foreground" />
         </div>
-        <h2 class="text-[15px] font-semibold tracking-tight">{{ title }}</h2>
+        <h2 class="text-[15px] font-bold tracking-tight">{{ title }}</h2>
         <span
           v-if="!loading && !error && books.length > 0"
-          class="rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums"
-          :class="[typeBg, typeColor]"
+          class="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-bold tabular-nums text-foreground"
         >
           {{ books.length }}
         </span>
@@ -105,7 +90,7 @@ const SKELETONS = Array.from({ length: 8 })
     </div>
 
     <!-- Books row — card's overflow:hidden gives clean edge, no gradient needed -->
-    <div v-else ref="scrollEl" class="flex gap-3 overflow-x-auto px-5 pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div v-else ref="scrollEl" class="flex gap-5 overflow-x-auto px-5 pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div
         v-for="(book, index) in books"
         :key="book.id"
