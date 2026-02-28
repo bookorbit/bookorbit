@@ -33,3 +33,20 @@ export interface MetadataProviderInfo {
   label: string;
   identifiable: boolean;
 }
+
+export interface MetadataSource {
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  language: string | null;
+  pageCount: number | null;
+  seriesName: string | null;
+  seriesIndex: number | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  authors: string[];
+  genres: string[];
+}
+

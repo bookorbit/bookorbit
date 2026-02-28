@@ -12,3 +12,4 @@ export * from "./reader-settings";
 export * from "./scanner";
 export * from "./opds";
 export * from "./kobo";
+export * from "./staging";

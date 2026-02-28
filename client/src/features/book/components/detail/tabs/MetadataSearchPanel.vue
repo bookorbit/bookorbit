@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import { Search, BookOpen, Loader2 } from 'lucide-vue-next'
-import type { BookDetail, MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
 import MetadataResultCard from './MetadataResultCard.vue'
 import { providerActivePillStyle } from '../../../lib/metadata-fetch'
 
 const props = defineProps<{
-  book: BookDetail
+  searchDefaults: { title?: string; author?: string; isbn?: string }
   providers: MetadataProviderInfo[]
   filteredResults: MetadataCandidate[]
   providerCounts: Partial<Record<MetadataProviderKey, number>>
@@ -23,9 +23,9 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive({
-  title: props.book.title ?? '',
-  author: props.book.authors[0]?.name ?? '',
-  isbn: props.book.isbn13 ?? props.book.isbn10 ?? '',
+  title: props.searchDefaults.title ?? '',
+  author: props.searchDefaults.author ?? '',
+  isbn: props.searchDefaults.isbn ?? '',
 })
 
 const canSearch = computed(() => !!(form.title.trim() || form.isbn.trim()))

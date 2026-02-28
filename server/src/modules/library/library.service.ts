@@ -32,9 +32,20 @@ export class LibraryService {
     if (!hasAccess) throw new ForbiddenException('No access to this library');
   }
 
-  async findAll(user: RequestUser): Promise<{ id: number }[]> {
+  async findAll(user: RequestUser) {
     const isSuperuser = user.roles.some((r) => r.isSuperuser);
-    return isSuperuser ? this.libraryRepo.findAll() : this.libraryRepo.findAllForUser(user.id);
+    const libs = isSuperuser ? await this.libraryRepo.findAll() : await this.libraryRepo.findAllForUser(user.id);
+    const allFolders = await this.libraryRepo.findAllFolders();
+    const foldersByLibrary = new Map<number, typeof allFolders>();
+    for (const f of allFolders) {
+      const arr = foldersByLibrary.get(f.libraryId);
+      if (arr) arr.push(f);
+      else foldersByLibrary.set(f.libraryId, [f]);
+    }
+    return libs.map((lib) => ({
+      ...lib,
+      folders: (foldersByLibrary.get(lib.id) ?? []).map(({ id, path, createdAt }) => ({ id, path, createdAt })),
+    }));
   }
 
   async findOne(id: number) {

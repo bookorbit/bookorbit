@@ -63,6 +63,10 @@ export class LibraryRepository {
     return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
   }
 
+  findAllFolders() {
+    return this.db.select().from(libraryFolders);
+  }
+
   findAllFolderPaths() {
     return this.db
       .select({ libraryId: libraryFolders.libraryId, path: libraryFolders.path, libraryName: libraries.name })

@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ArrowLeft, CopyCheck, Copy, CheckCheck } from 'lucide-vue-next'
-import type { BookDetail, MetadataCandidate, MetadataProviderInfo } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderInfo, MetadataSource } from '@projectx/types'
 import { useMetadataDiff, type MetadataPatch } from '../../../composables/useMetadataDiff'
 import { getProviderLabel, providerBadgeStyle, getProviderColor } from '../../../lib/metadata-fetch'
 import MetadataDiffRow from './MetadataDiffRow.vue'
 
 const props = defineProps<{
-  book: BookDetail
+  current: MetadataSource
   candidate: MetadataCandidate
   providers: MetadataProviderInfo[]
+  backLabel?: string
+  currentCoverUrl?: string
+  fieldSources?: Record<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -19,7 +22,7 @@ const emit = defineEmits<{
 
 const providerLabel = computed(() => getProviderLabel(props.candidate.provider, props.providers))
 
-const { fields, toggleField, copyAll, copyMissing, buildPatch, hasCopied } = useMetadataDiff(props.book, props.candidate)
+const { fields, toggleField, copyAll, copyMissing, buildPatch, hasCopied } = useMetadataDiff(props.current, props.candidate, props.currentCoverUrl)
 
 function apply() {
   emit('apply', buildPatch())
@@ -35,8 +38,16 @@ function apply() {
         @click="$emit('back')"
       >
         <ArrowLeft class="size-4 transition-transform group-hover:-translate-x-0.5" />
-        Results
+        {{ backLabel ?? 'Results' }}
       </button>
+      <div v-if="candidate.coverUrl" class="shrink-0 w-8 rounded overflow-hidden bg-muted ring-1 ring-border" style="aspect-ratio: 2/3">
+        <img
+          :src="candidate.coverUrl"
+          alt=""
+          class="w-full h-full object-cover"
+          @error="($event.target as HTMLImageElement).style.display = 'none'"
+        />
+      </div>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold truncate leading-snug">{{ candidate.title }}</p>
         <div class="flex items-center gap-1.5 mt-0.5">
@@ -78,7 +89,7 @@ function apply() {
 
     <!-- Diff rows -->
     <div class="flex-1 overflow-y-auto px-4">
-      <MetadataDiffRow v-for="field in fields" :key="field.key" :field="field" @toggle="toggleField" />
+      <MetadataDiffRow v-for="field in fields" :key="field.key" :field="field" :source="fieldSources?.[field.key]" @toggle="toggleField" />
       <p v-if="fields.length === 0" class="py-8 text-center text-sm text-muted-foreground">No metadata available from this source.</p>
     </div>
 

@@ -10,10 +10,12 @@ import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const { user } = useAuth()
 const { scrollers } = useDashboardConfig()
 const themeStore = useThemeStore()
+const { hasPermission } = usePermissions()
 
 const settingsOpen = ref(false)
 

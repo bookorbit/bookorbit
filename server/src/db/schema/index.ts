@@ -9,3 +9,4 @@ export * from './reader';
 export * from './oidc';
 export * from './opds';
 export * from './kobo';
+export * from './staging';

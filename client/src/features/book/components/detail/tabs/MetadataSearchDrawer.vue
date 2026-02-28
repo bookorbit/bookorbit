@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { X, Sparkles, ChevronRight } from 'lucide-vue-next'
-import type { BookDetail, MetadataCandidate } from '@projectx/types'
+import type { BookDetail, MetadataCandidate, MetadataSource } from '@projectx/types'
 import { useMetadataSearch } from '../../../composables/useMetadataSearch'
+import { useCoverVersions } from '../../../composables/useCoverVersions'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import MetadataSearchPanel from './MetadataSearchPanel.vue'
 import MetadataDiffPanel from './MetadataDiffPanel.vue'
@@ -13,6 +14,29 @@ const emit = defineEmits<{
   apply: [{ formPatch: MetadataPatch; coverUrl?: string }]
 }>()
 
+const { coverUrl } = useCoverVersions()
+const bookCoverUrl = computed(() => coverUrl(props.book.id, 'cover'))
+const searchDefaults = computed(() => ({
+  title: props.book.title ?? undefined,
+  author: props.book.authors[0]?.name ?? undefined,
+  isbn: props.book.isbn13 ?? props.book.isbn10 ?? undefined,
+}))
+
+const currentSource = computed<MetadataSource>(() => ({
+  title: props.book.title,
+  subtitle: props.book.subtitle,
+  description: props.book.description,
+  publisher: props.book.publisher,
+  publishedYear: props.book.publishedYear,
+  language: props.book.language,
+  pageCount: props.book.pageCount,
+  seriesName: props.book.seriesName,
+  seriesIndex: props.book.seriesIndex,
+  isbn10: props.book.isbn10,
+  isbn13: props.book.isbn13,
+  authors: props.book.authors.map((a) => a.name),
+  genres: props.book.genres,
+}))
 const {
   filteredResults,
   providerCounts,
@@ -95,7 +119,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
         <div class="flex-1 min-h-0">
           <MetadataSearchPanel
             v-if="view === 'search'"
-            :book="book"
+            :search-defaults="searchDefaults"
             :providers="providers"
             :filtered-results="filteredResults"
             :provider-counts="providerCounts"
@@ -110,9 +134,10 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
 
           <MetadataDiffPanel
             v-else-if="view === 'diff' && selectedCandidate"
-            :book="book"
+            :current="currentSource"
             :candidate="selectedCandidate"
             :providers="providers"
+            :current-cover-url="bookCoverUrl"
             @back="backToSearch"
             @apply="handleApply"
           />

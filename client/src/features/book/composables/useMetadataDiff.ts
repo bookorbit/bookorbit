@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import type { BookDetail, MetadataCandidate, MetadataProviderKey } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderKey, MetadataSource } from '@projectx/types'
 
 export type DiffFieldKey =
   | 'title'
@@ -74,14 +74,14 @@ const PROVIDER_ID_FIELD: Record<MetadataProviderKey, keyof MetadataPatch | undef
   openLibrary: 'openLibraryId',
 }
 
-export function useMetadataDiff(book: BookDetail, candidate: MetadataCandidate) {
+export function useMetadataDiff(current: MetadataSource, candidate: MetadataCandidate, currentCoverUrl?: string) {
   const copiedFields = reactive(new Set<DiffFieldKey>())
 
   function getBookValue(key: DiffFieldKey): string {
-    if (key === 'authors') return book.authors.map((a) => a.name).join(', ')
-    if (key === 'genres') return book.genres.join(', ')
-    if (key === 'coverUrl') return ''
-    const val = book[key as keyof BookDetail]
+    if (key === 'authors') return current.authors.join(', ')
+    if (key === 'genres') return current.genres.join(', ')
+    if (key === 'coverUrl') return currentCoverUrl ?? ''
+    const val = current[key as keyof MetadataSource]
     return val != null ? String(val) : ''
   }
 
@@ -96,8 +96,12 @@ export function useMetadataDiff(book: BookDetail, candidate: MetadataCandidate) 
   const fields = computed<DiffField[]>(() =>
     FIELD_DEFS.flatMap((def) => {
       const candidateVal = getCandidateValue(def.key)
-      if (!candidateVal) return []
       const bookVal = getBookValue(def.key)
+      if (def.key === 'coverUrl') {
+        if (!candidateVal && !bookVal) return []
+      } else {
+        if (!candidateVal) return []
+      }
       const isCopied = copiedFields.has(def.key)
       return [
         {

@@ -24,6 +24,23 @@ export class MetadataFetchPipeline {
     existingFields: Partial<Record<MetadataField, unknown>>,
     libraryId?: number,
   ): Promise<ResolvedMetadataFields> {
+    const { resolved } = await this.runInternal(params, existingFields, libraryId);
+    return resolved;
+  }
+
+  async runWithSources(
+    params: MetadataSearchParams,
+    existingFields: Partial<Record<MetadataField, unknown>>,
+    libraryId?: number,
+  ): Promise<{ resolved: ResolvedMetadataFields; sources: Record<string, string> }> {
+    return this.runInternal(params, existingFields, libraryId);
+  }
+
+  private async runInternal(
+    params: MetadataSearchParams,
+    existingFields: Partial<Record<MetadataField, unknown>>,
+    libraryId?: number,
+  ): Promise<{ resolved: ResolvedMetadataFields; sources: Record<string, string> }> {
     const global = await this.preferencesService.getGlobal();
     const overrides = libraryId ? (await this.preferencesService.getForLibrary(libraryId, global)).overrides : null;
     const registeredKeys = this.registry.all().map((p) => p.key);
@@ -54,8 +71,9 @@ export class MetadataFetchPipeline {
     preferences: MetadataFetchPreferences,
     byProvider: Map<string, MetadataCandidate>,
     existing: Partial<Record<MetadataField, unknown>>,
-  ): ResolvedMetadataFields {
+  ): { resolved: ResolvedMetadataFields; sources: Record<string, string> } {
     const result: ResolvedMetadataFields = {};
+    const sources: Record<string, string> = {};
 
     for (const field of Object.keys(preferences.fields) as MetadataField[]) {
       const fp = preferences.fields[field];
@@ -70,6 +88,7 @@ export class MetadataFetchPipeline {
 
         if (field === 'cover') {
           result.coverUrl = candidate.coverUrl;
+          sources['coverUrl'] = providerKey;
           break;
         }
 
@@ -78,18 +97,20 @@ export class MetadataFetchPipeline {
           case 'fillMissing':
             if (existingValue === null || existingValue === undefined || existingValue === '') {
               (result as Record<string, unknown>)[field] = value;
+              sources[field] = providerKey;
             }
             break;
           case 'overwrite':
           case 'overwriteIfProvided':
             (result as Record<string, unknown>)[field] = value;
+            sources[field] = providerKey;
             break;
         }
         break;
       }
     }
 
-    return result;
+    return { resolved: result, sources };
   }
 
   private extractField(candidate: MetadataCandidate, field: MetadataField): unknown {

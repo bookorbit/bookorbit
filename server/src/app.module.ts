@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { LoggerModule } from 'nestjs-pino';
 
 import { appConfig, authConfig, dbConfig, externalApiConfig, mailerConfig, storageConfig } from './config/config';
+import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { LibraryAccessGuard } from './common/guards/library-access.guard';
@@ -32,11 +34,13 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
+import { StagingModule } from './modules/staging/staging.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
+    LoggerModule.forRoot(loggerConfig),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig, externalApiConfig],
@@ -69,6 +73,7 @@ import { UserModule } from './modules/user/user.module';
     DashboardModule,
     CbzModule,
     ReaderPreferencesModule,
+    StagingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

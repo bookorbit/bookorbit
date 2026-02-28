@@ -17,6 +17,7 @@ export const authConfig = registerAs('auth', () => ({
 
 export const storageConfig = registerAs('storage', () => ({
   booksPath: process.env.BOOKS_PATH ?? '/data/books',
+  stagingPath: process.env.STAGING_PATH,
 }));
 
 export const externalApiConfig = registerAs('externalApi', () => ({

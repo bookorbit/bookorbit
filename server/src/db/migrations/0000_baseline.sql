@@ -385,6 +385,28 @@ CREATE TABLE "kobo_sync_settings" (
 	CONSTRAINT "kobo_sync_settings_user_id_unique" UNIQUE("user_id")
 );
 --> statement-breakpoint
+CREATE TABLE "staging_files" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"file_name" varchar(500) NOT NULL,
+	"absolute_path" text NOT NULL,
+	"file_size" bigint,
+	"format" varchar(20),
+	"status" varchar(20) DEFAULT 'pending' NOT NULL,
+	"embedded_metadata" jsonb,
+	"selected_metadata" jsonb,
+	"fetched_metadata" jsonb,
+	"cover_path" text,
+	"target_library_id" integer,
+	"target_folder_id" integer,
+	"confidence" integer,
+	"fetched_metadata_sources" jsonb,
+	"error_message" text,
+	"metadata_edited_at" timestamp,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "staging_files_absolute_path_unique" UNIQUE("absolute_path")
+);
+--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -429,6 +451,8 @@ ALTER TABLE "kobo_reading_states" ADD CONSTRAINT "kobo_reading_states_book_id_bo
 ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_snapshot_id_kobo_library_snapshots_id_fk" FOREIGN KEY ("snapshot_id") REFERENCES "public"."kobo_library_snapshots"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_sync_settings" ADD CONSTRAINT "kobo_sync_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "staging_files" ADD CONSTRAINT "staging_files_target_library_id_libraries_id_fk" FOREIGN KEY ("target_library_id") REFERENCES "public"."libraries"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "staging_files" ADD CONSTRAINT "staging_files_target_folder_id_library_folders_id_fk" FOREIGN KEY ("target_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
@@ -438,4 +462,5 @@ CREATE UNIQUE INDEX "rp_user_file_idx" ON "reader_preferences" USING btree ("use
 CREATE INDEX "reading_progress_user_id_idx" ON "reading_progress" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_user_id_idx" ON "oidc_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_subject_issuer_idx" ON "oidc_sessions" USING btree ("oidc_subject","oidc_issuer");--> statement-breakpoint
-CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_session_id");
+CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_session_id");--> statement-breakpoint
+CREATE INDEX "staging_files_status_idx" ON "staging_files" USING btree ("status");

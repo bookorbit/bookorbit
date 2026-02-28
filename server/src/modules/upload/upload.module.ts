@@ -13,5 +13,6 @@ import { UploadValidatorService } from './upload-validator.service';
   imports: [AppSettingsModule, LibraryModule, MetadataModule],
   controllers: [UploadController],
   providers: [UploadService, UploadValidatorService, UploadStorageService, UploadProcessorService],
+  exports: [UploadValidatorService, UploadStorageService, UploadProcessorService],
 })
 export class UploadModule {}

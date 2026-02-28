@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
@@ -21,8 +22,9 @@ async function bootstrap() {
   await migrate(drizzle(pool), { migrationsFolder: join(__dirname, '..', 'src', 'db', 'migrations') });
   await pool.end();
 
-  const adapter = new FastifyAdapter({ logger: true });
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+  const adapter = new FastifyAdapter({ logger: false });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   // Kobo devices send Content-Type: application/json with empty bodies on GET/DELETE.
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.

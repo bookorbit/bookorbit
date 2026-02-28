@@ -6,6 +6,7 @@ const PROVIDER_HEX: Record<string, string> = {
   amazon: '#FF9900',
   hardcover: '#4F47E5',
   openLibrary: '#E83B2A',
+  auto: '#8B5CF6',
 }
 
 const DEFAULT_COLOR = 'oklch(0.5 0.01 0)'
@@ -16,6 +17,7 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   goodreads: 'Goodreads',
   hardcover: 'Hardcover',
   openLibrary: 'Open Lib',
+  auto: 'Fetched',
 }
 
 export function getProviderColor(provider: string): string {

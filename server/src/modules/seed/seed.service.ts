@@ -17,6 +17,7 @@ const BUILT_IN_PERMISSIONS = [
   { name: 'library_delete_books', description: 'Remove books from a library', isSystem: true },
   { name: 'kobo_sync', description: 'Sync with Kobo device', isSystem: true },
   { name: 'opds_access', description: 'Access the OPDS catalog', isSystem: true },
+  { name: 'staging_access', description: 'Access the staging inbox to review and import files', isSystem: true },
 ];
 
 const ADMIN_PERMISSIONS = [
@@ -30,9 +31,18 @@ const ADMIN_PERMISSIONS = [
   'library_delete_books',
   'kobo_sync',
   'opds_access',
+  'staging_access',
 ];
 
-const USER_PERMISSIONS = ['library_upload', 'library_download', 'library_edit_metadata', 'library_delete_books', 'kobo_sync', 'opds_access'];
+const USER_PERMISSIONS = [
+  'library_upload',
+  'library_download',
+  'library_edit_metadata',
+  'library_delete_books',
+  'kobo_sync',
+  'opds_access',
+  'staging_access',
+];
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
@@ -97,6 +107,31 @@ export class SeedService implements OnApplicationBootstrap {
       .onConflictDoNothing({ target: schema.appSettings.key });
 
     await this.db.insert(schema.appSettings).values({ key: 'opds_enabled', value: 'true' }).onConflictDoNothing({ target: schema.appSettings.key });
+
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'staging_auto_fetch_metadata', value: 'true' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'staging_auto_finalize_enabled', value: 'false' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'staging_auto_finalize_threshold', value: '85' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'staging_auto_finalize_library_id', value: '' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'staging_auto_finalize_folder_id', value: '' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
 
     const defaultOidcConfig = JSON.stringify({
       enabled: false,

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
@@ -10,6 +10,11 @@ import * as schema from '../../db/schema';
 const APP_SETTING_KEYS = {
   OIDC_CONFIG: 'oidc_config',
   UPLOAD_FILE_PATTERN: 'upload_file_pattern',
+  STAGING_AUTO_FETCH_METADATA: 'staging_auto_fetch_metadata',
+  STAGING_AUTO_FINALIZE_ENABLED: 'staging_auto_finalize_enabled',
+  STAGING_AUTO_FINALIZE_THRESHOLD: 'staging_auto_finalize_threshold',
+  STAGING_AUTO_FINALIZE_LIBRARY_ID: 'staging_auto_finalize_library_id',
+  STAGING_AUTO_FINALIZE_FOLDER_ID: 'staging_auto_finalize_folder_id',
 } as const;
 
 type Db = NodePgDatabase<typeof schema>;
@@ -60,6 +65,13 @@ export class AppSettingsService {
     return setting;
   }
 
+  async isStagingAutoFetchEnabled(): Promise<boolean> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.STAGING_AUTO_FETCH_METADATA),
+    });
+    return row?.value !== 'false';
+  }
+
   async getOidcConfig(): Promise<OidcFullConfig> {
     const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, APP_SETTING_KEYS.OIDC_CONFIG) });
     if (!row) return { ...DEFAULT_OIDC_CONFIG };
@@ -98,5 +110,33 @@ export class AppSettingsService {
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
 
     return merged;
+  }
+
+  async getAutoFinalizeSettings(): Promise<{
+    enabled: boolean;
+    threshold: number;
+    libraryId: number | null;
+    folderId: number | null;
+  }> {
+    const keys = [
+      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_ENABLED,
+      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_THRESHOLD,
+      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_LIBRARY_ID,
+      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_FOLDER_ID,
+    ];
+    const rows = await this.db.select().from(schema.appSettings).where(inArray(schema.appSettings.key, keys));
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+
+    const libVal = map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_LIBRARY_ID);
+    const folderVal = map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_FOLDER_ID);
+    const libId = libVal ? parseInt(libVal, 10) : null;
+    const folderId = folderVal ? parseInt(folderVal, 10) : null;
+
+    return {
+      enabled: map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_ENABLED) === 'true',
+      threshold: parseInt(map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_THRESHOLD) ?? '85', 10),
+      libraryId: libId && !isNaN(libId) ? libId : null,
+      folderId: folderId && !isNaN(folderId) ? folderId : null,
+    };
   }
 }
