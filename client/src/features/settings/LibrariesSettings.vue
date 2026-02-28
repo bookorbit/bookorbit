@@ -26,7 +26,7 @@ const deleting = ref(false)
 async function loadAllStats() {
   await Promise.all(
     libraries.value.map(async (lib) => {
-      const res = await api(`/api/libraries/${lib.id}/stats`)
+      const res = await api(`/api/v1/libraries/${lib.id}/stats`)
       if (res.ok) stats.value[lib.id] = await res.json()
     }),
   )
@@ -51,7 +51,7 @@ watch(progressMap, (map) => {
   for (const [libraryId, event] of map) {
     if (event.status === 'completed' && !statsReloadedFor.has(libraryId)) {
       statsReloadedFor.add(libraryId)
-      api(`/api/libraries/${libraryId}/stats`).then(async (res) => {
+      api(`/api/v1/libraries/${libraryId}/stats`).then(async (res) => {
         if (res.ok) stats.value[libraryId] = await res.json()
         setTimeout(() => statsReloadedFor.delete(libraryId), 5000)
       })
@@ -65,7 +65,7 @@ watch(progressMap, (map) => {
 
 async function scan(lib: LibraryType) {
   try {
-    const res = await api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+    const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
     if (res.ok) {
       toast.success(`Scan started for "${lib.name}"`)
       subscribeLibrary(lib.id)
@@ -79,7 +79,7 @@ async function scan(lib: LibraryType) {
 
 async function refreshCovers(lib: LibraryType) {
   try {
-    const res = await api(`/api/scanner/libraries/${lib.id}/refresh-covers`, { method: 'POST' })
+    const res = await api(`/api/v1/scanner/libraries/${lib.id}/refresh-covers`, { method: 'POST' })
     if (!res.ok) toast.error(`Failed to refresh covers for "${lib.name}"`)
   } catch {
     toast.error(`Failed to refresh covers for "${lib.name}"`)
@@ -89,7 +89,7 @@ async function refreshCovers(lib: LibraryType) {
 async function scanAll() {
   scanningAll.value = true
   try {
-    const results = await Promise.all(libraries.value.map((lib) => api(`/api/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
+    const results = await Promise.all(libraries.value.map((lib) => api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
     const failed = results.filter((r) => !r.ok).length
     if (failed === 0) {
       toast.success('Scan started for all libraries')
@@ -135,7 +135,7 @@ async function confirmDelete() {
   const deletedId = deletingLibrary.value.id
   const deletedName = deletingLibrary.value.name
   try {
-    const res = await api(`/api/libraries/${deletedId}`, { method: 'DELETE' })
+    const res = await api(`/api/v1/libraries/${deletedId}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`"${deletedName}" deleted`)
       deletingLibrary.value = null

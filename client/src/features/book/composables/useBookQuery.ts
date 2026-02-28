@@ -33,7 +33,7 @@ export function useBookQuery(libraryId: Ref<number | null>) {
         pagination: { page: pagination.page, size: pagination.size },
       }
 
-      const res = await api(`/api/libraries/${libraryId.value}/books`, {
+      const res = await api(`/api/v1/libraries/${libraryId.value}/books`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

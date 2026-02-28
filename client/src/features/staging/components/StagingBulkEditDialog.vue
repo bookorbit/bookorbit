@@ -60,7 +60,7 @@ async function submit() {
   }
 
   try {
-    const res = await api('/api/staging/files/bulk-edit', {
+    const res = await api('/api/v1/staging/files/bulk-edit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

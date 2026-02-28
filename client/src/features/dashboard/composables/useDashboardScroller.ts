@@ -14,7 +14,7 @@ export function useDashboardScroller(type: ScrollerType, limit = 20, lensId?: nu
     try {
       const params = new URLSearchParams({ limit: String(limit) })
       if (type === 'lens' && lensId) params.set('lensId', String(lensId))
-      const res = await api(`/api/dashboard/scrollers/${type}?${params}`)
+      const res = await api(`/api/v1/dashboard/scrollers/${type}?${params}`)
       if (!res.ok) throw new Error()
       books.value = await res.json()
     } catch {

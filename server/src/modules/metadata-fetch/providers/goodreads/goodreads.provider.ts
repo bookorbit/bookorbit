@@ -79,7 +79,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
 
   private async fetchHtml(url: string): Promise<string | null> {
     try {
-      const res = await fetch(url, { headers: HEADERS });
+      const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.warn(`Goodreads returned ${res.status} for ${url}`);
         return null;

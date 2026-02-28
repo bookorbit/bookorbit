@@ -22,7 +22,7 @@ export function useLens(lensId: Ref<number>) {
     }
 
     try {
-      const res = await api(`/api/lenses/${lensId.value}/books?page=${page.value}&size=${PAGE_SIZE}`)
+      const res = await api(`/api/v1/lenses/${lensId.value}/books?page=${page.value}&size=${PAGE_SIZE}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: BooksPage = await res.json()

@@ -79,7 +79,7 @@ const mobileView = ref<'nav' | 'content'>('nav')
 
 onMounted(async () => {
   if (props.library) {
-    const res = await api(`/api/libraries/${props.library.id}`)
+    const res = await api(`/api/v1/libraries/${props.library.id}`)
     const full: Library = res.ok ? await res.json() : props.library
     creator.initEdit(full)
     visitedUpTo.value = ALL_SECTIONS.length - 1 // all unlocked in edit

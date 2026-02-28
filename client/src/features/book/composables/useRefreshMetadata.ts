@@ -26,7 +26,7 @@ export function useRefreshMetadata() {
   async function callRefresh<T>(bookId: number, preview: boolean): Promise<T | null> {
     refreshing.value = true
     try {
-      const url = `/api/books/${bookId}/refresh-metadata${preview ? '?preview=true' : ''}`
+      const url = `/api/v1/books/${bookId}/refresh-metadata${preview ? '?preview=true' : ''}`
       const res = await api(url, { method: 'POST' })
       if (!res.ok) return null
       return (await res.json()) as T

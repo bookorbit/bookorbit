@@ -83,7 +83,7 @@ async function fetchPreview() {
       pagination: { page: 0, size: 1 },
     }
     if (draftFilter.value) body.filter = draftFilter.value
-    const res = await api('/api/books/query', {
+    const res = await api('/api/v1/books/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

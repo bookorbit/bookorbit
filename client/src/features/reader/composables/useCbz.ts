@@ -8,11 +8,11 @@ export function useCbz(fileId: number, bookId: number) {
   const error = ref<string | null>(null)
 
   function pageUrl(n: number): string {
-    return `/api/cbz/files/${fileId}/pages/${n}`
+    return `/api/v1/cbz/files/${fileId}/pages/${n}`
   }
 
   async function load(): Promise<void> {
-    const [pagesRes, bookRes] = await Promise.all([api(`/api/cbz/files/${fileId}/pages`), api(`/api/books/${bookId}`)])
+    const [pagesRes, bookRes] = await Promise.all([api(`/api/v1/cbz/files/${fileId}/pages`), api(`/api/v1/books/${bookId}`)])
     if (!pagesRes.ok) {
       error.value = 'Failed to load comic'
       loading.value = false

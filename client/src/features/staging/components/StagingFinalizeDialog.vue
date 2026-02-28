@@ -60,7 +60,7 @@ async function fetchNamePreview(libId: number | null) {
   }
   previewLoading.value = true
   try {
-    const res = await api('/api/staging/files/preview-names', {
+    const res = await api('/api/v1/staging/files/preview-names', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...props.selectionPayload, defaultLibraryId: libId }),

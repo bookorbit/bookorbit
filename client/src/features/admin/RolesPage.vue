@@ -17,7 +17,7 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const [rolesRes, permsRes] = await Promise.all([api('/api/roles'), api('/api/permissions')])
+    const [rolesRes, permsRes] = await Promise.all([api('/api/v1/roles'), api('/api/v1/permissions')])
     if (!rolesRes.ok || !permsRes.ok) throw new Error('Failed to load data')
     roles.value = await rolesRes.json()
     permissions.value = await permsRes.json()
@@ -42,7 +42,7 @@ function openEdit(role: Role) {
 
 async function deleteRole(role: Role) {
   if (!confirm(`Delete role "${role.name}"?`)) return
-  const res = await api(`/api/roles/${role.id}`, { method: 'DELETE' })
+  const res = await api(`/api/v1/roles/${role.id}`, { method: 'DELETE' })
   if (res.ok) loadData()
 }
 

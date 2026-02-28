@@ -14,11 +14,18 @@ import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyCompress from '@fastify/compress';
 
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
 
 async function bootstrap() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 5_000,
+  });
   await migrate(drizzle(pool), { migrationsFolder: join(__dirname, '..', 'src', 'db', 'migrations') });
   await pool.end();
 
@@ -26,9 +33,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
   app.useLogger(app.get(Logger));
 
+  const fastify = adapter.getInstance();
+
   // Kobo devices send Content-Type: application/json with empty bodies on GET/DELETE.
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
-  const fastify = adapter.getInstance();
   fastify.addHook('preParsing', (request, _reply, payload, done) => {
     const ct = request.headers['content-type'] ?? '';
     const isJson = ct.startsWith('application/json');
@@ -43,9 +51,18 @@ async function bootstrap() {
     done(null, payload);
   });
 
+  // Echo pino-http's request ID so clients can correlate errors with server logs.
+  fastify.addHook('onSend', (_request, reply, _payload, done) => {
+    const id = reply.request.id;
+    if (id !== undefined && id !== null) {
+      void reply.header('X-Request-Id', String(id));
+    }
+    done();
+  });
+
   app.useWebSocketAdapter(new IoAdapter(app));
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api/v1');
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -57,6 +74,23 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        connectSrc: ["'self'", 'ws:', 'wss:'],
+        fontSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  });
+
+  await app.register(fastifyCompress, { encodings: ['gzip', 'br'] });
+
   await app.register(fastifyCookie);
   await app.register(fastifyMultipart, { limits: { fileSize: MAX_COVER_BYTES } });
 
@@ -67,7 +101,7 @@ async function bootstrap() {
     max: 100,
     timeWindow: '1 minute',
     allowList: (req: { cookies?: { access_token?: string }; headers?: { authorization?: string }; url?: string }) =>
-      !!req.cookies?.access_token || !!req.headers?.authorization || /^\/api\/kobo\//.test(req.url ?? ''),
+      !!req.cookies?.access_token || !!req.headers?.authorization || /^\/api\/v1\/kobo\//.test(req.url ?? ''),
   });
 
   if (process.env.NODE_ENV !== 'production') {

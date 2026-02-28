@@ -41,10 +41,10 @@ export function useCoverEditor(bookId: Ref<number>) {
       if (pendingFile.value) {
         const form = new FormData()
         form.append('file', pendingFile.value)
-        const res = await api(`/api/books/${bookId.value}/cover`, { method: 'POST', body: form })
+        const res = await api(`/api/v1/books/${bookId.value}/cover`, { method: 'POST', body: form })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
       } else {
-        const res = await api(`/api/books/${bookId.value}/cover/from-url`, {
+        const res = await api(`/api/v1/books/${bookId.value}/cover/from-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: pendingUrl.value }),
@@ -66,7 +66,7 @@ export function useCoverEditor(bookId: Ref<number>) {
     uploading.value = true
     error.value = null
     try {
-      const res = await api(`/api/books/${bookId.value}/cover`, { method: 'DELETE' })
+      const res = await api(`/api/v1/books/${bookId.value}/cover`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       bumpVersion(bookId.value)

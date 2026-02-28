@@ -13,7 +13,13 @@ export const DB = Symbol('DB');
       provide: DB,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const pool = new Pool({ connectionString: config.get('db.url') });
+        const pool = new Pool({
+          connectionString: config.get('db.url'),
+          max: 20,
+          idleTimeoutMillis: 30_000,
+          connectionTimeoutMillis: 5_000,
+          statement_timeout: 30_000,
+        });
         return drizzle(pool, { schema });
       },
     },

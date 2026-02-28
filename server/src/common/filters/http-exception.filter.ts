@@ -32,6 +32,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message,
       path: request.url,
       timestamp: new Date().toISOString(),
+      requestId: request.id,
     });
   }
 }

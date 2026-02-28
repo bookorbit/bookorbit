@@ -106,7 +106,7 @@ export function useFoliate(
 
       const mimeType = format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip'
       const ext = format === 'pdf' ? 'pdf' : format === 'cbz' ? 'cbz' : 'epub'
-      const res = await api(`/api/books/files/${fileId}/serve`)
+      const res = await api(`/api/v1/books/files/${fileId}/serve`)
       if (!res.ok) throw new Error(`Failed to fetch book file: ${res.status}`)
       const blob = await res.blob()
       const file = new File([blob], `book-file-${fileId}.${ext}`, { type: mimeType })

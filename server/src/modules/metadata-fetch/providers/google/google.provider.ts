@@ -31,7 +31,7 @@ export class GoogleProvider implements IdentifiableProvider {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.google);
     if (!enabled) return null;
     const url = this.buildUrl(`/volumes/${providerId}`, {}, apiKey);
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) {
       this.logger.warn(`Google Books API returned ${res.status} for lookupById(${providerId})`);
       return null;
@@ -50,7 +50,7 @@ export class GoogleProvider implements IdentifiableProvider {
 
   private async fetchVolumes(query: string, apiKey: string): Promise<MetadataCandidate[]> {
     const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' }, apiKey);
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) {
       this.logger.warn(`Google Books API returned ${res.status} for search("${query}")`);
       return [];

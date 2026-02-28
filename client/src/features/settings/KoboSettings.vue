@@ -74,7 +74,7 @@ async function submitCreate() {
   try {
     const device = await createDevice(newDeviceName.value.trim())
     newDeviceToken.value = device.token
-    newDeviceSyncUrl.value = `${window.location.origin}/api/kobo/${device.token}`
+    newDeviceSyncUrl.value = `${window.location.origin}/api/v1/kobo/${device.token}`
     showCreateForm.value = false
     newDeviceName.value = ''
   } catch (e) {

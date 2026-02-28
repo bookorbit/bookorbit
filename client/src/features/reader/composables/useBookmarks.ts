@@ -25,7 +25,7 @@ export function useBookmarks() {
 
   async function load(bookId: number) {
     loadError.value = null
-    const res = await api(`/api/books/${bookId}/bookmarks`)
+    const res = await api(`/api/v1/books/${bookId}/bookmarks`)
     if (!res.ok) {
       loadError.value = 'Failed to load'
       return
@@ -38,7 +38,7 @@ export function useBookmarks() {
     if (existing) {
       await remove(bookId, existing.id)
     } else {
-      const res = await api(`/api/books/${bookId}/bookmarks`, {
+      const res = await api(`/api/v1/books/${bookId}/bookmarks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cfi, title }),
@@ -51,7 +51,7 @@ export function useBookmarks() {
   }
 
   async function remove(bookId: number, bookmarkId: number) {
-    const res = await api(`/api/books/${bookId}/bookmarks/${bookmarkId}`, {
+    const res = await api(`/api/v1/books/${bookId}/bookmarks/${bookmarkId}`, {
       method: 'DELETE',
     })
     if (res.ok) {

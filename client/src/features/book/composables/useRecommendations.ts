@@ -11,7 +11,7 @@ export function useRecommendations() {
     loading.value = true
     recommendations.value = []
     try {
-      const res = await api(`/api/books/${bookId}/recommendations`)
+      const res = await api(`/api/v1/books/${bookId}/recommendations`)
       if (!res.ok) return
       recommendations.value = await res.json()
     } catch {

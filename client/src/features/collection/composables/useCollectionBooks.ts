@@ -20,7 +20,7 @@ export function useCollectionBooks(collectionId: Ref<number>) {
     }
     loading.value = true
     try {
-      const res = await api(`/api/collections/${collectionId.value}/books?page=${page}&size=${PAGE_SIZE}`)
+      const res = await api(`/api/v1/collections/${collectionId.value}/books?page=${page}&size=${PAGE_SIZE}`)
       if (!res.ok) throw new Error('Failed to load collection books')
       const data = await res.json()
       items.value = reset ? data.items : [...items.value, ...data.items]

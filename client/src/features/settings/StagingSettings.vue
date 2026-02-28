@@ -19,7 +19,7 @@ const autoFinalizeFolders = computed(() => autoFinalizeLibrary.value?.folders ??
 
 onMounted(async () => {
   try {
-    const [res] = await Promise.all([api('/api/app-settings'), fetchLibraries()])
+    const [res] = await Promise.all([api('/api/v1/app-settings'), fetchLibraries()])
     if (res.ok) {
       const settings: { key: string; value: string }[] = await res.json()
       const get = (key: string) => settings.find((s) => s.key === key)?.value
@@ -37,7 +37,7 @@ onMounted(async () => {
 })
 
 async function saveSetting(key: string, value: string) {
-  await api(`/api/app-settings/${key}`, {
+  await api(`/api/v1/app-settings/${key}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value }),
@@ -49,7 +49,7 @@ async function toggle() {
   const newVal = !autoFetch.value
   saving.value = true
   try {
-    const res = await api('/api/app-settings/staging_auto_fetch_metadata', {
+    const res = await api('/api/v1/app-settings/staging_auto_fetch_metadata', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: String(newVal) }),
@@ -65,7 +65,7 @@ async function toggleAutoFinalize() {
   const newVal = !autoFinalizeEnabled.value
   saving.value = true
   try {
-    const res = await api('/api/app-settings/staging_auto_finalize_enabled', {
+    const res = await api('/api/v1/app-settings/staging_auto_finalize_enabled', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: String(newVal) }),

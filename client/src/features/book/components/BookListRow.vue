@@ -69,7 +69,7 @@ async function setRating(star: number) {
   const newRating = localRating.value === star ? null : star
   localRating.value = newRating
   emit('rating-change', newRating)
-  await api(`/api/books/${props.book.id}/metadata`, {
+  await api(`/api/v1/books/${props.book.id}/metadata`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rating: newRating }),

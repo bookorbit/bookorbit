@@ -12,7 +12,7 @@ export function useProviderConfig() {
   async function fetchConfig() {
     loading.value = true
     try {
-      const res = await api('/api/metadata-preferences/providers')
+      const res = await api('/api/v1/metadata-preferences/providers')
       if (!res.ok) return
       const data: { config: ProviderConfigurations; statuses: ProviderStatus[] } = await res.json()
       config.value = data.config
@@ -25,7 +25,7 @@ export function useProviderConfig() {
   async function saveConfig(patch: Partial<ProviderConfigurations>) {
     saving.value = true
     try {
-      const res = await api('/api/metadata-preferences/providers', {
+      const res = await api('/api/v1/metadata-preferences/providers', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),

@@ -39,7 +39,7 @@ function sortOrderLabel(value: OpdsSortOrder): string {
 
 onMounted(async () => {
   try {
-    const [settingsRes, usersRes] = await Promise.all([api('/api/app-settings'), api('/api/v1/opds-users')])
+    const [settingsRes, usersRes] = await Promise.all([api('/api/v1/app-settings'), api('/api/v1/opds-users')])
     if (settingsRes.ok) {
       const settings = await settingsRes.json()
       const row = settings.find((s: { key: string; value: string }) => s.key === 'opds_enabled')
@@ -57,7 +57,7 @@ onMounted(async () => {
 
 async function toggleOpds() {
   const newVal = !opdsEnabled.value
-  const res = await api('/api/app-settings/opds_enabled', {
+  const res = await api('/api/v1/app-settings/opds_enabled', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: String(newVal) }),

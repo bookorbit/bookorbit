@@ -88,7 +88,7 @@ export class AmazonProvider implements IdentifiableProvider {
   private async fetchHtml(url: string, cookie = ''): Promise<string | null> {
     const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
     try {
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.warn(`Amazon returned ${res.status} for ${url}`);
         return null;

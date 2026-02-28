@@ -23,7 +23,7 @@ export function usePdf() {
     error.value = null
     try {
       const doc = await pdfjsLib.getDocument({
-        url: `/api/books/files/${fileId}/serve`,
+        url: `/api/v1/books/files/${fileId}/serve`,
         rangeChunkSize: 65536,
         disableStream: true,
         disableAutoFetch: true,

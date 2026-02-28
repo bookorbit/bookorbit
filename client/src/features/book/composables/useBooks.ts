@@ -53,7 +53,7 @@ export function useBooks(libraryId: Ref<number | null>) {
       })
       if (search.value.trim()) params.set('search', search.value.trim())
 
-      const res = await api(`/api/books?${params}`)
+      const res = await api(`/api/v1/books?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: BooksPage = await res.json()

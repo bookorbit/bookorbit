@@ -25,7 +25,7 @@ export function useGlobalSearch(query: Ref<string>) {
     timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ q: q.trim(), limit: '10' })
-        const res = await api(`/api/books/search?${params}`)
+        const res = await api(`/api/v1/books/search?${params}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         results.value = await res.json()
       } catch {

@@ -33,7 +33,7 @@ const form = reactive<OidcConfig>({
 
 onMounted(async () => {
   try {
-    const res = await api('/api/app-settings/oidc')
+    const res = await api('/api/v1/app-settings/oidc')
     if (res.ok) {
       const data = await res.json()
       Object.assign(form, data)
@@ -52,7 +52,7 @@ async function save() {
     const body: Partial<OidcConfig> = { ...form }
     if (!body.clientSecret) delete body.clientSecret
 
-    const res = await api('/api/app-settings/oidc', {
+    const res = await api('/api/v1/app-settings/oidc', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -76,7 +76,7 @@ async function testConnection() {
   testResult.value = null
   testing.value = true
   try {
-    const res = await api(`/api/app-settings/oidc/test?issuerUri=${encodeURIComponent(form.issuerUri)}`, { method: 'POST' })
+    const res = await api(`/api/v1/app-settings/oidc/test?issuerUri=${encodeURIComponent(form.issuerUri)}`, { method: 'POST' })
     const data = await res.json()
     if (data.success) {
       testResult.value = { success: true, message: `Connected - issuer: ${data.issuer}` }

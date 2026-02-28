@@ -12,7 +12,7 @@ export function useBookDetail() {
     error.value = null
     detail.value = null
     try {
-      const res = await api(`/api/books/${bookId}`)
+      const res = await api(`/api/v1/books/${bookId}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       detail.value = await res.json()
     } catch (e) {

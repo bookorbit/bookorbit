@@ -13,6 +13,7 @@ import { PermissionGuard } from './common/guards/permission.guard';
 import { DbModule } from './db/db.module';
 import { AnnotationModule } from './modules/annotation/annotation.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { HealthModule } from './modules/health/health.module';
 import { AppSettingsModule } from './modules/app-settings/app-settings.module';
 import { CollectionModule } from './modules/collection/collection.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -71,6 +72,7 @@ import { UserModule } from './modules/user/user.module';
     BookmarkModule,
     AnnotationModule,
     DashboardModule,
+    HealthModule,
     CbzModule,
     ReaderPreferencesModule,
     StagingModule,

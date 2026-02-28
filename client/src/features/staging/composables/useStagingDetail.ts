@@ -14,7 +14,7 @@ export function useStagingDetail() {
   async function loadFile(id: number) {
     loading.value = true
     try {
-      const res = await api(`/api/staging/files/${id}`)
+      const res = await api(`/api/v1/staging/files/${id}`)
       if (res.ok) file.value = await res.json()
     } finally {
       loading.value = false
@@ -24,7 +24,7 @@ export function useStagingDetail() {
   async function saveMetadata(id: number, metadata: Partial<StagingMetadata>): Promise<StagingFile | null> {
     saving.value = true
     try {
-      const res = await api(`/api/staging/files/${id}`, {
+      const res = await api(`/api/v1/staging/files/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selectedMetadata: metadata }),
@@ -55,7 +55,7 @@ export function useStagingDetail() {
   }
 
   async function setTarget(id: number, libraryId: number | null, folderId: number | null) {
-    const res = await api(`/api/staging/files/${id}`, {
+    const res = await api(`/api/v1/staging/files/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetLibraryId: libraryId, targetFolderId: folderId }),
@@ -64,12 +64,12 @@ export function useStagingDetail() {
   }
 
   async function discardFile(id: number) {
-    await api(`/api/staging/files/${id}`, { method: 'DELETE' })
+    await api(`/api/v1/staging/files/${id}`, { method: 'DELETE' })
     file.value = null
   }
 
   function coverUrl(id: number): string {
-    return `/api/staging/files/${id}/cover`
+    return `/api/v1/staging/files/${id}/cover`
   }
 
   return { file, loading, saving, saved, saveError, loadFile, saveMetadata, debouncedSave, setTarget, discardFile, coverUrl }

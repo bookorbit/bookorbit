@@ -20,7 +20,7 @@ export function useStagingFinalize() {
     result.value = null
 
     try {
-      const res = await api('/api/staging/finalize', {
+      const res = await api('/api/v1/staging/finalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

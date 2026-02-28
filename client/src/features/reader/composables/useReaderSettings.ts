@@ -67,8 +67,8 @@ export function useReaderSettings(bookFileId: number, format: string) {
 
   async function syncFromDb() {
     const [prefRes, defRes] = await Promise.all([
-      api(`/api/reader/preferences/${bookFileId}`).then((r) => (r.ok ? r.json() : null)),
-      api(`/api/reader/defaults`).then((r) => (r.ok ? r.json() : null)),
+      api(`/api/v1/reader/preferences/${bookFileId}`).then((r) => (r.ok ? r.json() : null)),
+      api(`/api/v1/reader/defaults`).then((r) => (r.ok ? r.json() : null)),
     ])
 
     if (prefRes?.settings) {
@@ -90,7 +90,7 @@ export function useReaderSettings(bookFileId: number, format: string) {
     writeLs(lsBookKey(bookFileId), next)
 
     if (syncEnabled.value) {
-      api(`/api/reader/preferences/${bookFileId}`, {
+      api(`/api/v1/reader/preferences/${bookFileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: next }),
@@ -104,7 +104,7 @@ export function useReaderSettings(bookFileId: number, format: string) {
     removeLs(lsBookKey(bookFileId))
 
     if (syncEnabled.value) {
-      api(`/api/reader/preferences/${bookFileId}`, { method: 'DELETE' }).catch(() => {})
+      api(`/api/v1/reader/preferences/${bookFileId}`, { method: 'DELETE' }).catch(() => {})
     }
   }
 
@@ -115,7 +115,7 @@ export function useReaderSettings(bookFileId: number, format: string) {
     writeLs(lsDefaultKey(group), next)
 
     if (syncEnabled.value) {
-      api(`/api/reader/defaults/${group}`, {
+      api(`/api/v1/reader/defaults/${group}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: next }),
@@ -128,7 +128,7 @@ export function useReaderSettings(bookFileId: number, format: string) {
     removeLs(lsDefaultKey(group))
 
     if (syncEnabled.value) {
-      api(`/api/reader/defaults/${group}`, { method: 'DELETE' }).catch(() => {})
+      api(`/api/v1/reader/defaults/${group}`, { method: 'DELETE' }).catch(() => {})
     }
   }
 
@@ -159,7 +159,7 @@ export function useReaderDefaultSettings<T extends ReaderSettings>(format: strin
     if (ls) settings.value = ls
 
     if (syncEnabled.value) {
-      const res = await api('/api/reader/defaults')
+      const res = await api('/api/v1/reader/defaults')
       if (res.ok) {
         const data = await res.json()
         if (data[group]) {
@@ -176,7 +176,7 @@ export function useReaderDefaultSettings<T extends ReaderSettings>(format: strin
     writeLs(lsDefaultKey(group), next)
 
     if (syncEnabled.value) {
-      api(`/api/reader/defaults/${group}`, {
+      api(`/api/v1/reader/defaults/${group}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: next }),
@@ -189,7 +189,7 @@ export function useReaderDefaultSettings<T extends ReaderSettings>(format: strin
     removeLs(lsDefaultKey(group))
 
     if (syncEnabled.value) {
-      api(`/api/reader/defaults/${group}`, { method: 'DELETE' }).catch(() => {})
+      api(`/api/v1/reader/defaults/${group}`, { method: 'DELETE' }).catch(() => {})
     }
   }
 

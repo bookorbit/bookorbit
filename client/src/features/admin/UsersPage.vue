@@ -28,7 +28,7 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const [usersRes, rolesRes] = await Promise.all([api(`/api/users?page=${page.value}&pageSize=50`), api('/api/roles')])
+    const [usersRes, rolesRes] = await Promise.all([api(`/api/v1/users?page=${page.value}&pageSize=50`), api('/api/v1/roles')])
     if (!usersRes.ok || !rolesRes.ok) throw new Error('Failed to load data')
     const ud = await usersRes.json()
     users.value = ud.users ?? ud.items ?? ud
@@ -54,7 +54,7 @@ function openEdit(user: UserRow) {
 }
 
 async function handleResetPassword(userId: number) {
-  const res = await api(`/api/users/${userId}/reset-password`, { method: 'POST' })
+  const res = await api(`/api/v1/users/${userId}/reset-password`, { method: 'POST' })
   if (!res.ok) return
   const data = await res.json()
   resetUrl.value = data.resetUrl
@@ -62,7 +62,7 @@ async function handleResetPassword(userId: number) {
 
 async function deleteUser(user: UserRow) {
   if (!confirm(`Delete user "${user.username}"? This cannot be undone.`)) return
-  const res = await api(`/api/users/${user.id}`, { method: 'DELETE' })
+  const res = await api(`/api/v1/users/${user.id}`, { method: 'DELETE' })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     error.value = data.message ?? 'Failed to delete user'

@@ -26,7 +26,7 @@ export function useFileNamingPattern() {
   async function fetchGlobalPattern() {
     loadingGlobal.value = true
     try {
-      const res = await api('/api/app-settings/upload-pattern')
+      const res = await api('/api/v1/app-settings/upload-pattern')
       if (res.ok) {
         const data: { pattern: string } = await res.json()
         globalPattern.value = data.pattern
@@ -45,7 +45,7 @@ export function useFileNamingPattern() {
     if (globalError.value) return
     savingGlobal.value = true
     try {
-      const res = await api('/api/app-settings/upload-pattern', {
+      const res = await api('/api/v1/app-settings/upload-pattern', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pattern: globalPattern.value }),
@@ -63,7 +63,7 @@ export function useFileNamingPattern() {
   async function saveLibraryPattern(library: Library) {
     savingLibraryId.value = library.id
     try {
-      const res = await api(`/api/libraries/${library.id}`, {
+      const res = await api(`/api/v1/libraries/${library.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileNamingPattern: library.fileNamingPattern ?? null }),

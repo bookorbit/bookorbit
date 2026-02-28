@@ -113,7 +113,7 @@ export function useBookUpload() {
     const pending = files.value.filter((f) => f.status === 'pending')
     if (pending.length === 0) return
 
-    const baseUrl = `/api/libraries/${libraryId}/upload`
+    const baseUrl = `/api/v1/libraries/${libraryId}/upload`
     const url = folderId !== undefined ? `${baseUrl}?folderId=${folderId}` : baseUrl
 
     // Process pending items with a concurrency limit of UPLOAD_CONCURRENCY

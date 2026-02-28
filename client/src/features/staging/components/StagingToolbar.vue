@@ -54,7 +54,7 @@ function onFilesSelected(event: Event) {
 async function rescan() {
   rescanning.value = true
   try {
-    const res = await api('/api/staging/rescan', { method: 'POST' })
+    const res = await api('/api/v1/staging/rescan', { method: 'POST' })
     if (res.ok) {
       emit('rescan')
     } else {

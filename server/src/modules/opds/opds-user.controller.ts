@@ -7,7 +7,7 @@ import { CreateOpdsUserDto } from './dto/create-opds-user.dto';
 import { UpdateOpdsUserDto } from './dto/update-opds-user.dto';
 import { OpdsUserService } from './opds-user.service';
 
-@Controller('v1/opds-users')
+@Controller('opds-users')
 @RequirePermission('opds_access')
 export class OpdsUserController {
   constructor(private readonly opdsUserService: OpdsUserService) {}

@@ -53,7 +53,7 @@ async function loadEntries(path: string) {
   loading.value = true
   error.value = null
   try {
-    const res = await api(`/api/path?path=${encodeURIComponent(path)}`)
+    const res = await api(`/api/v1/path?path=${encodeURIComponent(path)}`)
     if (res.ok) {
       entries.value = await res.json()
     } else {

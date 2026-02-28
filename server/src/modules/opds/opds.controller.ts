@@ -14,7 +14,7 @@ import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
 
-@Controller('v1/opds')
+@Controller('opds')
 @Public()
 @UseGuards(OpdsEnabledGuard, OpdsAuthGuard)
 export class OpdsController {

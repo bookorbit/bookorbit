@@ -24,7 +24,7 @@ async function loadAccess() {
   if (!props.libraryId) return
   loading.value = true
   try {
-    const [accessRes, usersRes] = await Promise.all([api(`/api/libraries/${props.libraryId}/access`), api('/api/users')])
+    const [accessRes, usersRes] = await Promise.all([api(`/api/v1/libraries/${props.libraryId}/access`), api('/api/v1/users')])
     if (accessRes.ok) accessList.value = await accessRes.json()
     if (usersRes.ok) {
       const all: UserOption[] = await usersRes.json()
@@ -38,7 +38,7 @@ async function loadAccess() {
 
 async function grant() {
   if (!props.libraryId || !grantUserId.value) return
-  await api(`/api/libraries/${props.libraryId}/access`, {
+  await api(`/api/v1/libraries/${props.libraryId}/access`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: grantUserId.value, accessLevel: grantLevel.value }),
@@ -49,7 +49,7 @@ async function grant() {
 
 async function changeLevel(userId: number, accessLevel: 'viewer' | 'editor' | 'owner') {
   if (!props.libraryId) return
-  await api(`/api/libraries/${props.libraryId}/access/${userId}`, {
+  await api(`/api/v1/libraries/${props.libraryId}/access/${userId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ accessLevel }),
@@ -59,7 +59,7 @@ async function changeLevel(userId: number, accessLevel: 'viewer' | 'editor' | 'o
 
 async function revoke(userId: number) {
   if (!props.libraryId) return
-  await api(`/api/libraries/${props.libraryId}/access/${userId}`, { method: 'DELETE' })
+  await api(`/api/v1/libraries/${props.libraryId}/access/${userId}`, { method: 'DELETE' })
   await loadAccess()
 }
 

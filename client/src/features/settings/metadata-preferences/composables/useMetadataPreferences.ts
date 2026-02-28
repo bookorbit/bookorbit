@@ -13,7 +13,7 @@ export function useMetadataPreferences() {
   async function fetchGlobal() {
     loadingGlobal.value = true
     try {
-      const res = await api('/api/metadata-preferences/global')
+      const res = await api('/api/v1/metadata-preferences/global')
       if (res.ok) globalPrefs.value = await res.json()
     } finally {
       loadingGlobal.value = false
@@ -23,7 +23,7 @@ export function useMetadataPreferences() {
   async function saveGlobal(prefs: MetadataFetchPreferences) {
     savingGlobal.value = true
     try {
-      const res = await api('/api/metadata-preferences/global', {
+      const res = await api('/api/v1/metadata-preferences/global', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(prefs),
@@ -40,7 +40,7 @@ export function useMetadataPreferences() {
   }
 
   async function fetchLibrary(libraryId: number) {
-    const res = await api(`/api/metadata-preferences/libraries/${libraryId}`)
+    const res = await api(`/api/v1/metadata-preferences/libraries/${libraryId}`)
     if (res.ok) {
       const data: LibraryMetadataPreferences = await res.json()
       libraryPrefs.value = new Map(libraryPrefs.value).set(libraryId, data)
@@ -51,7 +51,7 @@ export function useMetadataPreferences() {
     const key = `${libraryId}:${field}`
     savingField.value = key
     try {
-      const url = `/api/metadata-preferences/libraries/${libraryId}/fields/${field}`
+      const url = `/api/v1/metadata-preferences/libraries/${libraryId}/fields/${field}`
       const res = await api(url, {
         method: pref === null ? 'DELETE' : 'PUT',
         headers: pref !== null ? { 'Content-Type': 'application/json' } : undefined,
@@ -68,7 +68,7 @@ export function useMetadataPreferences() {
   }
 
   async function resetLibrary(libraryId: number) {
-    const res = await api(`/api/metadata-preferences/libraries/${libraryId}`, { method: 'DELETE' })
+    const res = await api(`/api/v1/metadata-preferences/libraries/${libraryId}`, { method: 'DELETE' })
     if (res.ok || res.status === 204) {
       await fetchLibrary(libraryId)
       toast.success('Library reset to global defaults')

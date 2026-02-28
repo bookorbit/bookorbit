@@ -17,7 +17,7 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const res = await api('/api/permissions')
+    const res = await api('/api/v1/permissions')
     if (!res.ok) throw new Error('Failed to load')
     permissions.value = await res.json()
   } catch (e) {
@@ -33,7 +33,7 @@ async function createPermission() {
   createError.value = null
   creating.value = true
   try {
-    const res = await api('/api/permissions', {
+    const res = await api('/api/v1/permissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName.value, description: newDescription.value || undefined }),
@@ -53,7 +53,7 @@ async function createPermission() {
 
 async function deletePermission(perm: Permission) {
   if (!confirm(`Delete permission "${perm.name}"?`)) return
-  const res = await api(`/api/permissions/${perm.id}`, { method: 'DELETE' })
+  const res = await api(`/api/v1/permissions/${perm.id}`, { method: 'DELETE' })
   if (res.ok) loadData()
 }
 </script>

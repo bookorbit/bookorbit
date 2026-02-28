@@ -77,7 +77,7 @@ async function handleDeleteSelected() {
   deletingInProgress = true
   try {
     const ids = [...selectedIds.value]
-    const res = await api('/api/books', {
+    const res = await api('/api/v1/books', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bookIds: ids }),

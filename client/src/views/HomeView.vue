@@ -208,7 +208,7 @@ const addToCollectionOpen = ref(false)
 async function handleDeleteSelected() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
-  const res = await api('/api/books', {
+  const res = await api('/api/v1/books', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bookIds: ids }),

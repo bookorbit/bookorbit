@@ -32,7 +32,7 @@ function uploadSingle(item: UploadItem): Promise<void> {
     formData.append('file', item.file)
 
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/staging/upload')
+    xhr.open('POST', '/api/v1/staging/upload')
 
     const token = getAccessToken()
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)

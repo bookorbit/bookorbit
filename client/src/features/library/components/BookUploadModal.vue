@@ -30,7 +30,7 @@ const hasFiles = computed(() => files.value.length > 0)
 const allDone = computed(() => hasFiles.value && files.value.every((f) => f.status === 'done' || f.status === 'error'))
 
 async function loadFolders(libraryId: number) {
-  const res = await api(`/api/libraries/${libraryId}`)
+  const res = await api(`/api/v1/libraries/${libraryId}`)
   if (res.ok) {
     const data: Library = await res.json()
     folders.value = data.folders ?? []

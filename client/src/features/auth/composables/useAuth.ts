@@ -17,7 +17,7 @@ setOnAuthFailure(() => {
 })
 
 async function me(): Promise<void> {
-  const res = await api('/api/auth/me')
+  const res = await api('/api/v1/auth/me')
   if (!res.ok) throw new Error('Failed to load user')
   user.value = await res.json()
 }
@@ -26,7 +26,7 @@ export function useAuth() {
   async function init(): Promise<void> {
     isLoading.value = true
     try {
-      const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+      const res = await fetch('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' })
       if (!res.ok) return
       const { accessToken } = await res.json()
       setAccessToken(accessToken)
@@ -39,7 +39,7 @@ export function useAuth() {
   }
 
   async function login(username: string, password: string): Promise<void> {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -65,7 +65,7 @@ export function useAuth() {
 
   async function logout(): Promise<void> {
     try {
-      const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      const res = await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
       clearAuth()
       if (res.ok) {
         const data = await res.json().catch(() => ({}))

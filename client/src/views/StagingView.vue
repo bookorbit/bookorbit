@@ -120,7 +120,7 @@ const emptyMessage = computed(() => {
 
 async function handleBulkDiscard() {
   const payload = getSelectionPayload()
-  await api('/api/staging/files/discard', {
+  await api('/api/v1/staging/files/discard', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -131,7 +131,7 @@ async function handleBulkDiscard() {
 
 async function handleApplyFetched() {
   const payload = getSelectionPayload()
-  const res = await api('/api/staging/files/apply-fetched', {
+  const res = await api('/api/v1/staging/files/apply-fetched', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -150,7 +150,7 @@ async function handleApplyFetched() {
 
 async function handleRetryFetch() {
   const payload = getSelectionPayload()
-  const res = await api('/api/staging/files/retry-fetch', {
+  const res = await api('/api/v1/staging/files/retry-fetch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -167,7 +167,7 @@ async function handleRetryFetch() {
 async function handleInlineApplyFetched(fileId: number) {
   const file = items.value.find((f) => f.id === fileId)
   if (!file?.fetchedMetadata) return
-  const res = await api(`/api/staging/files/${fileId}`, {
+  const res = await api(`/api/v1/staging/files/${fileId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ selectedMetadata: file.fetchedMetadata }),

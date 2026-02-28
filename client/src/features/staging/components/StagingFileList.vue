@@ -25,7 +25,7 @@ defineEmits<{
 }>()
 
 function backendCoverUrl(file: StagingFile): string {
-  return `/api/staging/files/${file.id}/cover?v=${new Date(file.updatedAt).getTime()}`
+  return `/api/v1/staging/files/${file.id}/cover?v=${new Date(file.updatedAt).getTime()}`
 }
 
 function coverUrl(file: StagingFile): string {
@@ -35,7 +35,7 @@ function coverUrl(file: StagingFile): string {
 function onCoverError(event: Event, file: StagingFile) {
   const img = event.target as HTMLImageElement
   const externalUrl = file.selectedMetadata?.coverUrl ?? file.fetchedMetadata?.coverUrl
-  if (img.src.includes('/api/staging/files/') && externalUrl) {
+  if (img.src.includes('/api/v1/staging/files/') && externalUrl) {
     img.src = externalUrl
   } else {
     img.style.display = 'none'

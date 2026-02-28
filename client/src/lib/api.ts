@@ -23,7 +23,7 @@ function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respons
 }
 
 async function attemptRefresh(): Promise<void> {
-  const res = await rawFetch('/api/auth/refresh', { method: 'POST' })
+  const res = await rawFetch('/api/v1/auth/refresh', { method: 'POST' })
   if (!res.ok) throw new Error('refresh failed')
   const data: RefreshResponse = await res.json()
   _accessToken = data.accessToken

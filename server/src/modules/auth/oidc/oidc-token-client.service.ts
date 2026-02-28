@@ -39,6 +39,7 @@ export class OidcTokenClientService {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {
@@ -60,6 +61,7 @@ export class OidcTokenClientService {
     try {
       const res = await fetch(userinfoEndpoint, {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) return {};
       return (await res.json()) as Promise<Record<string, unknown>>;

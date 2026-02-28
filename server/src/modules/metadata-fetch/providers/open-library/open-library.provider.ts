@@ -27,7 +27,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     query.set('limit', '10');
     query.set('fields', SEARCH_FIELDS);
 
-    const res = await fetch(`${BASE_URL}/search.json?${query}`);
+    const res = await fetch(`${BASE_URL}/search.json?${query}`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return [];
 
     const body = (await res.json()) as OpenLibrarySearchResponse;
@@ -37,7 +37,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.openLibrary);
     if (!enabled) return null;
-    const res = await fetch(`${BASE_URL}/works/${providerId}.json`);
+    const res = await fetch(`${BASE_URL}/works/${providerId}.json`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
 
     const work = (await res.json()) as OpenLibraryWork;

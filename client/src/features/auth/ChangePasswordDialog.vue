@@ -24,7 +24,7 @@ async function handleSubmit() {
 
   loading.value = true
   try {
-    const res = await api('/api/auth/change-password', {
+    const res = await api('/api/v1/auth/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ currentPassword: currentPassword.value, newPassword: newPassword.value }),

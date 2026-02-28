@@ -20,7 +20,7 @@ export function useMetadataSearch() {
   let abortController: AbortController | null = null
 
   async function loadProviders() {
-    const res = await api('/api/metadata-fetch/providers')
+    const res = await api('/api/v1/metadata-fetch/providers')
     if (res.ok) providers.value = (await res.json()) as MetadataProviderInfo[]
   }
 
@@ -48,7 +48,7 @@ export function useMetadataSearch() {
     if (selectedProviders.value.length) query.set('providers', selectedProviders.value.join(','))
 
     try {
-      const res = await api(`/api/metadata-fetch/stream?${query}`, {
+      const res = await api(`/api/v1/metadata-fetch/stream?${query}`, {
         signal: abortController.signal,
       })
       if (!res.ok || !res.body) return

@@ -11,7 +11,7 @@ const changeListeners = new Set<() => void>()
 
 async function restFetchSummary() {
   try {
-    const res = await api('/api/staging/summary')
+    const res = await api('/api/v1/staging/summary')
     if (res.ok) summary.value = await res.json()
   } catch {
     // best-effort refresh on reconnect
@@ -49,7 +49,7 @@ export function useStagingSummary() {
   async function fetchSummary() {
     loading.value = true
     try {
-      const res = await api('/api/staging/summary')
+      const res = await api('/api/v1/staging/summary')
       if (res.ok) summary.value = await res.json()
     } finally {
       loading.value = false

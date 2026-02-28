@@ -47,7 +47,7 @@ async function testPath() {
   testLoading.value = true
   testResult.value = null
   try {
-    const res = await api('/api/libraries/prescan', {
+    const res = await api('/api/v1/libraries/prescan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paths: [trimmed] }),

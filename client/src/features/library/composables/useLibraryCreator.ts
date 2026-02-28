@@ -82,7 +82,7 @@ export function useLibraryCreator() {
     prescanLoading.value = true
     prescanResult.value = null
     try {
-      const res = await api('/api/libraries/prescan', {
+      const res = await api('/api/v1/libraries/prescan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paths: form.folders }),
@@ -110,13 +110,13 @@ export function useLibraryCreator() {
       const payload = { ...form }
       let res: Response
       if (mode.value === 'create') {
-        res = await api('/api/libraries', {
+        res = await api('/api/v1/libraries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
       } else {
-        res = await api(`/api/libraries/${editingLibraryId.value}`, {
+        res = await api(`/api/v1/libraries/${editingLibraryId.value}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

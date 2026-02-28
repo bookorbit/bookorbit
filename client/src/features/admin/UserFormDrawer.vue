@@ -51,7 +51,7 @@ async function handleSubmit() {
     const isEdit = !!props.user?.id
 
     if (isEdit) {
-      const res = await api(`/api/users/${props.user!.id}`, {
+      const res = await api(`/api/v1/users/${props.user!.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.value, email: email.value || undefined, active: active.value }),
@@ -69,16 +69,16 @@ async function handleSubmit() {
 
       await Promise.all([
         ...toAssign.map((roleId) =>
-          api(`/api/users/${props.user!.id}/roles`, {
+          api(`/api/v1/users/${props.user!.id}/roles`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ roleId }),
           }),
         ),
-        ...toRevoke.map((roleId) => api(`/api/users/${props.user!.id}/roles/${roleId}`, { method: 'DELETE' })),
+        ...toRevoke.map((roleId) => api(`/api/v1/users/${props.user!.id}/roles/${roleId}`, { method: 'DELETE' })),
       ])
     } else {
-      const res = await api('/api/users', {
+      const res = await api('/api/v1/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

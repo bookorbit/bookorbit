@@ -9,7 +9,7 @@ import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 
-@Controller('v1/kobo')
+@Controller('kobo')
 @RequirePermission('kobo_sync')
 export class KoboUserController {
   constructor(

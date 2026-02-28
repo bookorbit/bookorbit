@@ -32,7 +32,7 @@ function generateNonce(): string {
 export function useOidc() {
   async function getPublicConfig(): Promise<OidcPublicConfig | null> {
     try {
-      const res = await fetch('/api/app-settings/oidc/public')
+      const res = await fetch('/api/v1/app-settings/oidc/public')
       if (!res.ok) return null
       return res.json()
     } catch {
@@ -60,7 +60,7 @@ export function useOidc() {
     const nonce = generateNonce()
 
     // Get server-side state (CSRF protection)
-    const stateRes = await fetch('/api/auth/oidc/state', { method: 'POST', credentials: 'include' })
+    const stateRes = await fetch('/api/v1/auth/oidc/state', { method: 'POST', credentials: 'include' })
     if (!stateRes.ok) throw new Error('Failed to generate state')
     const { state } = await stateRes.json()
 
@@ -92,7 +92,7 @@ export function useOidc() {
 
     const redirectUri = `${window.location.origin}/oauth2-callback`
 
-    const res = await fetch('/api/auth/oidc/callback', {
+    const res = await fetch('/api/v1/auth/oidc/callback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

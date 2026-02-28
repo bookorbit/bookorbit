@@ -34,7 +34,7 @@ export function useCoverVersions() {
   }
 
   function coverUrl(bookId: number, type: 'thumbnail' | 'cover' = 'thumbnail'): string {
-    const base = `/api/books/${bookId}/${type}`
+    const base = `/api/v1/books/${bookId}/${type}`
     const v = versions.value.get(bookId)
     return v ? `${base}?t=${v}` : base
   }

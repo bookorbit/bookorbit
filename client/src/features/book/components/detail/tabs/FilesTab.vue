@@ -30,7 +30,7 @@ function openFile(file: BookDetailFile) {
 
 function downloadFile(file: BookDetailFile) {
   const a = document.createElement('a')
-  a.href = `/api/books/files/${file.id}/serve`
+  a.href = `/api/v1/books/files/${file.id}/serve`
   a.download = file.filename ?? `book.${file.format ?? 'epub'}`
   a.click()
 }

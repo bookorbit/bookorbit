@@ -29,21 +29,21 @@ const loaded = ref(false)
 export function useLenses() {
   async function fetchLenses() {
     if (loaded.value) return
-    const res = await api('/api/lenses')
+    const res = await api('/api/v1/lenses')
     if (!res.ok) return
     lenses.value = await res.json()
     loaded.value = true
   }
 
   async function refreshLenses() {
-    const res = await api('/api/lenses')
+    const res = await api('/api/v1/lenses')
     if (!res.ok) return
     lenses.value = await res.json()
     loaded.value = true
   }
 
   async function createLens(payload: CreateLensPayload): Promise<Lens> {
-    const res = await api('/api/lenses', {
+    const res = await api('/api/v1/lenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -55,7 +55,7 @@ export function useLenses() {
   }
 
   async function updateLens(id: number, payload: Partial<CreateLensPayload>): Promise<Lens> {
-    const res = await api(`/api/lenses/${id}`, {
+    const res = await api(`/api/v1/lenses/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -68,7 +68,7 @@ export function useLenses() {
   }
 
   async function deleteLens(id: number): Promise<void> {
-    const res = await api(`/api/lenses/${id}`, { method: 'DELETE' })
+    const res = await api(`/api/v1/lenses/${id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     lenses.value = lenses.value.filter((l) => l.id !== id)
   }

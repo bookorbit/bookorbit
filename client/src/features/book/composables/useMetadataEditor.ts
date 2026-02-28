@@ -68,7 +68,7 @@ export function useMetadataEditor() {
     saving.value = true
     error.value = null
     try {
-      const res = await api(`/api/books/${bookId}/metadata`, {
+      const res = await api(`/api/v1/books/${bookId}/metadata`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

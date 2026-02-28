@@ -7,7 +7,7 @@ export function useStagingStatistics() {
 
   async function fetchStatistics() {
     try {
-      const res = await api('/api/staging/statistics')
+      const res = await api('/api/v1/staging/statistics')
       if (res.ok) statistics.value = await res.json()
     } catch {
       statistics.value = null

@@ -13,7 +13,7 @@ async function rebuildEmbeddings() {
   queued.value = null
   error.value = null
   try {
-    const res = await api('/api/books/embed-all', { method: 'POST' })
+    const res = await api('/api/v1/books/embed-all', { method: 'POST' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: { queued: number } = await res.json()
     queued.value = data.queued

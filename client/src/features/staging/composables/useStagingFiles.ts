@@ -36,7 +36,7 @@ export function useStagingFiles() {
       params.set('sort', filters.sort)
       params.set('order', filters.order)
 
-      const res = await api(`/api/staging/files?${params}`)
+      const res = await api(`/api/v1/staging/files?${params}`)
       if (res.ok) {
         const data: StagingFilesPage = await res.json()
         items.value = data.items
