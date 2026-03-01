@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 
 import { appConfig, authConfig, dbConfig, externalApiConfig, mailerConfig, storageConfig } from './config/config';
+import { validateEnv } from './config/env.validation';
 import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -44,6 +45,7 @@ import { UserModule } from './modules/user/user.module';
     LoggerModule.forRoot(loggerConfig),
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnv,
       load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig, externalApiConfig],
     }),
     ScheduleModule.forRoot(),

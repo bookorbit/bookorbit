@@ -3,9 +3,21 @@ import type { IncomingMessage, ServerResponse } from 'http';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+const FRAMEWORK_CONTEXTS = new Set(['InstanceLoader', 'RouterExplorer', 'RoutesResolver']);
+
 export const loggerConfig: Params = {
   pinoHttp: {
     level: isDev ? 'debug' : 'info',
+    hooks: {
+      logMethod(inputArgs, method) {
+        const first = inputArgs[0];
+        if (first !== null && typeof first === 'object' && 'context' in first && FRAMEWORK_CONTEXTS.has((first as Record<string, unknown>).context as string)) {
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return method.apply(this, inputArgs);
+      },
+    },
     customProps: () => ({ context: 'HTTP' }),
     customSuccessMessage: (req: IncomingMessage, res: ServerResponse, responseTime: number) => {
       return `${req.method} ${req.url} ${res.statusCode} +${Math.round(responseTime)}ms`;
