@@ -13,7 +13,6 @@ const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
   MetadataProviderKey.GOOGLE,
   MetadataProviderKey.AMAZON,
   MetadataProviderKey.GOODREADS,
-  MetadataProviderKey.HARDCOVER,
   MetadataProviderKey.OPEN_LIBRARY,
 ];
 

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { GripVertical } from 'lucide-vue-next'
+import { GripVertical, X } from 'lucide-vue-next'
 import type { MetadataProviderKey, ProviderStatus } from '@projectx/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+
+const REORDER_TYPE = 'application/x-field-chip-index'
 
 const props = defineProps<{
   providers: MetadataProviderKey[]
@@ -27,11 +29,15 @@ const dragOverIndex = ref<number | null>(null)
 function onDragStart(index: number, e: DragEvent) {
   draggingIndex.value = index
   e.dataTransfer!.effectAllowed = 'move'
+  e.dataTransfer!.setData(REORDER_TYPE, String(index))
+  e.stopPropagation()
 }
 
 function onDragOver(index: number, e: DragEvent) {
+  if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return
   e.preventDefault()
-  e.dataTransfer!.dropEffect = 'move'
+  e.stopPropagation()
+  e.dataTransfer.dropEffect = 'move'
   if (draggingIndex.value !== null && draggingIndex.value !== index) {
     dragOverIndex.value = index
   }
@@ -41,7 +47,9 @@ function onDragLeave(index: number) {
   if (dragOverIndex.value === index) dragOverIndex.value = null
 }
 
-function onDrop(targetIndex: number) {
+function onDrop(targetIndex: number, e: DragEvent) {
+  if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return
+  e.stopPropagation()
   if (draggingIndex.value === null || draggingIndex.value === targetIndex) return
   const updated = [...props.providers]
   const [moved] = updated.splice(draggingIndex.value, 1)
@@ -56,39 +64,49 @@ function onDragEnd() {
   dragOverIndex.value = null
 }
 
-function chipTitle(key: MetadataProviderKey) {
-  const s = statusFor(key)
-  if (!s) return key
-  if (!s.enabled) return `${s.label} (disabled)`
-  if (!s.configured) return `${s.label} (API key required)`
-  return s.label
+function removeProvider(index: number) {
+  const updated = [...props.providers]
+  updated.splice(index, 1)
+  emit('update:providers', updated)
 }
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2">
+  <div class="flex flex-wrap gap-1.5 min-h-[26px] items-center">
     <div
       v-for="(key, index) in providers"
       :key="key"
       :draggable="!disabled"
-      :title="chipTitle(key)"
-      class="flex items-center gap-1 h-6 px-1.5 rounded text-xs font-medium select-none"
+      :title="statusFor(key)?.label ?? key"
+      class="flex items-center gap-1 h-6 pl-1.5 pr-1 rounded text-xs font-medium select-none"
       :style="providerChipStyle(key, !isUsable(key))"
       :class="[
         !disabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         draggingIndex === index ? 'opacity-30 scale-95' : '',
-        dragOverIndex === index ? 'ring-2 ring-white/70 scale-110 brightness-125' : '',
+        dragOverIndex === index ? 'ring-2 ring-white/60 scale-105' : '',
       ]"
-      style="transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease"
+      style="transition: transform 0.12s ease"
       @dragstart="onDragStart(index, $event)"
       @dragover="onDragOver(index, $event)"
       @dragleave="onDragLeave(index)"
-      @drop="onDrop(index)"
+      @drop="onDrop(index, $event)"
       @dragend="onDragEnd"
     >
-      <GripVertical v-if="!disabled" :size="10" class="opacity-60 shrink-0" />
-      <span class="opacity-80 tabular-nums leading-none">{{ index + 1 }}</span>
-      {{ PROVIDER_SHORT_LABELS[key] ?? key }}
+      <GripVertical v-if="!disabled" :size="10" class="opacity-50 shrink-0" />
+      <span class="opacity-70 tabular-nums leading-none">{{ index + 1 }}</span>
+      <span>{{ PROVIDER_SHORT_LABELS[key] ?? key }}</span>
+      <button
+        v-if="!disabled"
+        class="ml-0.5 h-4 w-4 flex items-center justify-center rounded-sm opacity-60 hover:opacity-100 hover:bg-white/20 transition-opacity"
+        @click.stop="removeProvider(index)"
+        @mousedown.stop
+      >
+        <X :size="12" :stroke-width="3" />
+      </button>
     </div>
+
+    <span v-if="providers.length === 0 && !disabled" class="text-xs text-muted-foreground/40 italic h-6 flex items-center px-1">
+      drag a provider here
+    </span>
   </div>
 </template>
