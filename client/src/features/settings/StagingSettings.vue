@@ -98,10 +98,9 @@ async function onThresholdChange() {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Staging</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Configure how files are processed when they enter the staging area.</p>
+      <h2 class="settings-title">Staging</h2>
+      <p class="settings-subtitle">Configure how files are processed when they enter the staging area.</p>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-8">
@@ -114,8 +113,8 @@ async function onThresholdChange() {
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer select-none group" @click="toggle">
           <div>
-            <p class="text-sm font-medium text-foreground">Auto-fetch metadata from providers</p>
-            <p class="text-xs text-muted-foreground mt-0.5">
+            <p class="settings-label">Auto-fetch metadata from providers</p>
+            <p class="settings-hint">
               Automatically fetch metadata from configured providers (Google Books, Open Library, etc.) after a file is added to staging.
             </p>
           </div>
@@ -136,8 +135,8 @@ async function onThresholdChange() {
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
           <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer select-none" @click="toggleAutoFinalize">
             <div>
-              <p class="text-sm font-medium text-foreground">Enable auto-finalize</p>
-              <p class="text-xs text-muted-foreground mt-0.5">
+              <p class="settings-label">Enable auto-finalize</p>
+              <p class="settings-hint">
                 Files with a metadata confidence score at or above the threshold will be finalized automatically.
               </p>
             </div>
@@ -164,7 +163,7 @@ async function onThresholdChange() {
                 class="mt-1 w-full accent-primary"
                 @change="onThresholdChange"
               />
-              <div class="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+              <div class="flex justify-between settings-hint">
                 <span>50%</span>
                 <span>100%</span>
               </div>
@@ -197,5 +196,4 @@ async function onThresholdChange() {
         </div>
       </div>
     </div>
-  </div>
 </template>

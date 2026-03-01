@@ -127,7 +127,7 @@ watch(loading, (isLoading) => {
     const rect = sentinel.value.getBoundingClientRect()
     if (rect.top < window.innerHeight + 300) load()
   }
-})
+}, { flush: 'post' })
 </script>
 
 <template>

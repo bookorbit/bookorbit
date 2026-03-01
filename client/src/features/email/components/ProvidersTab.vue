@@ -1,0 +1,317 @@
+<script setup lang="ts">
+import { ref, reactive } from 'vue'
+import { toast } from 'vue-sonner'
+import { Plus, Pencil, Trash2, Star, Share2, Wifi } from 'lucide-vue-next'
+import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
+
+const { providers, createProvider, updateProvider, deleteProvider, setDefaultProvider, toggleSharedProvider, testProvider } = useEmailProviders()
+
+const showForm = ref(false)
+const editingId = ref<number | null>(null)
+const saving = ref(false)
+const testing = ref<number | null>(null)
+
+const emptyForm = (): EmailProviderForm => ({
+  name: '',
+  host: '',
+  port: 587,
+  username: '',
+  password: '',
+  fromName: '',
+  fromAddress: '',
+  auth: true,
+  ssl: false,
+  startTls: true,
+})
+
+const form = reactive<EmailProviderForm>(emptyForm())
+const formError = ref<string | null>(null)
+
+function openCreate() {
+  Object.assign(form, emptyForm())
+  editingId.value = null
+  formError.value = null
+  showForm.value = true
+}
+
+function openEdit(p: EmailProvider) {
+  Object.assign(form, {
+    name: p.name,
+    host: p.host,
+    port: p.port,
+    username: p.username ?? '',
+    password: '',
+    fromName: p.fromName ?? '',
+    fromAddress: p.fromAddress ?? '',
+    auth: p.auth,
+    ssl: p.ssl,
+    startTls: p.startTls,
+  })
+  editingId.value = p.id
+  formError.value = null
+  showForm.value = true
+}
+
+function cancelForm() {
+  showForm.value = false
+  editingId.value = null
+  formError.value = null
+}
+
+async function submitForm() {
+  if (!form.name.trim() || !form.host.trim()) {
+    formError.value = 'Name and host are required'
+    return
+  }
+  saving.value = true
+  formError.value = null
+  try {
+    if (editingId.value) {
+      const payload: Partial<EmailProviderForm> = { ...form }
+      if (!payload.password) delete payload.password
+      await updateProvider(editingId.value, payload)
+      toast.success('Provider updated')
+    } else {
+      await createProvider(form)
+      toast.success('Provider created')
+    }
+    cancelForm()
+  } catch (e) {
+    formError.value = e instanceof Error ? e.message : 'Failed to save'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function remove(p: EmailProvider) {
+  if (!confirm(`Delete provider "${p.name}"?`)) return
+  try {
+    await deleteProvider(p.id)
+    toast.success(`"${p.name}" deleted`)
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Failed to delete')
+  }
+}
+
+async function setDefault(p: EmailProvider) {
+  try {
+    await setDefaultProvider(p.id)
+    toast.success(`"${p.name}" set as default`)
+  } catch {
+    toast.error('Failed to set default')
+  }
+}
+
+async function toggleShare(p: EmailProvider) {
+  try {
+    await toggleSharedProvider(p.id)
+    toast.success(p.isShared ? 'Provider unshared' : 'Provider shared with all users')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Failed to update sharing')
+  }
+}
+
+async function test(p: EmailProvider) {
+  testing.value = p.id
+  try {
+    const result = await testProvider(p.id)
+    if (result.success) {
+      toast.success('Connection successful')
+    } else {
+      toast.error(result.error ?? 'Connection failed')
+    }
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Test failed')
+  } finally {
+    testing.value = null
+  }
+}
+</script>
+
+<template>
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SMTP Providers</p>
+      <button
+        v-if="!showForm"
+        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        @click="openCreate()"
+      >
+        <Plus :size="12" />
+        Add provider
+      </button>
+    </div>
+
+    <!-- Add/Edit form -->
+    <div v-if="showForm" class="border border-border rounded-lg p-5 bg-card space-y-4">
+      <p class="text-sm font-semibold text-foreground">{{ editingId ? 'Edit Provider' : 'New Provider' }}</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Name</label>
+          <input
+            v-model="form.name"
+            type="text"
+            placeholder="e.g. Gmail"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Host</label>
+          <input
+            v-model="form.host"
+            type="text"
+            placeholder="smtp.gmail.com"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Port</label>
+          <input
+            v-model.number="form.port"
+            type="number"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Username</label>
+          <input
+            v-model="form.username"
+            type="text"
+            autocomplete="off"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+            Password{{ editingId ? ' (leave blank to keep current)' : '' }}
+          </label>
+          <input
+            v-model="form.password"
+            type="password"
+            autocomplete="new-password"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">From Name</label>
+          <input
+            v-model="form.fromName"
+            type="text"
+            placeholder="My Library"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">From Address</label>
+          <input
+            v-model="form.fromAddress"
+            type="email"
+            placeholder="books@example.com"
+            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input v-model="form.auth" type="checkbox" class="rounded border-border" />
+          <span class="text-xs text-foreground">Authentication</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input v-model="form.ssl" type="checkbox" class="rounded border-border" />
+          <span class="text-xs text-foreground">SSL</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input v-model="form.startTls" type="checkbox" class="rounded border-border" />
+          <span class="text-xs text-foreground">STARTTLS</span>
+        </label>
+      </div>
+
+      <div v-if="formError" class="text-xs text-destructive">{{ formError }}</div>
+
+      <div class="flex items-center gap-2">
+        <button
+          class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          :disabled="saving"
+          @click="submitForm()"
+        >
+          {{ saving ? 'Saving...' : editingId ? 'Update' : 'Create' }}
+        </button>
+        <button
+          class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
+          @click="cancelForm()"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div v-if="providers.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+      <p class="text-sm text-muted-foreground">No providers yet. Add an SMTP provider to start sending emails.</p>
+    </div>
+
+    <!-- List -->
+    <div v-else-if="providers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div v-for="p in providers" :key="p.id" class="px-4 py-3 bg-card flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-sm font-medium text-foreground">{{ p.name }}</span>
+            <span v-if="p.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">Default</span>
+            <span v-if="p.isShared" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Shared</span>
+          </div>
+          <p class="text-xs text-muted-foreground mt-0.5">{{ p.host }}:{{ p.port }} · {{ p.fromAddress || p.username || 'no from address' }}</p>
+        </div>
+
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Test connection"
+            :disabled="testing === p.id"
+            @click="test(p)"
+          >
+            <Wifi :size="13" :class="testing === p.id ? 'animate-pulse' : ''" />
+          </button>
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+            :class="p.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
+            title="Set as default"
+            @click="setDefault(p)"
+          >
+            <Star :size="13" :class="p.isDefault ? 'fill-primary' : ''" />
+          </button>
+          <button
+            v-if="!p.isShared || p.userId !== null"
+            class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+            :class="p.isShared ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+            title="Toggle sharing"
+            @click="toggleShare(p)"
+          >
+            <Share2 :size="13" />
+          </button>
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Edit"
+            @click="openEdit(p)"
+          >
+            <Pencil :size="13" />
+          </button>
+          <button
+            v-if="p.userId !== null"
+            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            title="Delete"
+            @click="remove(p)"
+          >
+            <Trash2 :size="13" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="border border-border rounded-lg p-4 bg-card/50">
+      <p class="text-xs text-muted-foreground">
+        Providers with "Shared" enabled are available to all users. The "Default" provider is used when no provider is specified at send time.
+      </p>
+    </div>
+  </div>
+</template>

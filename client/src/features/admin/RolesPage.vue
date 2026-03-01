@@ -53,11 +53,10 @@ function onSaved() {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8">
     <div class="flex items-start justify-between mb-8">
       <div>
-        <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Roles</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Define roles and their permission sets.</p>
+        <h2 class="settings-title">Roles</h2>
+        <p class="settings-subtitle">Define roles and their permission sets.</p>
       </div>
       <button
         @click="openCreate"
@@ -120,7 +119,6 @@ function onSaved() {
         </tbody>
       </table>
     </div>
-  </div>
 
   <RoleFormDrawer v-if="drawerOpen" :role="editingRole" :permissions="permissions" @close="drawerOpen = false" @saved="onSaved" />
 </template>

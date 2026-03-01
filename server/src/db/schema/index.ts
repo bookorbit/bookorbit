@@ -10,3 +10,8 @@ export * from './oidc';
 export * from './opds';
 export * from './kobo';
 export * from './staging';
+export * from './email-templates';
+export * from './email-providers';
+export * from './email-recipients';
+export * from './email-preferences';
+export * from './email-send-log';

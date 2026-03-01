@@ -10,12 +10,20 @@ const settings = ref<KoboSyncSettings>({
   forceEnableHyphenation: false,
   kepubConversionLimitMb: 100,
 })
+let fetchPromise: Promise<void> | null = null
 
 export function useKoboSettings() {
-  async function fetchSettings() {
-    const res = await api('/api/v1/kobo/settings')
-    if (!res.ok) throw new Error('Failed to fetch settings')
-    settings.value = await res.json()
+  async function fetchSettings(): Promise<void> {
+    if (fetchPromise) return fetchPromise
+    fetchPromise = api('/api/v1/kobo/settings')
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to fetch settings')
+        settings.value = await res.json()
+      })
+      .finally(() => {
+        fetchPromise = null
+      })
+    return fetchPromise
   }
 
   async function updateSettings(patch: Partial<KoboSyncSettings>) {

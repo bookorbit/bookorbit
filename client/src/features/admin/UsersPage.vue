@@ -79,11 +79,10 @@ function onSaved(newResetUrl?: string) {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8">
     <div class="flex items-start justify-between mb-8">
       <div>
-        <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Users</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Manage user accounts and role assignments.</p>
+        <h2 class="settings-title">Users</h2>
+        <p class="settings-subtitle">Manage user accounts and role assignments.</p>
       </div>
       <button
         @click="openCreate"
@@ -165,7 +164,6 @@ function onSaved(newResetUrl?: string) {
         </tbody>
       </table>
     </div>
-  </div>
 
   <UserFormDrawer v-if="drawerOpen" :user="editingUser" :roles="roles" @close="drawerOpen = false" @saved="onSaved" />
 

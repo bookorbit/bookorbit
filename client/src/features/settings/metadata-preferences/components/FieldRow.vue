@@ -74,7 +74,7 @@ function update(patch: Partial<FieldPreference>) {
 
       <span
         v-if="inherited !== undefined"
-        class="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0"
+        class="text-xs font-medium px-1.5 py-0.5 rounded shrink-0"
         :class="inherited ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'"
       >
         {{ inherited ? 'inherited' : 'custom' }}

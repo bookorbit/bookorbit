@@ -194,12 +194,11 @@ function coverRefreshLabel(libraryId: number): string {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <!-- Header -->
     <div class="flex items-start justify-between mb-8">
       <div>
-        <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Libraries</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Manage your media libraries and trigger content scans.</p>
+        <h2 class="settings-title">Libraries</h2>
+        <p class="settings-subtitle">Manage your media libraries and trigger content scans.</p>
       </div>
       <div class="flex items-center gap-2 shrink-0 ml-4">
         <button
@@ -233,7 +232,7 @@ function coverRefreshLabel(libraryId: number): string {
           <div class="flex-1 min-w-0">
             <RouterLink
               :to="{ name: 'library', params: { id: lib.id } }"
-              class="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block"
+              class="settings-label hover:text-primary transition-colors truncate block"
               >{{ lib.name }}</RouterLink
             >
             <div class="flex items-center gap-3 mt-0.5">
@@ -365,5 +364,4 @@ function coverRefreshLabel(libraryId: number): string {
         </div>
       </div>
     </div>
-  </div>
 </template>

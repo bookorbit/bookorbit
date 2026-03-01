@@ -130,6 +130,98 @@ CREATE TABLE "collections" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "email_preferences" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"default_provider_id" integer,
+	"default_recipient_id" integer,
+	"default_template_id" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "email_preferences_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
+CREATE TABLE "email_providers" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer,
+	"name" varchar(255) NOT NULL,
+	"host" varchar(255) NOT NULL,
+	"port" integer NOT NULL,
+	"username" varchar(255),
+	"password_enc" text,
+	"from_name" varchar(255),
+	"from_address" varchar(255),
+	"auth" boolean DEFAULT true NOT NULL,
+	"ssl" boolean DEFAULT false NOT NULL,
+	"start_tls" boolean DEFAULT true NOT NULL,
+	"is_default" boolean DEFAULT false NOT NULL,
+	"is_shared" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "email_providers_user_id_name_unique" UNIQUE("user_id","name")
+);
+--> statement-breakpoint
+CREATE TABLE "email_recipient_group_members" (
+	"group_id" integer NOT NULL,
+	"recipient_id" integer NOT NULL,
+	CONSTRAINT "email_recipient_group_members_group_id_recipient_id_unique" UNIQUE("group_id","recipient_id")
+);
+--> statement-breakpoint
+CREATE TABLE "email_recipient_groups" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"default_template_id" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "email_recipient_groups_user_id_name_unique" UNIQUE("user_id","name")
+);
+--> statement-breakpoint
+CREATE TABLE "email_recipients" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"email" varchar(255) NOT NULL,
+	"is_default" boolean DEFAULT false NOT NULL,
+	"device_type" varchar(20),
+	"preferred_format" varchar(20),
+	"default_template_id" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "email_recipients_user_id_email_unique" UNIQUE("user_id","email")
+);
+--> statement-breakpoint
+CREATE TABLE "email_send_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"book_id" integer,
+	"book_file_id" integer,
+	"provider_id" integer,
+	"template_id" integer,
+	"to_email" varchar(255) NOT NULL,
+	"to_name" varchar(255),
+	"subject" text,
+	"status" varchar(20) DEFAULT 'pending' NOT NULL,
+	"attempt_count" integer DEFAULT 0 NOT NULL,
+	"next_retry_at" timestamp,
+	"error_message" text,
+	"sent_at" timestamp,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "email_templates" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer,
+	"name" varchar(255) NOT NULL,
+	"subject" text NOT NULL,
+	"body_text" text NOT NULL,
+	"is_default" boolean DEFAULT false NOT NULL,
+	"is_system" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "email_templates_user_id_name_unique" UNIQUE("user_id","name")
+);
+--> statement-breakpoint
 CREATE TABLE "libraries" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -422,6 +514,23 @@ ALTER TABLE "books" ADD CONSTRAINT "books_library_folder_id_library_folders_id_f
 ALTER TABLE "collection_books" ADD CONSTRAINT "collection_books_collection_id_collections_id_fk" FOREIGN KEY ("collection_id") REFERENCES "public"."collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collection_books" ADD CONSTRAINT "collection_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collections" ADD CONSTRAINT "collections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_preferences" ADD CONSTRAINT "email_preferences_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_preferences" ADD CONSTRAINT "email_preferences_default_provider_id_email_providers_id_fk" FOREIGN KEY ("default_provider_id") REFERENCES "public"."email_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_preferences" ADD CONSTRAINT "email_preferences_default_recipient_id_email_recipients_id_fk" FOREIGN KEY ("default_recipient_id") REFERENCES "public"."email_recipients"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_preferences" ADD CONSTRAINT "email_preferences_default_template_id_email_templates_id_fk" FOREIGN KEY ("default_template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_providers" ADD CONSTRAINT "email_providers_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipient_group_members" ADD CONSTRAINT "email_recipient_group_members_group_id_email_recipient_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."email_recipient_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipient_group_members" ADD CONSTRAINT "email_recipient_group_members_recipient_id_email_recipients_id_fk" FOREIGN KEY ("recipient_id") REFERENCES "public"."email_recipients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipient_groups" ADD CONSTRAINT "email_recipient_groups_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipient_groups" ADD CONSTRAINT "email_recipient_groups_default_template_id_email_templates_id_fk" FOREIGN KEY ("default_template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipients" ADD CONSTRAINT "email_recipients_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipients" ADD CONSTRAINT "email_recipients_default_template_id_email_templates_id_fk" FOREIGN KEY ("default_template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_provider_id_email_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."email_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_templates" ADD CONSTRAINT "email_templates_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "library_folders" ADD CONSTRAINT "library_folders_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lenses" ADD CONSTRAINT "lenses_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_authors" ADD CONSTRAINT "book_authors_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

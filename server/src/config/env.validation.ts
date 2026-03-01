@@ -24,6 +24,7 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('noreply@projectx.local'),
   APP_URL: z.string().url().default('http://localhost:5173'),
+  EMAIL_ENCRYPTION_KEY: z.string().optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

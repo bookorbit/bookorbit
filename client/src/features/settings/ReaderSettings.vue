@@ -22,15 +22,14 @@ async function setStorageMode(sync: boolean) {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Reading</h2>
-      <p class="mt-1 text-sm text-muted-foreground">General behavior that applies across all reader types.</p>
+      <h2 class="settings-title">Reading</h2>
+      <p class="settings-subtitle">General behavior that applies across all reader types.</p>
     </div>
 
     <!-- Preference storage -->
     <div class="mb-2">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Where to save reader preferences</p>
+      <p class="settings-group-label">Where to save reader preferences</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <!-- This device only -->
         <div
@@ -46,8 +45,8 @@ async function setStorageMode(sync: boolean) {
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <span class="text-sm font-medium text-foreground">This device only</span>
-              <span v-if="!syncEnabled" class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+              <span class="settings-label">This device only</span>
+              <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
                 Active
               </span>
             </div>
@@ -71,8 +70,8 @@ async function setStorageMode(sync: boolean) {
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <span class="text-sm font-medium text-foreground">My account</span>
-              <span v-if="syncEnabled" class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+              <span class="settings-label">My account</span>
+              <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
                 Active
               </span>
             </div>
@@ -83,5 +82,4 @@ async function setStorageMode(sync: boolean) {
         </div>
       </div>
     </div>
-  </div>
 </template>

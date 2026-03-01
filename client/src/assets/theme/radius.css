@@ -1,0 +1,13 @@
+/* ── Radius presets ──────────────────────────────────────────
+   Applied as a class on <html>. Default is :root value.
+────────────────────────────────────────────────────────────── */
+html.radius-sharp {
+  --radius: 0rem;
+}
+html.radius-rounded {
+  --radius: 1.25rem;
+}
+html.radius-pill {
+  --radius: 2.5rem;
+}
+

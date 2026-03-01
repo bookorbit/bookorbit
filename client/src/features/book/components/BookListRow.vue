@@ -14,6 +14,7 @@ import {
   PanelRight,
   Pencil,
   RefreshCw,
+  Send,
   Star,
   Trash2,
   TriangleAlert,
@@ -21,6 +22,8 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 
 const router = useRouter()
 
@@ -36,6 +39,9 @@ const emit = defineEmits<{
   select: [event: MouseEvent]
   'rating-change': [rating: number | null]
 }>()
+
+const { hasPermission } = usePermissions()
+const showSendDialog = ref(false)
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -224,6 +230,10 @@ function openFile(file: BookFileRef) {
             <FolderPlus class="size-4 mr-2" />
             Add to Collection
           </DropdownMenuItem>
+          <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
+            <Send class="size-4 mr-2" />
+            Send via Email
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem class="text-destructive focus:text-destructive" @click="emit('action', 'delete')">
             <Trash2 class="size-4 mr-2" />
@@ -233,4 +243,13 @@ function openFile(file: BookFileRef) {
       </DropdownMenu>
     </div>
   </div>
+
+  <SendBookDialog
+    v-if="showSendDialog"
+    :open="showSendDialog"
+    :book-ids="[book.id]"
+    :book-files="book.files"
+    :book-title="book.title ?? undefined"
+    @update:open="showSendDialog = $event"
+  />
 </template>

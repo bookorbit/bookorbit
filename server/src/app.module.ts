@@ -4,7 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 
-import { appConfig, authConfig, dbConfig, externalApiConfig, mailerConfig, storageConfig } from './config/config';
+import { appConfig, authConfig, dbConfig, emailConfig, externalApiConfig, mailerConfig, storageConfig } from './config/config';
 import { validateEnv } from './config/env.validation';
 import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
@@ -36,6 +36,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
+import { EmailModule } from './modules/email/email.module';
 import { StagingModule } from './modules/staging/staging.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
@@ -46,7 +47,7 @@ import { UserModule } from './modules/user/user.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
-      load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig, externalApiConfig],
+      load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig, externalApiConfig, emailConfig],
     }),
     ScheduleModule.forRoot(),
     DbModule,
@@ -78,6 +79,7 @@ import { UserModule } from './modules/user/user.module';
     CbzModule,
     ReaderPreferencesModule,
     StagingModule,
+    EmailModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

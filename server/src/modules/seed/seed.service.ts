@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { hash } from 'bcryptjs';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -18,6 +18,7 @@ const BUILT_IN_PERMISSIONS = [
   { name: 'kobo_sync', description: 'Sync with Kobo device', isSystem: true },
   { name: 'opds_access', description: 'Access the OPDS catalog', isSystem: true },
   { name: 'staging_access', description: 'Access the staging inbox to review and import files', isSystem: true },
+  { name: 'email_send', description: 'Send books via email', isSystem: true },
 ];
 
 const ADMIN_PERMISSIONS = [
@@ -32,6 +33,7 @@ const ADMIN_PERMISSIONS = [
   'kobo_sync',
   'opds_access',
   'staging_access',
+  'email_send',
 ];
 
 const USER_PERMISSIONS = [
@@ -42,6 +44,7 @@ const USER_PERMISSIONS = [
   'kobo_sync',
   'opds_access',
   'staging_access',
+  'email_send',
 ];
 
 @Injectable()
@@ -55,6 +58,7 @@ export class SeedService implements OnApplicationBootstrap {
     await this.seedRoles();
     await this.seedAppSettings();
     await this.seedDefaultAdmin();
+    await this.seedEmailDefaults();
   }
 
   private async seedPermissions() {
@@ -146,6 +150,44 @@ export class SeedService implements OnApplicationBootstrap {
       .insert(schema.appSettings)
       .values({ key: 'oidc_config', value: defaultOidcConfig })
       .onConflictDoNothing({ target: schema.appSettings.key });
+  }
+
+  private async seedEmailDefaults() {
+    const existingSystemTemplate = await this.db.query.emailTemplates.findFirst({
+      where: and(isNull(schema.emailTemplates.userId), eq(schema.emailTemplates.isSystem, true)),
+    });
+
+    if (!existingSystemTemplate) {
+      await this.db.insert(schema.emailTemplates).values({
+        userId: null,
+        name: 'Default',
+        subject: 'Your copy of {{title}} is ready',
+        bodyText:
+          'Hi,\n' +
+          '\n' +
+          'Your copy of "{{title}}" by {{author}} is attached and ready to read.\n' +
+          '\n' +
+          'Format: {{format}} ({{fileSize}})\n' +
+          '\n' +
+          'Enjoy!\n' +
+          '- {{senderName}}',
+        isDefault: true,
+        isSystem: true,
+      });
+    }
+
+    const emailRelayDefaults: Array<{ key: string; value: string }> = [
+      { key: 'email_relay_enabled', value: 'false' },
+      { key: 'email_relay_smtp', value: '{}' },
+      { key: 'email_relay_from_strategy', value: 'system' },
+      { key: 'email_relay_allow_user_override', value: 'true' },
+      { key: 'email_domain_allowlist', value: '[]' },
+      { key: 'email_domain_blocklist', value: '[]' },
+    ];
+
+    for (const setting of emailRelayDefaults) {
+      await this.db.insert(schema.appSettings).values(setting).onConflictDoNothing({ target: schema.appSettings.key });
+    }
   }
 
   private async seedDefaultAdmin() {

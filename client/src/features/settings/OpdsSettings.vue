@@ -124,10 +124,9 @@ async function deleteUser(user: OpdsUser) {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">OPDS</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
+      <h2 class="settings-title">OPDS</h2>
+      <p class="settings-subtitle">
         Connect OPDS-compatible reading apps like KOReader, Moon+ Reader, or Thorium Reader to your library.
       </p>
     </div>
@@ -137,12 +136,12 @@ async function deleteUser(user: OpdsUser) {
     <template v-else>
       <!-- Server Toggle -->
       <div v-if="canManageSettings" class="mb-6">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Server</p>
+        <p class="settings-group-label">Server</p>
         <div class="border border-border rounded-lg overflow-hidden">
           <div class="flex items-center justify-between px-5 py-4 bg-card">
             <div>
-              <p class="text-sm font-medium text-foreground">OPDS Catalog Server</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Allow OPDS clients to browse and download books</p>
+              <p class="settings-label">OPDS Catalog Server</p>
+              <p class="settings-hint">Allow OPDS clients to browse and download books</p>
             </div>
             <button
               class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -160,7 +159,7 @@ async function deleteUser(user: OpdsUser) {
 
       <!-- Endpoint URL -->
       <div v-if="opdsEnabled" class="mb-6">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Endpoint</p>
+        <p class="settings-group-label">Endpoint</p>
         <div class="border border-border rounded-lg overflow-hidden">
           <div class="flex items-center gap-2 px-5 py-4 bg-card">
             <Rss :size="14" class="text-muted-foreground shrink-0" />
@@ -244,8 +243,8 @@ async function deleteUser(user: OpdsUser) {
         <div v-else-if="opdsUsers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
           <div v-for="user in opdsUsers" :key="user.id" class="flex items-center gap-3 px-5 py-3.5 bg-card">
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-foreground truncate">{{ user.username }}</p>
-              <p class="text-xs text-muted-foreground mt-0.5">{{ sortOrderLabel(user.sortOrder) }}</p>
+              <p class="settings-label truncate">{{ user.username }}</p>
+              <p class="settings-hint">{{ sortOrderLabel(user.sortOrder) }}</p>
             </div>
             <select
               :value="user.sortOrder"
@@ -264,5 +263,4 @@ async function deleteUser(user: OpdsUser) {
         </div>
       </div>
     </template>
-  </div>
 </template>

@@ -1,0 +1,42 @@
+/* ── Background patterns ─────────────────────────────────────
+   Applied as a class on the library/lens/collection content area.
+   Uses --dot-color and --primary from the active theme.
+────────────────────────────────────────────────────────────── */
+.pattern-dots {
+  background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.pattern-cross {
+  background-image:
+    radial-gradient(circle, var(--dot-color) 1px, transparent 1px),
+    radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+.pattern-gradient {
+  background-image: radial-gradient(ellipse 70% 55% at 0% 0%, color-mix(in oklch, var(--primary) 20%, transparent), transparent 65%);
+}
+
+.pattern-aurora {
+  background-image:
+    radial-gradient(ellipse 60% 45% at 0% 50%, color-mix(in oklch, var(--primary) 15%, transparent), transparent 100%),
+    radial-gradient(ellipse 50% 40% at 100% 50%, color-mix(in oklch, var(--primary) 10%, transparent), transparent 100%),
+    radial-gradient(ellipse 40% 35% at 50% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 100%);
+}
+
+.pattern-horizon {
+  background-image: linear-gradient(180deg, transparent 0%, color-mix(in oklch, var(--primary) 8%, transparent) 50%, transparent 100%);
+}
+
+.glow-wrapper {
+  background-image:
+    url('/topbar.png'),
+    radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
+  background-blend-mode: hard-light, color-dodge;
+  background-position: top;
+  background-repeat: no-repeat;
+  background-size: auto 12rem;
+}
+

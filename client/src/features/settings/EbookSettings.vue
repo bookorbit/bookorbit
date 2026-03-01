@@ -20,11 +20,10 @@ const fontFamilies: { id: string | null; label: string }[] = [
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8 flex items-start justify-between gap-4">
       <div>
-        <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">eBook Reader</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Default settings applied when opening EPUB, MOBI, FB2, and TXT files.</p>
+        <h2 class="settings-title">eBook Reader</h2>
+        <p class="settings-subtitle">Default settings applied when opening EPUB, MOBI, FB2, and TXT files.</p>
       </div>
       <button class="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
         Reset to defaults
@@ -33,12 +32,12 @@ const fontFamilies: { id: string | null; label: string }[] = [
 
     <!-- Formatting source -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">New Books</p>
+      <p class="settings-group-label">New Books</p>
       <div class="border border-border rounded-lg overflow-hidden bg-card">
         <div class="flex items-start justify-between px-5 py-4 gap-4">
           <div>
-            <p class="text-sm font-medium text-foreground">Apply my settings to new books</p>
-            <p class="text-xs text-muted-foreground mt-0.5">
+            <p class="settings-label">Apply my settings to new books</p>
+            <p class="settings-hint">
               When off, new books open with the publisher's own fonts and layout. Your settings only apply once you change something in-reader.
             </p>
           </div>
@@ -58,13 +57,13 @@ const fontFamilies: { id: string | null; label: string }[] = [
 
     <!-- Layout -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Layout</p>
+      <p class="settings-group-label">Layout</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Flow -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Reading flow</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Paginated flips pages; scrolled flows continuously</p>
+            <p class="settings-label">Reading flow</p>
+            <p class="settings-hint">Paginated flips pages; scrolled flows continuously</p>
           </div>
           <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
             <button
@@ -88,10 +87,10 @@ const fontFamilies: { id: string | null; label: string }[] = [
         <div class="px-5 py-4 bg-card">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <p class="text-sm font-medium text-foreground">Columns</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Number of text columns per page</p>
+              <p class="settings-label">Columns</p>
+              <p class="settings-hint">Number of text columns per page</p>
             </div>
-            <span class="text-sm font-medium tabular-nums text-foreground">{{ effective.maxColumnCount }}</span>
+            <span class="settings-value">{{ effective.maxColumnCount }}</span>
           </div>
           <input
             type="range"
@@ -108,13 +107,13 @@ const fontFamilies: { id: string | null; label: string }[] = [
 
     <!-- Theme -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Theme</p>
+      <p class="settings-group-label">Theme</p>
       <div class="border border-border rounded-lg overflow-hidden bg-card px-5 py-4">
         <!-- Dark mode toggle -->
         <div class="flex items-center justify-between mb-4">
           <div>
-            <p class="text-sm font-medium text-foreground">Dark mode</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Use the dark variant of the selected theme</p>
+            <p class="settings-label">Dark mode</p>
+            <p class="settings-hint">Use the dark variant of the selected theme</p>
           </div>
           <button
             class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -128,22 +127,22 @@ const fontFamilies: { id: string | null; label: string }[] = [
           </button>
         </div>
         <!-- Theme swatches -->
-        <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
-          <button v-for="t in themes" :key="t.name" class="flex flex-col items-center gap-1.5 group" @click="update({ themeName: t.name })">
+        <div class="flex flex-wrap gap-2">
+          <button v-for="t in themes" :key="t.name" :title="t.label" class="flex flex-col items-center gap-1 group" @click="update({ themeName: t.name })">
             <div
-              class="w-full aspect-[3/2] rounded-md border-2 overflow-hidden transition-all"
+              class="w-20 h-14 rounded border-2 overflow-hidden transition-all shrink-0"
               :class="effective.themeName === t.name ? 'border-primary shadow-sm' : 'border-transparent hover:border-border'"
             >
               <div class="w-full h-1/2" :style="{ background: effective.isDark ? t.dark.bg : t.light.bg }" />
               <div
-                class="w-full h-1/2 flex items-center justify-center gap-0.5 px-1"
+                class="w-full h-1/2 flex items-center justify-center px-0.5"
                 :style="{ background: effective.isDark ? t.dark.bg : t.light.bg }"
               >
-                <div class="h-1 w-3/4 rounded-full opacity-60" :style="{ background: effective.isDark ? t.dark.fg : t.light.fg }" />
+                <div class="h-0.5 w-full rounded-full opacity-60" :style="{ background: effective.isDark ? t.dark.fg : t.light.fg }" />
               </div>
             </div>
             <span
-              class="text-[10px] font-medium transition-colors"
+              class="text-xs font-medium transition-colors leading-none"
               :class="effective.themeName === t.name ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'"
             >
               {{ t.label }}
@@ -155,13 +154,13 @@ const fontFamilies: { id: string | null; label: string }[] = [
 
     <!-- Typography -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Typography</p>
+      <p class="settings-group-label">Typography</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Font family -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Font</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Typeface used for body text</p>
+            <p class="settings-label">Font</p>
+            <p class="settings-hint">Typeface used for body text</p>
           </div>
           <select
             class="text-xs border border-border rounded-md px-2 py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
@@ -176,10 +175,10 @@ const fontFamilies: { id: string | null; label: string }[] = [
         <div class="px-5 py-4 bg-card">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <p class="text-sm font-medium text-foreground">Font size</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Base text size in pixels</p>
+              <p class="settings-label">Font size</p>
+              <p class="settings-hint">Base text size in pixels</p>
             </div>
-            <span class="text-sm font-medium tabular-nums text-foreground">{{ effective.fontSize }}px</span>
+            <span class="settings-value">{{ effective.fontSize }}px</span>
           </div>
           <input
             type="range"
@@ -196,10 +195,10 @@ const fontFamilies: { id: string | null; label: string }[] = [
         <div class="px-5 py-4 bg-card">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <p class="text-sm font-medium text-foreground">Line height</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Vertical spacing between lines</p>
+              <p class="settings-label">Line height</p>
+              <p class="settings-hint">Vertical spacing between lines</p>
             </div>
-            <span class="text-sm font-medium tabular-nums text-foreground">{{ effective.lineHeight.toFixed(1) }}</span>
+            <span class="settings-value">{{ effective.lineHeight.toFixed(1) }}</span>
           </div>
           <input
             type="range"
@@ -215,8 +214,8 @@ const fontFamilies: { id: string | null; label: string }[] = [
         <!-- Justify -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Justify text</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Align text to both margins</p>
+            <p class="settings-label">Justify text</p>
+            <p class="settings-hint">Align text to both margins</p>
           </div>
           <button
             class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -233,8 +232,8 @@ const fontFamilies: { id: string | null; label: string }[] = [
         <!-- Hyphenation -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Hyphenation</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Automatically break long words with hyphens</p>
+            <p class="settings-label">Hyphenation</p>
+            <p class="settings-hint">Automatically break long words with hyphens</p>
           </div>
           <button
             class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -252,16 +251,16 @@ const fontFamilies: { id: string | null; label: string }[] = [
 
     <!-- Advanced -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Advanced</p>
+      <p class="settings-group-label">Advanced</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Max inline size -->
         <div class="px-5 py-4 bg-card">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <p class="text-sm font-medium text-foreground">Max content width</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Maximum width of the text area in pixels</p>
+              <p class="settings-label">Max content width</p>
+              <p class="settings-hint">Maximum width of the text area in pixels</p>
             </div>
-            <span class="text-sm font-medium tabular-nums text-foreground">{{ effective.maxInlineSize }}px</span>
+            <span class="settings-value">{{ effective.maxInlineSize }}px</span>
           </div>
           <input
             type="range"
@@ -278,10 +277,10 @@ const fontFamilies: { id: string | null; label: string }[] = [
         <div class="px-5 py-4 bg-card">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <p class="text-sm font-medium text-foreground">Column gap</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Horizontal padding on each side of the text area</p>
+              <p class="settings-label">Column gap</p>
+              <p class="settings-hint">Horizontal padding on each side of the text area</p>
             </div>
-            <span class="text-sm font-medium tabular-nums text-foreground">{{ Math.round(effective.gap * 100) }}%</span>
+            <span class="settings-value">{{ Math.round(effective.gap * 100) }}%</span>
           </div>
           <input
             type="range"
@@ -295,5 +294,4 @@ const fontFamilies: { id: string | null; label: string }[] = [
         </div>
       </div>
     </div>
-  </div>
 </template>

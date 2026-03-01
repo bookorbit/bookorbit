@@ -3,12 +3,20 @@ import { api } from '@/lib/api'
 import type { KoboDevice, KoboDeviceWithToken } from '@projectx/types'
 
 const devices = ref<KoboDevice[]>([])
+let fetchPromise: Promise<void> | null = null
 
 export function useKoboDevices() {
-  async function fetchDevices() {
-    const res = await api('/api/v1/kobo/devices')
-    if (!res.ok) throw new Error('Failed to fetch devices')
-    devices.value = await res.json()
+  async function fetchDevices(): Promise<void> {
+    if (fetchPromise) return fetchPromise
+    fetchPromise = api('/api/v1/kobo/devices')
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to fetch devices')
+        devices.value = await res.json()
+      })
+      .finally(() => {
+        fetchPromise = null
+      })
+    return fetchPromise
   }
 
   async function createDevice(name: string): Promise<KoboDeviceWithToken> {

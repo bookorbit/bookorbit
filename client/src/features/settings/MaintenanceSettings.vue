@@ -26,14 +26,13 @@ async function rebuildEmbeddings() {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Maintenance</h2>
-      <p class="mt-1 text-sm text-muted-foreground">System maintenance and data operations.</p>
+      <h2 class="settings-title">Maintenance</h2>
+      <p class="settings-subtitle">System maintenance and data operations.</p>
     </div>
 
     <div>
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recommendations</p>
+      <p class="settings-group-label">Recommendations</p>
       <div class="border border-border rounded-lg bg-card px-5 py-5">
         <div class="flex items-start justify-between gap-6">
           <div class="flex items-start gap-3">
@@ -41,8 +40,8 @@ async function rebuildEmbeddings() {
               <Sparkles :size="16" class="text-primary" />
             </div>
             <div>
-              <p class="text-sm font-medium text-foreground">Rebuild recommendation embeddings</p>
-              <p class="text-xs text-muted-foreground mt-1 leading-relaxed max-w-sm">
+              <p class="settings-label">Rebuild recommendation embeddings</p>
+              <p class="settings-hint leading-relaxed max-w-sm">
                 Generates vector embeddings for all books. Run this after a large import or if recommendations seem off. Processes in the background.
               </p>
               <p v-if="queued !== null" class="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 mt-2">
@@ -63,5 +62,4 @@ async function rebuildEmbeddings() {
         </div>
       </div>
     </div>
-  </div>
 </template>

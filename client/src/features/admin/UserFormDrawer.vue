@@ -118,7 +118,7 @@ async function handleSubmit() {
 
       <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto space-y-4 px-6 py-6">
         <div v-if="!user?.id" class="space-y-1.5">
-          <label class="text-sm font-medium text-foreground">Username</label>
+          <label class="settings-label">Username</label>
           <input
             v-model="username"
             type="text"
@@ -128,7 +128,7 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label class="text-sm font-medium text-foreground">Full name</label>
+          <label class="settings-label">Full name</label>
           <input
             v-model="name"
             type="text"
@@ -138,7 +138,7 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label class="text-sm font-medium text-foreground">Email <span class="text-muted-foreground">(optional)</span></label>
+          <label class="settings-label">Email <span class="text-muted-foreground">(optional)</span></label>
           <input
             v-model="email"
             type="email"
@@ -148,11 +148,11 @@ async function handleSubmit() {
 
         <div v-if="user?.id" class="flex items-center gap-3">
           <input id="active" v-model="active" type="checkbox" class="h-4 w-4 rounded border-input" />
-          <label for="active" class="text-sm font-medium text-foreground">Active</label>
+          <label for="active" class="settings-label">Active</label>
         </div>
 
         <div class="space-y-2">
-          <p class="text-sm font-medium text-foreground">Roles</p>
+          <p class="settings-label">Roles</p>
           <div class="space-y-1.5">
             <label v-for="role in roles" :key="role.id" class="flex items-center gap-2 cursor-pointer">
               <input
@@ -173,7 +173,7 @@ async function handleSubmit() {
       <div class="border-t border-border px-6 py-4 flex gap-3 justify-end">
         <button
           @click="emit('close')"
-          class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+          class="rounded-md border border-border px-4 py-2 settings-label hover:bg-muted transition-colors"
         >
           Cancel
         </button>

@@ -1,0 +1,143 @@
+/* ── Theme tokens ───────────────────────────────────────────
+   Single source of truth. Never hardcode values in components.
+
+   Architecture:
+   - --tint-h / --tint-c control the hue of ALL neutral surfaces.
+     Changing just --tint-h shifts the entire palette toward that hue.
+   - Accent classes override --tint-h (surfaces) + --primary (interactive).
+   - Radius classes override --radius.
+   - Dark mode overrides lightness + slightly raises --tint-c.
+────────────────────────────────────────────────────────────── */
+:root {
+  /* Tint controls — warm amber base */
+  --tint-h: 80;
+  --tint-c: 0.006;
+
+  /* Colour roles */
+  --background: oklch(0.99 var(--tint-c) var(--tint-h));
+  --foreground: oklch(0.145 0.015 var(--tint-h));
+
+  --card: oklch(0.975 var(--tint-c) var(--tint-h));
+  --card-foreground: oklch(0.145 0.015 var(--tint-h));
+
+  --popover: oklch(0.975 var(--tint-c) var(--tint-h));
+  --popover-foreground: oklch(0.145 0.015 var(--tint-h));
+
+  --primary: oklch(0.21 0.015 var(--tint-h));
+  --primary-foreground: oklch(0.985 0.004 var(--tint-h));
+
+  --secondary: oklch(0.955 var(--tint-c) var(--tint-h));
+  --secondary-foreground: oklch(0.21 0.015 var(--tint-h));
+
+  --muted: oklch(0.955 var(--tint-c) var(--tint-h));
+  --muted-foreground: oklch(0.52 0.008 var(--tint-h));
+
+  --accent: oklch(0.955 var(--tint-c) var(--tint-h));
+  --accent-foreground: oklch(0.21 0.015 var(--tint-h));
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.878 0.01 var(--tint-h));
+  --input: oklch(0.878 0.01 var(--tint-h));
+  --ring: oklch(0.65 0.01 var(--tint-h));
+
+  --sidebar: oklch(0.965 var(--tint-c) var(--tint-h));
+  --sidebar-foreground: oklch(0.145 0.015 var(--tint-h));
+  --sidebar-primary: oklch(0.21 0.015 var(--tint-h));
+  --sidebar-primary-foreground: oklch(0.985 0.004 var(--tint-h));
+  --sidebar-accent: oklch(0.955 var(--tint-c) var(--tint-h));
+  --sidebar-accent-foreground: oklch(0.21 0.015 var(--tint-h));
+  --sidebar-border: oklch(0.878 0.01 var(--tint-h));
+  --sidebar-ring: oklch(0.65 0.01 var(--tint-h));
+
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+
+  /* Elevation surfaces */
+  --surface-1: oklch(0.975 var(--tint-c) var(--tint-h));
+  --surface-2: oklch(0.955 var(--tint-c) var(--tint-h));
+  --surface-3: oklch(0.93 0.01 var(--tint-h));
+  --surface-4: oklch(0.91 0.012 var(--tint-h));
+
+  /* Shadows */
+  --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.05);
+  --elevation-sm: 0 1px 3px oklch(0 0 0 / 0.08), 0 1px 2px oklch(0 0 0 / 0.06);
+  --elevation-md: 0 4px 6px -1px oklch(0 0 0 / 0.08), 0 2px 4px -2px oklch(0 0 0 / 0.06);
+  --elevation-lg: 0 10px 15px -3px oklch(0 0 0 / 0.08), 0 4px 6px -4px oklch(0 0 0 / 0.05);
+  --elevation-xl: 0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.06);
+  --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.18);
+
+  /* Shape */
+  --radius: 0.625rem;
+
+  --dot-color: oklch(0.82 0.01 var(--tint-h));
+}
+
+.dark {
+  --tint-c: 0.01;
+  --bg-lift: 0;
+
+  --background: oklch(calc(0.145 + var(--bg-lift)) var(--tint-c) var(--tint-h));
+  --foreground: oklch(0.985 0.004 var(--tint-h));
+
+  --card: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
+  --card-foreground: oklch(0.985 0.004 var(--tint-h));
+
+  --popover: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
+  --popover-foreground: oklch(0.985 0.004 var(--tint-h));
+
+  --primary: oklch(0.91 var(--tint-c) var(--tint-h));
+  --primary-foreground: oklch(0.205 0.012 var(--tint-h));
+
+  --secondary: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
+  --secondary-foreground: oklch(0.985 0.004 var(--tint-h));
+
+  --muted: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
+  --muted-foreground: oklch(0.68 0.008 var(--tint-h));
+
+  --accent: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
+  --accent-foreground: oklch(0.985 0.004 var(--tint-h));
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.52 0.008 var(--tint-h));
+
+  --sidebar: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
+  --sidebar-foreground: oklch(0.985 0.004 var(--tint-h));
+  --sidebar-primary: oklch(0.91 var(--tint-c) var(--tint-h));
+  --sidebar-primary-foreground: oklch(0.205 0.012 var(--tint-h));
+  --sidebar-accent: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
+  --sidebar-accent-foreground: oklch(0.985 0.004 var(--tint-h));
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.52 0.008 var(--tint-h));
+
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+
+  /* Elevation surfaces */
+  --surface-1: oklch(calc(0.205 + var(--bg-lift)) 0.012 var(--tint-h));
+  --surface-2: oklch(calc(0.235 + var(--bg-lift)) 0.012 var(--tint-h));
+  --surface-3: oklch(calc(0.265 + var(--bg-lift)) 0.012 var(--tint-h));
+  --surface-4: oklch(calc(0.295 + var(--bg-lift)) 0.012 var(--tint-h));
+
+  /* Shadows */
+  --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.4);
+  --elevation-sm: 0 1px 3px oklch(0 0 0 / 0.5), 0 1px 2px oklch(0 0 0 / 0.4);
+  --elevation-md: 0 4px 8px -1px oklch(0 0 0 / 0.5), 0 2px 4px -2px oklch(0 0 0 / 0.4);
+  --elevation-lg: 0 10px 20px -3px oklch(0 0 0 / 0.5), 0 4px 8px -4px oklch(0 0 0 / 0.4);
+  --elevation-xl: 0 20px 30px -5px oklch(0 0 0 / 0.6), 0 8px 12px -6px oklch(0 0 0 / 0.4);
+  --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.7);
+
+  --dot-color: oklch(calc(0.3 + var(--bg-lift)) 0.01 var(--tint-h));
+}
+

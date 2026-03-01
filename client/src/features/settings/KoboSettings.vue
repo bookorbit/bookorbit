@@ -154,10 +154,9 @@ async function saveSettings() {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Kobo Sync</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
+      <h2 class="settings-title">Kobo Sync</h2>
+      <p class="settings-subtitle">
         Pair your Kobo device to sync your library. Enable "Sync to Kobo" on any collection to push those books to your device.
       </p>
     </div>
@@ -170,7 +169,7 @@ async function saveSettings() {
         <div class="flex items-start justify-between gap-3 mb-3">
           <div>
             <p class="text-sm font-semibold text-foreground">Device paired successfully</p>
-            <p class="text-xs text-muted-foreground mt-0.5">
+            <p class="settings-hint">
               Copy this URL and enter it on your Kobo device under Settings - Account - Add account - Other.
             </p>
           </div>
@@ -264,8 +263,8 @@ async function saveSettings() {
             <div v-else class="flex items-center gap-3">
               <Tablet :size="16" class="text-muted-foreground shrink-0" />
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-foreground truncate">{{ device.name }}</p>
-                <p class="text-xs text-muted-foreground mt-0.5">Last seen: {{ formatLastSeen(device.lastSeenAt) }}</p>
+                <p class="settings-label truncate">{{ device.name }}</p>
+                <p class="settings-hint">Last seen: {{ formatLastSeen(device.lastSeenAt) }}</p>
               </div>
               <button
                 class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -286,12 +285,12 @@ async function saveSettings() {
 
       <!-- Sync settings -->
       <div class="mb-6">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Progress Thresholds</p>
+        <p class="settings-group-label">Progress Thresholds</p>
         <div class="border border-border rounded-lg p-5 bg-card space-y-5">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-foreground">Convert EPUB to KEPUB</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Optimizes ebooks for Kobo devices. Requires kepubify on first use.</p>
+              <p class="settings-label">Convert EPUB to KEPUB</p>
+              <p class="settings-hint">Optimizes ebooks for Kobo devices. Requires kepubify on first use.</p>
             </div>
             <button
               type="button"
@@ -310,8 +309,8 @@ async function saveSettings() {
 
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-foreground">Force hyphenation</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Passes --hyphenate to kepubify. Cached files are regenerated.</p>
+              <p class="settings-label">Force hyphenation</p>
+              <p class="settings-hint">Passes --hyphenate to kepubify. Cached files are regenerated.</p>
             </div>
             <button
               type="button"
@@ -330,8 +329,8 @@ async function saveSettings() {
 
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-foreground">Two-way progress sync</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Pushes web reader progress to your Kobo device on sync.</p>
+              <p class="settings-label">Two-way progress sync</p>
+              <p class="settings-hint">Pushes web reader progress to your Kobo device on sync.</p>
             </div>
             <button
               type="button"
@@ -406,5 +405,4 @@ async function saveSettings() {
         </ol>
       </div>
     </template>
-  </div>
 </template>

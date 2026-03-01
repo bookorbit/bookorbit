@@ -30,7 +30,7 @@ const route = useRoute()
 const themeStore = useThemeStore()
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
-const { libraries, fetchLibraries } = useLibraries()
+const { libraries } = useLibraries()
 
 const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
 
@@ -162,8 +162,7 @@ function loadIfSentinelVisible() {
   if (rect.top < window.innerHeight + 300) load()
 }
 
-onMounted(async () => {
-  await fetchLibraries()
+onMounted(() => {
   load(true)
 
   observer = new IntersectionObserver(
@@ -185,7 +184,7 @@ watch(filter, () => load(true), { deep: true })
 
 watch(loading, (isLoading) => {
   if (!isLoading) loadIfSentinelVisible()
-})
+}, { flush: 'post' })
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 

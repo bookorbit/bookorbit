@@ -9,11 +9,10 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8 flex items-start justify-between gap-4">
       <div>
-        <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Comics Reader</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Default settings applied when opening CBZ, CBR, and CB7 files.</p>
+        <h2 class="settings-title">Comics Reader</h2>
+        <p class="settings-subtitle">Default settings applied when opening CBZ, CBR, and CB7 files.</p>
       </div>
       <button class="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
         Reset to defaults
@@ -22,13 +21,13 @@ onMounted(load)
 
     <!-- View -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">View</p>
+      <p class="settings-group-label">View</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Scroll mode -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Reading mode</p>
-            <p class="text-xs text-muted-foreground mt-0.5">How pages are navigated</p>
+            <p class="settings-label">Reading mode</p>
+            <p class="settings-hint">How pages are navigated</p>
           </div>
           <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
             <button
@@ -62,8 +61,8 @@ onMounted(load)
         <!-- View mode -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Page view</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Show one or two pages side by side</p>
+            <p class="settings-label">Page view</p>
+            <p class="settings-hint">Show one or two pages side by side</p>
           </div>
           <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
             <button
@@ -86,8 +85,8 @@ onMounted(load)
         <!-- Fit mode -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Fit mode</p>
-            <p class="text-xs text-muted-foreground mt-0.5">How pages are scaled to fit the screen</p>
+            <p class="settings-label">Fit mode</p>
+            <p class="settings-hint">How pages are scaled to fit the screen</p>
           </div>
           <div class="flex flex-wrap justify-end gap-1.5">
             <button
@@ -114,8 +113,8 @@ onMounted(load)
         <!-- Reading direction -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Reading direction</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Left-to-right for western comics; right-to-left for manga</p>
+            <p class="settings-label">Reading direction</p>
+            <p class="settings-hint">Left-to-right for western comics; right-to-left for manga</p>
           </div>
           <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
             <button
@@ -139,13 +138,13 @@ onMounted(load)
 
     <!-- Display -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Display</p>
+      <p class="settings-group-label">Display</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Background color -->
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Background color</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Canvas color behind pages</p>
+            <p class="settings-label">Background color</p>
+            <p class="settings-hint">Canvas color behind pages</p>
           </div>
           <div class="flex items-center gap-1.5">
             <button
@@ -169,5 +168,4 @@ onMounted(load)
         </div>
       </div>
     </div>
-  </div>
 </template>

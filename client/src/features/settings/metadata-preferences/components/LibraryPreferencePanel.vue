@@ -49,9 +49,9 @@ function onReset() {
     <div class="flex items-center gap-3 px-5 py-3.5">
       <button class="flex items-center gap-2 flex-1 min-w-0 text-left" @click="open = !open">
         <component :is="open ? ChevronDown : ChevronRight" :size="14" class="text-muted-foreground shrink-0" />
-        <span class="text-sm font-medium text-foreground truncate">{{ libraryName }}</span>
+        <span class="settings-label truncate">{{ libraryName }}</span>
         <span
-          class="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded"
+          class="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded"
           :class="hasOverrides ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
         >
           {{ hasOverrides ? `${overriddenFields.size} override${overriddenFields.size === 1 ? '' : 's'}` : 'using global' }}

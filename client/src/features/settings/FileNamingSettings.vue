@@ -23,8 +23,30 @@ const {
 
 const referenceOpen = ref(true)
 
-const EXAMPLE_PATTERN_CONDITIONAL = '{authors}/<{series}/><{seriesIndex}. >{title}'
-const EXAMPLE_PATTERN_ELSE = '<{series}|Standalone>/{title}'
+const MODIFIERS = [
+  { key: ':first', description: 'First value only' },
+  { key: ':sort', description: 'Last, First format' },
+  { key: ':initial', description: 'First letter only' },
+  { key: ':upper', description: 'UPPERCASE' },
+  { key: ':lower', description: 'lowercase' },
+]
+
+const EXAMPLES = [
+  {
+    pattern: '{authors}/<{series}/><{seriesIndex}. >{title}',
+    cases: [
+      { label: 'with series', result: 'William Gibson/Sprawl/01. Neuromancer.epub' },
+      { label: 'without', result: 'William Gibson/Neuromancer.epub' },
+    ],
+  },
+  {
+    pattern: '<{series}|Standalone>/{title}',
+    cases: [
+      { label: 'with series', result: 'Sprawl/Neuromancer.epub' },
+      { label: 'without', result: 'Standalone/Neuromancer.epub' },
+    ],
+  },
+]
 
 onMounted(async () => {
   await Promise.all([fetchGlobalPattern(), fetchLibraries()])
@@ -32,18 +54,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto space-y-8">
+  <div class="space-y-8">
     <!-- Page header -->
     <div>
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">File Naming</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
+      <h2 class="settings-title">File Naming</h2>
+      <p class="settings-subtitle">
         Control how uploaded files are named and organized on disk. Patterns apply when a file is uploaded.
       </p>
     </div>
 
     <!-- Global default -->
     <div>
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Default Pattern</p>
+      <p class="settings-group-label">Default Pattern</p>
       <div class="border border-border rounded-lg bg-card px-5 py-5 space-y-4">
         <p class="text-xs text-muted-foreground leading-relaxed">
           Applied to all libraries unless overridden. Leave blank to use the built-in default layout.
@@ -80,7 +102,7 @@ onMounted(async () => {
 
     <!-- Per-library overrides -->
     <div>
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Library Overrides</p>
+      <p class="settings-group-label">Library Overrides</p>
       <div class="border border-border rounded-lg bg-card divide-y divide-border">
         <div v-if="libraries.length === 0" class="px-5 py-8 text-center text-sm text-muted-foreground">No libraries configured.</div>
 
@@ -88,11 +110,11 @@ onMounted(async () => {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2 min-w-0">
               <FileText :size="14" class="text-muted-foreground shrink-0" />
-              <span class="text-sm font-medium text-foreground truncate">{{ lib.name }}</span>
-              <span v-if="lib.fileNamingPattern" class="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+              <span class="settings-label truncate">{{ lib.name }}</span>
+              <span v-if="lib.fileNamingPattern" class="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
                 custom
               </span>
-              <span v-else class="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground"> using default </span>
+              <span v-else class="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground"> using default </span>
             </div>
             <button
               v-if="lib.fileNamingPattern"
@@ -136,86 +158,73 @@ onMounted(async () => {
     <!-- Placeholder reference (collapsible) -->
     <div class="border border-border rounded-lg bg-card overflow-hidden">
       <button
-        class="w-full flex items-center justify-between px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+        class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors"
         @click="referenceOpen = !referenceOpen"
       >
-        <span>Placeholder Reference</span>
+        <span class="text-sm font-medium text-foreground">Placeholder Reference</span>
         <ChevronDown v-if="!referenceOpen" :size="15" class="text-muted-foreground" />
         <ChevronUp v-else :size="15" class="text-muted-foreground" />
       </button>
 
-      <div v-if="referenceOpen" class="px-5 pb-5 space-y-5 border-t border-border">
+      <div v-if="referenceOpen" class="border-t border-border divide-y divide-border/60">
         <!-- Tokens -->
-        <div class="pt-4 space-y-2">
-          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Available tokens</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        <div class="px-5 py-4 space-y-2.5">
+          <p class="text-xs font-medium text-foreground">Available tokens</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-6">
             <div v-for="t in PATTERN_TOKENS" :key="t.token" class="flex items-center gap-2">
-              <code class="text-xs bg-muted px-1.5 py-0.5 rounded text-foreground shrink-0">{{ '{' + t.token + '}' }}</code>
+              <code class="shrink-0 text-xs font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">{{ '{' + t.token + '}' }}</code>
               <span class="text-xs text-muted-foreground">{{ t.description }}</span>
             </div>
           </div>
         </div>
 
         <!-- Modifiers -->
-        <div class="space-y-2">
-          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Modifiers</p>
+        <div class="px-5 py-4 space-y-2.5">
+          <p class="text-xs font-medium text-foreground">Modifiers</p>
           <p class="text-xs text-muted-foreground">
-            Append <code class="bg-muted px-1 rounded">:modifier</code> inside a token. Example:
-            <code class="bg-muted px-1 rounded">{'{authors:sort}'}</code>
+            Append <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground">:modifier</code> inside a token. Example:
+            <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground">{'{authors:sort}'}</code>
           </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            <div class="flex items-center gap-2">
-              <code class="text-xs bg-muted px-1.5 py-0.5 rounded">:first</code><span class="text-xs text-muted-foreground">First value only</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="text-xs bg-muted px-1.5 py-0.5 rounded">:sort</code><span class="text-xs text-muted-foreground">Last, First format</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="text-xs bg-muted px-1.5 py-0.5 rounded">:initial</code><span class="text-xs text-muted-foreground">First letter only</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="text-xs bg-muted px-1.5 py-0.5 rounded">:upper</code><span class="text-xs text-muted-foreground">UPPERCASE</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="text-xs bg-muted px-1.5 py-0.5 rounded">:lower</code><span class="text-xs text-muted-foreground">lowercase</span>
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="mod in MODIFIERS"
+              :key="mod.key"
+              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border/60"
+            >
+              <code class="text-xs font-mono text-foreground">{{ mod.key }}</code>
+              <span class="text-[11px] text-muted-foreground">{{ mod.description }}</span>
             </div>
           </div>
         </div>
 
         <!-- Optional blocks -->
-        <div class="space-y-2">
-          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Optional blocks</p>
-          <p class="text-xs text-muted-foreground leading-relaxed">
-            Wrap in <code class="bg-muted px-1 rounded">&lt;...&gt;</code> to omit a segment when all its tokens are empty. Use
-            <code class="bg-muted px-1 rounded">|</code> for a fallback: <code class="bg-muted px-1 rounded">&lt;primary|fallback&gt;</code>.
+        <div class="px-5 py-4 space-y-2.5">
+          <p class="text-xs font-medium text-foreground">Optional blocks</p>
+          <p class="text-xs text-muted-foreground">
+            Wrap in <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground">&lt;...&gt;</code> to skip a segment when its tokens are
+            empty. Use <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground">|fallback</code> to substitute a value instead.
           </p>
-          <div class="rounded-md bg-muted/50 px-4 py-3 space-y-2 text-xs font-mono">
-            <div>
-              <span class="text-muted-foreground">Pattern: </span><span>{{ EXAMPLE_PATTERN_CONDITIONAL }}</span>
+          <div class="space-y-2">
+            <div v-for="ex in EXAMPLES" :key="ex.pattern" class="rounded-md border border-border/60 overflow-hidden">
+              <div class="px-3 py-2 bg-muted/50 border-b border-border/60">
+                <code class="text-xs font-mono text-foreground">{{ ex.pattern }}</code>
+              </div>
+              <div class="px-3 py-2.5 space-y-1.5">
+                <div v-for="c in ex.cases" :key="c.label" class="flex items-baseline gap-3">
+                  <span class="text-[11px] text-muted-foreground shrink-0 w-16">{{ c.label }}</span>
+                  <code class="text-xs font-mono text-foreground/80 break-all">{{ c.result }}</code>
+                </div>
+              </div>
             </div>
-            <div>
-              <span class="text-muted-foreground">With series: </span>
-              <span class="text-foreground">Patrick Rothfuss/The Kingkiller Chronicle/01. The Name of the Wind.epub</span>
-            </div>
-            <div><span class="text-muted-foreground">Without: </span><span class="text-foreground">Andy Weir/Project Hail Mary.epub</span></div>
-          </div>
-          <div class="rounded-md bg-muted/50 px-4 py-3 space-y-2 text-xs font-mono">
-            <div>
-              <span class="text-muted-foreground">Pattern: </span><span>{{ EXAMPLE_PATTERN_ELSE }}</span>
-            </div>
-            <div>
-              <span class="text-muted-foreground">With series: </span>
-              <span class="text-foreground">The Kingkiller Chronicle/The Name of the Wind.epub</span>
-            </div>
-            <div><span class="text-muted-foreground">Without: </span><span class="text-foreground">Standalone/Project Hail Mary.epub</span></div>
           </div>
         </div>
 
-        <!-- Folder-only note -->
-        <div class="space-y-1">
-          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Folder-only mode</p>
-          <p class="text-xs text-muted-foreground leading-relaxed">
-            End the pattern with <code class="bg-muted px-1 rounded">/</code> to specify a folder only. The original filename is preserved inside it.
+        <!-- Folder-only mode -->
+        <div class="px-5 py-4">
+          <p class="text-xs font-medium text-foreground mb-1.5">Folder-only mode</p>
+          <p class="text-xs text-muted-foreground">
+            End the pattern with <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground">/</code> to specify a folder only - the
+            original filename is preserved inside it.
           </p>
         </div>
       </div>

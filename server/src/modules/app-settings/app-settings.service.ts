@@ -50,6 +50,15 @@ const DEFAULT_OIDC_CONFIG: OidcFullConfig = {
   autoProvision: { enabled: false, allowLocalLinking: true, defaultRoleId: null },
 };
 
+function parseSafe<T>(val: string | undefined, fallback: T): T {
+  if (!val) return fallback;
+  try {
+    return JSON.parse(val) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 @Injectable()
 export class AppSettingsService {
   constructor(@Inject(DB) private readonly db: Db) {}
@@ -74,12 +83,7 @@ export class AppSettingsService {
 
   async getOidcConfig(): Promise<OidcFullConfig> {
     const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, APP_SETTING_KEYS.OIDC_CONFIG) });
-    if (!row) return { ...DEFAULT_OIDC_CONFIG };
-    try {
-      return JSON.parse(row.value) as OidcFullConfig;
-    } catch {
-      return { ...DEFAULT_OIDC_CONFIG };
-    }
+    return parseSafe<OidcFullConfig>(row?.value, { ...DEFAULT_OIDC_CONFIG });
   }
 
   async getUploadPattern(): Promise<string> {

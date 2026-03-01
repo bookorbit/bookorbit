@@ -18,20 +18,19 @@ const fileTypes = ref([
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Scanner</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Configure when and how your libraries are scanned for new content.</p>
+      <h2 class="settings-title">Scanner</h2>
+      <p class="settings-subtitle">Configure when and how your libraries are scanned for new content.</p>
     </div>
 
     <!-- Schedule -->
     <div class="mb-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Schedule</p>
+      <p class="settings-group-label">Schedule</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Automatic scanning</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Periodically scan libraries for new or changed files</p>
+            <p class="settings-label">Automatic scanning</p>
+            <p class="settings-hint">Periodically scan libraries for new or changed files</p>
           </div>
           <button
             class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -47,8 +46,8 @@ const fileTypes = ref([
 
         <div class="flex items-center justify-between px-5 py-4 bg-card" :class="!autoScan ? 'opacity-40 pointer-events-none' : ''">
           <div>
-            <p class="text-sm font-medium text-foreground">Scan interval</p>
-            <p class="text-xs text-muted-foreground mt-0.5">How often to check all library folders</p>
+            <p class="settings-label">Scan interval</p>
+            <p class="settings-hint">How often to check all library folders</p>
           </div>
           <select
             v-model="scanInterval"
@@ -64,8 +63,8 @@ const fileTypes = ref([
 
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Scan on startup</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Run a scan automatically when the server starts</p>
+            <p class="settings-label">Scan on startup</p>
+            <p class="settings-hint">Run a scan automatically when the server starts</p>
           </div>
           <button
             class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -81,8 +80,8 @@ const fileTypes = ref([
 
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div>
-            <p class="text-sm font-medium text-foreground">Watch for changes</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Detect new files instantly using filesystem events</p>
+            <p class="settings-label">Watch for changes</p>
+            <p class="settings-hint">Detect new files instantly using filesystem events</p>
           </div>
           <button
             class="w-11 h-6 rounded-full transition-colors relative shrink-0"
@@ -100,7 +99,7 @@ const fileTypes = ref([
 
     <!-- File types -->
     <div>
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Supported file types</p>
+      <p class="settings-group-label">Supported file types</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <div v-for="type in fileTypes" :key="type.ext" class="flex items-center justify-between px-5 py-3.5 bg-card">
           <div class="flex items-center gap-3">
@@ -122,5 +121,4 @@ const fileTypes = ref([
     </div>
 
     <p class="mt-6 text-xs text-muted-foreground">Scanner configuration will be persisted in a future update.</p>
-  </div>
 </template>

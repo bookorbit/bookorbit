@@ -66,13 +66,13 @@ function chipTitle(key: MetadataProviderKey) {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-1">
+  <div class="flex flex-wrap gap-2">
     <div
       v-for="(key, index) in providers"
       :key="key"
       :draggable="!disabled"
       :title="chipTitle(key)"
-      class="flex items-center gap-1 h-6 px-1.5 rounded text-[11px] font-medium select-none"
+      class="flex items-center gap-1 h-6 px-1.5 rounded text-xs font-medium select-none"
       :style="providerChipStyle(key, !isUsable(key))"
       :class="[
         !disabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
@@ -86,8 +86,8 @@ function chipTitle(key: MetadataProviderKey) {
       @drop="onDrop(index)"
       @dragend="onDragEnd"
     >
-      <GripVertical v-if="!disabled" :size="10" class="opacity-40 shrink-0" />
-      <span class="opacity-40 tabular-nums leading-none">{{ index + 1 }}</span>
+      <GripVertical v-if="!disabled" :size="10" class="opacity-60 shrink-0" />
+      <span class="opacity-80 tabular-nums leading-none">{{ index + 1 }}</span>
       {{ PROVIDER_SHORT_LABELS[key] ?? key }}
     </div>
   </div>

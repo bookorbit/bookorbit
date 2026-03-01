@@ -59,15 +59,14 @@ async function deletePermission(perm: Permission) {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Permissions</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Create granular permissions to assign to roles.</p>
+      <h2 class="settings-title">Permissions</h2>
+      <p class="settings-subtitle">Create granular permissions to assign to roles.</p>
     </div>
 
     <!-- Create form -->
     <div class="mb-6 rounded-lg border border-border p-4">
-      <h2 class="text-sm font-medium text-foreground mb-3">Create permission</h2>
+      <h2 class="settings-label mb-3">Create permission</h2>
       <form @submit.prevent="createPermission" class="flex gap-2 flex-wrap">
         <input
           v-model="newName"
@@ -126,5 +125,4 @@ async function deletePermission(perm: Permission) {
         </tbody>
       </table>
     </div>
-  </div>
 </template>

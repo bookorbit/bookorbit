@@ -168,7 +168,7 @@ onUnmounted(() => observer?.disconnect())
 watch(lensId, () => load(true))
 watch(loading, (isLoading) => {
   if (!isLoading) checkSentinel()
-})
+}, { flush: 'post' })
 </script>
 
 <template>

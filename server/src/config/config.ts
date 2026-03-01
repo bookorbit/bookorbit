@@ -24,6 +24,10 @@ export const externalApiConfig = registerAs('externalApi', () => ({
   googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? '',
 }));
 
+export const emailConfig = registerAs('email', () => ({
+  encryptionKey: process.env.EMAIL_ENCRYPTION_KEY ?? '',
+}));
+
 export const mailerConfig = registerAs('mailer', () => ({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT ?? '587', 10),

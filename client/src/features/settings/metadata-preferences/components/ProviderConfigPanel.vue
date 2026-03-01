@@ -96,7 +96,7 @@ function save() {
     <div class="px-5 py-4 border-b border-border flex items-center justify-between">
       <div>
         <p class="text-sm font-semibold text-foreground">Metadata Providers</p>
-        <p class="text-xs text-muted-foreground mt-0.5">Enable providers and configure API keys or cookies where needed.</p>
+        <p class="settings-hint">Enable providers and configure API keys or cookies where needed.</p>
       </div>
       <button
         class="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
@@ -114,11 +114,11 @@ function save() {
         <div class="flex items-start gap-3 sm:w-44 shrink-0 pt-0.5">
           <input v-model="draft[row.key].enabled" type="checkbox" class="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer mt-0.5" />
           <div>
-            <p class="text-sm font-medium text-foreground">{{ row.label }}</p>
+            <p class="settings-label">{{ row.label }}</p>
             <template v-if="statusFor(row.key)">
-              <p v-if="!statusFor(row.key)?.configured" class="text-[10px] text-amber-600">API key required</p>
-              <p v-else-if="statusFor(row.key)?.hint" class="text-[10px] text-amber-500">{{ statusFor(row.key)?.hint }}</p>
-              <p v-else class="text-[10px] text-emerald-600">Configured</p>
+              <p v-if="!statusFor(row.key)?.configured" class="text-xs text-amber-600">API key required</p>
+              <p v-else-if="statusFor(row.key)?.hint" class="text-xs text-amber-500">{{ statusFor(row.key)?.hint }}</p>
+              <p v-else class="text-xs text-emerald-600">Configured</p>
             </template>
           </div>
         </div>
@@ -141,7 +141,7 @@ function save() {
                 :disabled="!draft[row.key].enabled"
                 class="w-full h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
               />
-              <p v-if="field.hint" class="text-[10px] text-muted-foreground mt-0.5">{{ field.hint }}</p>
+              <p v-if="field.hint" class="settings-hint">{{ field.hint }}</p>
             </template>
           </div>
         </div>

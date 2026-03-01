@@ -92,10 +92,9 @@ async function testConnection() {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-3xl mx-auto">
     <div class="mb-8">
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">OIDC / SSO</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Configure an OpenID Connect provider for single sign-on.</p>
+      <h2 class="settings-title">OIDC / SSO</h2>
+      <p class="settings-subtitle">Configure an OpenID Connect provider for single sign-on.</p>
     </div>
 
     <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
@@ -103,12 +102,12 @@ async function testConnection() {
     <form v-else class="space-y-6" @submit.prevent="save">
       <!-- Enable -->
       <div>
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Status</p>
+        <p class="settings-group-label">Status</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
           <div class="flex items-center justify-between px-5 py-4 bg-card">
             <div>
-              <p class="text-sm font-medium text-foreground">Enable OIDC</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Show SSO login button and allow OIDC authentication.</p>
+              <p class="settings-label">Enable OIDC</p>
+              <p class="settings-hint">Show SSO login button and allow OIDC authentication.</p>
             </div>
             <button
               type="button"
@@ -129,12 +128,12 @@ async function testConnection() {
 
       <!-- Provider -->
       <div>
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Provider</p>
+        <p class="settings-group-label">Provider</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
             <div class="shrink-0">
-              <p class="text-sm font-medium text-foreground">Provider Name</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Shown on the login button.</p>
+              <p class="settings-label">Provider Name</p>
+              <p class="settings-hint">Shown on the login button.</p>
             </div>
             <input
               v-model="form.providerName"
@@ -145,8 +144,8 @@ async function testConnection() {
           </div>
           <div class="flex items-start justify-between gap-8 px-5 py-4 bg-card">
             <div class="shrink-0 pt-0.5">
-              <p class="text-sm font-medium text-foreground">Issuer URI</p>
-              <p class="text-xs text-muted-foreground mt-0.5">The provider's base URL.</p>
+              <p class="settings-label">Issuer URI</p>
+              <p class="settings-hint">The provider's base URL.</p>
             </div>
             <div class="flex flex-col items-end gap-2">
               <div class="flex items-center gap-2">
@@ -177,7 +176,7 @@ async function testConnection() {
             </div>
           </div>
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Client ID</p>
+            <p class="settings-label shrink-0">Client ID</p>
             <input
               v-model="form.clientId"
               type="text"
@@ -185,7 +184,7 @@ async function testConnection() {
             />
           </div>
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Client Secret</p>
+            <p class="settings-label shrink-0">Client Secret</p>
             <input
               v-model="form.clientSecret"
               type="password"
@@ -195,7 +194,7 @@ async function testConnection() {
             />
           </div>
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Scopes</p>
+            <p class="settings-label shrink-0">Scopes</p>
             <input
               v-model="form.scopes"
               type="text"
@@ -207,10 +206,10 @@ async function testConnection() {
 
       <!-- Claim mapping -->
       <div>
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Claim Mapping</p>
+        <p class="settings-group-label">Claim Mapping</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Username claim</p>
+            <p class="settings-label shrink-0">Username claim</p>
             <input
               v-model="form.claimMapping.username"
               type="text"
@@ -218,7 +217,7 @@ async function testConnection() {
             />
           </div>
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Name claim</p>
+            <p class="settings-label shrink-0">Name claim</p>
             <input
               v-model="form.claimMapping.name"
               type="text"
@@ -226,7 +225,7 @@ async function testConnection() {
             />
           </div>
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Email claim</p>
+            <p class="settings-label shrink-0">Email claim</p>
             <input
               v-model="form.claimMapping.email"
               type="text"
@@ -234,7 +233,7 @@ async function testConnection() {
             />
           </div>
           <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="text-sm font-medium text-foreground shrink-0">Groups claim</p>
+            <p class="settings-label shrink-0">Groups claim</p>
             <input
               v-model="form.claimMapping.groups"
               type="text"
@@ -246,12 +245,12 @@ async function testConnection() {
 
       <!-- Auto-provisioning -->
       <div>
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Auto-Provisioning</p>
+        <p class="settings-group-label">Auto-Provisioning</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
           <div class="flex items-center justify-between px-5 py-4 bg-card">
             <div>
-              <p class="text-sm font-medium text-foreground">Auto-provision users</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Create accounts on first OIDC login if user does not exist.</p>
+              <p class="settings-label">Auto-provision users</p>
+              <p class="settings-hint">Create accounts on first OIDC login if user does not exist.</p>
             </div>
             <button
               type="button"
@@ -269,8 +268,8 @@ async function testConnection() {
           </div>
           <div class="flex items-center justify-between px-5 py-4 bg-card">
             <div>
-              <p class="text-sm font-medium text-foreground">Allow local account linking</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Link OIDC identity to an existing local account by username match.</p>
+              <p class="settings-label">Allow local account linking</p>
+              <p class="settings-hint">Link OIDC identity to an existing local account by username match.</p>
             </div>
             <button
               type="button"
@@ -302,5 +301,4 @@ async function testConnection() {
         <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
       </div>
     </form>
-  </div>
 </template>

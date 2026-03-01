@@ -45,6 +45,6 @@ export function providerActivePillStyle(provider: string): Record<string, string
 export function providerChipStyle(provider: MetadataProviderKey | string, disabled = false): Record<string, string> {
   const color = getProviderColor(provider)
   const style = makeProviderPillStyle(color, disabled ? 6 : 14, disabled ? 15 : 35)
-  if (disabled) style.opacity = '0.45'
+  if (disabled) style.opacity = '0.75'
   return style
 }

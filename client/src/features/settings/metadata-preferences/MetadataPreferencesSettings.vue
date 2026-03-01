@@ -35,14 +35,14 @@ async function onResetLibrary(libraryId: number) {
 </script>
 
 <template>
-  <div class="px-5 py-6 sm:px-10 sm:py-8 max-w-4xl mx-auto space-y-8">
+  <div class="space-y-8">
     <div>
-      <h2 class="font-serif font-semibold text-foreground text-2xl tracking-tight">Metadata Preferences</h2>
-      <p class="mt-1 text-sm text-muted-foreground">Control which providers supply each metadata field and how values are merged during a refresh.</p>
+      <h2 class="settings-title">Metadata Preferences</h2>
+      <p class="settings-subtitle">Control which providers supply each metadata field and how values are merged during a refresh.</p>
     </div>
 
     <div>
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Providers</p>
+      <p class="settings-group-label">Providers</p>
       <ProviderConfigPanel
         :config="config"
         :statuses="statuses"

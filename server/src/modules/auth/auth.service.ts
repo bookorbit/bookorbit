@@ -340,7 +340,7 @@ export class AuthService {
     reply.setCookie('refresh_token', rawToken, {
       httpOnly: true,
       sameSite: 'strict',
-      path: '/api/auth',
+      path: '/api/v1/auth',
       maxAge: ttlSeconds,
       secure: this.config.get('app.nodeEnv') === 'production',
     });
@@ -350,7 +350,7 @@ export class AuthService {
     reply.setCookie('refresh_token', '', {
       httpOnly: true,
       sameSite: 'strict',
-      path: '/api/auth',
+      path: '/api/v1/auth',
       maxAge: 0,
       secure: this.config.get('app.nodeEnv') === 'production',
     });

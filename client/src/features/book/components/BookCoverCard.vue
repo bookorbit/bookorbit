@@ -14,12 +14,15 @@ import {
   PanelRight,
   Pencil,
   RefreshCw,
+  Send,
   Trash2,
   TriangleAlert,
 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 
 const router = useRouter()
 
@@ -51,6 +54,8 @@ const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
+const { hasPermission } = usePermissions()
+const showSendDialog = ref(false)
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
@@ -210,6 +215,10 @@ function openFile(file: BookFileRef) {
                 <FolderPlus class="size-4 mr-2" />
                 Add to Collection
               </DropdownMenuItem>
+              <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
+                <Send class="size-4 mr-2" />
+                Send via Email
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem class="text-destructive focus:text-destructive" @click="emit('action', 'delete')">
                 <Trash2 class="size-4 mr-2" />
@@ -221,6 +230,15 @@ function openFile(file: BookFileRef) {
       </div>
     </div>
   </div>
+
+  <SendBookDialog
+    v-if="showSendDialog"
+    :open="showSendDialog"
+    :book-ids="[book.id]"
+    :book-files="book.files"
+    :book-title="book.title ?? undefined"
+    @update:open="showSendDialog = $event"
+  />
 </template>
 
 <style scoped>

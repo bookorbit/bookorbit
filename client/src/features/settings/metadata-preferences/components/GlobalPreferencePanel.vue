@@ -38,7 +38,7 @@ function save() {
     <div class="px-5 py-4 border-b border-border flex items-center justify-between">
       <div>
         <p class="text-sm font-semibold text-foreground">Global Defaults</p>
-        <p class="text-xs text-muted-foreground mt-0.5">Default rules applied to every library. Override per-library below.</p>
+        <p class="settings-hint">Default rules applied to every library. Override per-library below.</p>
       </div>
       <button
         class="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
