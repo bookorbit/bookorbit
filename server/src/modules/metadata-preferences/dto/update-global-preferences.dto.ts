@@ -1,13 +1,4 @@
-import {
-  IsIn,
-  IsBoolean,
-  IsArray,
-  IsString,
-  Validate,
-  ValidatorConstraint,
-  ValidatorConstraintInterface,
-  validateSync,
-} from 'class-validator';
+import { IsIn, IsBoolean, IsArray, IsString, Validate, ValidatorConstraint, ValidatorConstraintInterface, validateSync } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { MetadataProviderKey } from '@projectx/types';
 import type { MetadataField, MergeStrategy } from '@projectx/types';

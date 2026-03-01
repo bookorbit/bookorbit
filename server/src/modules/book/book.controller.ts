@@ -156,11 +156,7 @@ export class BookController {
 
   @Post(':id/refresh-metadata')
   @RequirePermission('library_edit_metadata')
-  refreshMetadata(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('preview') preview: string | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
+  refreshMetadata(@Param('id', ParseIntPipe) id: number, @Query('preview') preview: string | undefined, @CurrentUser() user: RequestUser) {
     return this.bookService.refreshMetadata(id, preview === 'true', user);
   }
 

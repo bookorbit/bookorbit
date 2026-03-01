@@ -149,7 +149,16 @@ export class StagingController {
   @Post('finalize')
   finalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeStagingDto) {
     const isSuperuser = user.roles.some((r) => r.isSuperuser);
-    return this.finalizeService.finalize(user.id, isSuperuser, dto.fileIds, dto.selectAll, dto.excludedIds, dto.defaultLibraryId, dto.defaultFolderId, dto.overrides);
+    return this.finalizeService.finalize(
+      user.id,
+      isSuperuser,
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      dto.defaultFolderId,
+      dto.overrides,
+    );
   }
 
   @Post('rescan')

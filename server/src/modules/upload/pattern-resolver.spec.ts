@@ -260,9 +260,7 @@ describe('replacePlaceholders', () => {
     });
 
     it('author/series/index. title -- no year', () => {
-      expect(replacePlaceholders('{authors:first}/{series}/{seriesIndex}. {title}', FULL)).toBe(
-        'William Gibson/Sprawl/01. Neuromancer',
-      );
+      expect(replacePlaceholders('{authors:first}/{series}/{seriesIndex}. {title}', FULL)).toBe('William Gibson/Sprawl/01. Neuromancer');
     });
 
     it('optional series folder collapses when absent', () => {
@@ -414,9 +412,7 @@ describe('DEFAULT_UPLOAD_PATTERN', () => {
   });
 
   it('series present but no index: series folder without index prefix', () => {
-    expect(resolveUploadPath(P, { ...FULL, seriesIndex: '' }, 'epub')).toBe(
-      'William Gibson/Sprawl/Neuromancer (1984).epub',
-    );
+    expect(resolveUploadPath(P, { ...FULL, seriesIndex: '' }, 'epub')).toBe('William Gibson/Sprawl/Neuromancer (1984).epub');
   });
 
   it('different file extension is appended correctly', () => {

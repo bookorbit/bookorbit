@@ -134,9 +134,15 @@ export class StagingIngestService {
         if (value === undefined) continue;
         fetched[field] = value;
       }
-      const updates = Object.keys(fetched).length > 0
-        ? { status: 'ready' as const, fetchedMetadata: fetched, confidence: computeConfidence(row.embeddedMetadata ?? {}, fetched as StagingMetadata), fetchedMetadataSources: sources }
-        : { status: 'ready' as const };
+      const updates =
+        Object.keys(fetched).length > 0
+          ? {
+              status: 'ready' as const,
+              fetchedMetadata: fetched,
+              confidence: computeConfidence(row.embeddedMetadata ?? {}, fetched as StagingMetadata),
+              fetchedMetadataSources: sources,
+            }
+          : { status: 'ready' as const };
       await this.repo.update(fileId, updates);
     } catch (err) {
       this.logger.warn(`Auto-fetch metadata failed for staging file ${fileId}: ${err instanceof Error ? err.message : err}`);
@@ -202,9 +208,19 @@ function normalizeAuthorName(name: string): string {
 function authorSimilarity(embAuthors: string[], fetchAuthors: string[]): number {
   let best = 0;
   for (const ea of embAuthors) {
-    const tokA = new Set(normalizeAuthorName(ea).replace(/[^a-z\s]/g, '').split(/\s+/).filter((t) => t.length > 1));
+    const tokA = new Set(
+      normalizeAuthorName(ea)
+        .replace(/[^a-z\s]/g, '')
+        .split(/\s+/)
+        .filter((t) => t.length > 1),
+    );
     for (const fa of fetchAuthors) {
-      const tokB = new Set(normalizeAuthorName(fa).replace(/[^a-z\s]/g, '').split(/\s+/).filter((t) => t.length > 1));
+      const tokB = new Set(
+        normalizeAuthorName(fa)
+          .replace(/[^a-z\s]/g, '')
+          .split(/\s+/)
+          .filter((t) => t.length > 1),
+      );
       best = Math.max(best, jaccard(tokA, tokB));
     }
   }

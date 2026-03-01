@@ -11,7 +11,12 @@ export const loggerConfig: Params = {
     hooks: {
       logMethod(inputArgs, method) {
         const first = inputArgs[0];
-        if (first !== null && typeof first === 'object' && 'context' in first && FRAMEWORK_CONTEXTS.has((first as Record<string, unknown>).context as string)) {
+        if (
+          first !== null &&
+          typeof first === 'object' &&
+          'context' in first &&
+          FRAMEWORK_CONTEXTS.has((first as Record<string, unknown>).context as string)
+        ) {
           return;
         }
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
