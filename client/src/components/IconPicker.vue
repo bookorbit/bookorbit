@@ -3,6 +3,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import * as LucideIcons from 'lucide-vue-next'
 import { ChevronDown, Search, X } from 'lucide-vue-next'
 import { RecycleScroller } from 'vue-virtual-scroller'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{
   modelValue: string
@@ -170,18 +171,20 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
         <RecycleScroller v-else class="overflow-y-auto px-2 py-1.5" style="height: 320px" :items="rows" :item-size="ROW_HEIGHT" key-field="id">
           <template #default="{ item }">
             <div class="flex gap-0.5">
-              <button
-                v-for="name in item.icons"
-                :key="name"
-                type="button"
-                :title="name"
-                :style="{ width: `calc(100% / ${COLS})`, aspectRatio: '1' }"
-                class="flex items-center justify-center rounded-md transition-colors"
-                :class="modelValue === name ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
-                @click="select(name)"
-              >
-                <component :is="getIconComponent(name)" :size="16" />
-              </button>
+              <Tooltip v-for="name in item.icons" :key="name">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    :style="{ width: `calc(100% / ${COLS})`, aspectRatio: '1' }"
+                    class="flex items-center justify-center rounded-md transition-colors"
+                    :class="modelValue === name ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+                    @click="select(name)"
+                  >
+                    <component :is="getIconComponent(name)" :size="16" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ name }}</TooltipContent>
+              </Tooltip>
             </div>
           </template>
         </RecycleScroller>

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import * as LucideIcons from 'lucide-vue-next'
 import { Library, Search, X } from 'lucide-vue-next'
 import { RecycleScroller } from 'vue-virtual-scroller'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{
   name: string
@@ -105,17 +106,19 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
         <RecycleScroller class="flex-1 overflow-y-auto px-2 py-1" :items="rows" :item-size="ROW_HEIGHT" key-field="id">
           <template #default="{ item }">
             <div class="flex gap-0.5">
-              <button
-                v-for="iconName in item.icons"
-                :key="iconName"
-                class="flex items-center justify-center rounded-md transition-colors"
-                style="width: calc(100% / 10); aspect-ratio: 1"
-                :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
-                :title="iconName"
-                @click="emit('update:icon', icon === iconName ? null : iconName)"
-              >
-                <component :is="getIconComponent(iconName)" :size="16" />
-              </button>
+              <Tooltip v-for="iconName in item.icons" :key="iconName">
+                <TooltipTrigger as-child>
+                  <button
+                    class="flex items-center justify-center rounded-md transition-colors"
+                    style="width: calc(100% / 10); aspect-ratio: 1"
+                    :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+                    @click="emit('update:icon', icon === iconName ? null : iconName)"
+                  >
+                    <component :is="getIconComponent(iconName)" :size="16" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ iconName }}</TooltipContent>
+              </Tooltip>
             </div>
           </template>
         </RecycleScroller>

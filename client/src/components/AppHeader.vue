@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import AccentPicker from '@/components/AccentPicker.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -175,30 +176,42 @@ function navigateToResult(result: GlobalSearchResult) {
       <!-- Right -->
       <div class="ml-auto flex items-center gap-0.5">
         <!-- Mobile: search icon -->
-        <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground" @click="mobileSearchOpen = true">
-          <Search :size="15" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground" @click="mobileSearchOpen = true">
+              <Search :size="15" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Search</TooltipContent>
+        </Tooltip>
 
         <!-- Upload button -->
-        <Button
-          v-if="hasPermission('library_upload')"
-          variant="ghost"
-          size="icon"
-          class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground"
-          title="Upload books"
-          @click="uploadOpen = true"
-        >
-          <Upload :size="15" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              v-if="hasPermission('library_upload')"
+              variant="ghost"
+              size="icon"
+              class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground"
+              @click="uploadOpen = true"
+            >
+              <Upload :size="15" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Upload books</TooltipContent>
+        </Tooltip>
 
         <!-- Desktop: appearance settings popover -->
-        <Popover>
-          <PopoverTrigger as-child>
-            <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground">
-              <Palette :size="15" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent class="w-72 p-4" align="end">
+        <Tooltip>
+          <Popover>
+            <TooltipTrigger as-child>
+              <PopoverTrigger as-child>
+                <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground">
+                  <Palette :size="15" />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <PopoverContent class="w-72 p-4" align="end">
             <div class="space-y-4">
               <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
               <div class="space-y-1.5">
@@ -215,11 +228,18 @@ function navigateToResult(result: GlobalSearchResult) {
               </div>
             </div>
           </PopoverContent>
-        </Popover>
+          </Popover>
+          <TooltipContent>Appearance</TooltipContent>
+        </Tooltip>
 
-        <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground" @click="openSettings()">
-          <Settings :size="15" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground" @click="openSettings()">
+              <Settings :size="15" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Settings</TooltipContent>
+        </Tooltip>
 
         <ThemeToggle />
 

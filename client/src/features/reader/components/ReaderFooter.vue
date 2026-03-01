@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 defineProps<{
   fraction: number
@@ -30,9 +31,14 @@ function onSeek(e: Event) {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     "
   >
-    <button class="viewer-btn" :disabled="sectionIndex === 0" @click="emit('prevSection')" title="Previous section">
-      <ChevronLeft :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" :disabled="sectionIndex === 0" @click="emit('prevSection')">
+          <ChevronLeft :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Previous section</TooltipContent>
+    </Tooltip>
 
     <div class="relative flex-1 flex items-center h-6">
       <input
@@ -59,8 +65,13 @@ function onSeek(e: Event) {
 
     <span class="text-xs tabular-nums shrink-0 min-w-[3rem] text-center text-white/50"> {{ Math.round(fraction * 100) }}% </span>
 
-    <button class="viewer-btn" :disabled="totalSections > 0 && sectionIndex >= totalSections - 1" @click="emit('nextSection')" title="Next section">
-      <ChevronRight :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" :disabled="totalSections > 0 && sectionIndex >= totalSections - 1" @click="emit('nextSection')">
+          <ChevronRight :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Next section</TooltipContent>
+    </Tooltip>
   </footer>
 </template>

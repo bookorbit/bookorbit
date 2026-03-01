@@ -13,12 +13,15 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
@@ -182,11 +185,16 @@ watch(libraryId, (newId) => {
 
 watch(filter, () => load(true), { deep: true })
 
-watch(loading, (isLoading) => {
-  if (!isLoading) loadIfSentinelVisible()
-}, { flush: 'post' })
+watch(
+  loading,
+  (isLoading) => {
+    if (!isLoading) loadIfSentinelVisible()
+  },
+  { flush: 'post' },
+)
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
+const { bumpVersion } = useCoverVersions()
 
 function handleSelect(id: number, event: MouseEvent) {
   if (event.shiftKey)
@@ -203,6 +211,7 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+const sendBookOpen = ref(false)
 
 async function handleDeleteSelected() {
   const ids = [...selectedIds.value]
@@ -220,6 +229,71 @@ async function handleDeleteSelected() {
   books.value = books.value.filter((b) => !deleted.has(b.id))
   exitSelectionMode()
   toast.success(`Deleted ${ids.length} book${ids.length === 1 ? '' : 's'}`)
+}
+
+async function handleBulkRefreshMetadata() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const toastId = toast.loading(`Refreshing metadata for ${ids.length} book${ids.length === 1 ? '' : 's'}...`)
+  const res = await api('/api/v1/books/bulk-refresh-metadata', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids }),
+  })
+  toast.dismiss(toastId)
+  if (!res.ok) {
+    toast.error('Failed to refresh metadata')
+    return
+  }
+  const { processed, failed } = await res.json()
+  ids.forEach((id) => bumpVersion(id))
+  if (failed > 0) {
+    toast.warning(`Refreshed ${processed} book${processed === 1 ? '' : 's'}, ${failed} failed`)
+  } else {
+    toast.success(`Refreshed metadata for ${processed} book${processed === 1 ? '' : 's'}`)
+  }
+}
+
+async function handleBulkReExtractCover() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const toastId = toast.loading(`Re-extracting covers for ${ids.length} book${ids.length === 1 ? '' : 's'}...`)
+  const res = await api('/api/v1/books/bulk-re-extract-cover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids }),
+  })
+  toast.dismiss(toastId)
+  if (!res.ok) {
+    toast.error('Failed to re-extract covers')
+    return
+  }
+  const { processed, updated } = await res.json()
+  ids.forEach((id) => bumpVersion(id))
+  toast.success(`Re-extracted ${updated} of ${processed} cover${processed === 1 ? '' : 's'}`)
+}
+
+async function handleExport(allFormats: boolean) {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const toastId = toast.loading(`Preparing ${ids.length} book${ids.length === 1 ? '' : 's'} for download...`)
+  const res = await api('/api/v1/books/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids, allFormats }),
+  })
+  toast.dismiss(toastId)
+  if (!res.ok) {
+    toast.error('Export failed')
+    return
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'books.zip'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
@@ -249,7 +323,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
   <SidebarProvider>
     <AppSidebar />
 
-    <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
+    <SidebarInset class="flex flex-col h-screen glow-wrapper">
       <AppHeader />
       <ViewHeader
         :title="title"
@@ -284,14 +358,18 @@ function handleBookAction(book: BookCard, action: BookActionType) {
                 <BookSortBuilder v-model="sortModel" />
               </PopoverContent>
             </Popover>
-            <button
-              v-if="!isDefaultSort"
-              @click="resetSort"
-              class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-              title="Reset sort to default"
-            >
-              <X :size="13" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  v-if="!isDefaultSort"
+                  @click="resetSort"
+                  class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <X :size="13" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Reset sort to default</TooltipContent>
+            </Tooltip>
           </div>
           <div class="w-px h-5 bg-border shrink-0" />
           <button
@@ -307,15 +385,19 @@ function handleBookAction(book: BookCard, action: BookActionType) {
             <span>Filters</span>
             <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
           </button>
-          <button
-            v-if="activeFilterCount > 0"
-            @click="clearFilters"
-            class="flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
-            title="Clear all filters"
-          >
-            <X :size="13" />
-            Clear
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="activeFilterCount > 0"
+                @click="clearFilters"
+                class="flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X :size="13" />
+                Clear
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Clear all filters</TooltipContent>
+          </Tooltip>
         </template>
       </ViewHeader>
 
@@ -327,29 +409,37 @@ function handleBookAction(book: BookCard, action: BookActionType) {
           <div class="flex items-center justify-between mb-3">
             <span class="text-xs font-medium text-muted-foreground">Filter rules</span>
             <div class="flex items-center gap-1.5">
-              <button
-                v-if="activeFilterCount > 0"
-                @click="saveFilter"
-                class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
-                :class="
-                  isFilterSaved
-                    ? 'border-primary/40 text-primary bg-primary/8'
-                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                "
-                :title="isFilterSaved ? 'Filter saved' : 'Save filter for this library'"
-              >
-                <BookmarkCheck v-if="isFilterSaved" :size="13" />
-                <Bookmark v-else :size="13" />
-                {{ isFilterSaved ? 'Saved' : 'Save filter' }}
-              </button>
-              <button
-                v-if="hasSavedFilter"
-                @click="forgetSavedFilter"
-                class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                title="Remove saved filter"
-              >
-                <X :size="11" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    v-if="activeFilterCount > 0"
+                    @click="saveFilter"
+                    class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
+                    :class="
+                      isFilterSaved
+                        ? 'border-primary/40 text-primary bg-primary/8'
+                        : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                    "
+                  >
+                    <BookmarkCheck v-if="isFilterSaved" :size="13" />
+                    <Bookmark v-else :size="13" />
+                    {{ isFilterSaved ? 'Saved' : 'Save filter' }}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ isFilterSaved ? 'Filter saved' : 'Save filter for this library' }}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    v-if="hasSavedFilter"
+                    @click="forgetSavedFilter"
+                    class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <X :size="11" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Remove saved filter</TooltipContent>
+              </Tooltip>
             </div>
           </div>
           <BookFilterBuilder v-model="filter" />
@@ -403,7 +493,11 @@ function handleBookAction(book: BookCard, action: BookActionType) {
   <SelectionActionBar
     :visible="selectionMode"
     :count="selectedCount"
+    @send="sendBookOpen = true"
+    @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
+    @refresh-metadata="handleBulkRefreshMetadata"
+    @re-extract-cover="handleBulkReExtractCover"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
@@ -414,4 +508,6 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     @update:open="addToCollectionOpen = $event"
     @done="exitSelectionMode"
   />
+
+  <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 </template>

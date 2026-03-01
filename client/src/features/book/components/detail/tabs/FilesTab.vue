@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import { BookOpen, Download, Files } from 'lucide-vue-next'
 import type { BookDetail, BookDetailFile } from '@projectx/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
@@ -119,13 +120,17 @@ function fileIconText(format: string | null): string {
           <BookOpen class="size-3.5" />
           Read
         </button>
-        <button
-          class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          title="Download"
-          @click="downloadFile(file)"
-        >
-          <Download class="size-3.5" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              @click="downloadFile(file)"
+            >
+              <Download class="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Download</TooltipContent>
+        </Tooltip>
       </div>
     </div>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { toast } from 'vue-sonner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Plus, Pencil, Trash2, Star, ChevronDown, ChevronRight } from 'lucide-vue-next'
 import { useEmailTemplates, type EmailTemplate, type EmailTemplateForm } from '../composables/useEmailTemplates'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -198,30 +199,40 @@ function insertVariable(variable: string, field: 'subject' | 'bodyText') {
           </div>
 
           <div class="flex items-center gap-1 shrink-0">
-            <button
-              class="flex items-center justify-center w-7 h-7 rounded transition-colors"
-              :class="t.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
-              title="Set as default"
-              @click="setDefault(t)"
-            >
-              <Star :size="13" :class="t.isDefault ? 'fill-primary' : ''" />
-            </button>
-            <button
-              v-if="!t.isSystem || isSuperuser"
-              class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Edit"
-              @click="openEdit(t)"
-            >
-              <Pencil :size="13" />
-            </button>
-            <button
-              v-if="!t.isSystem"
-              class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              title="Delete"
-              @click="remove(t)"
-            >
-              <Trash2 :size="13" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+                  :class="t.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
+                  @click="setDefault(t)"
+                >
+                  <Star :size="13" :class="t.isDefault ? 'fill-primary' : ''" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Set as default</TooltipContent>
+            </Tooltip>
+            <Tooltip v-if="!t.isSystem || isSuperuser">
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  @click="openEdit(t)"
+                >
+                  <Pencil :size="13" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
+            <Tooltip v-if="!t.isSystem">
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="remove(t)"
+                >
+                  <Trash2 :size="13" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 

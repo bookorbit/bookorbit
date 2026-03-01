@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Settings2 } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import AppHeader from '@/components/AppHeader.vue'
@@ -42,13 +43,17 @@ const greeting = computed(() => {
         <!-- Greeting -->
         <div class="flex items-center justify-between px-6 pb-4 pt-6">
           <h1 class="text-xl font-semibold tracking-tight">{{ greeting }}</h1>
-          <button
-            class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title="Customize dashboard"
-            @click="settingsOpen = true"
-          >
-            <Settings2 :size="16" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                @click="settingsOpen = true"
+              >
+                <Settings2 :size="16" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Customize dashboard</TooltipContent>
+          </Tooltip>
         </div>
 
         <!-- Scrollers -->

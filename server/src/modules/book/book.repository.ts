@@ -214,6 +214,22 @@ export class BookRepository {
     return rows.map((r) => r.id);
   }
 
+  async findPrimaryFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
+    if (bookIds.length === 0) return [];
+    return this.db
+      .select({ bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(bookFiles)
+      .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'primary')));
+  }
+
+  async findAllFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
+    if (bookIds.length === 0) return [];
+    return this.db
+      .select({ bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(bookFiles)
+      .where(inArray(bookFiles.bookId, bookIds));
+  }
+
   async deleteByIds(bookIds: number[]): Promise<void> {
     await this.db.delete(books).where(inArray(books.id, bookIds));
   }

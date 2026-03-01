@@ -12,6 +12,7 @@ import { useVisibility } from '../composables/useVisibility'
 import PdfSettingsPanel from './PdfSettingsPanel.vue'
 import type { PageDim } from '../composables/usePdf'
 import type { PdfReaderSettings } from '@projectx/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
@@ -238,12 +239,22 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         "
       >
-        <button class="viewer-btn" @click="router.back()" title="Back"><ArrowLeft :size="16" /></button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
+          </TooltipTrigger>
+          <TooltipContent>Back</TooltipContent>
+        </Tooltip>
         <div class="viewer-sep" />
 
-        <button class="viewer-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)" title="Previous page">
-          <ChevronLeft :size="16" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
+              <ChevronLeft :size="16" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Previous page</TooltipContent>
+        </Tooltip>
         <div class="flex items-center gap-1 text-sm text-white/80 shrink-0">
           <input
             v-model.number="pageInput"
@@ -257,30 +268,60 @@ const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.v
           <span class="text-white/40">/</span>
           <span class="tabular-nums">{{ totalPages }}</span>
         </div>
-        <button class="viewer-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)" title="Next page">
-          <ChevronRight :size="16" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">
+              <ChevronRight :size="16" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Next page</TooltipContent>
+        </Tooltip>
         <div class="viewer-sep" />
 
-        <button class="viewer-btn" @click.stop="adjustZoom(-0.1)" title="Zoom out"><Minus :size="14" /></button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" @click.stop="adjustZoom(-0.1)"><Minus :size="14" /></button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom out</TooltipContent>
+        </Tooltip>
         <span class="text-xs text-white/80 font-mono min-w-[64px] text-center tabular-nums select-none">{{ zoomLabel }}</span>
-        <button class="viewer-btn" @click.stop="adjustZoom(0.1)" title="Zoom in"><Plus :size="14" /></button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" @click.stop="adjustZoom(0.1)"><Plus :size="14" /></button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom in</TooltipContent>
+        </Tooltip>
         <div class="viewer-sep" />
 
-        <button class="viewer-btn" :class="showFind ? 'bg-white/20 text-white' : ''" @click="showFind = !showFind" title="Find (⌘F)">
-          <Search :size="14" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" :class="showFind ? 'bg-white/20 text-white' : ''" @click="showFind = !showFind">
+              <Search :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Find (⌘F)</TooltipContent>
+        </Tooltip>
         <div class="viewer-sep" />
 
-        <button class="viewer-btn" @click="toggleFullscreen" :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'">
-          <Minimize v-if="isFullscreen" :size="14" />
-          <Maximize v-else :size="14" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" @click="toggleFullscreen">
+              <Minimize v-if="isFullscreen" :size="14" />
+              <Maximize v-else :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ isFullscreen ? 'Exit fullscreen' : 'Fullscreen' }}</TooltipContent>
+        </Tooltip>
         <div class="viewer-sep" />
 
-        <button class="viewer-btn" :class="showSettings ? 'bg-white/20 text-white' : ''" @click.stop="showSettings = !showSettings" title="Settings">
-          <Settings :size="14" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" :class="showSettings ? 'bg-white/20 text-white' : ''" @click.stop="showSettings = !showSettings">
+              <Settings :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Settings</TooltipContent>
+        </Tooltip>
       </div>
 
       <!-- Find bar -->

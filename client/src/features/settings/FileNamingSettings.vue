@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { Check, ChevronDown, ChevronUp, FileText, Loader2, RotateCcw, Save } from 'lucide-vue-next'
 import { DEFAULT_UPLOAD_PATTERN, PATTERN_TOKENS } from '@projectx/types'
 import { useFileNamingPattern } from './composables/useFileNamingPattern'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const {
   globalPattern,
@@ -116,16 +117,20 @@ onMounted(async () => {
               </span>
               <span v-else class="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground"> using default </span>
             </div>
-            <button
-              v-if="lib.fileNamingPattern"
-              class="shrink-0 flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-              title="Clear override"
-              :disabled="savingLibraryId === lib.id"
-              @click="clearLibraryPattern(lib)"
-            >
-              <RotateCcw :size="11" />
-              Reset
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  v-if="lib.fileNamingPattern"
+                  class="shrink-0 flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  :disabled="savingLibraryId === lib.id"
+                  @click="clearLibraryPattern(lib)"
+                >
+                  <RotateCcw :size="11" />
+                  Reset
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Clear override</TooltipContent>
+            </Tooltip>
           </div>
 
           <div class="space-y-1.5">

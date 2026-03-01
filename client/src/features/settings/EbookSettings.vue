@@ -128,7 +128,7 @@ const fontFamilies: { id: string | null; label: string }[] = [
         </div>
         <!-- Theme swatches -->
         <div class="flex flex-wrap gap-2">
-          <button v-for="t in themes" :key="t.name" :title="t.label" class="flex flex-col items-center gap-1 group" @click="update({ themeName: t.name })">
+          <button v-for="t in themes" :key="t.name" class="flex flex-col items-center gap-1 group" @click="update({ themeName: t.name })">
             <div
               class="w-20 h-14 rounded border-2 overflow-hidden transition-all shrink-0"
               :class="effective.themeName === t.name ? 'border-primary shadow-sm' : 'border-transparent hover:border-border'"

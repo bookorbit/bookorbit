@@ -7,6 +7,7 @@ import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import type { BookDetail } from '@projectx/types'
 import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
@@ -69,13 +70,17 @@ function downloadFile() {
           :style="coverLoaded ? {} : coverStyle"
           @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
         >
-          <button
-            class="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Edit cover"
-            @click.stop="router.push({ name: 'book-edit', params: { bookId: book.id } })"
-          >
-            <Pencil class="size-3" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                @click.stop="router.push({ name: 'book-edit', params: { bookId: book.id } })"
+              >
+                <Pencil class="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Edit cover</TooltipContent>
+          </Tooltip>
           <img
             v-if="!coverFailed"
             :src="coverSrc"
@@ -97,26 +102,38 @@ function downloadFile() {
             Read
           </button>
           <div class="flex gap-2">
-            <button
-              class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
-              title="Download"
-              :disabled="!primaryFile"
-              @click="downloadFile"
-            >
-              <Download class="size-3.5" />
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
-              title="Add to Collection"
-            >
-              <FolderPlus class="size-3.5" />
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center h-9 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"
-              title="Delete"
-            >
-              <Trash2 class="size-3.5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                  :disabled="!primaryFile"
+                  @click="downloadFile"
+                >
+                  <Download class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Download</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+                >
+                  <FolderPlus class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Add to collection</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="flex flex-1 items-center justify-center h-9 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>

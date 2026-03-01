@@ -5,6 +5,7 @@ import { Moon, Sun } from 'lucide-vue-next'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const themeStore = useThemeStore()
 const accentOpen = ref(false)
@@ -57,10 +58,15 @@ async function handleOidcLogin() {
     <!-- Compact theme picker -->
     <div class="fixed bottom-5 right-5 z-20 flex items-center gap-1.5">
       <!-- Dark / light toggle -->
-      <button class="theme-btn" :title="themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark'" @click="themeStore.toggleTheme()">
-        <Sun v-if="themeStore.theme === 'dark'" :size="14" />
-        <Moon v-else :size="14" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button class="theme-btn" @click="themeStore.toggleTheme()">
+            <Sun v-if="themeStore.theme === 'dark'" :size="14" />
+            <Moon v-else :size="14" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark' }}</TooltipContent>
+      </Tooltip>
 
       <!-- Accent picker -->
       <div class="relative">
@@ -68,42 +74,51 @@ async function handleOidcLogin() {
         <Transition name="popover">
           <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-xl space-y-2">
             <div class="flex items-center gap-1.5">
-              <button
-                v-for="opt in ACCENT_VIVID"
-                :key="opt.id"
-                :title="opt.label"
-                class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
-                :style="{
-                  backgroundColor: opt.color,
-                  outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                  outlineOffset: '2px',
-                  transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
-                }"
-                @click="themeStore.setAccent(opt.id)"
-              />
+              <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
+                <TooltipTrigger as-child>
+                  <button
+                    class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
+                    :style="{
+                      backgroundColor: opt.color,
+                      outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                      outlineOffset: '2px',
+                      transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
+                    }"
+                    @click="themeStore.setAccent(opt.id)"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{{ opt.label }}</TooltipContent>
+              </Tooltip>
             </div>
             <div class="flex items-center gap-1.5">
-              <button
-                v-for="opt in ACCENT_PASTEL"
-                :key="opt.id"
-                :title="opt.label"
-                class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
-                :style="{
-                  backgroundColor: opt.color,
-                  outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                  outlineOffset: '2px',
-                  transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
-                }"
-                @click="themeStore.setAccent(opt.id)"
-              />
+              <Tooltip v-for="opt in ACCENT_PASTEL" :key="opt.id">
+                <TooltipTrigger as-child>
+                  <button
+                    class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none shrink-0"
+                    :style="{
+                      backgroundColor: opt.color,
+                      outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                      outlineOffset: '2px',
+                      transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
+                    }"
+                    @click="themeStore.setAccent(opt.id)"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{{ opt.label }}</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </Transition>
 
         <!-- Swatch button showing current accent -->
-        <button class="theme-btn" title="Change accent color" @click="accentOpen = !accentOpen">
-          <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="theme-btn" @click="accentOpen = !accentOpen">
+              <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Change accent color</TooltipContent>
+        </Tooltip>
       </div>
     </div>
 

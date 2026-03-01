@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
@@ -109,17 +110,21 @@ async function autoFill() {
       <div class="flex items-center justify-between min-h-[2rem]">
         <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
         <span v-else />
-        <div class="flex gap-2">
-          <button
-            class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
-            :disabled="autoFilling"
-            :title="autoFilling ? 'Fetching metadata...' : 'Auto-fill fields using your metadata preferences'"
-            @click="autoFill"
-          >
-            <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
-            <RefreshCw v-else class="size-3.5" />
-            Auto-fill
-          </button>
+          <div class="flex gap-2">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
+                  :disabled="autoFilling"
+                  @click="autoFill"
+                >
+                  <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
+                  <RefreshCw v-else class="size-3.5" />
+                  Auto-fill
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{{ autoFilling ? 'Fetching metadata...' : 'Auto-fill fields using your metadata preferences' }}</TooltipContent>
+            </Tooltip>
           <button
             class="search-online-btn flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
             @click="searchOpen = true"
@@ -201,17 +206,19 @@ async function autoFill() {
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rating</label>
           <div class="flex items-center gap-0.5 h-8" @mouseleave="hoverRating = null">
-            <button
-              v-for="star in 5"
-              :key="star"
-              type="button"
-              class="p-0.5 transition-colors"
-              :title="`Rate ${star}`"
-              @mouseenter="hoverRating = star"
-              @click="setRating(star)"
-            >
-              <Star class="size-4" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
-            </button>
+            <Tooltip v-for="star in 5" :key="star">
+              <TooltipTrigger as-child>
+                <button
+                  type="button"
+                  class="p-0.5 transition-colors"
+                  @mouseenter="hoverRating = star"
+                  @click="setRating(star)"
+                >
+                  <Star class="size-4" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Rate {{ star }}</TooltipContent>
+            </Tooltip>
             <button
               v-if="form.rating"
               type="button"

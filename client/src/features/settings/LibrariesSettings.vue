@@ -8,6 +8,7 @@ import type { Library as LibraryType, LibraryStats } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const route = useRoute()
 const router = useRouter()
@@ -282,28 +283,40 @@ function coverRefreshLabel(libraryId: number): string {
             </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
-            <button
-              class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Edit library"
-              @click="openEdit(lib)"
-            >
-              <Pencil :size="13" />
-            </button>
-            <button
-              class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              title="Delete library"
-              @click="openDelete(lib)"
-            >
-              <Trash2 :size="13" />
-            </button>
-            <button
-              class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-              title="Refresh covers"
-              :disabled="isRefreshingCovers(lib.id)"
-              @click="refreshCovers(lib)"
-            >
-              <Images :size="13" :class="isRefreshingCovers(lib.id) ? 'animate-pulse' : ''" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  @click="openEdit(lib)"
+                >
+                  <Pencil :size="13" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Edit library</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="openDelete(lib)"
+                >
+                  <Trash2 :size="13" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Delete library</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  :disabled="isRefreshingCovers(lib.id)"
+                  @click="refreshCovers(lib)"
+                >
+                  <Images :size="13" :class="isRefreshingCovers(lib.id) ? 'animate-pulse' : ''" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh covers</TooltipContent>
+            </Tooltip>
             <button
               class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
               :disabled="isScanning(lib.id)"

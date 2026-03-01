@@ -4,6 +4,7 @@ import { RotateCcw } from 'lucide-vue-next'
 import type { FieldPreference, MetadataField, ProviderStatus } from '@projectx/types'
 import MergeStrategyPicker from './MergeStrategyPicker.vue'
 import ProviderChipList from './ProviderChipList.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{
   field: MetadataField
@@ -80,15 +81,18 @@ function update(patch: Partial<FieldPreference>) {
         {{ inherited ? 'inherited' : 'custom' }}
       </span>
 
-      <button
-        v-if="inherited === false"
-        :disabled="saving"
-        class="flex items-center gap-1 h-6 px-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
-        title="Revert to global default"
-        @click="$emit('revert', field)"
-      >
-        <RotateCcw :size="11" />
-      </button>
+      <Tooltip v-if="inherited === false">
+        <TooltipTrigger as-child>
+          <button
+            :disabled="saving"
+            class="flex items-center gap-1 h-6 px-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+            @click="$emit('revert', field)"
+          >
+            <RotateCcw :size="11" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Revert to global default</TooltipContent>
+      </Tooltip>
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { Plus, Trash2 } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { Permission } from '@projectx/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const permissions = ref<Permission[]>([])
 const loading = ref(false)
@@ -111,14 +112,18 @@ async function deletePermission(perm: Permission) {
             <td class="px-4 py-3 text-muted-foreground hidden sm:table-cell">{{ perm.description ?? '-' }}</td>
             <td class="px-4 py-3">
               <div class="flex justify-end">
-                <button
-                  v-if="!perm.isSystem"
-                  @click="deletePermission(perm)"
-                  class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 :size="14" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      v-if="!perm.isSystem"
+                      @click="deletePermission(perm)"
+                      class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+                    >
+                      <Trash2 :size="14" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete</TooltipContent>
+                </Tooltip>
               </div>
             </td>
           </tr>

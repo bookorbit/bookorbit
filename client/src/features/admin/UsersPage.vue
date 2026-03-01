@@ -6,6 +6,7 @@ import type { AuthUser, Role } from '@projectx/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface UserRow extends AuthUser {
   id: number
@@ -136,27 +137,39 @@ function onSaved(newResetUrl?: string) {
             <td class="px-4 py-3">
               <div class="flex items-center gap-2 justify-end">
                 <template v-if="isSuperuser || !user.roles.some((r) => r.isSuperuser)">
-                  <button
-                    @click="openEdit(user)"
-                    class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil :size="14" />
-                  </button>
-                  <button
-                    @click="handleResetPassword(user.id)"
-                    class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    title="Reset password"
-                  >
-                    <KeyRound :size="14" />
-                  </button>
-                  <button
-                    @click="deleteUser(user)"
-                    class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    title="Delete user"
-                  >
-                    <Trash2 :size="14" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <button
+                        @click="openEdit(user)"
+                        class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Pencil :size="14" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <button
+                        @click="handleResetPassword(user.id)"
+                        class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <KeyRound :size="14" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Reset password</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <button
+                        @click="deleteUser(user)"
+                        class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 :size="14" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete user</TooltipContent>
+                  </Tooltip>
                 </template>
               </div>
             </td>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Plus, Trash2, UserMinus, UserPlus, ChevronDown, ChevronRight } from 'lucide-vue-next'
 import { useEmailGroups, type EmailGroup } from '../composables/useEmailGroups'
 import { useEmailRecipients } from '../composables/useEmailRecipients'
@@ -144,13 +145,17 @@ function availableRecipients(group: EmailGroup) {
             <span class="text-sm font-medium text-foreground">{{ g.name }}</span>
             <span class="ml-2 text-xs text-muted-foreground">{{ g.members.length }} {{ g.members.length === 1 ? 'member' : 'members' }}</span>
           </div>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            title="Delete group"
-            @click="remove(g)"
-          >
-            <Trash2 :size="13" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                @click="remove(g)"
+              >
+                <Trash2 :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete group</TooltipContent>
+          </Tooltip>
         </div>
 
         <!-- Expanded members -->

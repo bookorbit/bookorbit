@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Pencil } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -174,14 +175,18 @@ watch(loading, (isLoading) => {
         @toggle-selection="toggleSelectionMode"
       >
         <template #toolbar>
-          <button
-            v-if="collection"
-            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Edit collection"
-            @click="editCollectionOpen = true"
-          >
-            <Pencil :size="14" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="collection"
+                class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                @click="editCollectionOpen = true"
+              >
+                <Pencil :size="14" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Edit collection</TooltipContent>
+          </Tooltip>
         </template>
       </ViewHeader>
 

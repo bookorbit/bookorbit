@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { Role, Permission } from '@projectx/types'
 import RoleFormDrawer from './RoleFormDrawer.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const roles = ref<Role[]>([])
 const permissions = ref<Permission[]>([])
@@ -97,22 +98,30 @@ function onSaved() {
             </td>
             <td class="px-4 py-3">
               <div class="flex items-center gap-2 justify-end">
-                <button
-                  @click="openEdit(role)"
-                  :disabled="role.isSuperuser"
-                  class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  :title="role.isSuperuser ? 'Superuser roles cannot be edited' : 'Edit'"
-                >
-                  <Pencil :size="14" />
-                </button>
-                <button
-                  @click="deleteRole(role)"
-                  :disabled="role.isSystem"
-                  class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  :title="role.isSystem ? 'System roles cannot be deleted' : 'Delete'"
-                >
-                  <Trash2 :size="14" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      @click="openEdit(role)"
+                      :disabled="role.isSuperuser"
+                      class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Pencil :size="14" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ role.isSuperuser ? 'Superuser roles cannot be edited' : 'Edit' }}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      @click="deleteRole(role)"
+                      :disabled="role.isSystem"
+                      class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 :size="14" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ role.isSystem ? 'System roles cannot be deleted' : 'Delete' }}</TooltipContent>
+                </Tooltip>
               </div>
             </td>
           </tr>

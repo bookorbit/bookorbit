@@ -4,6 +4,7 @@ import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshC
 import type { StagingFileStatus } from '@projectx/types'
 import { api } from '@/lib/api'
 import { SUPPORTED_FORMATS_ACCEPT, useStagingUpload } from '../composables/useStagingUpload'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 defineProps<{
   activeStatus: StagingFileStatus | undefined
@@ -147,32 +148,38 @@ function clearSearch() {
         <FileText class="size-3.5" />
         Finalize
       </button>
-      <button
-        v-if="fetchedCount > 0"
-        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
-        :title="`Apply auto-fetched provider metadata to ${fetchedCount} file${fetchedCount !== 1 ? 's' : ''}`"
-        @click="$emit('applyFetched')"
-      >
-        <Wand2 class="size-3.5" />
-        Apply Fetched
-        <span
-          class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-amber-500/20 text-[10px] font-semibold tabular-nums"
-          >{{ fetchedCount }}</span
-        >
-      </button>
-      <button
-        v-if="errorCount > 0"
-        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
-        :title="`Retry metadata fetch for ${errorCount} error file${errorCount !== 1 ? 's' : ''}`"
-        @click="$emit('retryFetch')"
-      >
-        <RefreshCw class="size-3.5" />
-        Retry Errors
-        <span
-          class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-muted-foreground/20 text-[10px] font-semibold tabular-nums"
-          >{{ errorCount }}</span
-        >
-      </button>
+      <Tooltip v-if="fetchedCount > 0">
+        <TooltipTrigger as-child>
+          <button
+            class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
+            @click="$emit('applyFetched')"
+          >
+            <Wand2 class="size-3.5" />
+            Apply Fetched
+            <span
+              class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-amber-500/20 text-[10px] font-semibold tabular-nums"
+              >{{ fetchedCount }}</span
+            >
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Apply auto-fetched provider metadata to {{ fetchedCount }} file{{ fetchedCount !== 1 ? 's' : '' }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="errorCount > 0">
+        <TooltipTrigger as-child>
+          <button
+            class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
+            @click="$emit('retryFetch')"
+          >
+            <RefreshCw class="size-3.5" />
+            Retry Errors
+            <span
+              class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-muted-foreground/20 text-[10px] font-semibold tabular-nums"
+              >{{ errorCount }}</span
+            >
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Retry metadata fetch for {{ errorCount }} error file{{ errorCount !== 1 ? 's' : '' }}</TooltipContent>
+      </Tooltip>
       <button
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
         @click="$emit('bulkEdit')"

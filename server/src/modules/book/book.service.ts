@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
@@ -275,6 +275,67 @@ export class BookService {
     }
 
     return detail ?? this.getDetail(id, user);
+  }
+
+  async bulkRefreshMetadata(bookIds: number[], user: RequestUser): Promise<{ processed: number; failed: number }> {
+    if (bookIds.length === 0) return { processed: 0, failed: 0 };
+    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+    const isSuperuser = this.isSuperuser(user);
+    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+
+    let processed = 0;
+    let failed = 0;
+    const CONCURRENCY = 3;
+    for (let i = 0; i < bookIds.length; i += CONCURRENCY) {
+      await Promise.all(
+        bookIds.slice(i, i + CONCURRENCY).map(async (id) => {
+          try {
+            await this.refreshMetadata(id, false, user);
+            processed++;
+          } catch (err) {
+            this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err}`);
+            failed++;
+          }
+        }),
+      );
+    }
+    return { processed, failed };
+  }
+
+  async bulkReExtractCover(bookIds: number[], user: RequestUser): Promise<{ processed: number; updated: number }> {
+    if (bookIds.length === 0) return { processed: 0, updated: 0 };
+    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+    const isSuperuser = this.isSuperuser(user);
+    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+
+    const files = await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
+    const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
+
+    let processed = 0;
+    let updated = 0;
+    await Promise.all(
+      bookIds.map(async (id) => {
+        const file = filesByBookId.get(id);
+        if (!file) return;
+        processed++;
+        const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
+        if (saved) updated++;
+      }),
+    );
+    return { processed, updated };
+  }
+
+  async getExportFiles(bookIds: number[], user: RequestUser, allFormats: boolean): Promise<{ absolutePath: string; zipPath: string }[]> {
+    if (bookIds.length === 0) throw new BadRequestException('No books selected');
+    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+    const isSuperuser = this.isSuperuser(user);
+    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+
+    const files = allFormats ? await this.bookRepo.findAllFilesByBookIds(bookIds) : await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
+    return files.map((f) => ({ absolutePath: f.absolutePath, zipPath: `${f.bookId}/${basename(f.absolutePath)}` }));
   }
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {

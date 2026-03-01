@@ -5,6 +5,7 @@ import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
 import { stripFragment, formatDate } from '../utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const props = defineProps<{
@@ -77,13 +78,17 @@ const activeTab = ref<Tab>('chapters')
                 <p class="text-sm font-medium leading-snug truncate">{{ bm.title || 'Bookmark' }}</p>
                 <p class="text-xs text-muted-foreground mt-0.5">{{ formatDate(bm.createdAt) }}</p>
               </div>
-              <button
-                class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
-                @click="emit('deleteBookmark', bm.id)"
-                title="Delete bookmark"
-              >
-                <Trash2 :size="13" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
+                    @click="emit('deleteBookmark', bm.id)"
+                  >
+                    <Trash2 :size="13" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Delete bookmark</TooltipContent>
+              </Tooltip>
             </li>
           </ul>
         </template>
@@ -95,13 +100,17 @@ const activeTab = ref<Tab>('chapters')
               <div class="flex items-start gap-2 mb-1">
                 <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: ann.color }" />
                 <p class="text-sm leading-relaxed flex-1 min-w-0">{{ ann.text }}</p>
-                <button
-                  class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
-                  @click="emit('deleteAnnotation', ann.id)"
-                  title="Delete highlight"
-                >
-                  <Trash2 :size="13" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      @click="emit('deleteAnnotation', ann.id)"
+                    >
+                      <Trash2 :size="13" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete highlight</TooltipContent>
+                </Tooltip>
               </div>
               <p v-if="ann.chapterTitle" class="text-xs text-muted-foreground pl-4">{{ ann.chapterTitle }}</p>
               <p v-if="ann.note" class="text-xs text-muted-foreground mt-1 pl-4 italic">{{ ann.note }}</p>

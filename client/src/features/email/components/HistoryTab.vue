@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Trash2, RefreshCw } from 'lucide-vue-next'
 import { useEmailSendLog, type EmailSendLogEntry } from '../composables/useEmailSendLog'
 
@@ -83,22 +84,29 @@ function statusClass(status: string): string {
         </div>
 
         <div class="flex items-center gap-1 shrink-0">
-          <button
-            v-if="entry.status === 'failed'"
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Resend"
-            :disabled="resending === entry.id"
-            @click="resend(entry)"
-          >
-            <RefreshCw :size="13" :class="resending === entry.id ? 'animate-spin' : ''" />
-          </button>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            title="Delete"
-            @click="remove(entry)"
-          >
-            <Trash2 :size="13" />
-          </button>
+          <Tooltip v-if="entry.status === 'failed'">
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                :disabled="resending === entry.id"
+                @click="resend(entry)"
+              >
+                <RefreshCw :size="13" :class="resending === entry.id ? 'animate-spin' : ''" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Resend</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                @click="remove(entry)"
+              >
+                <Trash2 :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

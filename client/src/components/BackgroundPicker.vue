@@ -9,7 +9,6 @@ const themeStore = useThemeStore()
     <button
       v-for="opt in BACKGROUND_OPTIONS"
       :key="opt.id"
-      :title="opt.label"
       type="button"
       class="flex flex-col items-center gap-1 cursor-pointer focus:outline-none"
       @click="themeStore.setBackground(opt.id)"

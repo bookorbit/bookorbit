@@ -2,6 +2,7 @@
 import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Moon, Sun } from 'lucide-vue-next'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const themeStore = useThemeStore()
 const { coverSize, gridGap } = useDisplaySettings()
@@ -47,34 +48,38 @@ const { coverSize, gridGap } = useDisplaySettings()
         <p class="text-xs text-muted-foreground mb-3">Controls highlights and interactive elements</p>
         <div class="space-y-2">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <button
-              v-for="opt in ACCENT_VIVID"
-              :key="opt.id"
-              :title="opt.label"
-              class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
-              :style="{
-                backgroundColor: opt.color,
-                outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                outlineOffset: '2px',
-                transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
-              }"
-              @click="themeStore.setAccent(opt.id)"
-            />
+            <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
+              <TooltipTrigger as-child>
+                <button
+                  class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                  :style="{
+                    backgroundColor: opt.color,
+                    outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                    outlineOffset: '2px',
+                    transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
+                  }"
+                  @click="themeStore.setAccent(opt.id)"
+                />
+              </TooltipTrigger>
+              <TooltipContent>{{ opt.label }}</TooltipContent>
+            </Tooltip>
           </div>
           <div class="flex items-center gap-1.5 flex-wrap">
-            <button
-              v-for="opt in ACCENT_PASTEL"
-              :key="opt.id"
-              :title="opt.label"
-              class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
-              :style="{
-                backgroundColor: opt.color,
-                outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                outlineOffset: '2px',
-                transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
-              }"
-              @click="themeStore.setAccent(opt.id)"
-            />
+            <Tooltip v-for="opt in ACCENT_PASTEL" :key="opt.id">
+              <TooltipTrigger as-child>
+                <button
+                  class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                  :style="{
+                    backgroundColor: opt.color,
+                    outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
+                    outlineOffset: '2px',
+                    transform: themeStore.accent === opt.id ? 'scale(1.25)' : '',
+                  }"
+                  @click="themeStore.setAccent(opt.id)"
+                />
+              </TooltipTrigger>
+              <TooltipContent>{{ opt.label }}</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -89,7 +94,6 @@ const { coverSize, gridGap } = useDisplaySettings()
           <button
             v-for="opt in RADIUS_OPTIONS"
             :key="opt.id"
-            :title="opt.label"
             class="h-7 px-3 text-xs border-2 transition-colors font-medium"
             :style="{ borderRadius: opt.id === 'sharp' ? '2px' : opt.id === 'default' ? '6px' : opt.id === 'rounded' ? '14px' : '999px' }"
             :class="
@@ -146,17 +150,19 @@ const { coverSize, gridGap } = useDisplaySettings()
           </div>
         </div>
         <div class="flex items-center gap-4 flex-wrap">
-          <button
-            v-for="opt in BACKGROUND_OPTIONS"
-            :key="opt.id"
-            :title="opt.label"
-            type="button"
-            class="w-18 h-12 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
-            :class="themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'"
-            @click="themeStore.setBackground(opt.id)"
-          >
-            <div class="w-full h-full bg-background" :class="opt.cssClass" />
-          </button>
+          <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="w-18 h-12 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
+                :class="themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'"
+                @click="themeStore.setBackground(opt.id)"
+              >
+                <div class="w-full h-full bg-background" :class="opt.cssClass" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ opt.label }}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

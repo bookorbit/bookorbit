@@ -3,6 +3,7 @@ import { ref, reactive } from 'vue'
 import { toast } from 'vue-sonner'
 import { Plus, Pencil, Trash2, Star, Share2, Wifi } from 'lucide-vue-next'
 import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const { providers, createProvider, updateProvider, deleteProvider, setDefaultProvider, toggleSharedProvider, testProvider } = useEmailProviders()
 
@@ -264,46 +265,64 @@ async function test(p: EmailProvider) {
         </div>
 
         <div class="flex items-center gap-1 shrink-0">
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Test connection"
-            :disabled="testing === p.id"
-            @click="test(p)"
-          >
-            <Wifi :size="13" :class="testing === p.id ? 'animate-pulse' : ''" />
-          </button>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded transition-colors"
-            :class="p.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
-            title="Set as default"
-            @click="setDefault(p)"
-          >
-            <Star :size="13" :class="p.isDefault ? 'fill-primary' : ''" />
-          </button>
-          <button
-            v-if="!p.isShared || p.userId !== null"
-            class="flex items-center justify-center w-7 h-7 rounded transition-colors"
-            :class="p.isShared ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
-            title="Toggle sharing"
-            @click="toggleShare(p)"
-          >
-            <Share2 :size="13" />
-          </button>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Edit"
-            @click="openEdit(p)"
-          >
-            <Pencil :size="13" />
-          </button>
-          <button
-            v-if="p.userId !== null"
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            title="Delete"
-            @click="remove(p)"
-          >
-            <Trash2 :size="13" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                :disabled="testing === p.id"
+                @click="test(p)"
+              >
+                <Wifi :size="13" :class="testing === p.id ? 'animate-pulse' : ''" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Test connection</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+                :class="p.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
+                @click="setDefault(p)"
+              >
+                <Star :size="13" :class="p.isDefault ? 'fill-primary' : ''" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Set as default</TooltipContent>
+          </Tooltip>
+          <Tooltip v-if="!p.isShared || p.userId !== null">
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+                :class="p.isShared ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                @click="toggleShare(p)"
+              >
+                <Share2 :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle sharing</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                @click="openEdit(p)"
+              >
+                <Pencil :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+          <Tooltip v-if="p.userId !== null">
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                @click="remove(p)"
+              >
+                <Trash2 :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

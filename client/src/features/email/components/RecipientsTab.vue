@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { toast } from 'vue-sonner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Plus, Pencil, Trash2, Star } from 'lucide-vue-next'
 import { useEmailRecipients, type EmailRecipient, type EmailRecipientForm } from '../composables/useEmailRecipients'
 import { useEmailTemplates } from '../composables/useEmailTemplates'
@@ -220,28 +221,40 @@ function deviceLabel(type: string | null): string {
         </div>
 
         <div class="flex items-center gap-1 shrink-0">
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded transition-colors"
-            :class="r.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
-            title="Set as default"
-            @click="setDefault(r)"
-          >
-            <Star :size="13" :class="r.isDefault ? 'fill-primary' : ''" />
-          </button>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Edit"
-            @click="openEdit(r)"
-          >
-            <Pencil :size="13" />
-          </button>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            title="Delete"
-            @click="remove(r)"
-          >
-            <Trash2 :size="13" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+                :class="r.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
+                @click="setDefault(r)"
+              >
+                <Star :size="13" :class="r.isDefault ? 'fill-primary' : ''" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Set as default</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                @click="openEdit(r)"
+              >
+                <Pencil :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                @click="remove(r)"
+              >
+                <Trash2 :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

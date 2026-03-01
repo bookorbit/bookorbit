@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Loader2, Search, X } from 'lucide-vue-next'
 import type { SearchResult } from '../composables/useSearch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{
   results: SearchResult[]
@@ -55,13 +56,17 @@ function onClear() {
         >
           <X :size="14" />
         </button>
-        <button
-          class="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-          @click="emit('close')"
-          title="Close"
-        >
-          <X :size="16" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              @click="emit('close')"
+            >
+              <X :size="16" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Close</TooltipContent>
+        </Tooltip>
       </div>
 
       <div class="flex-1 overflow-y-auto">

@@ -20,6 +20,7 @@ import {
   TriangleAlert,
 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -157,16 +158,18 @@ function openFile(file: BookFileRef) {
     <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop>
       <!-- Star rating -->
       <div class="hidden sm:flex items-center gap-0.5" @mouseleave="hoverRating = null">
-        <button
-          v-for="star in 5"
-          :key="star"
-          class="p-0.5 transition-colors"
-          :title="`Rate ${star}`"
-          @mouseenter="hoverRating = star"
-          @click="setRating(star)"
-        >
-          <Star class="size-3" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
-        </button>
+        <Tooltip v-for="star in 5" :key="star">
+          <TooltipTrigger as-child>
+            <button
+              class="p-0.5 transition-colors"
+              @mouseenter="hoverRating = star"
+              @click="setRating(star)"
+            >
+              <Star class="size-3" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Rate {{ star }}</TooltipContent>
+        </Tooltip>
       </div>
 
       <!-- Format badges -->
@@ -178,23 +181,28 @@ function openFile(file: BookFileRef) {
           <TriangleAlert class="size-3 shrink-0" />
           <span class="hidden sm:inline">Missing</span>
         </span>
-        <button
-          v-if="primaryFile && !isMissing"
-          class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-          :title="`Open as ${primaryFile.format?.toUpperCase() ?? 'unknown'}`"
-          @click="openFile(primaryFile)"
-        >
-          {{ primaryFile.format ?? '?' }}
-        </button>
-        <button
-          v-for="file in secondaryFiles"
-          :key="file.id"
-          class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
-          :title="`Open as ${file.format?.toUpperCase() ?? 'unknown'}`"
-          @click="openFile(file)"
-        >
-          {{ file.format ?? '?' }}
-        </button>
+        <Tooltip v-if="primaryFile && !isMissing">
+          <TooltipTrigger as-child>
+            <button
+              class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+              @click="openFile(primaryFile)"
+            >
+              {{ primaryFile.format ?? '?' }}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Open as {{ primaryFile.format?.toUpperCase() ?? 'unknown' }}</TooltipContent>
+        </Tooltip>
+        <Tooltip v-for="file in secondaryFiles" :key="file.id">
+          <TooltipTrigger as-child>
+            <button
+              class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
+              @click="openFile(file)"
+            >
+              {{ file.format ?? '?' }}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Open as {{ file.format?.toUpperCase() ?? 'unknown' }}</TooltipContent>
+        </Tooltip>
       </div>
 
       <DropdownMenu>

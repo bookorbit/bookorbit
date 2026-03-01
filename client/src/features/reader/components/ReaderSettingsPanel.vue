@@ -95,7 +95,6 @@ function formatGap(v: number) {
                 :key="theme.name"
                 class="flex flex-col items-center gap-1.5 group"
                 @click="emit('update', { themeName: theme.name })"
-                :title="theme.label"
               >
                 <div
                   class="w-9 h-9 rounded-full border-2 transition-all flex items-center justify-center shadow-sm"

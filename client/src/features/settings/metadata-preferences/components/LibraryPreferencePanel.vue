@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-vue-next'
 import type { FieldPreference, LibraryMetadataPreferences, MetadataField, ProviderStatus } from '@projectx/types'
 import FieldPreferenceTable from './FieldPreferenceTable.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{
   libraryName: string
@@ -58,15 +59,18 @@ function onReset() {
         </span>
       </button>
 
-      <button
-        v-if="hasOverrides"
-        class="shrink-0 flex items-center gap-1 h-6 px-2 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        title="Reset all to global"
-        @click="onReset"
-      >
-        <RotateCcw :size="11" />
-        Reset all
-      </button>
+      <Tooltip v-if="hasOverrides">
+        <TooltipTrigger as-child>
+          <button
+            class="shrink-0 flex items-center gap-1 h-6 px-2 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            @click="onReset"
+          >
+            <RotateCcw :size="11" />
+            Reset all
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Reset all to global</TooltipContent>
+      </Tooltip>
     </div>
 
     <div v-if="open && libraryPrefs" class="border-t border-border">

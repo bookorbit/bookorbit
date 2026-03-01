@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Folder, FolderOpen, ChevronRight, ChevronUp, Search, X, Check, Loader2, HardDrive } from 'lucide-vue-next'
 import { api } from '@/lib/api'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface DirEntry {
   name: string
@@ -100,14 +101,18 @@ function selectCurrent() {
 
         <!-- Breadcrumb -->
         <div class="flex items-center gap-1 px-4 py-2 border-b border-border bg-muted/30 shrink-0 overflow-x-auto">
-          <button
-            v-if="canGoUp"
-            class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-1"
-            :title="'Go up'"
-            @click="goUp"
-          >
-            <ChevronUp :size="13" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="canGoUp"
+                class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-1"
+                @click="goUp"
+              >
+                <ChevronUp :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Go up</TooltipContent>
+          </Tooltip>
           <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
             <ChevronRight v-if="i > 0" :size="12" class="text-muted-foreground/50 shrink-0" />
             <button

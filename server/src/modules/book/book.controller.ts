@@ -14,6 +14,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
+import archiver from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
@@ -22,7 +23,9 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
+import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
 import { DeleteBooksDto } from './dto/delete-books.dto';
+import { ExportBooksDto } from './dto/export-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
@@ -54,6 +57,32 @@ export class BookController {
   @Post('query')
   globalQuery(@Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.bookService.globalQuery(user, query);
+  }
+
+  @Post('bulk-refresh-metadata')
+  @RequirePermission('library_edit_metadata')
+  bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkRefreshMetadata(dto.bookIds, user);
+  }
+
+  @Post('bulk-re-extract-cover')
+  @RequirePermission('library_edit_metadata')
+  bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkReExtractCover(dto.bookIds, user);
+  }
+
+  @Post('export')
+  @RequirePermission('library_download')
+  async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const files = await this.bookService.getExportFiles(dto.bookIds, user, dto.allFormats ?? false);
+    const archive = archiver('zip', { zlib: { level: 0 } });
+    reply.raw.setHeader('Content-Type', 'application/zip');
+    reply.raw.setHeader('Content-Disposition', 'attachment; filename="books.zip"');
+    archive.pipe(reply.raw);
+    for (const file of files) {
+      archive.file(file.absolutePath, { name: file.zipPath });
+    }
+    await archive.finalize();
   }
 
   @Get(':id/cover')

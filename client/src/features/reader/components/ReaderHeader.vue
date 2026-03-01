@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, BookOpen, Bookmark, BookmarkCheck, Maximize, Minimize, Search, Settings } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 defineProps<{
   chapterTitle: string
@@ -37,36 +38,66 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     "
   >
-    <button class="viewer-btn" @click="emit('back')" title="Go back">
-      <ArrowLeft :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" @click="emit('back')">
+          <ArrowLeft :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Go back</TooltipContent>
+    </Tooltip>
 
     <div class="viewer-sep" />
 
-    <button class="viewer-btn" @click="emit('toggleSidebar')" title="Table of contents">
-      <BookOpen :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" @click="emit('toggleSidebar')">
+          <BookOpen :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Table of contents</TooltipContent>
+    </Tooltip>
 
-    <button class="viewer-btn" :class="isBookmarked ? '!text-red-400' : ''" @click="emit('toggleBookmark')" title="Toggle bookmark">
-      <BookmarkCheck v-if="isBookmarked" :size="18" />
-      <Bookmark v-else :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" :class="isBookmarked ? '!text-red-400' : ''" @click="emit('toggleBookmark')">
+          <BookmarkCheck v-if="isBookmarked" :size="18" />
+          <Bookmark v-else :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Toggle bookmark</TooltipContent>
+    </Tooltip>
 
-    <button class="viewer-btn" @click="emit('toggleSearch')" title="Search">
-      <Search :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" @click="emit('toggleSearch')">
+          <Search :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Search</TooltipContent>
+    </Tooltip>
 
     <div class="flex-1 min-w-0 px-3">
       <p class="text-sm font-medium truncate text-center text-white/60">{{ chapterTitle }}</p>
     </div>
 
-    <button class="viewer-btn" @click="emit('toggleSettings')" title="Settings">
-      <Settings :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" @click="emit('toggleSettings')">
+          <Settings :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Settings</TooltipContent>
+    </Tooltip>
 
-    <button class="viewer-btn" @click="emit('toggleFullscreen')" :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
-      <Minimize v-if="isFullscreen" :size="18" />
-      <Maximize v-else :size="18" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button class="viewer-btn" @click="emit('toggleFullscreen')">
+          <Minimize v-if="isFullscreen" :size="18" />
+          <Maximize v-else :size="18" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{{ isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen' }}</TooltipContent>
+    </Tooltip>
   </header>
 </template>

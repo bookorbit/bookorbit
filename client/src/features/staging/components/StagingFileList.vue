@@ -3,6 +3,7 @@ import { BookOpen, FileText, Wand2, Pencil } from 'lucide-vue-next'
 import type { StagingFile, StagingMetadata } from '@projectx/types'
 import { formatBytes } from '@/lib/formatting'
 import StagingStatusBadge from './StagingStatusBadge.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 withDefaults(
   defineProps<{
@@ -169,14 +170,17 @@ function confidenceBadgeClass(file: StagingFile): string {
         </div>
 
         <div class="w-7 flex justify-center shrink-0">
-          <button
-            v-if="file.fetchedMetadata"
-            class="flex items-center justify-center size-6 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
-            title="Apply fetched metadata"
-            @click.stop="$emit('applyFetched', file.id)"
-          >
-            <Wand2 class="size-3.5" />
-          </button>
+          <Tooltip v-if="file.fetchedMetadata">
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center size-6 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
+                @click.stop="$emit('applyFetched', file.id)"
+              >
+                <Wand2 class="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Apply fetched metadata</TooltipContent>
+          </Tooltip>
         </div>
 
         <div class="w-16 flex justify-center shrink-0">

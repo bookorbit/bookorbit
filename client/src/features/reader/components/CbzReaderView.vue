@@ -9,6 +9,7 @@ import { useCbzSettings } from '../composables/useCbzSettings'
 import { useReaderSettings } from '../composables/useReaderSettings'
 import CbzSettingsPanel from './CbzSettingsPanel.vue'
 import type { CbxReaderSettings } from '@projectx/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
@@ -313,7 +314,12 @@ onUnmounted(() => {
           border-top: 1px solid rgba(255, 255, 255, 0.08);
         "
       >
-        <button class="viewer-btn" title="First page" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
+          </TooltipTrigger>
+          <TooltipContent>First page</TooltipContent>
+        </Tooltip>
         <button class="viewer-btn" :disabled="currentPage === 0" @click="prevPage"><ChevronLeft :size="16" /></button>
 
         <div class="flex-1 flex flex-col justify-center gap-0.5">
@@ -332,7 +338,12 @@ onUnmounted(() => {
         </div>
 
         <button class="viewer-btn" :disabled="currentPage >= pageCount - 1" @click="nextPage"><ChevronRight :size="16" /></button>
-        <button class="viewer-btn" title="Last page" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
+          </TooltipTrigger>
+          <TooltipContent>Last page</TooltipContent>
+        </Tooltip>
       </div>
     </div>
 
