@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CatalogService } from './catalog.service';
 
 @Controller('metadata')
@@ -19,5 +20,25 @@ export class CatalogController {
   @Get('tags')
   searchTags(@Query('q') q = '') {
     return this.catalogService.searchTags(q);
+  }
+
+  @Get('publishers')
+  searchPublishers(@Query('q') q = '') {
+    return this.catalogService.searchPublishers(q);
+  }
+
+  @Get('series')
+  searchSeries(@Query('q') q = '') {
+    return this.catalogService.searchSeries(q);
+  }
+
+  @Get('languages')
+  searchLanguages(@Query('q') q = '') {
+    return this.catalogService.searchLanguages(q);
+  }
+
+  @Get('collections')
+  searchCollections(@CurrentUser() user: { id: number }, @Query('q') q = '') {
+    return this.catalogService.searchCollections(user.id, q);
   }
 }

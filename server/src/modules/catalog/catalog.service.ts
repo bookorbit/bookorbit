@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ilike } from 'drizzle-orm';
+import { and, eq, ilike, isNotNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, genres, tags } from '../../db/schema';
+import { authors, bookMetadata, collections, genres, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -12,22 +12,58 @@ type Db = NodePgDatabase<typeof schema>;
 export class CatalogService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  searchAuthors(q: string) {
+  searchAuthors(q: string): Promise<{ name: string }[]> {
     return this.searchByName(q, authors);
   }
 
-  searchGenres(q: string) {
+  searchGenres(q: string): Promise<{ name: string }[]> {
     return this.searchByName(q, genres);
   }
 
-  searchTags(q: string) {
+  searchTags(q: string): Promise<{ name: string }[]> {
     return this.searchByName(q, tags);
   }
 
-  private searchByName(q: string, table: typeof authors | typeof genres | typeof tags): Promise<{ id: number; name: string }[]> {
+  searchPublishers(q: string): Promise<{ name: string }[]> {
     if (!q.trim()) return Promise.resolve([]);
     return this.db
-      .select({ id: table.id, name: table.name })
+      .selectDistinct({ name: bookMetadata.publisher })
+      .from(bookMetadata)
+      .where(and(isNotNull(bookMetadata.publisher), ilike(bookMetadata.publisher, `%${q}%`)))
+      .orderBy(bookMetadata.publisher)
+      .limit(15) as Promise<{ name: string }[]>;
+  }
+
+  searchSeries(q: string): Promise<{ name: string }[]> {
+    if (!q.trim()) return Promise.resolve([]);
+    return this.db
+      .selectDistinct({ name: bookMetadata.seriesName })
+      .from(bookMetadata)
+      .where(and(isNotNull(bookMetadata.seriesName), ilike(bookMetadata.seriesName, `%${q}%`)))
+      .orderBy(bookMetadata.seriesName)
+      .limit(15) as Promise<{ name: string }[]>;
+  }
+
+  searchLanguages(q: string): Promise<{ name: string }[]> {
+    if (!q.trim()) return Promise.resolve([]);
+    return this.db
+      .selectDistinct({ name: bookMetadata.language })
+      .from(bookMetadata)
+      .where(and(isNotNull(bookMetadata.language), ilike(bookMetadata.language, `%${q}%`)))
+      .orderBy(bookMetadata.language)
+      .limit(15) as Promise<{ name: string }[]>;
+  }
+
+  searchCollections(userId: number, q: string): Promise<{ name: string }[]> {
+    const baseWhere = eq(collections.userId, userId);
+    const where = q.trim() ? and(baseWhere, ilike(collections.name, `%${q}%`)) : baseWhere;
+    return this.db.select({ name: collections.name }).from(collections).where(where).orderBy(collections.name).limit(20);
+  }
+
+  private searchByName(q: string, table: typeof authors | typeof genres | typeof tags): Promise<{ name: string }[]> {
+    if (!q.trim()) return Promise.resolve([]);
+    return this.db
+      .select({ name: table.name })
       .from(table)
       .where(ilike(table.name, `%${q}%`))
       .orderBy(table.name)

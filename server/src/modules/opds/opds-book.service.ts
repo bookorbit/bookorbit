@@ -270,7 +270,7 @@ export class OpdsBookService {
     if (!lens) return { entries: [], total: 0 };
     if (!lens.isPublic && lens.userId !== userId) return { entries: [], total: 0 };
 
-    const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds: accessibleIds });
+    const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds: accessibleIds, userId });
     const statusClause = eq(books.status, 'present');
     const combinedWhere = where ? and(where, statusClause) : statusClause;
     return this.paginatedBookQuery(combinedWhere!, sortOrder, page, size);

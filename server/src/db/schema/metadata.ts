@@ -38,6 +38,8 @@ export const bookMetadata = pgTable(
   (t) => [
     index('bm_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
+    index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
+    index('bm_language_idx').on(t.language),
   ],
 );
 
@@ -48,9 +50,7 @@ export const authors = pgTable(
     name: varchar('name', { length: 500 }).notNull(),
     sortName: varchar('sort_name', { length: 500 }),
   },
-  (t) => [
-    index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
-  ],
+  (t) => [index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
 );
 
 export const bookAuthors = pgTable(

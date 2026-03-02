@@ -1,5 +1,8 @@
 import type { MetadataProviderKey } from './metadata-fetch';
 
+export const BOOK_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2'] as const;
+export type BookFormat = (typeof BOOK_FORMATS)[number];
+
 export type BookFileRef = {
   id: number;
   format: string | null;

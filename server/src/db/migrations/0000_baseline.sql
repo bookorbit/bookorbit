@@ -568,6 +568,8 @@ CREATE UNIQUE INDEX "email_templates_system_name_unique" ON "email_templates" US
 CREATE INDEX "authors_name_trgm_idx" ON "authors" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_title_trgm_idx" ON "book_metadata" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_series_trgm_idx" ON "book_metadata" USING gin ("series_name" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "bm_publisher_trgm_idx" ON "book_metadata" USING gin ("publisher" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "bm_language_idx" ON "book_metadata" USING btree ("language");--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint

@@ -30,7 +30,7 @@ export class LensService {
     const accessibleLibraryIds = (libs as { id: number }[]).map((l) => l.id);
     return Promise.all(
       lenses.map(async (lens) => {
-        const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds });
+        const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
         const bookCount = await this.bookRepo.countWhere(where);
         return { ...lens, bookCount };
       }),
@@ -93,7 +93,7 @@ export class LensService {
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = (libs as { id: number }[]).map((l) => l.id);
 
-    const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds });
+    const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy((lens.defaultSort as SortSpec[]) ?? []);
     const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
       where,

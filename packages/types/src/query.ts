@@ -8,6 +8,8 @@ export type RuleField =
   | 'pageCount'
   | 'author'
   | 'genre'
+  | 'tag'
+  | 'collection'
   | 'format'
   | 'addedAt'
   | 'fileAvailability'
@@ -44,11 +46,13 @@ export type RuleOperator =
 
 export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   title: ['contains', 'notContains', 'startsWith', 'endsWith', 'eq', 'notEq', 'isEmpty', 'isNotEmpty'],
-  publisher: ['contains', 'notContains', 'isEmpty', 'isNotEmpty'],
-  language: ['eq', 'notEq', 'isEmpty', 'isNotEmpty'],
-  series: ['contains', 'notContains', 'isEmpty', 'isNotEmpty'],
+  publisher: ['contains', 'notContains', 'eq', 'notEq', 'includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
+  language: ['eq', 'notEq', 'includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
+  series: ['contains', 'notContains', 'eq', 'notEq', 'includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
   author: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
   genre: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
+  tag: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
+  collection: ['includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
   format: ['includesAny', 'excludesAll'],
   publishedYear: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
   seriesIndex: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
@@ -104,9 +108,9 @@ export type GroupRule = {
   rules: (Rule | GroupRule)[]
 }
 
-export type SortField = 'author' | 'title' | 'series' | 'seriesIndex' | 'addedAt' | 'publishedYear' | 'pageCount'
+export type SortField = 'author' | 'title' | 'series' | 'seriesIndex' | 'addedAt' | 'updatedAt' | 'publishedYear' | 'pageCount'
 
-export const SORT_FIELDS: SortField[] = ['author', 'title', 'series', 'seriesIndex', 'addedAt', 'publishedYear', 'pageCount']
+export const SORT_FIELDS: SortField[] = ['author', 'title', 'series', 'seriesIndex', 'addedAt', 'updatedAt', 'publishedYear', 'pageCount']
 
 export type SortSpec = {
   field: SortField

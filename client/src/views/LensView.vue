@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Settings2, Trash2 } from 'lucide-vue-next'
+import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -19,7 +19,8 @@ import { useLenses } from '@/features/lens/composables/useLenses'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import { SORT_FIELD_LABELS, ruleToLabel } from '@/features/book/lib/filter-labels'
+import FilterSummary from '@/features/book/components/FilterSummary.vue'
+import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import type { BookCard, GroupRule, SortField } from '@projectx/types'
 
 const route = useRoute()
@@ -33,22 +34,7 @@ const lensId = computed(() => Number(route.params.id))
 const { items: books, total, loading, hasMore, load } = useLens(lensId)
 const { lenses, fetchLenses, deleteLens } = useLenses()
 
-function collectRuleChips(node: GroupRule): string[] {
-  const chips: string[] = []
-  for (const r of node.rules) {
-    if (r.type === 'rule') chips.push(ruleToLabel(r))
-    else chips.push(...collectRuleChips(r as GroupRule))
-  }
-  return chips
-}
-
 const lens = computed(() => lenses.value.find((l) => l.id === lensId.value))
-
-const ruleChips = computed<string[]>(() => {
-  const filter = lens.value?.filter
-  if (!filter) return []
-  return collectRuleChips(filter)
-})
 
 const sortChip = computed(() => {
   const specs = lens.value?.defaultSort
@@ -56,7 +42,8 @@ const sortChip = computed(() => {
   return specs.map((s) => `${SORT_FIELD_LABELS[s.field as SortField] ?? s.field} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', ')
 })
 
-const joinLabel = computed(() => lens.value?.filter?.join ?? 'AND')
+const filterExpanded = ref(true)
+
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 
@@ -214,6 +201,15 @@ watch(loading, (isLoading) => {
       >
         <template #actions>
           <button
+            v-if="lens?.filter || sortChip"
+            @click="filterExpanded = !filterExpanded"
+            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            :title="filterExpanded ? 'Hide filter' : 'Show filter'"
+          >
+            <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
+            <span>Filter</span>
+          </button>
+          <button
             @click="editorOpen = true; confirmDelete = false"
             class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
@@ -237,23 +233,18 @@ watch(loading, (isLoading) => {
       </ViewHeader>
 
       <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
-        <!-- Rule chips -->
-        <div v-if="ruleChips.length > 0 || sortChip" class="flex flex-wrap items-center gap-1.5 mb-4 cursor-pointer" @click="editorOpen = true">
-          <template v-if="ruleChips.length > 0">
-            <span
-              v-for="(chip, i) in ruleChips"
-              :key="i"
-              class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/8 border border-primary/20 text-primary font-medium hover:bg-primary/15 transition-colors"
-            >
-              {{ chip }}
-            </span>
-            <span v-if="ruleChips.length > 1" class="text-[10px] text-muted-foreground px-1"> ({{ joinLabel }}) </span>
-          </template>
+        <!-- Filter summary -->
+        <div v-if="filterExpanded && (lens?.filter || sortChip)" class="flex flex-wrap items-center gap-2 mb-4 cursor-pointer" @click="editorOpen = true">
+          <FilterSummary v-if="lens?.filter" :node="(lens.filter as GroupRule)" />
           <span
             v-if="sortChip"
-            class="text-xs px-2.5 py-1 rounded-full bg-muted border border-border text-muted-foreground hover:bg-muted/80 transition-colors"
+            class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden"
           >
-            Sort: {{ sortChip }}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
+              <ArrowUpDown :size="10" class="shrink-0" />
+              <span class="font-semibold">Sort</span>
+            </span>
+            <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
           </span>
         </div>
 

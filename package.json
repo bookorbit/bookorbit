@@ -8,7 +8,9 @@
     "build:client": "pnpm --filter client build",
     "build:server": "pnpm --filter server build",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "db:reset": "bash scripts/db/reset.sh",
+    "db:seed": "bash scripts/postman/seed.sh"
   },
   "engines": {
     "node": ">=24",

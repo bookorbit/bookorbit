@@ -5,7 +5,20 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { GroupRule, Rule, SortField, SortSpec } from '@projectx/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, readingProgress, genres } from '../../db/schema';
+import {
+  authors,
+  bookAuthors,
+  bookFiles,
+  bookGenres,
+  bookMetadata,
+  books,
+  bookTags,
+  collectionBooks,
+  collections,
+  readingProgress,
+  genres,
+  tags,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -14,6 +27,7 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   series: bookMetadata.seriesName,
   seriesIndex: bookMetadata.seriesIndex,
   addedAt: books.addedAt,
+  updatedAt: books.updatedAt,
   publishedYear: bookMetadata.publishedYear,
   pageCount: bookMetadata.pageCount,
 };
@@ -77,11 +91,17 @@ export class BookQueryBuilder {
       case 'title':
         return this.textRuleToSql(bookMetadata.title, operator, value as string);
       case 'publisher':
-        return this.textRuleToSql(bookMetadata.publisher, operator, value as string);
+        return Array.isArray(value)
+          ? this.textSetRuleToSql(bookMetadata.publisher, operator, value as string[])
+          : this.textRuleToSql(bookMetadata.publisher, operator, value as string);
       case 'language':
-        return this.textRuleToSql(bookMetadata.language, operator, value as string);
+        return Array.isArray(value)
+          ? this.textSetRuleToSql(bookMetadata.language, operator, value as string[])
+          : this.textRuleToSql(bookMetadata.language, operator, value as string);
       case 'series':
-        return this.textRuleToSql(bookMetadata.seriesName, operator, value as string);
+        return Array.isArray(value)
+          ? this.textSetRuleToSql(bookMetadata.seriesName, operator, value as string[])
+          : this.textRuleToSql(bookMetadata.seriesName, operator, value as string);
       case 'publishedYear':
         return this.numericRuleToSql(bookMetadata.publishedYear, operator, value as number, valueTo as number | undefined);
       case 'seriesIndex':
@@ -94,6 +114,10 @@ export class BookQueryBuilder {
         return this.authorRuleToSql(operator, value as string[]);
       case 'genre':
         return this.genreRuleToSql(operator, value as string[]);
+      case 'tag':
+        return this.tagRuleToSql(operator, value as string[]);
+      case 'collection':
+        return this.collectionRuleToSql(operator, value as string[], userId);
       case 'format':
         return this.formatRuleToSql(operator, value as string[]);
       case 'addedAt':
@@ -135,6 +159,19 @@ export class BookQueryBuilder {
         return isNotNull(col);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for text field`);
+    }
+  }
+
+  private textSetRuleToSql(col: AnyColumn, operator: string, values?: string[]): SQL {
+    switch (operator) {
+      case 'includesAny':
+        if (!values?.length) return sql`1 = 0`;
+        return inArray(col, values);
+      case 'excludesAll':
+        if (!values?.length) return sql`1 = 1`;
+        return or(isNull(col), not(inArray(col, values)))!;
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for text set field`);
     }
   }
 
@@ -271,6 +308,54 @@ export class BookQueryBuilder {
         return inArray(books.id, sq(and(eq(readingProgress.userId, userId), gte(readingProgress.percentage, 100))!));
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for readProgress field`);
+    }
+  }
+
+  private tagRuleToSql(operator: string, values?: string[]): SQL {
+    const sq = (whereClause?: SQL) =>
+      this.db.select({ bookId: bookTags.bookId }).from(bookTags).innerJoin(tags, eq(bookTags.tagId, tags.id)).where(whereClause);
+
+    switch (operator) {
+      case 'includesAny':
+        if (!values?.length) return sql`1 = 0`;
+        return inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v)))));
+      case 'includesAll':
+        if (!values?.length) return sql`1 = 0`;
+        return and(...values.map((v) => inArray(books.id, sq(eq(tags.name, v)))))!;
+      case 'excludesAll':
+        if (!values?.length) return sql`1 = 1`;
+        return not(inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v))))));
+      case 'isEmpty':
+        return not(inArray(books.id, sq()));
+      case 'isNotEmpty':
+        return inArray(books.id, sq());
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for tag field`);
+    }
+  }
+
+  private collectionRuleToSql(operator: string, values?: string[], userId?: number): SQL {
+    if (userId === undefined) throw new BadRequestException('Collection filter requires an authenticated user');
+    const sq = (whereClause?: SQL) =>
+      this.db
+        .select({ bookId: collectionBooks.bookId })
+        .from(collectionBooks)
+        .innerJoin(collections, and(eq(collectionBooks.collectionId, collections.id), eq(collections.userId, userId)))
+        .where(whereClause);
+
+    switch (operator) {
+      case 'includesAny':
+        if (!values?.length) return sql`1 = 0`;
+        return inArray(books.id, sq(or(...values.map((v) => eq(collections.name, v)))));
+      case 'excludesAll':
+        if (!values?.length) return sql`1 = 1`;
+        return not(inArray(books.id, sq(or(...values.map((v) => eq(collections.name, v))))));
+      case 'isEmpty':
+        return not(inArray(books.id, sq()));
+      case 'isNotEmpty':
+        return inArray(books.id, sq());
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for collection field`);
     }
   }
 

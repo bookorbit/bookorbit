@@ -6,6 +6,7 @@ export const SORT_FIELD_LABELS: Record<SortField, string> = {
   series: 'Series',
   seriesIndex: 'Series #',
   addedAt: 'Date Added',
+  updatedAt: 'Date Updated',
   publishedYear: 'Published Year',
   pageCount: 'Page Count',
 }
@@ -20,6 +21,8 @@ export const FIELD_LABELS: Record<RuleField, string> = {
   pageCount: 'Page Count',
   author: 'Author',
   genre: 'Genre',
+  tag: 'Tag',
+  collection: 'Collection',
   format: 'Format',
   addedAt: 'Added Date',
   fileAvailability: 'File Availability',
@@ -48,7 +51,7 @@ export const OPERATOR_LABELS: Record<RuleOperator, string> = {
   excludesAll: 'excludes all of',
   before: 'before',
   after: 'after',
-  withinLast: 'within last (days)',
+  withinLast: 'within last',
   isMissing: 'is missing',
   isPresent: 'is present',
   isUnread: 'is unread',
@@ -56,13 +59,14 @@ export const OPERATOR_LABELS: Record<RuleOperator, string> = {
   isFinished: 'is finished',
 }
 
-const NO_VALUE_OPS: RuleOperator[] = ['isEmpty', 'isNotEmpty']
+const NO_VALUE_OPS: RuleOperator[] = ['isEmpty', 'isNotEmpty', 'isMissing', 'isPresent', 'isUnread', 'isInProgress', 'isFinished']
 
-export function ruleToLabel(rule: Rule): string {
+export function ruleToParts(rule: Rule): { field: string; operator: string; value: string | null } {
   const field = FIELD_LABELS[rule.field] ?? rule.field
-  const op = OPERATOR_LABELS[rule.operator] ?? rule.operator
-  if (NO_VALUE_OPS.includes(rule.operator)) return `${field} ${op}`
+  const operator = OPERATOR_LABELS[rule.operator] ?? rule.operator
+  if (NO_VALUE_OPS.includes(rule.operator)) return { field, operator, value: null }
+  if (rule.operator === 'withinLast') return { field, operator, value: `${rule.value} days` }
   const val = Array.isArray(rule.value) ? (rule.value as string[]).join(', ') : String(rule.value ?? '')
-  if (rule.valueTo !== undefined) return `${field} ${op} ${val} - ${rule.valueTo}`
-  return `${field} ${op} ${val}`
+  return { field, operator, value: rule.valueTo !== undefined ? `${val} - ${rule.valueTo}` : val }
 }
+
