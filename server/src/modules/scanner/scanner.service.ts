@@ -10,7 +10,7 @@ import { waitForStability } from './lib/stability';
 import { BookCandidate, FileStat, findBookCandidates } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 
-const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'pdf']);
+const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf']);
 const BATCH_SIZE = 5;
 
 interface ScanCounts {

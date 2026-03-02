@@ -6,6 +6,7 @@ import { extractCb7Cover } from './cover-cb7';
 import { extractCbrCover } from './cover-cbr';
 import { extractCbzCover } from './cover-cbz';
 import { extractEpubCover } from './cover-epub';
+import { extractFb2Cover } from './cover-fb2';
 import { extractMobiCover } from './mobi-parser';
 
 const THUMBNAIL_WIDTH = 400;
@@ -39,6 +40,8 @@ export async function extractCover(absolutePath: string, format: string): Promis
       return extractCbrCover(absolutePath);
     case 'cb7':
       return extractCb7Cover(absolutePath);
+    case 'fb2':
+      return extractFb2Cover(absolutePath);
     default:
       return null;
   }

@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { basename, extname, join } from 'path';
-import { access as fsAccess, stat, unlink } from 'fs/promises';
+import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, ilike, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -271,6 +271,15 @@ export class StagingFinalizeService implements OnModuleInit {
   }
 
   private async applyMetadata(bookId: number, row: StagingFileRow): Promise<void> {
+    if (row.coverPath) {
+      try {
+        const bytes = await readFile(row.coverPath);
+        await this.metadataService.saveExtractedCoverBytes(bookId, bytes);
+      } catch (err) {
+        this.logger.warn(`Failed to copy staging cover to book ${bookId}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
     const meta = row.selectedMetadata ?? row.embeddedMetadata;
     if (!meta) return;
 

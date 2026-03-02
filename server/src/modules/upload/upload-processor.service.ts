@@ -10,7 +10,7 @@ import { sha256File } from '../scanner/lib/hash';
 
 type Db = NodePgDatabase<typeof schema>;
 
-const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'pdf']);
+const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf']);
 
 @Injectable()
 export class UploadProcessorService {

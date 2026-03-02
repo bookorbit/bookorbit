@@ -13,6 +13,7 @@ import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './li
 import { extractAndSaveCover, generateThumbnail, imageExt } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
+import { parseFb2File } from './lib/fb2-parser';
 import { parseMobiFile } from './lib/mobi-parser';
 import { parsePdfFile } from './lib/pdf-parser';
 
@@ -56,6 +57,15 @@ export class MetadataService {
     } catch (err) {
       this.logger.warn(`Cover download failed for book ${bookId}: ${err}`);
     }
+  }
+
+  async saveExtractedCoverBytes(bookId: number, bytes: Buffer): Promise<void> {
+    const ext = imageExt(bytes);
+    const dir = join(this.booksPath, 'covers', String(bookId));
+    await mkdir(dir, { recursive: true });
+    const [thumbnail] = await Promise.all([generateThumbnail(bytes), writeFile(join(dir, `cover_extracted.${ext}`), bytes)]);
+    await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+    await this.db.update(bookMetadata).set({ coverSource: 'extracted', updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId));
   }
 
   async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {
@@ -141,6 +151,24 @@ export class MetadataService {
           seriesIndex: null,
           authors: mobi.authors.map((name) => ({ name, sortName: null })),
           tags: mobi.tags,
+        };
+      }
+    } else if (format === 'fb2') {
+      const fb2 = await parseFb2File(absolutePath);
+      if (fb2) {
+        parsed = {
+          title: fb2.title,
+          subtitle: null,
+          description: fb2.description,
+          isbn10: null,
+          isbn13: null,
+          publisher: null,
+          publishedYear: fb2.publishedYear,
+          language: fb2.language,
+          seriesName: fb2.seriesName,
+          seriesIndex: fb2.seriesIndex,
+          authors: fb2.authors,
+          tags: fb2.genres,
         };
       }
     } else if (format === 'pdf') {

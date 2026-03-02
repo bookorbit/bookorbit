@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
-import { ImagePlus, Link, RotateCcw, Upload, X } from 'lucide-vue-next'
+import { Image, ImagePlus, Link, Loader2, RotateCcw, Upload, X } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import { hideOnError } from '../../../lib/metadata-fetch'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ coverChanged: ['extracted' | 'custom' | null] }>()
@@ -12,7 +13,22 @@ const emit = defineEmits<{ coverChanged: ['extracted' | 'custom' | null] }>()
 const bookIdRef = computed(() => props.book.id)
 const { uploading, error, previewSrc, pendingFile, pendingUrl, selectFile, setUrl, clearPending, confirm, revert } = useCoverEditor(bookIdRef)
 
-const { coverUrl } = useCoverVersions()
+const { coverUrl, bumpVersion } = useCoverVersions()
+const { hasPermission } = usePermissions()
+
+const reExtractingCover = ref(false)
+
+async function reExtractCover() {
+  if (reExtractingCover.value) return
+  reExtractingCover.value = true
+  try {
+    await fetch(`/api/v1/books/${props.book.id}/re-extract-cover`, { method: 'POST' })
+    bumpVersion(props.book.id)
+    emit('coverChanged', 'extracted')
+  } finally {
+    reExtractingCover.value = false
+  }
+}
 
 const mode = ref<'file' | 'url'>('file')
 const urlInput = ref('')
@@ -151,6 +167,16 @@ onUnmounted(() => clearTimeout(debounceTimer))
       >
         <RotateCcw class="size-3" />
         Revert to original
+      </button>
+      <button
+        v-if="hasPermission('library_edit_metadata')"
+        class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        :disabled="reExtractingCover"
+        @click="reExtractCover"
+      >
+        <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />
+        <Image v-else class="size-3" />
+        Regenerate Cover
       </button>
     </div>
   </div>

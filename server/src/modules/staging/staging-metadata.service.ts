@@ -5,6 +5,7 @@ import { join } from 'path';
 import type { StagingMetadata } from '@projectx/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
+import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
 import { extractCover, generateThumbnail, imageExt } from '../metadata/lib/cover';
@@ -56,6 +57,8 @@ export class StagingMetadataService {
         return this.fromCbx(absolutePath, 'cbr');
       case 'cb7':
         return this.fromCbx(absolutePath, 'cb7');
+      case 'fb2':
+        return this.fromFb2(absolutePath);
       default:
         return {};
     }
@@ -122,6 +125,21 @@ export class StagingMetadataService {
       seriesIndex: parsed.seriesIndex ?? undefined,
       authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
       genres: parsed.tags.length > 0 ? parsed.tags : undefined,
+    };
+  }
+
+  private async fromFb2(absolutePath: string): Promise<StagingMetadata> {
+    const parsed = await parseFb2File(absolutePath);
+    if (!parsed) return {};
+    return {
+      title: parsed.title ?? undefined,
+      description: parsed.description ?? undefined,
+      publishedYear: parsed.publishedYear ?? undefined,
+      language: parsed.language ?? undefined,
+      seriesName: parsed.seriesName ?? undefined,
+      seriesIndex: parsed.seriesIndex ?? undefined,
+      authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
+      genres: parsed.genres.length > 0 ? parsed.genres : undefined,
     };
   }
 
