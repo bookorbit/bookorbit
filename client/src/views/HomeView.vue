@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowUpDown, Bookmark, BookmarkCheck, Filter, X } from 'lucide-vue-next'
+import { ArrowUpDown, Bookmark, BookmarkCheck, Filter, Telescope, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -14,6 +14,7 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
+import SaveAsLensDialog from '@/features/lens/components/SaveAsLensDialog.vue'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
@@ -212,6 +213,7 @@ function toggleSelectionMode() {
 
 const addToCollectionOpen = ref(false)
 const sendBookOpen = ref(false)
+const saveAsLensOpen = ref(false)
 
 async function handleDeleteSelected() {
   const ids = [...selectedIds.value]
@@ -413,6 +415,19 @@ function handleBookAction(book: BookCard, action: BookActionType) {
                 <TooltipTrigger as-child>
                   <button
                     v-if="activeFilterCount > 0"
+                    @click="saveAsLensOpen = true"
+                    class="flex items-center gap-1.5 h-7 px-3 rounded-md border border-input text-xs font-medium text-muted-foreground bg-background hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Telescope :size="13" />
+                    Save as Lens
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Save this filter as a named lens</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    v-if="activeFilterCount > 0"
                     @click="saveFilter"
                     class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
                     :class="
@@ -510,4 +525,6 @@ function handleBookAction(book: BookCard, action: BookActionType) {
   />
 
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
+
+  <SaveAsLensDialog :open="saveAsLensOpen" :filter="filter" :sort="sort" @close="saveAsLensOpen = false" />
 </template>
