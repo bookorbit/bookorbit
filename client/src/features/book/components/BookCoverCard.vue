@@ -2,6 +2,7 @@
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
+import { getFormatColor } from '../lib/format-colors'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -9,6 +10,7 @@ import {
   Check,
   ExternalLink,
   FolderPlus,
+  Image,
   Loader2,
   MoreHorizontal,
   PanelRight,
@@ -22,6 +24,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -51,12 +54,37 @@ const readableFiles = computed(() => props.book.files.filter((f) => f.format && 
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
 const extraFiles = computed(() => readableFiles.value.filter((f) => f !== primaryFile.value))
 
-const { coverUrl } = useCoverVersions()
+const { coverUrl, bumpVersion } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
+const reExtractingCover = ref(false)
+
+async function reExtractCover() {
+  if (reExtractingCover.value) return
+  reExtractingCover.value = true
+  try {
+    await fetch(`/api/v1/books/${props.book.id}/re-extract-cover`, { method: 'POST' })
+    bumpVersion(props.book.id)
+  } finally {
+    reExtractingCover.value = false
+  }
+}
 const { hasPermission } = usePermissions()
+const { cardOverlays } = useDisplaySettings()
 const showSendDialog = ref(false)
+
+const showSeriesOverlay = computed(() => cardOverlays.value.includes('series') && seriesLine.value != null)
+const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
+const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
+const showProgressPill = computed(() => cardOverlays.value.includes('progress-pill') && hasProgress.value)
+const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && primaryFile.value?.format != null)
+const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
+const showNewOverlay = computed(() => {
+  if (!cardOverlays.value.includes('new')) return false
+  const addedAt = new Date(props.book.addedAt)
+  return Date.now() - addedAt.getTime() < 14 * 24 * 60 * 60 * 1000
+})
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
@@ -74,13 +102,22 @@ function openFile(file: BookFileRef) {
     query: { format: file.format ?? 'epub' },
   })
 }
+
+function handleCardClick(event: MouseEvent) {
+  if ((event.target as Element).closest('button')) return
+  if (props.selectionMode) {
+    emit('select', event)
+    return
+  }
+  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+}
 </script>
 
 <template>
   <div
     class="group flex flex-col @container"
     :class="[selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
-    @click="selectionMode ? emit('select', $event) : primaryFile && !isMissing && openFile(primaryFile)"
+    @click="handleCardClick"
   >
     <!-- Cover -->
     <div
@@ -104,7 +141,7 @@ function openFile(file: BookFileRef) {
       />
 
       <!-- Series badge -->
-      <div v-if="seriesLine" class="absolute top-1.5 left-1.5 right-1.5 z-10">
+      <div v-if="showSeriesOverlay" class="absolute top-1.5 left-1.5 right-1.5 z-10 pointer-events-none">
         <span
           class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-black/30 backdrop-blur-sm line-clamp-1"
           :style="{ color: coverStyle.color }"
@@ -112,6 +149,51 @@ function openFile(file: BookFileRef) {
           {{ seriesLine }}
         </span>
       </div>
+
+      <!-- "New" dot - top-right accent indicator -->
+      <div v-if="showNewOverlay && !isMissing" class="absolute top-1.5 right-1.5 z-10 size-2 rounded-full bg-primary shadow-sm pointer-events-none" />
+
+      <!-- Bottom-left overlays: rating dots + progress pill -->
+      <div
+        v-if="(showRatingOverlay || showProgressPill) && !selectionMode"
+        class="absolute bottom-1.5 left-1.5 z-10 flex flex-col gap-0.5 items-start pointer-events-none"
+      >
+        <div v-if="showRatingOverlay" class="flex gap-[3px]">
+          <span v-for="i in 5" :key="i" class="size-[5px] rounded-full" :class="i <= Math.round(book.rating!) ? 'bg-white/90' : 'bg-white/20'" />
+        </div>
+        <div v-if="showProgressPill">
+          <span
+            v-if="book.readingProgress === 100"
+            class="flex items-center gap-0.5 text-[8px] font-semibold px-1.5 py-0.5 rounded bg-green-500/70 text-white backdrop-blur-sm"
+          >
+            <Check :size="8" />
+          </span>
+          <span v-else class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/30 backdrop-blur-sm" :style="{ color: coverStyle.color }">
+            {{ Math.floor(book.readingProgress!) }}%
+          </span>
+        </div>
+      </div>
+
+      <!-- Format badge - bottom-right -->
+      <div
+        v-if="showFormatOverlay && !selectionMode"
+        class="absolute bottom-1.5 right-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
+      >
+        <span
+          class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
+          :style="{ backgroundColor: getFormatColor(primaryFile!.format!) + 'cc' }"
+        >
+          {{ primaryFile!.format!.toUpperCase() }}
+        </span>
+      </div>
+
+      <!-- Reading progress bar - bottom edge -->
+      <div
+        v-if="showProgressBar && !selectionMode"
+        class="absolute bottom-0 left-0 z-10 h-[3px] transition-all duration-300"
+        :class="book.readingProgress === 100 ? 'bg-green-500/80' : 'bg-primary/70'"
+        :style="{ width: `${book.readingProgress}%` }"
+      />
 
       <!-- Selection checkbox overlay -->
       <div v-if="selectionMode" class="absolute inset-0 z-30 pointer-events-none" :class="selected ? 'bg-primary/20' : ''">
@@ -172,10 +254,7 @@ function openFile(file: BookFileRef) {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                class="p-[7cqi] rounded-full bg-primary/70 hover:bg-primary transition-colors text-white"
-                @click="emit('action', 'quick-view')"
-              >
+              <button class="p-[7cqi] rounded-full bg-primary/70 hover:bg-primary transition-colors text-white" @click="emit('action', 'quick-view')">
                 <PanelRight class="size-[14cqi]" />
               </button>
             </TooltipTrigger>
@@ -219,6 +298,11 @@ function openFile(file: BookFileRef) {
                 <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
                 <RefreshCw v-else class="size-4 mr-2" />
                 Refresh Metadata
+              </DropdownMenuItem>
+              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="reExtractingCover" @click="reExtractCover()">
+                <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
+                <Image v-else class="size-4 mr-2" />
+                Regenerate Cover
               </DropdownMenuItem>
               <DropdownMenuItem @click="emit('action', 'add-to-collection')">
                 <FolderPlus class="size-4 mr-2" />

@@ -76,7 +76,7 @@ function fileIconText(format: string | null): string {
 </script>
 
 <template>
-  <div class="max-w-3xl space-y-2">
+  <div class="max-w-6xl space-y-2">
     <div
       v-for="file in book.files"
       :key="file.id"
