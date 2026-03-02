@@ -71,6 +71,12 @@ export class BookController {
     return this.bookService.bulkReExtractCover(dto.bookIds, user);
   }
 
+  @Post(':id/re-extract-cover')
+  @RequirePermission('library_edit_metadata')
+  reExtractCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkReExtractCover([id], user);
+  }
+
   @Post('export')
   @RequirePermission('library_download')
   async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {

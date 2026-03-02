@@ -1,11 +1,26 @@
 <script setup lang="ts">
 import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Moon, Sun } from 'lucide-vue-next'
-import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useDisplaySettings, type CardOverlayKey } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const themeStore = useThemeStore()
-const { coverSize, gridGap } = useDisplaySettings()
+const { coverSize, gridGap, cardOverlays } = useDisplaySettings()
+
+const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
+  { key: 'series', label: 'Series name', hint: 'Series title and index badge at top-left' },
+  { key: 'progress-bar', label: 'Progress bar', hint: 'Thin colored line along the bottom edge' },
+  { key: 'progress-pill', label: 'Progress pill', hint: '% badge at bottom-left' },
+  { key: 'format', label: 'File format', hint: 'Color-coded EPUB, PDF, CBZ badge at bottom-right' },
+  { key: 'rating', label: 'Rating dots', hint: '5-dot rating indicator at bottom-left' },
+  { key: 'new', label: 'New indicator', hint: 'Accent dot on books added in the last 14 days' },
+]
+
+function toggleOverlay(key: CardOverlayKey) {
+  const idx = cardOverlays.value.indexOf(key)
+  if (idx === -1) cardOverlays.value = [...cardOverlays.value, key]
+  else cardOverlays.value = cardOverlays.value.filter((k) => k !== key)
+}
 </script>
 
 <template>
@@ -205,6 +220,28 @@ const { coverSize, gridGap } = useDisplaySettings()
           step="4"
           class="w-full accent-primary cursor-pointer"
         />
+      </div>
+    </div>
+
+    <!-- Card overlays -->
+    <p class="settings-group-label mt-6">Card Overlays</p>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div
+        v-for="opt in OVERLAY_OPTIONS"
+        :key="opt.key"
+        class="flex items-center justify-between px-5 py-3.5 bg-card cursor-pointer"
+        @click="toggleOverlay(opt.key)"
+      >
+        <div>
+          <p class="settings-label">{{ opt.label }}</p>
+          <p class="settings-hint">{{ opt.hint }}</p>
+        </div>
+        <div class="w-9 h-5 rounded-full transition-colors shrink-0" :class="cardOverlays.includes(opt.key) ? 'bg-primary' : 'bg-muted'">
+          <div
+            class="mt-0.5 size-4 rounded-full bg-white shadow-sm transition-transform"
+            :class="cardOverlays.includes(opt.key) ? 'translate-x-4' : 'translate-x-0.5'"
+          />
+        </div>
       </div>
     </div>
   </div>
