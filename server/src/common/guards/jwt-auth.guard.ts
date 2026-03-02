@@ -26,8 +26,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (user.isDefaultPassword) {
       const req = context.switchToHttp().getRequest<FastifyRequest>();
       const url = req.url.split('?')[0];
-      const isChangePassword = url === '/api/auth/change-password' && req.method === 'POST';
-      const isMe = url === '/api/auth/me' && req.method === 'GET';
+      const isChangePassword = url === '/api/v1/auth/change-password' && req.method === 'POST';
+      const isMe = url === '/api/v1/auth/me' && req.method === 'GET';
       if (!isChangePassword && !isMe) {
         throw new ForbiddenException('Password change required');
       }

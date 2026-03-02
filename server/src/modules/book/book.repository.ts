@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, count, eq, inArray, sql } from 'drizzle-orm';
+import { SQL, and, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -159,6 +159,15 @@ export class BookRepository {
   async searchAcrossLibraries(libraryIds: number[], q: string, limit: number) {
     if (libraryIds.length === 0) return [];
 
+    const pattern = '%' + q + '%';
+
+    const matchedAuthors = this.db
+      .selectDistinct({ bookId: bookAuthors.bookId })
+      .from(bookAuthors)
+      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+      .where(sql`${authors.name} ILIKE ${pattern}`)
+      .as('matched_authors');
+
     const rows = await this.db
       .select({
         id: books.id,
@@ -170,19 +179,15 @@ export class BookRepository {
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .leftJoin(matchedAuthors, eq(matchedAuthors.bookId, books.id))
       .where(
         and(
           inArray(books.libraryId, libraryIds),
-          sql`(
-            ${bookMetadata.title} ILIKE ${'%' + q + '%'}
-            OR ${bookMetadata.seriesName} ILIKE ${'%' + q + '%'}
-            OR EXISTS (
-              SELECT 1 FROM ${bookAuthors}
-              JOIN ${authors} ON ${authors.id} = ${bookAuthors.authorId}
-              WHERE ${bookAuthors.bookId} = ${books.id}
-              AND ${authors.name} ILIKE ${'%' + q + '%'}
-            )
-          )`,
+          or(
+            sql`${bookMetadata.title} ILIKE ${pattern}`,
+            sql`${bookMetadata.seriesName} ILIKE ${pattern}`,
+            isNotNull(matchedAuthors.bookId),
+          ),
         ),
       )
       .orderBy(bookMetadata.title)

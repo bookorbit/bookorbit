@@ -1,4 +1,4 @@
-import { customType, integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { customType, index, integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
@@ -8,37 +8,50 @@ const embedding256 = customType<{ data: number[]; driverData: string }>({
 
 import { books } from './books';
 
-export const bookMetadata = pgTable('book_metadata', {
-  bookId: integer('book_id')
-    .primaryKey()
-    .references(() => books.id, { onDelete: 'cascade' }),
-  title: varchar('title', { length: 1000 }),
-  subtitle: varchar('subtitle', { length: 1000 }),
-  description: text('description'),
-  isbn10: varchar('isbn10', { length: 10 }),
-  isbn13: varchar('isbn13', { length: 13 }),
-  publisher: varchar('publisher', { length: 500 }),
-  publishedYear: integer('published_year'),
-  language: varchar('language', { length: 10 }),
-  pageCount: integer('page_count'),
-  seriesName: varchar('series_name', { length: 500 }),
-  seriesIndex: real('series_index'),
-  rating: integer('rating'),
-  coverSource: varchar('cover_source', { length: 9 }),
-  googleBooksId: varchar('google_books_id', { length: 50 }),
-  goodreadsId: varchar('goodreads_id', { length: 50 }),
-  amazonId: varchar('amazon_id', { length: 20 }),
-  hardcoverId: varchar('hardcover_id', { length: 50 }),
-  openLibraryId: varchar('open_library_id', { length: 50 }),
-  embedding: embedding256('embedding'),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const bookMetadata = pgTable(
+  'book_metadata',
+  {
+    bookId: integer('book_id')
+      .primaryKey()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 1000 }),
+    subtitle: varchar('subtitle', { length: 1000 }),
+    description: text('description'),
+    isbn10: varchar('isbn10', { length: 10 }),
+    isbn13: varchar('isbn13', { length: 13 }),
+    publisher: varchar('publisher', { length: 500 }),
+    publishedYear: integer('published_year'),
+    language: varchar('language', { length: 10 }),
+    pageCount: integer('page_count'),
+    seriesName: varchar('series_name', { length: 500 }),
+    seriesIndex: real('series_index'),
+    rating: integer('rating'),
+    coverSource: varchar('cover_source', { length: 9 }),
+    googleBooksId: varchar('google_books_id', { length: 50 }),
+    goodreadsId: varchar('goodreads_id', { length: 50 }),
+    amazonId: varchar('amazon_id', { length: 20 }),
+    hardcoverId: varchar('hardcover_id', { length: 50 }),
+    openLibraryId: varchar('open_library_id', { length: 50 }),
+    embedding: embedding256('embedding'),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [
+    index('bm_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
+    index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
+  ],
+);
 
-export const authors = pgTable('authors', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 500 }).notNull(),
-  sortName: varchar('sort_name', { length: 500 }),
-});
+export const authors = pgTable(
+  'authors',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 500 }).notNull(),
+    sortName: varchar('sort_name', { length: 500 }),
+  },
+  (t) => [
+    index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
+  ],
+);
 
 export const bookAuthors = pgTable(
   'book_authors',

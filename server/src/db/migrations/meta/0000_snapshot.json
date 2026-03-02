@@ -1,5 +1,5 @@
 {
-  "id": "a0c5b139-eebd-4476-86e8-21be6cdee148",
+  "id": "9b81eebf-1c40-4c73-baad-cd6109207d0f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1755,7 +1755,24 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "email_templates_system_name_unique": {
+          "name": "email_templates_system_name_unique",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"email_templates\".\"user_id\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "email_templates_user_id_users_id_fk": {
           "name": "email_templates_user_id_users_id_fk",
@@ -2093,7 +2110,24 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "authors_name_trgm_idx": {
+          "name": "authors_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -2360,7 +2394,40 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "bm_title_trgm_idx": {
+          "name": "bm_title_trgm_idx",
+          "columns": [
+            {
+              "expression": "title",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "bm_series_trgm_idx": {
+          "name": "bm_series_trgm_idx",
+          "columns": [
+            {
+              "expression": "series_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "book_metadata_book_id_books_id_fk": {
           "name": "book_metadata_book_id_books_id_fk",

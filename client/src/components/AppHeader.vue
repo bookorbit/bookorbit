@@ -42,7 +42,12 @@ const mobileSearchInput = ref<HTMLInputElement | null>(null)
 const selectedIndex = ref(-1)
 
 const globalSearchQuery = ref('')
-const { results: globalResults, loading: globalSearchLoading, settled: globalSearchSettled, clear: clearGlobalSearch } = useGlobalSearch(globalSearchQuery)
+const {
+  results: globalResults,
+  loading: globalSearchLoading,
+  settled: globalSearchSettled,
+  clear: clearGlobalSearch,
+} = useGlobalSearch(globalSearchQuery)
 
 const showDropdown = computed(
   () =>
@@ -135,7 +140,7 @@ function formatBadgeClass(fmt: string): string {
 
 <template>
   <header
-    class="flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/70 backdrop-blur-xl backdrop-saturate-150 px-3 shadow-sm sticky top-0 z-10"
+    class="flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/70 backdrop-blur-xl backdrop-saturate-150 px-3 shadow-sm sticky top-0 z-30"
   >
     <!-- Mobile: search active overlay -->
     <template v-if="mobileSearchOpen">
@@ -162,7 +167,10 @@ function formatBadgeClass(fmt: string): string {
           class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
         >
           <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
-          <div v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+          <div
+            v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
+            class="p-3 text-xs text-muted-foreground text-center"
+          >
             No results
           </div>
           <button
@@ -174,7 +182,12 @@ function formatBadgeClass(fmt: string): string {
               selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
             ]"
           >
-            <BookCoverImage :book-id="result.id" type="thumbnail" class="h-16 w-12 object-cover rounded shrink-0 bg-muted" :alt="result.title ?? ''" />
+            <BookCoverImage
+              :book-id="result.id"
+              type="thumbnail"
+              class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
+              :alt="result.title ?? ''"
+            />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-foreground truncate">
                 <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
@@ -246,7 +259,10 @@ function formatBadgeClass(fmt: string): string {
           class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto"
         >
           <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
-          <div v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+          <div
+            v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
+            class="p-3 text-xs text-muted-foreground text-center"
+          >
             No results
           </div>
           <button
@@ -258,7 +274,12 @@ function formatBadgeClass(fmt: string): string {
               selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
             ]"
           >
-            <BookCoverImage :book-id="result.id" type="thumbnail" class="h-16 w-12 object-cover rounded shrink-0 bg-muted" :alt="result.title ?? ''" />
+            <BookCoverImage
+              :book-id="result.id"
+              type="thumbnail"
+              class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
+              :alt="result.title ?? ''"
+            />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-foreground truncate">
                 <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
@@ -302,7 +323,12 @@ function formatBadgeClass(fmt: string): string {
         <!-- Mobile: search icon -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground" @click="mobileSearchOpen = true">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground"
+              @click="mobileSearchOpen = true"
+            >
               <Search :size="15" />
             </Button>
           </TooltipTrigger>
@@ -336,22 +362,22 @@ function formatBadgeClass(fmt: string): string {
               </PopoverTrigger>
             </TooltipTrigger>
             <PopoverContent class="w-72 p-4" align="end">
-            <div class="space-y-4">
-              <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
-              <div class="space-y-1.5">
-                <span class="text-xs text-muted-foreground">Accent</span>
-                <AccentPicker />
+              <div class="space-y-4">
+                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
+                <div class="space-y-1.5">
+                  <span class="text-xs text-muted-foreground">Accent</span>
+                  <AccentPicker />
+                </div>
+                <div class="space-y-1.5">
+                  <span class="text-xs text-muted-foreground">Radius</span>
+                  <RadiusPicker />
+                </div>
+                <div class="space-y-1.5">
+                  <span class="text-xs text-muted-foreground">Background</span>
+                  <BackgroundPicker />
+                </div>
               </div>
-              <div class="space-y-1.5">
-                <span class="text-xs text-muted-foreground">Radius</span>
-                <RadiusPicker />
-              </div>
-              <div class="space-y-1.5">
-                <span class="text-xs text-muted-foreground">Background</span>
-                <BackgroundPicker />
-              </div>
-            </div>
-          </PopoverContent>
+            </PopoverContent>
           </Popover>
           <TooltipContent>Appearance</TooltipContent>
         </Tooltip>
