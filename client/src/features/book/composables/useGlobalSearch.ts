@@ -4,18 +4,22 @@ import { api } from '@/lib/api'
 export interface GlobalSearchResult {
   id: number
   title: string | null
+  seriesName: string | null
   authors: string[]
   libraryId: number
   libraryName: string
+  formats: string[]
 }
 
 export function useGlobalSearch(query: Ref<string>) {
   const results = ref<GlobalSearchResult[]>([])
   const loading = ref(false)
+  const settled = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
 
   watch(query, (q) => {
     if (timer) clearTimeout(timer)
+    settled.value = false
     if (q.trim().length < 2) {
       results.value = []
       loading.value = false
@@ -32,6 +36,7 @@ export function useGlobalSearch(query: Ref<string>) {
         results.value = []
       } finally {
         loading.value = false
+        settled.value = true
       }
     }, 300)
   })
@@ -40,7 +45,8 @@ export function useGlobalSearch(query: Ref<string>) {
     if (timer) clearTimeout(timer)
     results.value = []
     loading.value = false
+    settled.value = false
   }
 
-  return { results, loading, clear }
+  return { results, loading, settled, clear }
 }

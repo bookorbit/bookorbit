@@ -447,7 +447,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 
         <!-- Grid view -->
         <div
-          v-if="viewMode === 'grid'"
+          v-show="viewMode === 'grid'"
           class="grid"
           :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
         >
@@ -463,7 +463,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
         </div>
 
         <!-- List view -->
-        <div v-else class="flex flex-col divide-y divide-border">
+        <div v-show="viewMode === 'list'" class="flex flex-col divide-y divide-border">
           <BookListRow
             v-for="book in books"
             :key="book.id"

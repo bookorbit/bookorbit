@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, count, eq, inArray, sql } from 'drizzle-orm';
+import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -162,13 +163,28 @@ export class BookRepository {
       .select({
         id: books.id,
         title: bookMetadata.title,
+        seriesName: bookMetadata.seriesName,
         libraryId: books.libraryId,
         libraryName: libraries.name,
       })
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .innerJoin(libraries, eq(libraries.id, books.libraryId))
-      .where(and(inArray(books.libraryId, libraryIds), sql`${bookMetadata.title} ILIKE ${'%' + q + '%'}`))
+      .where(
+        and(
+          inArray(books.libraryId, libraryIds),
+          sql`(
+            ${bookMetadata.title} ILIKE ${'%' + q + '%'}
+            OR ${bookMetadata.seriesName} ILIKE ${'%' + q + '%'}
+            OR EXISTS (
+              SELECT 1 FROM ${bookAuthors}
+              JOIN ${authors} ON ${authors.id} = ${bookAuthors.authorId}
+              WHERE ${bookAuthors.bookId} = ${books.id}
+              AND ${authors.name} ILIKE ${'%' + q + '%'}
+            )
+          )`,
+        ),
+      )
       .orderBy(bookMetadata.title)
       .limit(limit);
 
@@ -191,12 +207,31 @@ export class BookRepository {
       authorsByBook.set(row.bookId, list);
     }
 
+    const formatRows =
+      bookIds.length > 0
+        ? await this.db
+            .select({ bookId: bookFiles.bookId, format: bookFiles.format })
+            .from(bookFiles)
+            .where(and(inArray(bookFiles.bookId, bookIds), inArray(bookFiles.format, [...SUPPORTED_BOOK_FORMATS])))
+        : [];
+
+    const formatsByBook = new Map<number, string[]>();
+    for (const row of formatRows) {
+      if (row.format) {
+        const list = formatsByBook.get(row.bookId) ?? [];
+        if (!list.includes(row.format)) list.push(row.format);
+        formatsByBook.set(row.bookId, list);
+      }
+    }
+
     return rows.map((r) => ({
       id: r.id,
       title: r.title,
+      seriesName: r.seriesName,
       authors: authorsByBook.get(r.id) ?? [],
       libraryId: r.libraryId,
       libraryName: r.libraryName,
+      formats: formatsByBook.get(r.id) ?? [],
     }));
   }
 

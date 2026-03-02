@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -37,17 +37,27 @@ const uploadOpen = ref(false)
 
 const searchFocused = ref(false)
 const mobileSearchOpen = ref(false)
+const desktopSearchInput = ref<HTMLInputElement | null>(null)
 const mobileSearchInput = ref<HTMLInputElement | null>(null)
+const selectedIndex = ref(-1)
 
 const globalSearchQuery = ref('')
-const { results: globalResults, loading: globalSearchLoading, clear: clearGlobalSearch } = useGlobalSearch(globalSearchQuery)
+const { results: globalResults, loading: globalSearchLoading, settled: globalSearchSettled, clear: clearGlobalSearch } = useGlobalSearch(globalSearchQuery)
 
 const showDropdown = computed(
   () =>
     (searchFocused.value || mobileSearchOpen.value) &&
     globalSearchQuery.value.trim().length >= 2 &&
-    (globalResults.value.length > 0 || globalSearchLoading.value),
+    (globalResults.value.length > 0 || globalSearchLoading.value || globalSearchSettled.value),
 )
+
+watch(globalSearchQuery, () => {
+  selectedIndex.value = -1
+})
+
+watch(showDropdown, (open) => {
+  if (!open) selectedIndex.value = -1
+})
 
 watch(mobileSearchOpen, (open) => {
   if (open) nextTick(() => mobileSearchInput.value?.focus())
@@ -66,7 +76,60 @@ function closeMobileSearch() {
 function navigateToResult(result: GlobalSearchResult) {
   clearSearch()
   mobileSearchOpen.value = false
-  router.push({ name: 'library', params: { id: result.libraryId } })
+  router.push({ name: 'book-detail', params: { bookId: result.id } })
+}
+
+function handleSearchKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    clearSearch()
+    return
+  }
+  if (!showDropdown.value) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    selectedIndex.value = Math.min(selectedIndex.value + 1, globalResults.value.length - 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    selectedIndex.value = Math.max(selectedIndex.value - 1, -1)
+  } else if (e.key === 'Enter' && selectedIndex.value >= 0) {
+    const result = globalResults.value[selectedIndex.value]
+    if (result) navigateToResult(result)
+  }
+}
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    desktopSearchInput.value?.focus()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
+
+function highlightSegments(text: string | null, query: string) {
+  if (!text || !query.trim()) return [{ text: text ?? '', match: false }]
+  const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+  const lower = query.trim().toLowerCase()
+  return parts.map((part) => ({ text: part, match: part.toLowerCase() === lower }))
+}
+
+function formatBadgeClass(fmt: string): string {
+  switch (fmt.toLowerCase()) {
+    case 'epub':
+      return 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+    case 'pdf':
+      return 'bg-red-500/10 text-red-500 border-red-500/20'
+    case 'mobi':
+    case 'azw3':
+      return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+    case 'cbz':
+    case 'cbr':
+      return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
 }
 </script>
 
@@ -84,7 +147,7 @@ function navigateToResult(result: GlobalSearchResult) {
         <input
           ref="mobileSearchInput"
           v-model="globalSearchQuery"
-          @keydown.esc="clearSearch()"
+          @keydown="handleSearchKeydown"
           placeholder="Search all books..."
           class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
@@ -99,23 +162,53 @@ function navigateToResult(result: GlobalSearchResult) {
           class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
         >
           <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
-          <div v-else-if="!globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">No results</div>
+          <div v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+            No results
+          </div>
           <button
-            v-for="result in globalResults"
+            v-for="(result, index) in globalResults"
             :key="result.id"
             @click="navigateToResult(result)"
-            class="w-full flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors text-left"
+            :class="[
+              'w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left border-b border-border/40 last:border-b-0',
+              selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
+            ]"
           >
-            <BookCoverImage :book-id="result.id" type="thumbnail" class="h-11 w-8 object-cover rounded shrink-0 bg-muted" :alt="result.title ?? ''" />
+            <BookCoverImage :book-id="result.id" type="thumbnail" class="h-16 w-12 object-cover rounded shrink-0 bg-muted" :alt="result.title ?? ''" />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-foreground truncate">{{ result.title ?? 'Untitled' }}</p>
-              <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate">{{ result.authors.join(', ') }}</p>
+              <p class="text-sm font-medium text-foreground truncate">
+                <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
+                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
+              </p>
+              <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                <template v-for="seg in highlightSegments(result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
+                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
+              </p>
+              <p v-if="result.seriesName" class="text-xs text-muted-foreground/70 truncate mt-0.5 italic">
+                <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
+                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
+              </p>
             </div>
-            <span
-              class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-20 truncate"
-            >
-              {{ result.libraryName }}
-            </span>
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded border border-primary/15 max-w-20 truncate">
+                {{ result.libraryName }}
+              </span>
+              <div v-if="result.formats.length" class="flex gap-1">
+                <span
+                  v-for="fmt in result.formats"
+                  :key="fmt"
+                  :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
+                >
+                  {{ fmt }}
+                </span>
+              </div>
+            </div>
           </button>
         </div>
       </div>
@@ -129,15 +222,16 @@ function navigateToResult(result: GlobalSearchResult) {
 
       <!-- Center: desktop global search -->
       <div
-        class="hidden md:flex flex-1 mx-4 relative items-center transition-all duration-200"
-        :class="searchFocused || globalSearchQuery ? 'max-w-sm' : 'max-w-xs'"
+        class="hidden md:flex flex-1 mx-4 relative items-center transition-all duration-300"
+        :class="searchFocused || globalSearchQuery ? 'max-w-lg' : 'max-w-xs'"
       >
         <Search class="absolute left-2.5 text-muted-foreground pointer-events-none" :size="13" />
         <input
+          ref="desktopSearchInput"
           v-model="globalSearchQuery"
           @focus="searchFocused = true"
-          @blur="searchFocused = false"
-          @keydown.esc="clearSearch()"
+          @blur="searchFocused = false; selectedIndex = -1"
+          @keydown="handleSearchKeydown"
           placeholder="Search all books..."
           class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
@@ -149,26 +243,56 @@ function navigateToResult(result: GlobalSearchResult) {
         <div
           v-if="showDropdown"
           @mousedown.prevent
-          class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
+          class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto"
         >
           <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
-          <div v-else-if="!globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">No results</div>
+          <div v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+            No results
+          </div>
           <button
-            v-for="result in globalResults"
+            v-for="(result, index) in globalResults"
             :key="result.id"
             @click="navigateToResult(result)"
-            class="w-full flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors text-left"
+            :class="[
+              'w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left border-b border-border/40 last:border-b-0',
+              selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
+            ]"
           >
-            <BookCoverImage :book-id="result.id" type="thumbnail" class="h-11 w-8 object-cover rounded shrink-0 bg-muted" :alt="result.title ?? ''" />
+            <BookCoverImage :book-id="result.id" type="thumbnail" class="h-16 w-12 object-cover rounded shrink-0 bg-muted" :alt="result.title ?? ''" />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-foreground truncate">{{ result.title ?? 'Untitled' }}</p>
-              <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate">{{ result.authors.join(', ') }}</p>
+              <p class="text-sm font-medium text-foreground truncate">
+                <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
+                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
+              </p>
+              <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                <template v-for="seg in highlightSegments(result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
+                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
+              </p>
+              <p v-if="result.seriesName" class="text-xs text-muted-foreground/70 truncate mt-0.5 italic">
+                <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
+                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
+              </p>
             </div>
-            <span
-              class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded-full border border-primary/15 shrink-0 max-w-[80px] truncate"
-            >
-              {{ result.libraryName }}
-            </span>
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded border border-primary/15 max-w-20 truncate">
+                {{ result.libraryName }}
+              </span>
+              <div v-if="result.formats.length" class="flex gap-1">
+                <span
+                  v-for="fmt in result.formats"
+                  :key="fmt"
+                  :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
+                >
+                  {{ fmt }}
+                </span>
+              </div>
+            </div>
           </button>
         </div>
       </div>

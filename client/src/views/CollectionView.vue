@@ -200,7 +200,7 @@ watch(loading, (isLoading) => {
         </div>
 
         <div
-          v-if="viewMode === 'grid' && books.length > 0"
+          v-show="viewMode === 'grid' && books.length > 0"
           class="grid"
           :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
         >
@@ -215,7 +215,7 @@ watch(loading, (isLoading) => {
           />
         </div>
 
-        <div v-else-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
           <BookListRow
             v-for="book in books"
             :key="book.id"
