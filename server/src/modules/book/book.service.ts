@@ -277,7 +277,11 @@ export class BookService {
     return detail ?? this.getDetail(id, user);
   }
 
-  async bulkRefreshMetadata(bookIds: number[], user: RequestUser): Promise<{ processed: number; failed: number }> {
+  async bulkRefreshMetadata(
+    bookIds: number[],
+    user: RequestUser,
+    onProgress?: (bookId: number) => void,
+  ): Promise<{ processed: number; failed: number }> {
     if (bookIds.length === 0) return { processed: 0, failed: 0 };
     const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
     const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
@@ -286,24 +290,25 @@ export class BookService {
 
     let processed = 0;
     let failed = 0;
-    const CONCURRENCY = 3;
-    for (let i = 0; i < bookIds.length; i += CONCURRENCY) {
-      await Promise.all(
-        bookIds.slice(i, i + CONCURRENCY).map(async (id) => {
-          try {
-            await this.refreshMetadata(id, false, user);
-            processed++;
-          } catch (err) {
-            this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err}`);
-            failed++;
-          }
-        }),
-      );
+    for (const id of bookIds) {
+      try {
+        await this.refreshMetadata(id, false, user);
+        processed++;
+        onProgress?.(id);
+      } catch (err) {
+        this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err}`);
+        failed++;
+        onProgress?.(id);
+      }
     }
     return { processed, failed };
   }
 
-  async bulkReExtractCover(bookIds: number[], user: RequestUser): Promise<{ processed: number; updated: number }> {
+  async bulkReExtractCover(
+    bookIds: number[],
+    user: RequestUser,
+    onProgress?: (bookId: number) => void,
+  ): Promise<{ processed: number; updated: number }> {
     if (bookIds.length === 0) return { processed: 0, updated: 0 };
     const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
     const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
@@ -315,15 +320,16 @@ export class BookService {
 
     let processed = 0;
     let updated = 0;
-    await Promise.all(
-      bookIds.map(async (id) => {
-        const file = filesByBookId.get(id);
-        if (!file) return;
-        processed++;
-        const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
-        if (saved) updated++;
-      }),
-    );
+    for (const id of bookIds) {
+      const file = filesByBookId.get(id);
+      if (!file) continue;
+      processed++;
+      const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
+      if (saved) {
+        updated++;
+        onProgress?.(id);
+      }
+    }
     return { processed, updated };
   }
 

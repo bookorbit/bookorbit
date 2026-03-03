@@ -61,14 +61,32 @@ export class BookController {
 
   @Post('bulk-refresh-metadata')
   @RequirePermission('library_edit_metadata')
-  bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkRefreshMetadata(dto.bookIds, user);
+  async bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    const result = await this.bookService.bulkRefreshMetadata(dto.bookIds, user, (bookId) => {
+      reply.raw.write(`data: ${JSON.stringify({ bookId })}\n\n`);
+    });
+    reply.raw.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
+    reply.raw.end();
   }
 
   @Post('bulk-re-extract-cover')
   @RequirePermission('library_edit_metadata')
-  bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkReExtractCover(dto.bookIds, user);
+  async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    const result = await this.bookService.bulkReExtractCover(dto.bookIds, user, (bookId) => {
+      reply.raw.write(`data: ${JSON.stringify({ bookId })}\n\n`);
+    });
+    reply.raw.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
+    reply.raw.end();
   }
 
   @Post(':id/re-extract-cover')

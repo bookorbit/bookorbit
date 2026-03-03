@@ -23,6 +23,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
+import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
@@ -58,6 +59,8 @@ const { coverUrl, bumpVersion } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
+const { isRefreshing } = useRefreshingBooks()
+const anyRefreshing = computed(() => refreshing.value || isRefreshing(props.book.id))
 const reExtractingCover = ref(false)
 
 async function reExtractCover() {
@@ -227,7 +230,7 @@ function handleCardClick(event: MouseEvent) {
 
       <!-- Refresh spinner overlay -->
       <Transition name="fade">
-        <div v-if="refreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-[1.5px]">
+        <div v-if="anyRefreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-[1.5px]">
           <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
         </div>
       </Transition>
@@ -294,8 +297,8 @@ function handleCardClick(event: MouseEvent) {
                 <Pencil class="size-4 mr-2" />
                 Edit Metadata
               </DropdownMenuItem>
-              <DropdownMenuItem :disabled="refreshing" @click="refreshWithFeedback(book.id)">
-                <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
+              <DropdownMenuItem :disabled="anyRefreshing" @click="refreshWithFeedback(book.id)">
+                <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
                 <RefreshCw v-else class="size-4 mr-2" />
                 Refresh Metadata
               </DropdownMenuItem>

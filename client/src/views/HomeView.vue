@@ -21,6 +21,7 @@ import { useBookQuery, type BookCard } from '@/features/book/composables/useBook
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -195,6 +196,7 @@ watch(
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 const { bumpVersion } = useCoverVersions()
+const { markRefreshing, clearRefreshing } = useRefreshingBooks()
 
 function handleSelect(id: number, event: MouseEvent) {
   if (event.shiftKey)
@@ -235,19 +237,37 @@ async function handleDeleteSelected() {
 async function handleBulkRefreshMetadata() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
-  const toastId = toast.loading(`Refreshing metadata for ${ids.length} book${ids.length === 1 ? '' : 's'}...`)
+  markRefreshing(ids)
   const res = await api('/api/v1/books/bulk-refresh-metadata', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bookIds: ids }),
   })
-  toast.dismiss(toastId)
   if (!res.ok) {
+    clearRefreshing(ids)
     toast.error('Failed to refresh metadata')
     return
   }
-  const { processed, failed } = await res.json()
-  ids.forEach((id) => bumpVersion(id))
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let processed = 0
+  let failed = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.bookId !== undefined) { bumpVersion(data.bookId); clearRefreshing([data.bookId]) }
+          if (data.done) { processed = data.processed; failed = data.failed }
+        } catch { /* ignore malformed line */ }
+      }
+    }
+  } finally {
+    clearRefreshing(ids)
+  }
   if (failed > 0) {
     toast.warning(`Refreshed ${processed} book${processed === 1 ? '' : 's'}, ${failed} failed`)
   } else {
@@ -258,19 +278,37 @@ async function handleBulkRefreshMetadata() {
 async function handleBulkReExtractCover() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
-  const toastId = toast.loading(`Re-extracting covers for ${ids.length} book${ids.length === 1 ? '' : 's'}...`)
+  markRefreshing(ids)
   const res = await api('/api/v1/books/bulk-re-extract-cover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bookIds: ids }),
   })
-  toast.dismiss(toastId)
   if (!res.ok) {
+    clearRefreshing(ids)
     toast.error('Failed to re-extract covers')
     return
   }
-  const { processed, updated } = await res.json()
-  ids.forEach((id) => bumpVersion(id))
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let processed = 0
+  let updated = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.bookId !== undefined) { bumpVersion(data.bookId); clearRefreshing([data.bookId]) }
+          if (data.done) { processed = data.processed; updated = data.updated }
+        } catch { /* ignore malformed line */ }
+      }
+    }
+  } finally {
+    clearRefreshing(ids)
+  }
   toast.success(`Re-extracted ${updated} of ${processed} cover${processed === 1 ? '' : 's'}`)
 }
 

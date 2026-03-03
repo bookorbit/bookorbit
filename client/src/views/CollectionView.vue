@@ -11,12 +11,15 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
+import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { useCollectionBooks } from '@/features/collection/composables/useCollectionBooks'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import type { BookCard } from '@projectx/types'
@@ -50,9 +53,113 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+const sendBookOpen = ref(false)
 const editCollectionOpen = ref(false)
 let removingInProgress = false
 let deletingInProgress = false
+const { bumpVersion } = useCoverVersions()
+const { markRefreshing, clearRefreshing } = useRefreshingBooks()
+
+async function handleBulkRefreshMetadata() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  markRefreshing(ids)
+  const res = await api('/api/v1/books/bulk-refresh-metadata', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids }),
+  })
+  if (!res.ok) {
+    clearRefreshing(ids)
+    toast.error('Failed to refresh metadata')
+    return
+  }
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let processed = 0
+  let failed = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.bookId !== undefined) { bumpVersion(data.bookId); clearRefreshing([data.bookId]) }
+          if (data.done) { processed = data.processed; failed = data.failed }
+        } catch { /* ignore malformed line */ }
+      }
+    }
+  } finally {
+    clearRefreshing(ids)
+  }
+  if (failed > 0) {
+    toast.warning(`Refreshed ${processed} book${processed === 1 ? '' : 's'}, ${failed} failed`)
+  } else {
+    toast.success(`Refreshed metadata for ${processed} book${processed === 1 ? '' : 's'}`)
+  }
+}
+
+async function handleBulkReExtractCover() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  markRefreshing(ids)
+  const res = await api('/api/v1/books/bulk-re-extract-cover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids }),
+  })
+  if (!res.ok) {
+    clearRefreshing(ids)
+    toast.error('Failed to re-extract covers')
+    return
+  }
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let processed = 0
+  let updated = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.bookId !== undefined) { bumpVersion(data.bookId); clearRefreshing([data.bookId]) }
+          if (data.done) { processed = data.processed; updated = data.updated }
+        } catch { /* ignore malformed line */ }
+      }
+    }
+  } finally {
+    clearRefreshing(ids)
+  }
+  toast.success(`Re-extracted ${updated} of ${processed} cover${processed === 1 ? '' : 's'}`)
+}
+
+async function handleExport(allFormats: boolean) {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const toastId = toast.loading(`Preparing ${ids.length} book${ids.length === 1 ? '' : 's'} for download...`)
+  const res = await api('/api/v1/books/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookIds: ids, allFormats }),
+  })
+  toast.dismiss(toastId)
+  if (!res.ok) {
+    toast.error('Export failed')
+    return
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'books.zip'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)
 
@@ -146,8 +253,12 @@ watch(
     :visible="selectionMode"
     :count="selectedCount"
     :in-collection="true"
+    @send="sendBookOpen = true"
+    @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
     @remove-from-collection="handleRemoveFromCollection"
+    @refresh-metadata="handleBulkRefreshMetadata"
+    @re-extract-cover="handleBulkReExtractCover"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
@@ -160,6 +271,7 @@ watch(
   />
 
   <EditCollectionDialog v-if="collection" :open="editCollectionOpen" :collection="collection" @close="editCollectionOpen = false" />
+  <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 
   <SidebarInset class="flex flex-col h-screen glow-wrapper">
     <AppHeader />
