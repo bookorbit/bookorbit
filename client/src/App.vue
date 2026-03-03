@@ -6,6 +6,8 @@ import ChangePasswordDialog from '@/features/auth/ChangePasswordDialog.vue'
 import SettingsDrawer from '@/features/settings/SettingsDrawer.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { SidebarProvider } from '@/components/ui/sidebar'
+import AppSidebar from '@/components/AppSidebar.vue'
 
 useThemeStore()
 const { isOpen } = useChangePasswordDialog()
@@ -14,11 +16,12 @@ const route = useRoute()
 
 <template>
   <TooltipProvider :delay-duration="0">
-    <router-view v-slot="{ Component }">
-      <keep-alive :include="['HomeView', 'LensView']">
+    <SidebarProvider>
+      <AppSidebar />
+      <router-view v-slot="{ Component }">
         <component :is="Component" :key="route.path" />
-      </keep-alive>
-    </router-view>
+      </router-view>
+    </SidebarProvider>
     <ChangePasswordDialog v-if="isOpen" />
     <SettingsDrawer />
     <Toaster rich-colors />

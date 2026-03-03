@@ -7,11 +7,10 @@ import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
-import AppSidebar from '@/components/AppSidebar.vue'
 import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useLens } from '@/features/lens/composables/useLens'
@@ -27,7 +26,7 @@ const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
-const { coverSize, gridGap, viewMode } = useDisplaySettings()
+const { coverSize, gridGap, viewMode, lensFilterExpanded } = useDisplaySettings()
 
 const lensId = computed(() => Number(route.params.id))
 
@@ -42,8 +41,7 @@ const sortChip = computed(() => {
   return specs.map((s) => `${SORT_FIELD_LABELS[s.field as SortField] ?? s.field} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', ')
 })
 
-const filterExpanded = ref(true)
-
+const filterExpanded = lensFilterExpanded
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 
@@ -120,6 +118,11 @@ async function handleDelete() {
   }
 }
 
+function openEditor() {
+  editorOpen.value = true
+  confirmDelete.value = false
+}
+
 function onSaved() {
   load(true)
 }
@@ -135,12 +138,6 @@ function checkSentinel() {
 }
 
 onMounted(async () => {
-  await fetchLenses()
-  if (!lens.value) {
-    router.push({ name: 'home' })
-    return
-  }
-  load(true)
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0]?.isIntersecting && !loading.value) load()
@@ -148,14 +145,24 @@ onMounted(async () => {
     { rootMargin: '300px' },
   )
   if (sentinel.value) observer.observe(sentinel.value)
+
+  await fetchLenses()
+  if (!lens.value) {
+    router.push({ name: 'home' })
+    return
+  }
+  load(true)
 })
 
 onUnmounted(() => observer?.disconnect())
 
-watch(lensId, () => load(true))
-watch(loading, (isLoading) => {
-  if (!isLoading) checkSentinel()
-}, { flush: 'post' })
+watch(
+  loading,
+  (isLoading) => {
+    if (!isLoading) checkSentinel()
+  },
+  { flush: 'post' },
+)
 </script>
 
 <template>
@@ -183,131 +190,128 @@ watch(loading, (isLoading) => {
     @added="exitSelectionMode"
   />
 
-  <SidebarProvider>
-    <AppSidebar />
-
-    <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-      <AppHeader />
-      <ViewHeader
-        :title="lens?.name ?? 'Lens'"
-        :icon="lens?.icon ?? undefined"
-        :total="total"
-        :loaded="books.length"
-        v-model:coverSize="coverSize"
-        v-model:gridGap="gridGap"
-        v-model:viewMode="viewMode"
-        :selection-mode="selectionMode"
-        @toggle-selection="toggleSelectionMode"
-      >
-        <template #actions>
-          <button
-            v-if="lens?.filter || sortChip"
-            @click="filterExpanded = !filterExpanded"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            :title="filterExpanded ? 'Hide filter' : 'Show filter'"
-          >
-            <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
-            <span>Filter</span>
-          </button>
-          <button
-            @click="editorOpen = true; confirmDelete = false"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <Settings2 :size="13" />
-            <span>Edit</span>
-          </button>
-          <button
-            @click="handleDelete"
-            :disabled="deleting"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-            :class="
-              confirmDelete
-                ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
-                : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
-            "
-          >
-            <Trash2 :size="13" />
-            <span>{{ confirmDelete ? 'Confirm?' : 'Delete' }}</span>
-          </button>
-        </template>
-      </ViewHeader>
-
-      <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
-        <!-- Filter summary -->
-        <div v-if="filterExpanded && (lens?.filter || sortChip)" class="flex flex-wrap items-center gap-2 mb-4 cursor-pointer" @click="editorOpen = true">
-          <FilterSummary v-if="lens?.filter" :node="(lens.filter as GroupRule)" />
-          <span
-            v-if="sortChip"
-            class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden"
-          >
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
-              <ArrowUpDown :size="10" class="shrink-0" />
-              <span class="font-semibold">Sort</span>
-            </span>
-            <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
-          </span>
-        </div>
-
-        <!-- Empty state: no rules configured -->
-        <div v-if="!loading && !lens?.filter && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
-          <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-            <Settings2 :size="28" class="text-muted-foreground/50" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <p class="text-sm font-medium text-foreground">No rules configured</p>
-            <p class="text-xs text-muted-foreground max-w-xs">
-              Open the editor to define which books appear in this lens using filters and sort rules.
-            </p>
-          </div>
-          <button
-            @click="editorOpen = true"
-            class="h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            Configure Lens
-          </button>
-        </div>
-
-        <!-- Empty state: rules set but no matches -->
-        <div v-else-if="!loading && books.length === 0 && lens?.filter" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
-          <p class="text-sm font-medium text-foreground">No books match this lens</p>
-          <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>
-          <button @click="editorOpen = true" class="text-xs text-primary hover:underline">Edit Lens</button>
-        </div>
-
-        <!-- Grid view -->
-        <div
-          v-show="viewMode === 'grid' && books.length > 0"
-          class="grid"
-          :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
+    <AppHeader />
+    <ViewHeader
+      :title="lens?.name ?? 'Lens'"
+      :icon="lens?.icon ?? undefined"
+      :total="total"
+      :loaded="books.length"
+      v-model:coverSize="coverSize"
+      v-model:gridGap="gridGap"
+      v-model:viewMode="viewMode"
+      :selection-mode="selectionMode"
+      @toggle-selection="toggleSelectionMode"
+    >
+      <template #actions>
+        <button
+          v-if="lens?.filter || sortChip"
+          @click="filterExpanded = !filterExpanded"
+          class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          :title="filterExpanded ? 'Hide filter' : 'Show filter'"
         >
-          <BookCoverCard
-            v-for="book in books"
-            :key="book.id"
-            :book="book"
-            :selection-mode="selectionMode"
-            :selected="isSelected(book.id)"
-            @select="handleSelect(book.id, $event)"
-          />
-        </div>
+          <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
+          <span>Filter</span>
+        </button>
+        <button
+          @click="openEditor"
+          class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Settings2 :size="13" />
+          <span>Edit</span>
+        </button>
+        <button
+          @click="handleDelete"
+          :disabled="deleting"
+          class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
+          :class="
+            confirmDelete
+              ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
+              : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
+          "
+        >
+          <Trash2 :size="13" />
+          <span>{{ confirmDelete ? 'Confirm?' : 'Delete' }}</span>
+        </button>
+      </template>
+    </ViewHeader>
 
-        <!-- List view -->
-        <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-          <BookListRow
-            v-for="book in books"
-            :key="book.id"
-            :book="book"
-            :selection-mode="selectionMode"
-            :selected="isSelected(book.id)"
-            @select="handleSelect(book.id, $event)"
-            @action="handleBookAction(book, $event)"
-          />
-        </div>
+    <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
+      <!-- Filter summary -->
+      <div
+        v-if="filterExpanded && (lens?.filter || sortChip)"
+        class="flex flex-wrap items-center gap-2 mb-4 cursor-pointer"
+        @click="editorOpen = true"
+      >
+        <FilterSummary v-if="lens?.filter" :node="lens.filter as GroupRule" />
+        <span v-if="sortChip" class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
+            <ArrowUpDown :size="10" class="shrink-0" />
+            <span class="font-semibold">Sort</span>
+          </span>
+          <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
+        </span>
+      </div>
 
-        <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
+      <!-- Empty state: no rules configured -->
+      <div v-if="!loading && !lens?.filter && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
+        <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+          <Settings2 :size="28" class="text-muted-foreground/50" />
         </div>
-      </main>
-    </SidebarInset>
-  </SidebarProvider>
+        <div class="flex flex-col gap-1">
+          <p class="text-sm font-medium text-foreground">No rules configured</p>
+          <p class="text-xs text-muted-foreground max-w-xs">
+            Open the editor to define which books appear in this lens using filters and sort rules.
+          </p>
+        </div>
+        <button
+          @click="editorOpen = true"
+          class="h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Configure Lens
+        </button>
+      </div>
+
+      <!-- Empty state: rules set but no matches -->
+      <div v-else-if="!loading && books.length === 0 && lens?.filter" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+        <p class="text-sm font-medium text-foreground">No books match this lens</p>
+        <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>
+        <button @click="editorOpen = true" class="text-xs text-primary hover:underline">Edit Lens</button>
+      </div>
+
+      <!-- Grid view -->
+      <div
+        v-show="viewMode === 'grid' && books.length > 0"
+        class="grid"
+        :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+      >
+        <BookCoverCard
+          v-for="book in books"
+          :key="book.id"
+          :book="book"
+          :selection-mode="selectionMode"
+          :selected="isSelected(book.id)"
+          @select="handleSelect(book.id, $event)"
+        />
+      </div>
+
+      <!-- List view -->
+      <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <BookListRow
+          v-for="book in books"
+          :key="book.id"
+          :book="book"
+          :selection-mode="selectionMode"
+          :selected="isSelected(book.id)"
+          @select="handleSelect(book.id, $event)"
+          @action="handleBookAction(book, $event)"
+        />
+      </div>
+
+      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+        <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
+      </div>
+    </main>
+  </SidebarInset>
 </template>

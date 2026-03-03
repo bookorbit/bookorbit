@@ -18,7 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
-const { libraries, fetchLibraries } = useLibraries()
+const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
 const { result, loading, error, finalize, reset } = useStagingFinalize()
 
 const defaultLibraryId = ref<number | null>(null)
@@ -84,7 +84,7 @@ async function start() {
     defaultLibraryId: defaultLibraryId.value!,
     defaultFolderId: defaultFolderId.value!,
   })
-  if (result.value?.succeeded) fetchLibraries()
+  if (result.value?.succeeded) refreshLibraries()
 }
 
 function handleClose() {
@@ -187,7 +187,12 @@ function goToBook(bookId: number) {
           </div>
 
           <div class="max-h-56 overflow-y-auto space-y-1">
-            <div v-for="r in result.results" :key="r.fileId" class="rounded-lg overflow-hidden" :class="r.success ? '' : r.isDuplicate ? 'bg-amber-500/5' : 'bg-red-500/5'">
+            <div
+              v-for="r in result.results"
+              :key="r.fileId"
+              class="rounded-lg overflow-hidden"
+              :class="r.success ? '' : r.isDuplicate ? 'bg-amber-500/5' : 'bg-red-500/5'"
+            >
               <div class="flex items-center gap-2 px-3 py-2 text-sm" :class="r.success ? 'hover:bg-muted/50' : ''">
                 <Check v-if="r.success" class="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <Copy v-else-if="r.isDuplicate" class="size-3.5 text-amber-500 shrink-0" />

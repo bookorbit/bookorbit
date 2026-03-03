@@ -3,12 +3,23 @@ import { api } from '@/lib/api'
 import type { Collection } from '@projectx/types'
 
 const collections = ref<Collection[]>([])
+let loaded = false
+let fetchPromise: Promise<void> | null = null
 
 export function useCollections() {
-  async function fetchCollections() {
-    const res = await api('/api/v1/collections')
-    if (!res.ok) throw new Error('Failed to fetch collections')
-    collections.value = await res.json()
+  async function fetchCollections(): Promise<void> {
+    if (loaded) return
+    if (fetchPromise) return fetchPromise
+    fetchPromise = api('/api/v1/collections')
+      .then(async (res) => {
+        if (!res.ok) return
+        collections.value = await res.json()
+        loaded = true
+      })
+      .finally(() => {
+        fetchPromise = null
+      })
+    return fetchPromise
   }
 
   async function fetchCollectionsWithMembership(bookIds: number[]): Promise<Collection[]> {

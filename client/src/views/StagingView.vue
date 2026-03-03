@@ -4,9 +4,8 @@ import { PackageOpen, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 import type { StagingFile } from '@projectx/types'
 import { api } from '@/lib/api'
 import { formatBytes } from '@/lib/formatting'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import AppHeader from '@/components/AppHeader.vue'
-import AppSidebar from '@/components/AppSidebar.vue'
+import { SidebarInset } from '@/components/ui/sidebar'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useStagingFiles } from '@/features/staging/composables/useStagingFiles'
 import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
@@ -258,150 +257,146 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <SidebarProvider>
-    <AppSidebar />
+  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
+    <AppHeader />
 
-    <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-      <AppHeader />
-
-      <main
-        class="flex-1 overflow-y-auto"
-        :class="backgroundClass"
-        @dragover="onDragOver"
-        @dragenter="onDragEnter"
-        @dragleave="onDragLeave"
-        @drop="onDrop"
-      >
-        <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-6xl mx-auto w-full">
-          <div class="flex items-center gap-2.5">
-            <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">
-              <PackageOpen class="size-4.5 text-primary" />
-            </div>
-            <h1 class="text-xl font-semibold text-foreground tracking-tight">Staging</h1>
+    <main
+      class="flex-1 overflow-y-auto"
+      :class="backgroundClass"
+      @dragover="onDragOver"
+      @dragenter="onDragEnter"
+      @dragleave="onDragLeave"
+      @drop="onDrop"
+    >
+      <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+        <div class="flex items-center gap-2.5">
+          <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">
+            <PackageOpen class="size-4.5 text-primary" />
+          </div>
+          <h1 class="text-xl font-semibold text-foreground tracking-tight">Staging</h1>
+          <span
+            v-if="summary.total > 0"
+            class="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-xs font-semibold tabular-nums"
+          >
+            {{ summary.total }}
+          </span>
+          <Transition name="fade">
             <span
-              v-if="summary.total > 0"
-              class="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-xs font-semibold tabular-nums"
+              v-if="newFilesDetected"
+              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-medium"
             >
-              {{ summary.total }}
+              <span class="size-1.5 rounded-full bg-current animate-pulse" />
+              New files detected
             </span>
-            <Transition name="fade">
-              <span
-                v-if="newFilesDetected"
-                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-medium"
-              >
-                <span class="size-1.5 rounded-full bg-current animate-pulse" />
-                New files detected
-              </span>
-            </Transition>
-            <Transition name="fade">
-              <span
-                v-if="applyFetchedResult"
-                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
-              >
-                <CheckCircle2 class="size-3.5" />
-                {{
-                  applyFetchedResult.applied === 0
-                    ? 'No fetched metadata to apply'
-                    : `Applied to ${applyFetchedResult.applied} file${applyFetchedResult.applied !== 1 ? 's' : ''}${applyFetchedResult.skippedEdited > 0 ? `, skipped ${applyFetchedResult.skippedEdited} with manual edits` : ''}`
-                }}
-              </span>
-            </Transition>
-            <Transition name="fade">
-              <span
-                v-if="retryQueued !== null"
-                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-primary/15 text-primary text-xs font-medium"
-              >
-                <CheckCircle2 class="size-3.5" />
-                {{ retryQueued === 0 ? 'No error files to retry' : `Retrying ${retryQueued} file${retryQueued !== 1 ? 's' : ''}` }}
-              </span>
-            </Transition>
-            <Transition name="fade">
-              <span
-                v-if="!socketConnected"
-                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-muted text-muted-foreground text-xs font-medium"
-              >
-                <span class="size-1.5 rounded-full bg-muted-foreground animate-pulse" />
-                Reconnecting
-              </span>
-            </Transition>
-            <Transition name="fade">
-              <span
-                v-if="rescanFailed"
-                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
-              >
-                <AlertCircle class="size-3.5" />
-                Rescan failed
-              </span>
-            </Transition>
-          </div>
-
-          <StagingToolbar
-            :active-status="filters.status"
-            :selection-count="selectionCount"
-            :has-selection="hasSelection"
-            :fetched-count="fetchedCount"
-            :error-count="errorCount"
-            @status-filter="setStatus"
-            @search="setSearch"
-            @rescan="refresh"
-            @rescan-error="handleRescanError"
-            @retry-fetch="handleRetryFetch"
-            @bulk-discard="handleBulkDiscard"
-            @finalize="openFinalize"
-            @bulk-edit="openBulkEdit"
-            @refresh="refresh"
-            @apply-fetched="handleApplyFetched"
-          />
-
-          <!-- Statistics bar -->
-          <div v-if="statistics && statistics.byFormat.length > 0" class="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-            <span class="font-medium text-foreground">{{ formatBytes(statistics.totalSizeBytes) }} staged</span>
+          </Transition>
+          <Transition name="fade">
             <span
-              v-for="f in statistics.byFormat"
-              :key="f.format"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 tabular-nums"
+              v-if="applyFetchedResult"
+              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
             >
-              <span class="uppercase font-medium text-foreground/70">{{ f.format }}</span>
-              {{ f.count }} &middot; {{ formatBytes(f.sizeBytes) }}
+              <CheckCircle2 class="size-3.5" />
+              {{
+                applyFetchedResult.applied === 0
+                  ? 'No fetched metadata to apply'
+                  : `Applied to ${applyFetchedResult.applied} file${applyFetchedResult.applied !== 1 ? 's' : ''}${applyFetchedResult.skippedEdited > 0 ? `, skipped ${applyFetchedResult.skippedEdited} with manual edits` : ''}`
+              }}
             </span>
-          </div>
-
-          <!-- Drag-and-drop overlay -->
-          <div v-if="dragOver" class="fixed inset-0 z-40 flex items-center justify-center bg-primary/5 backdrop-blur-sm pointer-events-none">
-            <div class="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary/40 bg-card/80 px-12 py-10 shadow-lg">
-              <PackageOpen class="size-10 text-primary" />
-              <p class="text-sm font-medium text-foreground">Drop files to stage</p>
-              <p class="text-xs text-muted-foreground">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
-            </div>
-          </div>
-
-          <StagingFileList
-            :items="items"
-            :loading="loading"
-            :is-selected="isSelected"
-            :select-all="selectAll"
-            :empty-message="emptyMessage"
-            @select="toggleSelect"
-            @select-all="toggleSelectAll"
-            @open="openSheet"
-            @apply-fetched="handleInlineApplyFetched"
-          />
-
-          <div v-if="pageCount > 1" class="flex items-center justify-center gap-1">
-            <button
-              v-for="p in pageCount"
-              :key="p"
-              class="size-8 rounded-lg text-xs font-medium transition-all active:scale-95"
-              :class="filters.page === p ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'"
-              @click="setPage(p)"
+          </Transition>
+          <Transition name="fade">
+            <span
+              v-if="retryQueued !== null"
+              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-primary/15 text-primary text-xs font-medium"
             >
-              {{ p }}
-            </button>
+              <CheckCircle2 class="size-3.5" />
+              {{ retryQueued === 0 ? 'No error files to retry' : `Retrying ${retryQueued} file${retryQueued !== 1 ? 's' : ''}` }}
+            </span>
+          </Transition>
+          <Transition name="fade">
+            <span
+              v-if="!socketConnected"
+              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-muted text-muted-foreground text-xs font-medium"
+            >
+              <span class="size-1.5 rounded-full bg-muted-foreground animate-pulse" />
+              Reconnecting
+            </span>
+          </Transition>
+          <Transition name="fade">
+            <span
+              v-if="rescanFailed"
+              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
+            >
+              <AlertCircle class="size-3.5" />
+              Rescan failed
+            </span>
+          </Transition>
+        </div>
+
+        <StagingToolbar
+          :active-status="filters.status"
+          :selection-count="selectionCount"
+          :has-selection="hasSelection"
+          :fetched-count="fetchedCount"
+          :error-count="errorCount"
+          @status-filter="setStatus"
+          @search="setSearch"
+          @rescan="refresh"
+          @rescan-error="handleRescanError"
+          @retry-fetch="handleRetryFetch"
+          @bulk-discard="handleBulkDiscard"
+          @finalize="openFinalize"
+          @bulk-edit="openBulkEdit"
+          @refresh="refresh"
+          @apply-fetched="handleApplyFetched"
+        />
+
+        <!-- Statistics bar -->
+        <div v-if="statistics && statistics.byFormat.length > 0" class="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+          <span class="font-medium text-foreground">{{ formatBytes(statistics.totalSizeBytes) }} staged</span>
+          <span
+            v-for="f in statistics.byFormat"
+            :key="f.format"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 tabular-nums"
+          >
+            <span class="uppercase font-medium text-foreground/70">{{ f.format }}</span>
+            {{ f.count }} &middot; {{ formatBytes(f.sizeBytes) }}
+          </span>
+        </div>
+
+        <!-- Drag-and-drop overlay -->
+        <div v-if="dragOver" class="fixed inset-0 z-40 flex items-center justify-center bg-primary/5 backdrop-blur-sm pointer-events-none">
+          <div class="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary/40 bg-card/80 px-12 py-10 shadow-lg">
+            <PackageOpen class="size-10 text-primary" />
+            <p class="text-sm font-medium text-foreground">Drop files to stage</p>
+            <p class="text-xs text-muted-foreground">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
           </div>
         </div>
-      </main>
-    </SidebarInset>
-  </SidebarProvider>
+
+        <StagingFileList
+          :items="items"
+          :loading="loading"
+          :is-selected="isSelected"
+          :select-all="selectAll"
+          :empty-message="emptyMessage"
+          @select="toggleSelect"
+          @select-all="toggleSelectAll"
+          @open="openSheet"
+          @apply-fetched="handleInlineApplyFetched"
+        />
+
+        <div v-if="pageCount > 1" class="flex items-center justify-center gap-1">
+          <button
+            v-for="p in pageCount"
+            :key="p"
+            class="size-8 rounded-lg text-xs font-medium transition-all active:scale-95"
+            :class="filters.page === p ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'"
+            @click="setPage(p)"
+          >
+            {{ p }}
+          </button>
+        </div>
+      </div>
+    </main>
+  </SidebarInset>
 
   <Teleport to="body">
     <StagingFileSheet v-if="selectedFile" :file="selectedFile" @close="closeSheet" @discarded="onDiscarded" @updated="onFileUpdated" />

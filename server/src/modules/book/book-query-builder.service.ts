@@ -30,6 +30,7 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   updatedAt: books.updatedAt,
   publishedYear: bookMetadata.publishedYear,
   pageCount: bookMetadata.pageCount,
+  rating: bookMetadata.rating,
 };
 
 @Injectable()
@@ -69,14 +70,15 @@ export class BookQueryBuilder {
           ),
         );
       } else {
-        const col = SORT_FIELD_MAP[field]!;
+        const col = SORT_FIELD_MAP[field];
+        if (!col) continue;
         result.push(sql`${col} ${sql.raw(D)} NULLS LAST`);
         if (field === 'seriesIndex' && !sort.some((s) => s.field === 'series')) {
           result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
         }
       }
     }
-    return result;
+    return result.length > 0 ? result : [sql`${bookMetadata.title} ASC NULLS LAST`];
   }
 
   private groupToSql(node: GroupRule, depth: number, userId?: number): SQL {

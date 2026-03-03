@@ -9,6 +9,7 @@ export const SORT_FIELD_LABELS: Record<SortField, string> = {
   updatedAt: 'Date Updated',
   publishedYear: 'Published Year',
   pageCount: 'Page Count',
+  rating: 'Rating',
 }
 
 export const FIELD_LABELS: Record<RuleField, string> = {

@@ -8,11 +8,10 @@ import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
-import AppSidebar from '@/components/AppSidebar.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useCollections } from '@/features/collection/composables/useCollections'
@@ -123,12 +122,16 @@ onMounted(async () => {
 onUnmounted(() => observer?.disconnect())
 
 watch(collectionId, () => load(true))
-watch(loading, (isLoading) => {
-  if (!isLoading && sentinel.value) {
-    const rect = sentinel.value.getBoundingClientRect()
-    if (rect.top < window.innerHeight + 300) load()
-  }
-}, { flush: 'post' })
+watch(
+  loading,
+  (isLoading) => {
+    if (!isLoading && sentinel.value) {
+      const rect = sentinel.value.getBoundingClientRect()
+      if (rect.top < window.innerHeight + 300) load()
+    }
+  },
+  { flush: 'post' },
+)
 </script>
 
 <template>
@@ -158,80 +161,76 @@ watch(loading, (isLoading) => {
 
   <EditCollectionDialog v-if="collection" :open="editCollectionOpen" :collection="collection" @close="editCollectionOpen = false" />
 
-  <SidebarProvider>
-    <AppSidebar />
+  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
+    <AppHeader />
+    <ViewHeader
+      :title="collection?.name ?? 'Collection'"
+      :icon="collection?.icon || 'FolderOpen'"
+      :total="total"
+      :loaded="books.length"
+      v-model:coverSize="coverSize"
+      v-model:gridGap="gridGap"
+      v-model:viewMode="viewMode"
+      :selection-mode="selectionMode"
+      @toggle-selection="toggleSelectionMode"
+    >
+      <template #toolbar>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              v-if="collection"
+              class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="editCollectionOpen = true"
+            >
+              <Pencil :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Edit collection</TooltipContent>
+        </Tooltip>
+      </template>
+    </ViewHeader>
 
-    <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-      <AppHeader />
-      <ViewHeader
-        :title="collection?.name ?? 'Collection'"
-        :icon="collection?.icon || 'FolderOpen'"
-        :total="total"
-        :loaded="books.length"
-        v-model:coverSize="coverSize"
-        v-model:gridGap="gridGap"
-        v-model:viewMode="viewMode"
-        :selection-mode="selectionMode"
-        @toggle-selection="toggleSelectionMode"
+    <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
+      <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+        <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+          <FolderOpen :size="28" class="text-muted-foreground/50" />
+        </div>
+        <p class="text-sm font-medium text-foreground">No books in this collection</p>
+        <p class="text-xs text-muted-foreground">Select books from your library and add them here.</p>
+      </div>
+
+      <div
+        v-show="viewMode === 'grid' && books.length > 0"
+        class="grid"
+        :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
       >
-        <template #toolbar>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="collection"
-                class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                @click="editCollectionOpen = true"
-              >
-                <Pencil :size="14" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Edit collection</TooltipContent>
-          </Tooltip>
-        </template>
-      </ViewHeader>
+        <BookCoverCard
+          v-for="book in books"
+          :key="book.id"
+          :book="book"
+          :selection-mode="selectionMode"
+          :selected="isSelected(book.id)"
+          @action="handleBookAction(book, $event)"
+          @select="handleSelect(book.id, $event)"
+        />
+      </div>
 
-      <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
-        <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
-          <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-            <FolderOpen :size="28" class="text-muted-foreground/50" />
-          </div>
-          <p class="text-sm font-medium text-foreground">No books in this collection</p>
-          <p class="text-xs text-muted-foreground">Select books from your library and add them here.</p>
-        </div>
+      <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <BookListRow
+          v-for="book in books"
+          :key="book.id"
+          :book="book"
+          :selection-mode="selectionMode"
+          :selected="isSelected(book.id)"
+          @action="handleBookAction(book, $event)"
+          @select="handleSelect(book.id, $event)"
+        />
+      </div>
 
-        <div
-          v-show="viewMode === 'grid' && books.length > 0"
-          class="grid"
-          :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
-        >
-          <BookCoverCard
-            v-for="book in books"
-            :key="book.id"
-            :book="book"
-            :selection-mode="selectionMode"
-            :selected="isSelected(book.id)"
-            @action="handleBookAction(book, $event)"
-            @select="handleSelect(book.id, $event)"
-          />
-        </div>
-
-        <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-          <BookListRow
-            v-for="book in books"
-            :key="book.id"
-            :book="book"
-            :selection-mode="selectionMode"
-            :selected="isSelected(book.id)"
-            @action="handleBookAction(book, $event)"
-            @select="handleSelect(book.id, $event)"
-          />
-        </div>
-
-        <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
-        </div>
-      </main>
-    </SidebarInset>
-  </SidebarProvider>
+      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+        <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+      </div>
+    </main>
+  </SidebarInset>
 </template>

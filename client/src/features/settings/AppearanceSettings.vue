@@ -5,7 +5,7 @@ import { useDisplaySettings, type CardOverlayKey } from '@/composables/useDispla
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const themeStore = useThemeStore()
-const { coverSize, gridGap, cardOverlays } = useDisplaySettings()
+const { coverSize, gridGap, cardOverlays, lensFilterExpanded } = useDisplaySettings()
 
 const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
   { key: 'series', label: 'Series name', hint: 'Series title and index badge at top-left' },
@@ -240,6 +240,25 @@ function toggleOverlay(key: CardOverlayKey) {
           <div
             class="mt-0.5 size-4 rounded-full bg-white shadow-sm transition-transform"
             :class="cardOverlays.includes(opt.key) ? 'translate-x-4' : 'translate-x-0.5'"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lenses -->
+  <div class="mt-8">
+    <p class="settings-group-label">Lenses</p>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="flex items-center justify-between px-5 py-3.5 bg-card cursor-pointer" @click="lensFilterExpanded = !lensFilterExpanded">
+        <div>
+          <p class="settings-label">Show filter preview by default</p>
+          <p class="settings-hint">Expand the active filter and sort summary when opening a lens</p>
+        </div>
+        <div class="w-9 h-5 rounded-full transition-colors shrink-0" :class="lensFilterExpanded ? 'bg-primary' : 'bg-muted'">
+          <div
+            class="mt-0.5 size-4 rounded-full bg-white shadow-sm transition-transform"
+            :class="lensFilterExpanded ? 'translate-x-4' : 'translate-x-0.5'"
           />
         </div>
       </div>

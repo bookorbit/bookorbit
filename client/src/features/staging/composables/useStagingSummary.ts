@@ -9,6 +9,7 @@ const socketConnected = ref(true)
 let socket: Socket | null = null
 const changeListeners = new Set<() => void>()
 let fetchPromise: Promise<void> | null = null
+let loaded = false
 
 async function restFetchSummary() {
   if (fetchPromise) return fetchPromise
@@ -49,11 +50,15 @@ function getSocket(): Socket {
 
 export function useStagingSummary() {
   async function fetchSummary(): Promise<void> {
+    if (loaded) return
     if (fetchPromise) return fetchPromise
     loading.value = true
     fetchPromise = api('/api/v1/staging/summary')
       .then(async (res) => {
-        if (res.ok) summary.value = await res.json()
+        if (res.ok) {
+          summary.value = await res.json()
+          loaded = true
+        }
       })
       .finally(() => {
         loading.value = false

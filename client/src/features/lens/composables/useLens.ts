@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { api } from '@/lib/api'
 import type { BookCard, BooksPage } from '@projectx/types'
 
@@ -38,11 +38,6 @@ export function useLens(lensId: Ref<number>) {
       loading.value = false
     }
   }
-
-  watch(lensId, (id) => {
-    if (!id || isNaN(id)) return
-    load(true)
-  })
 
   return { items, total, loading, hasMore, load }
 }

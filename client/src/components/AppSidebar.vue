@@ -38,7 +38,7 @@ function getCollectionIcon(iconName: string | null) {
 
 const router = useRouter()
 const route = useRoute()
-const { libraries, fetchLibraries } = useLibraries()
+const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
 const { lenses, fetchLenses } = useLenses()
 const { collections, fetchCollections } = useCollections()
 const { hasPermission } = usePermissions()
@@ -88,7 +88,7 @@ function onLibrarySaved(library: Library) {
   createLibraryOpen.value = false
   subscribeLibrary(library.id)
   scanningLibraryId.value = library.id
-  fetchLibraries()
+  refreshLibraries()
 }
 
 watch(progressMap, (map) => {
