@@ -7,6 +7,7 @@ import { FileWriteSettingsService } from './file-write-settings.service';
 import { FormatWriterRegistry } from './format-writer.registry';
 import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
 import { EpubFormatWriter } from './formats/epub/epub-format-writer';
+import { PdfFormatWriter } from './formats/pdf/pdf-format-writer';
 
 @Module({
   providers: [
@@ -15,10 +16,11 @@ import { EpubFormatWriter } from './formats/epub/epub-format-writer';
     FileWriteSettingsService,
     FileLockService,
     EpubFormatWriter,
+    PdfFormatWriter,
     {
       provide: FORMAT_WRITERS,
-      useFactory: (epub: EpubFormatWriter) => [epub],
-      inject: [EpubFormatWriter],
+      useFactory: (epub: EpubFormatWriter, pdf: PdfFormatWriter) => [epub, pdf],
+      inject: [EpubFormatWriter, PdfFormatWriter],
     },
     FormatWriterRegistry,
   ],

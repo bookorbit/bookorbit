@@ -177,17 +177,17 @@ export class MetadataService {
         const fb = !pdf.title ? parseBookFilename(absolutePath) : null;
         parsed = {
           title: pdf.title ?? fb?.title ?? null,
-          subtitle: null,
-          description: pdf.subject,
-          isbn10: null,
-          isbn13: null,
-          publisher: null,
-          publishedYear: fb?.publishedYear ?? null,
-          language: null,
-          seriesName: null,
-          seriesIndex: null,
+          subtitle: pdf.subtitle,
+          description: pdf.description,
+          isbn10: pdf.isbn10,
+          isbn13: pdf.isbn13,
+          publisher: pdf.publisher,
+          publishedYear: pdf.publishedYear ?? fb?.publishedYear ?? null,
+          language: pdf.language,
+          seriesName: pdf.seriesName,
+          seriesIndex: pdf.seriesIndex,
           authors: pdf.authors,
-          tags: pdf.keywords,
+          tags: pdf.genres, // 'tags' in parsed feeds replaceGenres
         };
         if (pdf.pageCount !== null) {
           await this.db.update(bookMetadata).set({ pageCount: pdf.pageCount }).where(eq(bookMetadata.bookId, bookId));

@@ -36,10 +36,11 @@ export interface EpubReaderSettings {
 }
 
 export interface PdfReaderSettings {
-  scrollMode: 'continuous' | 'page'
+  scrollMode: 'vertical' | 'horizontal' | 'wrapped' | 'page'
   spread: 'none' | 'odd' | 'even'
   zoomMode: 'fit-width' | 'fit-page' | 'custom'
   customScale: number // 0.25-4.0, used when zoomMode is 'custom'
+  rotation: 0 | 90 | 180 | 270
 }
 
 export interface CbxReaderSettings {
@@ -75,10 +76,11 @@ export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
 }
 
 export const PDF_READER_DEFAULTS: PdfReaderSettings = {
-  scrollMode: 'continuous',
+  scrollMode: 'vertical',
   spread: 'none',
   zoomMode: 'fit-page',
   customScale: 1.0,
+  rotation: 0,
 }
 
 export const CBX_READER_DEFAULTS: CbxReaderSettings = {

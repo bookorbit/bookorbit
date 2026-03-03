@@ -5,15 +5,31 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { PDFDocument } from 'pdf-lib';
 
+import { extractXmpXml, parseXmp, type XmpParsed } from './pdf-xmp-reader';
+
 const execAsync = promisify(exec);
 
 export interface PdfParsed {
   title: string | null;
+  subtitle: string | null;
   authors: { name: string; sortName: string | null }[];
-  subject: string | null;
-  keywords: string[];
+  description: string | null;
   publisher: string | null;
+  publishedYear: number | null;
+  language: string | null;
+  genres: string[];
+  tags: string[];
+  isbn10: string | null;
+  isbn13: string | null;
+  seriesName: string | null;
+  seriesIndex: number | null;
+  rating: number | null;
   pageCount: number | null;
+  googleBooksId: string | null;
+  goodreadsId: string | null;
+  amazonId: string | null;
+  hardcoverId: string | null;
+  openLibraryId: string | null;
   coverBuffer: Buffer | null;
 }
 
@@ -23,7 +39,7 @@ function clean(value: string | undefined): string | null {
   return s.length > 0 ? s : null;
 }
 
-function splitKeywords(value: string | null): string[] {
+function splitCommaList(value: string | null): string[] {
   if (!value) return [];
   return value
     .split(/[,;]/)
@@ -31,7 +47,6 @@ function splitKeywords(value: string | null): string[] {
     .filter(Boolean);
 }
 
-/** Renders the first page of a PDF to JPEG using pdftoppm. */
 async function extractPdfCover(absolutePath: string): Promise<Buffer | null> {
   const tmpDir = await mkdtemp(join(tmpdir(), 'pdf-cover-'));
   try {
@@ -53,15 +68,18 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
     const buf = await readFile(absolutePath);
     const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
 
-    const title = clean(doc.getTitle());
-    const authorRaw = clean(doc.getAuthor());
-    const subject = clean(doc.getSubject());
-    const keywords = splitKeywords(clean(doc.getKeywords()));
-    const publisher: string | null = null;
-    const pageCount = doc.getPageCount();
+    // XMP is the authoritative source — richer and semantically correct.
+    // Info Dictionary is used only as fallback for fields XMP doesn't cover.
+    const xmpXml = extractXmpXml(doc);
+    const xmp: XmpParsed | null = xmpXml ? parseXmp(xmpXml) : null;
 
-    const authors = authorRaw
-      ? authorRaw
+    const infoTitle = clean(doc.getTitle());
+    const infoAuthorRaw = clean(doc.getAuthor());
+    const infoSubject = clean(doc.getSubject());
+    const infoKeywords = splitCommaList(clean(doc.getKeywords()));
+
+    const infoAuthors = infoAuthorRaw
+      ? infoAuthorRaw
           .split(/[,;]/)
           .map((s) => s.trim())
           .filter(Boolean)
@@ -70,7 +88,30 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
 
     const coverBuffer = await extractPdfCover(absolutePath);
 
-    return { title, authors, subject, keywords, publisher, pageCount, coverBuffer };
+    return {
+      title: xmp?.title ?? infoTitle,
+      subtitle: xmp?.subtitle ?? null,
+      authors: xmp?.authors?.length ? xmp.authors : infoAuthors,
+      description: xmp?.description ?? infoSubject,
+      publisher: xmp?.publisher ?? null,
+      publishedYear: xmp?.publishedYear ?? null,
+      language: xmp?.language ?? null,
+      genres: xmp?.genres?.length ? xmp.genres : [],
+      // Info Dict keywords are genres+tags mixed — only use as tags when no XMP
+      tags: xmp ? xmp.tags : infoKeywords,
+      isbn10: xmp?.isbn10 ?? null,
+      isbn13: xmp?.isbn13 ?? null,
+      seriesName: xmp?.seriesName ?? null,
+      seriesIndex: xmp?.seriesIndex ?? null,
+      rating: xmp?.rating ?? null,
+      pageCount: doc.getPageCount(),
+      googleBooksId: xmp?.googleBooksId ?? null,
+      goodreadsId: xmp?.goodreadsId ?? null,
+      amazonId: xmp?.amazonId ?? null,
+      hardcoverId: xmp?.hardcoverId ?? null,
+      openLibraryId: xmp?.openLibraryId ?? null,
+      coverBuffer,
+    };
   } catch {
     return null;
   }

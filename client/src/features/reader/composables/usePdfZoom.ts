@@ -47,7 +47,7 @@ export function usePdfZoom(
   })
 
   function adjustZoom(delta: number) {
-    customScale.value = Math.round(Math.max(0.25, Math.min(4, (zoomMode.value === 'custom' ? customScale.value : scale.value) + delta) * 20) / 20)
+    customScale.value = Math.round(Math.max(0.25, Math.min(4, (zoomMode.value === 'custom' ? customScale.value : scale.value) + delta)) * 20) / 20
     zoomMode.value = 'custom'
   }
 

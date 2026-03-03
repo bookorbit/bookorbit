@@ -1,14 +1,29 @@
 import { nextTick, ref } from 'vue'
-import type * as pdfjsLib from 'pdfjs-dist'
 import type { ComputedRef, Ref } from 'vue'
-import type { PageDim } from './usePdf'
+import type { CancellableRender, PageDim } from './usePdf'
 
-type RenderPageFn = (pageNum: number, canvas: HTMLCanvasElement, scale: number) => Promise<void>
-type GetTextContentFn = (pageNum: number) => Promise<{ content: pdfjsLib.TextContent; viewport: pdfjsLib.PageViewport } | null>
+interface PdfTextItem {
+  str: string
+  transform: number[]
+  height?: number
+}
+
+interface PdfViewport {
+  width: number
+  height: number
+  clone(opts: { scale: number; rotation: number }): PdfViewport
+}
+
+interface PdfTextContent {
+  items: unknown[]
+}
+
+type StartRenderPageFn = (pageNum: number, canvas: HTMLCanvasElement, scale: number) => CancellableRender
+type GetTextContentFn = (pageNum: number) => Promise<{ content: PdfTextContent; viewport: PdfViewport } | null>
 type OnDimUpdateFn = (pageNum: number, dim: PageDim) => void
 
 export function usePdfRenderer(
-  renderPageFn: RenderPageFn,
+  startRenderPageFn: StartRenderPageFn,
   getTextContentFn: GetTextContentFn,
   scale: ComputedRef<number>,
   rotation: Ref<0 | 90 | 180 | 270>,
@@ -19,6 +34,8 @@ export function usePdfRenderer(
   const textLayerMap = ref(new Map<number, HTMLElement>())
 
   const rendered = new Set<number>()
+  // Tracks in-flight renders so they can be cancelled before a new one starts on the same canvas.
+  const activeRenders = new Map<number, CancellableRender>()
   let renderQueue: number[] = []
   let isRendering = false
   let ioEntries: IntersectionObserverEntry[] = []
@@ -37,8 +54,18 @@ export function usePdfRenderer(
       const pageNum = renderQueue.shift()!
       const canvas = canvasMap.value.get(pageNum)
       if (!canvas) continue
-      await renderPageFn(pageNum, canvas, scale.value)
-      // Report natural dim back so layout can correct any initial estimate.
+
+      // Cancel any prior render on this canvas before starting a new one.
+      activeRenders.get(pageNum)?.cancel()
+
+      const task = startRenderPageFn(pageNum, canvas, scale.value)
+      activeRenders.set(pageNum, task)
+      await task.promise
+
+      // Only proceed with post-render steps if this task wasn't superseded.
+      if (activeRenders.get(pageNum) !== task) continue
+      activeRenders.delete(pageNum)
+
       onDimUpdate(pageNum, { width: canvas.width / scale.value, height: canvas.height / scale.value })
       rendered.add(pageNum)
       await buildTextLayer(pageNum)
@@ -58,8 +85,9 @@ export function usePdfRenderer(
     container.style.height = `${scaledVp.height}px`
     const s = scale.value
     for (const item of content.items) {
-      if (!('str' in item) || !(item as pdfjsLib.TextItem).str.trim()) continue
-      const { str, transform, height } = item as pdfjsLib.TextItem
+      if (typeof item !== 'object' || item === null || !('str' in item)) continue
+      const { str, transform, height } = item as PdfTextItem
+      if (!str.trim()) continue
       const [a, b, , , e, f] = transform
       const span = document.createElement('span')
       span.textContent = str
@@ -88,6 +116,9 @@ export function usePdfRenderer(
 
   // Clear render state and re-trigger visible pages — call after zoom, rotation, or resize.
   function invalidate() {
+    // Cancel all in-flight renders so their canvases are free immediately.
+    for (const task of activeRenders.values()) task.cancel()
+    activeRenders.clear()
     rendered.clear()
     renderQueue = []
     isRendering = false
@@ -102,6 +133,8 @@ export function usePdfRenderer(
 
   // Call when a new document is loaded to clear stale canvas/text-layer refs.
   function reset() {
+    for (const task of activeRenders.values()) task.cancel()
+    activeRenders.clear()
     canvasMap.value = new Map()
     textLayerMap.value = new Map()
     rendered.clear()
@@ -111,6 +144,7 @@ export function usePdfRenderer(
 
   function destroy() {
     io?.disconnect()
+    for (const task of activeRenders.values()) task.cancel()
   }
 
   return { canvasMap, textLayerMap, invalidate, setupIO, reset, destroy }

@@ -1,9 +1,8 @@
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
-
-const APP_WRITE_NAMESPACE = 'projectx';
-const APP_NS_URI = 'https://projectx.app/metadata/1.0/';
+import { PROJECTX_NS_PREFIX as APP_WRITE_NAMESPACE, PROJECTX_NS_URI as APP_NS_URI } from '../shared/projectx-ns';
+import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 
 const writerParser = new XMLParser({
   ignoreAttributes: false,
@@ -369,15 +368,5 @@ export function build(opfXml: string, payload: BookWritePayload, _options: Forma
 
   const newOpfXml = String(writerBuilder.build(parsed));
 
-  const fieldsWritten = (Object.keys(payload) as (keyof BookWritePayload)[])
-    .filter((k) => {
-      if (k === 'coverBytes') return false;
-      const v = payload[k];
-      if (v == null) return false;
-      if (Array.isArray(v)) return v.length > 0;
-      return true;
-    })
-    .map(String);
-
-  return { newOpfXml, fieldsWritten };
+  return { newOpfXml, fieldsWritten: resolveFieldsWritten(payload) };
 }

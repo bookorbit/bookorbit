@@ -10,7 +10,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsInt() @Min(1) pageCount?: number | null;
   @IsOptional() @IsString() @MaxLength(500) seriesName?: string | null;
   @IsOptional() @IsNumber() seriesIndex?: number | null;
-  @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
+  @IsOptional() @IsString() @MaxLength(13) isbn10?: string | null;
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];

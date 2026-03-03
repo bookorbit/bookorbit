@@ -91,7 +91,7 @@ export class StagingMetadataService {
       publisher: parsed.publisher ?? undefined,
       pageCount: parsed.pageCount ?? undefined,
       authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
-      genres: parsed.keywords.length > 0 ? parsed.keywords : undefined,
+      genres: parsed.genres.length > 0 ? parsed.genres : undefined,
     };
   }
 

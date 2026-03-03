@@ -756,6 +756,16 @@ html.radius-pill {
 }
 
 @layer components {
+  .pdf-find-match {
+    background: rgba(255, 220, 0, 0.38);
+    border-radius: 1px;
+  }
+  .pdf-find-match-current {
+    background: rgba(255, 140, 0, 0.55);
+    outline: 1px solid rgba(255, 140, 0, 0.85);
+    border-radius: 1px;
+  }
+
   .viewer-btn {
     @apply flex items-center justify-center w-8 h-8 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
   }

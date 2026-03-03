@@ -121,7 +121,7 @@ async function toggleWriteLog() {
 </script>
 
 <template>
-  <div class="max-w-6xl space-y-2">
+  <div class="max-w-8xl space-y-2">
     <!-- lastWrittenAt info strip -->
     <div v-if="book.lastWrittenAt" class="flex items-center justify-between px-1 py-1">
       <span class="text-xs text-muted-foreground"> Last synced to file: {{ formatRelative(book.lastWrittenAt) }} </span>

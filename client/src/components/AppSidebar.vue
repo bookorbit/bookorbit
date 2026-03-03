@@ -233,12 +233,12 @@ onMounted(async () => {
                 <SidebarMenuButton
                   :is-active="activeLibraryId === lib.id"
                   :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
-                  class="gap-2.5 h-8"
+                  class="gap-2.5 h-8 [&>svg]:size-4.25!"
                   @click="router.push({ name: 'library', params: { id: lib.id } })"
                 >
                   <component
                     :is="getLibraryIcon(lib.icon)"
-                    :size="16"
+                    :size="18"
                     :class="[
                       activeLibraryId === lib.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/45',
                       getProgress(lib.id)?.status === 'running' ? 'animate-pulse' : '',

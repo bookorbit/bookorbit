@@ -99,12 +99,12 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 }
 
 const editorOpen = ref(false)
-const confirmDelete = ref(false)
+const confirmLensDelete = ref(false)
 const deleting = ref(false)
 
 async function handleDelete() {
-  if (!confirmDelete.value) {
-    confirmDelete.value = true
+  if (!confirmLensDelete.value) {
+    confirmLensDelete.value = true
     return
   }
   deleting.value = true
@@ -113,13 +113,13 @@ async function handleDelete() {
     router.push({ name: 'home' })
   } finally {
     deleting.value = false
-    confirmDelete.value = false
+    confirmLensDelete.value = false
   }
 }
 
 function openEditor() {
   editorOpen.value = true
-  confirmDelete.value = false
+  confirmLensDelete.value = false
 }
 
 function onSaved() {
@@ -229,13 +229,13 @@ watch(
           :disabled="deleting"
           class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
           :class="
-            confirmDelete
+            confirmLensDelete
               ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
               : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
           "
         >
           <Trash2 :size="13" />
-          <span>{{ confirmDelete ? 'Confirm?' : 'Delete' }}</span>
+          <span>{{ confirmLensDelete ? 'Confirm?' : 'Delete' }}</span>
         </button>
       </template>
     </ViewHeader>

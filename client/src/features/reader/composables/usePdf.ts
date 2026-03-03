@@ -4,11 +4,15 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
-export type ZoomMode = 'fit-width' | 'fit-page' | 'custom'
 
 export interface PageDim {
   width: number
   height: number
+}
+
+export interface CancellableRender {
+  promise: Promise<void>
+  cancel: () => void
 }
 
 export function usePdf() {
@@ -24,7 +28,7 @@ export function usePdf() {
     try {
       const doc = await pdfjsLib.getDocument({
         url: `/api/v1/books/files/${fileId}/serve`,
-        rangeChunkSize: 65536,
+        rangeChunkSize: 524288,
         disableStream: true,
         disableAutoFetch: true,
       }).promise
@@ -46,15 +50,38 @@ export function usePdf() {
     return { width: vp.width, height: vp.height }
   }
 
-  async function renderPage(pageNum: number, canvas: HTMLCanvasElement, scale: number): Promise<void> {
-    const doc = pdfDoc.value
-    if (!doc) return
-    const page = await doc.getPage(pageNum)
-    const viewport = page.getViewport({ scale })
-    canvas.width = viewport.width
-    canvas.height = viewport.height
-    await page.render({ canvas, viewport }).promise
-    page.cleanup()
+  function startRenderPage(pageNum: number, canvas: HTMLCanvasElement, scale: number): CancellableRender {
+    let renderTask: pdfjsLib.RenderTask | null = null
+    let cancelled = false
+
+    const promise = (async () => {
+      const doc = pdfDoc.value
+      if (!doc || cancelled) return
+      const page = await doc.getPage(pageNum)
+      if (cancelled) {
+        page.cleanup()
+        return
+      }
+      const viewport = page.getViewport({ scale })
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      renderTask = page.render({ canvas, viewport })
+      try {
+        await renderTask.promise
+      } catch {
+        // cancelled or interrupted — not an error
+      } finally {
+        page.cleanup()
+      }
+    })()
+
+    return {
+      promise,
+      cancel() {
+        cancelled = true
+        renderTask?.cancel()
+      },
+    }
   }
 
   async function getTextContent(pageNum: number) {
@@ -72,5 +99,5 @@ export function usePdf() {
     pdfDoc.value = null
   })
 
-  return { pdfDoc, totalPages, loading, error, load, getPageDim, renderPage, getTextContent }
+  return { pdfDoc, totalPages, loading, error, load, getPageDim, startRenderPage, getTextContent }
 }
