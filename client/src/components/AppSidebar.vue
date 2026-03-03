@@ -2,14 +2,12 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from 'lucide-vue-next'
-import { Aperture, FolderOpen, LayoutDashboard, PackageOpen, Plus } from 'lucide-vue-next'
+import { Aperture, ChevronDown, FolderOpen, LayoutDashboard, PackageOpen, Plus } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -49,6 +47,23 @@ const createLensOpen = ref(false)
 const createCollectionOpen = ref(false)
 const createLibraryOpen = ref(false)
 const scanningLibraryId = ref<number | null>(null)
+
+const librariesOpen = ref(localStorage.getItem('projectx:sidebar:libraries') !== 'false')
+const lensesOpen = ref(localStorage.getItem('projectx:sidebar:lenses') !== 'false')
+const collectionsOpen = ref(localStorage.getItem('projectx:sidebar:collections') !== 'false')
+
+function toggleLibraries() {
+  librariesOpen.value = !librariesOpen.value
+  localStorage.setItem('projectx:sidebar:libraries', String(librariesOpen.value))
+}
+function toggleLenses() {
+  lensesOpen.value = !lensesOpen.value
+  localStorage.setItem('projectx:sidebar:lenses', String(lensesOpen.value))
+}
+function toggleCollections() {
+  collectionsOpen.value = !collectionsOpen.value
+  localStorage.setItem('projectx:sidebar:collections', String(collectionsOpen.value))
+}
 
 const activeLibraryId = computed(() => {
   const id = route.params.id
@@ -155,24 +170,24 @@ onMounted(async () => {
     </SidebarHeader>
 
     <SidebarContent>
-      <!-- Dashboard -->
-      <SidebarGroup class="pt-2 pb-0">
+      <!-- Dashboard / Staging -->
+      <SidebarGroup class="py-2">
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton :is-active="isDashboardActive" tooltip="Dashboard" class="gap-2.5" @click="router.push({ name: 'dashboard' })">
-                <LayoutDashboard :size="15" :class="isDashboardActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
-                <span :class="isDashboardActive ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'"> Dashboard </span>
+              <SidebarMenuButton :is-active="isDashboardActive" tooltip="Dashboard" class="gap-3 h-9" @click="router.push({ name: 'dashboard' })">
+                <LayoutDashboard :size="16" :class="isDashboardActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
+                <span class="text-sm" :class="isDashboardActive ? 'font-semibold text-sidebar-foreground' : 'text-sidebar-foreground/80'">Dashboard</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem v-if="hasPermission('staging_access')">
-              <SidebarMenuButton :is-active="isStagingActive" tooltip="Staging" class="gap-2.5" @click="router.push({ name: 'staging' })">
-                <PackageOpen :size="15" :class="isStagingActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
-                <span :class="isStagingActive ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'"> Staging </span>
+              <SidebarMenuButton :is-active="isStagingActive" tooltip="Staging" class="gap-3 h-9" @click="router.push({ name: 'staging' })">
+                <PackageOpen :size="16" :class="isStagingActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'" />
+                <span class="text-sm" :class="isStagingActive ? 'font-semibold text-sidebar-foreground' : 'text-sidebar-foreground/80'">Staging</span>
                 <span
                   v-if="stagingSummary.total > 0"
-                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
-                  :class="isStagingActive ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
+                  class="ml-auto shrink-0 rounded px-1.5 py-px text-[11px] tabular-nums font-medium group-data-[collapsible=icon]:hidden transition-colors"
+                  :class="isStagingActive ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/60'"
                 >
                   {{ stagingSummary.total }}
                 </span>
@@ -185,157 +200,206 @@ onMounted(async () => {
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Libraries -->
-      <SidebarGroup class="pt-2">
-        <SidebarGroupLabel
-          class="text-[10px] uppercase tracking-widest text-sidebar-foreground/75 font-semibold group-data-[collapsible=icon]:hidden"
-        >
-          Libraries
-        </SidebarGroupLabel>
-        <SidebarGroupAction v-if="hasPermission('manage_libraries')" tooltip="New Library" @click="createLibraryOpen = true">
-          <Plus />
-        </SidebarGroupAction>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem v-for="lib in libraries" :key="lib.id">
-              <SidebarMenuButton
-                :is-active="activeLibraryId === lib.id"
-                :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
-                class="gap-2.5"
-                @click="router.push({ name: 'library', params: { id: lib.id } })"
-              >
-                <component
-                  :is="getLibraryIcon(lib.icon)"
-                  :size="15"
-                  :class="[
-                    activeLibraryId === lib.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50',
-                    getProgress(lib.id)?.status === 'running' ? 'animate-pulse' : '',
-                  ]"
-                />
-                <span :class="activeLibraryId === lib.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
-                  {{ lib.name }}
-                </span>
-                <span
-                  v-if="getProgress(lib.id)?.status === 'running'"
-                  class="ml-auto shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs tabular-nums text-primary group-data-[collapsible=icon]:hidden"
+      <SidebarGroup class="py-2">
+        <div class="flex h-8 items-center px-2 group-data-[collapsible=icon]:hidden">
+          <button
+            class="flex flex-1 items-center gap-2 min-w-0 group/hdr"
+            @click="toggleLibraries"
+          >
+            <span class="text-xs font-bold uppercase tracking-wider text-sidebar-foreground/55 group-hover/hdr:text-sidebar-foreground/90 transition-colors">Libraries</span>
+            <span v-if="!librariesOpen && libraries.length > 0" class="text-[11px] font-normal normal-case tracking-normal text-sidebar-foreground/40">
+              ({{ libraries.length }})
+            </span>
+            <ChevronDown
+              :size="13"
+              :stroke-width="2.5"
+              class="ml-auto shrink-0 text-sidebar-foreground/40 transition-transform duration-200 group-hover/hdr:text-sidebar-foreground/70"
+              :class="librariesOpen ? 'rotate-0' : '-rotate-90'"
+            />
+          </button>
+          <button
+            v-if="hasPermission('manage_libraries')"
+            class="ml-1 shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            title="New Library"
+            @click="createLibraryOpen = true"
+          >
+            <Plus :size="14" :stroke-width="2.5" />
+          </button>
+        </div>
+        <div v-show="librariesOpen">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem v-for="lib in libraries" :key="lib.id">
+                <SidebarMenuButton
+                  :is-active="activeLibraryId === lib.id"
+                  :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
+                  class="gap-2.5 h-8"
+                  @click="router.push({ name: 'library', params: { id: lib.id } })"
                 >
-                  {{ scanPct(lib.id) }}%
-                </span>
-                <span
-                  v-else-if="lib.bookCount !== undefined"
-                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
-                  :class="activeLibraryId === lib.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
-                >
-                  {{ lib.bookCount.toLocaleString() }}
-                </span>
-              </SidebarMenuButton>
-              <Transition name="scan-progress">
-                <div v-if="getProgress(lib.id)?.status === 'running'" class="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
-                  <div class="h-0.5 w-full rounded-full bg-sidebar-foreground/10 overflow-hidden">
-                    <div
-                      class="h-full rounded-full bg-primary transition-all duration-300"
-                      :style="{
-                        width: getProgress(lib.id)!.total > 0 ? `${scanPct(lib.id)}%` : '30%',
-                        animation: getProgress(lib.id)!.total === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
-                      }"
-                    />
+                  <component
+                    :is="getLibraryIcon(lib.icon)"
+                    :size="16"
+                    :class="[
+                      activeLibraryId === lib.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/45',
+                      getProgress(lib.id)?.status === 'running' ? 'animate-pulse' : '',
+                    ]"
+                  />
+                  <span class="text-[13.5]" :class="activeLibraryId === lib.id ? 'font-semibold text-sidebar-foreground' : 'text-sidebar-foreground/75'">
+                    {{ lib.name }}
+                  </span>
+                  <span
+                    v-if="getProgress(lib.id)?.status === 'running'"
+                    class="ml-auto shrink-0 rounded bg-primary/15 px-1.5 py-px text-[11px] tabular-nums font-medium text-primary group-data-[collapsible=icon]:hidden"
+                  >
+                    {{ scanPct(lib.id) }}%
+                  </span>
+                  <span
+                    v-else-if="lib.bookCount !== undefined"
+                    class="ml-auto shrink-0 rounded px-1.5 py-px text-[11px] tabular-nums font-medium group-data-[collapsible=icon]:hidden transition-colors"
+                    :class="activeLibraryId === lib.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/8 text-sidebar-foreground/50'"
+                  >
+                    {{ lib.bookCount.toLocaleString() }}
+                  </span>
+                </SidebarMenuButton>
+                <Transition name="scan-progress">
+                  <div v-if="getProgress(lib.id)?.status === 'running'" class="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
+                    <div class="h-0.5 w-full rounded-full bg-sidebar-foreground/10 overflow-hidden">
+                      <div
+                        class="h-full rounded-full bg-primary transition-all duration-300"
+                        :style="{
+                          width: getProgress(lib.id)!.total > 0 ? `${scanPct(lib.id)}%` : '30%',
+                          animation: getProgress(lib.id)!.total === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                        }"
+                      />
+                    </div>
+                    <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
+                      {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
+                    </p>
                   </div>
-                  <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
-                    {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
-                  </p>
-                </div>
-              </Transition>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
+                </Transition>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </div>
       </SidebarGroup>
 
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Lenses -->
-      <SidebarGroup>
-        <SidebarGroupLabel
-          class="text-[10px] uppercase tracking-widest text-sidebar-foreground/75 font-semibold group-data-[collapsible=icon]:hidden"
-        >
-          Lenses
-        </SidebarGroupLabel>
-        <SidebarGroupAction tooltip="New Lens" @click="createLensOpen = true">
-          <Plus />
-        </SidebarGroupAction>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem v-for="lens in lenses" :key="lens.id">
-              <SidebarMenuButton
-                :is-active="activeLensId === lens.id"
-                :tooltip="lens.name"
-                class="gap-2.5"
-                @click="router.push({ name: 'lens', params: { id: lens.id } })"
-              >
-                <component
-                  :is="getLensIcon(lens.icon)"
-                  :size="15"
-                  :class="activeLensId === lens.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'"
-                />
-                <span :class="activeLensId === lens.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
-                  {{ lens.name }}
-                </span>
-                <span
-                  v-if="lens.bookCount !== undefined"
-                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
-                  :class="activeLensId === lens.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
+      <SidebarGroup class="py-2">
+        <div class="flex h-8 items-center px-2 group-data-[collapsible=icon]:hidden">
+          <button class="flex flex-1 items-center gap-2 min-w-0 group/hdr" @click="toggleLenses">
+            <span class="text-xs font-bold uppercase tracking-wider text-sidebar-foreground/55 group-hover/hdr:text-sidebar-foreground/90 transition-colors">Lenses</span>
+            <span v-if="!lensesOpen && lenses.length > 0" class="text-[11px] font-normal normal-case tracking-normal text-sidebar-foreground/40">
+              ({{ lenses.length }})
+            </span>
+            <ChevronDown
+              :size="13"
+              :stroke-width="2.5"
+              class="ml-auto shrink-0 text-sidebar-foreground/40 transition-transform duration-200 group-hover/hdr:text-sidebar-foreground/70"
+              :class="lensesOpen ? 'rotate-0' : '-rotate-90'"
+            />
+          </button>
+          <button
+            class="ml-1 shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            title="New Lens"
+            @click="createLensOpen = true"
+          >
+            <Plus :size="14" :stroke-width="2.5" />
+          </button>
+        </div>
+        <div v-show="lensesOpen">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem v-for="lens in lenses" :key="lens.id">
+                <SidebarMenuButton
+                  :is-active="activeLensId === lens.id"
+                  :tooltip="lens.name"
+                  class="gap-2.5 h-8"
+                  @click="router.push({ name: 'lens', params: { id: lens.id } })"
                 >
-                  {{ lens.bookCount.toLocaleString() }}
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem v-if="lenses.length === 0">
-              <span class="px-2 py-1 text-xs text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
+                  <component
+                    :is="getLensIcon(lens.icon)"
+                    :size="16"
+                    :class="activeLensId === lens.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/45'"
+                  />
+                  <span class="text-[13.5]" :class="activeLensId === lens.id ? 'font-semibold text-sidebar-foreground' : 'text-sidebar-foreground/75'">
+                    {{ lens.name }}
+                  </span>
+                  <span
+                    v-if="lens.bookCount !== undefined"
+                    class="ml-auto shrink-0 rounded px-1.5 py-px text-[11px] tabular-nums font-medium group-data-[collapsible=icon]:hidden transition-colors"
+                    :class="activeLensId === lens.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/8 text-sidebar-foreground/50'"
+                  >
+                    {{ lens.bookCount.toLocaleString() }}
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem v-if="lenses.length === 0">
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </div>
       </SidebarGroup>
 
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Collections -->
-      <SidebarGroup>
-        <SidebarGroupLabel
-          class="text-[10px] uppercase tracking-widest text-sidebar-foreground/75 font-semibold group-data-[collapsible=icon]:hidden"
-        >
-          Collections
-        </SidebarGroupLabel>
-        <SidebarGroupAction tooltip="New Collection" @click="createCollectionOpen = true">
-          <Plus />
-        </SidebarGroupAction>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem v-for="collection in collections" :key="collection.id">
-              <SidebarMenuButton
-                :is-active="activeCollectionId === collection.id"
-                :tooltip="collection.name"
-                class="gap-2.5"
-                @click="router.push({ name: 'collection', params: { id: collection.id } })"
-              >
-                <component
-                  :is="getCollectionIcon(collection.icon)"
-                  :size="15"
-                  :class="activeCollectionId === collection.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/50'"
-                />
-                <span :class="activeCollectionId === collection.id ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/70'">
-                  {{ collection.name }}
-                </span>
-                <span
-                  class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden transition-colors"
-                  :class="activeCollectionId === collection.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70'"
+      <SidebarGroup class="py-2">
+        <div class="flex h-8 items-center px-2 group-data-[collapsible=icon]:hidden">
+          <button class="flex flex-1 items-center gap-2 min-w-0 group/hdr" @click="toggleCollections">
+            <span class="text-xs font-bold uppercase tracking-wider text-sidebar-foreground/55 group-hover/hdr:text-sidebar-foreground/90 transition-colors">Collections</span>
+            <span v-if="!collectionsOpen && collections.length > 0" class="text-[11px] font-normal normal-case tracking-normal text-sidebar-foreground/40">
+              ({{ collections.length }})
+            </span>
+            <ChevronDown
+              :size="13"
+              :stroke-width="2.5"
+              class="ml-auto shrink-0 text-sidebar-foreground/40 transition-transform duration-200 group-hover/hdr:text-sidebar-foreground/70"
+              :class="collectionsOpen ? 'rotate-0' : '-rotate-90'"
+            />
+          </button>
+          <button
+            class="ml-1 shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            title="New Collection"
+            @click="createCollectionOpen = true"
+          >
+            <Plus :size="14" :stroke-width="2.5" />
+          </button>
+        </div>
+        <div v-show="collectionsOpen">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem v-for="collection in collections" :key="collection.id">
+                <SidebarMenuButton
+                  :is-active="activeCollectionId === collection.id"
+                  :tooltip="collection.name"
+                  class="gap-2.5 h-8"
+                  @click="router.push({ name: 'collection', params: { id: collection.id } })"
                 >
-                  {{ collection.bookCount.toLocaleString() }}
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem v-if="collections.length === 0">
-              <span class="px-2 py-1 text-xs text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No collections yet</span>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
+                  <component
+                    :is="getCollectionIcon(collection.icon)"
+                    :size="16"
+                    :class="activeCollectionId === collection.id ? 'text-sidebar-primary' : 'text-sidebar-foreground/45'"
+                  />
+                  <span class="text-[13.5]" :class="activeCollectionId === collection.id ? 'font-semibold text-sidebar-foreground' : 'text-sidebar-foreground/75'">
+                    {{ collection.name }}
+                  </span>
+                  <span
+                    class="ml-auto shrink-0 rounded px-1.5 py-px text-[11px] tabular-nums font-medium group-data-[collapsible=icon]:hidden transition-colors"
+                    :class="activeCollectionId === collection.id ? 'bg-primary/15 text-primary' : 'bg-sidebar-foreground/8 text-sidebar-foreground/50'"
+                  >
+                    {{ collection.bookCount.toLocaleString() }}
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem v-if="collections.length === 0">
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No collections yet</span>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </div>
       </SidebarGroup>
     </SidebarContent>
 
