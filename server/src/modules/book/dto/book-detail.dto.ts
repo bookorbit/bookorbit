@@ -33,4 +33,5 @@ export class BookDetailDto {
   genres: string[];
   tags: string[];
   files: BookFileDto[];
+  lastWrittenAt: Date | null;
 }

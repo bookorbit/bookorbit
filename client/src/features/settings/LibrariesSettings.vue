@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Images } from 'lucide-vue-next'
+import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Images, FileEdit } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import type { Library as LibraryType, LibraryStats } from '@projectx/types'
+import type { GlobalFileWriteSettings, Library as LibraryType, LibraryStats } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -23,6 +24,36 @@ const pendingNavigateLibraryId = ref<number | null>(null)
 const deletingLibrary = ref<LibraryType | null>(null)
 const deleteConfirmName = ref('')
 const deleting = ref(false)
+const fileSyncingMap = ref<Record<number, boolean>>({})
+const fileWriteEnabled = ref(false)
+const confirmSyncLibrary = ref<LibraryType | null>(null)
+
+const { syncAll: syncAllFiles } = useLibraryFileSync()
+
+function promptSyncFiles(lib: LibraryType) {
+  confirmSyncLibrary.value = lib
+}
+
+async function confirmSyncFiles() {
+  const lib = confirmSyncLibrary.value
+  if (!lib) return
+  confirmSyncLibrary.value = null
+  fileSyncingMap.value[lib.id] = true
+  try {
+    await syncAllFiles(lib.id)
+    toast.success(`Metadata synced to files for "${lib.name}"`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg.includes('400')) {
+      toast.error('Metadata file write is not enabled. Turn it on in Maintenance settings.')
+    } else {
+      toast.error(`File sync failed for "${lib.name}"`)
+    }
+  } finally {
+    fileSyncingMap.value[lib.id] = false
+  }
+}
+
 
 async function loadAllStats() {
   await Promise.all(
@@ -44,6 +75,12 @@ onMounted(async () => {
   await fetchLibraries()
   subscribeAll()
   loadAllStats()
+  api('/api/v1/app-settings/file-write-settings').then(async (res) => {
+    if (res.ok) {
+      const data: GlobalFileWriteSettings = await res.json()
+      fileWriteEnabled.value = data.enabled
+    }
+  })
 })
 
 const statsReloadedFor = new Set<number>()
@@ -297,6 +334,20 @@ function coverRefreshLabel(libraryId: number): string {
           <Tooltip>
             <TooltipTrigger as-child>
               <button
+                class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                :disabled="!!fileSyncingMap[lib.id] || !fileWriteEnabled"
+                @click="promptSyncFiles(lib)"
+              >
+                <FileEdit :size="13" :class="fileSyncingMap[lib.id] ? 'animate-pulse' : ''" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {{ fileWriteEnabled ? 'Sync metadata to files' : 'Sync metadata to files (enable in Maintenance settings)' }}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
                 class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 @click="openDelete(lib)"
               >
@@ -368,6 +419,32 @@ function coverRefreshLabel(libraryId: number): string {
           @click="confirmDelete"
         >
           {{ deleting ? 'Deleting...' : 'Delete Library' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync confirmation dialog -->
+  <div v-if="confirmSyncLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div class="bg-card border border-border rounded-xl shadow-xl w-full max-w-sm p-6">
+      <h3 class="text-base font-semibold text-foreground mb-1">Sync metadata to files?</h3>
+      <p class="text-sm text-muted-foreground mb-4">
+        This will overwrite the metadata inside every supported file in
+        <span class="font-medium text-foreground">{{ confirmSyncLibrary.name }}</span>
+        directly on disk. This cannot be undone.
+      </p>
+      <div class="flex justify-end gap-2">
+        <button
+          class="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
+          @click="confirmSyncLibrary = null"
+        >
+          Cancel
+        </button>
+        <button
+          class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          @click="confirmSyncFiles"
+        >
+          Sync files
         </button>
       </div>
     </div>

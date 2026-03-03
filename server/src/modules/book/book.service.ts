@@ -12,6 +12,7 @@ import { MetadataService } from '../metadata/metadata.service';
 import { LibraryService } from '../library/library.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
+import { FileWriteService } from '../file-write/file-write.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
@@ -31,6 +32,7 @@ export class BookService {
     private readonly pipeline: MetadataFetchPipeline,
     private readonly config: ConfigService,
     @Optional() private readonly embedder: BookEmbedderService,
+    @Optional() private readonly fileWriteService: FileWriteService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -39,7 +41,7 @@ export class BookService {
     return user.roles.some((r) => r.isSuperuser);
   }
 
-  private async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
+  async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
@@ -179,6 +181,7 @@ export class BookService {
     }
 
     this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
+    this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
     return this.getDetail(id, user);
   }
 
@@ -389,6 +392,7 @@ export class BookService {
         createdAt: f.createdAt,
         filename: basename(f.absolutePath),
       })),
+      lastWrittenAt: meta?.lastWrittenAt ?? null,
     };
   }
 }

@@ -21,6 +21,7 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { FileWriteRepository } from '../file-write/file-write.repository';
 import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
 import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
@@ -33,7 +34,10 @@ import type { BookQuery } from '@projectx/types';
 
 @Controller('books')
 export class BookController {
-  constructor(private readonly bookService: BookService) {}
+  constructor(
+    private readonly bookService: BookService,
+    private readonly fileWriteRepo: FileWriteRepository,
+  ) {}
 
   @Post('embed-all')
   @RequirePermission('manage_app_settings')
@@ -65,7 +69,7 @@ export class BookController {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     });
     const result = await this.bookService.bulkRefreshMetadata(dto.bookIds, user, (bookId) => {
       reply.raw.write(`data: ${JSON.stringify({ bookId })}\n\n`);
@@ -80,7 +84,7 @@ export class BookController {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     });
     const result = await this.bookService.bulkReExtractCover(dto.bookIds, user, (bookId) => {
       reply.raw.write(`data: ${JSON.stringify({ bookId })}\n\n`);
@@ -211,6 +215,14 @@ export class BookController {
   @RequirePermission('library_edit_metadata')
   refreshMetadata(@Param('id', ParseIntPipe) id: number, @Query('preview') preview: string | undefined, @CurrentUser() user: RequestUser) {
     return this.bookService.refreshMetadata(id, preview === 'true', user);
+  }
+
+  @Get(':id/write-log')
+  @RequirePermission('library_edit_metadata')
+  async getWriteLog(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    await this.bookService.verifyBookAccess(id, user);
+    const entries = await this.fileWriteRepo.findWriteLog(id);
+    return { entries };
   }
 
   @Get(':id')

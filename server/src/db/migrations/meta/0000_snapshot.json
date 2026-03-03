@@ -1,5 +1,5 @@
 {
-  "id": "d6367e5a-0f2b-4a49-9291-83caa87aa6f8",
+  "id": "147fbd21-53e8-47b8-ab41-2d093af68de3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1803,6 +1803,142 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.file_write_log": {
+      "name": "file_write_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "book_file_id": {
+          "name": "book_file_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "format": {
+          "name": "format",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fields_written": {
+          "name": "fields_written",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_ms": {
+          "name": "duration_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triggered_by": {
+          "name": "triggered_by",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "written_at": {
+          "name": "written_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fwl_book_id_idx": {
+          "name": "fwl_book_id_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "file_write_log_book_id_books_id_fk": {
+          "name": "file_write_log_book_id_books_id_fk",
+          "tableFrom": "file_write_log",
+          "tableTo": "books",
+          "columnsFrom": [
+            "book_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "file_write_log_book_file_id_book_files_id_fk": {
+          "name": "file_write_log_book_file_id_book_files_id_fk",
+          "tableFrom": "file_write_log",
+          "tableTo": "book_files",
+          "columnsFrom": [
+            "book_file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "file_write_log_user_id_users_id_fk": {
+          "name": "file_write_log_user_id_users_id_fk",
+          "tableFrom": "file_write_log",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.libraries": {
       "name": "libraries",
       "schema": "",
@@ -2383,6 +2519,12 @@
         "embedding": {
           "name": "embedding",
           "type": "vector(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_written_at": {
+          "name": "last_written_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },

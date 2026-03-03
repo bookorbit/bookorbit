@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 
+import type { GlobalFileWriteSettings } from '@projectx/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { AppSettingsService } from './app-settings.service';
@@ -76,5 +77,16 @@ export class AppSettingsController {
     } catch (err) {
       return { success: false, error: String(err) };
     }
+  }
+
+  @Get('file-write-settings')
+  getFileWriteSettings() {
+    return this.appSettingsService.getFileWriteSettings();
+  }
+
+  @Put('file-write-settings')
+  @HttpCode(HttpStatus.OK)
+  updateFileWriteSettings(@Body() patch: Partial<GlobalFileWriteSettings>) {
+    return this.appSettingsService.updateFileWriteSettings(patch);
   }
 }

@@ -61,6 +61,7 @@ export type BookDetail = {
   genres: string[];
   tags: string[];
   files: BookDetailFile[];
+  lastWrittenAt: string | null;
 };
 
 export type BooksPage = {

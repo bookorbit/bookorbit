@@ -13,3 +13,4 @@ export * from "./scanner";
 export * from "./opds";
 export * from "./kobo";
 export * from "./staging";
+export * from "./file-write";

@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 
 import { EmbeddingModule } from '../embedding/embedding.module';
+import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
@@ -10,7 +11,7 @@ import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
 
 @Module({
-  imports: [forwardRef(() => LibraryModule), MetadataModule, EmbeddingModule, MetadataFetchModule],
+  imports: [forwardRef(() => LibraryModule), MetadataModule, EmbeddingModule, MetadataFetchModule, FileWriteModule],
   controllers: [BookController],
   providers: [BookService, BookRepository, BookQueryBuilder],
   exports: [BookService, BookRepository, BookQueryBuilder],

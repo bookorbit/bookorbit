@@ -5,9 +5,14 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const FRAMEWORK_CONTEXTS = new Set(['InstanceLoader', 'RouterExplorer', 'RoutesResolver']);
 
+const SILENT_URL_RE = /\/books\/\d+\/(thumbnail|cover)(\?|$)/;
+
 export const loggerConfig: Params = {
   pinoHttp: {
     level: isDev ? 'debug' : 'info',
+    autoLogging: {
+      ignore: (req: IncomingMessage) => SILENT_URL_RE.test(req.url ?? ''),
+    },
     hooks: {
       logMethod(inputArgs, method) {
         const first = inputArgs[0];

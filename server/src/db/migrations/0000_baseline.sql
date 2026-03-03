@@ -222,6 +222,20 @@ CREATE TABLE "email_templates" (
 	CONSTRAINT "email_templates_user_id_name_unique" UNIQUE("user_id","name")
 );
 --> statement-breakpoint
+CREATE TABLE "file_write_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"book_id" integer NOT NULL,
+	"book_file_id" integer,
+	"user_id" integer,
+	"format" varchar(20) NOT NULL,
+	"status" varchar(10) NOT NULL,
+	"fields_written" jsonb,
+	"error_message" text,
+	"duration_ms" integer,
+	"triggered_by" varchar(10) NOT NULL,
+	"written_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "libraries" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -304,6 +318,7 @@ CREATE TABLE "book_metadata" (
 	"hardcover_id" varchar(50),
 	"open_library_id" varchar(50),
 	"embedding" vector(256),
+	"last_written_at" timestamp,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -531,6 +546,9 @@ ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_file_id_book_fi
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_provider_id_email_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."email_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_templates" ADD CONSTRAINT "email_templates_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "library_folders" ADD CONSTRAINT "library_folders_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lenses" ADD CONSTRAINT "lenses_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_authors" ADD CONSTRAINT "book_authors_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -565,6 +583,7 @@ ALTER TABLE "staging_files" ADD CONSTRAINT "staging_files_target_folder_id_libra
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_system_name_unique" ON "email_templates" USING btree ("name") WHERE "email_templates"."user_id" is null;--> statement-breakpoint
+CREATE INDEX "fwl_book_id_idx" ON "file_write_log" USING btree ("book_id");--> statement-breakpoint
 CREATE INDEX "authors_name_trgm_idx" ON "authors" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_title_trgm_idx" ON "book_metadata" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_series_trgm_idx" ON "book_metadata" USING gin ("series_name" gin_trgm_ops);--> statement-breakpoint

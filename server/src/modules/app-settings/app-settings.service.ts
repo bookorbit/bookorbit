@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
+import { DEFAULT_UPLOAD_PATTERN, DEFAULT_FILE_WRITE_SETTINGS, type GlobalFileWriteSettings } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -15,6 +15,7 @@ const APP_SETTING_KEYS = {
   STAGING_AUTO_FINALIZE_THRESHOLD: 'staging_auto_finalize_threshold',
   STAGING_AUTO_FINALIZE_LIBRARY_ID: 'staging_auto_finalize_library_id',
   STAGING_AUTO_FINALIZE_FOLDER_ID: 'staging_auto_finalize_folder_id',
+  FILE_WRITE_SETTINGS: 'file_write_settings',
 } as const;
 
 type Db = NodePgDatabase<typeof schema>;
@@ -142,5 +143,23 @@ export class AppSettingsService {
       libraryId: libId && !isNaN(libId) ? libId : null,
       folderId: folderId && !isNaN(folderId) ? folderId : null,
     };
+  }
+
+  async getFileWriteSettings(): Promise<GlobalFileWriteSettings> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.FILE_WRITE_SETTINGS),
+    });
+    return parseSafe<GlobalFileWriteSettings>(row?.value, { ...DEFAULT_FILE_WRITE_SETTINGS });
+  }
+
+  async updateFileWriteSettings(patch: Partial<GlobalFileWriteSettings>): Promise<GlobalFileWriteSettings> {
+    const current = await this.getFileWriteSettings();
+    const merged: GlobalFileWriteSettings = { ...current, ...patch };
+    const value = JSON.stringify(merged);
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: APP_SETTING_KEYS.FILE_WRITE_SETTINGS, value })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
+    return merged;
   }
 }

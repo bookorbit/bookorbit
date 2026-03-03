@@ -33,6 +33,7 @@ export const bookMetadata = pgTable(
     hardcoverId: varchar('hardcover_id', { length: 50 }),
     openLibraryId: varchar('open_library_id', { length: 50 }),
     embedding: embedding256('embedding'),
+    lastWrittenAt: timestamp('last_written_at'),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (t) => [
