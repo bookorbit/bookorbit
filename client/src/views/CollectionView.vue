@@ -161,7 +161,7 @@ watch(
 
   <EditCollectionDialog v-if="collection" :open="editCollectionOpen" :collection="collection" @close="editCollectionOpen = false" />
 
-  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
+  <SidebarInset class="flex flex-col h-screen glow-wrapper">
     <AppHeader />
     <ViewHeader
       :title="collection?.name ?? 'Collection'"

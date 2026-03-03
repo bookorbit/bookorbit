@@ -190,7 +190,7 @@ watch(
     @added="exitSelectionMode"
   />
 
-  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
+  <SidebarInset class="flex flex-col h-screen glow-wrapper">
     <AppHeader />
     <ViewHeader
       :title="lens?.name ?? 'Lens'"
