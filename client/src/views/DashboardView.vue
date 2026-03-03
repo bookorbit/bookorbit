@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { Settings2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-import AppHeader from '@/components/AppHeader.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
@@ -29,10 +28,7 @@ const greeting = computed(() => {
 </script>
 
 <template>
-  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-    <AppHeader />
-
-    <main class="flex-1 overflow-y-auto" :class="backgroundClass">
+  <main class="flex-1 overflow-y-auto" :class="backgroundClass">
       <!-- Greeting -->
       <div class="flex items-center justify-between px-6 pb-4 pt-6">
         <h1 class="text-xl font-semibold tracking-tight">{{ greeting }}</h1>
@@ -64,8 +60,7 @@ const greeting = computed(() => {
           <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">Customize dashboard</button>
         </div>
       </div>
-    </main>
-  </SidebarInset>
+  </main>
 
   <DashboardSettingsSheet v-model:open="settingsOpen" />
 </template>

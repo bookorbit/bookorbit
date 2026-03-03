@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { SidebarInset } from '@/components/ui/sidebar'
-import AppHeader from '@/components/AppHeader.vue'
 import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
@@ -44,9 +42,7 @@ const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === t
 </script>
 
 <template>
-  <SidebarInset class="flex flex-col min-h-screen overflow-x-hidden">
-      <AppHeader />
-      <div class="flex items-center border-b shrink-0 h-11">
+  <div class="flex items-center border-b shrink-0 h-11">
         <BookDetailTabs :book-id="bookId" />
       </div>
 
@@ -75,6 +71,5 @@ const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === t
             </div>
           </div>
         </template>
-      </main>
-  </SidebarInset>
+  </main>
 </template>

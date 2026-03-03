@@ -6,13 +6,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
-import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
-import { SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useCollections } from '@/features/collection/composables/useCollections'
@@ -273,9 +271,7 @@ watch(
   <EditCollectionDialog v-if="collection" :open="editCollectionOpen" :collection="collection" @close="editCollectionOpen = false" />
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 
-  <SidebarInset class="flex flex-col h-screen glow-wrapper">
-    <AppHeader />
-    <ViewHeader
+  <ViewHeader
       :title="collection?.name ?? 'Collection'"
       :icon="collection?.icon || 'FolderOpen'"
       :total="total"
@@ -343,6 +339,5 @@ watch(
         <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
         <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
       </div>
-    </main>
-  </SidebarInset>
+  </main>
 </template>

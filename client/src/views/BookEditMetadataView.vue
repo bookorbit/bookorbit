@@ -2,8 +2,6 @@
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { BookDetail } from '@projectx/types'
-import { SidebarInset } from '@/components/ui/sidebar'
-import AppHeader from '@/components/AppHeader.vue'
 import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue'
 import EditMetadataTab from '@/features/book/components/detail/tabs/EditMetadataTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
@@ -30,9 +28,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 </script>
 
 <template>
-  <SidebarInset class="flex flex-col min-h-screen overflow-x-hidden">
-      <AppHeader />
-      <div class="flex items-center border-b shrink-0 h-11">
+  <div class="flex items-center border-b shrink-0 h-11">
         <BookDetailTabs :book-id="bookId" />
       </div>
 
@@ -43,6 +39,5 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
           <div class="h-9 rounded-md bg-muted animate-pulse" />
           <div class="h-9 rounded-md bg-muted animate-pulse" />
         </div>
-      </main>
-  </SidebarInset>
+  </main>
 </template>

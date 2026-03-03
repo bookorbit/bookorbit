@@ -8,13 +8,11 @@ import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsLensDialog from '@/features/lens/components/SaveAsLensDialog.vue'
-import { SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
@@ -359,9 +357,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 </script>
 
 <template>
-  <SidebarInset class="flex flex-col h-screen glow-wrapper">
-    <AppHeader />
-    <ViewHeader
+  <ViewHeader
       :title="title"
       :total="total"
       :loaded="books.length"
@@ -528,8 +524,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
         <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
         <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
       </div>
-    </main>
-  </SidebarInset>
+  </main>
 
   <BookQuickView
     :book-id="quickViewBookId"

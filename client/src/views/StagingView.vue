@@ -4,8 +4,6 @@ import { PackageOpen, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 import type { StagingFile } from '@projectx/types'
 import { api } from '@/lib/api'
 import { formatBytes } from '@/lib/formatting'
-import AppHeader from '@/components/AppHeader.vue'
-import { SidebarInset } from '@/components/ui/sidebar'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useStagingFiles } from '@/features/staging/composables/useStagingFiles'
 import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
@@ -257,10 +255,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <SidebarInset class="flex flex-col min-h-screen glow-wrapper">
-    <AppHeader />
-
-    <main
+  <main
       class="flex-1 overflow-y-auto"
       :class="backgroundClass"
       @dragover="onDragOver"
@@ -395,8 +390,7 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
-    </main>
-  </SidebarInset>
+  </main>
 
   <Teleport to="body">
     <StagingFileSheet v-if="selectedFile" :file="selectedFile" @close="closeSheet" @discarded="onDiscarded" @updated="onFileUpdated" />

@@ -6,48 +6,54 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'dashboard',
-      component: () => import('@/views/DashboardView.vue'),
-    },
-    {
-      path: '/staging',
-      name: 'staging',
-      component: () => import('@/views/StagingView.vue'),
-    },
-    {
-      path: '/library/:id',
-      name: 'library',
-      component: () => import('@/views/HomeView.vue'),
-    },
-    {
-      path: '/lens/:id',
-      name: 'lens',
-      component: () => import('@/views/LensView.vue'),
-    },
-    {
-      path: '/collection/:id',
-      name: 'collection',
-      component: () => import('@/views/CollectionView.vue'),
+      component: () => import('@/components/AppLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'dashboard',
+          component: () => import('@/views/DashboardView.vue'),
+        },
+        {
+          path: '/staging',
+          name: 'staging',
+          component: () => import('@/views/StagingView.vue'),
+        },
+        {
+          path: '/library/:id',
+          name: 'library',
+          component: () => import('@/views/HomeView.vue'),
+        },
+        {
+          path: '/lens/:id',
+          name: 'lens',
+          component: () => import('@/views/LensView.vue'),
+        },
+        {
+          path: '/collection/:id',
+          name: 'collection',
+          component: () => import('@/views/CollectionView.vue'),
+        },
+        {
+          path: '/book/:bookId',
+          name: 'book-detail',
+          component: () => import('@/views/BookDetailView.vue'),
+        },
+        {
+          path: '/book/:bookId/files',
+          name: 'book-files',
+          component: () => import('@/views/BookFilesView.vue'),
+        },
+        {
+          path: '/book/:bookId/edit',
+          name: 'book-edit',
+          component: () => import('@/views/BookEditMetadataView.vue'),
+        },
+      ],
     },
     {
       path: '/read/:bookId/:fileId',
       name: 'reader',
       component: () => import('@/features/reader/ReaderView.vue'),
-    },
-    {
-      path: '/book/:bookId',
-      name: 'book-detail',
-      component: () => import('@/views/BookDetailView.vue'),
-    },
-    {
-      path: '/book/:bookId/files',
-      name: 'book-files',
-      component: () => import('@/views/BookFilesView.vue'),
-    },
-    {
-      path: '/book/:bookId/edit',
-      name: 'book-edit',
-      component: () => import('@/views/BookEditMetadataView.vue'),
     },
     {
       path: '/login',

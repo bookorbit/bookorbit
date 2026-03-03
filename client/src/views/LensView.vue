@@ -5,13 +5,11 @@ import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-v
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
-import AppHeader from '@/components/AppHeader.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
-import { SidebarInset } from '@/components/ui/sidebar'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useLens } from '@/features/lens/composables/useLens'
@@ -302,9 +300,7 @@ watch(
   />
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 
-  <SidebarInset class="flex flex-col h-screen glow-wrapper">
-    <AppHeader />
-    <ViewHeader
+  <ViewHeader
       :title="lens?.name ?? 'Lens'"
       :icon="lens?.icon ?? undefined"
       :total="total"
@@ -424,6 +420,5 @@ watch(
         <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
         <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
       </div>
-    </main>
-  </SidebarInset>
+  </main>
 </template>
