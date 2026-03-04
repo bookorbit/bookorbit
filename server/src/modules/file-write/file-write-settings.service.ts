@@ -27,7 +27,8 @@ export class FileWriteSettingsService {
     });
     if (!row) return { ...DEFAULT_FILE_WRITE_SETTINGS };
     try {
-      return { ...DEFAULT_FILE_WRITE_SETTINGS, ...(JSON.parse(row.value) as Partial<GlobalFileWriteSettings>) };
+      const stored = JSON.parse(row.value) as Partial<GlobalFileWriteSettings>;
+      return mergeSettings(DEFAULT_FILE_WRITE_SETTINGS, stored);
     } catch {
       return { ...DEFAULT_FILE_WRITE_SETTINGS };
     }
@@ -35,7 +36,7 @@ export class FileWriteSettingsService {
 
   async updateGlobal(patch: Partial<GlobalFileWriteSettings>): Promise<GlobalFileWriteSettings> {
     const current = await this.getGlobal();
-    const merged: GlobalFileWriteSettings = { ...current, ...patch };
+    const merged = mergeSettings(current, patch);
     const value = JSON.stringify(merged);
     await this.db
       .insert(schema.appSettings)
@@ -43,4 +44,14 @@ export class FileWriteSettingsService {
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
     return merged;
   }
+}
+
+function mergeSettings(base: GlobalFileWriteSettings, patch: Partial<GlobalFileWriteSettings>): GlobalFileWriteSettings {
+  return {
+    ...base,
+    ...patch,
+    epub: { ...base.epub, ...(patch.epub ?? {}) },
+    pdf: { ...base.pdf, ...(patch.pdf ?? {}) },
+    cbx: { ...base.cbx, ...(patch.cbx ?? {}) },
+  };
 }

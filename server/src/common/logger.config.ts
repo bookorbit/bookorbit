@@ -1,20 +1,21 @@
 import type { Params } from 'nestjs-pino';
 import type { IncomingMessage, ServerResponse } from 'http';
+import { RequestMethod } from '@nestjs/common';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
 const FRAMEWORK_CONTEXTS = new Set(['InstanceLoader', 'RouterExplorer', 'RoutesResolver']);
 
-const SILENT_URL_RE = /\/books\/\d+\/(thumbnail|cover)(\?|$)/;
-
 export const loggerConfig: Params = {
+  exclude: [
+    { method: RequestMethod.GET, path: 'books/:id/thumbnail' },
+    { method: RequestMethod.GET, path: 'books/:id/cover' },
+    { method: RequestMethod.GET, path: 'cbz/files/:id/pages/:page' },
+  ],
   pinoHttp: {
     level: isDev ? 'debug' : 'info',
-    autoLogging: {
-      ignore: (req: IncomingMessage) => SILENT_URL_RE.test(req.url ?? ''),
-    },
     hooks: {
-      logMethod(inputArgs, method) {
+      logMethod: function (inputArgs, method) {
         const first = inputArgs[0];
         if (
           first !== null &&
@@ -24,8 +25,7 @@ export const loggerConfig: Params = {
         ) {
           return;
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return method.apply(this, inputArgs);
+        method.apply(this, inputArgs);
       },
     },
     customProps: () => ({ context: 'HTTP' }),
@@ -41,10 +41,8 @@ export const loggerConfig: Params = {
       return 'info';
     },
     serializers: {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      req: (req: any) => ({ id: req.id as string, method: req.method as string, url: req.url as string }),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      res: (res: any) => ({ statusCode: res.statusCode as number }),
+      req: (req: IncomingMessage & { id?: string }) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res: ServerResponse) => ({ statusCode: res.statusCode }),
     },
     ...(isDev
       ? {

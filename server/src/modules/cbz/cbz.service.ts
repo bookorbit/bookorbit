@@ -36,6 +36,8 @@ function mimeForExt(name: string): string {
 // ── CBZ: ZIP byte-offset scan ──────────────────────────────────────────────────
 
 const LFH_SIG = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+// Data descriptor signature (optional but written by most tools)
+const DD_SIG = Buffer.from([0x50, 0x4b, 0x07, 0x08]);
 
 interface ZipEntry {
   name: string;
@@ -46,6 +48,11 @@ interface ZipEntry {
 
 // Scans local file headers directly — bypasses the central directory, which
 // unzipper fails to locate when the ZIP has a large comment (e.g. ComicTagger metadata).
+//
+// When general purpose bit flag bit 3 is set the local header stores
+// compressedSize=0 and the real size is in a data descriptor after the data.
+// We resolve that by scanning for the descriptor signature and verifying the
+// size field is self-consistent (dataStart + cSize === descriptorOffset).
 function buildZipIndex(buf: Buffer): ZipEntry[] {
   const entries: ZipEntry[] = [];
   let pos = 0;
@@ -54,25 +61,47 @@ function buildZipIndex(buf: Buffer): ZipEntry[] {
     const sigPos = buf.indexOf(LFH_SIG, pos);
     if (sigPos === -1) break;
 
+    const flags = buf.readUInt16LE(sigPos + 6);
     const compression = buf.readUInt16LE(sigPos + 8);
-    const compressedSize = buf.readUInt32LE(sigPos + 18);
+    let compressedSize = buf.readUInt32LE(sigPos + 18);
     const fileNameLen = buf.readUInt16LE(sigPos + 26);
     const extraLen = buf.readUInt16LE(sigPos + 28);
     const dataStart = sigPos + 30 + fileNameLen + extraLen;
     const fileName = buf.subarray(sigPos + 30, sigPos + 30 + fileNameLen).toString('utf-8');
 
+    // Bit 3: data descriptor present — local header has size=0.
+    if ((flags & 0x0008) !== 0 && compressedSize === 0) {
+      compressedSize = resolveDataDescriptorSize(buf, dataStart);
+    }
+
     if (!fileName.endsWith('/') && !isHidden(fileName) && isImage(fileName)) {
-      if (compression === 0 || compression === 8) {
+      // Only add entries whose size we were able to resolve.
+      if ((compression === 0 || compression === 8) && compressedSize > 0) {
         entries.push({ name: fileName, dataStart, compressedSize, compression });
       }
     }
 
-    pos = dataStart + compressedSize;
-    if (compressedSize === 0) pos = sigPos + 4;
+    pos = compressedSize > 0 ? dataStart + compressedSize : sigPos + 4;
   }
 
   entries.sort((a, b) => naturalSort(a.name, b.name));
   return entries;
+}
+
+// Scans forward from dataStart for the data descriptor signature PK\x07\x08.
+// Verifies self-consistency: the compressed-size field stored in the descriptor
+// must equal (descriptorOffset - dataStart). This eliminates false positives
+// where the compressed payload itself happens to contain the signature bytes.
+function resolveDataDescriptorSize(buf: Buffer, dataStart: number): number {
+  let search = dataStart;
+  while (search < buf.length - 16) {
+    const idx = buf.indexOf(DD_SIG, search);
+    if (idx === -1) break;
+    const cSize = buf.readUInt32LE(idx + 8);
+    if (idx === dataStart + cSize) return cSize;
+    search = idx + 1;
+  }
+  return 0;
 }
 
 // ── CBR: node-unrar-js ─────────────────────────────────────────────────────────
@@ -200,6 +229,9 @@ export class CbzService {
         throw new NotFoundException(`Page ${pageIndex} out of range`);
       }
       const entry = entries[pageIndex];
+      if (entry.compressedSize === 0) {
+        throw new NotFoundException(`Page ${pageIndex} data could not be located in archive`);
+      }
       const raw = createReadStream(file.absolutePath, {
         start: entry.dataStart,
         end: entry.dataStart + entry.compressedSize - 1,

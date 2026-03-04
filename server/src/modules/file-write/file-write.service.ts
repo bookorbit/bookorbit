@@ -3,14 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
-import type { WriteResult } from '@projectx/types';
+import type { WriteResult, GlobalFileWriteSettings } from '@projectx/types';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteSettingsService } from './file-write-settings.service';
 import { FormatWriterRegistry } from './format-writer.registry';
 import type { BookWritePayload, BookWritePayloadKey } from './interfaces/book-write-payload.interface';
 
-// All known payload fields for Phase 1 full-write mask
 const ALL_FIELDS = new Set<BookWritePayloadKey>([
   'title',
   'subtitle',
@@ -91,10 +90,20 @@ export class FileWriteService implements OnModuleDestroy {
       return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
     }
 
+    const formatSettings = resolveFormatSettings(settings, format);
+    if (!formatSettings.enabled) {
+      const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format disabled' };
+      this.logger.debug(`Write skipped for book ${bookId}: format disabled (${format})`);
+      if (triggeredBy === 'sync') {
+        await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+      }
+      return result;
+    }
+
     const sizeBytes = file.sizeBytes ?? 0;
-    if (sizeBytes > settings.maxFileSizeBytes) {
+    if (sizeBytes > formatSettings.maxFileSizeBytes) {
       const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'file exceeds size limit' };
-      this.logger.debug(`Write skipped for book ${bookId}: file size ${sizeBytes} exceeds limit ${settings.maxFileSizeBytes}`);
+      this.logger.debug(`Write skipped for book ${bookId}: file size ${sizeBytes} exceeds limit ${formatSettings.maxFileSizeBytes}`);
       if (triggeredBy === 'sync') {
         await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
       }
@@ -142,5 +151,22 @@ export class FileWriteService implements OnModuleDestroy {
     } catch {
       return null;
     }
+  }
+}
+
+function resolveFormatSettings(settings: GlobalFileWriteSettings, format: string): { enabled: boolean; maxFileSizeBytes: number } {
+  switch (format) {
+    case 'epub':
+      return settings.epub;
+    case 'pdf':
+      return settings.pdf;
+    case 'cbz':
+    case 'cb7':
+      return {
+        enabled: settings.cbx.enabled && (settings.cbx.formats as string[]).includes(format),
+        maxFileSizeBytes: settings.cbx.maxFileSizeBytes,
+      };
+    default:
+      return { enabled: false, maxFileSizeBytes: 0 };
   }
 }

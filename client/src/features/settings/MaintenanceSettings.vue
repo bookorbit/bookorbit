@@ -26,22 +26,33 @@ async function rebuildEmbeddings() {
   }
 }
 
-const writeSettings = ref<GlobalFileWriteSettings>({ ...DEFAULT_FILE_WRITE_SETTINGS })
+const writeSettings = ref<GlobalFileWriteSettings>(structuredClone(DEFAULT_FILE_WRITE_SETTINGS))
 const writeSaving = ref(false)
 const writeSaved = ref(false)
 
-const maxFileSizeMb = computed({
-  get: () => Math.round(writeSettings.value.maxFileSizeBytes / (1024 * 1024)),
+const epubMaxMb = computed({
+  get: () => Math.round(writeSettings.value.epub.maxFileSizeBytes / (1024 * 1024)),
   set: (mb: number) => {
-    writeSettings.value.maxFileSizeBytes = mb * 1024 * 1024
+    writeSettings.value.epub.maxFileSizeBytes = mb * 1024 * 1024
+  },
+})
+const pdfMaxMb = computed({
+  get: () => Math.round(writeSettings.value.pdf.maxFileSizeBytes / (1024 * 1024)),
+  set: (mb: number) => {
+    writeSettings.value.pdf.maxFileSizeBytes = mb * 1024 * 1024
+  },
+})
+const cbxMaxMb = computed({
+  get: () => Math.round(writeSettings.value.cbx.maxFileSizeBytes / (1024 * 1024)),
+  set: (mb: number) => {
+    writeSettings.value.cbx.maxFileSizeBytes = mb * 1024 * 1024
   },
 })
 
 onMounted(async () => {
   const res = await api('/api/v1/app-settings/file-write-settings')
   if (res.ok) {
-    const data: GlobalFileWriteSettings = await res.json()
-    writeSettings.value = data
+    writeSettings.value = await res.json()
   }
 })
 
@@ -67,13 +78,19 @@ async function saveWriteSettings() {
   }
 }
 
-function toggleEnabled() {
-  writeSettings.value.enabled = !writeSettings.value.enabled
+function toggle(path: () => boolean, set: (v: boolean) => void) {
+  set(!path())
   void saveWriteSettings()
 }
 
-function toggleWriteCover() {
-  writeSettings.value.writeCover = !writeSettings.value.writeCover
+function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
+  const formats = writeSettings.value.cbx.formats
+  const idx = formats.indexOf(fmt)
+  if (idx === -1) {
+    writeSettings.value.cbx.formats = [...formats, fmt]
+  } else {
+    writeSettings.value.cbx.formats = formats.filter((f) => f !== fmt)
+  }
   void saveWriteSettings()
 }
 </script>
@@ -118,22 +135,30 @@ function toggleWriteCover() {
 
   <div class="mt-8">
     <p class="settings-group-label">Metadata File Sync</p>
-    <div class="border border-border rounded-lg bg-card px-5 py-5 space-y-5">
-      <div class="flex items-start gap-3">
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <FileEdit :size="16" class="text-primary" />
-        </div>
-        <div class="flex-1">
-          <p class="settings-label">Write metadata to original files</p>
-          <p class="settings-hint leading-relaxed max-w-sm">
-            When enabled, saving metadata automatically updates the physical file on disk. Supports EPUB. Other formats are skipped.
-          </p>
+    <div class="border border-border rounded-lg bg-card divide-y divide-border">
+      <!-- Master toggle -->
+      <div class="px-5 py-4 flex items-start justify-between gap-6">
+        <div class="flex items-start gap-3">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <FileEdit :size="16" class="text-primary" />
+          </div>
+          <div>
+            <p class="settings-label">Write metadata to original files</p>
+            <p class="settings-hint leading-relaxed max-w-sm">
+              When enabled, saving metadata updates the physical file on disk. Configure each format below.
+            </p>
+          </div>
         </div>
         <button
           class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
           :class="writeSettings.enabled ? 'bg-primary' : 'bg-muted'"
           :disabled="writeSaving"
-          @click="toggleEnabled"
+          @click="
+            toggle(
+              () => writeSettings.enabled,
+              (v) => (writeSettings.enabled = v),
+            )
+          "
         >
           <span
             class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
@@ -142,33 +167,23 @@ function toggleWriteCover() {
         </button>
       </div>
 
-      <div v-if="writeSettings.enabled" class="pl-12 space-y-4">
-        <div class="flex items-center justify-between gap-4">
+      <template v-if="writeSettings.enabled">
+        <!-- Cover toggle -->
+        <div class="px-5 py-4 flex items-center justify-between gap-4">
           <div>
-            <p class="settings-label text-sm">Max file size (MB)</p>
-            <p class="settings-hint text-xs">Files larger than this are skipped.</p>
-          </div>
-          <input
-            v-model.number="maxFileSizeMb"
-            type="number"
-            min="1"
-            max="2000"
-            :disabled="writeSaving"
-            class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-            @change="saveWriteSettings"
-          />
-        </div>
-
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <p class="settings-label text-sm">Include cover image</p>
-            <p class="settings-hint text-xs">Writes the stored cover back into the file.</p>
+            <p class="settings-label">Include cover image</p>
+            <p class="settings-hint">Writes the stored cover back into the file (EPUB only).</p>
           </div>
           <button
             class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
             :class="writeSettings.writeCover ? 'bg-primary' : 'bg-muted'"
             :disabled="writeSaving"
-            @click="toggleWriteCover"
+            @click="
+              toggle(
+                () => writeSettings.writeCover,
+                (v) => (writeSettings.writeCover = v),
+              )
+            "
           >
             <span
               class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
@@ -176,12 +191,149 @@ function toggleWriteCover() {
             />
           </button>
         </div>
-      </div>
 
-      <p v-if="writeSaved" class="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 pl-12">
+        <!-- EPUB row -->
+        <div class="px-5 py-4 space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="settings-label">EPUB</p>
+              <p class="settings-hint">Writes metadata into the OPF file inside the EPUB archive.</p>
+            </div>
+            <button
+              class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
+              :class="writeSettings.epub.enabled ? 'bg-primary' : 'bg-muted'"
+              :disabled="writeSaving"
+              @click="
+                toggle(
+                  () => writeSettings.epub.enabled,
+                  (v) => (writeSettings.epub.enabled = v),
+                )
+              "
+            >
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                :class="writeSettings.epub.enabled ? 'translate-x-4' : 'translate-x-0'"
+              />
+            </button>
+          </div>
+          <div v-if="writeSettings.epub.enabled" class="flex items-center justify-between gap-4 pl-0">
+            <p class="text-sm text-muted-foreground">Max file size (MB)</p>
+            <input
+              v-model.number="epubMaxMb"
+              type="number"
+              min="1"
+              max="2000"
+              :disabled="writeSaving"
+              class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              @change="saveWriteSettings"
+            />
+          </div>
+        </div>
+
+        <!-- PDF row -->
+        <div class="px-5 py-4 space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="settings-label">PDF</p>
+              <p class="settings-hint">Embeds metadata into PDF Info dictionary and XMP stream.</p>
+            </div>
+            <button
+              class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
+              :class="writeSettings.pdf.enabled ? 'bg-primary' : 'bg-muted'"
+              :disabled="writeSaving"
+              @click="
+                toggle(
+                  () => writeSettings.pdf.enabled,
+                  (v) => (writeSettings.pdf.enabled = v),
+                )
+              "
+            >
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                :class="writeSettings.pdf.enabled ? 'translate-x-4' : 'translate-x-0'"
+              />
+            </button>
+          </div>
+          <div v-if="writeSettings.pdf.enabled" class="flex items-center justify-between gap-4">
+            <p class="text-sm text-muted-foreground">Max file size (MB)</p>
+            <input
+              v-model.number="pdfMaxMb"
+              type="number"
+              min="1"
+              max="2000"
+              :disabled="writeSaving"
+              class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              @change="saveWriteSettings"
+            />
+          </div>
+        </div>
+
+        <!-- Comic archives row -->
+        <div class="px-5 py-4 space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="settings-label">Comic archives</p>
+              <p class="settings-hint">Writes ComicInfo.xml into CBZ and CB7 archives.</p>
+            </div>
+            <button
+              class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
+              :class="writeSettings.cbx.enabled ? 'bg-primary' : 'bg-muted'"
+              :disabled="writeSaving"
+              @click="
+                toggle(
+                  () => writeSettings.cbx.enabled,
+                  (v) => (writeSettings.cbx.enabled = v),
+                )
+              "
+            >
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                :class="writeSettings.cbx.enabled ? 'translate-x-4' : 'translate-x-0'"
+              />
+            </button>
+          </div>
+          <template v-if="writeSettings.cbx.enabled">
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                v-for="fmt in ['cbz', 'cb7'] as const"
+                :key="fmt"
+                class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-50"
+                :class="
+                  writeSettings.cbx.formats.includes(fmt)
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+                "
+                :disabled="writeSaving"
+                @click="toggleCbxFormat(fmt)"
+              >
+                {{ fmt.toUpperCase() }}
+              </button>
+              <span
+                class="flex items-center px-3 py-1 rounded-full text-xs font-medium border border-border bg-muted text-muted-foreground cursor-default select-none"
+              >
+                CBR not writable
+              </span>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-sm text-muted-foreground">Max file size (MB)</p>
+              <input
+                v-model.number="cbxMaxMb"
+                type="number"
+                min="1"
+                max="5000"
+                :disabled="writeSaving"
+                class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                @change="saveWriteSettings"
+              />
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <div v-if="writeSaved" class="px-5 py-3 flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
         <Check :size="12" />
         Settings saved
-      </p>
+      </div>
     </div>
   </div>
 </template>

@@ -1,0 +1,121 @@
+import { Injectable } from '@nestjs/common';
+import { readFile, rename, unlink, writeFile } from 'fs/promises';
+import { dirname, join } from 'path';
+import { randomUUID } from 'crypto';
+
+import type { WriteResult } from '@projectx/types';
+import { getSevenZip, type SevenZipFS } from '../../../../common/sevenzip';
+import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
+import type { FormatWriter } from '../../interfaces/format-writer.interface';
+import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
+import { resolveFieldsWritten } from '../shared/resolve-fields-written';
+import { buildComicInfoXml } from './comic-info-builder';
+
+// All WASM FS ops are synchronous — Node's single-threaded event loop guarantees
+// that synchronous blocks from concurrent writes never interleave with each other.
+// The archive path uses a unique ID to avoid VFS collisions across concurrent writes.
+// The XML path is shared but safe: it is only used within synchronous blocks and
+// is always written before it is added to the archive, with no await in between.
+const VFS_XML_PATH = '/ComicInfo.xml';
+
+@Injectable()
+export class Cb7FormatWriter implements FormatWriter {
+  readonly format = 'cb7';
+
+  async write(filePath: string, payload: BookWritePayload, options: FormatWriteOptions): Promise<WriteResult> {
+    const start = Date.now();
+    const { fieldMask, dryRun } = options;
+    const fieldsWritten = resolveFieldsWritten(payload, fieldMask);
+
+    if (dryRun) {
+      return { status: 'skipped', reason: 'dry-run', fieldsWritten, durationMs: Date.now() - start };
+    }
+
+    const uid = randomUUID().replace(/-/g, '');
+    const vfsArchivePath = `/cbx-arc-${uid}`;
+    const vfsExtractDir = `/cbx-ext-${uid}`;
+
+    const sz = await getSevenZip();
+
+    try {
+      const archiveBytes = await readFile(filePath);
+
+      // --- synchronous block start: no awaits until we're done with the VFS ---
+
+      const fd = sz.FS.open(vfsArchivePath, 'w+');
+      sz.FS.write(fd, archiveBytes, 0, archiveBytes.length);
+      sz.FS.close(fd);
+
+      let existingXml: string | null = null;
+      try {
+        sz.FS.mkdir(vfsExtractDir);
+        sz.callMain(['e', vfsArchivePath, `-o${vfsExtractDir}`, 'ComicInfo.xml', '-y']);
+        const raw = sz.FS.readFile(`${vfsExtractDir}/ComicInfo.xml`);
+        existingXml = Buffer.from(raw).toString('utf-8');
+      } catch {
+        // No ComicInfo.xml in archive — start fresh
+      }
+
+      const xml = buildComicInfoXml(existingXml, payload, fieldMask);
+      const xmlBytes = Buffer.from(xml, 'utf-8');
+
+      try {
+        sz.FS.unlink(VFS_XML_PATH);
+      } catch {
+        // Not present — expected on first write
+      }
+      const fd2 = sz.FS.open(VFS_XML_PATH, 'w+');
+      sz.FS.write(fd2, xmlBytes, 0, xmlBytes.length);
+      sz.FS.close(fd2);
+
+      // Delete old entry (if any) then add the updated one.
+      // 7z strips the leading / from absolute VFS paths, so /ComicInfo.xml
+      // is stored in the archive as ComicInfo.xml at the root.
+      sz.callMain(['d', vfsArchivePath, 'ComicInfo.xml', '-y']);
+      sz.callMain(['a', vfsArchivePath, VFS_XML_PATH]);
+
+      const modifiedBytes = sz.FS.readFile(vfsArchivePath);
+
+      // --- synchronous block end ---
+
+      const tmpPath = join(dirname(filePath), `.cbx-write-${uid}`);
+      await writeFile(tmpPath, Buffer.from(modifiedBytes));
+      try {
+        await rename(tmpPath, filePath);
+      } catch (err) {
+        await unlink(tmpPath).catch(() => {});
+        throw err;
+      }
+
+      return { status: 'success', fieldsWritten, durationMs: Date.now() - start };
+    } finally {
+      cleanupVfs(sz.FS, vfsArchivePath, vfsExtractDir);
+    }
+  }
+}
+
+function cleanupVfs(vfs: SevenZipFS, archivePath: string, extractDir: string): void {
+  try {
+    vfs.unlink(VFS_XML_PATH);
+  } catch {
+    // Already deleted by a concurrent write's cleanup — that's fine
+  }
+  try {
+    vfs.unlink(archivePath);
+  } catch {
+    /* ignore */
+  }
+  try {
+    for (const f of vfs.readdir(extractDir)) {
+      if (f === '.' || f === '..') continue;
+      try {
+        vfs.unlink(`${extractDir}/${f}`);
+      } catch {
+        /* ignore */
+      }
+    }
+    vfs.rmdir(extractDir);
+  } catch {
+    /* ignore */
+  }
+}
