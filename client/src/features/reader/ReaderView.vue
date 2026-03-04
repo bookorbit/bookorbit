@@ -145,7 +145,7 @@ onMounted(async () => {
     }
   }
 
-  await open(fileId, fileFormat, progress.cfi.value)
+  await open(bookId, fileId, fileFormat, progress.cfi.value)
   setChapters(getChapters())
   sectionFractions.value = getSectionFractions()
   await bookmarks.load(bookId)

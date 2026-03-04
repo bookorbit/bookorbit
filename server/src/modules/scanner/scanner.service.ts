@@ -5,7 +5,7 @@ import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
 import { classifyFile, FileRole } from './lib/classify';
-import { sha256File } from './lib/hash';
+import { fingerprintFile } from './lib/hash';
 import { waitForStability } from './lib/stability';
 import { BookCandidate, FileStat, findBookCandidates } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
@@ -343,7 +343,7 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     // 3. Hash match — cross-filesystem copy (expensive, last resort).
-    const hash = await sha256File(fileStat.absolutePath);
+    const hash = await fingerprintFile(fileStat.absolutePath);
     const byHash = await this.scannerRepo.findBookFileByHash(hash);
     if (byHash) {
       await this.scannerRepo.updateBookFile(byHash.id, {

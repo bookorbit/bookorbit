@@ -101,7 +101,10 @@ async function bootstrap() {
     max: 100,
     timeWindow: '1 minute',
     allowList: (req: { cookies?: { access_token?: string }; headers?: { authorization?: string }; url?: string }) =>
-      !!req.cookies?.access_token || !!req.headers?.authorization || /^\/api\/v1\/kobo\//.test(req.url ?? ''),
+      !!req.cookies?.access_token ||
+      !!req.headers?.authorization ||
+      /^\/api\/v1\/kobo\//.test(req.url ?? '') ||
+      /^\/api\/v1\/epub\/\d+\/file\//.test(req.url ?? ''),
   });
 
   if (process.env.NODE_ENV !== 'production') {

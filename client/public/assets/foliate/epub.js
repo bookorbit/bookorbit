@@ -871,7 +871,6 @@ class Loader {
         const directUrl = this.#getDirectUrl(path)
         if (directUrl) {
           el.setAttribute(attr, directUrl)
-          el.setAttribute('loading', 'lazy') // Native lazy loading hint
           return true
         }
         return false

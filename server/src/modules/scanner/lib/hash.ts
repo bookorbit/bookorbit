@@ -1,16 +1,30 @@
 import { createHash } from 'crypto';
-import { createReadStream } from 'fs';
+import { open } from 'fs/promises';
+
+const BASE = 1024;
+const BLOCK_SIZE = 1024;
 
 /**
- * SHA-256 a file by streaming it — avoids loading large files into memory.
- * Only called when path and inode lookups both fail (cross-filesystem move).
+ * Partial MD5 fingerprint — reads 1 KB blocks from exponentially spaced positions
+ * (1 KB, 4 KB, 16 KB, … up to 1 GB) rather than the entire file.
+ * Used only when path and inode lookups both fail (cross-filesystem move detection).
  */
-export function sha256File(absolutePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = createHash('sha256');
-    const stream = createReadStream(absolutePath);
-    stream.on('data', (chunk) => hash.update(chunk));
-    stream.on('end', () => resolve(hash.digest('hex')));
-    stream.on('error', reject);
-  });
+export async function fingerprintFile(absolutePath: string): Promise<string> {
+  const fh = await open(absolutePath, 'r');
+  try {
+    const { size } = await fh.stat();
+    const hash = createHash('md5');
+    const buf = Buffer.allocUnsafe(BLOCK_SIZE);
+
+    for (let i = 0; i <= 10; i++) {
+      const position = BASE << (2 * i);
+      if (position >= size) break;
+      const { bytesRead } = await fh.read(buf, 0, BLOCK_SIZE, position);
+      if (bytesRead > 0) hash.update(buf.subarray(0, bytesRead));
+    }
+
+    return hash.digest('hex');
+  } finally {
+    await fh.close();
+  }
 }

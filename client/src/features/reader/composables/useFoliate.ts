@@ -1,5 +1,5 @@
 import { onUnmounted, ref } from 'vue'
-import { api } from '@/lib/api'
+import { api, getAccessToken } from '@/lib/api'
 import { useFoliateAnnotations } from './useFoliateAnnotations'
 import { useFoliateSelection } from './useFoliateSelection'
 import { useFoliateInput } from './useFoliateInput'
@@ -38,10 +38,11 @@ export function useFoliate(
 
   async function loadScript() {
     if (customElements.get('foliate-view')) return
+    const src = import.meta.env.DEV ? `/assets/foliate/view.js?v=${Date.now()}` : '/assets/foliate/view.js'
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script')
       script.type = 'module'
-      script.src = '/assets/foliate/view.js'
+      script.src = src
       script.onload = () => setTimeout(resolve, 100)
       script.onerror = () => reject(new Error('Failed to load foliate/view.js'))
       document.head.appendChild(script)
@@ -49,7 +50,7 @@ export function useFoliate(
     await customElements.whenDefined('foliate-view')
   }
 
-  async function open(fileId: number, format: string, cfi?: string | null) {
+  async function open(bookId: number, fileId: number, format: string, cfi?: string | null) {
     const el = container()
     if (!el) return
 
@@ -104,13 +105,25 @@ export function useFoliate(
         loading.value = false
       })
 
-      const mimeType = format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip'
-      const ext = format === 'pdf' ? 'pdf' : format === 'cbz' ? 'cbz' : 'epub'
-      const res = await api(`/api/v1/books/files/${fileId}/serve`)
-      if (!res.ok) throw new Error(`Failed to fetch book file: ${res.status}`)
-      const blob = await res.blob()
-      const file = new File([blob], `book-file-${fileId}.${ext}`, { type: mimeType })
-      await view.open(file)
+      if (format === 'epub') {
+        const infoRes = await api(`/api/v1/epub/${bookId}/info`)
+        if (!infoRes.ok) throw new Error(`Failed to fetch EPUB info: ${infoRes.status}`)
+        const bookInfo = await infoRes.json()
+        const makeStreamingBook = (window as Record<string, unknown>).makeStreamingBook as
+          | ((id: number, base: string, info: unknown, token: string | null) => Promise<unknown>)
+          | undefined
+        if (!makeStreamingBook) throw new Error('makeStreamingBook not available')
+        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, getAccessToken())
+        await view.open(book as never)
+      } else {
+        const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip'
+        const ext = format === 'pdf' ? 'pdf' : format === 'cbz' ? 'cbz' : format
+        const res = await api(`/api/v1/books/files/${fileId}/serve`)
+        if (!res.ok) throw new Error(`Failed to fetch book file: ${res.status}`)
+        const blob = await res.blob()
+        const file = new File([blob], `book-file-${fileId}.${ext}`, { type: mimeType })
+        await view.open(file)
+      }
       if (onApplyStyles) onApplyStyles(view.renderer)
       await view.goTo(cfi ?? 0).catch(() => {})
     } catch (e) {
@@ -146,7 +159,7 @@ export function useFoliate(
     error,
     fraction,
     view: viewRef,
-    open,
+    open: (bookId: number, fileId: number, format: string, cfi?: string | null) => open(bookId, fileId, format, cfi),
     prev: () => getViewEl()?.prev?.(),
     next: () => getViewEl()?.next?.(),
     goTo: (t: string | number) => getViewEl()?.goTo?.(t),

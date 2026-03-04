@@ -35,24 +35,6 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     }
   }
 
-  // Build URL with token for browser-initiated requests (fonts, images in CSS)
-  const getDirectFileUrl = (name) => {
-    if (!name) return null
-    const encodedPath = name.split('/').map(encodeURIComponent).join('/')
-    let url = `${baseUrl}/${bookId}/file/${encodedPath}`
-    const params = []
-    if (bookType) {
-      params.push(`bookType=${encodeURIComponent(bookType)}`)
-    }
-    if (authToken) {
-      params.push(`token=${encodeURIComponent(authToken)}`)
-    }
-    if (params.length > 0) {
-      url += '?' + params.join('&')
-    }
-    return url
-  }
-
   /**
    * Load file as text
    */
@@ -105,24 +87,13 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     return item?.size ?? 0
   }
 
-  /**
-   * Get direct URL for a file without fetching it.
-   * This allows the browser to fetch resources on-demand (fonts, images).
-   * Note: Uses token in URL since browser-initiated requests can't use headers.
-   * @param {string} name - File path within the EPUB
-   * @returns {string|null} Direct URL to the file
-   */
-  const getDirectUrl = (name) => {
-    if (!name) return null
-    return getDirectFileUrl(name)
-  }
-
   return {
     loadText,
     loadBlob,
     getSize,
-    getDirectUrl, // For lazy loading of fonts/images in CSS
-    // Expose for debugging
+    // getDirectUrl intentionally omitted: browser-initiated fetches from inside a
+    // sandboxed blob-URL iframe are blocked by Cross-Origin-Resource-Policy headers.
+    // Images go through loadBlob (JS fetch with Authorization header) instead.
     _bookInfo: bookInfo,
     _manifestMap: manifestMap,
   }

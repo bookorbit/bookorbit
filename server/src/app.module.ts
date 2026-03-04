@@ -37,6 +37,7 @@ import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { EmailModule } from './modules/email/email.module';
+import { EpubModule } from './modules/epub/epub.module';
 import { StagingModule } from './modules/staging/staging.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
@@ -78,6 +79,7 @@ import { UserModule } from './modules/user/user.module';
     HealthModule,
     CbzModule,
     ReaderPreferencesModule,
+    EpubModule,
     StagingModule,
     EmailModule,
   ],

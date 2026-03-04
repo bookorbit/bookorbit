@@ -6,7 +6,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, bookMetadata, books } from '../../db/schema';
 import { MetadataService } from '../metadata/metadata.service';
-import { sha256File } from '../scanner/lib/hash';
+import { fingerprintFile } from '../scanner/lib/hash';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -30,7 +30,7 @@ export class UploadProcessorService {
     format: string,
     sizeBytes: number,
   ): Promise<{ bookId: number }> {
-    const [fileStat, hash] = await Promise.all([stat(absolutePath), sha256File(absolutePath)]);
+    const [fileStat, hash] = await Promise.all([stat(absolutePath), fingerprintFile(absolutePath)]);
 
     const [book] = await this.db.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning();
 
