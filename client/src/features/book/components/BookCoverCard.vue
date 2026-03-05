@@ -27,7 +27,6 @@ import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const router = useRouter()
 
@@ -243,26 +242,16 @@ function handleCardClick(event: MouseEvent) {
       >
         <!-- Center: primary action buttons -->
         <div class="flex-1 flex flex-col items-center justify-center gap-[18cqi]">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="primaryFile && !isMissing"
-                class="p-[7cqi] rounded-full bg-primary/50 hover:bg-primary transition-colors text-white"
-                @click="openFile(primaryFile)"
-              >
-                <BookOpen class="size-[14cqi]" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Read</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button class="p-[7cqi] rounded-full bg-primary/70 hover:bg-primary transition-colors text-white" @click="emit('action', 'quick-view')">
-                <PanelRight class="size-[14cqi]" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Quick view</TooltipContent>
-          </Tooltip>
+          <button
+            v-if="primaryFile && !isMissing"
+            class="p-[7cqi] rounded-full bg-primary/50 hover:bg-primary transition-colors text-white"
+            @click="openFile(primaryFile)"
+          >
+            <BookOpen class="size-[14cqi]" />
+          </button>
+          <button class="p-[7cqi] rounded-full bg-primary/70 hover:bg-primary transition-colors text-white" @click="emit('action', 'quick-view')">
+            <PanelRight class="size-[14cqi]" />
+          </button>
         </div>
 
         <!-- Bottom: title/author + kebab -->

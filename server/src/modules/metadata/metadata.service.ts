@@ -100,40 +100,38 @@ export class MetadataService {
       parsed = await extractEpubMetadata(absolutePath);
     } else if (format === 'cbz') {
       const cbz = await extractCbzMetadata(absolutePath);
-      if (cbz) {
-        parsed = {
-          title: cbz.title,
-          subtitle: null,
-          description: cbz.description,
-          isbn10: null,
-          isbn13: null,
-          publisher: cbz.publisher,
-          publishedYear: cbz.publishedYear,
-          language: cbz.language,
-          seriesName: cbz.seriesName,
-          seriesIndex: cbz.seriesIndex,
-          authors: cbz.authors,
-          tags: cbz.tags,
-        };
-      }
+      const fb = parseBookFilename(absolutePath);
+      parsed = {
+        title: cbz?.title ?? fb.title,
+        subtitle: null,
+        description: cbz?.description ?? null,
+        isbn10: null,
+        isbn13: null,
+        publisher: cbz?.publisher ?? null,
+        publishedYear: cbz?.publishedYear ?? fb.publishedYear ?? null,
+        language: cbz?.language ?? null,
+        seriesName: cbz?.seriesName ?? null,
+        seriesIndex: cbz?.seriesIndex ?? null,
+        authors: cbz?.authors ?? [],
+        tags: cbz?.tags ?? [],
+      };
     } else if (format === 'cbr' || format === 'cb7') {
       const cbx = format === 'cbr' ? await extractCbrMetadata(absolutePath) : await extractCb7Metadata(absolutePath);
-      if (cbx) {
-        parsed = {
-          title: cbx.title,
-          subtitle: null,
-          description: cbx.description,
-          isbn10: null,
-          isbn13: null,
-          publisher: cbx.publisher,
-          publishedYear: cbx.publishedYear,
-          language: cbx.language,
-          seriesName: cbx.seriesName,
-          seriesIndex: cbx.seriesIndex,
-          authors: cbx.authors,
-          tags: cbx.tags,
-        };
-      }
+      const fb = parseBookFilename(absolutePath);
+      parsed = {
+        title: cbx?.title ?? fb.title,
+        subtitle: null,
+        description: cbx?.description ?? null,
+        isbn10: null,
+        isbn13: null,
+        publisher: cbx?.publisher ?? null,
+        publishedYear: cbx?.publishedYear ?? fb.publishedYear ?? null,
+        language: cbx?.language ?? null,
+        seriesName: cbx?.seriesName ?? null,
+        seriesIndex: cbx?.seriesIndex ?? null,
+        authors: cbx?.authors ?? [],
+        tags: cbx?.tags ?? [],
+      };
     } else if (format === 'mobi' || format === 'azw3' || format === 'azw') {
       const mobi = await parseMobiFile(absolutePath);
       if (mobi) {
