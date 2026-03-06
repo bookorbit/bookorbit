@@ -10,6 +10,14 @@
  * @returns {Object} Loader interface compatible with Foliate's EPUB class
  */
 export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null, bookType = null) => {
+  const OPTIONAL_TEXT_FILES = new Set([
+    'META-INF/encryption.xml',
+    'META-INF/com.apple.ibooks.display-options.xml',
+    'META-INF/com.kobobooks.display-options.xml',
+    'META-INF/calibre_bookmarks.txt',
+  ])
+  const isOptionalTextPath = (name) => OPTIONAL_TEXT_FILES.has(name) || /(^|\/)toc\.ncx$/i.test(name)
+
   // Build a map of file paths to their manifest info for quick lookup
   const manifestMap = new Map(bookInfo.manifest.map((item) => [item.href, item]))
 
@@ -44,6 +52,8 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
       const url = getFileUrl(name)
       const response = await fetch(url, getFetchOptions())
       if (!response.ok) {
+        if (response.status === 404 && !manifestMap.has(name)) return null
+        if (response.status === 404 && isOptionalTextPath(name)) return null
         console.warn(`Failed to load text: ${name}`, response.status)
         return null
       }

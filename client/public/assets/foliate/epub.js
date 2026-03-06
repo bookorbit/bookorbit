@@ -84,6 +84,12 @@ const getAttributes =
 const getElementText = (el) => normalizeWhitespace(el?.textContent)
 
 const childGetter = (doc, ns) => {
+  if (!doc?.documentElement)
+    return {
+      $: () => null,
+      $$: () => [],
+      $$$: () => [],
+    }
   // ignore the namespace if it doesn't appear in document at all
   const useNS = doc.lookupNamespaceURI(null) === ns || doc.lookupPrefix(ns)
   const f = useNS ? (el, name) => (el) => el.namespaceURI === ns && el.localName === name : (el, name) => (el) => el.localName === name
@@ -348,6 +354,7 @@ const parseNav = (doc, resolve = (f) => f) => {
 }
 
 const parseNCX = (doc, resolve = (f) => f) => {
+  if (!doc?.documentElement) return { toc: null, pageList: null, others: [] }
   const { $, $$ } = childGetter(doc, NS.NCX)
   const resolveHref = (href) => (href ? decodeURI(resolve(href)) : null)
   const parseItem = (el) => {
@@ -1083,19 +1090,25 @@ ${doc.querySelector('parsererror').innerText}`)
     if (navPath)
       try {
         const resolve = (url) => resolveURL(url, navPath)
-        const nav = parseNav(await this.#loadXML(navPath), resolve)
-        this.toc = nav.toc
-        this.pageList = nav.pageList
-        this.landmarks = nav.landmarks
+        const navDoc = await this.#loadXML(navPath)
+        if (navDoc) {
+          const nav = parseNav(navDoc, resolve)
+          this.toc = nav.toc
+          this.pageList = nav.pageList
+          this.landmarks = nav.landmarks
+        }
       } catch (e) {
         console.warn(e)
       }
     if (!this.toc && ncxPath)
       try {
         const resolve = (url) => resolveURL(url, ncxPath)
-        const ncx = parseNCX(await this.#loadXML(ncxPath), resolve)
-        this.toc = ncx.toc
-        this.pageList = ncx.pageList
+        const ncxDoc = await this.#loadXML(ncxPath)
+        if (ncxDoc) {
+          const ncx = parseNCX(ncxDoc, resolve)
+          this.toc = ncx.toc
+          this.pageList = ncx.pageList
+        }
       } catch (e) {
         console.warn(e)
       }
@@ -1118,6 +1131,7 @@ ${doc.querySelector('parsererror').innerText}`)
   }
   async loadDocument(item) {
     const str = await this.loadText(item.href)
+    if (!str) throw new Error(`Failed to load section document: ${item.href}`)
     return this.parser.parseFromString(str, item.mediaType)
   }
   getMediaOverlay() {

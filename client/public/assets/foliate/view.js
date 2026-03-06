@@ -535,10 +535,45 @@ export class View extends HTMLElement {
 
   async goTo(target) {
     const resolved = this.resolveNavigation(target)
+    const hasContent = () => (this.renderer.getContents?.()?.length ?? 0) > 0
+    const tryGoTo = async (nextResolved) => {
+      try {
+        await this.renderer.goTo(nextResolved)
+        return hasContent()
+      } catch (e) {
+        console.warn(e)
+        return false
+      }
+    }
     try {
-      await this.renderer.goTo(resolved)
-      this.history.pushState(target)
-      return resolved
+      let opened = await tryGoTo(resolved)
+      let finalTarget = target
+      let finalResolved = resolved
+      if (!opened && typeof resolved?.index === 'number') {
+        const total = this.book?.sections?.length ?? 0
+        for (let index = resolved.index + 1; index < total; index++) {
+          opened = await tryGoTo({ index })
+          if (opened) {
+            finalTarget = index
+            finalResolved = { index }
+            console.warn(`Skipped unreadable section ${resolved.index}, opened section ${index}`)
+            break
+          }
+        }
+        if (!opened)
+          for (let index = resolved.index - 1; index >= 0; index--) {
+            opened = await tryGoTo({ index })
+            if (opened) {
+              finalTarget = index
+              finalResolved = { index }
+              console.warn(`Skipped unreadable section ${resolved.index}, opened section ${index}`)
+              break
+            }
+          }
+      }
+      if (!opened) throw new Error(`Could not open section for target ${target}`)
+      this.history.pushState(finalTarget)
+      return finalResolved
     } catch (e) {
       console.error(e)
       console.error(`Could not go to ${target}`)

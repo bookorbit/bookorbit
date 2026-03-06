@@ -66,24 +66,47 @@ function getText(v: unknown): string | null {
 }
 
 function findInZip(files: unzipper.File[], path: string): unzipper.File | undefined {
-  const clean = path.startsWith('/') ? path.slice(1) : path;
-  return files.find((f) => {
-    const fp = f.path.startsWith('/') ? f.path.slice(1) : f.path;
-    return fp === clean;
-  });
+  const clean = normalizeZipPath(path);
+  const cleanLower = clean.toLowerCase();
+  let ciMatch: unzipper.File | undefined;
+  for (const file of files) {
+    const fp = normalizeZipPath(file.path);
+    if (fp === clean) return file;
+    if (!ciMatch && fp.toLowerCase() === cleanLower) ciMatch = file;
+  }
+  return ciMatch;
+}
+
+function safeDecodeURI(path: string): string {
+  try {
+    return decodeURI(path);
+  } catch {
+    return path;
+  }
+}
+
+function normalizeZipPath(path: string): string {
+  const clean = safeDecodeURI((path ?? '').replace(/\\/g, '/')).replace(/^\/+/, '');
+  const parts = clean.split('/');
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (resolved.length > 0) resolved.pop();
+      continue;
+    }
+    resolved.push(part);
+  }
+  return resolved.join('/');
 }
 
 function resolveHref(href: string, basePath: string): string {
-  if (!href || href.startsWith('http://') || href.startsWith('https://')) return href;
-  if (href.startsWith('/')) return href.slice(1);
-  let resolved = basePath + href;
-  while (resolved.includes('/../')) {
-    const idx = resolved.indexOf('/../');
-    const prev = resolved.lastIndexOf('/', idx - 1);
-    if (prev >= 0) resolved = resolved.slice(0, prev + 1) + resolved.slice(idx + 4);
-    else break;
-  }
-  return resolved;
+  if (!href || /^[a-z][a-z\d+.-]*:/i.test(href)) return href;
+  const decoded = safeDecodeURI(href);
+  const [pathWithQuery, fragment] = decoded.split('#');
+  const path = pathWithQuery.split('?')[0];
+  const resolvedPath = path.startsWith('/') ? normalizeZipPath(path) : normalizeZipPath(basePath + path);
+  return fragment ? `${resolvedPath}#${fragment}` : resolvedPath;
 }
 
 function guessContentType(path: string): string {
@@ -162,7 +185,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
     const mediaType = item['@_media-type'] ?? 'application/octet-stream';
     const propertiesStr = item['@_properties'];
     const properties = propertiesStr ? propertiesStr.split(/\s+/) : undefined;
-    const fullHref = rootPath + relHref;
+    const fullHref = normalizeZipPath(resolveHref(relHref, rootPath).split('#')[0]);
     const size = findInZip(zip.files, fullHref)?.uncompressedSize ?? 0;
     const manifestItem: EpubManifestItem = { id, href: fullHref, mediaType, size, ...(properties ? { properties } : {}) };
     manifestById.set(id, manifestItem);
@@ -266,18 +289,17 @@ export class EpubService {
     user: RequestUser,
   ): Promise<{ stream: NodeJS.ReadableStream; contentType: string; size: number }> {
     if (filePath.includes('..')) throw new ForbiddenException('Invalid path');
+    const normalizedPath = normalizeZipPath(filePath);
+    if (!normalizedPath) throw new ForbiddenException('Invalid path');
 
     const epubPath = await this.resolveEpubPath(bookId, user);
     const cached = await this.getCachedEntry(epubPath);
-
-    if (!cached.validPaths.has(filePath)) throw new NotFoundException(`File not found in EPUB: ${filePath}`);
-
     const zip = await unzipper.Open.file(epubPath);
-    const entry = findInZip(zip.files, filePath);
-    if (!entry) throw new NotFoundException(`Entry not in archive: ${filePath}`);
+    const entry = findInZip(zip.files, normalizedPath);
+    if (!entry) throw new NotFoundException(`Entry not in archive: ${normalizedPath}`);
 
-    const manifestItem = cached.info.manifest.find((m) => m.href === filePath);
-    const contentType = manifestItem?.mediaType ?? guessContentType(filePath);
+    const manifestItem = cached.info.manifest.find((m) => m.href === normalizedPath);
+    const contentType = manifestItem?.mediaType ?? guessContentType(normalizedPath);
 
     return { stream: entry.stream(), contentType, size: entry.uncompressedSize };
   }
@@ -307,8 +329,8 @@ export class EpubService {
     this.logger.debug(`Parsing EPUB: ${epubPath}`);
     const info = await parseEpub(epubPath);
 
-    const validPaths = new Set<string>(['META-INF/container.xml', info.containerPath]);
-    for (const item of info.manifest) validPaths.add(item.href);
+    const validPaths = new Set<string>(['META-INF/container.xml', normalizeZipPath(info.containerPath)]);
+    for (const item of info.manifest) validPaths.add(normalizeZipPath(item.href));
 
     const entry: CacheEntry = { info, mtime: mtimeMs, validPaths, lastAccessed: Date.now() };
     this.evict();
