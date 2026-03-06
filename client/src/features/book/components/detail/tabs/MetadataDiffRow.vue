@@ -36,7 +36,7 @@ const lightboxSrc = ref<string | null>(null)
       <!-- Toggle -->
       <div class="flex justify-center">
         <button
-          v-if="field.candidateDisplay"
+          v-if="field.isCopyable && field.candidateDisplay"
           class="size-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-sm"
           :class="
             field.isCopied
@@ -90,7 +90,7 @@ const lightboxSrc = ref<string | null>(null)
       <!-- Toggle button -->
       <div class="flex items-center justify-center">
         <button
-          v-if="field.hasDiff"
+          v-if="field.isCopyable && field.hasDiff"
           class="size-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-sm shrink-0"
           :class="
             field.isCopied
@@ -102,9 +102,10 @@ const lightboxSrc = ref<string | null>(null)
           <RotateCcw v-if="field.isCopied" class="size-3.5" />
           <ArrowLeft v-else class="size-3.5" />
         </button>
-        <div v-else class="size-8 flex items-center justify-center">
+        <div v-else-if="field.isCopyable" class="size-8 flex items-center justify-center">
           <CheckCircle2 class="size-3.5 text-muted-foreground/25" />
         </div>
+        <div v-else class="size-8" />
       </div>
 
       <!-- New value: muted by default, highlights when selected -->
@@ -121,7 +122,16 @@ const lightboxSrc = ref<string | null>(null)
             {{ source }}
           </span>
         </div>
-        <p class="wrap-break-word leading-snug text-sm w-full" :class="field.isCopied ? 'text-primary font-medium' : 'text-muted-foreground'">
+        <a
+          v-if="field.key === 'sourceUrl' && field.candidateDisplay"
+          :href="field.candidateDisplay"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="wrap-break-word leading-snug text-sm w-full text-primary hover:underline"
+        >
+          {{ field.candidateDisplay }}
+        </a>
+        <p v-else class="wrap-break-word leading-snug text-sm w-full" :class="field.isCopied ? 'text-primary font-medium' : 'text-muted-foreground'">
           {{ field.candidateDisplay }}
         </p>
       </div>

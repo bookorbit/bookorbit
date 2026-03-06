@@ -52,6 +52,9 @@ const {
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
+const currentProviderId = computed(() =>
+  selectedCandidate.value ? (props.book.providerIds[selectedCandidate.value.provider] ?? null) : null,
+)
 
 onMounted(() => {
   loadProviders()
@@ -138,6 +141,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             :candidate="selectedCandidate"
             :providers="providers"
             :current-cover-url="bookCoverUrl"
+            :current-provider-id="currentProviderId"
             @back="backToSearch"
             @apply="handleApply"
           />

@@ -16,6 +16,8 @@ export type DiffFieldKey =
   | 'isbn10'
   | 'genres'
   | 'coverUrl'
+  | 'providerId'
+  | 'sourceUrl'
 
 export interface DiffField {
   key: DiffFieldKey
@@ -26,6 +28,7 @@ export interface DiffField {
   hasDiff: boolean
   isCopied: boolean
   isCover: boolean
+  isCopyable: boolean
 }
 
 export interface MetadataPatch {
@@ -66,7 +69,9 @@ const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'genres', label: 'Genres' },
 ]
 
-const PROVIDER_ID_FIELD: Record<MetadataProviderKey, keyof MetadataPatch | undefined> = {
+type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId'
+
+const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
   goodreads: 'goodreadsId',
   amazon: 'amazonId',
@@ -74,7 +79,20 @@ const PROVIDER_ID_FIELD: Record<MetadataProviderKey, keyof MetadataPatch | undef
   openLibrary: 'openLibraryId',
 }
 
-export function useMetadataDiff(current: MetadataSource, candidate: MetadataCandidate, currentCoverUrl?: string) {
+const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
+  google: 'Google Books ID',
+  goodreads: 'Goodreads ID',
+  amazon: 'Amazon ID',
+  hardcover: 'Hardcover ID',
+  openLibrary: 'Open Library ID',
+}
+
+export function useMetadataDiff(
+  current: MetadataSource,
+  candidate: MetadataCandidate,
+  currentCoverUrl?: string,
+  currentProviderId?: string | null,
+) {
   const copiedFields = reactive(new Set<DiffFieldKey>())
 
   function getBookValue(key: DiffFieldKey): string {
@@ -94,28 +112,66 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
   }
 
   const fields = computed<DiffField[]>(() =>
-    FIELD_DEFS.flatMap((def) => {
-      const candidateVal = getCandidateValue(def.key)
-      const bookVal = getBookValue(def.key)
-      if (def.key === 'coverUrl') {
-        if (!candidateVal && !bookVal) return []
-      } else {
-        if (!candidateVal) return []
-      }
-      const isCopied = copiedFields.has(def.key)
-      return [
-        {
-          key: def.key,
-          label: def.label,
-          bookValue: bookVal,
-          currentDisplay: isCopied ? candidateVal : bookVal,
-          candidateDisplay: candidateVal,
-          hasDiff: bookVal !== candidateVal,
-          isCopied,
-          isCover: def.key === 'coverUrl',
-        },
-      ]
-    }),
+    [
+      ...FIELD_DEFS.flatMap((def) => {
+        const candidateVal = getCandidateValue(def.key)
+        const bookVal = getBookValue(def.key)
+        if (def.key === 'coverUrl') {
+          if (!candidateVal && !bookVal) return []
+        } else {
+          if (!candidateVal) return []
+        }
+        const isCopied = copiedFields.has(def.key)
+        return [
+          {
+            key: def.key,
+            label: def.label,
+            bookValue: bookVal,
+            currentDisplay: isCopied ? candidateVal : bookVal,
+            candidateDisplay: candidateVal,
+            hasDiff: bookVal !== candidateVal,
+            isCopied,
+            isCover: def.key === 'coverUrl',
+            isCopyable: true,
+          },
+        ]
+      }),
+      ...(candidate.providerId || currentProviderId
+        ? [
+            (() => {
+              const providerIsCopied = copiedFields.has('providerId')
+              const candidateProviderId = candidate.providerId ?? ''
+              const existingProviderId = currentProviderId ?? ''
+              return {
+                key: 'providerId' as const,
+                label: PROVIDER_ID_LABEL[candidate.provider] ?? 'Provider ID',
+                bookValue: existingProviderId,
+                currentDisplay: providerIsCopied ? candidateProviderId : existingProviderId,
+                candidateDisplay: candidateProviderId,
+                hasDiff: existingProviderId !== candidateProviderId,
+                isCopied: providerIsCopied,
+                isCover: false,
+                isCopyable: true,
+              }
+            })(),
+          ]
+        : []),
+      ...(candidate.sourceUrl
+        ? [
+            {
+              key: 'sourceUrl' as const,
+              label: 'Source URL',
+              bookValue: '',
+              currentDisplay: '',
+              candidateDisplay: candidate.sourceUrl,
+              hasDiff: true,
+              isCopied: false,
+              isCover: false,
+              isCopyable: false,
+            },
+          ]
+        : []),
+    ] as DiffField[],
   )
 
   function toggleField(key: DiffFieldKey) {
@@ -124,12 +180,14 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
   }
 
   function copyAll() {
-    for (const f of fields.value) copiedFields.add(f.key)
+    for (const f of fields.value) {
+      if (f.isCopyable) copiedFields.add(f.key)
+    }
   }
 
   function copyMissing() {
     for (const f of fields.value) {
-      if (!f.bookValue) copiedFields.add(f.key)
+      if (f.isCopyable && !f.bookValue) copiedFields.add(f.key)
     }
   }
 
@@ -162,6 +220,12 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
         formPatch.seriesIndex = candidate.seriesIndex ?? null
         continue
       }
+      if (key === 'providerId') {
+        const idField = PROVIDER_ID_FIELD[candidate.provider]
+        if (idField) formPatch[idField] = candidate.providerId
+        continue
+      }
+      if (key === 'sourceUrl') continue
       const val = candidate[key as keyof MetadataCandidate]
       ;(formPatch as Record<string, unknown>)[key] = val != null ? String(val) : null
     }

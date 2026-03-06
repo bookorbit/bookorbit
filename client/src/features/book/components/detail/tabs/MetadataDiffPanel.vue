@@ -12,6 +12,7 @@ const props = defineProps<{
   providers: MetadataProviderInfo[]
   backLabel?: string
   currentCoverUrl?: string
+  currentProviderId?: string | null
   fieldSources?: Record<string, string>
 }>()
 
@@ -22,7 +23,12 @@ const emit = defineEmits<{
 
 const providerLabel = computed(() => getProviderLabel(props.candidate.provider, props.providers))
 
-const { fields, toggleField, copyAll, copyMissing, buildPatch, hasCopied } = useMetadataDiff(props.current, props.candidate, props.currentCoverUrl)
+const { fields, toggleField, copyAll, copyMissing, buildPatch, hasCopied } = useMetadataDiff(
+  props.current,
+  props.candidate,
+  props.currentCoverUrl,
+  props.currentProviderId,
+)
 
 function apply() {
   emit('apply', buildPatch())
