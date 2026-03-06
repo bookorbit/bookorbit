@@ -3,7 +3,10 @@ import { describe, it, expect, vi } from 'vitest'
 import BookListRow from '../BookListRow.vue'
 import type { BookCard } from '@projectx/types'
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return { ...actual, useRouter: () => ({ push: vi.fn() }) }
+})
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn() }),
 }))
@@ -18,6 +21,9 @@ const globalStubs = {
     DropdownMenuItem: { template: '<div><slot /></div>' },
     DropdownMenuTrigger: { template: '<div><slot /></div>' },
     DropdownMenuSeparator: { template: '<div />' },
+    Tooltip: { template: '<div><slot /></div>' },
+    TooltipTrigger: { template: '<div><slot /></div>' },
+    TooltipContent: { template: '<div><slot /></div>' },
   },
 }
 
@@ -29,6 +35,13 @@ const missingBook: BookCard = {
   seriesName: null,
   seriesIndex: null,
   files: [],
+  publishedYear: null,
+  language: null,
+  genres: [],
+  tags: [],
+  rating: null,
+  readingProgress: null,
+  addedAt: '2026-01-01T00:00:00.000Z',
 }
 
 const presentBook: BookCard = {
@@ -39,6 +52,13 @@ const presentBook: BookCard = {
   seriesName: null,
   seriesIndex: null,
   files: [{ id: 10, format: 'epub', role: 'primary' }],
+  publishedYear: 2024,
+  language: 'en',
+  genres: ['Fiction'],
+  tags: [],
+  rating: null,
+  readingProgress: null,
+  addedAt: '2026-01-01T00:00:00.000Z',
 }
 
 describe('BookListRow — missing state', () => {

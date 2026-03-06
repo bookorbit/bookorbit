@@ -43,7 +43,8 @@ src/
 ## Testing
 
 ```bash
-pnpm test:unit          # run Vitest
+pnpm test:unit          # run unit tests
+pnpm test:cov           # run unit tests with coverage
 ```
 
 ## Key conventions

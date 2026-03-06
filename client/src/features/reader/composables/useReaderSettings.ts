@@ -43,8 +43,8 @@ export function useReaderSettings(bookFileId: number, format: string) {
     () =>
       ({
         ...(READER_GROUP_DEFAULTS[group] as ReaderSettings),
-        ...(defaultSettings.value ?? {}),
-        ...(bookDelta.value ?? {}),
+        ...(defaultSettings.value ?? undefined),
+        ...(bookDelta.value ?? undefined),
       }) as ReaderSettings,
   )
 
@@ -84,7 +84,7 @@ export function useReaderSettings(bookFileId: number, format: string) {
 
   // Merges only the changed field(s) into the existing delta — never saves a full snapshot.
   function updateBookSettings(patch: Partial<ReaderSettings>) {
-    const next = { ...(bookDelta.value ?? {}), ...patch } as Partial<ReaderSettings>
+    const next = { ...(bookDelta.value ?? undefined), ...patch } as Partial<ReaderSettings>
     bookDelta.value = next
     isCustomized.value = Object.keys(next).length > 0
     writeLs(lsBookKey(bookFileId), next)

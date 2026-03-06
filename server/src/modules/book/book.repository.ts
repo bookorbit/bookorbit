@@ -204,10 +204,7 @@ export class BookRepository {
         metadataHash: koboSnapshotBooks.metadataHash,
       })
       .from(koboLibrarySnapshots)
-      .leftJoin(
-        koboSnapshotBooks,
-        and(eq(koboSnapshotBooks.snapshotId, koboLibrarySnapshots.id), eq(koboSnapshotBooks.bookId, bookId)),
-      )
+      .leftJoin(koboSnapshotBooks, and(eq(koboSnapshotBooks.snapshotId, koboLibrarySnapshots.id), eq(koboSnapshotBooks.bookId, bookId)))
       .where(eq(koboLibrarySnapshots.userId, userId))
       .limit(1);
     return row ?? null;
@@ -217,10 +214,7 @@ export class BookRepository {
     const rows = await this.db
       .select({ name: collections.name })
       .from(collectionBooks)
-      .innerJoin(
-        collections,
-        and(eq(collections.id, collectionBooks.collectionId), eq(collections.userId, userId), eq(collections.syncToKobo, true)),
-      )
+      .innerJoin(collections, and(eq(collections.id, collectionBooks.collectionId), eq(collections.userId, userId), eq(collections.syncToKobo, true)))
       .where(eq(collectionBooks.bookId, bookId));
     return rows.map((r) => r.name);
   }
@@ -252,11 +246,7 @@ export class BookRepository {
       .where(
         and(
           inArray(books.libraryId, libraryIds),
-          or(
-            sql`${bookMetadata.title} ILIKE ${pattern}`,
-            sql`${bookMetadata.seriesName} ILIKE ${pattern}`,
-            isNotNull(matchedAuthors.bookId),
-          ),
+          or(sql`${bookMetadata.title} ILIKE ${pattern}`, sql`${bookMetadata.seriesName} ILIKE ${pattern}`, isNotNull(matchedAuthors.bookId)),
         ),
       )
       .orderBy(bookMetadata.title)

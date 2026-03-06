@@ -4,7 +4,6 @@ import { CheckSquare, LayoutGrid, List, MoreHorizontal, SlidersHorizontal, Squar
 import * as LucideIcons from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import {
   DropdownMenu,
@@ -64,7 +63,11 @@ function getIconComponent(name: string) {
         variant="ghost"
         size="sm"
         class="hidden md:flex h-8 gap-1.5 text-[11px] font-bold uppercase tracking-tight px-2.5 rounded-lg transition-all"
-        :class="selectionMode ? 'text-primary bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/20' : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/5'"
+        :class="
+          selectionMode
+            ? 'text-primary bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/20'
+            : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/5'
+        "
         @click="emit('toggle-selection')"
       >
         <CheckSquare v-if="selectionMode" :size="13" />
@@ -101,7 +104,11 @@ function getIconComponent(name: string) {
       <!-- Desktop: display settings popover -->
       <Popover>
         <PopoverTrigger as-child>
-          <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-primary/5">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="hidden md:flex h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-primary/5"
+          >
             <SlidersHorizontal :size="14" />
           </Button>
         </PopoverTrigger>

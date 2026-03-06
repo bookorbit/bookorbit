@@ -54,6 +54,16 @@ pnpm test:e2e       # end-to-end tests
 pnpm test:cov       # unit tests with coverage
 ```
 
+## Quality
+
+```bash
+pnpm type-check      # TypeScript checks (no emit)
+pnpm lint:check      # Non-mutating lint checks
+pnpm lint:fix        # Auto-fix lint issues
+pnpm format:check    # Prettier check
+pnpm format          # Prettier write
+```
+
 ## Key conventions
 
 - Constructor injection with `@Inject(DB)` for the Drizzle instance.

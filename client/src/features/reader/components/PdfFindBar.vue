@@ -2,7 +2,7 @@
 import { nextTick, ref, watch } from 'vue'
 import { ChevronDown, ChevronUp, X } from 'lucide-vue-next'
 
-const props = defineProps<{
+defineProps<{
   matchCount: number
   currentIndex: number
 }>()
@@ -42,10 +42,7 @@ defineExpose({
 </script>
 
 <template>
-  <div
-    class="flex items-center gap-1.5 px-3 py-1.5 shrink-0"
-    style="background: rgba(60, 65, 70, 1); border-bottom: 1px solid rgba(0,0,0,0.3)"
-  >
+  <div class="flex items-center gap-1.5 px-3 py-1.5 shrink-0" style="background: rgba(60, 65, 70, 1); border-bottom: 1px solid rgba(0, 0, 0, 0.3)">
     <input
       ref="inputRef"
       v-model="query"
@@ -53,8 +50,8 @@ defineExpose({
       placeholder="Find in document..."
       class="flex-1 min-w-0 bg-transparent text-sm text-white/90 outline-none placeholder:text-white/30"
       style="max-width: 260px"
-      @keydown.enter="emit('next')"
-      @keydown.shift.enter.prevent="emit('prev')"
+      @keydown.enter.exact="emit('next')"
+      @keydown.enter.shift.exact.prevent="emit('prev')"
       @keydown.escape="emit('close')"
     />
 
@@ -95,4 +92,3 @@ defineExpose({
     </button>
   </div>
 </template>
-

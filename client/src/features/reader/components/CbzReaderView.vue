@@ -75,9 +75,17 @@ function handleImageClick(e: MouseEvent) {
     return
   }
   const x = e.clientX / window.innerWidth
-  if (x < 0.25) direction.value === 'rtl' ? nextPage() : prevPage()
-  else if (x > 0.75) direction.value === 'rtl' ? prevPage() : nextPage()
-  else handleMiddleTap()
+  if (x < 0.25) {
+    if (direction.value === 'rtl') nextPage()
+    else prevPage()
+    return
+  }
+  if (x > 0.75) {
+    if (direction.value === 'rtl') prevPage()
+    else nextPage()
+    return
+  }
+  handleMiddleTap()
 }
 
 // ── Touch / swipe ──────────────────────────────────────────────────────────────
@@ -90,8 +98,13 @@ function onTouchStart(e: TouchEvent) {
 function onTouchEnd(e: TouchEvent) {
   const dx = e.changedTouches[0].clientX - touchStartX
   if (Math.abs(dx) < 50) return
-  if (dx < 0) direction.value === 'rtl' ? prevPage() : nextPage()
-  else direction.value === 'rtl' ? nextPage() : prevPage()
+  if (dx < 0) {
+    if (direction.value === 'rtl') prevPage()
+    else nextPage()
+    return
+  }
+  if (direction.value === 'rtl') nextPage()
+  else prevPage()
 }
 
 // ── Wheel (paginated mode only) ────────────────────────────────────────────────
@@ -111,16 +124,19 @@ function onKeyDown(e: KeyboardEvent) {
     case 'ArrowRight':
     case 'PageDown':
       e.preventDefault()
-      isRtl ? prevPage() : nextPage()
+      if (isRtl) prevPage()
+      else nextPage()
       break
     case 'ArrowLeft':
     case 'PageUp':
       e.preventDefault()
-      isRtl ? nextPage() : prevPage()
+      if (isRtl) nextPage()
+      else prevPage()
       break
     case ' ':
       e.preventDefault()
-      e.shiftKey ? prevPage() : nextPage()
+      if (e.shiftKey) prevPage()
+      else nextPage()
       break
     case 'Home':
       goToPage(0)

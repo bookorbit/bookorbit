@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { api } from '@/lib/api'
 
 export interface Bookmark {

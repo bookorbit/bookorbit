@@ -2,24 +2,74 @@
   "name": "projectx",
   "private": true,
   "scripts": {
+    "help": "node ./scripts/help.mjs",
+    "guide": "node ./scripts/help.mjs",
+    "setup": "bash ./scripts/setup.sh",
+    "doctor": "bash ./scripts/doctor.sh",
     "dev": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cd client && npm run dev -- --host",
     "dev:server": "cd server && npm run start:dev",
+    "quick": "pnpm run verify:fast",
+    "verify:fast": "pnpm run lint:check && pnpm run typecheck && pnpm run test",
+    "verify": "pnpm run lint:check && pnpm run typecheck && pnpm run test && pnpm run test:e2e:smoke",
+    "verify:strict": "pnpm run format:check && pnpm run lint:check && pnpm run typecheck:full && pnpm run test && pnpm run test:e2e:smoke",
     "build:client": "pnpm --filter client build",
     "build:server": "pnpm --filter server build",
-    "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
-    "db:reset": "bash scripts/db/reset.sh",
-    "db:seed": "bash scripts/postman/seed.sh"
+    "typecheck": "pnpm run typecheck:server && pnpm run typecheck:client:baseline",
+    "typecheck:full": "pnpm run typecheck:server && pnpm run typecheck:client",
+    "typecheck:server": "pnpm --filter server type-check",
+    "typecheck:client": "pnpm --filter client type-check",
+    "typecheck:client:baseline": "node ./scripts/client-typecheck-baseline.mjs check",
+    "typecheck:client:baseline:update": "node ./scripts/client-typecheck-baseline.mjs update",
+    "lint": "pnpm run lint:check",
+    "lint:check": "pnpm --filter server lint:check && pnpm --filter client lint:check",
+    "lint:fix": "pnpm --filter server lint:fix && pnpm --filter client lint:fix",
+    "format": "pnpm --filter server format && pnpm --filter client format",
+    "format:check": "pnpm --filter server format:check && pnpm --filter client format:check",
+    "test": "pnpm run test:server && pnpm run test:client",
+    "test:server": "pnpm --filter server test",
+    "test:client": "pnpm --filter client test:unit --run",
+    "test:e2e:smoke": "pnpm --filter server test:e2e",
+    "coverage": "pnpm run coverage:server && pnpm run coverage:client",
+    "coverage:server": "pnpm --filter server test:cov",
+    "coverage:client": "pnpm --filter client test:cov --run",
+    "db:up": "docker compose up -d --wait",
+    "db:migrate": "pnpm --filter server db:migrate",
+    "db:reset": "bash ./scripts/db/reset.sh",
+    "db:seed": "bash ./scripts/db/seed.sh",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=24",
     "pnpm": ">=9"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.0",
+    "prettier": "^3.6.2"
+  },
+  "lint-staged": {
+    "*.{md,json,yml,yaml}": [
+      "pnpm exec prettier --write"
+    ],
+    "client/src/**/*.{ts,vue}": [
+      "pnpm --dir client exec eslint --fix",
+      "pnpm exec prettier --write"
+    ],
+    "server/{src,test}/**/*.ts": [
+      "pnpm --dir server exec eslint --fix",
+      "pnpm exec prettier --write"
+    ]
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@nestjs/core", "@parcel/watcher", "@swc/core", "esbuild", "sharp", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@parcel/watcher",
+      "@swc/core",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

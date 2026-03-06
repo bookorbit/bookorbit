@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import type { StringValue } from 'ms';
 
 import { CommonModule } from '../../common/common.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
@@ -25,8 +26,8 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('auth.jwtSecret'),
-        signOptions: { expiresIn: config.get<string>('auth.jwtExpiresIn') },
+        secret: config.getOrThrow<string>('auth.jwtSecret'),
+        signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn') },
       }),
     }),
     UserModule,

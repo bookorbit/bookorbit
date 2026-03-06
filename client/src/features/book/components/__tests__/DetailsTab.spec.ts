@@ -3,7 +3,10 @@ import { describe, it, expect, vi } from 'vitest'
 import DetailsTab from '../detail/tabs/DetailsTab.vue'
 import type { BookDetail } from '@projectx/types'
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return { ...actual, useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }
+})
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => false }),
 }))

@@ -129,8 +129,15 @@ export class BookService {
   }
 
   private sanitizeFilenameSegment(raw: string, fallback = 'download'): string {
-    const fallbackSafe = fallback.replace(/[/\\:*?"<>|\0]/g, '_').trim().slice(0, 255) || 'download';
-    const cleaned = raw.replace(/[/\\:*?"<>|\0]/g, '_').trim().slice(0, 255);
+    const fallbackSafe =
+      fallback
+        .replace(/[/\\:*?"<>|\0]/g, '_')
+        .trim()
+        .slice(0, 255) || 'download';
+    const cleaned = raw
+      .replace(/[/\\:*?"<>|\0]/g, '_')
+      .trim()
+      .slice(0, 255);
     if (!cleaned || cleaned === '.' || cleaned === '..') return fallbackSafe;
     return cleaned;
   }
@@ -207,9 +214,7 @@ export class BookService {
       const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
       return this.sanitizeFilenameSegment(resolvedName ?? originalFilename, originalFilename);
     } catch (err) {
-      this.logger.warn(
-        `Download filename pattern resolution failed for book ${file.bookId}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`Download filename pattern resolution failed for book ${file.bookId}: ${err instanceof Error ? err.message : String(err)}`);
       return this.sanitizeFilenameSegment(originalFilename, originalFilename);
     }
   }

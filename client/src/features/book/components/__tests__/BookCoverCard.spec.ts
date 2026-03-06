@@ -1,9 +1,12 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import BookCoverCard from '../BookCoverCard.vue'
 import type { BookCard } from '@projectx/types'
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return { ...actual, useRouter: () => ({ push: vi.fn() }) }
+})
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn() }),
 }))
@@ -30,6 +33,13 @@ const missingBook: BookCard = {
   seriesName: null,
   seriesIndex: null,
   files: [],
+  publishedYear: null,
+  language: null,
+  genres: [],
+  tags: [],
+  rating: null,
+  readingProgress: null,
+  addedAt: '2026-01-01T00:00:00.000Z',
 }
 
 const presentBook: BookCard = {
@@ -40,6 +50,13 @@ const presentBook: BookCard = {
   seriesName: null,
   seriesIndex: null,
   files: [{ id: 10, format: 'epub', role: 'primary' }],
+  publishedYear: 2024,
+  language: 'en',
+  genres: [],
+  tags: [],
+  rating: null,
+  readingProgress: null,
+  addedAt: '2026-01-01T00:00:00.000Z',
 }
 
 describe('BookCoverCard — missing state', () => {
@@ -66,7 +83,8 @@ describe('BookCoverCard — missing state', () => {
 
   it('uses cursor-default on the root when book is missing', () => {
     const wrapper = mount(BookCoverCard, { props: { book: missingBook }, global: globalStubs })
-    expect(wrapper.classes()).toContain('cursor-default')
+    const root = wrapper.find('div.group')
+    expect(root.classes()).toContain('cursor-default')
   })
 })
 

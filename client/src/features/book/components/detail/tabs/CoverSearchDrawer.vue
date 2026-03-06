@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
-import { Search, Loader2, X, Image as ImageIcon, ExternalLink, Check } from 'lucide-vue-next'
+import { Search, Loader2, X, Image as ImageIcon, Check } from 'lucide-vue-next'
 import type { CoverSearchResult } from '@projectx/types'
 
 const props = defineProps<{
@@ -120,9 +120,11 @@ onMounted(() => {
             @click="handleSelect(String(res.url))"
           >
             <img :src="res.previewUrl" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-            
+
             <!-- Hover Overlay -->
-            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+            <div
+              class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2"
+            >
               <div class="p-2 rounded-full bg-primary text-white scale-75 group-hover:scale-100 transition-transform">
                 <Check class="size-5" />
               </div>
@@ -130,8 +132,10 @@ onMounted(() => {
             </div>
 
             <!-- Resolution Badge -->
-            <div class="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white backdrop-blur-md shadow-sm"
-                 :class="res.width >= 1000 ? 'bg-green-500/80' : 'bg-black/50'">
+            <div
+              class="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white backdrop-blur-md shadow-sm"
+              :class="res.width >= 1000 ? 'bg-green-500/80' : 'bg-black/50'"
+            >
               {{ res.width }}x{{ res.height }}
             </div>
 
@@ -182,10 +186,10 @@ onMounted(() => {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>

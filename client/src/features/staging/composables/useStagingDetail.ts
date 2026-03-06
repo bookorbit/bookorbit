@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { api } from '@/lib/api'
 import type { StagingFile, StagingMetadata } from '@projectx/types'
 

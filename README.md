@@ -11,7 +11,7 @@ A book and library management app with Kobo device support. Multi-user, self-hos
 ### Prerequisites
 
 | Tool    | Version | Install                                                      |
-|---------|---------|--------------------------------------------------------------|
+| ------- | ------- | ------------------------------------------------------------ |
 | Node.js | >= 24   | [nodejs.org](https://nodejs.org)                             |
 | pnpm    | >= 9    | `corepack enable && corepack prepare pnpm@latest --activate` |
 | Docker  | latest  | [docker.com](https://www.docker.com/products/docker-desktop) |
@@ -21,10 +21,7 @@ A book and library management app with Kobo device support. Multi-user, self-hos
 ```bash
 git clone <repo-url> projectx
 cd projectx
-docker compose up -d --wait          # start Postgres
-cp server/.env.example server/.env   # create env config (edit if needed)
-pnpm install                         # install all dependencies
-cd server && pnpm db:migrate && cd .. # apply database migrations
+pnpm setup
 ```
 
 Docker is only used for PostgreSQL. The server and client run directly on your machine.
@@ -55,8 +52,8 @@ Both must be running. The client proxies all `/api` and `/socket.io` requests to
 ### First steps after setup
 
 1. **Log in** - a default admin account is created automatically:
-    - Username: `admin`
-    - Password: `admin`
+   - Username: `admin`
+   - Password: `admin`
 2. **Change password** - you'll be prompted to set a new password on first login. Use `Admin123!` for local dev.
 3. **Create a library** - open Settings (gear icon) > Libraries > Create Library. Add a folder path pointing to some books on your machine, e.g. any directory containing `.epub`, `.pdf`, or `.cbz` files.
 4. **Scan** - the library scans automatically after creation. You should see books appear on the home page once the scan completes.
@@ -95,40 +92,58 @@ This is a **pnpm workspace**. The three packages are:
 
 All commands run from the **repo root** unless noted otherwise.
 
+### Everyday workflow
+
+| Command              | Description                                        |
+| -------------------- | -------------------------------------------------- |
+| `pnpm setup`         | One-time bootstrap                                 |
+| `pnpm dev`           | Daily development                                  |
+| `pnpm verify`        | Default local checks before push                   |
+| `pnpm quick`         | Faster local checks while coding                   |
+| `pnpm verify:strict` | Aspirational strict gate (format + full typecheck) |
+| `pnpm guide`         | Print command reference                            |
+
 ### Development
 
 | Command                       | Description                          |
-|-------------------------------|--------------------------------------|
+| ----------------------------- | ------------------------------------ |
 | `pnpm dev`                    | Start server + client (concurrently) |
 | `cd server && pnpm start:dev` | Server only (watch mode)             |
 | `cd client && pnpm dev`       | Client only (Vite dev server)        |
 
 ### Testing
 
-| Command                                            | Description               |
-|----------------------------------------------------|---------------------------|
-| `cd server && pnpm test`                           | Server unit tests         |
-| `cd server && pnpm test -- --testPathPattern=scan` | Run matching server tests |
-| `cd client && pnpm test:unit`                      | Client unit tests         |
-| `cd client && pnpm test:unit -- BookCover`         | Run matching client tests |
-| `cd server && pnpm test:e2e`                       | Server E2E tests          |
+| Command                         | Description                  |
+| ------------------------------- | ---------------------------- |
+| `pnpm test`                     | Server + client unit tests   |
+| `pnpm test:server`              | Server unit tests            |
+| `pnpm test:client`              | Client unit tests            |
+| `pnpm test:e2e:smoke`           | Server smoke e2e             |
+| `pnpm coverage`                 | Coverage for server + client |
+| `pnpm --filter server test:e2e` | Server e2e only              |
 
 ### Database
 
-| Command                                | Description                              |
-|----------------------------------------|------------------------------------------|
-| `cd server && pnpm db:migrate`         | Apply pending migrations                 |
-| `cd server && pnpm db:generate <name>` | Generate a migration from schema changes |
-| `cd server && pnpm db:studio`          | Open Drizzle Studio (DB browser)         |
+| Command                                   | Description                              |
+| ----------------------------------------- | ---------------------------------------- |
+| `pnpm db:up`                              | Start local Postgres                     |
+| `pnpm db:migrate`                         | Apply pending migrations                 |
+| `pnpm db:seed`                            | Seed baseline app data                   |
+| `pnpm db:reset`                           | Reset schema, migrate, and seed          |
+| `pnpm --filter server db:generate <name>` | Generate a migration from schema changes |
+| `pnpm --filter server db:studio`          | Open Drizzle Studio (DB browser)         |
 
 ### Linting & formatting
 
-| Command                               | Description        |
-|---------------------------------------|--------------------|
-| `cd server && npx prettier --write .` | Format server code |
-| `cd client && npx prettier --write .` | Format client code |
-| `cd server && pnpm lint`              | Lint server        |
-| `cd client && pnpm lint`              | Lint client        |
+| Command                                 | Description                                |
+| --------------------------------------- | ------------------------------------------ |
+| `pnpm format:check`                     | Check formatting                           |
+| `pnpm format`                           | Auto-format source files                   |
+| `pnpm lint:check`                       | Non-mutating lint checks                   |
+| `pnpm lint:fix`                         | Auto-fix lint issues                       |
+| `pnpm typecheck`                        | Server typecheck + no-new client TS errors |
+| `pnpm typecheck:full`                   | Typecheck server + client (strict)         |
+| `pnpm typecheck:client:baseline:update` | Refresh accepted client TS baseline        |
 
 ---
 
@@ -162,7 +177,7 @@ If other people have pushed changes, you may need to sync dependencies and migra
 
 ```bash
 pnpm install                      # pick up lockfile changes
-cd server && pnpm db:migrate      # apply any new migrations
+pnpm db:migrate                   # apply any new migrations
 ```
 
 ### Adding a dependency
@@ -189,7 +204,7 @@ The fastest way to learn the patterns is to follow an existing module:
 Server environment is configured in `server/.env` (created from `.env.example` during setup).
 
 | Variable                 | Default                                                | Description                                                |
-|--------------------------|--------------------------------------------------------|------------------------------------------------------------|
+| ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------- |
 | `DATABASE_URL`           | `postgres://projectx:projectx@localhost:5432/projectx` | PostgreSQL connection string                               |
 | `PORT`                   | `3000`                                                 | Server port                                                |
 | `NODE_ENV`               | `development`                                          | Environment mode                                           |
@@ -209,30 +224,16 @@ The database schema is defined in `server/src/db/schema/` using Drizzle ORM. Eac
 **Making schema changes:**
 
 1. Edit the relevant file in `server/src/db/schema/`
-2. Generate a migration: `cd server && pnpm db:generate describe_your_change`
-3. Apply it: `cd server && pnpm db:migrate`
+2. Generate a migration: `pnpm --filter server db:generate describe_your_change`
+3. Apply it: `pnpm db:migrate`
 
 Never hand-write migration SQL. Always generate from schema diffs.
 
 ### Resetting the database from scratch
 
 ```bash
-# 1. Drop and recreate the public schema
-docker exec $(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1) \
-  psql -U projectx -d projectx -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-
-# 2. Clear Drizzle's migration tracking (it lives in a separate schema)
-docker exec $(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1) \
-  psql -U projectx -d projectx -c "DELETE FROM drizzle.__drizzle_migrations;"
-
-# 3. Re-apply all migrations
-cd server && pnpm db:migrate
-
-# 4. (Optional) Wipe cover images
-rm -rf local/data/covers
+pnpm db:reset
 ```
-
-Step 2 is necessary because Drizzle tracks applied migrations in `drizzle.__drizzle_migrations`, which lives outside the `public` schema and survives the drop.
 
 ---
 
@@ -264,7 +265,7 @@ Another PostgreSQL instance is running. Either stop it or change the port mappin
 
 ```yaml
 ports:
-  - "5433:5432"  # use 5433 on host
+  - "5433:5432" # use 5433 on host
 ```
 
 Then update `DATABASE_URL` in `server/.env` to use port `5433`.
@@ -325,8 +326,7 @@ Make sure you're accessing the client at `http://localhost:5173` (not port 3000)
 ## Further Reading
 
 | Doc                                    | What it covers                                               |
-|----------------------------------------|--------------------------------------------------------------|
+| -------------------------------------- | ------------------------------------------------------------ |
 | [`server/README.md`](server/README.md) | Backend module map, DB commands, NestJS conventions          |
 | [`client/README.md`](client/README.md) | Frontend project layout, IDE setup, Vue/Tailwind conventions |
 | [`packages/types/`](packages/types/)   | Shared type definitions between server and client            |
-

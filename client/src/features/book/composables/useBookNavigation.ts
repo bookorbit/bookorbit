@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const bookIds = ref<number[]>([])
 const total = ref(0)

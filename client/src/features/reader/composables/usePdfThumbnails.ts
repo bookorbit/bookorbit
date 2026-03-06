@@ -1,4 +1,4 @@
-import { ref, shallowRef } from 'vue'
+import { ref } from 'vue'
 import type * as pdfjsLib from 'pdfjs-dist'
 import type { Ref, ShallowRef } from 'vue'
 
@@ -39,4 +39,3 @@ export function usePdfThumbnails(pdfDoc: ShallowRef<pdfjsLib.PDFDocumentProxy | 
 
   return { thumbnails, loadThumbnail, loadRange }
 }
-

@@ -1,5 +1,4 @@
 import type { OidcPublicConfig } from '@projectx/types'
-import { api } from '@/lib/api'
 
 async function generatePkce(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const array = new Uint8Array(32)

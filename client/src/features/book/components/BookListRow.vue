@@ -104,8 +104,12 @@ function openFile(file: BookFileRef) {
 
 <template>
   <div
-    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer hover:bg-muted/50"
-    :class="[selectionMode ? 'cursor-pointer select-none' : '', selected ? 'bg-primary/8 ring-1 ring-primary/30' : '']"
+    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer"
+    :class="[
+      selectionMode ? 'cursor-pointer select-none' : '',
+      selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
+      isMissing ? 'grayscale opacity-60' : 'hover:bg-muted/50',
+    ]"
     @click="selectionMode ? emit('select', $event) : emit('action', 'quick-view')"
   >
     <!-- Selection checkbox -->
@@ -160,11 +164,7 @@ function openFile(file: BookFileRef) {
       <div class="hidden sm:flex items-center gap-0.5" @mouseleave="hoverRating = null">
         <Tooltip v-for="star in 5" :key="star">
           <TooltipTrigger as-child>
-            <button
-              class="p-0.5 transition-colors"
-              @mouseenter="hoverRating = star"
-              @click="setRating(star)"
-            >
+            <button class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
               <Star class="size-3" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
             </button>
           </TooltipTrigger>

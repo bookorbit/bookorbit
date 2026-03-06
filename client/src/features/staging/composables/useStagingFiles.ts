@@ -1,4 +1,4 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import type { StagingFile, StagingFilesPage, StagingFileStatus } from '@projectx/types'
 
@@ -142,4 +142,3 @@ export function useStagingFiles() {
     getSelectionPayload,
   }
 }
-

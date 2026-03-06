@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+HUSKY_SH="$(dirname -- "$0")/_/husky.sh"
+[ -f "$HUSKY_SH" ] && . "$HUSKY_SH"
+
+pnpm exec lint-staged

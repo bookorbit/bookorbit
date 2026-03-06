@@ -19,6 +19,7 @@ import { createReadStream } from 'fs';
 import { access } from 'fs/promises';
 import { Readable } from 'stream';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { StagingMetadata } from '@projectx/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -138,7 +139,14 @@ export class StagingController {
 
   @Post('files/bulk-edit')
   bulkEdit(@Body() dto: BulkEditStagingDto) {
-    return this.service.bulkEdit(dto.fileIds, dto.selectAll, dto.excludedIds, dto.fields, dto.enabledFields, dto.mergeArrays);
+    return this.service.bulkEdit(
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.fields as Partial<StagingMetadata & Record<string, unknown>>,
+      dto.enabledFields,
+      dto.mergeArrays,
+    );
   }
 
   @Post('files/preview-names')
