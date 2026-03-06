@@ -19,13 +19,10 @@ import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
-import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import type { BookCard } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
-const themeStore = useThemeStore()
-const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
 
 const collectionId = computed(() => Number(route.params.id))
@@ -191,7 +188,7 @@ watch(
       </template>
     </ViewHeader>
 
-    <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
+    <main class="flex-none pr-4 pb-2">
       <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
           <FolderOpen :size="28" class="text-muted-foreground/50" />

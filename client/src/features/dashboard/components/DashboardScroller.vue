@@ -66,7 +66,7 @@ const SKELETONS = Array.from({ length: 8 })
     <!-- Skeleton -->
     <div v-if="loading" class="flex gap-3 overflow-hidden px-5 pb-5">
       <div v-for="(_, n) in SKELETONS" :key="n" class="w-[120px] shrink-0">
-        <div class="w-full animate-pulse rounded-md bg-muted" style="aspect-ratio: 2/3" />
+        <div class="w-full animate-pulse rounded-lg bg-muted" style="aspect-ratio: 2/3" />
       </div>
     </div>
 

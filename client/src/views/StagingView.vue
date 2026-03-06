@@ -4,7 +4,6 @@ import { PackageOpen, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 import type { StagingFile } from '@projectx/types'
 import { api } from '@/lib/api'
 import { formatBytes } from '@/lib/formatting'
-import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useStagingFiles } from '@/features/staging/composables/useStagingFiles'
 import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
 import { useStagingStatistics } from '@/features/staging/composables/useStagingStatistics'
@@ -14,9 +13,6 @@ import StagingFileList from '@/features/staging/components/StagingFileList.vue'
 import StagingFileSheet from '@/features/staging/components/StagingFileSheet.vue'
 import StagingFinalizeDialog from '@/features/staging/components/StagingFinalizeDialog.vue'
 import StagingBulkEditDialog from '@/features/staging/components/StagingBulkEditDialog.vue'
-
-const themeStore = useThemeStore()
-const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 
 const {
   items,
@@ -256,13 +252,12 @@ onUnmounted(() => {
 
 <template>
   <main
-      class="flex-1 overflow-y-auto"
-      :class="backgroundClass"
-      @dragover="onDragOver"
-      @dragenter="onDragEnter"
-      @dragleave="onDragLeave"
-      @drop="onDrop"
-    >
+    class="flex-1"
+    @dragover="onDragOver"
+    @dragenter="onDragEnter"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
       <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-6xl mx-auto w-full">
         <div class="flex items-center gap-2.5">
           <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">

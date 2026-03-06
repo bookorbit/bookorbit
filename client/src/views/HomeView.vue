@@ -24,13 +24,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
-import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import type { GroupRule, SortSpec } from '@projectx/types'
 
 const route = useRoute()
-const themeStore = useThemeStore()
-const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const { libraries } = useLibraries()
 
@@ -326,7 +323,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       </template>
     </ViewHeader>
 
-    <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
+    <main class="flex-none pr-4 pb-2">
       <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
       <!-- Filter builder panel -->

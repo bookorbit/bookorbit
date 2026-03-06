@@ -71,7 +71,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
           // Adjust the padding for floating and inset variants.
           variant === 'floating' || variant === 'inset'
-            ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
+            ? 'p-3 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(6))+2px)]'
             : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
           props.class,
         )
@@ -80,7 +80,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     >
       <div
         data-sidebar="sidebar"
-        class="bg-sidebar/50 backdrop-blur-xl backdrop-saturate-150 border-r border-sidebar-border/60 shadow-[1px_0_0_0_oklch(1_0_0/0.04)] group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+        class="bg-sidebar/55 backdrop-blur-2xl backdrop-saturate-200 border-r border-sidebar-border/60 shadow-[1px_0_0_0_oklch(1_0_0/0.04)] group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-xl group-data-[variant=floating]:border group-data-[variant=floating]:shadow-xl group-data-[variant=floating]:shadow-black/5"
       >
         <slot />
       </div>

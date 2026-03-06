@@ -42,67 +42,67 @@ function getIconComponent(name: string) {
 </script>
 
 <template>
-  <div class="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 bg-card/40 px-4">
+  <div class="flex h-10 shrink-0 items-center gap-2 px-1 mr-4 mt-2 ml-0 mb-2 sticky top-0 z-20 transition-all duration-300">
     <!-- Left: optional icon + title + count -->
-    <div class="flex items-center gap-2 flex-1 min-w-0">
-      <component v-if="icon" :is="getIconComponent(icon)" :size="15" class="shrink-0 text-muted-foreground" />
-      <span class="font-semibold text-[14px] text-foreground tracking-tight truncate">{{ title }}</span>
-      <span
-        class="hidden sm:inline-flex text-[11px] font-medium text-primary/70 bg-primary/8 px-2 py-0.5 rounded-full tabular-nums border border-primary/15 shrink-0"
-      >
-        {{ loaded.toLocaleString() }}<span class="text-muted-foreground/60 mx-0.5">/</span>{{ total.toLocaleString() }}
+    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+      <div class="w-1 h-4 bg-primary/40 rounded-full" />
+      <component v-if="icon" :is="getIconComponent(icon)" :size="14" class="shrink-0 text-muted-foreground/60" />
+      <span class="font-bold text-[16px] text-foreground/90 tracking-tight truncate">{{ title }}</span>
+      <span class="text-[12px] font-bold text-primary/60 tabular-nums uppercase tracking-wider ml-1">
+        {{ loaded.toLocaleString() }}<span class="text-muted-foreground/30 mx-0.5 font-normal">/</span>{{ total.toLocaleString() }}
       </span>
     </div>
 
     <!-- Right -->
-    <div class="flex items-center gap-2 shrink-0">
+    <div class="flex items-center gap-1 shrink-0">
       <slot name="toolbar" />
+      <div class="w-px h-3.5 bg-border/40 mx-1.5" />
       <slot name="actions" />
 
       <!-- Select mode toggle -->
       <Button
         variant="ghost"
         size="sm"
-        class="hidden md:flex h-8 gap-1.5 text-xs px-2.5"
-        :class="selectionMode ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:text-foreground'"
+        class="hidden md:flex h-8 gap-1.5 text-[11px] font-bold uppercase tracking-tight px-2.5 rounded-lg transition-all"
+        :class="selectionMode ? 'text-primary bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/20' : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/5'"
         @click="emit('toggle-selection')"
       >
-        <CheckSquare v-if="selectionMode" :size="14" />
-        <Square v-else :size="14" />
+        <CheckSquare v-if="selectionMode" :size="13" />
+        <Square v-else :size="13" />
         Select
       </Button>
 
-      <Separator orientation="vertical" class="hidden md:block mx-1 h-4" />
+      <div class="hidden md:block w-px h-3.5 bg-border/40 mx-1.5" />
 
       <!-- Desktop: view mode toggle -->
-      <div class="hidden md:flex items-center">
+      <div class="hidden md:flex items-center gap-0.5">
         <Button
           variant="ghost"
           size="icon"
-          class="h-8 w-8"
-          :class="viewMode === 'grid' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+          class="h-8 w-8 rounded-lg"
+          :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground/50 hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'grid')"
         >
-          <LayoutGrid :size="15" />
+          <LayoutGrid :size="14" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          class="h-8 w-8"
-          :class="viewMode === 'list' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+          class="h-8 w-8 rounded-lg"
+          :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground/50 hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'list')"
         >
-          <List :size="15" />
+          <List :size="14" />
         </Button>
       </div>
 
-      <Separator orientation="vertical" class="hidden md:block mx-1 h-4" />
+      <div class="hidden md:block w-px h-3.5 bg-border/40 mx-1.5" />
 
       <!-- Desktop: display settings popover -->
       <Popover>
         <PopoverTrigger as-child>
-          <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground">
-            <SlidersHorizontal :size="15" />
+          <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-primary/5">
+            <SlidersHorizontal :size="14" />
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-56 p-4" align="end">

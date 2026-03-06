@@ -41,7 +41,7 @@ function handleClick() {
 <template>
   <div class="group cursor-pointer select-none" @click="handleClick">
     <div
-      class="relative w-full overflow-hidden rounded-md shadow-md transition-all duration-200 group-hover:shadow-xl group-hover:scale-[1.04]"
+      class="relative w-full overflow-hidden rounded-lg shadow-md transition-all duration-200 group-hover:shadow-xl group-hover:scale-[1.04]"
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >

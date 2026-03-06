@@ -17,11 +17,11 @@ function navigate(routeName: string) {
 </script>
 
 <template>
-  <div class="flex items-center gap-0 overflow-x-auto flex-1 min-w-0">
+  <div class="flex items-stretch gap-0 overflow-x-auto flex-1 min-w-0">
     <button
       v-for="tab in tabs"
       :key="tab.routeName"
-      class="px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+      class="px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
       :class="route.name === tab.routeName ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
       @click="navigate(tab.routeName)"
     >

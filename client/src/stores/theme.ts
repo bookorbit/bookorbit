@@ -37,7 +37,20 @@ export type Accent =
   | 'orchid'
   | 'blush'
 export type Radius = 'sharp' | 'default' | 'rounded' | 'pill'
-export type Background = 'none' | 'dots' | 'cross' | 'gradient' | 'aurora' | 'horizon'
+export type Background =
+  | 'none'
+  | 'dots'
+  | 'cross'
+  | 'aurora'
+  | 'horizon'
+  | 'mesh'
+  | 'glow'
+  | 'scanlines'
+  | 'brushed'
+  | 'prism'
+  | 'spectrum'
+  | 'elevation'
+  | 'terminal'
 
 export const ACCENT_VIVID: { id: Accent; label: string; color: string }[] = [
   { id: 'rose', label: 'Rose', color: '#e11d48' },
@@ -85,12 +98,26 @@ export const RADIUS_OPTIONS: { id: Radius; label: string }[] = [
 ]
 
 export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: string }[] = [
+  // Basic
   { id: 'none', label: 'None', cssClass: '' },
   { id: 'dots', label: 'Dots', cssClass: 'pattern-dots' },
   { id: 'cross', label: 'Cross', cssClass: 'pattern-cross' },
-  { id: 'gradient', label: 'Gradient', cssClass: 'pattern-gradient' },
+
+  // Atmospheric
   { id: 'aurora', label: 'Aurora', cssClass: 'pattern-aurora' },
   { id: 'horizon', label: 'Horizon', cssClass: 'pattern-horizon' },
+  { id: 'glow', label: 'Glow', cssClass: 'pattern-glow' },
+  { id: 'mesh', label: 'Mesh', cssClass: 'pattern-mesh' },
+
+  // Technical
+  { id: 'scanlines', label: 'Scanlines', cssClass: 'pattern-scanlines' },
+  { id: 'terminal', label: 'Terminal', cssClass: 'pattern-terminal' },
+  { id: 'brushed', label: 'Brushed', cssClass: 'pattern-brushed' },
+
+  // Architectural
+  { id: 'elevation', label: 'Elevation', cssClass: 'pattern-elevation' },
+  { id: 'prism', label: 'Prism', cssClass: 'pattern-prism' },
+  { id: 'spectrum', label: 'Spectrum', cssClass: 'pattern-spectrum' },
 ]
 
 const ACCENT_IDS = ACCENT_OPTIONS.map((a) => a.id)

@@ -4,18 +4,14 @@ import { Settings2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { useAuth } from '@/features/auth/composables/useAuth'
-import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
 
 const { user } = useAuth()
 const { scrollers } = useDashboardConfig()
-const themeStore = useThemeStore()
 
 const settingsOpen = ref(false)
-
-const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 
 const enabledScrollers = computed(() => scrollers.value.filter((s) => s.enabled).sort((a, b) => a.order - b.order))
 
@@ -28,25 +24,28 @@ const greeting = computed(() => {
 </script>
 
 <template>
-  <main class="flex-1 overflow-y-auto" :class="backgroundClass">
-      <!-- Greeting -->
-      <div class="flex items-center justify-between px-6 pb-4 pt-6">
-        <h1 class="text-xl font-semibold tracking-tight">{{ greeting }}</h1>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              @click="settingsOpen = true"
-            >
-              <Settings2 :size="16" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Customize dashboard</TooltipContent>
-        </Tooltip>
+  <main class="flex-none">
+    <!-- Greeting -->
+    <div class="flex items-center justify-between px-1 h-10 ml-5 pt-4 mr-4 mb-2 sticky top-0 z-20 transition-all duration-300">
+      <div class="flex items-center gap-2.5">
+        <div class="w-1 h-4 bg-primary/40 rounded-full" />
+        <h1 class="text-[16px] font-bold text-foreground/90 tracking-tight">{{ greeting }}</h1>
       </div>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            @click="settingsOpen = true"
+          >
+            <Settings2 :size="15" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Customize dashboard</TooltipContent>
+      </Tooltip>
+    </div>
 
-      <!-- Scrollers -->
-      <div class="space-y-5 px-4 pb-8 sm:px-6">
+    <!-- Scrollers -->
+    <div class="space-y-5 px-4 pb-8 pt-2 sm:px-6">
         <DashboardScroller
           v-for="scroller in enabledScrollers"
           :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"

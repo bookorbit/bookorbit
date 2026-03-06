@@ -18,15 +18,12 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
-import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import type { BookCard, GroupRule, SortField } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
-const themeStore = useThemeStore()
-const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 const { coverSize, gridGap, viewMode, lensFilterExpanded } = useDisplaySettings()
 
 const lensId = computed(() => Number(route.params.id))
@@ -240,7 +237,7 @@ watch(
       </template>
     </ViewHeader>
 
-    <main class="flex-1 overflow-y-auto px-4 py-4" :class="backgroundClass">
+    <main class="flex-none pr-4 pb-2">
       <!-- Filter summary -->
       <div
         v-if="filterExpanded && (lens?.filter || sortChip)"

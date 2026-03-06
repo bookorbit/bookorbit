@@ -140,7 +140,7 @@ function formatBadgeClass(fmt: string): string {
 
 <template>
   <header
-    class="flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/70 backdrop-blur-xl backdrop-saturate-150 px-3 shadow-sm sticky top-0 z-30"
+    class="flex h-12 shrink-0 items-center gap-2 border border-sidebar-border/50 bg-background/90 backdrop-blur-xl px-3 shadow-lg shadow-black/5 relative mt-3 ml-0 mr-4 z-30 rounded-xl transition-all duration-300 flex-none"
   >
     <!-- Mobile: search active overlay -->
     <template v-if="mobileSearchOpen">
@@ -236,9 +236,9 @@ function formatBadgeClass(fmt: string): string {
       <!-- Center: desktop global search -->
       <div
         class="hidden md:flex flex-1 mx-4 relative items-center transition-all duration-300"
-        :class="searchFocused || globalSearchQuery ? 'max-w-lg' : 'max-w-xs'"
+        :class="searchFocused || globalSearchQuery ? 'max-w-xl' : 'max-w-sm'"
       >
-        <Search class="absolute left-2.5 text-muted-foreground pointer-events-none" :size="13" />
+        <Search class="absolute left-3 text-muted-foreground/60 pointer-events-none" :size="14" />
         <input
           ref="desktopSearchInput"
           v-model="globalSearchQuery"
@@ -246,11 +246,16 @@ function formatBadgeClass(fmt: string): string {
           @blur="searchFocused = false; selectedIndex = -1"
           @keydown="handleSearchKeydown"
           placeholder="Search all books..."
-          class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+          class="w-full h-8 pl-9 pr-8 text-[13px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
         />
-        <button v-if="globalSearchQuery" @click="clearSearch()" class="absolute right-2 text-muted-foreground hover:text-foreground">
-          <X :size="13" />
-        </button>
+        <div class="absolute right-2.5 flex items-center gap-1.5">
+          <button v-if="globalSearchQuery" @click="clearSearch()" class="text-muted-foreground/60 hover:text-foreground transition-colors">
+            <X :size="13" />
+          </button>
+          <kbd v-else class="hidden lg:inline-flex h-4.5 select-none items-center gap-1 rounded border border-sidebar-border/50 bg-background/50 px-1.5 font-mono text-[9px] font-medium text-muted-foreground/40 opacity-100">
+            <span class="text-xs">⌘</span>K
+          </kbd>
+        </div>
 
         <!-- Desktop search dropdown -->
         <div
