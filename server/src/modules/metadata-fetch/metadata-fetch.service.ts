@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -16,6 +16,7 @@ type Db = NodePgDatabase<typeof schema>;
 @Injectable()
 export class MetadataFetchService {
   private static readonly PROVIDER_TIMEOUT_MS = 15_000;
+  private readonly logger = new Logger(MetadataFetchService.name);
 
   constructor(
     private readonly registry: ProviderRegistry,
@@ -54,12 +55,32 @@ export class MetadataFetchService {
     };
   }
 
-  private fetchFromProvider(p: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+  private async fetchFromProvider(p: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const existingId = params.existingProviderIds?.[p.key];
     if (isIdentifiable(p) && existingId) {
       return p.lookupById(existingId).then((r) => (r ? [r] : []));
     }
-    return p.search(params);
+
+    const primary = await p.search(params);
+    const hasIsbn = hasText(params.isbn);
+    if (!hasIsbn) return primary;
+
+    if (primary.length > 0) {
+      this.logger.log(`[${p.key}] ISBN search returned ${primary.length} result(s); no fallback`);
+      return primary;
+    }
+
+    const hasFallbackTerms = hasText(params.title) || hasText(params.author);
+    if (!hasFallbackTerms) {
+      this.logger.log(`[${p.key}] ISBN search returned no results and no title/author available; no fallback`);
+      return [];
+    }
+
+    this.logger.log(`[${p.key}] ISBN search returned no results; falling back to non-ISBN search`);
+    const fallbackParams: MetadataSearchParams = { ...params, isbn: undefined };
+    const fallback = await p.search(fallbackParams);
+    this.logger.log(`[${p.key}] Non-ISBN fallback ${fallback.length > 0 ? `returned ${fallback.length} result(s)` : 'returned no results'}`);
+    return fallback;
   }
 
   private withTimeout(promise: Promise<MetadataCandidate[]>): Promise<MetadataCandidate[]> {
@@ -69,4 +90,8 @@ export class MetadataFetchService {
     });
     return Promise.race([promise.catch(() => [] as MetadataCandidate[]), timeout]).finally(() => clearTimeout(timer!));
   }
+}
+
+function hasText(v: string | undefined): boolean {
+  return typeof v === 'string' && v.trim().length > 0;
 }

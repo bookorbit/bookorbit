@@ -78,6 +78,43 @@ describe('AmazonProvider', () => {
       expect(result[0].providerId).toBe('B123456789');
     });
 
+    it('should search amazon by isbn and then fetch by resolved asin', async () => {
+      const searchHtml = `
+        <div data-component-type="s-search-result" data-asin="B123456789">
+          <div data-cy="title-recipe">ISBN Result</div>
+        </div>
+      `;
+      const bookHtml = `
+        <span id="productTitle">ISBN Result</span>
+        <div id="bylineInfo"><span class="author"><a href="#">Author</a></span></div>
+      `;
+
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(searchHtml) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(bookHtml) });
+
+      const result = await provider.search({ isbn: '9781250165343' });
+
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('https://www.amazon.com/s?k=9781250165343'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ cookie: 'test-cookie' }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('https://www.amazon.com/dp/B123456789'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ cookie: 'test-cookie' }),
+        }),
+      );
+      expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('https://www.amazon.com/dp/9781250165343'), expect.any(Object));
+      expect(result).toHaveLength(1);
+      expect(result[0].providerId).toBe('B123456789');
+    });
+
     it('should handle sleep between requests', async () => {
       const BETWEEN_REQUESTS_MS = 800;
       jest.useFakeTimers();

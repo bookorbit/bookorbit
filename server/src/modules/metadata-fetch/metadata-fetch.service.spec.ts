@@ -73,6 +73,66 @@ describe('MetadataFetchService', () => {
     expect(openLibrary.search).toHaveBeenCalledWith({ title: 'Dune' });
   });
 
+  it('falls back to non-isbn search when isbn search returns no results', async () => {
+    const google: MetadataProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: false,
+      search: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([candidate(MetadataProviderKey.GOOGLE, 'g-fallback')]),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(service.search({ title: 'Dune', author: 'Frank Herbert', isbn: '9780441013593' }).pipe(toArray()));
+
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-fallback')]);
+    expect(google.search).toHaveBeenCalledTimes(2);
+    expect(google.search).toHaveBeenNthCalledWith(1, {
+      title: 'Dune',
+      author: 'Frank Herbert',
+      isbn: '9780441013593',
+    });
+    expect(google.search).toHaveBeenNthCalledWith(2, {
+      title: 'Dune',
+      author: 'Frank Herbert',
+      isbn: undefined,
+    });
+  });
+
+  it('does not fall back when isbn search already returns results', async () => {
+    const google: MetadataProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: false,
+      search: jest.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'g-isbn')]),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(service.search({ title: 'Dune', isbn: '9780441013593' }).pipe(toArray()));
+
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-isbn')]);
+    expect(google.search).toHaveBeenCalledTimes(1);
+    expect(google.search).toHaveBeenCalledWith({ title: 'Dune', isbn: '9780441013593' });
+  });
+
+  it('does not fall back when no non-isbn terms are available', async () => {
+    const google: MetadataProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: false,
+      search: jest.fn().mockResolvedValue([]),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(service.search({ isbn: '9780441013593' }).pipe(toArray()));
+
+    expect(results).toEqual([]);
+    expect(google.search).toHaveBeenCalledTimes(1);
+    expect(google.search).toHaveBeenCalledWith({ isbn: '9780441013593' });
+  });
+
   it('uses lookupById for identifiable providers when existing provider ids are present', async () => {
     const google: IdentifiableProvider = {
       key: MetadataProviderKey.GOOGLE,

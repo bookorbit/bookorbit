@@ -130,5 +130,32 @@ describe('OpenLibraryProvider', () => {
       const result = await provider.lookupById('OL1W');
       expect(result).toBeNull();
     });
+
+    it('should backfill genres from search when work payload has no subjects', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue({
+            key: '/works/OL1W',
+            title: 'Test Book',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue({
+            docs: [
+              {
+                key: '/works/OL1W',
+                subject: ['Fiction', 'Classic'],
+              },
+            ],
+          }),
+        });
+
+      const result = await provider.lookupById('OL1W');
+
+      expect(result?.genres).toEqual(['Fiction', 'Classic']);
+    });
   });
 });

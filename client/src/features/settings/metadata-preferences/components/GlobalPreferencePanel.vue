@@ -14,22 +14,40 @@ const emit = defineEmits<{ save: [prefs: MetadataFetchPreferences] }>()
 
 const draft = ref<MetadataFetchPreferences | null>(null)
 
+function withDefaultOptions(prefs: MetadataFetchPreferences): MetadataFetchPreferences {
+  return {
+    ...prefs,
+    options: {
+      genres: {
+        mode: prefs.options?.genres.mode ?? 'firstProvider',
+        providerScope: prefs.options?.genres.providerScope ?? 'selectedProviders',
+      },
+      saveProviderIds: prefs.options?.saveProviderIds ?? false,
+    },
+  }
+}
+
 watch(
   () => props.preferences,
   (p) => {
-    if (p) draft.value = JSON.parse(JSON.stringify(p))
+    if (p) draft.value = JSON.parse(JSON.stringify(withDefaultOptions(p)))
   },
   { immediate: true },
 )
 
 function onFieldChange(field: MetadataField, pref: FieldPreference) {
   if (!draft.value) return
-  draft.value = { fields: { ...draft.value.fields, [field]: pref } }
+  draft.value = { ...draft.value, fields: { ...draft.value.fields, [field]: pref } }
 }
 
 function save() {
   if (!draft.value) return
   emit('save', draft.value)
+}
+
+function setGenreMerge(enabled: boolean) {
+  if (!draft.value?.options) return
+  draft.value.options.genres.mode = enabled ? 'merge' : 'firstProvider'
 }
 </script>
 
@@ -53,6 +71,54 @@ function save() {
 
     <div v-if="draft">
       <FieldPreferenceTable :preferences="draft" :statuses="statuses" @change="onFieldChange" />
+      <div class="border-t border-border px-5 py-4 space-y-3">
+        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Advanced Fetch Behavior</p>
+
+        <label class="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            class="h-3.5 w-3.5 rounded border-input accent-primary mt-0.5 cursor-pointer"
+            :checked="draft.options?.genres.mode === 'merge'"
+            @change="setGenreMerge(($event.target as HTMLInputElement).checked)"
+          />
+          <span class="text-sm text-foreground leading-5">Merge genres across providers</span>
+        </label>
+
+        <fieldset class="pl-6 space-y-2" :disabled="draft.options?.genres.mode !== 'merge'">
+          <label class="flex items-start gap-2.5">
+            <input
+              type="radio"
+              name="genre-provider-scope"
+              class="h-3.5 w-3.5 border-input accent-primary mt-0.5 cursor-pointer"
+              :checked="draft.options?.genres.providerScope === 'selectedProviders'"
+              :disabled="draft.options?.genres.mode !== 'merge'"
+              @change="draft.options && (draft.options.genres.providerScope = 'selectedProviders')"
+            />
+            <span class="text-sm text-foreground leading-5">Use only selected providers from the Genres field</span>
+          </label>
+          <label class="flex items-start gap-2.5">
+            <input
+              type="radio"
+              name="genre-provider-scope"
+              class="h-3.5 w-3.5 border-input accent-primary mt-0.5 cursor-pointer"
+              :checked="draft.options?.genres.providerScope === 'allConfiguredProviders'"
+              :disabled="draft.options?.genres.mode !== 'merge'"
+              @change="draft.options && (draft.options.genres.providerScope = 'allConfiguredProviders')"
+            />
+            <span class="text-sm text-foreground leading-5">Use all enabled and configured providers</span>
+          </label>
+        </fieldset>
+
+        <label class="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            class="h-3.5 w-3.5 rounded border-input accent-primary mt-0.5 cursor-pointer"
+            :checked="draft.options?.saveProviderIds ?? false"
+            @change="draft.options && (draft.options.saveProviderIds = ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="text-sm text-foreground leading-5">Save provider IDs during auto-refresh</span>
+        </label>
+      </div>
     </div>
     <div v-else class="px-5 py-6 text-sm text-muted-foreground">Loading...</div>
   </div>

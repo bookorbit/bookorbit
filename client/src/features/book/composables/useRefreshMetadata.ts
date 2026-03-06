@@ -17,6 +17,11 @@ export interface MetadataRefreshPreview {
   seriesName?: string | null
   seriesIndex?: number | null
   coverUrl?: string
+  googleBooksId?: string | null
+  goodreadsId?: string | null
+  amazonId?: string | null
+  hardcoverId?: string | null
+  openLibraryId?: string | null
 }
 
 export function useRefreshMetadata() {

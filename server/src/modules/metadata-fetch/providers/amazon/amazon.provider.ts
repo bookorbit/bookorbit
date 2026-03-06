@@ -35,7 +35,7 @@ export class AmazonProvider implements IdentifiableProvider {
     const { enabled, domain, cookie } = await this.providerConfig.getConfig().then((c) => c.amazon);
     if (!enabled) return [];
 
-    const asins = params.isbn ? [params.isbn] : await this.searchAsins(params, domain, cookie);
+    const asins = await this.searchAsins(params, domain, cookie);
 
     const results: MetadataCandidate[] = [];
     for (const asin of asins.slice(0, MAX_RESULTS)) {
@@ -53,7 +53,8 @@ export class AmazonProvider implements IdentifiableProvider {
   }
 
   private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string): Promise<string[]> {
-    const query = [params.title, params.author].filter(Boolean).join(' ');
+    const query = params.isbn?.trim() || [params.title, params.author].filter(Boolean).join(' ');
+    if (!query) return [];
     const url = `https://www.${domain}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
     const html = await this.fetchHtml(url, cookie);
     return html ? extractAsins(html, MAX_RESULTS) : [];

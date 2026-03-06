@@ -38,7 +38,7 @@ async function onResetLibrary(libraryId: number) {
   <div class="space-y-8">
     <div>
       <h2 class="settings-title">Metadata Preferences</h2>
-      <p class="settings-subtitle">Control which providers supply each metadata field and how values are merged during a refresh.</p>
+      <p class="settings-subtitle">Control provider priority, merge behavior, and advanced auto-refresh metadata behavior.</p>
     </div>
 
     <div>
@@ -54,8 +54,8 @@ async function onResetLibrary(libraryId: number) {
     <div>
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Field Preferences</p>
       <p class="text-xs text-muted-foreground mb-3">
-        For each metadata field, choose which providers to use and in what order (drag to reorder - lower number = higher priority).
-        The merge strategy controls how a provider's value is applied: <span class="font-medium text-foreground">Fill missing</span> only writes when empty,
+        For each metadata field, choose which providers to use and in what order (drag to reorder - lower number = higher priority). The merge
+        strategy controls how a provider's value is applied: <span class="font-medium text-foreground">Fill missing</span> only writes when empty,
         <span class="font-medium text-foreground">Overwrite if provided</span> writes whenever the provider returns a value,
         <span class="font-medium text-foreground">Always overwrite</span> replaces the existing value unconditionally.
       </p>
@@ -63,7 +63,9 @@ async function onResetLibrary(libraryId: number) {
         <GlobalPreferencePanel :preferences="globalPrefs" :statuses="statuses" :saving="savingGlobal" @save="saveGlobal" />
 
         <div v-if="libraries.length" class="space-y-2">
-          <p class="text-xs text-muted-foreground px-1">Per-library overrides - expand a library to customize individual fields. Fields not overridden inherit global defaults.</p>
+          <p class="text-xs text-muted-foreground px-1">
+            Per-library overrides - expand a library to customize individual fields. Fields not overridden inherit global defaults.
+          </p>
           <LibraryPreferencePanel
             v-for="lib in libraries"
             :key="lib.id"

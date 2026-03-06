@@ -91,4 +91,52 @@ describe('UpdateGlobalPreferencesDto', () => {
       ]),
     );
   });
+
+  it('accepts valid advanced options', async () => {
+    const { errors } = await validateInput({
+      fields: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'fillMissing',
+        },
+      },
+      options: {
+        genres: {
+          mode: 'merge',
+          providerScope: 'allConfiguredProviders',
+        },
+        saveProviderIds: true,
+      },
+    });
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects invalid advanced options', async () => {
+    const { errors } = await validateInput({
+      fields: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'fillMissing',
+        },
+      },
+      options: {
+        genres: {
+          mode: 'invalid',
+          providerScope: 'invalid',
+        },
+        saveProviderIds: 'yes',
+      },
+    });
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          property: 'options',
+        }),
+      ]),
+    );
+  });
 });

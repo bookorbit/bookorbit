@@ -93,6 +93,11 @@ async function autoFill() {
   if (preview.pageCount != null) form.pageCount = preview.pageCount
   if (preview.seriesName != null) form.seriesName = preview.seriesName
   if (preview.seriesIndex != null) form.seriesIndex = preview.seriesIndex
+  if (preview.googleBooksId != null) form.googleBooksId = preview.googleBooksId
+  if (preview.goodreadsId != null) form.goodreadsId = preview.goodreadsId
+  if (preview.amazonId != null) form.amazonId = preview.amazonId
+  if (preview.hardcoverId != null) form.hardcoverId = preview.hardcoverId
+  if (preview.openLibraryId != null) form.openLibraryId = preview.openLibraryId
   if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
 }
 </script>
@@ -110,21 +115,21 @@ async function autoFill() {
       <div class="flex items-center justify-between min-h-[2rem]">
         <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
         <span v-else />
-          <div class="flex gap-2">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
-                  :disabled="autoFilling"
-                  @click="autoFill"
-                >
-                  <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
-                  <RefreshCw v-else class="size-3.5" />
-                  Auto-fill
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ autoFilling ? 'Fetching metadata...' : 'Auto-fill fields using your metadata preferences' }}</TooltipContent>
-            </Tooltip>
+        <div class="flex gap-2">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
+                :disabled="autoFilling"
+                @click="autoFill"
+              >
+                <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
+                <RefreshCw v-else class="size-3.5" />
+                Auto-fill
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ autoFilling ? 'Fetching metadata...' : 'Auto-fill fields using your metadata preferences' }}</TooltipContent>
+          </Tooltip>
           <button
             class="search-online-btn flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
             @click="searchOpen = true"
@@ -208,12 +213,7 @@ async function autoFill() {
           <div class="flex items-center gap-0.5 h-8" @mouseleave="hoverRating = null">
             <Tooltip v-for="star in 5" :key="star">
               <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="p-0.5 transition-colors"
-                  @mouseenter="hoverRating = star"
-                  @click="setRating(star)"
-                >
+                <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
                   <Star class="size-4" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
                 </button>
               </TooltipTrigger>

@@ -1,9 +1,22 @@
-import { IsIn, IsBoolean, IsArray, IsString, Validate, ValidatorConstraint, ValidatorConstraintInterface, validateSync } from 'class-validator';
-import { plainToInstance } from 'class-transformer';
+import {
+  IsIn,
+  IsBoolean,
+  IsArray,
+  IsString,
+  IsOptional,
+  Validate,
+  ValidateNested,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  validateSync,
+} from 'class-validator';
+import { plainToInstance, Type } from 'class-transformer';
 import { ALL_METADATA_FIELDS, MetadataProviderKey } from '@projectx/types';
-import type { MetadataField, MergeStrategy } from '@projectx/types';
+import type { GenreMergeMode, GenreProviderScope, MetadataField, MergeStrategy } from '@projectx/types';
 
 const MERGE_STRATEGIES: MergeStrategy[] = ['fillMissing', 'overwrite', 'overwriteIfProvided'];
+const GENRE_MERGE_MODES: GenreMergeMode[] = ['firstProvider', 'merge'];
+const GENRE_PROVIDER_SCOPES: GenreProviderScope[] = ['selectedProviders', 'allConfiguredProviders'];
 const PROVIDER_KEYS = Object.values(MetadataProviderKey);
 
 export class FieldPreferenceDto {
@@ -17,6 +30,23 @@ export class FieldPreferenceDto {
 
   @IsIn(MERGE_STRATEGIES)
   mergeStrategy!: MergeStrategy;
+}
+
+class GenreOptionsDto {
+  @IsIn(GENRE_MERGE_MODES)
+  mode!: GenreMergeMode;
+
+  @IsIn(GENRE_PROVIDER_SCOPES)
+  providerScope!: GenreProviderScope;
+}
+
+export class MetadataFetchOptionsDto {
+  @ValidateNested()
+  @Type(() => GenreOptionsDto)
+  genres!: GenreOptionsDto;
+
+  @IsBoolean()
+  saveProviderIds!: boolean;
 }
 
 @ValidatorConstraint({ name: 'isFieldPreferencesMap', async: false })
@@ -39,4 +69,9 @@ class IsFieldPreferencesMapConstraint implements ValidatorConstraintInterface {
 export class UpdateGlobalPreferencesDto {
   @Validate(IsFieldPreferencesMapConstraint)
   fields!: Record<MetadataField, FieldPreferenceDto>;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MetadataFetchOptionsDto)
+  options?: MetadataFetchOptionsDto;
 }

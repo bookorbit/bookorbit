@@ -73,6 +73,7 @@ function makeService() {
   };
   const pipeline = {
     run: jest.fn(),
+    runWithSources: jest.fn(),
   };
   const config = {
     get: jest.fn().mockImplementation((key: string) => (key === 'storage.booksPath' ? '/tmp/books' : undefined)),
@@ -312,15 +313,16 @@ describe('BookService', () => {
           },
         },
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
       });
-      pipeline.run.mockResolvedValue({ title: 'New Title' });
+      pipeline.runWithSources.mockResolvedValue({ resolved: { title: 'New Title' }, sources: {}, providerIds: {} });
       const updateSpy = jest.spyOn(service, 'updateMetadata');
 
       const result = await service.refreshMetadata(1, true, user);
 
       expect(result).toEqual({ title: 'New Title' });
       expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 7, false);
-      expect(pipeline.run).toHaveBeenCalledWith(
+      expect(pipeline.runWithSources).toHaveBeenCalledWith(
         {
           title: 'Old Title',
           author: 'Author One',
@@ -341,6 +343,7 @@ describe('BookService', () => {
           pageCount: null,
           seriesName: null,
           seriesIndex: null,
+          genres: [],
           cover: 'extracted',
         },
         7,
@@ -358,8 +361,13 @@ describe('BookService', () => {
           book_metadata: { title: 'Old', isbn13: null, isbn10: null },
         },
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
       });
-      pipeline.run.mockResolvedValue({ title: 'Resolved', authors: ['A'], genres: ['G'], coverUrl: 'https://img/c.jpg' });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: { title: 'Resolved', authors: ['A'], genres: ['G'], coverUrl: 'https://img/c.jpg' },
+        sources: {},
+        providerIds: {},
+      });
 
       const updateSpy = jest.spyOn(service, 'updateMetadata').mockResolvedValue({ id: 1 } as never);
       const getDetailSpy = jest.spyOn(service, 'getDetail').mockResolvedValue({ id: 1, title: 'Final' } as never);
@@ -370,6 +378,70 @@ describe('BookService', () => {
       expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith('https://img/c.jpg', 1);
       expect(getDetailSpy).toHaveBeenCalledWith(1, user);
       expect(result).toEqual({ id: 1, title: 'Final' });
+    });
+
+    it('refreshMetadata preview includes provider ids returned by pipeline', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: { title: 'Resolved' },
+        sources: {},
+        providerIds: {
+          [MetadataProviderKey.GOOGLE]: 'g-id',
+          [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
+        },
+      });
+
+      const result = await service.refreshMetadata(1, true, user);
+
+      expect(result).toEqual({
+        title: 'Resolved',
+        googleBooksId: 'g-id',
+        openLibraryId: 'ol-id',
+      });
+    });
+
+    it('refreshMetadata persists provider ids returned by pipeline', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: { title: 'Resolved' },
+        sources: {},
+        providerIds: {
+          [MetadataProviderKey.GOOGLE]: 'g-id',
+          [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
+        },
+      });
+
+      const updateSpy = jest.spyOn(service, 'updateMetadata').mockResolvedValue({ id: 1 } as never);
+
+      await service.refreshMetadata(1, false, user);
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        {
+          title: 'Resolved',
+          googleBooksId: 'g-id',
+          openLibraryId: 'ol-id',
+        },
+        user,
+      );
     });
 
     it('updateMetadata writes scalar fields, collections, schedules file write, and triggers embedding', async () => {
@@ -430,12 +502,14 @@ describe('BookService', () => {
     it('normalizes kobo provider payload and clamps progress', async () => {
       const { service, bookRepo } = makeService();
       const user = makeUser({
-        roles: [{
-          id: 1,
-          name: 'Kobo',
-          isSuperuser: false,
-          permissions: [{ id: 1, name: 'kobo_sync' }],
-        }],
+        roles: [
+          {
+            id: 1,
+            name: 'Kobo',
+            isSuperuser: false,
+            permissions: [{ id: 1, name: 'kobo_sync' }],
+          },
+        ],
       } as never);
       jest.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
       bookRepo.findKoboReadingState.mockResolvedValue({

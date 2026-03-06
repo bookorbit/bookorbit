@@ -25,6 +25,10 @@ describe('MetadataPreferenceResolver', () => {
 
     expect(defaults.fields.title.mergeStrategy).toBe('fillMissing');
     expect(defaults.fields.description.mergeStrategy).toBe('overwriteIfProvided');
+    expect(defaults.options).toEqual({
+      genres: { mode: 'firstProvider', providerScope: 'selectedProviders' },
+      saveProviderIds: false,
+    });
   });
 
   it('prefers library overrides over global preferences and falls back to defaults', () => {
@@ -74,6 +78,21 @@ describe('MetadataPreferenceResolver', () => {
     expect(resolved.fields.title).toEqual(defaults.fields.title);
   });
 
+  it('normalizes malformed options to safe defaults', () => {
+    const defaults = resolver.getDefaultPreferences();
+    const malformed = {
+      fields: defaults.fields,
+      options: {
+        genres: { mode: 'invalid', providerScope: 'invalid' },
+        saveProviderIds: 'yes',
+      },
+    } as unknown as MetadataFetchPreferences;
+
+    const resolved = resolver.resolve(malformed, null);
+
+    expect(resolved.options).toEqual(defaults.options);
+  });
+
   it('adds newly registered provider keys without duplicating existing keys', () => {
     const defaults = resolver.getDefaultPreferences();
     const preferences: MetadataFetchPreferences = {
@@ -94,6 +113,7 @@ describe('MetadataPreferenceResolver', () => {
     ]);
 
     expect(next.fields.title.providers).toEqual([MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOOGLE, MetadataProviderKey.HARDCOVER]);
+    expect(next.options).toEqual(defaults.options);
   });
 
   it('remains safe when stored preferences are missing fields and still appends new providers', () => {

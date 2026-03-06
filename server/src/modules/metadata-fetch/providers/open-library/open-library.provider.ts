@@ -5,7 +5,7 @@ import { ProviderConfigService } from '../../../metadata-preferences/provider-co
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
-import { OpenLibrarySearchResponse, OpenLibraryWork } from './open-library.types';
+import { OpenLibraryDoc, OpenLibrarySearchResponse, OpenLibraryWork } from './open-library.types';
 
 const BASE_URL = 'https://openlibrary.org';
 const SEARCH_FIELDS = 'key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,number_of_pages_median,subject';
@@ -41,7 +41,11 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     if (!res.ok) return null;
 
     const work = (await res.json()) as OpenLibraryWork;
-    return mapOpenLibraryWork(work);
+    const mapped = mapOpenLibraryWork(work);
+    if (mapped.genres?.length) return mapped;
+
+    const searchGenres = await this.lookupGenresByWorkId(providerId);
+    return searchGenres?.length ? { ...mapped, genres: searchGenres } : mapped;
   }
 
   private buildSearchParams(params: MetadataSearchParams): URLSearchParams | null {
@@ -55,5 +59,26 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       if (params.author) query.set('author', params.author);
     }
     return query;
+  }
+
+  private async lookupGenresByWorkId(providerId: string): Promise<string[] | undefined> {
+    const query = new URLSearchParams({
+      q: providerId,
+      limit: '20',
+      fields: 'key,subject',
+    });
+    const res = await fetch(`${BASE_URL}/search.json?${query}`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return undefined;
+
+    const body = (await res.json()) as Partial<OpenLibrarySearchResponse>;
+    if (!Array.isArray(body.docs) || body.docs.length === 0) return undefined;
+    const key = `/works/${providerId}`;
+    const doc = body.docs.find((d) => d.key === key);
+    return this.extractSubjectGenres(doc);
+  }
+
+  private extractSubjectGenres(doc: OpenLibraryDoc | undefined): string[] | undefined {
+    if (!doc?.subject?.length) return undefined;
+    return doc.subject.slice(0, 10);
   }
 }

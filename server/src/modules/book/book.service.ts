@@ -48,6 +48,33 @@ export class BookService {
     return user.roles.some((r) => r.isSuperuser || r.permissions.some((p) => p.name === permissionName));
   }
 
+  private collectExistingProviderIds(meta: {
+    googleBooksId?: string | null;
+    goodreadsId?: string | null;
+    amazonId?: string | null;
+    hardcoverId?: string | null;
+    openLibraryId?: string | null;
+  }): Partial<Record<MetadataProviderKey, string>> {
+    const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
+    if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
+    if (meta.goodreadsId) providerIds[MetadataProviderKey.GOODREADS] = meta.goodreadsId;
+    if (meta.amazonId) providerIds[MetadataProviderKey.AMAZON] = meta.amazonId;
+    if (meta.hardcoverId) providerIds[MetadataProviderKey.HARDCOVER] = meta.hardcoverId;
+    if (meta.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
+    return providerIds;
+  }
+
+  private applyResolvedProviderIds(
+    dto: Pick<UpdateBookMetadataDto, 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId'>,
+    providerIds: Partial<Record<MetadataProviderKey, string>>,
+  ): void {
+    if (providerIds[MetadataProviderKey.GOOGLE]) dto.googleBooksId = providerIds[MetadataProviderKey.GOOGLE];
+    if (providerIds[MetadataProviderKey.GOODREADS]) dto.goodreadsId = providerIds[MetadataProviderKey.GOODREADS];
+    if (providerIds[MetadataProviderKey.AMAZON]) dto.amazonId = providerIds[MetadataProviderKey.AMAZON];
+    if (providerIds[MetadataProviderKey.HARDCOVER]) dto.hardcoverId = providerIds[MetadataProviderKey.HARDCOVER];
+    if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) dto.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
+  }
+
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
@@ -386,16 +413,11 @@ export class BookService {
     const found = await this.bookRepo.findById(id);
     if (!found) throw new NotFoundException(`Book ${id} not found`);
 
-    const { book, authorRows } = found;
+    const { book, authorRows, genreRows } = found;
     await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
     const meta = book.book_metadata;
 
-    const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
-    if (meta?.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
-    if (meta?.goodreadsId) providerIds[MetadataProviderKey.GOODREADS] = meta.goodreadsId;
-    if (meta?.amazonId) providerIds[MetadataProviderKey.AMAZON] = meta.amazonId;
-    if (meta?.hardcoverId) providerIds[MetadataProviderKey.HARDCOVER] = meta.hardcoverId;
-    if (meta?.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
+    const providerIds = this.collectExistingProviderIds(meta ?? {});
 
     const searchParams: MetadataSearchParams = {
       title: meta?.title ?? undefined,
@@ -415,12 +437,23 @@ export class BookService {
       pageCount: meta?.pageCount,
       seriesName: meta?.seriesName,
       seriesIndex: meta?.seriesIndex,
+      genres: genreRows.map((g) => g.name),
       cover: meta?.coverSource,
     };
 
-    const resolved = await this.pipeline.run(searchParams, existingFields, book.books.libraryId);
+    const { resolved, providerIds: resolvedProviderIds } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId);
 
-    if (preview) return resolved;
+    if (preview) {
+      const previewResult: ResolvedMetadataFields & {
+        googleBooksId?: string;
+        goodreadsId?: string;
+        amazonId?: string;
+        hardcoverId?: string;
+        openLibraryId?: string;
+      } = { ...resolved };
+      this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
+      return previewResult;
+    }
 
     const r = resolved as Record<string, unknown>;
     const dto: UpdateBookMetadataDto = {};
@@ -435,6 +468,7 @@ export class BookService {
     if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
     if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
     if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
+    this.applyResolvedProviderIds(dto, resolvedProviderIds);
 
     let detail: BookDetailDto | undefined;
     if (Object.keys(dto).length > 0) {

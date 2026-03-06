@@ -30,6 +30,8 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
 ];
 
 export type MergeStrategy = 'fillMissing' | 'overwrite' | 'overwriteIfProvided';
+export type GenreMergeMode = 'firstProvider' | 'merge';
+export type GenreProviderScope = 'selectedProviders' | 'allConfiguredProviders';
 
 export interface FieldPreference {
   enabled: boolean;
@@ -39,8 +41,17 @@ export interface FieldPreference {
 
 export type FieldPreferenceOverrides = Partial<Record<MetadataField, FieldPreference>>;
 
+export interface MetadataFetchOptions {
+  genres: {
+    mode: GenreMergeMode;
+    providerScope: GenreProviderScope;
+  };
+  saveProviderIds: boolean;
+}
+
 export interface MetadataFetchPreferences {
   fields: Record<MetadataField, FieldPreference>;
+  options?: MetadataFetchOptions;
 }
 
 export interface LibraryMetadataPreferences {
