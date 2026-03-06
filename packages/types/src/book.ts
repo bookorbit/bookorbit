@@ -75,3 +75,17 @@ export type BookRecommendation = {
   book: BookCard;
   score: number;
 };
+
+export type CoverSearchResult = {
+  url: number | string; // ID for proxy or direct URL
+  previewUrl: string;
+  sourceUrl: string;
+  width: number;
+  height: number;
+  source: string;
+};
+
+export type CoverSearchResponse = {
+  results: CoverSearchResult[];
+  total: number;
+};

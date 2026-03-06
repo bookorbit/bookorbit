@@ -1,6 +1,20 @@
-import { BadRequestException, Body, Controller, Delete, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { MultipartFile } from '@fastify/multipart';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -12,6 +26,23 @@ type MultipartRequest = FastifyRequest & { file: () => Promise<MultipartFile | u
 @Controller('books')
 export class CoverController {
   constructor(private readonly coverService: CoverService) {}
+
+  @Get('cover/search')
+  @RequirePermission('library_edit_metadata')
+  async searchCovers(@Query('title') title: string, @Query('author') author?: string, @Query('isAudiobook') isAudiobook?: string) {
+    return this.coverService.searchCovers({
+      title,
+      author,
+      isAudiobook: isAudiobook === 'true',
+    });
+  }
+
+  @Get('cover/proxy')
+  @RequirePermission('library_view')
+  async proxyImage(@Query('url') url: string, @Res() res: FastifyReply) {
+    const { buffer, contentType } = await this.coverService.proxyImage(url);
+    res.type(contentType).send(buffer);
+  }
 
   @Post(':id/cover')
   @HttpCode(HttpStatus.NO_CONTENT)

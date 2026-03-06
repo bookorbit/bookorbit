@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
-import { Image, ImagePlus, Link, Loader2, RotateCcw, Upload, X } from 'lucide-vue-next'
+import { Image, ImagePlus, Link, Loader2, RotateCcw, Search, Upload, X } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import { hideOnError } from '../../../lib/metadata-fetch'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import CoverSearchDrawer from './CoverSearchDrawer.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ coverChanged: ['extracted' | 'custom' | null] }>()
@@ -32,10 +33,13 @@ async function reExtractCover() {
 
 const mode = ref<'file' | 'url'>('file')
 const urlInput = ref('')
+const isSearchOpen = ref(false)
+
 let debounceTimer: ReturnType<typeof setTimeout>
 
 const activeSrc = computed(() => previewSrc.value ?? coverUrl(props.book.id, 'cover'))
 const hasPending = computed(() => !!pendingFile.value || !!pendingUrl.value)
+const isAudiobook = computed(() => props.book.files.some((f) => f.format === 'audiobook' || f.role === 'audiobook'))
 
 function onFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -52,6 +56,11 @@ function switchMode(m: 'file' | 'url') {
   clearTimeout(debounceTimer)
   clearPending()
   urlInput.value = ''
+}
+
+function handleSearchSelect(url: string) {
+  urlInput.value = url
+  setUrl(url)
 }
 
 async function handleConfirm() {
@@ -129,7 +138,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
     </div>
 
     <!-- URL input -->
-    <div v-else>
+    <div v-else class="flex flex-col gap-2">
       <input
         v-model="urlInput"
         class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
@@ -137,6 +146,27 @@ onUnmounted(() => clearTimeout(debounceTimer))
         @input="onUrlInput"
       />
     </div>
+
+    <!-- Search Button -->
+    <button
+      class="flex items-center justify-center gap-2 w-full h-9 rounded-lg border border-input bg-background text-xs font-medium hover:bg-muted transition-colors"
+      @click="isSearchOpen = true"
+    >
+      <Search class="size-3.5" />
+      Find cover online
+    </button>
+
+    <!-- Cover Search Drawer -->
+    <Teleport to="body">
+      <CoverSearchDrawer
+        v-if="isSearchOpen"
+        :initial-title="book.title ?? ''"
+        :initial-author="book.authors?.[0]?.name ?? ''"
+        :is-audiobook="isAudiobook"
+        @close="isSearchOpen = false"
+        @select="handleSearchSelect"
+      />
+    </Teleport>
 
     <!-- Error -->
     <p v-if="error" class="text-xs text-destructive">{{ error }}</p>

@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
@@ -11,6 +11,9 @@ import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover
 import { BookRepository } from '../book/book.repository';
 import { LibraryService } from '../library/library.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { DuckDuckGoCoverProvider } from './providers/duckduckgo-cover-provider';
+import { CoverSearchParams } from './providers/cover-provider';
+import { CoverSearchResult } from '@projectx/types';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -18,6 +21,7 @@ const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 @Injectable()
 export class CoverService {
+  private readonly logger = new Logger(CoverService.name);
   private readonly booksPath: string;
 
   constructor(
@@ -25,8 +29,37 @@ export class CoverService {
     private readonly bookRepo: BookRepository,
     private readonly libraryService: LibraryService,
     private readonly config: ConfigService,
+    private readonly ddgProvider: DuckDuckGoCoverProvider,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
+  }
+
+  async searchCovers(params: CoverSearchParams): Promise<CoverSearchResult[]> {
+    // Currently only DDG provider, but could be multiple
+    const results = await this.ddgProvider.search(params);
+    return results.map((r) => ({
+      ...r,
+      // Encode URL for proxying
+      previewUrl: `/api/v1/books/cover/proxy?url=${encodeURIComponent(r.previewUrl)}`,
+    }));
+  }
+
+  async proxyImage(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        },
+      });
+      if (!response.ok) throw new Error(`Proxy failed: ${response.status}`);
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const buffer = Buffer.from(await response.arrayBuffer());
+      return { buffer, contentType };
+    } catch (error) {
+      this.logger.error(`Proxy error for ${url}: ${error.message}`);
+      throw new BadRequestException('Failed to proxy image');
+    }
   }
 
   async uploadCover(bookId: number, buffer: Buffer, mimeType: string, user: RequestUser): Promise<void> {

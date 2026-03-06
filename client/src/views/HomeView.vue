@@ -169,6 +169,7 @@ const activeFilterCount = computed(() => filter.value?.rules?.length ?? 0)
 
 function clearFilters() {
   filter.value = undefined
+  forgetSavedFilter()
 }
 
 const sentinel = ref<HTMLElement | null>(null)
