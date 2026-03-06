@@ -260,8 +260,7 @@ function currentZoomValue(): string {
     <Tooltip>
       <TooltipTrigger as-child>
         <a
-          :href="`/api/v1/books/files/${fileId}/serve`"
-          download
+          :href="`/api/v1/books/files/${fileId}/serve?download=1`"
           class="viewer-btn flex items-center justify-center"
         >
           <Download :size="14" />
@@ -346,4 +345,3 @@ function currentZoomValue(): string {
     </DropdownMenu>
   </div>
 </template>
-

@@ -18,7 +18,7 @@ function IsValidPattern(options?: ValidationOptions) {
   };
 }
 
-export class UpdateUploadPatternDto {
+export class UpdateFilePatternDto {
   @IsString()
   @MaxLength(500)
   @IsValidPattern()

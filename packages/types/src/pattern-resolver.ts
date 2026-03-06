@@ -1,4 +1,5 @@
 export const DEFAULT_UPLOAD_PATTERN = '<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. >{title}< ({year})>';
+export const DEFAULT_DOWNLOAD_PATTERN = '{originalFilename}';
 
 export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: 'Neuromancer',
@@ -115,4 +116,25 @@ export function resolveUploadPath(pattern: string, values: Record<string, string
   const lastSegment = resolved.split('/').pop() ?? '';
   const hasExt = /\.[a-z0-9]{2,5}$/i.test(lastSegment);
   return hasExt ? resolved : resolved + dotExt;
+}
+
+/**
+ * Resolves a file naming pattern to a filename (no path separators).
+ * - If the resolved pattern contains folder segments, only the last segment is used.
+ * - If the resolved pattern ends with '/', originalFilename is used.
+ * - Extension is appended when missing.
+ *
+ * Returns null if the pattern resolves to an empty filename.
+ */
+export function resolveDownloadFilename(pattern: string, values: Record<string, string>, ext: string): string | null {
+  const resolved = replacePlaceholders(pattern, values);
+  if (!resolved) return null;
+
+  const dotExt = ext.startsWith('.') ? ext : `.${ext}`;
+  let stem = resolved.endsWith('/') ? values['originalFilename'] ?? '' : (resolved.split('/').filter(Boolean).pop() ?? '');
+  stem = stem.trim();
+  if (!stem) return null;
+
+  const hasExt = /\.[a-z0-9]{2,5}$/i.test(stem);
+  return hasExt ? stem : stem + dotExt;
 }

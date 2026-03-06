@@ -25,6 +25,18 @@ import {
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type PatternMetadataRow = {
+  bookId: number;
+  title: string | null;
+  subtitle: string | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  language: string | null;
+  seriesName: string | null;
+  seriesIndex: number | null;
+  isbn13: string | null;
+  authors: string[];
+};
 
 @Injectable()
 export class BookRepository {
@@ -304,6 +316,43 @@ export class BookRepository {
 
   async findLibraryIdsByBookIds(bookIds: number[]): Promise<{ id: number; libraryId: number }[]> {
     return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
+  }
+
+  async findPatternMetadataByBookIds(bookIds: number[]): Promise<PatternMetadataRow[]> {
+    if (bookIds.length === 0) return [];
+
+    const [metaRows, authorRows] = await Promise.all([
+      this.db
+        .select({
+          bookId: books.id,
+          title: bookMetadata.title,
+          subtitle: bookMetadata.subtitle,
+          publisher: bookMetadata.publisher,
+          publishedYear: bookMetadata.publishedYear,
+          language: bookMetadata.language,
+          seriesName: bookMetadata.seriesName,
+          seriesIndex: bookMetadata.seriesIndex,
+          isbn13: bookMetadata.isbn13,
+        })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(inArray(books.id, bookIds)),
+      this.db
+        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, bookIds))
+        .orderBy(bookAuthors.displayOrder),
+    ]);
+
+    const authorsByBookId = new Map<number, string[]>();
+    for (const row of authorRows) {
+      const list = authorsByBookId.get(row.bookId) ?? [];
+      list.push(row.name);
+      authorsByBookId.set(row.bookId, list);
+    }
+
+    return metaRows.map((row) => ({ ...row, authors: authorsByBookId.get(row.bookId) ?? [] }));
   }
 
   async findAllIds(): Promise<number[]> {

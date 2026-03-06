@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
-import { basename, join } from 'path';
+import { basename, extname, join } from 'path';
 
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey, resolveUploadPath } from '@projectx/types';
 import type { BookKoboState, BookQuery, BooksPage, MetadataField } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { LibraryService } from '../library/library.service';
@@ -23,6 +24,7 @@ import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 export class BookService {
   private readonly logger = new Logger(BookService.name);
   private readonly booksPath: string;
+  private static readonly DEFAULT_DOWNLOAD_PATTERN = '{originalFilename}';
 
   constructor(
     private readonly bookRepo: BookRepository,
@@ -31,6 +33,7 @@ export class BookService {
     private readonly metadataService: MetadataService,
     private readonly pipeline: MetadataFetchPipeline,
     private readonly config: ConfigService,
+    private readonly appSettings: AppSettingsService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {
@@ -117,10 +120,112 @@ export class BookService {
       .catch(() => null);
   }
 
-  async getFileInfo(fileId: number, user: RequestUser): Promise<{ path: string; size: number; format: string }> {
+  private formatSeriesIndex(value: number | null): string | null {
+    if (value == null) return null;
+    const whole = Math.floor(value);
+    const fraction = value - whole;
+    const padded = String(whole).padStart(2, '0');
+    return fraction > 0 ? `${padded}.${String(fraction).split('.')[1]}` : padded;
+  }
+
+  private sanitizeFilenameSegment(raw: string, fallback = 'download'): string {
+    const fallbackSafe = fallback.replace(/[/\\:*?"<>|\0]/g, '_').trim().slice(0, 255) || 'download';
+    const cleaned = raw.replace(/[/\\:*?"<>|\0]/g, '_').trim().slice(0, 255);
+    if (!cleaned || cleaned === '.' || cleaned === '..') return fallbackSafe;
+    return cleaned;
+  }
+
+  private sanitizeZipPath(rawPath: string, fallbackFilename: string): string {
+    const segments = rawPath
+      .replace(/\\/g, '/')
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => this.sanitizeFilenameSegment(segment));
+    if (segments.length === 0) return this.sanitizeFilenameSegment(fallbackFilename);
+    return segments.join('/');
+  }
+
+  private withSuffix(path: string, suffix: number): string {
+    const slash = path.lastIndexOf('/');
+    const dir = slash >= 0 ? path.slice(0, slash + 1) : '';
+    const name = slash >= 0 ? path.slice(slash + 1) : path;
+    const dot = name.lastIndexOf('.');
+    if (dot > 0) return `${dir}${name.slice(0, dot)} (${suffix})${name.slice(dot)}`;
+    return `${dir}${name} (${suffix})`;
+  }
+
+  private makeUniqueZipPath(path: string, used: Set<string>): string {
+    if (!used.has(path)) {
+      used.add(path);
+      return path;
+    }
+    let suffix = 2;
+    let candidate = this.withSuffix(path, suffix);
+    while (used.has(candidate)) {
+      suffix += 1;
+      candidate = this.withSuffix(path, suffix);
+    }
+    used.add(candidate);
+    return candidate;
+  }
+
+  private buildDownloadPatternTokens(
+    absolutePath: string,
+    format: string | null,
+    meta?: Awaited<ReturnType<BookRepository['findPatternMetadataByBookIds']>>[number],
+  ): Record<string, string> {
+    const pathExtension = extname(absolutePath).toLowerCase().slice(1);
+    const extension = pathExtension || (format && format !== 'unknown' ? format : 'bin');
+    const stem = basename(absolutePath, extname(absolutePath));
+    const tokens: Record<string, string> = { originalFilename: stem, extension };
+
+    if (!meta) return tokens;
+    if (meta.title) tokens['title'] = meta.title;
+    if (meta.subtitle) tokens['subtitle'] = meta.subtitle;
+    if (meta.publisher) tokens['publisher'] = meta.publisher;
+    if (meta.language) tokens['language'] = meta.language;
+    if (meta.isbn13) tokens['isbn'] = meta.isbn13;
+    if (meta.publishedYear) tokens['year'] = String(meta.publishedYear);
+    if (meta.seriesName) tokens['series'] = meta.seriesName;
+
+    const seriesIndex = this.formatSeriesIndex(meta.seriesIndex);
+    if (seriesIndex) tokens['seriesIndex'] = seriesIndex;
+    if (meta.authors.length > 0) tokens['authors'] = meta.authors.join(', ');
+
+    return tokens;
+  }
+
+  private async resolveDownloadFilenameForFile(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
+    const originalFilename = basename(file.absolutePath);
+    try {
+      const [pattern, metaRows] = await Promise.all([
+        this.appSettings.getDownloadPattern(),
+        this.bookRepo.findPatternMetadataByBookIds([file.bookId]),
+      ]);
+      const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metaRows[0]);
+      const resolvedPath = resolveUploadPath(pattern || BookService.DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
+      const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
+      return this.sanitizeFilenameSegment(resolvedName ?? originalFilename, originalFilename);
+    } catch (err) {
+      this.logger.warn(
+        `Download filename pattern resolution failed for book ${file.bookId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return this.sanitizeFilenameSegment(originalFilename, originalFilename);
+    }
+  }
+
+  async getFileInfo(
+    fileId: number,
+    user: RequestUser,
+  ): Promise<{ path: string; size: number; format: string; bookId: number; originalFilename: string }> {
     const file = await this.verifyFileAccess(fileId, user);
     const { size } = await stat(file.absolutePath);
-    return { path: file.absolutePath, size, format: file.format ?? 'unknown' };
+    const originalFilename = basename(file.absolutePath);
+    return { path: file.absolutePath, size, format: file.format ?? 'unknown', bookId: file.bookId, originalFilename };
+  }
+
+  async resolveDownloadFilename(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
+    return this.resolveDownloadFilenameForFile(file);
   }
 
   async searchAcrossLibraries(q: string, limit: number, user: RequestUser) {
@@ -403,7 +508,22 @@ export class BookService {
     await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
 
     const files = allFormats ? await this.bookRepo.findAllFilesByBookIds(bookIds) : await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
-    return files.map((f) => ({ absolutePath: f.absolutePath, zipPath: `${f.bookId}/${basename(f.absolutePath)}` }));
+    const [pattern, metadataRows] = await Promise.all([
+      this.appSettings.getDownloadPattern(),
+      this.bookRepo.findPatternMetadataByBookIds([...new Set(files.map((f) => f.bookId))]),
+    ]);
+    const metadataByBookId = new Map(metadataRows.map((row) => [row.bookId, row]));
+    const usedPaths = new Set<string>();
+
+    return files.map((file) => {
+      const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metadataByBookId.get(file.bookId));
+      const resolvedPath = resolveUploadPath(pattern || BookService.DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
+      const fallbackFilename = basename(file.absolutePath);
+      const rawZipPath = resolvedPath ?? fallbackFilename;
+      const safeZipPath = this.sanitizeZipPath(rawZipPath, fallbackFilename);
+      const zipPath = this.makeUniqueZipPath(safeZipPath, usedPaths);
+      return { absolutePath: file.absolutePath, zipPath };
+    });
   }
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {

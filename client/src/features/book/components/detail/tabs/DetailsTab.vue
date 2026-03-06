@@ -228,8 +228,7 @@ function openBook() {
 function downloadFile() {
   if (!primaryFile.value) return
   const a = document.createElement('a')
-  a.href = `/api/v1/books/files/${primaryFile.value.id}/serve`
-  a.download = `book.${primaryFile.value.format ?? 'epub'}`
+  a.href = `/api/v1/books/files/${primaryFile.value.id}/serve?download=1`
   a.click()
 }
 

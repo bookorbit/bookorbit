@@ -1,24 +1,32 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Check, ChevronDown, ChevronUp, FileText, Loader2, RotateCcw, Save } from 'lucide-vue-next'
-import { DEFAULT_UPLOAD_PATTERN, PATTERN_TOKENS } from '@projectx/types'
+import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN, PATTERN_TOKENS } from '@projectx/types'
 import { useFileNamingPattern } from './composables/useFileNamingPattern'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const {
   globalPattern,
   globalError,
+  downloadPattern,
+  downloadError,
   libraries,
   loadingGlobal,
   savingGlobal,
+  loadingDownload,
+  savingDownload,
   savingLibraryId,
   fetchGlobalPattern,
+  fetchDownloadPattern,
   fetchLibraries,
   onGlobalPatternInput,
+  onDownloadPatternInput,
   saveGlobalPattern,
+  saveDownloadPattern,
   saveLibraryPattern,
   clearLibraryPattern,
   getEffectivePreview,
+  previewDownloadName,
   previewPath,
 } = useFileNamingPattern()
 
@@ -50,7 +58,7 @@ const EXAMPLES = [
 ]
 
 onMounted(async () => {
-  await Promise.all([fetchGlobalPattern(), fetchLibraries()])
+  await Promise.all([fetchGlobalPattern(), fetchDownloadPattern(), fetchLibraries()])
 })
 </script>
 
@@ -60,13 +68,13 @@ onMounted(async () => {
     <div>
       <h2 class="settings-title">File Naming</h2>
       <p class="settings-subtitle">
-        Control how uploaded files are named and organized on disk. Patterns apply when a file is uploaded.
+        Control naming patterns for uploads and downloads using the same placeholder syntax.
       </p>
     </div>
 
-    <!-- Global default -->
+    <!-- Upload global default -->
     <div>
-      <p class="settings-group-label">Default Pattern</p>
+      <p class="settings-group-label">Upload Pattern</p>
       <div class="border border-border rounded-lg bg-card px-5 py-5 space-y-4">
         <p class="text-xs text-muted-foreground leading-relaxed">
           Applied to all libraries unless overridden. Leave blank to use the built-in default layout.
@@ -96,6 +104,43 @@ onMounted(async () => {
           <p v-if="globalError" class="text-xs text-destructive">{{ globalError }}</p>
           <p class="text-xs text-muted-foreground font-mono">
             Preview: <span class="text-foreground">{{ previewPath(globalPattern) }}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download global default -->
+    <div>
+      <p class="settings-group-label">Download Pattern</p>
+      <div class="border border-border rounded-lg bg-card px-5 py-5 space-y-4">
+        <p class="text-xs text-muted-foreground leading-relaxed">
+          Controls suggested filenames for single-file downloads and files inside export ZIPs.
+        </p>
+
+        <div class="space-y-1.5">
+          <div class="flex gap-2">
+            <input
+              :value="downloadPattern"
+              type="text"
+              :placeholder="DEFAULT_DOWNLOAD_PATTERN"
+              class="flex-1 h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+              :class="downloadError ? 'border-destructive focus:ring-destructive' : ''"
+              :disabled="loadingDownload"
+              @input="onDownloadPatternInput(($event.target as HTMLInputElement).value)"
+            />
+            <button
+              class="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              :disabled="savingDownload || !!downloadError || loadingDownload"
+              @click="saveDownloadPattern"
+            >
+              <Loader2 v-if="savingDownload" :size="13" class="animate-spin" />
+              <Save v-else :size="13" />
+              Save
+            </button>
+          </div>
+          <p v-if="downloadError" class="text-xs text-destructive">{{ downloadError }}</p>
+          <p class="text-xs text-muted-foreground font-mono">
+            Preview: <span class="text-foreground">{{ previewDownloadName(downloadPattern) }}</span>
           </p>
         </div>
       </div>
@@ -229,7 +274,7 @@ onMounted(async () => {
           <p class="text-xs font-medium text-foreground mb-1.5">Folder-only mode</p>
           <p class="text-xs text-muted-foreground">
             End the pattern with <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground">/</code> to specify a folder only - the
-            original filename is preserved inside it.
+            original filename is preserved inside it. This affects upload destinations and ZIP export paths.
           </p>
         </div>
       </div>

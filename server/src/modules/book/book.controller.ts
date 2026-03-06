@@ -32,6 +32,34 @@ import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import type { BookQuery } from '@projectx/types';
 
+function stripLoneSurrogates(value: string): string {
+  let out = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        out += value[i] + value[i + 1];
+        i += 1;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) continue;
+    out += value[i];
+  }
+  return out;
+}
+
+function encodeFilenameStar(value: string): string | null {
+  try {
+    const cleaned = stripLoneSurrogates(value);
+    if (!cleaned) return null;
+    return encodeURIComponent(cleaned).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  } catch {
+    return null;
+  }
+}
+
 @Controller('books')
 export class BookController {
   constructor(
@@ -170,12 +198,21 @@ export class BookController {
     @Param('fileId', ParseIntPipe) fileId: number,
     @CurrentUser() user: RequestUser,
     @Headers('range') rangeHeader: string | undefined,
+    @Query('download') download: string | undefined,
     @Res() reply: FastifyReply,
   ) {
-    const { path, size, format } = await this.bookService.getFileInfo(fileId, user);
+    const { path, size, format, bookId, originalFilename } = await this.bookService.getFileInfo(fileId, user);
     const mimeType = format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip';
+    const isDownload = download === '1' || download === 'true';
+    const filename = isDownload
+      ? await this.bookService.resolveDownloadFilename({ bookId, absolutePath: path, format: format === 'unknown' ? null : format })
+      : originalFilename;
+    const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
+    const encodedFilename = encodeFilenameStar(filename);
+
     reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Disposition', 'inline');
+    const disposition = `${isDownload ? 'attachment' : 'inline'}; filename="${asciiFilename}"`;
+    reply.header('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
     reply.type(mimeType);
 
     if (rangeHeader) {

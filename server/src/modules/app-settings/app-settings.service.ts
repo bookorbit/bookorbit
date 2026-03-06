@@ -10,6 +10,7 @@ import * as schema from '../../db/schema';
 const APP_SETTING_KEYS = {
   OIDC_CONFIG: 'oidc_config',
   UPLOAD_FILE_PATTERN: 'upload_file_pattern',
+  DOWNLOAD_FILE_PATTERN: 'download_file_pattern',
   STAGING_AUTO_FETCH_METADATA: 'staging_auto_fetch_metadata',
   STAGING_AUTO_FINALIZE_ENABLED: 'staging_auto_finalize_enabled',
   STAGING_AUTO_FINALIZE_THRESHOLD: 'staging_auto_finalize_threshold',
@@ -19,6 +20,7 @@ const APP_SETTING_KEYS = {
 } as const;
 
 type Db = NodePgDatabase<typeof schema>;
+const DEFAULT_DOWNLOAD_PATTERN = '{originalFilename}';
 
 export interface OidcFullConfig {
   enabled: boolean;
@@ -96,6 +98,18 @@ export class AppSettingsService {
     await this.db
       .insert(schema.appSettings)
       .values({ key: APP_SETTING_KEYS.UPLOAD_FILE_PATTERN, value: pattern })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: pattern } });
+  }
+
+  async getDownloadPattern(): Promise<string> {
+    const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, APP_SETTING_KEYS.DOWNLOAD_FILE_PATTERN) });
+    return row?.value ?? DEFAULT_DOWNLOAD_PATTERN;
+  }
+
+  async setDownloadPattern(pattern: string): Promise<void> {
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: APP_SETTING_KEYS.DOWNLOAD_FILE_PATTERN, value: pattern })
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: pattern } });
   }
 

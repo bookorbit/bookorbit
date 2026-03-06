@@ -1,8 +1,10 @@
 import {
   applyModifier,
+  DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN,
   EXAMPLE_PATTERN_METADATA,
   replacePlaceholders,
+  resolveDownloadFilename,
   resolveUploadPath,
   validatePattern,
 } from '@projectx/types';
@@ -331,6 +333,30 @@ describe('resolveUploadPath', () => {
     it('preserves a leading slash in the resolved path', () => {
       expect(resolveUploadPath('/{authors}/{title}', FULL, 'epub')).toBe('/William Gibson/Neuromancer.epub');
     });
+  });
+});
+
+// ── resolveDownloadFilename ──────────────────────────────────────────────────
+
+describe('resolveDownloadFilename', () => {
+  it('resolves to original filename by default', () => {
+    expect(resolveDownloadFilename(DEFAULT_DOWNLOAD_PATTERN, FULL, 'epub')).toBe('neuromancer.epub');
+  });
+
+  it('appends extension when missing', () => {
+    expect(resolveDownloadFilename('{authors:first} - {title}', FULL, 'epub')).toBe('William Gibson - Neuromancer.epub');
+  });
+
+  it('uses only the last segment when folders are present', () => {
+    expect(resolveDownloadFilename('{authors}/{title}', FULL, 'epub')).toBe('Neuromancer.epub');
+  });
+
+  it('supports folder-only patterns by falling back to original filename', () => {
+    expect(resolveDownloadFilename('{authors}/', FULL, 'epub')).toBe('neuromancer.epub');
+  });
+
+  it('returns null when pattern resolves to an empty name', () => {
+    expect(resolveDownloadFilename('{series}', PARTIAL, 'epub')).toBeNull();
   });
 });
 
