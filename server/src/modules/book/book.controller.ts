@@ -225,6 +225,12 @@ export class BookController {
     return { entries };
   }
 
+  @Get(':id/kobo-state')
+  @RequirePermission('kobo_sync')
+  getKoboState(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.getKoboState(id, user);
+  }
+
   @Get(':id')
   getDetail(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getDetail(id, user);

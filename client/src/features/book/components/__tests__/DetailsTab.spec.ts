@@ -4,6 +4,12 @@ import DetailsTab from '../detail/tabs/DetailsTab.vue'
 import type { BookDetail } from '@projectx/types'
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
+vi.mock('@/features/auth/composables/usePermissions', () => ({
+  usePermissions: () => ({ hasPermission: () => false }),
+}))
+vi.mock('@/lib/api', () => ({
+  api: vi.fn(async () => ({ ok: false, json: async () => ({}) })),
+}))
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn() }),
 }))
@@ -13,6 +19,9 @@ vi.mock('@/features/book/lib/book-cover', () => ({
 
 const globalStubs = {
   stubs: {
+    Tooltip: { template: '<div><slot /></div>' },
+    TooltipTrigger: { template: '<div><slot /></div>' },
+    TooltipContent: { template: '<div><slot /></div>' },
     DialogRoot: { template: '<div><slot /></div>' },
     DialogPortal: { template: '<div><slot /></div>' },
     DialogOverlay: { template: '<div />' },
@@ -37,10 +46,15 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     pageCount: null,
     seriesName: null,
     seriesIndex: null,
+    rating: null,
+    coverSource: null,
+    providerIds: {},
     authors: [],
     genres: [],
     tags: [],
     files: [],
+    folderPath: '/books',
+    lastWrittenAt: null,
     ...overrides,
   }
 }
@@ -80,5 +94,23 @@ describe('DetailsTab — present state', () => {
     })
     expect(wrapper.find('[class*="border-amber-500"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Files not found')
+  })
+
+  it('renders provider icon links without the Info Links section', () => {
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          providerIds: {
+            amazon: '0345415000',
+            goodreads: '12345',
+          },
+        }),
+      },
+      global: globalStubs,
+    })
+
+    expect(wrapper.find('a[title="Open in Amazon"]').exists()).toBe(true)
+    expect(wrapper.find('a[title="Open in Goodreads"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Info Links')
   })
 })

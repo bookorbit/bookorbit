@@ -13,7 +13,12 @@ import {
   bookMetadata,
   books,
   bookTags,
+  collectionBooks,
+  collections,
   genres,
+  koboLibrarySnapshots,
+  koboReadingStates,
+  koboSnapshotBooks,
   libraries,
   readingProgress,
   tags,
@@ -154,6 +159,58 @@ export class BookRepository {
       .where(and(eq(readingProgress.bookFileId, fileId), eq(readingProgress.userId, userId)))
       .limit(1);
     return row ?? null;
+  }
+
+  async findKoboReadingState(userId: number, bookId: number) {
+    const [row] = await this.db
+      .select({
+        createdAtKobo: koboReadingStates.createdAtKobo,
+        lastModifiedKobo: koboReadingStates.lastModifiedKobo,
+        priorityTimestamp: koboReadingStates.priorityTimestamp,
+        currentBookmark: koboReadingStates.currentBookmark,
+        statistics: koboReadingStates.statistics,
+        statusInfo: koboReadingStates.statusInfo,
+        progressSyncedAt: koboReadingStates.progressSyncedAt,
+        updatedAt: koboReadingStates.updatedAt,
+      })
+      .from(koboReadingStates)
+      .where(and(eq(koboReadingStates.userId, userId), eq(koboReadingStates.bookId, bookId)))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findKoboSnapshotState(userId: number, bookId: number) {
+    const [row] = await this.db
+      .select({
+        snapshotId: koboLibrarySnapshots.id,
+        snapshotUpdatedAt: koboLibrarySnapshots.updatedAt,
+        synced: koboSnapshotBooks.synced,
+        pendingDelete: koboSnapshotBooks.pendingDelete,
+        isNew: koboSnapshotBooks.isNew,
+        removedByDevice: koboSnapshotBooks.removedByDevice,
+        fileHash: koboSnapshotBooks.fileHash,
+        metadataHash: koboSnapshotBooks.metadataHash,
+      })
+      .from(koboLibrarySnapshots)
+      .leftJoin(
+        koboSnapshotBooks,
+        and(eq(koboSnapshotBooks.snapshotId, koboLibrarySnapshots.id), eq(koboSnapshotBooks.bookId, bookId)),
+      )
+      .where(eq(koboLibrarySnapshots.userId, userId))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findKoboSyncCollectionNamesForBook(userId: number, bookId: number): Promise<string[]> {
+    const rows = await this.db
+      .select({ name: collections.name })
+      .from(collectionBooks)
+      .innerJoin(
+        collections,
+        and(eq(collections.id, collectionBooks.collectionId), eq(collections.userId, userId), eq(collections.syncToKobo, true)),
+      )
+      .where(eq(collectionBooks.bookId, bookId));
+    return rows.map((r) => r.name);
   }
 
   async searchAcrossLibraries(libraryIds: number[], q: string, limit: number) {

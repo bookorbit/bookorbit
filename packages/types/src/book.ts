@@ -64,6 +64,35 @@ export type BookDetail = {
   lastWrittenAt: string | null;
 };
 
+export type BookKoboReadingState = {
+  status: string | null;
+  progressPercent: number | null;
+  createdAtKobo: string | null;
+  lastModifiedKobo: string | null;
+  priorityTimestamp: string | null;
+  progressSyncedAt: string | null;
+  updatedAt: string;
+};
+
+export type BookKoboSnapshotState = {
+  snapshotId: number;
+  snapshotUpdatedAt: string;
+  inSnapshot: boolean;
+  synced: boolean | null;
+  pendingDelete: boolean | null;
+  isNew: boolean | null;
+  removedByDevice: boolean | null;
+  fileHash: string | null;
+  metadataHash: string | null;
+};
+
+export type BookKoboState = {
+  eligibleForKoboSync: boolean;
+  syncCollections: string[];
+  readingState: BookKoboReadingState | null;
+  snapshot: BookKoboSnapshotState | null;
+};
+
 export type BooksPage = {
   items: BookCard[];
   total: number;

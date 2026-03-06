@@ -4,7 +4,7 @@ import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, join } from 'path';
 
 import { MetadataProviderKey } from '@projectx/types';
-import type { BookQuery, BooksPage, MetadataField } from '@projectx/types';
+import type { BookKoboState, BookQuery, BooksPage, MetadataField } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
@@ -39,6 +39,10 @@ export class BookService {
 
   private isSuperuser(user: RequestUser): boolean {
     return user.roles.some((r) => r.isSuperuser);
+  }
+
+  private hasPermission(user: RequestUser, permissionName: string): boolean {
+    return user.roles.some((r) => r.isSuperuser || r.permissions.some((p) => p.name === permissionName));
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -211,6 +215,61 @@ export class BookService {
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     await this.verifyFileAccess(fileId, user);
     await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage);
+  }
+
+  async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {
+    await this.verifyBookAccess(id, user);
+
+    if (!this.hasPermission(user, 'kobo_sync')) {
+      return {
+        eligibleForKoboSync: false,
+        syncCollections: [],
+        readingState: null,
+        snapshot: null,
+      };
+    }
+
+    const [readingStateRow, snapshotRow, syncCollections] = await Promise.all([
+      this.bookRepo.findKoboReadingState(user.id, id),
+      this.bookRepo.findKoboSnapshotState(user.id, id),
+      this.bookRepo.findKoboSyncCollectionNamesForBook(user.id, id),
+    ]);
+
+    const currentBookmark = (readingStateRow?.currentBookmark ?? null) as Record<string, unknown> | null;
+    const statusInfo = (readingStateRow?.statusInfo ?? null) as Record<string, unknown> | null;
+
+    const progressCandidate = currentBookmark?.ProgressPercent ?? currentBookmark?.ContentSourceProgressPercent;
+    const progressPercent = typeof progressCandidate === 'number' ? Math.max(0, Math.min(100, progressCandidate)) : null;
+    const status = typeof statusInfo?.Status === 'string' ? statusInfo.Status : null;
+
+    return {
+      eligibleForKoboSync: syncCollections.length > 0,
+      syncCollections,
+      readingState: readingStateRow
+        ? {
+            status,
+            progressPercent,
+            createdAtKobo: readingStateRow.createdAtKobo ?? null,
+            lastModifiedKobo: readingStateRow.lastModifiedKobo ?? null,
+            priorityTimestamp: readingStateRow.priorityTimestamp ?? null,
+            progressSyncedAt: readingStateRow.progressSyncedAt?.toISOString() ?? null,
+            updatedAt: readingStateRow.updatedAt.toISOString(),
+          }
+        : null,
+      snapshot: snapshotRow
+        ? {
+            snapshotId: snapshotRow.snapshotId,
+            snapshotUpdatedAt: snapshotRow.snapshotUpdatedAt.toISOString(),
+            inSnapshot: snapshotRow.synced !== null,
+            synced: snapshotRow.synced ?? null,
+            pendingDelete: snapshotRow.pendingDelete ?? null,
+            isNew: snapshotRow.isNew ?? null,
+            removedByDevice: snapshotRow.removedByDevice ?? null,
+            fileHash: snapshotRow.fileHash ?? null,
+            metadataHash: snapshotRow.metadataHash ?? null,
+          }
+        : null,
+    };
   }
 
   async refreshMetadata(id: number, preview: boolean, user: RequestUser): Promise<BookDetailDto | ResolvedMetadataFields> {
