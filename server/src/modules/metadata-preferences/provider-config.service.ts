@@ -18,6 +18,10 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   openLibrary: { enabled: true },
 };
 
+function asObject(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
 const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.GOOGLE]: 'Google Books',
   [MetadataProviderKey.AMAZON]: 'Amazon',
@@ -30,33 +34,44 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
 export class ProviderConfigService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
+  private createDefaultConfig(): ProviderConfigurations {
+    return {
+      google: { ...DEFAULT_CONFIG.google },
+      amazon: { ...DEFAULT_CONFIG.amazon },
+      goodreads: { ...DEFAULT_CONFIG.goodreads },
+      hardcover: { ...DEFAULT_CONFIG.hardcover },
+      openLibrary: { ...DEFAULT_CONFIG.openLibrary },
+    };
+  }
+
   async getConfig(): Promise<ProviderConfigurations> {
+    const defaults = this.createDefaultConfig();
     const row = await this.db.query.appSettings.findFirst({
       where: eq(schema.appSettings.key, PROVIDER_CONFIG_KEY),
     });
-    if (!row) return { ...DEFAULT_CONFIG };
+    if (!row) return defaults;
     try {
-      const stored = JSON.parse(row.value) as Partial<ProviderConfigurations>;
+      const stored = asObject(JSON.parse(row.value));
       return {
-        google: { ...DEFAULT_CONFIG.google, ...stored.google },
-        amazon: { ...DEFAULT_CONFIG.amazon, ...stored.amazon },
-        goodreads: { ...DEFAULT_CONFIG.goodreads, ...stored.goodreads },
-        hardcover: { ...DEFAULT_CONFIG.hardcover, ...stored.hardcover },
-        openLibrary: { ...DEFAULT_CONFIG.openLibrary, ...stored.openLibrary },
+        google: { ...defaults.google, ...asObject(stored.google) },
+        amazon: { ...defaults.amazon, ...asObject(stored.amazon) },
+        goodreads: { ...defaults.goodreads, ...asObject(stored.goodreads) },
+        hardcover: { ...defaults.hardcover, ...asObject(stored.hardcover) },
+        openLibrary: { ...defaults.openLibrary, ...asObject(stored.openLibrary) },
       };
     } catch {
-      return { ...DEFAULT_CONFIG };
+      return defaults;
     }
   }
 
   async updateConfig(patch: Partial<ProviderConfigurations>): Promise<ProviderConfigurations> {
     const current = await this.getConfig();
     const next: ProviderConfigurations = {
-      google: { ...current.google, ...(patch.google ?? {}) },
-      amazon: { ...current.amazon, ...(patch.amazon ?? {}) },
-      goodreads: { ...current.goodreads, ...(patch.goodreads ?? {}) },
-      hardcover: { ...current.hardcover, ...(patch.hardcover ?? {}) },
-      openLibrary: { ...current.openLibrary, ...(patch.openLibrary ?? {}) },
+      google: { ...current.google, ...asObject(patch.google) },
+      amazon: { ...current.amazon, ...asObject(patch.amazon) },
+      goodreads: { ...current.goodreads, ...asObject(patch.goodreads) },
+      hardcover: { ...current.hardcover, ...asObject(patch.hardcover) },
+      openLibrary: { ...current.openLibrary, ...asObject(patch.openLibrary) },
     };
     const value = JSON.stringify(next);
     await this.db

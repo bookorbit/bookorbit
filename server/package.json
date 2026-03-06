@@ -136,9 +136,6 @@
     "moduleNameMapper": {
       "^@projectx/types$": "<rootDir>/../../packages/types/src/index.ts"
     },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {
       "global": {

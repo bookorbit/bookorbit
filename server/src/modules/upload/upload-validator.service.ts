@@ -11,12 +11,13 @@ export class UploadValidatorService {
    */
   validateFormat(filename: string, libraryAllowedFormats: string[]): string {
     const ext = extname(filename).toLowerCase().slice(1);
+    const normalizedAllowed = libraryAllowedFormats.map((f) => f.trim().toLowerCase()).filter(Boolean);
 
     if (!SUPPORTED_BOOK_FORMATS.has(ext)) {
       throw new BadRequestException(`Unsupported file type .${ext}. Allowed types: ${[...SUPPORTED_BOOK_FORMATS].join(', ')}`);
     }
 
-    if (libraryAllowedFormats.length > 0 && !libraryAllowedFormats.includes(ext)) {
+    if (normalizedAllowed.length > 0 && !normalizedAllowed.includes(ext)) {
       throw new BadRequestException(`This library does not allow .${ext} files`);
     }
 
@@ -30,8 +31,20 @@ export class UploadValidatorService {
   sanitizeFilename(raw: string): string {
     const sanitized = raw
       .replace(/[/\\:*?"<>|\0]/g, '_')
-      .trim()
-      .slice(0, 255);
-    return sanitized || 'upload';
+      .trim();
+
+    if (!sanitized) return 'upload';
+
+    // Dotfile-like names (e.g. ".epub") have no extname() stem.
+    if (sanitized.startsWith('.') && !sanitized.slice(1).includes('.')) {
+      return `upload${sanitized}`;
+    }
+
+    const ext = extname(sanitized);
+    if (!ext) return sanitized.slice(0, 255);
+    if (ext.length >= 255) return sanitized.slice(0, 255);
+
+    const stem = sanitized.slice(0, -ext.length).slice(0, 255 - ext.length).trim();
+    return `${stem || 'upload'}${ext}`;
   }
 }

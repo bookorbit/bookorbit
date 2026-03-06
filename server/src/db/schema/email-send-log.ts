@@ -23,7 +23,10 @@ export const emailSendLog = pgTable('email_send_log', {
   errorMessage: text('error_message'),
   sentAt: timestamp('sent_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export type EmailSendLog = typeof emailSendLog.$inferSelect;

@@ -16,7 +16,8 @@ export class ProviderRegistry {
   }
 
   select(keys?: MetadataProviderKey[]): MetadataProvider[] {
-    if (!keys?.length) return this.providers;
+    if (keys === undefined) return this.providers;
+    if (keys.length === 0) return [];
     const known = new Set(this.providers.map((p) => p.key));
     const unknown = keys.filter((k) => !known.has(k));
     if (unknown.length) throw new BadRequestException(`Unknown providers: ${unknown.join(', ')}`);

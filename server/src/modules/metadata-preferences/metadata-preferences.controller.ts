@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put } from '@nestjs/common';
+import { ALL_METADATA_FIELDS } from '@projectx/types';
 import type { FieldPreference, MetadataField } from '@projectx/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -10,6 +11,13 @@ import { MetadataPreferencesService } from './metadata-preferences.service';
 @RequirePermission('manage_metadata_config')
 export class MetadataPreferencesController {
   constructor(private readonly service: MetadataPreferencesService) {}
+
+  private parseMetadataField(field: string): MetadataField {
+    if ((ALL_METADATA_FIELDS as string[]).includes(field)) {
+      return field as MetadataField;
+    }
+    throw new BadRequestException(`Unsupported metadata field: ${field}`);
+  }
 
   @Get('global')
   getGlobal() {
@@ -30,13 +38,13 @@ export class MetadataPreferencesController {
   @Put('libraries/:id/fields/:field')
   @HttpCode(HttpStatus.OK)
   setLibraryFieldOverride(@Param('id', ParseIntPipe) id: number, @Param('field') field: string, @Body() dto: UpdateLibraryFieldDto) {
-    return this.service.setLibraryFieldOverride(id, field as MetadataField, dto as FieldPreference);
+    return this.service.setLibraryFieldOverride(id, this.parseMetadataField(field), dto as FieldPreference);
   }
 
   @Delete('libraries/:id/fields/:field')
   @HttpCode(HttpStatus.NO_CONTENT)
   clearLibraryFieldOverride(@Param('id', ParseIntPipe) id: number, @Param('field') field: string) {
-    return this.service.setLibraryFieldOverride(id, field as MetadataField, null);
+    return this.service.setLibraryFieldOverride(id, this.parseMetadataField(field), null);
   }
 
   @Delete('libraries/:id')

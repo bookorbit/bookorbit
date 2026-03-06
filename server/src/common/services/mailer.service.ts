@@ -30,8 +30,8 @@ export class MailerService {
   }
 
   async sendPasswordReset(to: string, username: string, rawToken: string): Promise<void> {
-    const appUrl = this.config.get<string>('mailer.appUrl');
-    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+    const appUrl = (this.config.get<string>('mailer.appUrl') ?? '').replace(/\/+$/, '');
+    const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
     if (this.config.get('app.nodeEnv') !== 'production') {
       this.logger.log(`[DEV] Password reset URL for ${username}: ${resetUrl}`);

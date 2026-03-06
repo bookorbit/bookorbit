@@ -18,12 +18,23 @@ export interface SevenZipModule {
 }
 
 let _instance: SevenZipModule | null = null;
+let _instancePromise: Promise<SevenZipModule> | null = null;
 
 export async function getSevenZip(): Promise<SevenZipModule> {
-  if (!_instance) {
+  if (_instance) return _instance;
+
+  if (!_instancePromise) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const factory = require('7z-wasm') as (opts?: object) => Promise<SevenZipModule>;
-    _instance = await factory();
+    _instancePromise = factory()
+      .then((module) => {
+        _instance = module;
+        return module;
+      })
+      .catch((error) => {
+        _instancePromise = null;
+        throw error;
+      });
   }
-  return _instance;
+  return _instancePromise;
 }

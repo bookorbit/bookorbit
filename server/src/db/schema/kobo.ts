@@ -27,7 +27,10 @@ export const koboSyncSettings = pgTable('kobo_sync_settings', {
   forceEnableHyphenation: boolean('force_enable_hyphenation').notNull().default(false),
   kepubConversionLimitMb: integer('kepub_conversion_limit_mb').notNull().default(100),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export const koboLibrarySnapshots = pgTable('kobo_library_snapshots', {
@@ -37,7 +40,10 @@ export const koboLibrarySnapshots = pgTable('kobo_library_snapshots', {
     .references(() => users.id, { onDelete: 'cascade' })
     .unique(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export const koboSnapshotBooks = pgTable(
@@ -77,7 +83,10 @@ export const koboReadingStates = pgTable(
     statistics: jsonb('statistics'),
     statusInfo: jsonb('status_info'),
     progressSyncedAt: timestamp('progress_synced_at'),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.bookId)],
 );

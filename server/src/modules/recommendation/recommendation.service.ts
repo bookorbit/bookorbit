@@ -33,7 +33,7 @@ export class RecommendationService {
     if (!embedding) {
       embedding = await this.embedder.embedBook(bookId);
     }
-    if (!embedding) return [];
+    if (!this.isValidEmbedding(embedding)) return [];
 
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = libs.map((l) => l.id);
@@ -72,11 +72,13 @@ export class RecommendationService {
     const authorSim = meta ? this.jaccard(new Set(target.authorNames), new Set(meta.authorNames)) : 0;
     const genreTagSim = meta ? this.jaccard(new Set(target.genreTagNames), new Set(meta.genreTagNames)) : 0;
 
-    const seriesBonus = target.seriesName && candidate.seriesName && target.seriesName === candidate.seriesName ? 1.0 : 0.0;
+    const targetSeries = this.normalizeSeries(target.seriesName);
+    const candidateSeries = this.normalizeSeries(candidate.seriesName);
+    const seriesBonus = targetSeries && candidateSeries && targetSeries === candidateSeries ? 1.0 : 0.0;
 
     let ratingProximity = 0.5;
     if (target.rating != null && candidate.rating != null) {
-      ratingProximity = 1 - Math.abs(target.rating - candidate.rating) / 4;
+      ratingProximity = Math.max(0, Math.min(1, 1 - Math.abs(target.rating - candidate.rating) / 4));
     }
 
     return 0.5 * cosineSim + 0.1 * authorSim + 0.25 * genreTagSim + 0.1 * seriesBonus + 0.05 * ratingProximity;
@@ -91,5 +93,15 @@ export class RecommendationService {
 
   private isSuperuser(user: RequestUser): boolean {
     return user.roles.some((r) => r.isSuperuser);
+  }
+
+  private isValidEmbedding(embedding: number[] | null): embedding is number[] {
+    return Array.isArray(embedding) && embedding.length > 0 && embedding.every((v) => Number.isFinite(v));
+  }
+
+  private normalizeSeries(seriesName: string | null): string | null {
+    if (!seriesName) return null;
+    const normalized = seriesName.trim().toLowerCase();
+    return normalized.length > 0 ? normalized : null;
   }
 }

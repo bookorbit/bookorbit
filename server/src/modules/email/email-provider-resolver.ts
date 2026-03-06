@@ -19,12 +19,12 @@ export class EmailProviderResolver {
   ) {}
 
   async resolve(user: RequestUser, requestedProviderId?: number | null): Promise<ResolvedSmtp> {
-    if (requestedProviderId) {
+    if (requestedProviderId !== null && requestedProviderId !== undefined) {
       return this.fromProvider(await this.providerService.getProviderWithDecryptedPassword(requestedProviderId, user));
     }
 
     const prefs = await this.preferencesService.getForUser(user.id);
-    if (prefs?.defaultProviderId) {
+    if (prefs?.defaultProviderId !== null && prefs?.defaultProviderId !== undefined) {
       return this.fromProvider(await this.providerService.getProviderWithDecryptedPassword(prefs.defaultProviderId, user));
     }
 

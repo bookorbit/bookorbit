@@ -499,8 +499,8 @@ export class BookService {
       const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
       if (saved) {
         updated++;
-        onProgress?.(id);
       }
+      onProgress?.(id);
     }
     return { processed, updated };
   }

@@ -36,7 +36,10 @@ export const libraries = pgTable('libraries', {
   pollInterval: integer('poll_interval_seconds').default(300),
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export const libraryFolders = pgTable('library_folders', {

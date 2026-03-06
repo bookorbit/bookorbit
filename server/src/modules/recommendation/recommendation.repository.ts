@@ -70,7 +70,7 @@ export class RecommendationRepository {
   }
 
   async findAnnCandidates(embedding: number[], targetBookId: number, libraryIds: number[]): Promise<AnnCandidate[]> {
-    if (libraryIds.length === 0) return [];
+    if (libraryIds.length === 0 || embedding.length === 0 || embedding.some((v) => !Number.isFinite(v))) return [];
 
     const vecStr = `[${embedding.join(',')}]`;
 

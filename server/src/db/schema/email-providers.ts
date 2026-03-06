@@ -20,7 +20,10 @@ export const emailProviders = pgTable(
     isDefault: boolean('is_default').notNull().default(false),
     isShared: boolean('is_shared').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.name)],
 );

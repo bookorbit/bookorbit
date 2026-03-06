@@ -22,6 +22,7 @@ const parser = new XMLParser({
   isArray: (name) => ['creator', 'identifier', 'subject', 'title', 'meta', 'item'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
+  parseTagValue: false, // keep all values as strings — prevents leading-zero loss on ISBNs and numeric year conversion
 });
 
 function toArray<T>(val: T | T[] | undefined): T[] {
@@ -164,7 +165,10 @@ export function parseOpf(xml: string): ParsedOpf {
   let seriesName: string | null = namedMeta('calibre:series');
   let seriesIndex: number | null = null;
   const rawSeriesIdx = namedMeta('calibre:series_index');
-  if (rawSeriesIdx) seriesIndex = parseFloat(rawSeriesIdx) || null;
+  if (rawSeriesIdx) {
+    const idx = parseFloat(rawSeriesIdx);
+    if (!isNaN(idx)) seriesIndex = idx;
+  }
 
   if (!seriesName) {
     // EPUB 3: belongs-to-collection

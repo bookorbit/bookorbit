@@ -301,7 +301,7 @@ export class BookRepository {
 
   async countWhere(where: SQL | undefined): Promise<number> {
     const [{ total }] = await this.db.select({ total: count() }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where);
-    return total;
+    return Number(total);
   }
 
   async findLibraryIdsByBookIds(bookIds: number[]): Promise<{ id: number; libraryId: number }[]> {

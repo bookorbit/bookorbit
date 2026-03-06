@@ -21,9 +21,10 @@ export class UserRepository {
       this.db.select({ id: schema.users.id }).from(schema.users).orderBy(schema.users.username).limit(pageSize).offset(offset),
       this.db.select({ total: count() }).from(schema.users),
     ]);
+    const normalizedTotal = Number(total);
 
     const userIds = userPage.map((u) => u.id);
-    if (userIds.length === 0) return { users: [], total };
+    if (userIds.length === 0) return { users: [], total: normalizedTotal };
 
     const rows = await this.db
       .select({
@@ -76,8 +77,8 @@ export class UserRepository {
       }
     }
 
-    const users = userIds.map((id) => usersMap.get(id)!);
-    return { users, total };
+    const users = userIds.map((id) => usersMap.get(id)).filter((user): user is UserListItem => user !== undefined);
+    return { users, total: normalizedTotal };
   }
 
   async findByUsername(username: string) {
@@ -159,7 +160,7 @@ export class UserRepository {
 
   async update(id: number, data: Partial<Pick<typeof schema.users.$inferInsert, 'name' | 'email' | 'active' | 'settings'>>) {
     const { settings, ...rest } = data;
-    const setData: Record<string, unknown> = { ...rest };
+    const setData: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (settings !== undefined) {
       // Merge into existing settings rather than replacing the whole object
       setData.settings = sql`${schema.users.settings} || ${JSON.stringify(settings)}::jsonb`;
@@ -196,7 +197,7 @@ export class UserRepository {
       .from(schema.userRoles)
       .innerJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
       .where(and(eq(schema.roles.isSuperuser, true), ne(schema.userRoles.userId, excludeUserId)));
-    return total;
+    return Number(total);
   }
 
   async incrementTokenVersion(userId: number) {

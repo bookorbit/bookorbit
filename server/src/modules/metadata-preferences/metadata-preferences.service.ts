@@ -24,14 +24,16 @@ export class MetadataPreferencesService {
     });
     if (!row) return this.resolver.getDefaultPreferences();
     try {
-      return JSON.parse(row.value) as MetadataFetchPreferences;
+      const parsed = JSON.parse(row.value) as MetadataFetchPreferences;
+      return this.resolver.resolve(parsed, null);
     } catch {
       return this.resolver.getDefaultPreferences();
     }
   }
 
   async setGlobal(prefs: MetadataFetchPreferences): Promise<void> {
-    const value = JSON.stringify(prefs);
+    const normalized = this.resolver.resolve(prefs, null);
+    const value = JSON.stringify(normalized);
     await this.db
       .insert(schema.appSettings)
       .values({ key: GLOBAL_PREFERENCES_KEY, value })

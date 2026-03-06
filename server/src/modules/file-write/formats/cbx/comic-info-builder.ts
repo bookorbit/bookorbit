@@ -45,15 +45,25 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   if (fieldMask.has('rating') && payload.rating != null) info['CommunityRating'] = formatRating(payload.rating);
   if (fieldMask.has('isbn13') && payload.isbn13 != null) info['GTIN'] = payload.isbn13;
 
-  const webUrl = resolveWebUrl(payload);
-  if (webUrl != null) info['Web'] = webUrl;
+  const hasProviderSelection = PROVIDER_ID_KEYS.some((key) => fieldMask.has(key));
+  if (hasProviderSelection) {
+    const webUrl = resolveWebUrl(payload, fieldMask);
+    if (webUrl != null) {
+      info['Web'] = webUrl;
+    } else {
+      delete info['Web'];
+    }
+  }
 
-  const existingNotes = typeof info['Notes'] === 'string' ? info['Notes'] : null;
-  const notes = buildNotes(existingNotes, payload);
-  if (notes != null) {
-    info['Notes'] = notes;
-  } else {
-    delete info['Notes'];
+  const hasManagedNotesSelection = MANAGED_NOTES_KEYS.some((key) => fieldMask.has(key));
+  if (hasManagedNotesSelection) {
+    const existingNotes = typeof info['Notes'] === 'string' ? info['Notes'] : null;
+    const notes = buildNotes(existingNotes, payload, fieldMask);
+    if (notes != null) {
+      info['Notes'] = notes;
+    } else {
+      delete info['Notes'];
+    }
   }
 
   if (!info['@_xmlns:xsi']) {
@@ -85,26 +95,43 @@ function formatRating(val: number): string {
   return Math.min(5.0, Math.max(0.0, val / 2.0)).toFixed(1);
 }
 
-function resolveWebUrl(payload: BookWritePayload): string | null {
-  if (payload.goodreadsId) return `https://www.goodreads.com/book/show/${payload.goodreadsId}`;
-  if (payload.amazonId) return `https://www.amazon.com/dp/${payload.amazonId}`;
-  if (payload.hardcoverId) return `https://hardcover.app/books/${payload.hardcoverId}`;
-  if (payload.googleBooksId) return `https://books.google.com/books?id=${payload.googleBooksId}`;
-  if (payload.openLibraryId) return `https://openlibrary.org/works/${payload.openLibraryId}`;
+const PROVIDER_ID_KEYS: BookWritePayloadKey[] = ['goodreadsId', 'amazonId', 'hardcoverId', 'googleBooksId', 'openLibraryId'];
+const MANAGED_NOTES_KEYS: BookWritePayloadKey[] = ['subtitle', 'isbn10', 'goodreadsId', 'amazonId', 'hardcoverId', 'googleBooksId', 'openLibraryId'];
+
+function resolveWebUrl(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
+  if (fieldMask.has('goodreadsId') && payload.goodreadsId) return `https://www.goodreads.com/book/show/${payload.goodreadsId}`;
+  if (fieldMask.has('amazonId') && payload.amazonId) return `https://www.amazon.com/dp/${payload.amazonId}`;
+  if (fieldMask.has('hardcoverId') && payload.hardcoverId) return `https://hardcover.app/books/${payload.hardcoverId}`;
+  if (fieldMask.has('googleBooksId') && payload.googleBooksId) return `https://books.google.com/books?id=${payload.googleBooksId}`;
+  if (fieldMask.has('openLibraryId') && payload.openLibraryId) return `https://openlibrary.org/works/${payload.openLibraryId}`;
   return null;
 }
 
-function buildNotes(existing: string | null, payload: BookWritePayload): string | null {
+function buildNotes(existing: string | null, payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
   const lines: string[] = [];
+  const existingManaged = new Map<string, string>();
+  const managedKeys = new Set(MANAGED_NOTES_KEYS.map((k) => String(k)));
 
   if (existing) {
     for (const line of existing.split('\n')) {
       const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('[projectx:')) lines.push(trimmed);
+      if (!trimmed) continue;
+
+      const match = trimmed.match(/^\[projectx:([^\]]+)\]\s*(.*)$/);
+      if (match) {
+        const [, key, value] = match;
+        if (managedKeys.has(key)) {
+          existingManaged.set(key, value);
+        } else {
+          lines.push(trimmed);
+        }
+        continue;
+      }
+      lines.push(trimmed);
     }
   }
 
-  const ids: [string, string | null | undefined][] = [
+  const ids: [BookWritePayloadKey, string | null | undefined][] = [
     ['subtitle', payload.subtitle],
     ['isbn10', payload.isbn10],
     ['goodreadsId', payload.goodreadsId],
@@ -115,7 +142,15 @@ function buildNotes(existing: string | null, payload: BookWritePayload): string 
   ];
 
   for (const [key, val] of ids) {
-    if (val != null && val !== '') lines.push(`[projectx:${key}] ${val}`);
+    if (fieldMask.has(key)) {
+      if (val != null && val !== '') lines.push(`[projectx:${key}] ${val}`);
+      continue;
+    }
+
+    const existingVal = existingManaged.get(String(key));
+    if (existingVal != null && existingVal !== '') {
+      lines.push(`[projectx:${key}] ${existingVal}`);
+    }
   }
 
   return lines.length > 0 ? lines.join('\n') : null;

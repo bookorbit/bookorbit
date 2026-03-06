@@ -145,8 +145,8 @@ export function inject(opfXml: string, opfDir: string, coverBytes: Buffer): Cove
         } as OrderedNode);
       }
       // Add <meta name="cover" content="cover-image"/> to metadata for EPUB2 compat
-      if (tag === 'metadata') {
-        const metaContent = node['metadata'] as OrderedNode[];
+      if (tag === 'metadata' || tag === 'opf:metadata') {
+        const metaContent = node[tag] as OrderedNode[];
         metaContent.push({ meta: [], ':@': { '@_name': 'cover', '@_content': 'cover-image' } } as OrderedNode);
       }
     }

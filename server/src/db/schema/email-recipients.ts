@@ -17,6 +17,10 @@ export const emailRecipients = pgTable(
     preferredFormat: varchar('preferred_format', { length: 20 }),
     defaultTemplateId: integer('default_template_id').references(() => emailTemplates.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.email)],
 );
@@ -31,7 +35,10 @@ export const emailRecipientGroups = pgTable(
     name: varchar('name', { length: 255 }).notNull(),
     defaultTemplateId: integer('default_template_id').references(() => emailTemplates.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.name)],
 );

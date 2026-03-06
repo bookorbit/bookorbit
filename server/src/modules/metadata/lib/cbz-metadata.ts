@@ -131,7 +131,7 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
     return {
       title: (cbi['title'] as string) ?? null,
       seriesName: (cbi['series'] as string) ?? null,
-      seriesIndex: cbi['issue'] != null ? Number(cbi['issue']) || null : null,
+      seriesIndex: cbi['issue'] != null ? (Number.isFinite(Number(cbi['issue'])) ? Number(cbi['issue']) : null) : null,
       description: (cbi['comments'] as string) ?? null,
       publisher: (cbi['publisher'] as string) ?? null,
       publishedYear: (cbi['publicationYear'] as number) ?? null,

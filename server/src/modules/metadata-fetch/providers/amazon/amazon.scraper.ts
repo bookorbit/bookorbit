@@ -186,7 +186,7 @@ function extractLanguage($: CheerioAPI): string | undefined {
 function extractPageCount($: CheerioAPI): number | undefined {
   const rpi = $('#rpi-attribute-book_details-fiona_pages .rpi-attribute-value span').first().text().trim();
   const text = rpi || detailBulletValue($, /print length|pages/i);
-  const digits = text.match(/\d+/)?.[0];
+  const digits = text.replace(/,/g, '').match(/\d+/)?.[0];
   return digits ? parseInt(digits, 10) : undefined;
 }
 

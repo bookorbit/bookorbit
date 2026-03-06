@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsEnum,
   IsInt,
+  Min,
   IsOptional,
   IsString,
   registerDecorator,
@@ -42,6 +43,7 @@ function AtLeastOneSearchTerm(options?: ValidationOptions) {
 export class MetadataSearchDto {
   @IsOptional()
   @IsInt()
+  @Min(1)
   @Type(() => Number)
   bookId?: number;
 
@@ -58,7 +60,23 @@ export class MetadataSearchDto {
   isbn?: string;
 
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.split(',') : (value as MetadataProviderKey[])))
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .flatMap((item) => (typeof item === 'string' ? item.split(',') : [item]))
+        .map((item) => (typeof item === 'string' ? item.trim() : item))
+        .filter((item): item is MetadataProviderKey => typeof item === 'string' && item.length > 0);
+    }
+
+    return value as MetadataProviderKey[];
+  })
   @IsEnum(MetadataProviderKey, { each: true })
   providers?: MetadataProviderKey[];
 }

@@ -17,13 +17,14 @@ export class EmailTransportService {
   buildTransporter(config: SmtpConfig): Transporter {
     const secure = config.ssl || config.port === 465;
     const requireTls = !secure && (config.startTls || config.port === 587);
+    const hasAuthCredentials = config.username !== undefined && config.username !== null && config.password !== undefined && config.password !== null;
 
     return nodemailer.createTransport({
       host: config.host,
       port: config.port,
       secure,
       requireTLS: requireTls,
-      ...(config.auth && config.username && config.password ? { auth: { user: config.username, pass: config.password } } : {}),
+      ...(config.auth && hasAuthCredentials ? { auth: { user: config.username, pass: config.password } } : {}),
       tls: { rejectUnauthorized: false },
     } as nodemailer.TransportOptions);
   }

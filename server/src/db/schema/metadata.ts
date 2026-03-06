@@ -3,7 +3,13 @@ import { customType, index, integer, pgTable, primaryKey, real, serial, text, ti
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
   toDriver: (v) => `[${v.join(',')}]`,
-  fromDriver: (v) => v.slice(1, -1).split(',').map(Number),
+  fromDriver: (v) => {
+    if (typeof v !== 'string' || !v || v === '[]') return [];
+    return v
+      .slice(1, -1)
+      .split(',')
+      .map((n) => parseFloat(n));
+  },
 });
 
 import { books } from './books';
@@ -34,7 +40,10 @@ export const bookMetadata = pgTable(
     openLibraryId: varchar('open_library_id', { length: 50 }),
     embedding: embedding256('embedding'),
     lastWrittenAt: timestamp('last_written_at'),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [
     index('bm_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),

@@ -15,7 +15,10 @@ export const lenses = pgTable(
     defaultSort: jsonb('default_sort').notNull().default([]),
     isPublic: boolean('is_public').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.name)],
 );

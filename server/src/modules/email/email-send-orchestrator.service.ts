@@ -189,10 +189,11 @@ export class EmailSendOrchestrator {
   ) {
     try {
       const transporter = this.transportService.buildTransporter(smtpConfig);
+      const effectiveSubject = task.deviceType === 'kindle' ? 'convert' : subject;
 
       await transporter.sendMail({
         to: task.recipientEmail,
-        subject,
+        subject: effectiveSubject,
         text: bodyText,
         attachments: [
           {

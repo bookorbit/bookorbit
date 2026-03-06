@@ -1,6 +1,6 @@
 import { IsIn, IsBoolean, IsArray, IsString, Validate, ValidatorConstraint, ValidatorConstraintInterface, validateSync } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { MetadataProviderKey } from '@projectx/types';
+import { ALL_METADATA_FIELDS, MetadataProviderKey } from '@projectx/types';
 import type { MetadataField, MergeStrategy } from '@projectx/types';
 
 const MERGE_STRATEGIES: MergeStrategy[] = ['fillMissing', 'overwrite', 'overwriteIfProvided'];
@@ -23,7 +23,9 @@ export class FieldPreferenceDto {
 class IsFieldPreferencesMapConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-    for (const v of Object.values(value as Record<string, unknown>)) {
+    const knownFields = new Set<string>(ALL_METADATA_FIELDS);
+    for (const [field, v] of Object.entries(value as Record<string, unknown>)) {
+      if (!knownFields.has(field)) return false;
       const instance = plainToInstance(FieldPreferenceDto, v);
       if (validateSync(instance).length > 0) return false;
     }

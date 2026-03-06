@@ -218,8 +218,14 @@ export class BookController {
     if (rangeHeader) {
       const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
       if (match) {
-        const start = parseInt(match[1]);
-        const end = match[2] ? parseInt(match[2]) : size - 1;
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : size - 1;
+        if (start >= size || end < start || end >= size) {
+          reply.status(416);
+          reply.header('Content-Range', `bytes */${size}`);
+          reply.send();
+          return;
+        }
         reply.status(206);
         reply.header('Content-Range', `bytes ${start}-${end}/${size}`);
         reply.header('Content-Length', end - start + 1);

@@ -27,6 +27,18 @@ function stripHtml(val: string): string {
     .trim();
 }
 
+function extractAnnotationText(val: unknown): string {
+  if (typeof val === 'string') return val;
+  if (Array.isArray(val)) return val.map(extractAnnotationText).filter(Boolean).join(' ');
+  if (typeof val === 'object' && val !== null) {
+    return Object.values(val as Record<string, unknown>)
+      .map(extractAnnotationText)
+      .filter(Boolean)
+      .join(' ');
+  }
+  return '';
+}
+
 export interface Fb2Metadata {
   title: string | null;
   description: string | null;
@@ -104,7 +116,7 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
     let description2: string | null = null;
     const annotRaw = titleInfo['annotation'];
     if (annotRaw != null) {
-      const annotStr = typeof annotRaw === 'object' ? JSON.stringify(annotRaw) : typeof annotRaw === 'string' ? annotRaw : null;
+      const annotStr = annotRaw != null ? extractAnnotationText(annotRaw) : null;
       if (annotStr) description2 = stripHtml(annotStr) || null;
     }
 

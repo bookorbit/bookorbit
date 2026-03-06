@@ -14,7 +14,10 @@ export const emailTemplates = pgTable(
     isDefault: boolean('is_default').notNull().default(false),
     isSystem: boolean('is_system').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [
     unique().on(t.userId, t.name),

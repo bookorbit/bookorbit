@@ -62,7 +62,8 @@ export class BookQueryBuilder {
     if (sort.length === 0) return [sql`${bookMetadata.title} ASC NULLS LAST`];
     const result: SQL[] = [];
     for (const { field, dir } of sort) {
-      const D = dir.toUpperCase();
+      const D = this.normalizeSortDirection(dir);
+      if (!D) continue;
       if (field === 'author') {
         result.push(
           sql.raw(
@@ -79,6 +80,12 @@ export class BookQueryBuilder {
       }
     }
     return result.length > 0 ? result : [sql`${bookMetadata.title} ASC NULLS LAST`];
+  }
+
+  private normalizeSortDirection(dir: string): 'ASC' | 'DESC' | null {
+    const direction = dir.toUpperCase();
+    if (direction === 'ASC' || direction === 'DESC') return direction;
+    return null;
   }
 
   private groupToSql(node: GroupRule, depth: number, userId?: number): SQL {
@@ -180,18 +187,26 @@ export class BookQueryBuilder {
   private numericRuleToSql(col: AnyColumn, operator: string, value?: number, valueTo?: number): SQL {
     switch (operator) {
       case 'eq':
+        this.assertNumber(value, operator, 'value');
         return eq(col, value!);
       case 'notEq':
+        this.assertNumber(value, operator, 'value');
         return ne(col, value!);
       case 'gt':
+        this.assertNumber(value, operator, 'value');
         return gt(col, value!);
       case 'gte':
+        this.assertNumber(value, operator, 'value');
         return gte(col, value!);
       case 'lt':
+        this.assertNumber(value, operator, 'value');
         return lt(col, value!);
       case 'lte':
+        this.assertNumber(value, operator, 'value');
         return lte(col, value!);
       case 'between':
+        this.assertNumber(value, operator, 'value');
+        this.assertNumber(valueTo, operator, 'valueTo');
         return and(gte(col, value!), lte(col, valueTo!))!;
       case 'isEmpty':
         return isNull(col);
@@ -266,16 +281,37 @@ export class BookQueryBuilder {
   private dateRuleToSql(operator: string, value?: string | number, valueTo?: string): SQL {
     switch (operator) {
       case 'before':
-        return lt(books.addedAt, new Date(value as string));
+        return lt(books.addedAt, this.parseDate(value, operator, 'value'));
       case 'after':
-        return gt(books.addedAt, new Date(value as string));
+        return gt(books.addedAt, this.parseDate(value, operator, 'value'));
       case 'between':
-        return and(gte(books.addedAt, new Date(value as string)), lte(books.addedAt, new Date(valueTo!)))!;
-      case 'withinLast':
-        return sql`${books.addedAt} >= NOW() - (${value} * INTERVAL '1 day')`;
+        return and(gte(books.addedAt, this.parseDate(value, operator, 'value')), lte(books.addedAt, this.parseDate(valueTo, operator, 'valueTo')))!;
+      case 'withinLast': {
+        const days = typeof value === 'string' ? Number(value) : value;
+        this.assertNumber(days, operator, 'value');
+        if (days! < 0) throw new BadRequestException(`Operator '${operator}' requires a non-negative value`);
+        return sql`${books.addedAt} >= NOW() - (${days} * INTERVAL '1 day')`;
+      }
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for date field`);
     }
+  }
+
+  private assertNumber(value: number | undefined, operator: string, key: 'value' | 'valueTo'): void {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new BadRequestException(`Operator '${operator}' requires a valid numeric ${key}`);
+    }
+  }
+
+  private parseDate(value: string | number | undefined, operator: string, key: 'value' | 'valueTo'): Date {
+    if (value === undefined || value === null || value === '') {
+      throw new BadRequestException(`Operator '${operator}' requires a valid date ${key}`);
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Operator '${operator}' requires a valid date ${key}`);
+    }
+    return parsed;
   }
 
   private statusRuleToSql(operator: string): SQL {

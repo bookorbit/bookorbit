@@ -4,9 +4,17 @@ import { RequestUser } from '../types/request-user';
 @Injectable()
 export class PermissionService {
   userHas(user: RequestUser, permissionName: string): boolean {
-    for (const role of user.roles) {
-      if (role.isSuperuser) return true;
+    const roles = Array.isArray(user?.roles) ? user.roles : [];
+
+    for (const role of roles) {
+      if (role?.isSuperuser) return true;
     }
-    return user.roles.flatMap((r) => r.permissions.map((p) => p.name)).includes(permissionName);
+
+    for (const role of roles) {
+      const permissions = Array.isArray(role?.permissions) ? role.permissions : [];
+      if (permissions.some((permission) => permission?.name === permissionName)) return true;
+    }
+
+    return false;
   }
 }

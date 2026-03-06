@@ -13,7 +13,10 @@ export const collections = pgTable('collections', {
   description: text('description'),
   syncToKobo: boolean('sync_to_kobo').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export const collectionBooks = pgTable(

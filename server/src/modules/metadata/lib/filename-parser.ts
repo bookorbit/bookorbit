@@ -27,7 +27,12 @@ export function parseBookFilename(absolutePath: string): ParsedFilename {
   const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
 
   // Remove all parenthetical suffixes from the end: "(2020)", "(UK)", "(retail)", etc.
-  const title = stem.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  let title = stem;
+  let prev: string;
+  do {
+    prev = title;
+    title = title.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  } while (title !== prev);
 
   return { title, publishedYear: year };
 }

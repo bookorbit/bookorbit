@@ -17,7 +17,10 @@ export const readingProgress = pgTable(
     cfi: varchar('cfi', { length: 2000 }),
     // PDF / CBX / CBR: zero-based page index
     pageNumber: integer('page_number'),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [primaryKey({ columns: [t.bookFileId, t.userId] }), index('reading_progress_user_id_idx').on(t.userId)],
 );
@@ -62,7 +65,10 @@ export const annotations = pgTable(
     note: text('note'),
     chapterTitle: varchar('chapter_title', { length: 500 }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [index('annotations_user_id_idx').on(t.userId)],
 );
@@ -79,7 +85,10 @@ export const readerDefaultPreferences = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     formatGroup: varchar('format_group', { length: 10 }).notNull(),
     settings: jsonb('settings').notNull(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [uniqueIndex('rdp_user_format_idx').on(t.userId, t.formatGroup)],
 );
@@ -98,7 +107,10 @@ export const readerPreferences = pgTable(
       .notNull()
       .references(() => bookFiles.id, { onDelete: 'cascade' }),
     settings: jsonb('settings').notNull(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [uniqueIndex('rp_user_file_idx').on(t.userId, t.bookFileId)],
 );

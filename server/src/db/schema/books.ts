@@ -13,7 +13,10 @@ export const books = pgTable('books', {
   folderPath: varchar('folder_path', { length: 4096 }).notNull(),
   status: varchar('status', { length: 20 }).notNull().default('present'),
   addedAt: timestamp('added_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export const bookFiles = pgTable('book_files', {
@@ -33,7 +36,10 @@ export const bookFiles = pgTable('book_files', {
   format: varchar('format', { length: 20 }),
   role: varchar('role', { length: 20 }).notNull().default('primary'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 });
 
 export type Book = typeof books.$inferSelect;

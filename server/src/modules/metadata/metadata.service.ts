@@ -135,7 +135,8 @@ export class MetadataService {
     } else if (format === 'mobi' || format === 'azw3' || format === 'azw') {
       const mobi = await parseMobiFile(absolutePath);
       if (mobi) {
-        const year = mobi.publishedDate ? parseInt(mobi.publishedDate.substring(0, 4), 10) || null : null;
+        const yearMatch = mobi.publishedDate?.match(/\b(\d{4})\b/);
+        const year = yearMatch ? Number.parseInt(yearMatch[1], 10) : null;
         parsed = {
           title: mobi.title,
           subtitle: null,
@@ -264,9 +265,22 @@ export class MetadataService {
   async replaceAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
     await this.db.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
 
-    if (parsedAuthors.length === 0) return;
+    const normalized = parsedAuthors
+      .map((author) => ({
+        name: author.name.trim(),
+        sortName: author.sortName?.trim() || null,
+      }))
+      .filter((author) => author.name.length > 0);
 
-    const unique = parsedAuthors.filter((a, i, arr) => arr.findIndex((b) => b.name === a.name) === i);
+    if (normalized.length === 0) return;
+
+    const seen = new Set<string>();
+    const unique = normalized.filter((author) => {
+      const key = author.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     for (let i = 0; i < unique.length; i++) {
       const { name, sortName } = unique[i];
@@ -285,7 +299,7 @@ export class MetadataService {
 
   async replaceGenres(bookId: number, parsedGenres: string[]) {
     await this.db.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
-    const unique = [...new Set(parsedGenres.map((g) => g.substring(0, 200)).filter(Boolean))];
+    const unique = [...new Set(parsedGenres.map((g) => g.trim().substring(0, 200)).filter(Boolean))];
     if (unique.length === 0) return;
 
     for (const name of unique) {
@@ -301,7 +315,7 @@ export class MetadataService {
 
   async replaceTags(bookId: number, userTags: string[]) {
     await this.db.delete(bookTags).where(eq(bookTags.bookId, bookId));
-    const unique = [...new Set(userTags.map((t) => t.substring(0, 200)).filter(Boolean))];
+    const unique = [...new Set(userTags.map((t) => t.trim().substring(0, 200)).filter(Boolean))];
     if (unique.length === 0) return;
 
     for (const name of unique) {
