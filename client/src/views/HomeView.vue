@@ -14,12 +14,13 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsLensDialog from '@/features/lens/components/SaveAsLensDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
-import { toast } from 'vue-sonner'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
+
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
+import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -36,6 +37,26 @@ const libraryId = shallowRef<number | null>(route.params.id ? Number(route.param
 const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+
+const { setBookContext, registerLoadMore } = useBookNavigation()
+watch(
+  [books, total],
+  ([newBooks, newTotal]) => {
+    setBookContext(
+      newBooks.map((b) => b.id),
+      newTotal,
+    )
+  },
+  { deep: true, immediate: true },
+)
+onMounted(() => {
+  registerLoadMore(async () => {
+    await load()
+  })
+})
+onUnmounted(() => {
+  registerLoadMore(null)
+})
 
 const FILTER_STORAGE_PREFIX = 'projectx:filter:library:'
 function getFilterKey(id: number) {

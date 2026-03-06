@@ -2,7 +2,7 @@
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { BookDetail } from '@projectx/types'
-import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue'
+import BookDetailHeader from '@/features/book/components/detail/BookDetailHeader.vue'
 import EditMetadataTab from '@/features/book/components/detail/tabs/EditMetadataTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 
@@ -24,9 +24,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 </script>
 
 <template>
-  <div class="flex items-stretch border-b shrink-0 h-11 px-3">
-    <BookDetailTabs :book-id="bookId" />
-  </div>
+  <BookDetailHeader :book-id="bookId" />
 
   <main class="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
     <EditMetadataTab v-if="detail" :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" />

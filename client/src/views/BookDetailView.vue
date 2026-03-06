@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import BookDetailTabs from '@/features/book/components/detail/BookDetailTabs.vue'
+import BookDetailHeader from '@/features/book/components/detail/BookDetailHeader.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
@@ -38,9 +38,7 @@ watch(bookId, (id) => fetch(id), { immediate: true })
 </script>
 
 <template>
-  <div class="flex items-stretch border-b shrink-0 h-11 px-3">
-    <BookDetailTabs :book-id="bookId" />
-  </div>
+  <BookDetailHeader :book-id="bookId" />
 
   <main class="flex-none overflow-x-hidden px-6 py-6">
     <DetailsTab v-if="detail" :book="detail" />

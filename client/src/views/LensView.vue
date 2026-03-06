@@ -11,9 +11,9 @@ import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
-import { toast } from 'vue-sonner'
 import { useLens } from '@/features/lens/composables/useLens'
 import { useLenses } from '@/features/lens/composables/useLenses'
+import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
@@ -29,6 +29,26 @@ const { coverSize, gridGap, viewMode, lensFilterExpanded } = useDisplaySettings(
 const lensId = computed(() => Number(route.params.id))
 
 const { items: books, total, loading, hasMore, load } = useLens(lensId)
+const { setBookContext, registerLoadMore } = useBookNavigation()
+watch(
+  [books, total],
+  ([newBooks, newTotal]) => {
+    setBookContext(
+      newBooks.map((b) => b.id),
+      newTotal,
+    )
+  },
+  { deep: true, immediate: true },
+)
+
+onMounted(() => {
+  registerLoadMore(async () => {
+    await load()
+  })
+})
+onUnmounted(() => {
+  registerLoadMore(null)
+})
 const { lenses, fetchLenses, deleteLens } = useLenses()
 
 const lens = computed(() => lenses.value.find((l) => l.id === lensId.value))

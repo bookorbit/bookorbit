@@ -15,6 +15,7 @@ import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { useCollectionBooks } from '@/features/collection/composables/useCollectionBooks'
+import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
@@ -30,6 +31,26 @@ const { collections, fetchCollections, removeBooksFromCollection } = useCollecti
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
 
 const { items: books, total, loading, hasMore, load } = useCollectionBooks(collectionId)
+const { setBookContext, registerLoadMore } = useBookNavigation()
+watch(
+  [books, total],
+  ([newBooks, newTotal]) => {
+    setBookContext(
+      newBooks.map((b) => b.id),
+      newTotal,
+    )
+  },
+  { deep: true, immediate: true },
+)
+
+onMounted(() => {
+  registerLoadMore(async () => {
+    await load()
+  })
+})
+onUnmounted(() => {
+  registerLoadMore(null)
+})
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 
