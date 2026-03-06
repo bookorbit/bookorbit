@@ -65,7 +65,7 @@ function downloadFile() {
     <div class="md:w-56 shrink-0 md:sticky md:top-4 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
-          class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
+          class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in bg-muted/50"
           style="aspect-ratio: 2/3"
           :style="coverLoaded ? {} : coverStyle"
           @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
@@ -84,7 +84,7 @@ function downloadFile() {
           <img
             v-if="!coverFailed"
             :src="coverSrc"
-            class="w-full h-full object-cover transition-opacity duration-200"
+            class="w-full h-full object-contain transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             :alt="book.title ?? ''"
             @load="coverLoaded = true"

@@ -78,7 +78,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <img
         :src="activeSrc"
         :alt="book.title ?? ''"
-        class="w-full h-full object-cover"
+        class="w-full h-full object-contain"
         @error="hideOnError"
         @load="(e) => ((e.target as HTMLImageElement).style.visibility = 'visible')"
       />
