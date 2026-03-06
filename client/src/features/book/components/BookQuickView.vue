@@ -2,9 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, Pencil, Star, Trash2, X } from 'lucide-vue-next'
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose } from 'reka-ui'
+import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from 'reka-ui'
 import { formatBytes } from '@/lib/formatting'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useBookDetail } from '../composables/useBookDetail'
@@ -151,12 +151,20 @@ function editMetadata() {
   router.push({ name: 'book-edit', params: { bookId: detail.value.id } })
   emit('update:open', false)
 }
+
+function openDetails() {
+  if (!detail.value) return
+  router.push({ name: 'book-detail', params: { bookId: detail.value.id } })
+  emit('update:open', false)
+}
 </script>
 
 <template>
   <TooltipProvider :delay-duration="0">
     <Sheet :open="props.open" @update:open="emit('update:open', $event)">
       <SheetContent side="right" class="sm:max-w-[400px] p-0 overflow-hidden">
+        <SheetTitle class="sr-only">{{ detail?.title ? `Quick view for ${detail.title}` : 'Book quick view' }}</SheetTitle>
+        <SheetDescription class="sr-only">Preview book details and run quick actions.</SheetDescription>
         <div class="flex flex-col h-full">
           <!-- Header: cover + title block -->
           <div class="p-5 pt-10 border-b shrink-0">
@@ -190,9 +198,9 @@ function editMetadata() {
 
               <!-- Info -->
               <div class="flex-1 min-w-0 pr-2">
-                <SheetTitle class="text-sm font-bold leading-snug line-clamp-3">
+                <h2 class="text-sm font-bold leading-snug line-clamp-3">
                   {{ detail.title ?? 'Untitled' }}
-                </SheetTitle>
+                </h2>
                 <p v-if="detail.subtitle" class="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                   {{ detail.subtitle }}
                 </p>
@@ -261,7 +269,10 @@ function editMetadata() {
                 <span v-if="detail.publishedYear" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
                   {{ detail.publishedYear }}
                 </span>
-                <span v-if="detail.language" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                <span
+                  v-if="detail.language"
+                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground"
+                >
                   {{ detail.language }}
                 </span>
               </div>
@@ -339,7 +350,7 @@ function editMetadata() {
             </button>
             <button
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
-              @click="router.push({ name: 'book-detail', params: { bookId: detail!.id } }); emit('update:open', false)"
+              @click="openDetails"
             >
               <ExternalLink class="size-4" />
               Details
@@ -391,6 +402,8 @@ function editMetadata() {
         <DialogContent
           class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
+          <DialogTitle class="sr-only">{{ detail?.title ? `${detail.title} cover preview` : 'Book cover preview' }}</DialogTitle>
+          <DialogDescription class="sr-only">Enlarged cover image preview dialog.</DialogDescription>
           <img v-if="detail" :src="coverSrc!" :alt="detail.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
           <DialogClose
             class="absolute -top-3 -right-3 p-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"

@@ -16,4 +16,8 @@ export const [useSidebar, provideSidebarContext] = createContext<{
   openMobile: Ref<boolean>
   setOpenMobile: (value: boolean) => void
   toggleSidebar: () => void
+  widthPx: Ref<number>
+  setWidth: (value: number) => void
+  minWidthPx: number
+  maxWidthPx: number
 }>('Sidebar')
