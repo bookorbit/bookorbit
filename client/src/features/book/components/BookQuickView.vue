@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, Pencil, Trash2, X } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, FolderPlus, Pencil, Star, Trash2, X } from 'lucide-vue-next'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose } from 'reka-ui'
+import { formatBytes } from '@/lib/formatting'
+import { getProviderColor } from '@/lib/provider-colors'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { bookCoverStyle } from '../lib/book-cover'
+import { getFormatColor } from '../lib/format-colors'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
@@ -16,11 +19,20 @@ const emit = defineEmits<{
   action: [type: 'edit-metadata' | 'add-to-collection' | 'delete']
 }>()
 
+type ProviderLink = {
+  key: string
+  label: string
+  url: string
+  iconUrl: string
+  fallback: string
+}
+
 const router = useRouter()
 const { detail, loading, fetch } = useBookDetail()
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+const providerIconErrors = ref<Record<string, boolean>>({})
 
 watch(
   () => props.bookId,
@@ -29,6 +41,7 @@ watch(
       coverLoaded.value = false
       coverFailed.value = false
       descriptionExpanded.value = false
+      providerIconErrors.value = {}
       fetch(id)
     }
   },
@@ -47,11 +60,81 @@ const seriesLine = computed(() => {
 })
 
 const authorLine = computed(() => detail.value?.authors.map((a) => a.name).join(', ') ?? null)
+const ratingStars = [1, 2, 3, 4, 5]
+const providerLinks = computed<ProviderLink[]>(() => {
+  const out: ProviderLink[] = []
+  const ids = detail.value?.providerIds
+  if (!ids) return out
+  if (ids.google) {
+    out.push({
+      key: 'google',
+      label: 'Google Books',
+      url: `https://books.google.com/books?id=${ids.google}`,
+      iconUrl: 'https://books.google.com/favicon.ico',
+      fallback: 'G',
+    })
+  }
+  if (ids.goodreads) {
+    out.push({
+      key: 'goodreads',
+      label: 'Goodreads',
+      url: `https://www.goodreads.com/book/show/${ids.goodreads}`,
+      iconUrl: 'https://www.goodreads.com/favicon.ico',
+      fallback: 'GR',
+    })
+  }
+  if (ids.amazon) {
+    out.push({
+      key: 'amazon',
+      label: 'Amazon',
+      url: `https://www.amazon.com/dp/${ids.amazon}`,
+      iconUrl: 'https://www.amazon.com/favicon.ico',
+      fallback: 'A',
+    })
+  }
+  if (ids.hardcover) {
+    out.push({
+      key: 'hardcover',
+      label: 'Hardcover',
+      url: `https://hardcover.app/books/${ids.hardcover}`,
+      iconUrl: 'https://hardcover.app/favicon.ico',
+      fallback: 'H',
+    })
+  }
+  if (ids.openLibrary) {
+    const path = String(ids.openLibrary).startsWith('/works/') ? String(ids.openLibrary) : `/works/${ids.openLibrary}`
+    out.push({
+      key: 'openLibrary',
+      label: 'Open Library',
+      url: `https://openlibrary.org${path}`,
+      iconUrl: 'https://openlibrary.org/favicon.ico',
+      fallback: 'OL',
+    })
+  }
+  return out
+})
 
 const descriptionExpanded = ref(false)
 const coverLightboxOpen = ref(false)
 
 const primaryFile = computed(() => detail.value?.files.find((f) => f.role === 'primary') ?? detail.value?.files[0] ?? null)
+
+function providerLinkStyle(provider: string) {
+  const color = getProviderColor(provider)
+  return {
+    borderColor: `${color}66`,
+    backgroundColor: `${color}12`,
+  }
+}
+
+function formatBadgeStyle(fmt: string) {
+  const color = getFormatColor(fmt)
+  return {
+    color,
+    borderColor: `${color}66`,
+    backgroundColor: `${color}1a`,
+  }
+}
 
 function openBook() {
   if (!primaryFile.value || !detail.value) return
@@ -113,8 +196,39 @@ function editMetadata() {
                 <p v-if="detail.subtitle" class="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                   {{ detail.subtitle }}
                 </p>
+                <div v-if="providerLinks.length" class="mt-2 flex items-center gap-1">
+                  <a
+                    v-for="link in providerLinks"
+                    :key="link.key"
+                    :href="link.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    :title="`Open in ${link.label}`"
+                    class="inline-flex size-6 items-center justify-center rounded border transition-colors hover:bg-muted/60"
+                    :style="providerLinkStyle(link.key)"
+                  >
+                    <img
+                      v-if="!providerIconErrors[link.key]"
+                      :src="link.iconUrl"
+                      :alt="link.label"
+                      class="size-3.5 rounded-[2px] object-contain"
+                      loading="lazy"
+                      @error="providerIconErrors[link.key] = true"
+                    />
+                    <span v-else class="text-[8px] font-bold leading-none text-foreground/90">{{ link.fallback }}</span>
+                  </a>
+                </div>
                 <p v-if="authorLine" class="text-xs text-foreground/80 mt-2">{{ authorLine }}</p>
                 <p v-if="seriesLine" class="text-xs text-muted-foreground mt-0.5 italic">{{ seriesLine }}</p>
+                <div v-if="detail.rating != null" class="mt-2 flex items-center gap-1">
+                  <Star
+                    v-for="star in ratingStars"
+                    :key="star"
+                    class="size-3"
+                    :class="detail.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
+                  />
+                  <span class="text-[10px] text-muted-foreground ml-1">{{ detail.rating }}/5</span>
+                </div>
               </div>
             </div>
           </div>
@@ -156,6 +270,35 @@ function editMetadata() {
               <p v-if="detail.publisher" class="text-xs text-muted-foreground">
                 {{ detail.publisher }}
               </p>
+
+              <!-- Primary file summary -->
+              <div v-if="primaryFile" class="rounded-md border border-border bg-muted/20 px-3 py-2.5">
+                <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Primary File</p>
+                <p class="text-xs text-foreground mt-1 truncate">{{ primaryFile.filename ?? `File #${primaryFile.id}` }}</p>
+                <div class="mt-1.5 flex items-center gap-1.5">
+                  <span
+                    class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+                    :style="formatBadgeStyle(primaryFile.format ?? '?')"
+                  >
+                    {{ (primaryFile.format ?? '?').toUpperCase() }}
+                  </span>
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                    {{ formatBytes(primaryFile.sizeBytes) }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- ISBN -->
+              <dl v-if="detail.isbn13 || detail.isbn10" class="grid grid-cols-1 gap-y-2 border-t pt-4">
+                <div v-if="detail.isbn13" class="min-w-0">
+                  <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-13</dt>
+                  <dd class="text-xs text-foreground mt-0.5 font-mono">{{ detail.isbn13 }}</dd>
+                </div>
+                <div v-if="detail.isbn10" class="min-w-0">
+                  <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-10</dt>
+                  <dd class="text-xs text-foreground mt-0.5 font-mono">{{ detail.isbn10 }}</dd>
+                </div>
+              </dl>
 
               <!-- Genres -->
               <div v-if="detail.genres.length" class="flex flex-wrap gap-1.5">
