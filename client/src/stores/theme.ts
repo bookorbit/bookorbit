@@ -49,6 +49,7 @@ export type Background =
   | 'brushed'
   | 'prism'
   | 'spectrum'
+  | 'polar-aurora'
   | 'elevation'
   | 'terminal'
 
@@ -118,6 +119,7 @@ export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: stri
   { id: 'elevation', label: 'Elevation', cssClass: 'pattern-elevation' },
   { id: 'prism', label: 'Prism', cssClass: 'pattern-prism' },
   { id: 'spectrum', label: 'Spectrum', cssClass: 'pattern-spectrum' },
+  { id: 'polar-aurora', label: 'Polar Aurora', cssClass: 'pattern-polar-aurora' },
 ]
 
 const ACCENT_IDS = ACCENT_OPTIONS.map((a) => a.id)

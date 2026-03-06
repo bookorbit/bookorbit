@@ -97,6 +97,13 @@
   filter: contrast(160%) brightness(110%);
 }
 
+.pattern-polar-aurora {
+  background-image:
+    radial-gradient(120% 58% at 0% 22%, oklch(0.76 0.14 calc(var(--tint-h) + 20) / 0.13), transparent 68%),
+    radial-gradient(120% 58% at 100% 34%, oklch(0.74 0.14 calc(var(--tint-h) + 190) / 0.12), transparent 68%),
+    radial-gradient(130% 62% at 50% -12%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 72%);
+}
+
 .pattern-isogrid::before {
   content: '';
   position: fixed;
