@@ -119,7 +119,7 @@ export class ScannerService implements OnApplicationBootstrap {
       try {
         candidates = await findBookCandidates(folder.path);
       } catch (err) {
-        this.logger.warn(`Cannot walk ${folder.path}: ${err}`);
+        this.logger.warn(`Cannot walk ${folder.path}: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       if (allowed) {
@@ -251,7 +251,7 @@ export class ScannerService implements OnApplicationBootstrap {
       try {
         isNew = await this.processFile(fileStat, format, role, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
       } catch (err) {
-        this.logger.warn(`Failed to process file ${fileStat.absolutePath}: ${err}`);
+        this.logger.warn(`Failed to process file ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
         continue;
       }
 
@@ -262,7 +262,7 @@ export class ScannerService implements OnApplicationBootstrap {
         try {
           await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
         } catch (err) {
-          this.logger.warn(`Metadata extraction failed for ${fileStat.absolutePath}: ${err}`);
+          this.logger.warn(`Metadata extraction failed for ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }

@@ -33,7 +33,7 @@ export class StagingMetadataService {
         status: 'ready',
       });
     } catch (err) {
-      this.logger.warn(`Metadata extraction failed for staging file ${fileId}: ${err}`);
+      this.logger.warn(`Metadata extraction failed for staging file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);
       await this.repo.update(fileId, {
         status: 'error',
         errorMessage: err instanceof Error ? err.message : 'Metadata extraction failed',

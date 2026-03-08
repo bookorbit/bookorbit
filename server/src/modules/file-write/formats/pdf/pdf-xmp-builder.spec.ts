@@ -43,17 +43,11 @@ describe('buildXmp', () => {
   });
 
   it('writes series only when both seriesName and seriesIndex are selected and present', () => {
-    const withBoth = buildXmp(
-      { seriesName: 'Dune', seriesIndex: 1 },
-      new Set(['seriesName', 'seriesIndex']),
-    );
+    const withBoth = buildXmp({ seriesName: 'Dune', seriesIndex: 1 }, new Set(['seriesName', 'seriesIndex']));
     expect(withBoth).toContain('<projectx:seriesName>Dune</projectx:seriesName>');
     expect(withBoth).toContain('<projectx:seriesIndex>1</projectx:seriesIndex>');
 
-    const missingMask = buildXmp(
-      { seriesName: 'Dune', seriesIndex: 1 },
-      new Set(['seriesName']),
-    );
+    const missingMask = buildXmp({ seriesName: 'Dune', seriesIndex: 1 }, new Set(['seriesName']));
     expect(missingMask).not.toContain('projectx:seriesName');
     expect(missingMask).not.toContain('projectx:seriesIndex');
   });

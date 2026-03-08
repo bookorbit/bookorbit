@@ -34,6 +34,11 @@
     "coverage:server": "pnpm --filter server test:cov",
     "coverage:client": "pnpm --filter client test:cov --run",
     "db:up": "docker compose up -d --wait",
+    "prod:up": "docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --wait",
+    "prod:down": "docker compose --env-file .env.prod -f docker-compose.prod.yml down",
+    "db:backup:prod": "bash ./scripts/db/backup-prod.sh .env.prod",
+    "db:restore:prod": "bash ./scripts/db/restore-prod.sh .env.prod",
+    "db:restore:test:prod": "bash ./scripts/db/restore-test-prod.sh .env.prod",
     "db:migrate": "pnpm --filter server db:migrate",
     "db:reset": "bash ./scripts/db/reset.sh",
     "db:seed": "bash ./scripts/db/seed.sh",
@@ -46,8 +51,8 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.1.0",
-    "prettier": "^3.6.2"
+    "lint-staged": "^16.3.2",
+    "prettier": "^3.8.1"
   },
   "lint-staged": {
     "*.{md,json,yml,yaml}": [

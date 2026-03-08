@@ -39,11 +39,7 @@ describe('CbzFormatWriter', () => {
     mockBuildComicInfoXml.mockReturnValue('<ComicInfo><Title>Dune</Title></ComicInfo>');
     mockWriteComicInfoToZip.mockResolvedValue(undefined);
 
-    const result = await writer.write(
-      '/book.cbz',
-      { title: 'Dune', tags: ['classic'] },
-      { fieldMask: new Set(['title', 'tags']), dryRun: false },
-    );
+    const result = await writer.write('/book.cbz', { title: 'Dune', tags: ['classic'] }, { fieldMask: new Set(['title', 'tags']), dryRun: false });
 
     expect(mockReadComicInfoFromZip).toHaveBeenCalledWith('/book.cbz');
     expect(mockBuildComicInfoXml).toHaveBeenCalledWith('<ComicInfo/>', { title: 'Dune', tags: ['classic'] }, new Set(['title', 'tags']));

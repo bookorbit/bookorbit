@@ -84,9 +84,9 @@ export const koboReadingStates = pgTable(
     statusInfo: jsonb('status_info'),
     progressSyncedAt: timestamp('progress_synced_at'),
     updatedAt: timestamp('updated_at')
-    .defaultNow()
-    .notNull()
-    .$onUpdateFn(() => new Date()),
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.bookId)],
 );

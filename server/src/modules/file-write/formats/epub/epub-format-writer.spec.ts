@@ -53,17 +53,10 @@ describe('EpubFormatWriter', () => {
 
     const coverBytes = Buffer.from('cover');
 
-    const result = await writer.write(
-      '/book.epub',
-      { title: 'Dune', coverBytes },
-      { fieldMask: new Set(['title', 'coverBytes']), dryRun: false },
-    );
+    const result = await writer.write('/book.epub', { title: 'Dune', coverBytes }, { fieldMask: new Set(['title', 'coverBytes']), dryRun: false });
 
     expect(mockCoverLocate).toHaveBeenCalledWith('<package />', 'OPS/');
-    expect(mockPatch).toHaveBeenCalledWith(
-      '/book.epub',
-      expect.any(Map),
-    );
+    expect(mockPatch).toHaveBeenCalledWith('/book.epub', expect.any(Map));
 
     const patches = mockPatch.mock.calls[0][1];
     expect(patches.get('OPS/content.opf')).toEqual(Buffer.from('<package>new</package>'));
@@ -83,11 +76,7 @@ describe('EpubFormatWriter', () => {
 
     const coverBytes = Buffer.from([1, 2, 3]);
 
-    await writer.write(
-      '/book.epub',
-      { title: 'Dune', coverBytes },
-      { fieldMask: new Set(['title', 'coverBytes']), dryRun: false },
-    );
+    await writer.write('/book.epub', { title: 'Dune', coverBytes }, { fieldMask: new Set(['title', 'coverBytes']), dryRun: false });
 
     expect(mockCoverInject).toHaveBeenCalledWith('<package>new</package>', 'OPS/', coverBytes);
 

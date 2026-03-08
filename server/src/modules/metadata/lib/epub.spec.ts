@@ -13,7 +13,7 @@ function zipFile(path: string, content: string | Buffer) {
   const buf = typeof content === 'string' ? Buffer.from(content) : content;
   return {
     path,
-    buffer: async () => buf,
+    buffer: () => Promise.resolve(buf),
   };
 }
 
@@ -33,7 +33,20 @@ describe('extractEpubMetadata', () => {
       files: [zipFile('META-INF/container.xml', containerXml), zipFile('OPS/content.opf', '<package/>')],
     });
 
-    mockParseOpf.mockReturnValue({ title: 'Dune', subtitle: null, description: null, isbn10: null, isbn13: null, publisher: null, publishedYear: null, language: null, seriesName: null, seriesIndex: null, authors: [], tags: [] });
+    mockParseOpf.mockReturnValue({
+      title: 'Dune',
+      subtitle: null,
+      description: null,
+      isbn10: null,
+      isbn13: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      tags: [],
+    });
 
     await expect(extractEpubMetadata('/books/dune.epub')).resolves.toEqual(expect.objectContaining({ title: 'Dune' }));
   });
@@ -45,7 +58,20 @@ describe('extractEpubMetadata', () => {
       files: [zipFile('META-INF/container.xml', containerXml), zipFile('OPS/content.opf', '<package/>')],
     });
 
-    mockParseOpf.mockReturnValue({ title: 'Leading Slash', subtitle: null, description: null, isbn10: null, isbn13: null, publisher: null, publishedYear: null, language: null, seriesName: null, seriesIndex: null, authors: [], tags: [] });
+    mockParseOpf.mockReturnValue({
+      title: 'Leading Slash',
+      subtitle: null,
+      description: null,
+      isbn10: null,
+      isbn13: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      tags: [],
+    });
 
     await expect(extractEpubMetadata('/books/x.epub')).resolves.toEqual(expect.objectContaining({ title: 'Leading Slash' }));
   });

@@ -113,11 +113,7 @@ describe('UserService', () => {
   it('assignRole allows superuser-role assignment for manage_roles users', async () => {
     (db.query.roles.findFirst as jest.Mock).mockResolvedValue({ id: 9, isSuperuser: true });
 
-    await service.assignRole(
-      2,
-      9,
-      reqUser({ roles: [{ isSuperuser: false, permissions: [{ name: 'manage_roles' }] }] }),
-    );
+    await service.assignRole(2, 9, reqUser({ roles: [{ isSuperuser: false, permissions: [{ name: 'manage_roles' }] }] }));
 
     expect(userRepo.assignRole).toHaveBeenCalledWith(2, 9);
   });
@@ -143,6 +139,8 @@ describe('UserService', () => {
   it('adminResetPassword throws when target user does not exist', async () => {
     userRepo.findByIdWithRolesAndPermissions.mockResolvedValue(null);
 
-    await expect(service.adminResetPassword(9, reqUser({ roles: [{ isSuperuser: true, permissions: [] }] }))).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.adminResetPassword(9, reqUser({ roles: [{ isSuperuser: true, permissions: [] }] }))).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

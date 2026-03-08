@@ -154,7 +154,7 @@ export class FileEventProcessorService {
 
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      const fullPath = join(entry.parentPath ?? entry.path, entry.name);
+      const fullPath = join(entry.parentPath ?? dirPath, entry.name);
       const { role } = classifyFile(fullPath);
       if (role !== 'primary') continue;
 

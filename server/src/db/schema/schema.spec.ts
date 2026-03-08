@@ -45,16 +45,16 @@ describe('Database Schema Logic', () => {
     });
 
     it('fromDriver should handle null/undefined safely', () => {
-      // @ts-ignore
+      // @ts-expect-error: testing invalid null input
       expect(embeddingColumn.mapFromDriverValue(null)).toEqual([]);
-      // @ts-ignore
+      // @ts-expect-error: testing invalid undefined input
       expect(embeddingColumn.mapFromDriverValue(undefined)).toEqual([]);
     });
 
     it('fromDriver should handle non-string inputs safely', () => {
-      // @ts-ignore
+      // @ts-expect-error: testing invalid number input
       expect(embeddingColumn.mapFromDriverValue(123)).toEqual([]);
-      // @ts-ignore
+      // @ts-expect-error: testing invalid object input
       expect(embeddingColumn.mapFromDriverValue({})).toEqual([]);
     });
   });

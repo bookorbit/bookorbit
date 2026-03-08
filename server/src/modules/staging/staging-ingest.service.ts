@@ -145,7 +145,7 @@ export class StagingIngestService {
           : { status: 'ready' as const };
       await this.repo.update(fileId, updates);
     } catch (err) {
-      this.logger.warn(`Auto-fetch metadata failed for staging file ${fileId}: ${err instanceof Error ? err.message : err}`);
+      this.logger.warn(`Auto-fetch metadata failed for staging file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);
       await this.repo.update(fileId, { status: 'ready' });
     }
   }

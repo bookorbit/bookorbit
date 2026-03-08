@@ -29,9 +29,7 @@ export class UploadValidatorService {
    * Preserves the original extension.
    */
   sanitizeFilename(raw: string): string {
-    const sanitized = raw
-      .replace(/[/\\:*?"<>|\0]/g, '_')
-      .trim();
+    const sanitized = raw.replace(/[/\\:*?"<>|\0]/g, '_').trim();
 
     if (!sanitized) return 'upload';
 
@@ -44,7 +42,10 @@ export class UploadValidatorService {
     if (!ext) return sanitized.slice(0, 255);
     if (ext.length >= 255) return sanitized.slice(0, 255);
 
-    const stem = sanitized.slice(0, -ext.length).slice(0, 255 - ext.length).trim();
+    const stem = sanitized
+      .slice(0, -ext.length)
+      .slice(0, 255 - ext.length)
+      .trim();
     return `${stem || 'upload'}${ext}`;
   }
 }

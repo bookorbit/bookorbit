@@ -276,7 +276,7 @@ export class StagingFinalizeService implements OnModuleInit {
         const bytes = await readFile(row.coverPath);
         await this.metadataService.saveExtractedCoverBytes(bookId, bytes);
       } catch (err) {
-        this.logger.warn(`Failed to copy staging cover to book ${bookId}: ${err instanceof Error ? err.message : err}`);
+        this.logger.warn(`Failed to copy staging cover to book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 

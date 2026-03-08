@@ -139,9 +139,9 @@ describe('PdfFormatWriter', () => {
 
     const writer = new PdfFormatWriter();
 
-    await expect(
-      writer.write('/books/dune.pdf', { title: 'Dune' }, { fieldMask: new Set(['title']), dryRun: false }),
-    ).rejects.toThrow('permission denied');
+    await expect(writer.write('/books/dune.pdf', { title: 'Dune' }, { fieldMask: new Set(['title']), dryRun: false })).rejects.toThrow(
+      'permission denied',
+    );
 
     expect(mockUnlink).toHaveBeenCalledWith('/books/.tmp-abc-uuid.pdf');
   });

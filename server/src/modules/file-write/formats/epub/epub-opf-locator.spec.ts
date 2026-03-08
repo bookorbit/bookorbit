@@ -20,11 +20,11 @@ describe('locateOpf', () => {
       files: [
         {
           path: 'META-INF/container.xml',
-          buffer: jest.fn().mockResolvedValue(
-            Buffer.from(
-              `<?xml version="1.0"?><container><rootfiles><rootfile full-path="OPS/content.opf"/></rootfiles></container>`,
+          buffer: jest
+            .fn()
+            .mockResolvedValue(
+              Buffer.from(`<?xml version="1.0"?><container><rootfiles><rootfile full-path="OPS/content.opf"/></rootfiles></container>`),
             ),
-          ),
         },
       ],
     } as never);

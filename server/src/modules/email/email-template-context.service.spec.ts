@@ -7,7 +7,6 @@ import { DB } from '../../db';
 describe('EmailTemplateContextService', () => {
   let service: EmailTemplateContextService;
   let db: any;
-  let config: ConfigService;
 
   beforeEach(async () => {
     db = {
@@ -28,7 +27,6 @@ describe('EmailTemplateContextService', () => {
     }).compile();
 
     service = module.get<EmailTemplateContextService>(EmailTemplateContextService);
-    config = module.get<ConfigService>(ConfigService);
   });
 
   it('should build context for a book', async () => {
@@ -47,24 +45,22 @@ describe('EmailTemplateContextService', () => {
     // Authors and tags use orderBy or innerJoin and don't have limit
     (db.orderBy as jest.Mock).mockResolvedValueOnce(mockAuthors);
     (db.where as jest.Mock).mockImplementation(function (this: any) {
-       if (db.where.mock.calls.length === 4) { // tags call
-          return Promise.resolve(mockTags);
-       }
-       return this;
+      if (db.where.mock.calls.length === 4) {
+        // tags call
+        return Promise.resolve(mockTags);
+      }
+      return this;
     });
 
     // Actually, it's cleaner to mock each stage
-    db.limit = jest.fn()
-      .mockResolvedValueOnce([mockBook])
-      .mockResolvedValueOnce([mockMeta])
-      .mockResolvedValueOnce([mockFile]);
+    db.limit = jest.fn().mockResolvedValueOnce([mockBook]).mockResolvedValueOnce([mockMeta]).mockResolvedValueOnce([mockFile]);
 
     db.orderBy = jest.fn().mockResolvedValueOnce(mockAuthors);
-    
+
     // For tags, it's select().from().innerJoin().where() -> no limit, no orderBy
     // We need to make where() return mockTags for the 4th call
     let callCount = 0;
-    db.where = jest.fn().mockImplementation(function(this: any) {
+    db.where = jest.fn().mockImplementation(function (this: any) {
       callCount++;
       if (callCount === 4) return Promise.resolve(mockTags);
       return this;

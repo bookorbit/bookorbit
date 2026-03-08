@@ -3,6 +3,7 @@
 **/dist
 **/*.log
 .env
+.env.prod
 client/.env
 server/.env
 docker/postgres/data

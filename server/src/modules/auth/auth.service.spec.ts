@@ -355,9 +355,7 @@ describe('AuthService', () => {
         passwordHash: 'hash',
       });
 
-      await expect(service.changePassword(1, { currentPassword: 'old', newPassword: 'New@1234' }, makeReply())).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.changePassword(1, { currentPassword: 'old', newPassword: 'New@1234' }, makeReply())).rejects.toThrow(BadRequestException);
     });
   });
 

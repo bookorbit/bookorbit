@@ -10,7 +10,7 @@ function zipFile(path: string, content: string | Buffer) {
   const buf = typeof content === 'string' ? Buffer.from(content) : content;
   return {
     path,
-    buffer: async () => buf,
+    buffer: () => Promise.resolve(buf),
   };
 }
 
@@ -29,11 +29,7 @@ describe('extractEpubCover', () => {
     const cover = Buffer.from([1, 2, 3]);
 
     mockOpenFile.mockResolvedValue({
-      files: [
-        zipFile('META-INF/container.xml', containerXml),
-        zipFile('OPS/content.opf', opfXml),
-        zipFile('OPS/images/cover.jpg', cover),
-      ],
+      files: [zipFile('META-INF/container.xml', containerXml), zipFile('OPS/content.opf', opfXml), zipFile('OPS/images/cover.jpg', cover)],
     });
 
     await expect(extractEpubCover('/book.epub')).resolves.toEqual(cover);

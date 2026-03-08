@@ -12,7 +12,7 @@ export const DB = Symbol('DB');
     {
       provide: DB,
       inject: [ConfigService],
-      useFactory: async (config: ConfigService) => {
+      useFactory: (config: ConfigService) => {
         const pool = new Pool({
           connectionString: config.get('db.url'),
           max: 20,
@@ -20,7 +20,6 @@ export const DB = Symbol('DB');
           connectionTimeoutMillis: 5_000,
           statement_timeout: 30_000,
         });
-        await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
         return drizzle(pool, { schema });
       },
     },

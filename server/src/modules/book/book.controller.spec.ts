@@ -216,9 +216,9 @@ describe('BookController', () => {
   it('streams server-sent events for bulk metadata refresh progress', async () => {
     const { controller, bookService } = makeController();
     const { reply, raw } = makeReply();
-    bookService.bulkRefreshMetadata.mockImplementation(async (_bookIds: number[], _user: RequestUser, onProgress: (bookId: number) => void) => {
+    bookService.bulkRefreshMetadata.mockImplementation((_bookIds: number[], _user: RequestUser, onProgress: (bookId: number) => void) => {
       onProgress(9);
-      return { processed: 1, failed: 0 };
+      return Promise.resolve({ processed: 1, failed: 0 });
     });
 
     await controller.bulkRefreshMetadata({ bookIds: [9] }, makeUser(), reply);

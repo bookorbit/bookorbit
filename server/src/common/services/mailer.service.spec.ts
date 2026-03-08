@@ -65,9 +65,7 @@ describe('MailerService', () => {
     await expect(service.sendPasswordReset('user@example.com', 'Alice', 'a+b&c/d==')).resolves.toBeUndefined();
 
     expect(createTransportMock).not.toHaveBeenCalled();
-    expect(logger.log).toHaveBeenCalledWith(
-      '[DEV] Password reset URL for Alice: http://app.local/reset-password?token=a%2Bb%26c%2Fd%3D%3D',
-    );
+    expect(logger.log).toHaveBeenCalledWith('[DEV] Password reset URL for Alice: http://app.local/reset-password?token=a%2Bb%26c%2Fd%3D%3D');
   });
 
   it('sends password reset email with expected payload and no DEV log in production', async () => {

@@ -12,7 +12,7 @@ describe('FileLockService', () => {
       return 1;
     });
 
-    const second = lock.withLock('/tmp/a', async () => {
+    const second = lock.withLock('/tmp/a', () => {
       sequence.push('second:start');
       sequence.push('second:end');
       return 2;
@@ -27,10 +27,10 @@ describe('FileLockService', () => {
     const starts: string[] = [];
 
     await Promise.all([
-      lock.withLock('/tmp/a', async () => {
+      lock.withLock('/tmp/a', () => {
         starts.push('a');
       }),
-      lock.withLock('/tmp/b', async () => {
+      lock.withLock('/tmp/b', () => {
         starts.push('b');
       }),
     ]);
@@ -43,13 +43,13 @@ describe('FileLockService', () => {
     const lock = new FileLockService();
 
     await expect(
-      lock.withLock('/tmp/fail', async () => {
+      lock.withLock('/tmp/fail', () => {
         throw new Error('boom');
       }),
     ).rejects.toThrow('boom');
 
     await expect(
-      lock.withLock('/tmp/fail', async () => {
+      lock.withLock('/tmp/fail', () => {
         return 'ok';
       }),
     ).resolves.toBe('ok');

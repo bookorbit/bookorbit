@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailRecipientService } from './email-recipient.service';
 import { EmailRecipientRepository } from './email-recipient.repository';

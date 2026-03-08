@@ -7,9 +7,6 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
 import { Readable } from 'stream';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
 import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
@@ -20,15 +17,6 @@ import fastifyCompress from '@fastify/compress';
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
 
 async function bootstrap() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 3,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
-  await migrate(drizzle(pool), { migrationsFolder: join(__dirname, '..', 'src', 'db', 'migrations') });
-  await pool.end();
-
   const adapter = new FastifyAdapter({ logger: false });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
   app.useLogger(app.get(Logger));
@@ -74,7 +62,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  await app.register(fastifyHelmet, {
+  await app.register(fastifyHelmet as never, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -89,15 +77,15 @@ async function bootstrap() {
     },
   });
 
-  await app.register(fastifyCompress, { encodings: ['gzip', 'br'] });
+  await app.register(fastifyCompress as never, { encodings: ['gzip', 'br'] });
 
-  await app.register(fastifyCookie);
-  await app.register(fastifyMultipart, { limits: { fileSize: MAX_COVER_BYTES } });
+  await app.register(fastifyCookie as never);
+  await app.register(fastifyMultipart as never, { limits: { fileSize: MAX_COVER_BYTES } });
 
   // Rate limit unauthenticated requests only (brute-force protection on public endpoints).
   // Bypass for: JWT cookie (web app), Authorization header (OPDS Basic Auth),
   // and Kobo device endpoints (token-authenticated via URL).
-  await app.register(fastifyRateLimit, {
+  await app.register(fastifyRateLimit as never, {
     max: 100,
     timeWindow: '1 minute',
     allowList: (req: { cookies?: { access_token?: string }; headers?: { authorization?: string }; url?: string }) =>
@@ -115,7 +103,7 @@ async function bootstrap() {
   }
 
   if (process.env.NODE_ENV === 'production') {
-    await app.register(fastifyStatic, {
+    await app.register(fastifyStatic as never, {
       root: join(__dirname, '..', 'public'),
       prefix: '/',
       decorateReply: false,

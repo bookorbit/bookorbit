@@ -17,10 +17,7 @@ describe('FileWriteRepository', () => {
     const c2 = chain([]);
 
     const db = {
-      select: jest
-        .fn()
-        .mockReturnValueOnce(c1)
-        .mockReturnValueOnce(c2),
+      select: jest.fn().mockReturnValueOnce(c1).mockReturnValueOnce(c2),
     };
 
     const repo = new FileWriteRepository(db as never);
@@ -78,12 +75,7 @@ describe('FileWriteRepository', () => {
     };
 
     const db = {
-      select: jest
-        .fn()
-        .mockReturnValueOnce(metaChain)
-        .mockReturnValueOnce(authorChain)
-        .mockReturnValueOnce(genreChain)
-        .mockReturnValueOnce(tagChain),
+      select: jest.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain).mockReturnValueOnce(genreChain).mockReturnValueOnce(tagChain),
     };
 
     const repo = new FileWriteRepository(db as never);

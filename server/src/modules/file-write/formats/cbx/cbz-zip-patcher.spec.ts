@@ -81,10 +81,7 @@ describe('cbz-zip-patcher', () => {
 
   it('readComicInfoFromZip finds comicinfo case-insensitively in root or nested paths', async () => {
     mockOpenFile.mockResolvedValue({
-      files: [
-        { path: 'pages/001.jpg' },
-        { path: 'META/ComicInfo.XML', buffer: jest.fn().mockResolvedValue(Buffer.from('<ComicInfo/>')) },
-      ],
+      files: [{ path: 'pages/001.jpg' }, { path: 'META/ComicInfo.XML', buffer: jest.fn().mockResolvedValue(Buffer.from('<ComicInfo/>')) }],
     } as never);
 
     await expect(readComicInfoFromZip('/book.cbz')).resolves.toBe('<ComicInfo/>');

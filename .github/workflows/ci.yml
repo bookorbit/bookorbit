@@ -1,0 +1,218 @@
+name: CI
+run-name: >-
+  ${{ (github.event_name == 'push' && format('CI - {0} ({1})', github.event.head_commit.message, github.ref_name)) || (github.event_name == 'pull_request' && format('CI - PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title)) || 'CI - manual' }}
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
+  PNPM_VERSION: "10"
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+
+  detect-changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    needs: [dependency-review]
+    timeout-minutes: 10
+    if: always() && (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped')
+    outputs:
+      server: ${{ steps.manual.outputs.server || steps.changes.outputs.server }}
+      client: ${{ steps.manual.outputs.client || steps.changes.outputs.client }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Manual dispatch runs all scopes
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo "server=true" >> "$GITHUB_OUTPUT"
+          echo "client=true" >> "$GITHUB_OUTPUT"
+
+      # For push events dorny/paths-filter diffs github.event.before..github.sha.
+      # New-branch pushes (before = 0000...) are handled by treating all files as changed.
+      # Force-push edge cases (before SHA no longer reachable) may mark all files changed too.
+      - name: Compute changed scopes
+        id: changes
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            server:
+              - 'server/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/actions/setup-node-pnpm/action.yml'
+              - '.github/workflows/ci.yml'
+            client:
+              - 'client/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/actions/setup-node-pnpm/action.yml'
+              - '.github/workflows/ci.yml'
+
+      - name: Print change scope
+        shell: bash
+        run: |
+          echo "server=${{ steps.manual.outputs.server || steps.changes.outputs.server }}"
+          echo "client=${{ steps.manual.outputs.client || steps.changes.outputs.client }}"
+
+  checks:
+    name: ${{ matrix.check }} (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    needs: [dependency-review, detect-changes]
+    timeout-minutes: 20
+    # matrix context is not available in job-level if; per-package change filtering
+    # is done via the has-changes gate step below.
+    if: >
+      always() &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
+      needs.detect-changes.result == 'success'
+    strategy:
+      # All matrix cells run independently so all failures are visible in one pass.
+      fail-fast: false
+      matrix:
+        package: [server, client]
+        check: [lint, typecheck, test]
+    permissions:
+      contents: read
+      # checks: write is only used by publish-unit-test-result-action in test matrix cells.
+      # Lint and typecheck cells receive this permission too due to the shared job definition.
+      checks: write
+    steps:
+      - name: Check for package changes
+        id: has-changes
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+          SERVER_CHANGED: ${{ needs.detect-changes.outputs.server }}
+          CLIENT_CHANGED: ${{ needs.detect-changes.outputs.client }}
+        run: |
+          if [[ "$PACKAGE" == "server" && "$SERVER_CHANGED" == "true" ]] || \
+             [[ "$PACKAGE" == "client" && "$CLIENT_CHANGED" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.has-changes.outputs.run == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js and pnpm
+        if: steps.has-changes.outputs.run == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+
+      - name: Run lint
+        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'lint'
+        shell: bash
+        run: pnpm --filter "${{ matrix.package }}" lint:check
+
+      - name: Run typecheck
+        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'typecheck'
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          if [[ "$PACKAGE" == "server" ]]; then
+            pnpm --filter server type-check
+          else
+            pnpm --filter @projectx/types build
+            pnpm run typecheck:client:baseline
+          fi
+
+      - name: Prepare test report directory
+        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'test'
+        shell: bash
+        run: mkdir -p "$GITHUB_WORKSPACE/test-results/${{ matrix.package }}"
+
+      - name: Run tests
+        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'test'
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+          JUNIT_OUTPUT: ${{ github.workspace }}/test-results/${{ matrix.package }}/junit.xml
+        run: |
+          if [[ "$PACKAGE" == "server" ]]; then
+            JEST_JUNIT_OUTPUT_FILE="$JUNIT_OUTPUT" pnpm --filter server exec jest --ci --reporters=default --reporters=jest-junit
+          else
+            pnpm --filter client exec vitest --run --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
+          fi
+
+      - name: Publish test report annotations
+        if: >
+          always() &&
+          steps.has-changes.outputs.run == 'true' &&
+          matrix.check == 'test' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2
+        with:
+          check_name: ${{ matrix.package == 'server' && 'Server Unit Tests' || 'Client Unit Tests' }}
+          files: ${{ format('test-results/{0}/junit.xml', matrix.package) }}
+          fail_on: nothing
+          comment_mode: off
+
+      - name: Upload test report artifact
+        if: >
+          always() &&
+          steps.has-changes.outputs.run == 'true' &&
+          matrix.check == 'test' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: test-report-${{ matrix.package }}
+          path: test-results/${{ matrix.package }}
+          retention-days: 7
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [dependency-review, detect-changes, checks]
+    timeout-minutes: 5
+    if: always()
+    steps:
+      - name: Fail if any quality job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more quality jobs failed."
+          exit 1
+
+      - name: Quality checks complete
+        run: |
+          echo "dependency-review=${{ needs.dependency-review.result }}"
+          echo "detect-changes=${{ needs.detect-changes.result }}"
+          echo "checks=${{ needs.checks.result }}"

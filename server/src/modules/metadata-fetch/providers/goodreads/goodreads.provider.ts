@@ -86,7 +86,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
       }
       return res.text();
     } catch (err) {
-      this.logger.warn(`Goodreads fetch failed for ${url}: ${err}`);
+      this.logger.warn(`Goodreads fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
   }

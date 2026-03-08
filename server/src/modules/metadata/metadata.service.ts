@@ -55,7 +55,7 @@ export class MetadataService {
 
       this.logger.debug(`Online cover saved for book ${bookId}`);
     } catch (err) {
-      this.logger.warn(`Cover download failed for book ${bookId}: ${err}`);
+      this.logger.warn(`Cover download failed for book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -233,7 +233,7 @@ export class MetadataService {
         this.logger.debug(`Cover saved for book ${bookId}: ${saved}`);
       }
     } catch (err) {
-      this.logger.warn(`Cover extraction failed for book ${bookId}: ${err}`);
+      this.logger.warn(`Cover extraction failed for book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -249,7 +249,7 @@ export class MetadataService {
       await this.setCoverSourceIfUnset(bookId, 'extracted');
       this.logger.debug(`PDF cover saved for book ${bookId}`);
     } catch (err) {
-      this.logger.warn(`PDF cover save failed for book ${bookId}: ${err}`);
+      this.logger.warn(`PDF cover save failed for book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

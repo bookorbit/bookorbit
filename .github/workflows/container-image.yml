@@ -1,0 +1,120 @@
+name: Container Image
+run-name: ${{ github.event_name == 'workflow_run' && format('Image - {0} ({1})', github.event.workflow_run.head_commit.message, github.event.workflow_run.head_branch) || format('Image - {0}', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  # Use the commit SHA across all trigger types so a workflow_run completion and a
+  # simultaneous tag push for the same commit share one concurrency slot and cancel correctly.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  image:
+    name: Build and Push Image
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Resolve source and image tags
+        id: vars
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GH_REF: ${{ github.ref }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # SHA resolution mirrors the concurrency group logic at the top of this workflow.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$GH_REF" != "refs/heads/main" ]]; then
+            echo "workflow_dispatch is only supported from main."
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            SHA="$WORKFLOW_RUN_HEAD_SHA"
+          else
+            SHA="$GH_SHA"
+          fi
+
+          SHORT_SHA="${SHA:0:12}"
+          IMAGE="$REGISTRY/$IMAGE_NAME"
+
+          PRIMARY_TAG="$GH_REF_NAME"
+
+          echo "checkout_ref=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "${IMAGE}:${PRIMARY_TAG}" >> "$GITHUB_OUTPUT"
+          echo "${IMAGE}:sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ steps.vars.outputs.checkout_ref }}
+
+      - name: Verify CI succeeded for tag commit
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Checking CI status for commit ${COMMIT_SHA}..."
+          success_count=$(gh api --paginate \
+            "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${COMMIT_SHA}&status=completed" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length' \
+            | awk '{sum += $1} END {print sum}')
+          if [[ "${success_count:-0}" -lt 1 ]]; then
+            echo "No successful CI run found for tag commit ${COMMIT_SHA}. Refusing to publish image."
+            exit 1
+          fi
+          echo "CI verification passed: ${success_count} successful run(s) found."
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build_push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.vars.outputs.tags }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

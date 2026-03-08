@@ -502,7 +502,7 @@ export class BookService {
         processed++;
         onProgress?.(id);
       } catch (err) {
-        this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err}`);
+        this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err instanceof Error ? err.message : String(err)}`);
         failed++;
         onProgress?.(id);
       }

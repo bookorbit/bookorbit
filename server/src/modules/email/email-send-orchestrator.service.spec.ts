@@ -19,11 +19,8 @@ jest.mock('fs');
 describe('EmailSendOrchestrator', () => {
   let orchestrator: EmailSendOrchestrator;
   let providerResolver: EmailProviderResolver;
-  let fileSelector: EmailFileSelector;
   let recipientService: EmailRecipientService;
   let groupService: EmailRecipientGroupService;
-  let templateService: EmailTemplateService;
-  let templateContextService: EmailTemplateContextService;
   let preferencesService: EmailPreferencesService;
   let sendLogService: EmailSendLogService;
   let transportService: EmailTransportService;
@@ -42,7 +39,14 @@ describe('EmailSendOrchestrator', () => {
     roles: [],
   };
 
-  const mockRecipient = { id: 10, email: 'recipient@test.com', name: 'Recipient', deviceType: 'kindle', preferredFormat: 'mobi', defaultTemplateId: null };
+  const mockRecipient = {
+    id: 10,
+    email: 'recipient@test.com',
+    name: 'Recipient',
+    deviceType: 'kindle',
+    preferredFormat: 'mobi',
+    defaultTemplateId: null,
+  };
   const mockFile = { id: 100, absolutePath: '/path/to/book.mobi', format: 'MOBI', relPath: 'Books/book.mobi' };
   const mockTemplate = { id: 200, subject: 'Subject {{title}}', bodyText: 'Body' };
   const mockProvider = { config: { host: 'smtp.test.com' }, providerId: 300 };
@@ -101,11 +105,8 @@ describe('EmailSendOrchestrator', () => {
 
     orchestrator = module.get<EmailSendOrchestrator>(EmailSendOrchestrator);
     providerResolver = module.get<EmailProviderResolver>(EmailProviderResolver);
-    fileSelector = module.get<EmailFileSelector>(EmailFileSelector);
     recipientService = module.get<EmailRecipientService>(EmailRecipientService);
     groupService = module.get<EmailRecipientGroupService>(EmailRecipientGroupService);
-    templateService = module.get<EmailTemplateService>(EmailTemplateService);
-    templateContextService = module.get<EmailTemplateContextService>(EmailTemplateContextService);
     preferencesService = module.get<EmailPreferencesService>(EmailPreferencesService);
     sendLogService = module.get<EmailSendLogService>(EmailSendLogService);
     transportService = module.get<EmailTransportService>(EmailTransportService);
@@ -171,9 +172,11 @@ describe('EmailSendOrchestrator', () => {
       const result = await orchestrator.resend(400, mockUser);
 
       expect(result.queued).toBe(1);
-      expect(sendLogService.create).toHaveBeenCalledWith(expect.objectContaining({
-        toEmail: 'resend@test.com',
-      }));
+      expect(sendLogService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'resend@test.com',
+        }),
+      );
     });
   });
 
@@ -191,11 +194,13 @@ describe('EmailSendOrchestrator', () => {
 
       await (orchestrator as any).dispatchSend(400, {}, task, file, 'Subject', 'Body', 0);
 
-      expect(mockTransporter.sendMail).toHaveBeenCalledWith(expect.objectContaining({
-        to: 'test@test.com',
-        subject: 'Subject',
-        text: 'Body',
-      }));
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'test@test.com',
+          subject: 'Subject',
+          text: 'Body',
+        }),
+      );
       expect(sendLogService.markSent).toHaveBeenCalledWith(400);
     });
 
@@ -221,9 +226,11 @@ describe('EmailSendOrchestrator', () => {
 
       await (orchestrator as any).dispatchSend(400, {}, task, file, 'Original', 'Body', 0);
 
-      expect(mockTransporter.sendMail).toHaveBeenCalledWith(expect.objectContaining({
-        subject: 'convert',
-      }));
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'convert',
+        }),
+      );
     });
 
     it('should use "convert" subject in resend if original was "convert"', async () => {
@@ -241,9 +248,11 @@ describe('EmailSendOrchestrator', () => {
 
       await orchestrator.resend(400, mockUser);
 
-      expect(sendLogService.create).toHaveBeenCalledWith(expect.objectContaining({
-        subject: 'convert',
-      }));
+      expect(sendLogService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'convert',
+        }),
+      );
     });
 
     it('should not retry if isFinal is true', async () => {

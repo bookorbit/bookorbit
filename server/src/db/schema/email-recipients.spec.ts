@@ -4,7 +4,15 @@ import { emailRecipientGroupMembers, emailRecipientGroups, emailRecipients } fro
 
 const fkByColumn = (table: unknown) => {
   const config = getTableConfig(table as never);
-  return new Map(config.foreignKeys.map((fk) => [fk.reference().columns.map((col) => col.name).join(','), fk]));
+  return new Map(
+    config.foreignKeys.map((fk) => [
+      fk
+        .reference()
+        .columns.map((col) => col.name)
+        .join(','),
+      fk,
+    ]),
+  );
 };
 
 describe('email-recipients schema', () => {

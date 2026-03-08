@@ -1,0 +1,60 @@
+name: Setup Node and pnpm
+description: Set up Node.js, activate pnpm via Corepack, and optionally install dependencies.
+
+inputs:
+  node-version:
+    description: Node.js version to install.
+    required: false
+    default: "24"
+  pnpm-version:
+    description: pnpm version to activate via Corepack.
+    required: false
+    default: "10"
+  install:
+    description: Whether to run pnpm install.
+    required: false
+    default: "true"
+  cache:
+    description: Whether to enable pnpm dependency caching.
+    required: false
+    default: "true"
+  cache-dependency-path:
+    description: Path(s) used to generate the cache key.
+    required: false
+    default: "pnpm-lock.yaml"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Enable Corepack and activate pnpm
+      shell: bash
+      run: |
+        corepack enable
+        corepack prepare "pnpm@${{ inputs.pnpm-version }}" --activate
+
+    # pnpm must be on PATH before its store path can be resolved for cache keying,
+    # so caching is configured in a separate step after Corepack activates pnpm.
+    - name: Get pnpm store directory
+      if: ${{ inputs.cache == 'true' }}
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm store
+      if: ${{ inputs.cache == 'true' }}
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: ${{ runner.os }}-pnpm-${{ inputs.pnpm-version }}-store-${{ hashFiles(inputs.cache-dependency-path) }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-${{ inputs.pnpm-version }}-store-
+
+    - name: Install dependencies
+      if: ${{ inputs.install == 'true' }}
+      shell: bash
+      run: pnpm install --frozen-lockfile

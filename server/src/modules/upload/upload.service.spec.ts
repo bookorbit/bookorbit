@@ -95,7 +95,15 @@ describe('UploadService', () => {
 
     expect(result).toEqual({ bookId: 99, filename: 'Dune.epub', format: 'epub', sizeBytes: 456 });
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Frank Herbert/Dune.epub');
-    expect(processor.createBookRecord).toHaveBeenCalledWith(1, 2, '/library/Frank Herbert', '/library/Frank Herbert/Dune.epub', 'Frank Herbert/Dune.epub', 'epub', 456);
+    expect(processor.createBookRecord).toHaveBeenCalledWith(
+      1,
+      2,
+      '/library/Frank Herbert',
+      '/library/Frank Herbert/Dune.epub',
+      'Frank Herbert/Dune.epub',
+      'epub',
+      456,
+    );
     expect(processor.extractMetadataAsync).toHaveBeenCalledWith(99, '/library/Frank Herbert/Dune.epub', 'epub');
   });
 
@@ -141,9 +149,7 @@ describe('UploadService', () => {
   });
 
   it('rejects uploads when no default folder exists for the library', async () => {
-    db.select
-      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
-      .mockReturnValueOnce(selectChain([]));
+    db.select.mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }])).mockReturnValueOnce(selectChain([]));
 
     await expect(service.upload(1, undefined, 'raw.epub', {} as any, user)).rejects.toBeInstanceOf(BadRequestException);
     expect(storage.streamToTemp).not.toHaveBeenCalled();

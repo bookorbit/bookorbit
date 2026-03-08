@@ -98,7 +98,10 @@ describe('LibraryService', () => {
       }),
     );
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(5);
-    expect(result.folders).toEqual([{ id: 11, path: '/a' }, { id: 12, path: '/b' }]);
+    expect(result.folders).toEqual([
+      { id: 11, path: '/a' },
+      { id: 12, path: '/b' },
+    ]);
   });
 
   it('create rejects duplicate library names', async () => {
@@ -146,14 +149,14 @@ describe('LibraryService', () => {
   it('prescan counts primary files recursively and flags overlapping paths', async () => {
     libraryRepo.findAllFolderPaths.mockResolvedValue([{ path: '/books/existing', libraryName: 'Existing Library' }]);
 
-    mockReaddir.mockImplementation(async (path: Parameters<typeof readdir>[0]) => {
+    mockReaddir.mockImplementation((path: Parameters<typeof readdir>[0]) => {
       if (path === '/books/new') {
-        return [dirent('a.epub', 'file'), dirent('.hidden.epub', 'file'), dirent('sub', 'dir')] as any;
+        return Promise.resolve([dirent('a.epub', 'file'), dirent('.hidden.epub', 'file'), dirent('sub', 'dir')] as any);
       }
       if (path === '/books/new/sub') {
-        return [dirent('b.pdf', 'file'), dirent('note.txt', 'file')] as any;
+        return Promise.resolve([dirent('b.pdf', 'file'), dirent('note.txt', 'file')] as any);
       }
-      return [] as any;
+      return Promise.resolve([] as any);
     });
 
     mockIsPrimaryFormat.mockImplementation((path: string) => path.endsWith('.epub') || path.endsWith('.pdf'));

@@ -25,7 +25,9 @@ describe('UploadController', () => {
       file: jest.fn().mockResolvedValue({ filename: 'a.epub', file: {} }),
     };
 
-    await expect(controller.uploadBook(1, 'abc', { id: 1, roles: [] } as any, req as any)).rejects.toThrow(new BadRequestException('Invalid folderId'));
+    await expect(controller.uploadBook(1, 'abc', { id: 1, roles: [] } as any, req as any)).rejects.toThrow(
+      new BadRequestException('Invalid folderId'),
+    );
   });
 
   it('passes parsed arguments to upload service and overrides multipart size limit', async () => {

@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, readdir, rm, stat } from 'fs/promises';
+import { readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -130,20 +130,23 @@ export class LibraryService {
 
     const results = await Promise.all(
       dto.paths.map(async (inputPath) => {
-        let accessible = false;
+        let accessible: boolean;
         let fileCount = 0;
         let overlapLibrary: string | undefined;
 
-        try {
-          await access(inputPath);
-          const s = await stat(inputPath);
-          if (!s.isDirectory()) {
-            return { path: inputPath, accessible: false, fileCount: 0, error: 'Not a directory' };
-          }
-          accessible = true;
-          fileCount = await countPrimaryFiles(inputPath);
-        } catch {
+        const s = await stat(inputPath).catch(() => null);
+        if (s === null) {
           accessible = false;
+        } else if (!s.isDirectory()) {
+          return { path: inputPath, accessible: false, fileCount: 0, error: 'Not a directory' };
+        } else {
+          accessible = true;
+          try {
+            fileCount = await countPrimaryFiles(inputPath);
+          } catch {
+            accessible = false;
+            fileCount = 0;
+          }
         }
 
         // Check if this path overlaps an existing library folder

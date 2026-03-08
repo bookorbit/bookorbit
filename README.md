@@ -72,8 +72,12 @@ projectx/
 │   └── types/          Shared TypeScript types (@projectx/types)
 ├── docker/
 │   └── postgres/       Postgres init scripts (extensions)
+├── docs/
+│   └── production.md   Production deploy/backup/restore runbook
 ├── local/              Local dev data (covers, docs) - gitignored
 ├── docker-compose.yml  Dev: runs Postgres only (app runs natively)
+├── docker-compose.prod.yml  Prod: app + Postgres + migration job
+├── .env.prod.example   Template env file for production compose
 ├── Dockerfile          Production multi-stage build
 └── Dockerfile.dev      Runs entire stack in Docker (not used for normal dev)
 ```
@@ -132,6 +136,16 @@ All commands run from the **repo root** unless noted otherwise.
 | `pnpm db:reset`                           | Reset schema, migrate, and seed          |
 | `pnpm --filter server db:generate <name>` | Generate a migration from schema changes |
 | `pnpm --filter server db:studio`          | Open Drizzle Studio (DB browser)         |
+
+### Production operations
+
+| Command                                    | Description                                  |
+| ------------------------------------------ | -------------------------------------------- |
+| `pnpm prod:up`                             | Start/update production compose stack        |
+| `pnpm prod:down`                           | Stop production compose stack                |
+| `pnpm db:backup:prod`                      | Create Postgres backup (`local/backups/`)    |
+| `pnpm db:restore:prod -- <file.dump>`      | Restore backup into production database      |
+| `pnpm db:restore:test:prod -- <file.dump>` | Restore into temp DB to validate backup file |
 
 ### Linting & formatting
 
@@ -214,6 +228,24 @@ Server environment is configured in `server/.env` (created from `.env.example` d
 | `BOOKS_PATH`             | `../local/data`                                        | App data directory for cover images (not where books live) |
 | `SMTP_*`                 | (empty)                                                | Optional SMTP config for password-reset emails             |
 | `APP_URL`                | `http://localhost:5173`                                | Client URL (used in emails)                                |
+
+## Production Deploy
+
+Production uses a separate compose file and env file:
+
+- Compose: `docker-compose.prod.yml`
+- Env file: `.env.prod` (from `.env.prod.example`)
+- Image source: immutable images built in CI (`.github/workflows/container-image.yml`)
+
+Quick start:
+
+```bash
+cp .env.prod.example .env.prod
+# edit .env.prod and set APP_IMAGE + secrets
+pnpm prod:up
+```
+
+Detailed runbook (deploy, backup, restore, restore drills): [docs/production.md](docs/production.md)
 
 ---
 
@@ -325,8 +357,9 @@ Make sure you're accessing the client at `http://localhost:5173` (not port 3000)
 
 ## Further Reading
 
-| Doc                                    | What it covers                                               |
-| -------------------------------------- | ------------------------------------------------------------ |
-| [`server/README.md`](server/README.md) | Backend module map, DB commands, NestJS conventions          |
-| [`client/README.md`](client/README.md) | Frontend project layout, IDE setup, Vue/Tailwind conventions |
-| [`packages/types/`](packages/types/)   | Shared type definitions between server and client            |
+| Doc                                        | What it covers                                               |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| [`docs/production.md`](docs/production.md) | Production compose deployment, backups, restore testing      |
+| [`server/README.md`](server/README.md)     | Backend module map, DB commands, NestJS conventions          |
+| [`client/README.md`](client/README.md)     | Frontend project layout, IDE setup, Vue/Tailwind conventions |
+| [`packages/types/`](packages/types/)       | Shared type definitions between server and client            |

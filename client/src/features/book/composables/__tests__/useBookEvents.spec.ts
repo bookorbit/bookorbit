@@ -13,7 +13,7 @@ vi.mock('@/features/scanner/composables/useScanProgress', () => ({
 }))
 
 vi.mock('vue-sonner', () => ({
-  toast: { warning: vi.fn() },
+  toast: { warning: vi.fn<(message: string) => void>() },
 }))
 
 // Import the composable after mocks are in place.
@@ -42,7 +42,7 @@ afterEach(() => {
 describe('onBookMissing', () => {
   it('fires the callback with the bookIds array on book:missing event', () => {
     const { onBookMissing } = useBookEvents()
-    const cb = vi.fn()
+    const cb = vi.fn<(bookIds: number[]) => void>()
     const cleanup = onBookMissing(cb)
 
     mockSocket.emit('book:missing', { libraryId: 1, bookIds: [10, 20, 30] })
@@ -54,7 +54,7 @@ describe('onBookMissing', () => {
 
   it('cleanup function deregisters the callback', () => {
     const { onBookMissing } = useBookEvents()
-    const cb = vi.fn()
+    const cb = vi.fn<(bookIds: number[]) => void>()
     const cleanup = onBookMissing(cb)
     cleanup()
 

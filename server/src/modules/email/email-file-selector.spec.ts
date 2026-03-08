@@ -18,10 +18,7 @@ describe('EmailFileSelector', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EmailFileSelector,
-        { provide: DB, useValue: db },
-      ],
+      providers: [EmailFileSelector, { provide: DB, useValue: db }],
     }).compile();
 
     selector = module.get<EmailFileSelector>(EmailFileSelector);

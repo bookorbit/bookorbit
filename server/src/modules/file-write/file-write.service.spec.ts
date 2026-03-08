@@ -41,13 +41,7 @@ describe('FileWriteService', () => {
       get: jest.fn().mockImplementation((key: string) => (key === 'storage.booksPath' ? '/books' : undefined)),
     } as unknown as ConfigService;
 
-    const service = new FileWriteService(
-      fileWriteRepo as never,
-      settingsService as never,
-      registry as never,
-      lockService as never,
-      config,
-    );
+    const service = new FileWriteService(fileWriteRepo as never, settingsService as never, registry as never, lockService as never, config);
 
     return { service, fileWriteRepo, settingsService, registry, writer, lockService };
   }

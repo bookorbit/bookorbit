@@ -24,9 +24,7 @@ describe('epub-opf-builder', () => {
   it('throws on unsupported package version', () => {
     const opf = `<package version="1.0"><metadata></metadata></package>`;
 
-    expect(() => build(opf, { title: 'Book' }, { fieldMask: new Set(['title']), dryRun: false })).toThrow(
-      'Unsupported EPUB version: "1.0"',
-    );
+    expect(() => build(opf, { title: 'Book' }, { fieldMask: new Set(['title']), dryRun: false })).toThrow('Unsupported EPUB version: "1.0"');
   });
 
   it('rewrites metadata for EPUB3, preserves UID, and appends required namespace prefix', () => {

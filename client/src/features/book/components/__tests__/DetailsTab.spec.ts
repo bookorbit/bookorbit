@@ -5,16 +5,25 @@ import type { BookDetail } from '@projectx/types'
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }
+  return {
+    ...actual,
+    useRouter: () => ({
+      push: vi.fn<(...args: unknown[]) => unknown>(),
+      replace: vi.fn<(...args: unknown[]) => unknown>(),
+    }),
+  }
 })
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => false }),
 }))
 vi.mock('@/lib/api', () => ({
-  api: vi.fn(async () => ({ ok: false, json: async () => ({}) })),
+  api: vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; json: () => Promise<Record<string, never>> }>>(async () => ({
+    ok: false,
+    json: async () => ({}),
+  })),
 }))
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
-  useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn() }),
+  useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
 }))
 vi.mock('@/features/book/lib/book-cover', () => ({
   bookCoverStyle: () => ({ background: 'oklch(0.22 0.07 200)', color: 'oklch(0.92 0.03 200)' }),

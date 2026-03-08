@@ -106,9 +106,7 @@ describe('Cb7FormatWriter', () => {
 
     const writer = new Cb7FormatWriter();
 
-    await expect(
-      writer.write('/book.cb7', { title: 'Dune' }, { fieldMask: new Set(['title']), dryRun: false }),
-    ).rejects.toThrow('rename denied');
+    await expect(writer.write('/book.cb7', { title: 'Dune' }, { fieldMask: new Set(['title']), dryRun: false })).rejects.toThrow('rename denied');
 
     expect(mockBuildComicInfoXml).toHaveBeenCalledWith(null, { title: 'Dune' }, new Set(['title']));
     expect(mockUnlink).toHaveBeenCalledWith('/.cbx-write-abcdef123');

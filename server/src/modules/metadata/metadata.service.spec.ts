@@ -114,7 +114,7 @@ describe('MetadataService', () => {
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      arrayBuffer: async () => Buffer.from('image-bytes'),
+      arrayBuffer: () => Promise.resolve(Buffer.from('image-bytes')),
     }) as never;
 
     await service.downloadAndSaveCover('https://img.example/cover.png', 9);
@@ -132,7 +132,7 @@ describe('MetadataService', () => {
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      arrayBuffer: async () => Buffer.alloc(0),
+      arrayBuffer: () => Promise.resolve(Buffer.alloc(0)),
     }) as never;
     await service.downloadAndSaveCover('https://img.example/empty.png', 4);
 
@@ -238,7 +238,7 @@ describe('MetadataService', () => {
     db.select.mockImplementation(() => ({
       from: () => ({
         where: () => ({
-          limit: async () => [],
+          limit: () => Promise.resolve([]),
         }),
       }),
     }));
@@ -247,7 +247,7 @@ describe('MetadataService', () => {
         return {
           values: (row: { name: string; sortName: string | null }) => {
             insertedAuthors.push(row);
-            return { returning: async () => [{ id: 81 }] };
+            return { returning: () => Promise.resolve([{ id: 81 }]) };
           },
         };
       }
@@ -255,7 +255,7 @@ describe('MetadataService', () => {
         return {
           values: (row: { bookId: number; authorId: number; displayOrder: number }) => {
             insertedBookAuthors.push(row);
-            return { onConflictDoNothing: async () => undefined };
+            return { onConflictDoNothing: () => Promise.resolve(undefined) };
           },
         };
       }
@@ -283,7 +283,7 @@ describe('MetadataService', () => {
     db.select.mockImplementation(() => ({
       from: () => ({
         where: () => ({
-          limit: async () => [{ id: 9 }],
+          limit: () => Promise.resolve([{ id: 9 }]),
         }),
       }),
     }));
@@ -292,7 +292,7 @@ describe('MetadataService', () => {
         return {
           values: (row: { bookId: number; authorId: number; displayOrder: number }) => {
             insertedBookAuthors.push(row);
-            return { onConflictDoNothing: async () => undefined };
+            return { onConflictDoNothing: () => Promise.resolve(undefined) };
           },
         };
       }
