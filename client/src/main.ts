@@ -6,16 +6,25 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useAuth } from './features/auth/composables/useAuth'
+import { useSetupStatus } from './features/auth/composables/useSetupStatus'
 
 const app = createApp(App)
 
 app.use(createPinia())
 
-// Init auth before installing router — app.use(router) triggers the initial
-// navigation which runs the beforeEach guard. If auth isn't resolved yet,
-// user.value is null and the guard redirects every reload to /login.
+// Resolve setup status/auth before installing router.
+// app.use(router) triggers initial navigation and guard execution.
+const { fetchSetupStatus, needsSetup } = useSetupStatus()
+try {
+  await fetchSetupStatus()
+} catch {
+  // If setup-status check fails, continue with normal auth bootstrap.
+}
+
 const { init } = useAuth()
-await init()
+if (needsSetup.value !== true) {
+  await init()
+}
 
 app.use(router)
 app.mount('#app')

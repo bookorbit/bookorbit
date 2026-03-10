@@ -192,13 +192,15 @@ async function refreshSelectedAuthorsMetadata() {
   markRefreshing(ids)
   try {
     const result = await bulkRefreshAuthorsMetadata(ids, (event) => {
-      if (event.imageUpdated && event.imageUrl) {
+      if (event.imageUpdated) {
         const index = items.value.findIndex((item) => item.id === event.authorId)
         if (index !== -1) {
           const next = [...items.value]
+          const current = next[index]
+          if (!current) return
           next[index] = {
-            ...next[index],
-            imageUrl: event.imageUrl,
+            ...current,
+            imageUrl: event.imageUrl ?? null,
           }
           items.value = next
         }
@@ -229,7 +231,9 @@ async function refreshSingleAuthorMetadata(authorId: number) {
     const index = items.value.findIndex((item) => item.id === authorId)
     if (index !== -1) {
       const next = [...items.value]
-      next[index] = { ...next[index], ...updated }
+      const current = next[index]
+      if (!current) return
+      next[index] = { ...current, ...updated }
       items.value = next
     }
     void maybeLoadSecondaryPanels()

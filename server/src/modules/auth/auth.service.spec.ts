@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, ServiceUnav
 
 import { AuthService } from './auth.service';
 
-function makeDb(overrides?: Partial<ReturnType<typeof makeDb>>) {
+function makeDb(overrides?: Record<string, unknown>) {
   const db: Record<string, unknown> = {
     query: {
       appSettings: { findFirst: jest.fn() },
@@ -11,20 +11,18 @@ function makeDb(overrides?: Partial<ReturnType<typeof makeDb>>) {
       roles: { findFirst: jest.fn() },
       passwordResetTokens: { findFirst: jest.fn() },
     },
+    $count: jest.fn().mockResolvedValue(0),
     insert: jest.fn().mockReturnThis(),
     values: jest.fn().mockReturnThis(),
+    onConflictDoNothing: jest.fn().mockReturnThis(),
+    returning: jest.fn().mockResolvedValue([]),
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockResolvedValue([{ total: 0 }]),
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
     where: jest.fn().mockResolvedValue(undefined),
     delete: jest.fn().mockReturnThis(),
-    transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(undefined),
-      };
-      return fn(tx);
-    }),
+    transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(db)),
   };
   return { ...db, ...overrides } as never;
 }
@@ -65,7 +63,7 @@ function makeFullUser(overrides?: Partial<Record<string, unknown>>) {
   } as never;
 }
 
-function makeService(dbOverrides?: Partial<ReturnType<typeof makeDb>>) {
+function makeService(dbOverrides?: Record<string, unknown>) {
   const db = makeDb(dbOverrides);
   const userService = {
     findByUsername: jest.fn(),
@@ -83,6 +81,7 @@ function makeService(dbOverrides?: Partial<ReturnType<typeof makeDb>>) {
       if (key === 'auth.jwtRefreshExpiresIn') return '7d';
       if (key === 'auth.jwtExpiresIn') return '15m';
       if (key === 'app.nodeEnv') return 'test';
+      if (key === 'auth.setupBootstrapToken') return 'bootstrap-token';
       return undefined;
     }),
   };
@@ -116,6 +115,80 @@ function makeService(dbOverrides?: Partial<ReturnType<typeof makeDb>>) {
 }
 
 describe('AuthService', () => {
+  describe('setupStatus', () => {
+    it('returns needsSetup=true when there are no users', async () => {
+      const { service, db } = makeService();
+      ((db as unknown as Record<string, unknown>).$count as jest.Mock).mockResolvedValue(0);
+
+      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: true });
+    });
+
+    it('returns needsSetup=false when at least one user exists', async () => {
+      const { service, db } = makeService();
+      ((db as unknown as Record<string, unknown>).$count as jest.Mock).mockResolvedValue(1);
+
+      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: false });
+    });
+  });
+
+  describe('setup', () => {
+    it('throws ForbiddenException when setup token is invalid in production', async () => {
+      const { service, config } = makeService();
+      config.get.mockImplementation((key: string) => {
+        if (key === 'app.nodeEnv') return 'production';
+        if (key === 'auth.setupBootstrapToken') return 'expected-token';
+        if (key === 'auth.jwtRefreshExpiresIn') return '7d';
+        if (key === 'auth.jwtExpiresIn') return '15m';
+        return undefined;
+      });
+
+      await expect(
+        service.setup({ username: 'admin', name: 'Admin', email: 'admin@example.com', password: 'Admin1234' } as never, 'wrong-token', makeReply()),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ConflictException when setup is already completed', async () => {
+      const { service, db } = makeService();
+      ((db as unknown as Record<string, unknown>).returning as jest.Mock).mockResolvedValueOnce([]);
+
+      await expect(
+        service.setup({ username: 'admin', name: 'Admin', email: 'admin@example.com', password: 'Admin1234' } as never, undefined, makeReply()),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('creates initial admin and returns auth payload', async () => {
+      const { service, db, userService } = makeService();
+      const reply = makeReply();
+
+      ((db as unknown as Record<string, unknown>).returning as jest.Mock)
+        .mockResolvedValueOnce([{ id: 99 }])
+        .mockResolvedValueOnce([{ id: 7, tokenVersion: 1 }]);
+      (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValue(null);
+      (db.query as never as Record<string, Record<string, jest.Mock>>).roles.findFirst.mockResolvedValue({ id: 1, name: 'Admin' });
+      userService.findByIdWithRolesAndPermissions.mockResolvedValue(
+        makeFullUser({
+          id: 7,
+          username: 'owner',
+          name: 'Owner',
+          email: 'owner@example.com',
+          roles: [{ id: 1, name: 'Admin', description: '', isSuperuser: true, isSystem: true, permissions: [] }],
+        }),
+      );
+
+      const result = await service.setup(
+        { username: 'owner', name: 'Owner', email: 'owner@example.com', password: 'Owner1234' } as never,
+        undefined,
+        reply,
+      );
+
+      expect(result).toMatchObject({
+        accessToken: 'signed-jwt',
+        user: { id: 7, username: 'owner', email: 'owner@example.com' },
+      });
+      expect((reply as unknown as { setCookie: jest.Mock }).setCookie).toHaveBeenCalled();
+    });
+  });
+
   describe('register', () => {
     it('throws ForbiddenException when registration is closed', async () => {
       const { service, db } = makeService();
@@ -127,9 +200,9 @@ describe('AuthService', () => {
     });
 
     it('throws ConflictException when username already exists', async () => {
-      const { service, db, userService } = makeService();
+      const { service, db } = makeService();
       (db.query as never as Record<string, Record<string, jest.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
-      userService.findByUsername.mockResolvedValue({ id: 99, username: 'existing' });
+      (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValueOnce({ id: 99, username: 'existing' });
 
       await expect(service.register({ username: 'existing', name: 'E', password: 'P@ssw0rd!', email: undefined } as never)).rejects.toThrow(
         ConflictException,
@@ -137,10 +210,11 @@ describe('AuthService', () => {
     });
 
     it('throws ConflictException when email already in use', async () => {
-      const { service, db, userService } = makeService();
+      const { service, db } = makeService();
       (db.query as never as Record<string, Record<string, jest.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
-      userService.findByUsername.mockResolvedValue(null);
-      userService.findByEmail.mockResolvedValue({ id: 88, email: 'existing@example.com' });
+      (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 88, email: 'existing@example.com' });
 
       await expect(
         service.register({ username: 'newuser', name: 'N', password: 'P@ssw0rd!', email: 'existing@example.com' } as never),
@@ -148,14 +222,11 @@ describe('AuthService', () => {
     });
 
     it('registers user successfully and assigns User role', async () => {
-      const { service, db, userService } = makeService();
+      const { service, db } = makeService();
       (db.query as never as Record<string, Record<string, jest.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
-      userService.findByUsername.mockResolvedValue(null);
-      userService.findByEmail.mockResolvedValue(null);
-      userService.create.mockResolvedValue({ id: 1, username: 'jdoe', name: 'John Doe' });
+      (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValueOnce(null);
+      ((db as unknown as Record<string, unknown>).returning as jest.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);
       (db.query as never as Record<string, Record<string, jest.Mock>>).roles.findFirst.mockResolvedValue({ id: 5, name: 'User' });
-      (db.insert as jest.Mock).mockReturnThis();
-      (db.values as jest.Mock).mockResolvedValue(undefined);
 
       const result = await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: undefined } as never);
       expect(result).toEqual({ id: 1, username: 'jdoe', name: 'John Doe' });
@@ -279,6 +350,27 @@ describe('AuthService', () => {
 
       await expect(service.refresh(makeRequest({ refresh_token: 'expired-token' }), makeReply())).rejects.toThrow(UnauthorizedException);
     });
+
+    it('rotates token and sets cookies when refresh succeeds', async () => {
+      const { service, db } = makeService();
+      const reply = makeReply();
+      (db.query as never as Record<string, Record<string, jest.Mock>>).refreshTokens.findFirst.mockResolvedValue({
+        id: 11,
+        userId: 5,
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 2,
+        active: true,
+      });
+
+      const result = await service.refresh(makeRequest({ refresh_token: 'ok-token' }), reply);
+      expect(result).toEqual({ accessToken: 'signed-jwt' });
+      expect(db.update).toHaveBeenCalled();
+      expect((reply as unknown as { setCookie: jest.Mock }).setCookie).toHaveBeenCalled();
+    });
   });
 
   describe('validateUser', () => {
@@ -357,20 +449,70 @@ describe('AuthService', () => {
 
       await expect(service.changePassword(1, { currentPassword: 'old', newPassword: 'New@1234' }, makeReply())).rejects.toThrow(BadRequestException);
     });
+
+    it('throws UnauthorizedException when current password is wrong', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        provisioningMethod: 'local',
+        passwordHash: '$2b$12$N4G7fngl8wXlWv2vN7INzuLe6Qw3sJwN6gI6s2zQm6A2f0r7WQX1y', // hash for a different password
+      });
+
+      await expect(service.changePassword(1, { currentPassword: 'wrong-current', newPassword: 'New@1234' }, makeReply())).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
   });
 
   describe('getSessions', () => {
-    it('filters out expired sessions', async () => {
+    it('returns active sessions', async () => {
       const { service, db } = makeService();
       const now = new Date();
       (db.query as never as Record<string, Record<string, jest.Mock>>).refreshTokens.findMany.mockResolvedValue([
         { id: 1, createdAt: new Date(now.getTime() - 1000), expiresAt: new Date(now.getTime() + 60000) },
-        { id: 2, createdAt: new Date(now.getTime() - 2000), expiresAt: new Date(now.getTime() - 1000) },
       ]);
 
       const sessions = await service.getSessions(1);
       expect(sessions).toHaveLength(1);
       expect(sessions[0].id).toBe(1);
+    });
+  });
+
+  describe('revokeSession', () => {
+    it('throws ForbiddenException when session belongs to another user', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, jest.Mock>>).refreshTokens.findFirst.mockResolvedValue({
+        id: 9,
+        userId: 999,
+      });
+
+      await expect(service.revokeSession(1, 9)).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('throws BadRequestException when reset token is expired', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, jest.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 1,
+        userId: 1,
+        expiresAt: new Date(Date.now() - 10_000),
+        usedAt: null,
+      });
+
+      await expect(service.resetPassword({ token: 'expired', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when reset token is already used', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, jest.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 1,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 10_000),
+        usedAt: new Date(),
+      });
+
+      await expect(service.resetPassword({ token: 'used', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
     });
   });
 

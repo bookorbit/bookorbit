@@ -51,12 +51,9 @@ Both must be running. The client proxies all `/api` and `/socket.io` requests to
 
 ### First steps after setup
 
-1. **Log in** - a default admin account is created automatically:
-   - Username: `admin`
-   - Password: `admin`
-2. **Change password** - you'll be prompted to set a new password on first login. Use `Admin123!` for local dev.
-3. **Create a library** - open Settings (gear icon) > Libraries > Create Library. Add a folder path pointing to some books on your machine, e.g. any directory containing `.epub`, `.pdf`, or `.cbz` files.
-4. **Scan** - the library scans automatically after creation. You should see books appear on the home page once the scan completes.
+1. **Complete initial setup** - you'll be redirected to `/setup` to create the first administrator account (username, password, name, and email).
+2. **Create a library** - open Settings (gear icon) > Libraries > Create Library. Add a folder path pointing to some books on your machine, e.g. any directory containing `.epub`, `.pdf`, or `.cbz` files.
+3. **Scan** - the library scans automatically after creation. You should see books appear on the home page once the scan completes.
 
 > **Where does data go?** `BOOKS_PATH` in `server/.env` defaults to `../local/data` (resolves to `<project-root>/local/data`). This is the app's data directory where extracted cover images and thumbnails are stored (`local/data/covers/`). It is **not** where your book files live - those paths are configured per-library in the UI. The `local/` folder is gitignored.
 
@@ -225,6 +222,7 @@ Server environment is configured in `server/.env` (created from `.env.example` d
 | `JWT_SECRET`             | `change-me-in-production`                              | JWT signing secret                                         |
 | `JWT_EXPIRES_IN`         | `15m`                                                  | Access token lifetime                                      |
 | `JWT_REFRESH_EXPIRES_IN` | `7d`                                                   | Refresh token lifetime                                     |
+| `SETUP_BOOTSTRAP_TOKEN`  | (empty)                                                | Required in production for initial `/api/v1/auth/setup`    |
 | `BOOKS_PATH`             | `../local/data`                                        | App data directory for cover images (not where books live) |
 | `SMTP_*`                 | (empty)                                                | Optional SMTP config for password-reset emails             |
 | `APP_URL`                | `http://localhost:5173`                                | Client URL (used in emails)                                |

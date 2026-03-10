@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Inject,
+  InternalServerErrorException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -13,7 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import '@fastify/cookie';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -28,6 +29,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SetupDto } from './dto/setup.dto';
 import { OidcDiscoveryService } from './oidc/oidc-discovery.service';
 import { OidcSessionRepository } from './oidc/oidc-session.repository';
 
@@ -42,6 +44,8 @@ function parseDurationMs(duration: string): number {
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
+
+const INITIAL_SETUP_KEY = 'initial_setup_completed_at';
 
 @Injectable()
 export class AuthService {
@@ -66,33 +70,99 @@ export class AuthService {
       throw new ForbiddenException('Registration is not open');
     }
 
-    const existingUsername = await this.userService.findByUsername(dto.username);
-    if (existingUsername) throw new ConflictException('Username already taken');
-
-    if (dto.email) {
-      const existingEmail = await this.userService.findByEmail(dto.email);
-      if (existingEmail) throw new ConflictException('Email already in use');
-    }
-
     const passwordHash = await hash(dto.password, 12);
-    const user = await this.userService.create({
-      username: dto.username,
-      name: dto.name,
-      email: dto.email,
-      passwordHash,
-      isDefaultPassword: false,
+    return this.db.transaction(async (tx) => {
+      const existingUsername = await tx.query.users.findFirst({ where: eq(schema.users.username, dto.username) });
+      if (existingUsername) throw new ConflictException('Username already taken');
+
+      if (dto.email) {
+        const existingEmail = await tx.query.users.findFirst({ where: eq(schema.users.email, dto.email) });
+        if (existingEmail) throw new ConflictException('Email already in use');
+      }
+
+      const [user] = await tx
+        .insert(schema.users)
+        .values({
+          username: dto.username,
+          name: dto.name,
+          email: dto.email,
+          passwordHash,
+          isDefaultPassword: false,
+        })
+        .returning({ id: schema.users.id, username: schema.users.username, name: schema.users.name });
+
+      const userRole = await tx.query.roles.findFirst({
+        where: eq(schema.roles.name, 'User'),
+      });
+      if (!userRole) {
+        this.logger.error(`User role not found while registering ${user.username}`);
+        throw new InternalServerErrorException('User role not found');
+      }
+
+      await tx.insert(schema.userRoles).values({ userId: user.id, roleId: userRole.id });
+      return user;
+    });
+  }
+
+  async setupStatus(): Promise<{ needsSetup: boolean }> {
+    const count = await this.db.$count(schema.users);
+    return { needsSetup: count === 0 };
+  }
+
+  async setup(dto: SetupDto, setupToken: string | undefined, reply: FastifyReply) {
+    this.assertSetupToken(setupToken);
+    const passwordHash = await hash(dto.password, 12);
+
+    const created = await this.db.transaction(async (tx) => {
+      const [setupMarker] = await tx
+        .insert(schema.appSettings)
+        .values({ key: INITIAL_SETUP_KEY, value: new Date().toISOString() })
+        .onConflictDoNothing({ target: schema.appSettings.key })
+        .returning({ id: schema.appSettings.id });
+      if (!setupMarker) {
+        throw new ConflictException('Setup already completed');
+      }
+
+      const [{ total }] = await tx.select({ total: count() }).from(schema.users);
+      if (Number(total) > 0) {
+        throw new ConflictException('Setup already completed');
+      }
+
+      const existingUsername = await tx.query.users.findFirst({ where: eq(schema.users.username, dto.username) });
+      if (existingUsername) {
+        throw new ConflictException('Username already taken');
+      }
+
+      const existingEmail = await tx.query.users.findFirst({ where: eq(schema.users.email, dto.email) });
+      if (existingEmail) {
+        throw new ConflictException('Email already in use');
+      }
+
+      const [user] = await tx
+        .insert(schema.users)
+        .values({
+          username: dto.username,
+          name: dto.name,
+          email: dto.email,
+          passwordHash,
+          isDefaultPassword: false,
+        })
+        .returning({
+          id: schema.users.id,
+          tokenVersion: schema.users.tokenVersion,
+        });
+
+      const adminRole = await tx.query.roles.findFirst({ where: eq(schema.roles.name, 'Admin') });
+      if (!adminRole) {
+        throw new InternalServerErrorException('Admin role not found');
+      }
+
+      await tx.insert(schema.userRoles).values({ userId: user.id, roleId: adminRole.id }).onConflictDoNothing();
+
+      return user;
     });
 
-    const userRole = await this.db.query.roles.findFirst({
-      where: eq(schema.roles.name, 'User'),
-    });
-    if (userRole) {
-      await this.db.insert(schema.userRoles).values({ userId: user.id, roleId: userRole.id });
-    } else {
-      this.logger.warn(`User role not found — registered user ${user.username} has no role`);
-    }
-
-    return { id: user.id, username: user.username, name: user.name };
+    return this.issueTokensForUser(created.id, reply);
   }
 
   async login(dto: LoginDto, reply: FastifyReply) {
@@ -174,6 +244,11 @@ export class AuthService {
 
     const userForToken = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
     if (!userForToken) throw new UnauthorizedException();
+    if (!userForToken.active) {
+      this.clearRefreshCookie(reply);
+      this.clearAccessCookie(reply);
+      throw new UnauthorizedException('Account disabled');
+    }
 
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(row.userId, userForToken.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
@@ -236,16 +311,17 @@ export class AuthService {
 
   async getSessions(userId: number) {
     const rows = await this.db.query.refreshTokens.findMany({
-      where: and(eq(schema.refreshTokens.userId, userId), isNull(schema.refreshTokens.revokedAt)),
+      where: and(eq(schema.refreshTokens.userId, userId), isNull(schema.refreshTokens.revokedAt), gt(schema.refreshTokens.expiresAt, new Date())),
     });
-    return rows.filter((r) => r.expiresAt > new Date()).map(({ id, createdAt, expiresAt }) => ({ id, createdAt, expiresAt }));
+    return rows.map(({ id, createdAt, expiresAt }) => ({ id, createdAt, expiresAt }));
   }
 
   async revokeSession(userId: number, sessionId: number) {
     const row = await this.db.query.refreshTokens.findFirst({
       where: eq(schema.refreshTokens.id, sessionId),
     });
-    if (!row || row.userId !== userId) throw new UnauthorizedException();
+    if (!row) throw new UnauthorizedException();
+    if (row.userId !== userId) throw new ForbiddenException('You do not have access to this session');
     await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, sessionId));
   }
 
@@ -332,6 +408,16 @@ export class AuthService {
     await this.db.insert(schema.refreshTokens).values({ userId, tokenHash, expiresAt });
 
     return { accessToken, rawRefreshToken };
+  }
+
+  private assertSetupToken(setupToken: string | undefined) {
+    const isProduction = this.config.get<string>('app.nodeEnv') === 'production';
+    if (!isProduction) return;
+
+    const expected = this.config.get<string>('auth.setupBootstrapToken') ?? '';
+    if (!expected || setupToken !== expected) {
+      throw new ForbiddenException('Invalid setup token');
+    }
   }
 
   private setRefreshCookie(reply: FastifyReply, rawToken: string) {

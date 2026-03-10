@@ -5,6 +5,7 @@ import { Moon, Sun } from 'lucide-vue-next'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
+import { useSetupStatus } from './composables/useSetupStatus'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const themeStore = useThemeStore()
@@ -13,6 +14,7 @@ const currentAccent = computed(() => ACCENT_OPTIONS.find((o) => o.id === themeSt
 
 const { login } = useAuth()
 const { getPublicConfig, initiateLogin } = useOidc()
+const { setupStatusError } = useSetupStatus()
 
 const username = ref('')
 const password = ref('')
@@ -157,6 +159,7 @@ async function handleOidcLogin() {
         </div>
 
         <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
+        <div v-if="setupStatusError" class="text-sm text-destructive">{{ setupStatusError }}</div>
 
         <button
           type="submit"

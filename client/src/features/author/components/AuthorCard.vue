@@ -24,7 +24,8 @@ const emit = defineEmits<{
 
 const initial = computed(() => props.author.name.trim().charAt(0).toUpperCase() || '?')
 const fallbackStyle = computed(() => bookCoverStyle(props.author.name || String(props.author.id)))
-const hasImage = computed(() => Boolean(props.author.imageUrl) && !imageFailed.value)
+const imageSrc = computed(() => props.author.imageUrl ?? undefined)
+const hasImage = computed(() => Boolean(imageSrc.value) && !imageFailed.value)
 
 const imageFailed = ref(false)
 watch(
@@ -67,7 +68,7 @@ function handleDelete() {
     >
       <img
         v-if="hasImage"
-        :src="author.imageUrl"
+        :src="imageSrc"
         :alt="`${author.name} portrait`"
         class="absolute inset-0 h-full w-full object-cover"
         loading="lazy"

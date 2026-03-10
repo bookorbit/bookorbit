@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -11,6 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { OidcCallbackDto } from './dto/oidc-callback.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SetupDto } from './dto/setup.dto';
 import { OidcService } from './oidc/oidc.service';
 
 @Controller('auth')
@@ -24,6 +25,19 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Public()
+  @Get('setup-status')
+  setupStatus() {
+    return this.authService.setupStatus();
+  }
+
+  @Public()
+  @Post('setup')
+  @HttpCode(HttpStatus.CREATED)
+  setup(@Body() dto: SetupDto, @Headers('x-setup-token') setupToken: string | undefined, @Res({ passthrough: true }) reply: FastifyReply) {
+    return this.authService.setup(dto, setupToken, reply);
   }
 
   @Public()

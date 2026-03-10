@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import type { AuthUser, AuthResponse } from '@projectx/types'
 import { api, setAccessToken, setOnAuthFailure } from '@/lib/api'
 import router from '@/router'
+import { useSetupStatus } from './useSetupStatus'
 
 const user = ref<AuthUser | null>(null)
 const isLoading = ref(false)
@@ -13,7 +14,8 @@ function clearAuth() {
 
 setOnAuthFailure(() => {
   clearAuth()
-  router.push('/login')
+  const { needsSetup } = useSetupStatus()
+  router.push(needsSetup.value ? '/setup' : '/login')
 })
 
 async function me(): Promise<void> {
@@ -56,11 +58,42 @@ export function useAuth() {
     user.value = data.user
 
     if (data.user.isDefaultPassword) {
-      router.push('/change-password')
+      router.push('/')
     } else {
       const redirect = router.currentRoute.value.query.redirect as string | undefined
       router.push(redirect ?? '/')
     }
+  }
+
+  async function setup(payload: { username: string; name: string; email: string; password: string; setupToken?: string }): Promise<void> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (payload.setupToken) {
+      headers['x-setup-token'] = payload.setupToken
+    }
+
+    const res = await fetch('/api/v1/auth/setup', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({
+        username: payload.username,
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message ?? 'Failed to complete setup')
+    }
+
+    const data: AuthResponse = await res.json()
+    setAccessToken(data.accessToken)
+    user.value = data.user
+
+    useSetupStatus().markSetupComplete()
+    router.push('/')
   }
 
   async function logout(): Promise<void> {
@@ -80,5 +113,5 @@ export function useAuth() {
     router.push('/login')
   }
 
-  return { user, isLoading, init, login, logout, me }
+  return { user, isLoading, init, login, logout, me, setup }
 }

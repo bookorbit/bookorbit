@@ -13,6 +13,7 @@ const envSchema = z.object({
     ),
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  SETUP_BOOTSTRAP_TOKEN: z.string().optional(),
   BOOKS_PATH: z.string().default('/data/books'),
   STAGING_PATH: z.string().optional(),
   CLIENT_URL: z.string().url().optional(),
@@ -32,6 +33,9 @@ export function validateEnv(config: Record<string, unknown>) {
   if (!result.success) {
     const errors = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Environment validation failed:\n${errors}`);
+  }
+  if (result.data.NODE_ENV === 'production' && !result.data.SETUP_BOOTSTRAP_TOKEN?.trim()) {
+    throw new Error('Environment validation failed:\n  SETUP_BOOTSTRAP_TOKEN: SETUP_BOOTSTRAP_TOKEN is required in production');
   }
   return result.data;
 }

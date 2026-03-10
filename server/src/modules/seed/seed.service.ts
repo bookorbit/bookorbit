@@ -1,5 +1,4 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { hash } from 'bcryptjs';
+import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -49,25 +48,20 @@ const USER_PERMISSIONS = [
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(SeedService.name);
-
   constructor(@Inject(DB) private readonly db: NodePgDatabase<typeof schema>) {}
 
   async onApplicationBootstrap() {
     await this.seedPermissions();
     await this.seedRoles();
     await this.seedAppSettings();
-    await this.seedDefaultAdmin();
     await this.seedEmailDefaults();
   }
 
   private async seedPermissions() {
-    for (const perm of BUILT_IN_PERMISSIONS) {
-      await this.db
-        .insert(schema.permissions)
-        .values(perm)
-        .onConflictDoUpdate({ target: schema.permissions.name, set: { isSystem: true } });
-    }
+    await this.db
+      .insert(schema.permissions)
+      .values(BUILT_IN_PERMISSIONS)
+      .onConflictDoUpdate({ target: schema.permissions.name, set: { isSystem: true } });
   }
 
   private async seedRoles() {
@@ -99,9 +93,11 @@ export class SeedService implements OnApplicationBootstrap {
     const perms = await this.db.query.permissions.findMany({
       where: inArray(schema.permissions.name, permissionNames),
     });
-    for (const perm of perms) {
-      await this.db.insert(schema.rolePermissions).values({ roleId, permissionId: perm.id }).onConflictDoNothing();
-    }
+    if (perms.length === 0) return;
+    await this.db
+      .insert(schema.rolePermissions)
+      .values(perms.map((perm) => ({ roleId, permissionId: perm.id })))
+      .onConflictDoNothing();
   }
 
   private async seedAppSettings() {
@@ -188,28 +184,5 @@ export class SeedService implements OnApplicationBootstrap {
     for (const setting of emailRelayDefaults) {
       await this.db.insert(schema.appSettings).values(setting).onConflictDoNothing({ target: schema.appSettings.key });
     }
-  }
-
-  private async seedDefaultAdmin() {
-    const count = await this.db.$count(schema.users);
-    if (count > 0) return;
-
-    const passwordHash = await hash('admin', 12);
-    const [user] = await this.db
-      .insert(schema.users)
-      .values({
-        username: 'admin',
-        name: 'Administrator',
-        passwordHash,
-        isDefaultPassword: true,
-      })
-      .returning();
-
-    const adminRole = await this.db.query.roles.findFirst({ where: eq(schema.roles.name, 'Admin') });
-    if (adminRole) {
-      await this.db.insert(schema.userRoles).values({ userId: user.id, roleId: adminRole.id });
-    }
-
-    this.logger.warn('WARNING: Default admin account created. Login with admin/admin and change your password immediately.');
   }
 }
