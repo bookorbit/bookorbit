@@ -33,7 +33,7 @@ export class LibraryService {
   }
 
   async findAll(user: RequestUser) {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
     const libs = isSuperuser ? await this.libraryRepo.findAll() : await this.libraryRepo.findAllForUser(user.id);
     const allFolders = await this.libraryRepo.findAllFolders();
     const foldersByLibrary = new Map<number, typeof allFolders>();

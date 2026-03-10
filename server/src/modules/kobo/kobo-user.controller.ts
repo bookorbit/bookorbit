@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -10,7 +11,7 @@ import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 
 @Controller('kobo')
-@RequirePermission('kobo_sync')
+@RequirePermission(Permission.KoboSync)
 export class KoboUserController {
   constructor(
     private readonly deviceService: KoboDeviceService,

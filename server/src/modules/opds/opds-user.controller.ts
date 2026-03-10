@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -8,7 +9,7 @@ import { UpdateOpdsUserDto } from './dto/update-opds-user.dto';
 import { OpdsUserService } from './opds-user.service';
 
 @Controller('opds-users')
-@RequirePermission('opds_access')
+@RequirePermission(Permission.OpdsAccess)
 export class OpdsUserController {
   constructor(private readonly opdsUserService: OpdsUserService) {}
 

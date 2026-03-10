@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 class ClaimMappingDto {
   @IsString()
@@ -23,9 +23,9 @@ class AutoProvisionDto {
   allowLocalLinking: boolean;
 
   @IsOptional()
-  @IsInt()
-  @IsPositive()
-  defaultRoleId: number | null;
+  @IsArray()
+  @IsString({ each: true })
+  defaultPermissionNames?: string[];
 }
 
 export class UpdateOidcConfigDto {

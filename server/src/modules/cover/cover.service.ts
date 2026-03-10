@@ -127,11 +127,7 @@ export class CoverService {
   private async verifyAccess(bookId: number, user: RequestUser): Promise<void> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(
-      user.id,
-      libraryId,
-      user.roles.some((r) => r.isSuperuser),
-    );
+    await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
   }
 
   private async setCoverSource(bookId: number, source: 'extracted' | 'custom' | null): Promise<void> {

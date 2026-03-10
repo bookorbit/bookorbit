@@ -1,3 +1,5 @@
+import { Permission } from '@projectx/types';
+
 import { UserController } from './user.controller';
 
 describe('UserController', () => {
@@ -8,8 +10,8 @@ describe('UserController', () => {
     createUser: jest.fn(),
     updateUser: jest.fn(),
     deleteUser: jest.fn(),
-    assignRole: jest.fn(),
-    revokeRole: jest.fn(),
+    setPermissions: jest.fn(),
+    setSuperuser: jest.fn(),
     adminResetPassword: jest.fn(),
   };
 
@@ -33,15 +35,16 @@ describe('UserController', () => {
     expect(userService.updateMe).toHaveBeenCalledWith(7, dto);
   });
 
-  it('delegates role assignment/revocation and admin reset', async () => {
+  it('delegates permission and superuser management and admin reset', async () => {
     const requester = { id: 1 } as any;
+    const dto = { permissionNames: [Permission.LibraryDownload] };
 
-    await controller.assignRole(8, { roleId: 4 } as any, requester);
-    await controller.revokeRole(8, 4, requester);
+    await controller.setPermissions(8, dto as any, requester);
+    await controller.setSuperuser(8, true, requester);
     await controller.adminResetPassword(8, requester);
 
-    expect(userService.assignRole).toHaveBeenCalledWith(8, 4, requester);
-    expect(userService.revokeRole).toHaveBeenCalledWith(8, 4, requester);
+    expect(userService.setPermissions).toHaveBeenCalledWith(8, dto, requester);
+    expect(userService.setSuperuser).toHaveBeenCalledWith(8, true, requester);
     expect(userService.adminResetPassword).toHaveBeenCalledWith(8, requester);
   });
 });

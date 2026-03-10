@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, Get, HttpCode, HttpStatus, Put } from '@nestjs/common';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -5,7 +6,7 @@ import { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
 import { ProviderConfigService } from './provider-config.service';
 
 @Controller('metadata-preferences/providers')
-@RequirePermission('manage_metadata_config')
+@RequirePermission(Permission.ManageMetadataConfig)
 export class ProviderConfigController {
   constructor(private readonly service: ProviderConfigService) {}
 

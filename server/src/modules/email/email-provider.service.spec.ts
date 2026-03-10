@@ -18,17 +18,18 @@ describe('EmailProviderService', () => {
     name: 'Test User',
     email: 'test@example.com',
     active: true,
+    isSuperuser: false,
     isDefaultPassword: false,
     tokenVersion: 1,
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [{ id: 1, name: 'User', description: '', isSuperuser: false, isSystem: false, permissions: [] }],
+    permissions: [],
   };
 
   const mockAdmin: RequestUser = {
     ...mockUser,
-    roles: [{ id: 2, name: 'Admin', description: '', isSuperuser: true, isSystem: false, permissions: [] }],
+    isSuperuser: true,
   };
 
   const mockProvider = {

@@ -433,7 +433,7 @@ export class AuthorsService {
   }
 
   private isSuperuser(user: RequestUser): boolean {
-    return user.roles.some((role) => role.isSuperuser);
+    return user.isSuperuser;
   }
 
   private mapAuthorSummary(row: {

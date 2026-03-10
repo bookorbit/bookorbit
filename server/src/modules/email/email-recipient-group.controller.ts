@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -9,7 +10,7 @@ import { UpdateEmailRecipientGroupDto } from './dto/update-email-recipient-group
 import { EmailRecipientGroupService } from './email-recipient-group.service';
 
 @Controller('email/recipient-groups')
-@RequirePermission('email_send')
+@RequirePermission(Permission.EmailSend)
 export class EmailRecipientGroupController {
   constructor(private readonly service: EmailRecipientGroupService) {}
 

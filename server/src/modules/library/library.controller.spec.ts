@@ -40,9 +40,9 @@ describe('LibraryController', () => {
   it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {
     fileWriteSettings.resolve.mockResolvedValue({ enabled: false });
 
-    await expect(
-      controller.writeMetadataToFiles(1, undefined, { id: 1, roles: [{ isSuperuser: true }] } as any, { raw: {} } as any),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.writeMetadataToFiles(1, undefined, { id: 1, isSuperuser: true } as any, { raw: {} } as any)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('writeMetadataToFiles streams progress and final done event with counters', async () => {
@@ -62,7 +62,7 @@ describe('LibraryController', () => {
       },
     };
 
-    await controller.writeMetadataToFiles(1, 'false', { id: 7, roles: [{ isSuperuser: false }] } as any, reply as any);
+    await controller.writeMetadataToFiles(1, 'false', { id: 7, isSuperuser: false } as any, reply as any);
 
     expect(reply.raw.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({ 'Content-Type': 'text/event-stream' }));
     expect(reply.raw.write).toHaveBeenCalledTimes(4);
@@ -77,7 +77,7 @@ describe('LibraryController', () => {
     fileWriteRepo.findNonMissingBookFilesByLibrary.mockResolvedValue([]);
     const reply = { raw: { writeHead: jest.fn(), write: jest.fn(), end: jest.fn() } };
 
-    await controller.writeMetadataToFiles(1, 'true', { id: 1, roles: [{ isSuperuser: true }] } as any, reply as any);
+    await controller.writeMetadataToFiles(1, 'true', { id: 1, isSuperuser: true } as any, reply as any);
 
     expect(fileWriteSettings.resolve).not.toHaveBeenCalled();
   });

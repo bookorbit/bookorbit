@@ -1,6 +1,6 @@
-import { boolean, index, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
-import { roles, users } from './auth';
+import { users } from './auth';
 
 export const oidcSessions = pgTable(
   'oidc_sessions',
@@ -26,6 +26,6 @@ export const oidcSessions = pgTable(
 export const oidcGroupMappings = pgTable('oidc_group_mappings', {
   id: serial('id').primaryKey(),
   oidcGroupClaim: text('oidc_group_claim').notNull().unique(),
-  roleId: integer('role_id').references(() => roles.id, { onDelete: 'set null' }),
+  permissionName: varchar('permission_name', { length: 100 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });

@@ -38,7 +38,7 @@ export interface OidcFullConfig {
   autoProvision: {
     enabled: boolean;
     allowLocalLinking: boolean;
-    defaultRoleId: number | null;
+    defaultPermissionNames: string[];
   };
 }
 
@@ -50,7 +50,7 @@ const DEFAULT_OIDC_CONFIG: OidcFullConfig = {
   clientSecret: '',
   scopes: 'openid profile email',
   claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
-  autoProvision: { enabled: false, allowLocalLinking: true, defaultRoleId: null },
+  autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
 };
 
 function parseSafe<T>(val: string | undefined, fallback: T): T {

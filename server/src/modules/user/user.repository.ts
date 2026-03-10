@@ -4,7 +4,8 @@ import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
 
-import { RequestUser, RequestUserRole } from '../../common/types/request-user';
+import { Permission } from '@projectx/types';
+import { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
@@ -33,29 +34,26 @@ export class UserRepository {
         name: schema.users.name,
         email: schema.users.email,
         active: schema.users.active,
+        isSuperuser: schema.users.isSuperuser,
         isDefaultPassword: schema.users.isDefaultPassword,
         createdAt: schema.users.createdAt,
-        roleId: schema.roles.id,
-        roleName: schema.roles.name,
-        roleIsSuperuser: schema.roles.isSuperuser,
-        roleIsSystem: schema.roles.isSystem,
+        permissionName: schema.userPermissions.permissionName,
       })
       .from(schema.users)
-      .leftJoin(schema.userRoles, eq(schema.userRoles.userId, schema.users.id))
-      .leftJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
+      .leftJoin(schema.userPermissions, eq(schema.userPermissions.userId, schema.users.id))
       .where(inArray(schema.users.id, userIds))
       .orderBy(schema.users.username);
 
-    type UserListRole = { id: number; name: string; isSuperuser: boolean; isSystem: boolean };
     type UserListItem = {
       id: number;
       username: string;
       name: string;
       email: string | null;
       active: boolean;
+      isSuperuser: boolean;
       isDefaultPassword: boolean;
       createdAt: Date;
-      roles: UserListRole[];
+      permissions: Permission[];
     };
 
     const usersMap = new Map<number, UserListItem>();
@@ -67,13 +65,14 @@ export class UserRepository {
           name: row.name,
           email: row.email,
           active: row.active,
+          isSuperuser: row.isSuperuser,
           isDefaultPassword: row.isDefaultPassword,
           createdAt: row.createdAt,
-          roles: [],
+          permissions: [],
         });
       }
-      if (row.roleId) {
-        usersMap.get(row.id)!.roles.push({ id: row.roleId, name: row.roleName!, isSuperuser: row.roleIsSuperuser!, isSystem: row.roleIsSystem! });
+      if (row.permissionName) {
+        usersMap.get(row.id)!.permissions.push(row.permissionName as Permission);
       }
     }
 
@@ -85,7 +84,7 @@ export class UserRepository {
     return this.db.query.users.findFirst({ where: eq(schema.users.username, username) });
   }
 
-  async findByIdWithRolesAndPermissions(id: number): Promise<RequestUser | null> {
+  async findByIdWithPermissions(id: number): Promise<RequestUser | null> {
     const rows = await this.db
       .select({
         id: schema.users.id,
@@ -93,48 +92,26 @@ export class UserRepository {
         name: schema.users.name,
         email: schema.users.email,
         active: schema.users.active,
+        isSuperuser: schema.users.isSuperuser,
         isDefaultPassword: schema.users.isDefaultPassword,
         tokenVersion: schema.users.tokenVersion,
         settings: schema.users.settings,
         avatarUrl: schema.users.avatarUrl,
         provisioningMethod: schema.users.provisioningMethod,
-        roleId: schema.roles.id,
-        roleName: schema.roles.name,
-        roleDescription: schema.roles.description,
-        roleIsSuperuser: schema.roles.isSuperuser,
-        roleIsSystem: schema.roles.isSystem,
-        permId: schema.permissions.id,
-        permName: schema.permissions.name,
+        permissionName: schema.userPermissions.permissionName,
       })
       .from(schema.users)
-      .leftJoin(schema.userRoles, eq(schema.userRoles.userId, schema.users.id))
-      .leftJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
-      .leftJoin(schema.rolePermissions, eq(schema.rolePermissions.roleId, schema.roles.id))
-      .leftJoin(schema.permissions, eq(schema.permissions.id, schema.rolePermissions.permissionId))
+      .leftJoin(schema.userPermissions, eq(schema.userPermissions.userId, schema.users.id))
       .where(eq(schema.users.id, id));
 
     if (rows.length === 0) return null;
 
     const first = rows[0];
-    const rolesMap = new Map<number, RequestUserRole>();
+    const permissions: Permission[] = [];
 
     for (const row of rows) {
-      if (row.roleId === null) continue;
-      if (!rolesMap.has(row.roleId)) {
-        rolesMap.set(row.roleId, {
-          id: row.roleId,
-          name: row.roleName!,
-          description: row.roleDescription ?? null,
-          isSuperuser: row.roleIsSuperuser!,
-          isSystem: row.roleIsSystem!,
-          permissions: [],
-        });
-      }
-      if (row.permId !== null) {
-        const role = rolesMap.get(row.roleId)!;
-        if (!role.permissions.some((p) => p.id === row.permId)) {
-          role.permissions.push({ id: row.permId, name: row.permName! });
-        }
+      if (row.permissionName && !permissions.includes(row.permissionName as Permission)) {
+        permissions.push(row.permissionName as Permission);
       }
     }
 
@@ -144,12 +121,13 @@ export class UserRepository {
       name: first.name,
       email: first.email,
       active: first.active,
+      isSuperuser: first.isSuperuser,
       isDefaultPassword: first.isDefaultPassword,
       tokenVersion: first.tokenVersion,
       settings: first.settings as Record<string, unknown>,
       avatarUrl: first.avatarUrl,
       provisioningMethod: first.provisioningMethod,
-      roles: Array.from(rolesMap.values()),
+      permissions,
     };
   }
 
@@ -162,7 +140,6 @@ export class UserRepository {
     const { settings, ...rest } = data;
     const setData: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (settings !== undefined) {
-      // Merge into existing settings rather than replacing the whole object
       setData.settings = sql`${schema.users.settings} || ${JSON.stringify(settings)}::jsonb`;
     }
     const [user] = await this.db.update(schema.users).set(setData).where(eq(schema.users.id, id)).returning({
@@ -183,20 +160,24 @@ export class UserRepository {
     await this.db.delete(schema.users).where(eq(schema.users.id, id));
   }
 
-  async assignRole(userId: number, roleId: number) {
-    await this.db.insert(schema.userRoles).values({ userId, roleId }).onConflictDoNothing();
+  async setPermissions(userId: number, permissionNames: Permission[]) {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.userPermissions).where(eq(schema.userPermissions.userId, userId));
+      if (permissionNames.length > 0) {
+        await tx.insert(schema.userPermissions).values(permissionNames.map((permissionName) => ({ userId, permissionName })));
+      }
+    });
   }
 
-  async revokeRole(userId: number, roleId: number) {
-    await this.db.delete(schema.userRoles).where(and(eq(schema.userRoles.userId, userId), eq(schema.userRoles.roleId, roleId)));
+  async setSuperuser(userId: number, isSuperuser: boolean) {
+    await this.db.update(schema.users).set({ isSuperuser }).where(eq(schema.users.id, userId));
   }
 
   async countOtherSuperusers(excludeUserId: number): Promise<number> {
     const [{ total }] = await this.db
       .select({ total: count() })
-      .from(schema.userRoles)
-      .innerJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
-      .where(and(eq(schema.roles.isSuperuser, true), ne(schema.userRoles.userId, excludeUserId)));
+      .from(schema.users)
+      .where(and(eq(schema.users.isSuperuser, true), ne(schema.users.id, excludeUserId)));
     return Number(total);
   }
 

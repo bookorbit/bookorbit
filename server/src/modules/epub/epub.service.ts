@@ -307,11 +307,7 @@ export class EpubService {
   private async resolveEpubPath(bookId: number, user: RequestUser): Promise<string> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(
-      user.id,
-      libraryId,
-      user.roles.some((r) => r.isSuperuser),
-    );
+    await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
 
     const [file] = await this.bookRepo.findPrimaryFilesByBookIds([bookId]);
     if (!file || file.format !== 'epub') throw new NotFoundException(`No primary EPUB file for book ${bookId}`);

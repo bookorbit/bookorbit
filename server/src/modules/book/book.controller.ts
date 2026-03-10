@@ -30,6 +30,7 @@ import { ExportBooksDto } from './dto/export-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
+import { Permission } from '@projectx/types';
 import type { BookQuery } from '@projectx/types';
 
 function stripLoneSurrogates(value: string): string {
@@ -68,14 +69,14 @@ export class BookController {
   ) {}
 
   @Post('embed-all')
-  @RequirePermission('manage_app_settings')
+  @RequirePermission(Permission.ManageAppSettings)
   embedAll() {
     return this.bookService.embedAll();
   }
 
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('library_delete_books')
+  @RequirePermission(Permission.LibraryDeleteBooks)
   deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {
     return this.bookService.deleteBooks(dto.bookIds, user);
   }
@@ -92,7 +93,7 @@ export class BookController {
   }
 
   @Post('bulk-refresh-metadata')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   async bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -107,7 +108,7 @@ export class BookController {
   }
 
   @Post('bulk-re-extract-cover')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -122,13 +123,13 @@ export class BookController {
   }
 
   @Post(':id/re-extract-cover')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   reExtractCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.bulkReExtractCover([id], user);
   }
 
   @Post('export')
-  @RequirePermission('library_download')
+  @RequirePermission(Permission.LibraryDownload)
   async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const files = await this.bookService.getExportFiles(dto.bookIds, user, dto.allFormats ?? false);
     const archive = archiver('zip', { zlib: { level: 0 } });
@@ -193,7 +194,7 @@ export class BookController {
   // These MUST come before `:id/*` routes to avoid NestJS matching 'files' as :id.
 
   @Get('files/:fileId/serve')
-  @RequirePermission('library_download')
+  @RequirePermission(Permission.LibraryDownload)
   async serveFile(
     @Param('fileId', ParseIntPipe) fileId: number,
     @CurrentUser() user: RequestUser,
@@ -249,19 +250,19 @@ export class BookController {
   }
 
   @Patch(':id/metadata')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   updateMetadata(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataDto, @CurrentUser() user: RequestUser) {
     return this.bookService.updateMetadata(id, dto, user);
   }
 
   @Post(':id/refresh-metadata')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   refreshMetadata(@Param('id', ParseIntPipe) id: number, @Query('preview') preview: string | undefined, @CurrentUser() user: RequestUser) {
     return this.bookService.refreshMetadata(id, preview === 'true', user);
   }
 
   @Get(':id/write-log')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   async getWriteLog(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     await this.bookService.verifyBookAccess(id, user);
     const entries = await this.fileWriteRepo.findWriteLog(id);
@@ -269,7 +270,7 @@ export class BookController {
   }
 
   @Get(':id/kobo-state')
-  @RequirePermission('kobo_sync')
+  @RequirePermission(Permission.KoboSync)
   getKoboState(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getKoboState(id, user);
   }

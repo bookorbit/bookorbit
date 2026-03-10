@@ -41,11 +41,11 @@ export class BookService {
   }
 
   private isSuperuser(user: RequestUser): boolean {
-    return user.roles.some((r) => r.isSuperuser);
+    return user.isSuperuser;
   }
 
   private hasPermission(user: RequestUser, permissionName: string): boolean {
-    return user.roles.some((r) => r.isSuperuser || r.permissions.some((p) => p.name === permissionName));
+    return user.isSuperuser || user.permissions.includes(permissionName);
   }
 
   private collectExistingProviderIds(meta: {

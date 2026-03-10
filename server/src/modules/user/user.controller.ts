@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { Permission } from '@projectx/types';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseBoolPipe, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { AssignRoleDto } from './dto/assign-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserService } from './user.service';
@@ -14,7 +15,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
@@ -29,46 +30,50 @@ export class UserController {
   }
 
   @Get(':id')
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   findById(@Param('id', ParseIntPipe) id: number) {
     return this.userService.findById(id);
   }
 
   @Post()
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   createUser(@Body() dto: CreateUserDto) {
     return this.userService.createUser(dto);
   }
 
   @Patch(':id')
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   updateUser(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @CurrentUser() requestingUser: RequestUser) {
     return this.userService.updateUser(id, dto, requestingUser);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   deleteUser(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestingUser: RequestUser) {
     return this.userService.deleteUser(id, requestingUser);
   }
 
-  @Post(':id/roles')
+  @Put(':id/permissions')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('manage_users')
-  assignRole(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignRoleDto, @CurrentUser() requestingUser: RequestUser) {
-    return this.userService.assignRole(id, dto.roleId, requestingUser);
+  @RequirePermission(Permission.ManageUsers)
+  setPermissions(@Param('id', ParseIntPipe) id: number, @Body() dto: SetPermissionsDto, @CurrentUser() requestingUser: RequestUser) {
+    return this.userService.setPermissions(id, dto, requestingUser);
   }
 
-  @Delete(':id/roles/:roleId')
+  @Put(':id/superuser')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('manage_users')
-  revokeRole(@Param('id', ParseIntPipe) id: number, @Param('roleId', ParseIntPipe) roleId: number, @CurrentUser() requestingUser: RequestUser) {
-    return this.userService.revokeRole(id, roleId, requestingUser);
+  @RequirePermission(Permission.ManageUsers)
+  setSuperuser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('isSuperuser', ParseBoolPipe) isSuperuser: boolean,
+    @CurrentUser() requestingUser: RequestUser,
+  ) {
+    return this.userService.setSuperuser(id, isSuperuser, requestingUser);
   }
 
   @Post(':id/reset-password')
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   adminResetPassword(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestingUser: RequestUser) {
     return this.userService.adminResetPassword(id, requestingUser);
   }

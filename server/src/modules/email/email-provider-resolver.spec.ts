@@ -21,7 +21,8 @@ describe('EmailProviderResolver', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
   const mockProvider = {
     id: 10,

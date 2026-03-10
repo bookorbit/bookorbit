@@ -24,7 +24,7 @@ export class LibraryAccessGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{ user: RequestUser; params?: Record<string, string> }>();
     const user = request.user;
 
-    if (user.roles.some((r) => r.isSuperuser)) return true;
+    if (user.isSuperuser) return true;
 
     const libraryId = parseInt(request.params?.libraryId ?? '', 10);
     if (!libraryId) throw new ForbiddenException('Missing libraryId');

@@ -13,8 +13,6 @@ import {
   Settings,
   Info,
   Users,
-  ShieldCheck,
-  KeyRound,
   LogIn,
   Rss,
   Tablet,
@@ -35,8 +33,6 @@ import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
 import AboutSettings from './AboutSettings.vue'
 import UsersPage from '@/features/admin/UsersPage.vue'
-import RolesPage from '@/features/admin/RolesPage.vue'
-import PermissionsPage from '@/features/admin/PermissionsPage.vue'
 import FileNamingSettings from './FileNamingSettings.vue'
 import OidcSettings from './OidcSettings.vue'
 import OpdsSettings from './OpdsSettings.vue'
@@ -62,7 +58,6 @@ type SectionId =
   | 'comics'
   | 'about'
   | 'users'
-  | 'roles'
   | 'permissions'
   | 'oidc'
   | 'file-naming'
@@ -111,10 +106,7 @@ const navGroups = computed(() => {
   if (su || perms.includes('manage_users')) {
     adminItems.push({ id: 'users', label: 'Users', icon: Users, component: UsersPage, maxWidth: 'max-w-4xl' })
   }
-  if (su || perms.includes('manage_roles')) {
-    adminItems.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, component: RolesPage, maxWidth: 'max-w-3xl' })
-    adminItems.push({ id: 'permissions', label: 'Permissions', icon: KeyRound, component: PermissionsPage })
-  }
+
   if (su || perms.includes('manage_metadata_config')) {
     adminItems.push({
       id: 'metadata-preferences',

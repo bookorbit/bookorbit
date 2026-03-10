@@ -92,7 +92,7 @@ export class RecommendationService {
   }
 
   private isSuperuser(user: RequestUser): boolean {
-    return user.roles.some((r) => r.isSuperuser);
+    return user.isSuperuser;
   }
 
   private isValidEmbedding(embedding: number[] | null): embedding is number[] {

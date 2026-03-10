@@ -27,23 +27,23 @@ describe('OidcGroupMappingService', () => {
     expect(db.query.oidcGroupMappings.findMany).not.toHaveBeenCalled();
   });
 
-  it('inserts role assignments for matched groups', async () => {
+  it('inserts permission assignments for matched groups', async () => {
     db.query.oidcGroupMappings.findMany.mockResolvedValue([
-      { oidcGroupClaim: 'admins', roleId: 10 },
-      { oidcGroupClaim: 'editors', roleId: 20 },
+      { oidcGroupClaim: 'admins', permissionName: 'manage_users' },
+      { oidcGroupClaim: 'editors', permissionName: 'library_edit_metadata' },
     ]);
 
     await service.syncUserGroups(42, ['admins', 'editors']);
 
     expect(db.insert).toHaveBeenCalledTimes(2);
-    expect(db.values).toHaveBeenCalledWith({ userId: 42, roleId: 10 });
-    expect(db.values).toHaveBeenCalledWith({ userId: 42, roleId: 20 });
+    expect(db.values).toHaveBeenCalledWith({ userId: 42, permissionName: 'manage_users' });
+    expect(db.values).toHaveBeenCalledWith({ userId: 42, permissionName: 'library_edit_metadata' });
   });
 
-  it('deduplicates roleIds when multiple group claims map to the same role', async () => {
+  it('deduplicates permissionNames when multiple group claims map to the same permission', async () => {
     db.query.oidcGroupMappings.findMany.mockResolvedValue([
-      { oidcGroupClaim: 'admins', roleId: 10 },
-      { oidcGroupClaim: 'superadmins', roleId: 10 },
+      { oidcGroupClaim: 'admins', permissionName: 'manage_users' },
+      { oidcGroupClaim: 'superadmins', permissionName: 'manage_users' },
     ]);
 
     await service.syncUserGroups(42, ['admins', 'superadmins']);
@@ -59,20 +59,20 @@ describe('OidcGroupMappingService', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
-  it('skips mappings with null roleId', async () => {
+  it('skips mappings with null permissionName', async () => {
     db.query.oidcGroupMappings.findMany.mockResolvedValue([
-      { oidcGroupClaim: 'admins', roleId: null },
-      { oidcGroupClaim: 'editors', roleId: 5 },
+      { oidcGroupClaim: 'admins', permissionName: null },
+      { oidcGroupClaim: 'editors', permissionName: 'library_edit_metadata' },
     ]);
 
     await service.syncUserGroups(42, ['admins', 'editors']);
 
     expect(db.insert).toHaveBeenCalledTimes(1);
-    expect(db.values).toHaveBeenCalledWith({ userId: 42, roleId: 5 });
+    expect(db.values).toHaveBeenCalledWith({ userId: 42, permissionName: 'library_edit_metadata' });
   });
 
-  it('uses onConflictDoNothing to avoid duplicate role assignments', async () => {
-    db.query.oidcGroupMappings.findMany.mockResolvedValue([{ oidcGroupClaim: 'admins', roleId: 10 }]);
+  it('uses onConflictDoNothing to avoid duplicate permission assignments', async () => {
+    db.query.oidcGroupMappings.findMany.mockResolvedValue([{ oidcGroupClaim: 'admins', permissionName: 'manage_users' }]);
 
     await service.syncUserGroups(42, ['admins']);
 

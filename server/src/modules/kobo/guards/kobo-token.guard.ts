@@ -34,7 +34,7 @@ export class KoboTokenGuard implements CanActivate {
 
     if (!device) throw new UnauthorizedException('Invalid device token');
 
-    const user = await this.userService.findByIdWithRolesAndPermissions(device.userId);
+    const user = await this.userService.findByIdWithPermissions(device.userId);
     if (!user || !user.active) throw new UnauthorizedException('Account not found or disabled');
     if (!this.permissionService.userHas(user, 'kobo_sync')) throw new UnauthorizedException('Kobo sync permission revoked');
 

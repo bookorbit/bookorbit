@@ -2,13 +2,14 @@ import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundExce
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Permission } from '@projectx/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRepository } from './user.repository';
@@ -41,10 +42,6 @@ export class UserService {
     return this.userRepo.createOidcUser(data);
   }
 
-  assignRoleDirectly(userId: number, roleId: number) {
-    return this.userRepo.assignRole(userId, roleId);
-  }
-
   generatePasswordResetToken(userId: number): Promise<string> {
     return this.userRepo.generateResetToken(userId);
   }
@@ -53,8 +50,8 @@ export class UserService {
     return this.userRepo.incrementTokenVersion(userId);
   }
 
-  findByIdWithRolesAndPermissions(id: number): Promise<RequestUser | null> {
-    return this.userRepo.findByIdWithRolesAndPermissions(id);
+  findByIdWithPermissions(id: number): Promise<RequestUser | null> {
+    return this.userRepo.findByIdWithPermissions(id);
   }
 
   create(data: Parameters<UserRepository['create']>[0]) {
@@ -66,7 +63,7 @@ export class UserService {
   }
 
   async findById(id: number) {
-    const user = await this.userRepo.findByIdWithRolesAndPermissions(id);
+    const user = await this.userRepo.findByIdWithPermissions(id);
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
@@ -84,8 +81,14 @@ export class UserService {
       isDefaultPassword: true,
     });
 
-    if (dto.roleIds?.length) {
-      await Promise.all(dto.roleIds.map((roleId) => this.userRepo.assignRole(user.id, roleId)));
+    if (dto.permissionNames?.length) {
+      await this.userRepo.setPermissions(user.id, dto.permissionNames as Permission[]);
+    }
+
+    if (dto.libraryIds?.length) {
+      for (const libraryId of dto.libraryIds) {
+        await this.db.insert(schema.userLibraryAccess).values({ userId: user.id, libraryId, accessLevel: 'viewer' }).onConflictDoNothing();
+      }
     }
 
     const appUrl = this.config.get<string>('mailer.appUrl') ?? 'http://localhost:5173';
@@ -100,17 +103,16 @@ export class UserService {
       throw new ConflictException('You cannot deactivate your own account');
     }
 
-    const requestingIsSuperuser = requestingUser.roles.some((r) => r.isSuperuser);
-    const target = await this.userRepo.findByIdWithRolesAndPermissions(id);
+    const target = await this.userRepo.findByIdWithPermissions(id);
     if (!target) throw new NotFoundException('User not found');
 
-    if (target.roles.some((r) => r.isSuperuser) && !requestingIsSuperuser) {
+    if (target.isSuperuser && !requestingUser.isSuperuser) {
       throw new ForbiddenException('Only administrators can edit administrator accounts');
     }
 
-    if (dto.active === false) {
+    if (dto.active === false && target.isSuperuser) {
       const otherSuperusers = await this.userRepo.countOtherSuperusers(id);
-      if (target.roles.some((r) => r.isSuperuser) && otherSuperusers === 0) {
+      if (otherSuperusers === 0) {
         throw new ConflictException('Cannot deactivate the last administrator');
       }
     }
@@ -130,62 +132,56 @@ export class UserService {
     if (id === requestingUser.id) {
       throw new ConflictException('You cannot delete your own account');
     }
-    const requestingIsSuperuser = requestingUser.roles.some((r) => r.isSuperuser);
-    const [target, otherSuperusers] = await Promise.all([this.userRepo.findByIdWithRolesAndPermissions(id), this.userRepo.countOtherSuperusers(id)]);
-    if (target?.roles.some((r) => r.isSuperuser)) {
-      if (!requestingIsSuperuser) throw new ForbiddenException('Only administrators can delete administrator accounts');
+    const [target, otherSuperusers] = await Promise.all([this.userRepo.findByIdWithPermissions(id), this.userRepo.countOtherSuperusers(id)]);
+    if (target?.isSuperuser) {
+      if (!requestingUser.isSuperuser) throw new ForbiddenException('Only administrators can delete administrator accounts');
       if (otherSuperusers === 0) throw new ConflictException('Cannot delete the last administrator');
     }
     await this.userRepo.delete(id);
   }
 
-  async assignRole(targetUserId: number, roleId: number, requestingUser: RequestUser) {
-    await this.guardSuperuserRoleOp(roleId, requestingUser);
-    await this.userRepo.assignRole(targetUserId, roleId);
+  setPermissionsDirectly(userId: number, permissionNames: Permission[]) {
+    return this.userRepo.setPermissions(userId, permissionNames);
   }
 
-  async revokeRole(targetUserId: number, roleId: number, requestingUser: RequestUser) {
+  async setPermissions(targetUserId: number, dto: SetPermissionsDto, requestingUser: RequestUser) {
     if (targetUserId === requestingUser.id) {
-      throw new ConflictException('You cannot revoke roles from your own account');
+      throw new ConflictException('You cannot modify your own permissions');
     }
-    await this.guardSuperuserRoleOp(roleId, requestingUser);
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
 
-    const [target, otherSuperusers] = await Promise.all([
-      this.userRepo.findByIdWithRolesAndPermissions(targetUserId),
-      this.userRepo.countOtherSuperusers(targetUserId),
-    ]);
-    const roleBeingRevoked = target?.roles.find((r) => r.id === roleId);
-    if (roleBeingRevoked?.isSuperuser && otherSuperusers === 0) {
-      throw new ConflictException('Cannot remove the last administrator');
+    if (target.isSuperuser && !requestingUser.isSuperuser) {
+      throw new ForbiddenException('Only administrators can modify administrator permissions');
     }
 
-    await this.userRepo.revokeRole(targetUserId, roleId);
+    await this.userRepo.setPermissions(targetUserId, dto.permissionNames as Permission[]);
+  }
+
+  async setSuperuser(targetUserId: number, isSuperuser: boolean, requestingUser: RequestUser) {
+    if (!requestingUser.isSuperuser) {
+      throw new ForbiddenException('Only administrators can change superuser status');
+    }
+    if (targetUserId === requestingUser.id) {
+      throw new ConflictException('You cannot change your own superuser status');
+    }
+    if (!isSuperuser) {
+      const otherSuperusers = await this.userRepo.countOtherSuperusers(targetUserId);
+      if (otherSuperusers === 0) {
+        throw new ConflictException('Cannot remove the last administrator');
+      }
+    }
+    await this.userRepo.setSuperuser(targetUserId, isSuperuser);
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {
-    const target = await this.userRepo.findByIdWithRolesAndPermissions(targetUserId);
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
     if (!target) throw new NotFoundException('User not found');
-    const requestingIsSuperuser = requestingUser.roles.some((r) => r.isSuperuser);
-    if (target.roles.some((r) => r.isSuperuser) && !requestingIsSuperuser) {
+    if (target.isSuperuser && !requestingUser.isSuperuser) {
       throw new ForbiddenException('Only administrators can reset administrator passwords');
     }
     const appUrl = this.config.get<string>('mailer.appUrl') ?? 'http://localhost:5173';
     const rawToken = await this.userRepo.generateResetToken(targetUserId);
     return { resetUrl: `${appUrl}/reset-password?token=${rawToken}` };
-  }
-
-  // If the role being assigned/revoked is a superuser role, the requesting user
-  // must also have manage_roles permission (not just manage_users).
-  private async guardSuperuserRoleOp(roleId: number, requestingUser: RequestUser) {
-    const role = await this.db.query.roles.findFirst({ where: eq(schema.roles.id, roleId) });
-    if (!role) throw new NotFoundException('Role not found');
-
-    if (role.isSuperuser) {
-      const hasManageRoles =
-        requestingUser.roles.some((r) => r.isSuperuser) || requestingUser.roles.flatMap((r) => r.permissions).some((p) => p.name === 'manage_roles');
-      if (!hasManageRoles) {
-        throw new ForbiddenException('Assigning or revoking superuser roles requires manage_roles permission');
-      }
-    }
   }
 }

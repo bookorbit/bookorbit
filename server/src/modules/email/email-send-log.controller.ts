@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -8,7 +9,7 @@ import { EmailSendLogService } from './email-send-log.service';
 import { EmailSendOrchestrator } from './email-send-orchestrator.service';
 
 @Controller('email/log')
-@RequirePermission('email_send')
+@RequirePermission(Permission.EmailSend)
 export class EmailSendLogController {
   constructor(
     private readonly logService: EmailSendLogService,

@@ -16,7 +16,8 @@ describe('EmailRecipientController', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   const service = {

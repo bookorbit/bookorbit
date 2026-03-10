@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, Get, HttpCode, HttpStatus, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,7 +8,7 @@ import { UpdateEmailPreferencesDto } from './dto/update-email-preferences.dto';
 import { EmailPreferencesService } from './email-preferences.service';
 
 @Controller('email/preferences')
-@RequirePermission('email_send')
+@RequirePermission(Permission.EmailSend)
 export class EmailPreferencesController {
   constructor(private readonly service: EmailPreferencesService) {}
 

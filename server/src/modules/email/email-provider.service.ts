@@ -130,6 +130,6 @@ export class EmailProviderService {
   }
 
   private isSuperuser(user: RequestUser): boolean {
-    return user.roles.some((r) => r.isSuperuser);
+    return user.isSuperuser;
   }
 }

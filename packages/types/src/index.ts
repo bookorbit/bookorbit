@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./permissions";
 export * from "./metadata-preferences";
 export * from "./dashboard";
 export * from "./book";

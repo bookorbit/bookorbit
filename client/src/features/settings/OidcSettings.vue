@@ -10,7 +10,7 @@ interface OidcConfig {
   clientSecret: string
   scopes: string
   claimMapping: { username: string; name: string; email: string; groups: string }
-  autoProvision: { enabled: boolean; allowLocalLinking: boolean; defaultRoleId: number | null }
+  autoProvision: { enabled: boolean; allowLocalLinking: boolean; defaultPermissionNames: string[] }
 }
 
 const loading = ref(true)
@@ -28,7 +28,7 @@ const form = reactive<OidcConfig>({
   clientSecret: '',
   scopes: 'openid profile email',
   claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
-  autoProvision: { enabled: false, allowLocalLinking: true, defaultRoleId: null },
+  autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
 })
 
 onMounted(async () => {
@@ -92,213 +92,213 @@ async function testConnection() {
 </script>
 
 <template>
-    <div class="mb-8">
-      <h2 class="settings-title">OIDC / SSO</h2>
-      <p class="settings-subtitle">Configure an OpenID Connect provider for single sign-on.</p>
+  <div class="mb-8">
+    <h2 class="settings-title">OIDC / SSO</h2>
+    <p class="settings-subtitle">Configure an OpenID Connect provider for single sign-on.</p>
+  </div>
+
+  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+
+  <form v-else class="space-y-6" @submit.prevent="save">
+    <!-- Enable -->
+    <div>
+      <p class="settings-group-label">Status</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div>
+            <p class="settings-label">Enable OIDC</p>
+            <p class="settings-hint">Show SSO login button and allow OIDC authentication.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="form.enabled"
+            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+            :class="form.enabled ? 'bg-primary' : 'bg-input'"
+            @click="form.enabled = !form.enabled"
+          >
+            <span
+              class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
+              :class="form.enabled ? 'translate-x-4' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
-
-    <form v-else class="space-y-6" @submit.prevent="save">
-      <!-- Enable -->
-      <div>
-        <p class="settings-group-label">Status</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <div class="flex items-center justify-between px-5 py-4 bg-card">
-            <div>
-              <p class="settings-label">Enable OIDC</p>
-              <p class="settings-hint">Show SSO login button and allow OIDC authentication.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="form.enabled"
-              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-              :class="form.enabled ? 'bg-primary' : 'bg-input'"
-              @click="form.enabled = !form.enabled"
-            >
-              <span
-                class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
-                :class="form.enabled ? 'translate-x-4' : 'translate-x-0.5'"
-              />
-            </button>
+    <!-- Provider -->
+    <div>
+      <p class="settings-group-label">Provider</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <div class="shrink-0">
+            <p class="settings-label">Provider Name</p>
+            <p class="settings-hint">Shown on the login button.</p>
           </div>
+          <input
+            v-model="form.providerName"
+            type="text"
+            placeholder="Authentik"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
         </div>
-      </div>
-
-      <!-- Provider -->
-      <div>
-        <p class="settings-group-label">Provider</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <div class="shrink-0">
-              <p class="settings-label">Provider Name</p>
-              <p class="settings-hint">Shown on the login button.</p>
-            </div>
-            <input
-              v-model="form.providerName"
-              type="text"
-              placeholder="Authentik"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+        <div class="flex items-start justify-between gap-8 px-5 py-4 bg-card">
+          <div class="shrink-0 pt-0.5">
+            <p class="settings-label">Issuer URI</p>
+            <p class="settings-hint">The provider's base URL.</p>
           </div>
-          <div class="flex items-start justify-between gap-8 px-5 py-4 bg-card">
-            <div class="shrink-0 pt-0.5">
-              <p class="settings-label">Issuer URI</p>
-              <p class="settings-hint">The provider's base URL.</p>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <div class="flex items-center gap-2">
-                <input
-                  v-model="form.issuerUri"
-                  type="url"
-                  placeholder="https://accounts.example.com"
-                  class="w-64 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-                <button
-                  type="button"
-                  :disabled="testing || !form.issuerUri"
-                  class="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors shrink-0"
-                  @click="testConnection"
-                >
-                  {{ testing ? 'Testing...' : 'Test' }}
-                </button>
-              </div>
-              <div
-                v-if="testResult"
-                class="text-xs px-3 py-1.5 rounded-md border"
-                :class="
-                  testResult.success ? 'border-green-500/30 text-green-600 bg-green-500/5' : 'border-destructive/30 text-destructive bg-destructive/5'
-                "
+          <div class="flex flex-col items-end gap-2">
+            <div class="flex items-center gap-2">
+              <input
+                v-model="form.issuerUri"
+                type="url"
+                placeholder="https://accounts.example.com"
+                class="w-64 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <button
+                type="button"
+                :disabled="testing || !form.issuerUri"
+                class="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors shrink-0"
+                @click="testConnection"
               >
-                {{ testResult.message }}
-              </div>
+                {{ testing ? 'Testing...' : 'Test' }}
+              </button>
             </div>
-          </div>
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Client ID</p>
-            <input
-              v-model="form.clientId"
-              type="text"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Client Secret</p>
-            <input
-              v-model="form.clientSecret"
-              type="password"
-              placeholder="Leave blank to keep existing"
-              autocomplete="new-password"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Scopes</p>
-            <input
-              v-model="form.scopes"
-              type="text"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Claim mapping -->
-      <div>
-        <p class="settings-group-label">Claim Mapping</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Username claim</p>
-            <input
-              v-model="form.claimMapping.username"
-              type="text"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Name claim</p>
-            <input
-              v-model="form.claimMapping.name"
-              type="text"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Email claim</p>
-            <input
-              v-model="form.claimMapping.email"
-              type="text"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
-            <p class="settings-label shrink-0">Groups claim</p>
-            <input
-              v-model="form.claimMapping.groups"
-              type="text"
-              class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Auto-provisioning -->
-      <div>
-        <p class="settings-group-label">Auto-Provisioning</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <div class="flex items-center justify-between px-5 py-4 bg-card">
-            <div>
-              <p class="settings-label">Auto-provision users</p>
-              <p class="settings-hint">Create accounts on first OIDC login if user does not exist.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="form.autoProvision.enabled"
-              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-              :class="form.autoProvision.enabled ? 'bg-primary' : 'bg-input'"
-              @click="form.autoProvision.enabled = !form.autoProvision.enabled"
+            <div
+              v-if="testResult"
+              class="text-xs px-3 py-1.5 rounded-md border"
+              :class="
+                testResult.success ? 'border-green-500/30 text-green-600 bg-green-500/5' : 'border-destructive/30 text-destructive bg-destructive/5'
+              "
             >
-              <span
-                class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
-                :class="form.autoProvision.enabled ? 'translate-x-4' : 'translate-x-0.5'"
-              />
-            </button>
-          </div>
-          <div class="flex items-center justify-between px-5 py-4 bg-card">
-            <div>
-              <p class="settings-label">Allow local account linking</p>
-              <p class="settings-hint">Link OIDC identity to an existing local account by username match.</p>
+              {{ testResult.message }}
             </div>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="form.autoProvision.allowLocalLinking"
-              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-              :class="form.autoProvision.allowLocalLinking ? 'bg-primary' : 'bg-input'"
-              @click="form.autoProvision.allowLocalLinking = !form.autoProvision.allowLocalLinking"
-            >
-              <span
-                class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
-                :class="form.autoProvision.allowLocalLinking ? 'translate-x-4' : 'translate-x-0.5'"
-              />
-            </button>
           </div>
         </div>
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Client ID</p>
+          <input
+            v-model="form.clientId"
+            type="text"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Client Secret</p>
+          <input
+            v-model="form.clientSecret"
+            type="password"
+            placeholder="Leave blank to keep existing"
+            autocomplete="new-password"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Scopes</p>
+          <input
+            v-model="form.scopes"
+            type="text"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
       </div>
+    </div>
 
-      <!-- Save -->
-      <div class="flex items-center gap-3">
-        <button
-          type="submit"
-          :disabled="saving"
-          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {{ saving ? 'Saving...' : 'Save changes' }}
-        </button>
-        <p v-if="saveSuccess" class="text-sm text-green-600">Saved.</p>
-        <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
+    <!-- Claim mapping -->
+    <div>
+      <p class="settings-group-label">Claim Mapping</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Username claim</p>
+          <input
+            v-model="form.claimMapping.username"
+            type="text"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Name claim</p>
+          <input
+            v-model="form.claimMapping.name"
+            type="text"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Email claim</p>
+          <input
+            v-model="form.claimMapping.email"
+            type="text"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+        <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
+          <p class="settings-label shrink-0">Groups claim</p>
+          <input
+            v-model="form.claimMapping.groups"
+            type="text"
+            class="w-52 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
       </div>
-    </form>
+    </div>
+
+    <!-- Auto-provisioning -->
+    <div>
+      <p class="settings-group-label">Auto-Provisioning</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div>
+            <p class="settings-label">Auto-provision users</p>
+            <p class="settings-hint">Create accounts on first OIDC login if user does not exist.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="form.autoProvision.enabled"
+            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+            :class="form.autoProvision.enabled ? 'bg-primary' : 'bg-input'"
+            @click="form.autoProvision.enabled = !form.autoProvision.enabled"
+          >
+            <span
+              class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
+              :class="form.autoProvision.enabled ? 'translate-x-4' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div>
+            <p class="settings-label">Allow local account linking</p>
+            <p class="settings-hint">Link OIDC identity to an existing local account by username match.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="form.autoProvision.allowLocalLinking"
+            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+            :class="form.autoProvision.allowLocalLinking ? 'bg-primary' : 'bg-input'"
+            @click="form.autoProvision.allowLocalLinking = !form.autoProvision.allowLocalLinking"
+          >
+            <span
+              class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
+              :class="form.autoProvision.allowLocalLinking ? 'translate-x-4' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <div class="flex items-center gap-3">
+      <button
+        type="submit"
+        :disabled="saving"
+        class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+      >
+        {{ saving ? 'Saving...' : 'Save changes' }}
+      </button>
+      <p v-if="saveSuccess" class="text-sm text-green-600">Saved.</p>
+      <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
+    </div>
+  </form>
 </template>

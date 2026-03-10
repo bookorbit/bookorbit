@@ -19,7 +19,8 @@ describe('EmailRecipientService', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   const mockRecipient = { id: 10, userId: 1, name: 'Recipient', email: 'r@test.com' };

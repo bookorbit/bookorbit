@@ -33,7 +33,8 @@ describe('RecommendationController', () => {
       settings: {},
       avatarUrl: null,
       provisioningMethod: 'local',
-      roles: [],
+      isSuperuser: false,
+      permissions: [],
     };
 
     await expect(controller.getRecommendations(10, user)).resolves.toEqual(recommendation);

@@ -1,16 +1,4 @@
-export interface RequestUserPermission {
-  id: number;
-  name: string;
-}
-
-export interface RequestUserRole {
-  id: number;
-  name: string;
-  description: string | null;
-  isSuperuser: boolean;
-  isSystem: boolean;
-  permissions: RequestUserPermission[];
-}
+import { Permission } from '@projectx/types';
 
 export interface RequestUser {
   id: number;
@@ -18,10 +6,11 @@ export interface RequestUser {
   name: string;
   email: string | null;
   active: boolean;
+  isSuperuser: boolean;
   isDefaultPassword: boolean;
   tokenVersion: number;
   settings: Record<string, unknown>;
   avatarUrl: string | null;
   provisioningMethod: string;
-  roles: RequestUserRole[];
+  permissions: Permission[];
 }

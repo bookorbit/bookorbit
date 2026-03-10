@@ -28,12 +28,13 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
     name: 'Tester',
     email: null,
     active: true,
+    isSuperuser: false,
     isDefaultPassword: false,
     tokenVersion: 1,
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
-    roles: [],
+    permissions: [],
     ...overrides,
   };
 }
@@ -501,16 +502,7 @@ describe('BookService', () => {
 
     it('normalizes kobo provider payload and clamps progress', async () => {
       const { service, bookRepo } = makeService();
-      const user = makeUser({
-        roles: [
-          {
-            id: 1,
-            name: 'Kobo',
-            isSuperuser: false,
-            permissions: [{ id: 1, name: 'kobo_sync' }],
-          },
-        ],
-      } as never);
+      const user = makeUser({ permissions: ['kobo_sync'] } as never);
       jest.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
       bookRepo.findKoboReadingState.mockResolvedValue({
         currentBookmark: { ProgressPercent: 130 },

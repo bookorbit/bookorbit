@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 
+import { Permission } from '@projectx/types';
 import type { GlobalFileWriteSettings } from '@projectx/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -9,7 +10,7 @@ import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
 import { UpdateOidcConfigDto } from './dto/update-oidc-config.dto';
 
 @Controller('app-settings')
-@RequirePermission('manage_app_settings')
+@RequirePermission(Permission.ManageAppSettings)
 export class AppSettingsController {
   constructor(private readonly appSettingsService: AppSettingsService) {}
 

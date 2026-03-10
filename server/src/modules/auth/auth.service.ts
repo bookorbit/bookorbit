@@ -3,7 +3,6 @@ import {
   ConflictException,
   ForbiddenException,
   Inject,
-  InternalServerErrorException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -91,15 +90,6 @@ export class AuthService {
         })
         .returning({ id: schema.users.id, username: schema.users.username, name: schema.users.name });
 
-      const userRole = await tx.query.roles.findFirst({
-        where: eq(schema.roles.name, 'User'),
-      });
-      if (!userRole) {
-        this.logger.error(`User role not found while registering ${user.username}`);
-        throw new InternalServerErrorException('User role not found');
-      }
-
-      await tx.insert(schema.userRoles).values({ userId: user.id, roleId: userRole.id });
       return user;
     });
   }
@@ -146,18 +136,12 @@ export class AuthService {
           email: dto.email,
           passwordHash,
           isDefaultPassword: false,
+          isSuperuser: true,
         })
         .returning({
           id: schema.users.id,
           tokenVersion: schema.users.tokenVersion,
         });
-
-      const adminRole = await tx.query.roles.findFirst({ where: eq(schema.roles.name, 'Admin') });
-      if (!adminRole) {
-        throw new InternalServerErrorException('Admin role not found');
-      }
-
-      await tx.insert(schema.userRoles).values({ userId: user.id, roleId: adminRole.id }).onConflictDoNothing();
 
       return user;
     });
@@ -174,7 +158,7 @@ export class AuthService {
     const valid = await compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    const fullUser = await this.userService.findByIdWithRolesAndPermissions(user.id);
+    const fullUser = await this.userService.findByIdWithPermissions(user.id);
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(user.id, user.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
@@ -183,32 +167,23 @@ export class AuthService {
   }
 
   buildUserResponse(user: RequestUser) {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
-    const permissions = isSuperuser ? ['*'] : [...new Set(user.roles.flatMap((r) => r.permissions.map((p) => p.name)))];
     return {
       id: user.id,
       username: user.username,
       name: user.name,
       email: user.email,
       active: user.active,
+      isSuperuser: user.isSuperuser,
       isDefaultPassword: user.isDefaultPassword,
       settings: user.settings,
       avatarUrl: user.avatarUrl,
       provisioningMethod: user.provisioningMethod,
-      roles: user.roles.map((r) => ({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        isSuperuser: r.isSuperuser,
-        isSystem: r.isSystem,
-        permissions: r.permissions.map((p) => ({ id: p.id, name: p.name })),
-      })),
-      permissions,
+      permissions: user.isSuperuser ? ['*'] : user.permissions,
     };
   }
 
   async issueTokensForUser(userId: number, reply: FastifyReply) {
-    const user = await this.userService.findByIdWithRolesAndPermissions(userId);
+    const user = await this.userService.findByIdWithPermissions(userId);
     if (!user || !user.active) throw new UnauthorizedException();
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(userId, user.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
@@ -303,7 +278,7 @@ export class AuthService {
   }
 
   async validateUser(userId: number, tokenVersion: number) {
-    const user = await this.userService.findByIdWithRolesAndPermissions(userId);
+    const user = await this.userService.findByIdWithPermissions(userId);
     if (!user || !user.active) throw new UnauthorizedException();
     if (user.tokenVersion !== tokenVersion) throw new UnauthorizedException();
     return user;

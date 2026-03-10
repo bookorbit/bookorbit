@@ -38,7 +38,7 @@ export class EmailTemplateService {
 
   async update(id: number, dto: UpdateEmailTemplateDto, user: RequestUser) {
     const template = await this.getAccessible(id, user);
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
 
     if (template.isSystem && !isSuperuser) throw new ForbiddenException('Only administrators can modify system templates');
     if (!template.isSystem && template.userId !== user.id) throw new ForbiddenException('Cannot modify this template');

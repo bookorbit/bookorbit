@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -9,7 +10,7 @@ import { PreviewTemplateDto } from './dto/preview-template.dto';
 import { EmailTemplateService } from './email-template.service';
 
 @Controller('email/templates')
-@RequirePermission('email_send')
+@RequirePermission(Permission.EmailSend)
 export class EmailTemplateController {
   constructor(private readonly service: EmailTemplateService) {}
 

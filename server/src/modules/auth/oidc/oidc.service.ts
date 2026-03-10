@@ -1,5 +1,6 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
+import { Permission } from '@projectx/types';
 
 import { AppSettingsService } from '../../app-settings/app-settings.service';
 import { UserService } from '../../user/user.service';
@@ -115,8 +116,8 @@ export class OidcService {
         avatarUrl: claims.avatarUrl,
       });
 
-      if (config.autoProvision.defaultRoleId) {
-        await this.userService.assignRoleDirectly(user.id, config.autoProvision.defaultRoleId);
+      if (config.autoProvision.defaultPermissionNames?.length) {
+        await this.userService.setPermissionsDirectly(user.id, config.autoProvision.defaultPermissionNames as Permission[]);
       }
     }
 

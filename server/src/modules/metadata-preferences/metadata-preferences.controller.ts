@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put } from '@nestjs/common';
-import { ALL_METADATA_FIELDS } from '@projectx/types';
+import { Permission, ALL_METADATA_FIELDS } from '@projectx/types';
 import type { FieldPreference, MetadataField } from '@projectx/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -8,7 +8,7 @@ import { UpdateLibraryFieldDto } from './dto/update-library-field.dto';
 import { MetadataPreferencesService } from './metadata-preferences.service';
 
 @Controller('metadata-preferences')
-@RequirePermission('manage_metadata_config')
+@RequirePermission(Permission.ManageMetadataConfig)
 export class MetadataPreferencesController {
   constructor(private readonly service: MetadataPreferencesService) {}
 

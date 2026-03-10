@@ -35,7 +35,7 @@ export class UploadService {
   ) {}
 
   async upload(libraryId: number, folderId: number | undefined, rawFilename: string, fileStream: Readable, user: RequestUser): Promise<UploadResult> {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
 
     const library = await this.findLibraryOrFail(libraryId);
     await this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser);

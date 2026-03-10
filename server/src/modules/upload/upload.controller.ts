@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { BadRequestException, Controller, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
@@ -18,7 +19,7 @@ export class UploadController {
 
   @Post(':id/upload')
   @HttpCode(HttpStatus.CREATED)
-  @RequirePermission('library_upload')
+  @RequirePermission(Permission.LibraryUpload)
   async uploadBook(
     @Param('id', ParseIntPipe) libraryId: number,
     @Query('folderId') rawFolderId: string | undefined,

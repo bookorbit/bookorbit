@@ -1,5 +1,6 @@
 import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import { Permission } from '@projectx/types';
 
 import { OpdsAuthGuard } from '../opds-auth.guard';
 import type { OpdsRequestUser } from '../opds-auth.guard';
@@ -42,12 +43,13 @@ const FULL_USER = {
   name: 'Admin',
   email: null,
   active: true,
+  isSuperuser: false,
   isDefaultPassword: false,
   tokenVersion: 1,
   settings: {},
   avatarUrl: null,
   provisioningMethod: 'local',
-  roles: [{ id: 1, name: 'User', description: null, isSuperuser: false, isSystem: true, permissions: [{ id: 99, name: 'opds_access' }] }],
+  permissions: [Permission.OpdsAccess],
 };
 
 function makeGuard(overrides: { validateResult?: unknown; fullUser?: unknown; userHas?: boolean } = {}) {
@@ -57,7 +59,7 @@ function makeGuard(overrides: { validateResult?: unknown; fullUser?: unknown; us
       .mockResolvedValue(overrides.validateResult !== undefined ? overrides.validateResult : { opdsUser: OPDS_USER, parentUser: PARENT_USER }),
   };
   const userService = {
-    findByIdWithRolesAndPermissions: jest.fn().mockResolvedValue(overrides.fullUser !== undefined ? overrides.fullUser : FULL_USER),
+    findByIdWithPermissions: jest.fn().mockResolvedValue(overrides.fullUser !== undefined ? overrides.fullUser : FULL_USER),
   };
   const permissionService = {
     userHas: jest.fn().mockReturnValue(overrides.userHas !== undefined ? overrides.userHas : true),
@@ -111,7 +113,7 @@ describe('OpdsAuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
   });
 
-  it('returns 401 when parent user not found via findByIdWithRolesAndPermissions', async () => {
+  it('returns 401 when parent user not found via findByIdWithPermissions', async () => {
     const guard = makeGuard({ fullUser: null });
     const { context } = mockContext(basicHeader('reader', 'pass'));
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);

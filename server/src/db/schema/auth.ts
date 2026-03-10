@@ -9,6 +9,7 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).unique(),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   active: boolean('active').notNull().default(true),
+  isSuperuser: boolean('is_superuser').notNull().default(false),
   isDefaultPassword: boolean('is_default_password').notNull().default(false),
   tokenVersion: integer('token_version').notNull().default(1),
   settings: jsonb('settings').notNull().default({}),
@@ -23,47 +24,15 @@ export const users = pgTable('users', {
     .$onUpdateFn(() => new Date()),
 });
 
-export const permissions = pgTable('permissions', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull().unique(),
-  description: text('description'),
-  isSystem: boolean('is_system').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
-
-export const roles = pgTable('roles', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull().unique(),
-  description: text('description'),
-  isSuperuser: boolean('is_superuser').notNull().default(false),
-  isSystem: boolean('is_system').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
-
-export const rolePermissions = pgTable(
-  'role_permissions',
-  {
-    roleId: integer('role_id')
-      .notNull()
-      .references(() => roles.id, { onDelete: 'cascade' }),
-    permissionId: integer('permission_id')
-      .notNull()
-      .references(() => permissions.id, { onDelete: 'cascade' }),
-  },
-  (t) => [primaryKey({ columns: [t.roleId, t.permissionId] })],
-);
-
-export const userRoles = pgTable(
-  'user_roles',
+export const userPermissions = pgTable(
+  'user_permissions',
   {
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    roleId: integer('role_id')
-      .notNull()
-      .references(() => roles.id, { onDelete: 'cascade' }),
+    permissionName: varchar('permission_name', { length: 100 }).notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.roleId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.permissionName] })],
 );
 
 export const libraryAccessLevelEnum = pgEnum('library_access_level', ['viewer', 'editor', 'owner']);
@@ -124,12 +93,6 @@ export const appSettings = pgTable('app_settings', {
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
-
-export type Permission = typeof permissions.$inferSelect;
-export type NewPermission = typeof permissions.$inferInsert;
-
-export type Role = typeof roles.$inferSelect;
-export type NewRole = typeof roles.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type AppSetting = typeof appSettings.$inferSelect;

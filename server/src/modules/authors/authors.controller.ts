@@ -5,6 +5,7 @@ import type { FastifyReply } from 'fastify';
 import { extname } from 'path';
 import { map, Observable } from 'rxjs';
 
+import { Permission } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -61,7 +62,7 @@ export class AuthorsController {
   }
 
   @Post('bulk-refresh-metadata')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   async bulkRefreshMetadata(@Body() dto: BulkAuthorIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -118,25 +119,25 @@ export class AuthorsController {
   }
 
   @Post(':id/enrichment/refresh')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   refreshEnrichment(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
     return this.authorsService.refreshEnrichment(user, id);
   }
 
   @Patch(':id')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   update(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAuthorDto) {
     return this.authorsService.update(user, id, dto);
   }
 
   @Post('merge')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   merge(@CurrentUser() user: RequestUser, @Body() dto: MergeAuthorsDto) {
     return this.authorsService.merge(user, dto);
   }
 
   @Delete()
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   delete(@CurrentUser() user: RequestUser, @Body() dto: DeleteAuthorsDto) {
     return this.authorsService.delete(user, dto);
   }

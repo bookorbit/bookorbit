@@ -46,7 +46,8 @@ function makeUser(): RequestUser {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 }
 

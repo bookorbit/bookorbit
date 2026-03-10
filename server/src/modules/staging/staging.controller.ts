@@ -19,6 +19,7 @@ import { createReadStream } from 'fs';
 import { access } from 'fs/promises';
 import { Readable } from 'stream';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { Permission } from '@projectx/types';
 import type { StagingMetadata } from '@projectx/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -46,7 +47,7 @@ type MultipartRequest = FastifyRequest & {
 };
 
 @Controller('staging')
-@RequirePermission('staging_access')
+@RequirePermission(Permission.StagingAccess)
 export class StagingController {
   constructor(
     private readonly service: StagingService,
@@ -156,7 +157,7 @@ export class StagingController {
 
   @Post('finalize')
   finalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeStagingDto) {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
     return this.finalizeService.finalize(
       user.id,
       isSuperuser,

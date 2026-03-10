@@ -12,18 +12,19 @@ describe('EmailAdminLogController', () => {
     name: 'Admin User',
     email: 'admin@example.com',
     active: true,
+    isSuperuser: true,
     isDefaultPassword: false,
     tokenVersion: 1,
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [{ id: 1, name: 'Admin', description: '', isSuperuser: true, isSystem: false, permissions: [] }],
+    permissions: [],
   };
 
   const normalUser: RequestUser = {
     ...superuser,
     id: 2,
-    roles: [{ id: 2, name: 'User', description: '', isSuperuser: false, isSystem: false, permissions: [] }],
+    isSuperuser: false,
   };
 
   it('uses default pagination values when query is empty', async () => {

@@ -4,16 +4,18 @@ jest.mock('crypto', () => ({ randomBytes: jest.fn() }));
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { Permission } from '@projectx/types';
 
 import { UserService } from './user.service';
 
 const mockHash = hash as jest.MockedFunction<typeof hash>;
 const mockRandomBytes = randomBytes as jest.MockedFunction<typeof randomBytes>;
 
-function reqUser(overrides: Partial<{ id: number; roles: Array<{ isSuperuser: boolean; permissions: Array<{ name: string }> }> }> = {}) {
+function reqUser(overrides: Partial<{ id: number; isSuperuser: boolean; permissions: Permission[] }> = {}) {
   return {
     id: 1,
-    roles: [{ isSuperuser: false, permissions: [] }],
+    isSuperuser: false,
+    permissions: [],
     ...overrides,
   } as any;
 }
@@ -25,25 +27,23 @@ describe('UserService', () => {
     findByOidcSubject: jest.fn(),
     linkOidcIdentity: jest.fn(),
     createOidcUser: jest.fn(),
-    assignRole: jest.fn(),
+    setPermissions: jest.fn(),
     generateResetToken: jest.fn(),
     incrementTokenVersion: jest.fn(),
-    findByIdWithRolesAndPermissions: jest.fn(),
+    findByIdWithPermissions: jest.fn(),
     create: jest.fn(),
     findAll: jest.fn(),
     update: jest.fn(),
     countOtherSuperusers: jest.fn(),
     delete: jest.fn(),
-    revokeRole: jest.fn(),
+    setSuperuser: jest.fn(),
   };
 
   const config = { get: jest.fn() };
   const db = {
-    query: {
-      roles: {
-        findFirst: jest.fn(),
-      },
-    },
+    insert: jest.fn().mockReturnThis(),
+    values: jest.fn().mockReturnThis(),
+    onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
   };
 
   let service: UserService;
@@ -65,10 +65,15 @@ describe('UserService', () => {
     await expect(service.createUser({ username: 'taken', name: 'Name' } as any)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('createUser creates user, assigns requested roles, and returns reset URL', async () => {
+  it('createUser creates user, assigns requested permissions, and returns reset URL', async () => {
     userRepo.findByUsername.mockResolvedValue(null);
 
-    const result = await service.createUser({ username: 'newuser', name: 'New User', email: 'x@y.com', roleIds: [3, 4] } as any);
+    const result = await service.createUser({
+      username: 'newuser',
+      name: 'New User',
+      email: 'x@y.com',
+      permissionNames: [Permission.LibraryDownload, Permission.KoboSync],
+    } as any);
 
     expect(userRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -79,8 +84,7 @@ describe('UserService', () => {
         isDefaultPassword: true,
       }),
     );
-    expect(userRepo.assignRole).toHaveBeenCalledWith(10, 3);
-    expect(userRepo.assignRole).toHaveBeenCalledWith(10, 4);
+    expect(userRepo.setPermissions).toHaveBeenCalledWith(10, [Permission.LibraryDownload, Permission.KoboSync]);
     expect(result).toEqual({ id: 10, username: 'newuser', name: 'New User', resetUrl: 'https://app.example.com/reset-password?token=reset-token' });
   });
 
@@ -89,58 +93,59 @@ describe('UserService', () => {
   });
 
   it('updateUser blocks non-superuser editing a superuser account', async () => {
-    userRepo.findByIdWithRolesAndPermissions.mockResolvedValue({ id: 2, roles: [{ isSuperuser: true }] });
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
 
     await expect(service.updateUser(2, { name: 'x' }, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('updateUser prevents deactivating the last administrator', async () => {
-    userRepo.findByIdWithRolesAndPermissions.mockResolvedValue({ id: 2, roles: [{ isSuperuser: true }] });
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
     userRepo.countOtherSuperusers.mockResolvedValue(0);
 
-    await expect(service.updateUser(2, { active: false }, reqUser({ roles: [{ isSuperuser: true, permissions: [] }] }))).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(service.updateUser(2, { active: false }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('assignRole requires manage_roles permission for superuser roles', async () => {
-    (db.query.roles.findFirst as jest.Mock).mockResolvedValue({ id: 9, isSuperuser: true });
-
-    await expect(service.assignRole(2, 9, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
-    expect(userRepo.assignRole).not.toHaveBeenCalled();
+  it('setPermissions blocks modifying own permissions', async () => {
+    await expect(service.setPermissions(1, { permissionNames: [] }, reqUser({ id: 1 }))).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('assignRole allows superuser-role assignment for manage_roles users', async () => {
-    (db.query.roles.findFirst as jest.Mock).mockResolvedValue({ id: 9, isSuperuser: true });
+  it('setPermissions blocks non-superuser modifying a superuser account', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
 
-    await service.assignRole(2, 9, reqUser({ roles: [{ isSuperuser: false, permissions: [{ name: 'manage_roles' }] }] }));
-
-    expect(userRepo.assignRole).toHaveBeenCalledWith(2, 9);
+    await expect(service.setPermissions(2, { permissionNames: [Permission.LibraryDownload] }, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('revokeRole blocks self-role-revocation', async () => {
-    await expect(service.revokeRole(1, 7, reqUser({ id: 1 }))).rejects.toBeInstanceOf(ConflictException);
+  it('setPermissions succeeds for superuser modifying another user', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
+
+    await service.setPermissions(2, { permissionNames: [Permission.LibraryDownload] }, reqUser({ isSuperuser: true }));
+
+    expect(userRepo.setPermissions).toHaveBeenCalledWith(2, [Permission.LibraryDownload]);
   });
 
-  it('revokeRole prevents removing the last superuser role from target', async () => {
-    (db.query.roles.findFirst as jest.Mock).mockResolvedValue({ id: 11, isSuperuser: true });
-    userRepo.findByIdWithRolesAndPermissions.mockResolvedValue({ id: 2, roles: [{ id: 11, isSuperuser: true }] });
+  it('setSuperuser blocks non-superuser from changing superuser status', async () => {
+    await expect(service.setSuperuser(2, true, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('setSuperuser blocks changing own superuser status', async () => {
+    await expect(service.setSuperuser(1, false, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('setSuperuser prevents removing the last administrator', async () => {
     userRepo.countOtherSuperusers.mockResolvedValue(0);
 
-    await expect(service.revokeRole(2, 11, reqUser({ roles: [{ isSuperuser: true, permissions: [] }] }))).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.setSuperuser(2, false, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('adminResetPassword forbids non-superuser reset of superuser account', async () => {
-    userRepo.findByIdWithRolesAndPermissions.mockResolvedValue({ id: 2, roles: [{ isSuperuser: true }] });
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
 
     await expect(service.adminResetPassword(2, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('adminResetPassword throws when target user does not exist', async () => {
-    userRepo.findByIdWithRolesAndPermissions.mockResolvedValue(null);
+    userRepo.findByIdWithPermissions.mockResolvedValue(null);
 
-    await expect(service.adminResetPassword(9, reqUser({ roles: [{ isSuperuser: true, permissions: [] }] }))).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.adminResetPassword(9, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 });

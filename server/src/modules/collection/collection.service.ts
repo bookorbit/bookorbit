@@ -19,7 +19,7 @@ export class CollectionService {
   ) {}
 
   private isSuperuser(user: RequestUser): boolean {
-    return user.roles.some((r) => r.isSuperuser);
+    return user.isSuperuser;
   }
 
   private assertAccess(ownerId: number, user: RequestUser): void {

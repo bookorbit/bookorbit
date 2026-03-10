@@ -91,7 +91,7 @@ describe('UserRepository', () => {
     mockHash.mockResolvedValue('oidc-password-hash');
   });
 
-  it('findAll returns normalized count and skips role query when no ids are on the page', async () => {
+  it('findAll returns normalized count and skips user query when no ids are on the page', async () => {
     const idOffset = jest.fn().mockResolvedValue([]);
     const idLimit = jest.fn().mockReturnValue({ offset: idOffset });
     const idOrderBy = jest.fn().mockReturnValue({ limit: idLimit });
@@ -107,7 +107,7 @@ describe('UserRepository', () => {
     expect(select).toHaveBeenCalledTimes(2);
   });
 
-  it('findAll preserves page order, aggregates roles, and tolerates missing join rows', async () => {
+  it('findAll preserves page order, aggregates permissions, and tolerates missing join rows', async () => {
     const idOffset = jest.fn().mockResolvedValue([{ id: 20 }, { id: 10 }]);
     const idLimit = jest.fn().mockReturnValue({ offset: idOffset });
     const idOrderBy = jest.fn().mockReturnValue({ limit: idLimit });
@@ -122,12 +122,10 @@ describe('UserRepository', () => {
         name: 'Alice',
         email: null,
         active: true,
+        isSuperuser: false,
         isDefaultPassword: false,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
-        roleId: 1,
-        roleName: 'admin',
-        roleIsSuperuser: true,
-        roleIsSystem: true,
+        permissionName: 'library_download',
       },
       {
         id: 10,
@@ -135,18 +133,15 @@ describe('UserRepository', () => {
         name: 'Alice',
         email: null,
         active: true,
+        isSuperuser: false,
         isDefaultPassword: false,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
-        roleId: 2,
-        roleName: 'editor',
-        roleIsSuperuser: false,
-        roleIsSystem: false,
+        permissionName: 'kobo_sync',
       },
     ]);
     const rowsWhere = jest.fn().mockReturnValue({ orderBy: rowsOrderBy });
-    const rowsJoin2 = jest.fn().mockReturnValue({ where: rowsWhere });
-    const rowsJoin1 = jest.fn().mockReturnValue({ leftJoin: rowsJoin2 });
-    const rowsFrom = jest.fn().mockReturnValue({ leftJoin: rowsJoin1 });
+    const rowsJoin = jest.fn().mockReturnValue({ where: rowsWhere });
+    const rowsFrom = jest.fn().mockReturnValue({ leftJoin: rowsJoin });
 
     select.mockReturnValueOnce({ from: idFrom }).mockReturnValueOnce({ from: countFrom }).mockReturnValueOnce({ from: rowsFrom });
 
@@ -157,26 +152,20 @@ describe('UserRepository', () => {
     expect(result.users[0]).toMatchObject({
       id: 10,
       username: 'alice',
-      roles: [
-        { id: 1, name: 'admin', isSuperuser: true, isSystem: true },
-        { id: 2, name: 'editor', isSuperuser: false, isSystem: false },
-      ],
+      permissions: ['library_download', 'kobo_sync'],
     });
   });
 
-  it('findByIdWithRolesAndPermissions returns null when user is missing', async () => {
+  it('findByIdWithPermissions returns null when user is missing', async () => {
     const where = jest.fn().mockResolvedValue([]);
-    const join4 = jest.fn().mockReturnValue({ where });
-    const join3 = jest.fn().mockReturnValue({ leftJoin: join4 });
-    const join2 = jest.fn().mockReturnValue({ leftJoin: join3 });
-    const join1 = jest.fn().mockReturnValue({ leftJoin: join2 });
-    const from = jest.fn().mockReturnValue({ leftJoin: join1 });
+    const join = jest.fn().mockReturnValue({ where });
+    const from = jest.fn().mockReturnValue({ leftJoin: join });
     select.mockReturnValue({ from });
 
-    await expect(repo.findByIdWithRolesAndPermissions(99)).resolves.toBeNull();
+    await expect(repo.findByIdWithPermissions(99)).resolves.toBeNull();
   });
 
-  it('findByIdWithRolesAndPermissions deduplicates permissions and ignores null role rows', async () => {
+  it('findByIdWithPermissions deduplicates permissions and ignores null rows', async () => {
     const where = jest.fn().mockResolvedValue([
       {
         id: 3,
@@ -184,18 +173,13 @@ describe('UserRepository', () => {
         name: 'Sam',
         email: 'sam@example.com',
         active: true,
+        isSuperuser: false,
         isDefaultPassword: false,
         tokenVersion: 2,
         settings: { locale: 'en' },
         avatarUrl: null,
         provisioningMethod: 'local',
-        roleId: 1,
-        roleName: 'admin',
-        roleDescription: 'Admin role',
-        roleIsSuperuser: true,
-        roleIsSystem: true,
-        permId: 10,
-        permName: 'books.read',
+        permissionName: 'library_download',
       },
       {
         id: 3,
@@ -203,18 +187,13 @@ describe('UserRepository', () => {
         name: 'Sam',
         email: 'sam@example.com',
         active: true,
+        isSuperuser: false,
         isDefaultPassword: false,
         tokenVersion: 2,
         settings: { locale: 'en' },
         avatarUrl: null,
         provisioningMethod: 'local',
-        roleId: 1,
-        roleName: 'admin',
-        roleDescription: 'Admin role',
-        roleIsSuperuser: true,
-        roleIsSystem: true,
-        permId: 10,
-        permName: 'books.read',
+        permissionName: 'library_download',
       },
       {
         id: 3,
@@ -222,63 +201,25 @@ describe('UserRepository', () => {
         name: 'Sam',
         email: 'sam@example.com',
         active: true,
+        isSuperuser: false,
         isDefaultPassword: false,
         tokenVersion: 2,
         settings: { locale: 'en' },
         avatarUrl: null,
         provisioningMethod: 'local',
-        roleId: 2,
-        roleName: 'editor',
-        roleDescription: null,
-        roleIsSuperuser: false,
-        roleIsSystem: false,
-        permId: null,
-        permName: null,
-      },
-      {
-        id: 3,
-        username: 'sam',
-        name: 'Sam',
-        email: 'sam@example.com',
-        active: true,
-        isDefaultPassword: false,
-        tokenVersion: 2,
-        settings: { locale: 'en' },
-        avatarUrl: null,
-        provisioningMethod: 'local',
-        roleId: null,
-        roleName: null,
-        roleDescription: null,
-        roleIsSuperuser: null,
-        roleIsSystem: null,
-        permId: null,
-        permName: null,
+        permissionName: null,
       },
     ]);
-    const join4 = jest.fn().mockReturnValue({ where });
-    const join3 = jest.fn().mockReturnValue({ leftJoin: join4 });
-    const join2 = jest.fn().mockReturnValue({ leftJoin: join3 });
-    const join1 = jest.fn().mockReturnValue({ leftJoin: join2 });
-    const from = jest.fn().mockReturnValue({ leftJoin: join1 });
+    const join = jest.fn().mockReturnValue({ where });
+    const from = jest.fn().mockReturnValue({ leftJoin: join });
     select.mockReturnValue({ from });
 
-    const user = await repo.findByIdWithRolesAndPermissions(3);
+    const user = await repo.findByIdWithPermissions(3);
 
     expect(user).toMatchObject({
       id: 3,
       username: 'sam',
-      roles: [
-        {
-          id: 1,
-          name: 'admin',
-          permissions: [{ id: 10, name: 'books.read' }],
-        },
-        {
-          id: 2,
-          name: 'editor',
-          permissions: [],
-        },
-      ],
+      permissions: ['library_download'],
     });
   });
 
@@ -301,8 +242,7 @@ describe('UserRepository', () => {
 
   it('countOtherSuperusers normalizes db count values to a number', async () => {
     const where = jest.fn().mockResolvedValue([{ total: '3' }]);
-    const innerJoin = jest.fn().mockReturnValue({ where });
-    const from = jest.fn().mockReturnValue({ innerJoin });
+    const from = jest.fn().mockReturnValue({ where });
     select.mockReturnValue({ from });
 
     await expect(repo.countOtherSuperusers(7)).resolves.toBe(3);

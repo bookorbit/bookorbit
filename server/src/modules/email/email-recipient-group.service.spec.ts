@@ -21,7 +21,8 @@ describe('EmailRecipientGroupService', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   const mockGroup = { id: 10, userId: 1, name: 'Test Group' };

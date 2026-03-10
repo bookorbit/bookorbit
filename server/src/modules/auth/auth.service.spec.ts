@@ -8,7 +8,6 @@ function makeDb(overrides?: Record<string, unknown>) {
       appSettings: { findFirst: jest.fn() },
       refreshTokens: { findFirst: jest.fn(), findMany: jest.fn() },
       users: { findFirst: jest.fn() },
-      roles: { findFirst: jest.fn() },
       passwordResetTokens: { findFirst: jest.fn() },
     },
     $count: jest.fn().mockResolvedValue(0),
@@ -44,21 +43,13 @@ function makeFullUser(overrides?: Partial<Record<string, unknown>>) {
     name: 'John Doe',
     email: 'jdoe@example.com',
     active: true,
+    isSuperuser: false,
     isDefaultPassword: false,
     tokenVersion: 1,
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
-    roles: [
-      {
-        id: 1,
-        name: 'User',
-        description: '',
-        isSuperuser: false,
-        isSystem: true,
-        permissions: [{ id: 1, name: 'read_books' }],
-      },
-    ],
+    permissions: ['library_download'],
     ...overrides,
   } as never;
 }
@@ -68,7 +59,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
   const userService = {
     findByUsername: jest.fn(),
     findByEmail: jest.fn(),
-    findByIdWithRolesAndPermissions: jest.fn(),
+    findByIdWithPermissions: jest.fn(),
     create: jest.fn(),
     incrementTokenVersion: jest.fn().mockResolvedValue(undefined),
     generatePasswordResetToken: jest.fn().mockResolvedValue('raw-reset-token'),
@@ -164,14 +155,14 @@ describe('AuthService', () => {
         .mockResolvedValueOnce([{ id: 99 }])
         .mockResolvedValueOnce([{ id: 7, tokenVersion: 1 }]);
       (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValue(null);
-      (db.query as never as Record<string, Record<string, jest.Mock>>).roles.findFirst.mockResolvedValue({ id: 1, name: 'Admin' });
-      userService.findByIdWithRolesAndPermissions.mockResolvedValue(
+      userService.findByIdWithPermissions.mockResolvedValue(
         makeFullUser({
           id: 7,
           username: 'owner',
           name: 'Owner',
           email: 'owner@example.com',
-          roles: [{ id: 1, name: 'Admin', description: '', isSuperuser: true, isSystem: true, permissions: [] }],
+          isSuperuser: true,
+          permissions: [],
         }),
       );
 
@@ -221,12 +212,11 @@ describe('AuthService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('registers user successfully and assigns User role', async () => {
+    it('registers user successfully', async () => {
       const { service, db } = makeService();
       (db.query as never as Record<string, Record<string, jest.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
       (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValueOnce(null);
       ((db as unknown as Record<string, unknown>).returning as jest.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);
-      (db.query as never as Record<string, Record<string, jest.Mock>>).roles.findFirst.mockResolvedValue({ id: 5, name: 'User' });
 
       const result = await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: undefined } as never);
       expect(result).toEqual({ id: 1, username: 'jdoe', name: 'John Doe' });
@@ -250,7 +240,6 @@ describe('AuthService', () => {
 
     it('throws UnauthorizedException when password is wrong', async () => {
       const { service, userService } = makeService();
-      // bcryptjs hash for a different password
       userService.findByUsername.mockResolvedValue({
         id: 1,
         active: true,
@@ -265,35 +254,21 @@ describe('AuthService', () => {
   describe('buildUserResponse', () => {
     it('returns wildcard permissions for superuser', () => {
       const { service } = makeService();
-      const user = makeFullUser({
-        roles: [{ id: 1, name: 'Admin', description: '', isSuperuser: true, isSystem: true, permissions: [] }],
-      });
+      const user = makeFullUser({ isSuperuser: true, permissions: [] });
 
       const response = service.buildUserResponse(user as never);
       expect(response.permissions).toEqual(['*']);
     });
 
-    it('deduplicates permissions across multiple roles', () => {
+    it('returns flat permission list for non-superuser', () => {
       const { service } = makeService();
       const user = makeFullUser({
-        roles: [
-          { id: 1, name: 'Editor', description: '', isSuperuser: false, isSystem: false, permissions: [{ id: 1, name: 'read_books' }] },
-          {
-            id: 2,
-            name: 'Uploader',
-            description: '',
-            isSuperuser: false,
-            isSystem: false,
-            permissions: [
-              { id: 1, name: 'read_books' },
-              { id: 2, name: 'upload_books' },
-            ],
-          },
-        ],
+        isSuperuser: false,
+        permissions: ['library_download', 'kobo_sync'],
       });
 
       const response = service.buildUserResponse(user as never);
-      expect(response.permissions).toEqual(['read_books', 'upload_books']);
+      expect(response.permissions).toEqual(['library_download', 'kobo_sync']);
     });
 
     it('includes all user fields in response', () => {
@@ -306,6 +281,7 @@ describe('AuthService', () => {
         name: 'John Doe',
         email: 'jdoe@example.com',
         active: true,
+        isSuperuser: false,
         isDefaultPassword: false,
         provisioningMethod: 'local',
       });
@@ -335,7 +311,6 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh(makeRequest({ refresh_token: 'revoked-token' }), makeReply())).rejects.toThrow(UnauthorizedException);
-      // Should delete all user sessions
       expect(db.delete).toHaveBeenCalled();
     });
 
@@ -376,21 +351,21 @@ describe('AuthService', () => {
   describe('validateUser', () => {
     it('throws UnauthorizedException when user not found', async () => {
       const { service, userService } = makeService();
-      userService.findByIdWithRolesAndPermissions.mockResolvedValue(null);
+      userService.findByIdWithPermissions.mockResolvedValue(null);
 
       await expect(service.validateUser(1, 1)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws UnauthorizedException when user is inactive', async () => {
       const { service, userService } = makeService();
-      userService.findByIdWithRolesAndPermissions.mockResolvedValue(makeFullUser({ active: false }));
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ active: false }));
 
       await expect(service.validateUser(1, 1)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws UnauthorizedException when tokenVersion does not match', async () => {
       const { service, userService } = makeService();
-      userService.findByIdWithRolesAndPermissions.mockResolvedValue(makeFullUser({ tokenVersion: 5 }));
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ tokenVersion: 5 }));
 
       await expect(service.validateUser(1, 3)).rejects.toThrow(UnauthorizedException);
     });
@@ -398,7 +373,7 @@ describe('AuthService', () => {
     it('returns user when all checks pass', async () => {
       const { service, userService } = makeService();
       const user = makeFullUser({ tokenVersion: 2 });
-      userService.findByIdWithRolesAndPermissions.mockResolvedValue(user);
+      userService.findByIdWithPermissions.mockResolvedValue(user);
 
       const result = await service.validateUser(1, 2);
       expect(result).toEqual(user);
@@ -455,7 +430,7 @@ describe('AuthService', () => {
       (db.query as never as Record<string, Record<string, jest.Mock>>).users.findFirst.mockResolvedValue({
         id: 1,
         provisioningMethod: 'local',
-        passwordHash: '$2b$12$N4G7fngl8wXlWv2vN7INzuLe6Qw3sJwN6gI6s2zQm6A2f0r7WQX1y', // hash for a different password
+        passwordHash: '$2b$12$N4G7fngl8wXlWv2vN7INzuLe6Qw3sJwN6gI6s2zQm6A2f0r7WQX1y',
       });
 
       await expect(service.changePassword(1, { currentPassword: 'wrong-current', newPassword: 'New@1234' }, makeReply())).rejects.toThrow(

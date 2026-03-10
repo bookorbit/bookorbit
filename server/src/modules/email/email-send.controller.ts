@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Body, Controller, HttpCode, HttpStatus, Param, ParseIntPipe, Post } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,7 +8,7 @@ import { SendBookDto } from './dto/send-book.dto';
 import { EmailSendOrchestrator } from './email-send-orchestrator.service';
 
 @Controller('email/send')
-@RequirePermission('email_send')
+@RequirePermission(Permission.EmailSend)
 export class EmailSendController {
   constructor(private readonly orchestrator: EmailSendOrchestrator) {}
 

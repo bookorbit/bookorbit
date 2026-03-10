@@ -21,7 +21,7 @@ export class LensService {
   ) {}
 
   private isSuperuser(user: RequestUser): boolean {
-    return user.roles.some((r) => r.isSuperuser);
+    return user.isSuperuser;
   }
 
   async findAll(user: RequestUser) {

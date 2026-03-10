@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import type { RequestUser } from '../types/request-user';
 
 import { PermissionService } from './permission.service';
@@ -9,21 +10,13 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     name: 'Jane Doe',
     email: 'jdoe@example.com',
     active: true,
+    isSuperuser: false,
     isDefaultPassword: false,
     tokenVersion: 1,
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
-    roles: [
-      {
-        id: 1,
-        name: 'Reader',
-        description: null,
-        isSuperuser: false,
-        isSystem: true,
-        permissions: [{ id: 1, name: 'read_books' }],
-      },
-    ],
+    permissions: [Permission.LibraryDownload],
     ...overrides,
   };
 }
@@ -31,61 +24,30 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
 describe('PermissionService', () => {
   const service = new PermissionService();
 
-  it('returns true for any permission when user has a superuser role', () => {
-    const user = makeUser({
-      roles: [{ id: 9, name: 'Admin', description: null, isSuperuser: true, isSystem: true, permissions: [] }],
-    });
+  it('returns true for any permission when user is superuser', () => {
+    const user = makeUser({ isSuperuser: true, permissions: [] });
 
-    expect(service.userHas(user, 'non_existent_permission')).toBe(true);
+    expect(service.userHas(user, Permission.ManageUsers)).toBe(true);
   });
 
-  it('returns true when permission exists across multiple roles', () => {
+  it('returns true when user has the specific permission', () => {
     const user = makeUser({
-      roles: [
-        { id: 1, name: 'Reader', description: null, isSuperuser: false, isSystem: true, permissions: [{ id: 1, name: 'read_books' }] },
-        { id: 2, name: 'Uploader', description: null, isSuperuser: false, isSystem: false, permissions: [{ id: 2, name: 'upload_books' }] },
-      ],
+      permissions: [Permission.LibraryDownload, Permission.KoboSync],
     });
 
-    expect(service.userHas(user, 'upload_books')).toBe(true);
+    expect(service.userHas(user, Permission.KoboSync)).toBe(true);
   });
 
   it('returns false when permission does not exist', () => {
-    const user = makeUser();
+    const user = makeUser({ permissions: [Permission.LibraryDownload] });
 
-    expect(service.userHas(user, 'manage_users')).toBe(false);
+    expect(service.userHas(user, Permission.ManageUsers)).toBe(false);
   });
 
-  it('handles malformed role permission lists without throwing', () => {
-    const malformedUser = makeUser({
-      roles: [
-        {
-          id: 1,
-          name: 'BrokenRole',
-          description: null,
-          isSuperuser: false,
-          isSystem: false,
-          permissions: undefined as unknown as RequestUser['roles'][number]['permissions'],
-        },
-        {
-          id: 2,
-          name: 'ValidRole',
-          description: null,
-          isSuperuser: false,
-          isSystem: false,
-          permissions: [{ id: 10, name: 'read_books' }],
-        },
-      ],
-    });
+  it('returns false instead of throwing when permissions are missing from a malformed runtime user payload', () => {
+    const malformedUser = { ...makeUser(), permissions: undefined } as unknown as RequestUser;
 
-    expect(() => service.userHas(malformedUser, 'read_books')).not.toThrow();
-    expect(service.userHas(malformedUser, 'read_books')).toBe(true);
-  });
-
-  it('returns false instead of throwing when roles are missing from a malformed runtime user payload', () => {
-    const malformedUser = { ...makeUser(), roles: undefined } as unknown as RequestUser;
-
-    expect(() => service.userHas(malformedUser, 'read_books')).not.toThrow();
-    expect(service.userHas(malformedUser, 'read_books')).toBe(false);
+    expect(() => service.userHas(malformedUser, Permission.LibraryDownload)).not.toThrow();
+    expect(service.userHas(malformedUser, Permission.LibraryDownload)).toBe(false);
   });
 });

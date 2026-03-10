@@ -20,13 +20,13 @@ export class OidcGroupMappingService {
       where: inArray(schema.oidcGroupMappings.oidcGroupClaim, groups),
     });
 
-    const roleIds = [...new Set(mappings.flatMap((m) => (m.roleId ? [m.roleId] : [])))];
-    if (roleIds.length === 0) return;
+    const permissionNames = [...new Set(mappings.flatMap((m) => (m.permissionName ? [m.permissionName] : [])))];
+    if (permissionNames.length === 0) return;
 
-    for (const roleId of roleIds) {
-      await this.db.insert(schema.userRoles).values({ userId, roleId }).onConflictDoNothing();
+    for (const permissionName of permissionNames) {
+      await this.db.insert(schema.userPermissions).values({ userId, permissionName }).onConflictDoNothing();
     }
 
-    this.logger.debug(`Synced ${roleIds.length} role(s) for user ${userId} from OIDC groups`);
+    this.logger.debug(`Synced ${permissionNames.length} permission(s) for user ${userId} from OIDC groups`);
   }
 }

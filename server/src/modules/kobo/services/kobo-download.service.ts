@@ -121,11 +121,7 @@ export class KoboDownloadService {
   }
 
   private async checkSuperuser(userId: number): Promise<boolean> {
-    const userRoles = await this.db
-      .select({ isSuperuser: schema.roles.isSuperuser })
-      .from(schema.userRoles)
-      .innerJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
-      .where(eq(schema.userRoles.userId, userId));
-    return userRoles.some((r) => r.isSuperuser);
+    const user = await this.db.query.users.findFirst({ where: eq(schema.users.id, userId) });
+    return user?.isSuperuser ?? false;
   }
 }

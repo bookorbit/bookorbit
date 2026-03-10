@@ -17,21 +17,13 @@ function makeUser(isSuperuser = false): RequestUser {
     name: 'Reader',
     email: null,
     active: true,
+    isSuperuser,
     isDefaultPassword: false,
     tokenVersion: 1,
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
-    roles: [
-      {
-        id: 1,
-        name: isSuperuser ? 'Superuser' : 'User',
-        description: null,
-        isSuperuser,
-        isSystem: false,
-        permissions: [],
-      },
-    ],
+    permissions: [],
   };
 }
 

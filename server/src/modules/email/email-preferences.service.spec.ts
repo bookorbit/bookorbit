@@ -18,7 +18,8 @@ describe('EmailPreferencesService', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   const mockPrefs = { userId: 1, defaultProviderId: 10, defaultRecipientId: 20 };

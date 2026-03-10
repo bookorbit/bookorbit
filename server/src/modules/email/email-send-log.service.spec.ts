@@ -19,7 +19,8 @@ describe('EmailSendLogService', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   const mockLog = { id: 10, userId: 1, toEmail: 'test@test.com', status: 'pending', attemptCount: 0 };

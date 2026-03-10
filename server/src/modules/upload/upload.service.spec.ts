@@ -51,7 +51,7 @@ describe('UploadService', () => {
     extractMetadataAsync: jest.fn(),
   };
 
-  const user = { id: 7, roles: [{ isSuperuser: false }] } as any;
+  const user = { id: 7, isSuperuser: false, permissions: [] } as any;
 
   let service: UploadService;
 

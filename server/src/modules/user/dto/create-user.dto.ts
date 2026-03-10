@@ -14,7 +14,12 @@ export class CreateUserDto {
   email?: string;
 
   @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  permissionNames?: string[];
+
+  @IsArray()
   @IsInt({ each: true })
   @IsOptional()
-  roleIds?: number[];
+  libraryIds?: number[];
 }

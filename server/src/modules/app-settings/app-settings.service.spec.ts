@@ -81,7 +81,7 @@ describe('AppSettingsService', () => {
         clientSecret: 'secret',
         scopes: 'openid profile email groups',
         claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
-        autoProvision: { enabled: true, allowLocalLinking: false, defaultRoleId: 2 },
+        autoProvision: { enabled: true, allowLocalLinking: false, defaultPermissionNames: ['library_download'] },
       };
       db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) });
       const config = await service.getOidcConfig();
@@ -105,7 +105,7 @@ describe('AppSettingsService', () => {
         clientSecret: '',
         scopes: 'openid profile email',
         claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
-        autoProvision: { enabled: false, allowLocalLinking: true, defaultRoleId: null },
+        autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
       };
       db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(existing) });
       db.onConflictDoUpdate.mockResolvedValue(undefined);

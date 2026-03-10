@@ -15,7 +15,8 @@ describe('EmailPreferencesController', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   it('delegates findForUser with current user', async () => {

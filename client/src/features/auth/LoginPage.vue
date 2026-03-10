@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { OidcPublicConfig } from '@projectx/types'
-import { Moon, Sun } from 'lucide-vue-next'
-import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, useThemeStore } from '@/stores/theme'
+import { Moon, Sun, Wallpaper } from 'lucide-vue-next'
+import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
@@ -10,7 +10,43 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 const themeStore = useThemeStore()
 const accentOpen = ref(false)
+const radiusOpen = ref(false)
+const backgroundOpen = ref(false)
 const currentAccent = computed(() => ACCENT_OPTIONS.find((o) => o.id === themeStore.accent))
+
+function radiusPreview(id: string): string {
+  const map: Record<string, string> = {
+    sharp: '0px',
+    default: '4px',
+    rounded: '8px',
+    pill: '999px',
+  }
+  return map[id] ?? '4px'
+}
+
+function openRadius() {
+  radiusOpen.value = !radiusOpen.value
+  accentOpen.value = false
+  backgroundOpen.value = false
+}
+
+function openBackground() {
+  backgroundOpen.value = !backgroundOpen.value
+  accentOpen.value = false
+  radiusOpen.value = false
+}
+
+function openAccent() {
+  accentOpen.value = !accentOpen.value
+  radiusOpen.value = false
+  backgroundOpen.value = false
+}
+
+function closeAll() {
+  accentOpen.value = false
+  radiusOpen.value = false
+  backgroundOpen.value = false
+}
 
 const { login } = useAuth()
 const { getPublicConfig, initiateLogin } = useOidc()
@@ -53,10 +89,6 @@ async function handleOidcLogin() {
 
 <template>
   <div class="login-bg min-h-screen flex items-center justify-center px-4 overflow-hidden">
-    <div class="blob blob-1" />
-    <div class="blob blob-2" />
-    <div class="blob blob-3" />
-
     <!-- Compact theme picker -->
     <div class="fixed bottom-5 right-5 z-20 flex items-center gap-1.5">
       <!-- Dark / light toggle -->
@@ -69,6 +101,72 @@ async function handleOidcLogin() {
         </TooltipTrigger>
         <TooltipContent>{{ themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark' }}</TooltipContent>
       </Tooltip>
+
+      <!-- Radius picker -->
+      <div class="relative">
+        <Transition name="popover">
+          <div v-if="radiusOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-xl">
+            <div class="flex items-center gap-1.5">
+              <Tooltip v-for="opt in RADIUS_OPTIONS" :key="opt.id">
+                <TooltipTrigger as-child>
+                  <button
+                    class="flex items-center justify-center w-8 h-8 rounded-lg transition-all focus:outline-none"
+                    :class="
+                      themeStore.radius === opt.id
+                        ? 'text-primary bg-primary/10'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
+                    "
+                    @click="themeStore.setRadius(opt.id)"
+                  >
+                    <span class="w-4 h-4 border-2 border-current block" :style="{ borderRadius: radiusPreview(opt.id) }" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ opt.label }}</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </Transition>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="theme-btn" @click="openRadius()">
+              <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Change corner radius</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <!-- Background picker -->
+      <div class="relative">
+        <Transition name="popover">
+          <div v-if="backgroundOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-xl w-64 max-h-72 overflow-y-auto">
+            <div class="grid grid-cols-5 gap-1.5">
+              <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
+                <TooltipTrigger as-child>
+                  <button
+                    class="w-full h-9 rounded overflow-hidden ring-2 transition-all focus:outline-none shrink-0"
+                    :class="
+                      themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
+                    "
+                    @click="themeStore.setBackground(opt.id)"
+                  >
+                    <div class="w-full h-full bg-background pattern-preview" :class="opt.cssClass" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ opt.label }}</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </Transition>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="theme-btn" @click="openBackground()">
+              <Wallpaper :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Change background</TooltipContent>
+        </Tooltip>
+      </div>
 
       <!-- Accent picker -->
       <div class="relative">
@@ -115,7 +213,7 @@ async function handleOidcLogin() {
         <!-- Swatch button showing current accent -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <button class="theme-btn" @click="accentOpen = !accentOpen">
+            <button class="theme-btn" @click="openAccent()">
               <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
@@ -125,7 +223,7 @@ async function handleOidcLogin() {
     </div>
 
     <!-- Click-outside backdrop -->
-    <div v-if="accentOpen" class="fixed inset-0 z-10" @click="accentOpen = false" />
+    <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll()" />
 
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
       <div class="text-center mb-8">
@@ -196,72 +294,7 @@ async function handleOidcLogin() {
 
 <style scoped>
 .login-bg {
-  background: var(--background);
   position: relative;
-}
-
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  pointer-events: none;
-}
-
-.blob-1 {
-  width: 640px;
-  height: 520px;
-  background: color-mix(in oklch, var(--primary) 28%, transparent);
-  top: -12%;
-  left: -18%;
-  animation: drift-1 20s ease-in-out infinite alternate;
-}
-
-.blob-2 {
-  width: 520px;
-  height: 560px;
-  background: color-mix(in oklch, var(--primary) 18%, transparent);
-  bottom: -18%;
-  right: -12%;
-  animation: drift-2 26s ease-in-out infinite alternate;
-}
-
-.blob-3 {
-  width: 420px;
-  height: 420px;
-  background: color-mix(in oklch, var(--primary) 14%, transparent);
-  top: 35%;
-  left: 38%;
-  animation: drift-3 18s ease-in-out infinite alternate;
-}
-
-@keyframes drift-1 {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(70px, 55px) scale(1.12);
-  }
-}
-
-@keyframes drift-2 {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(-55px, -70px) scale(1.08);
-  }
-}
-
-@keyframes drift-3 {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(-35px, 28px) scale(0.92);
-  }
-  100% {
-    transform: translate(35px, -28px) scale(1.1);
-  }
 }
 
 .theme-btn {

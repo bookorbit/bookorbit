@@ -3,7 +3,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { AuthorsService } from './authors.service';
 
 function reqUser(id = 7, superuser = false) {
-  return { id, roles: [{ isSuperuser: superuser, permissions: [] }] } as any;
+  return { id, isSuperuser: superuser, permissions: [] } as any;
 }
 
 describe('AuthorsService', () => {

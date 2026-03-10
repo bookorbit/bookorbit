@@ -15,7 +15,8 @@ describe('EmailSendController', () => {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'manual',
-    roles: [],
+    isSuperuser: false,
+    permissions: [],
   };
 
   const orchestrator = {

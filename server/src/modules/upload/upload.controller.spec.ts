@@ -17,7 +17,9 @@ describe('UploadController', () => {
   it('throws when no multipart file is provided', async () => {
     const req = { file: jest.fn().mockResolvedValue(undefined) };
 
-    await expect(controller.uploadBook(1, undefined, { id: 1, roles: [] } as any, req as any)).rejects.toThrow(BadRequestException);
+    await expect(controller.uploadBook(1, undefined, { id: 1, isSuperuser: false, permissions: [] } as any, req as any)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('throws when folderId query value is not numeric', async () => {
@@ -25,7 +27,7 @@ describe('UploadController', () => {
       file: jest.fn().mockResolvedValue({ filename: 'a.epub', file: {} }),
     };
 
-    await expect(controller.uploadBook(1, 'abc', { id: 1, roles: [] } as any, req as any)).rejects.toThrow(
+    await expect(controller.uploadBook(1, 'abc', { id: 1, isSuperuser: false, permissions: [] } as any, req as any)).rejects.toThrow(
       new BadRequestException('Invalid folderId'),
     );
   });
@@ -37,9 +39,9 @@ describe('UploadController', () => {
     };
     uploadService.upload.mockResolvedValue({ bookId: 9 });
 
-    await controller.uploadBook(3, '12', { id: 5, roles: [] } as any, req as any);
+    await controller.uploadBook(3, '12', { id: 5, isSuperuser: false, permissions: [] } as any, req as any);
 
     expect(req.file).toHaveBeenCalledWith({ limits: { fileSize: MAX_UPLOAD_BYTES } });
-    expect(uploadService.upload).toHaveBeenCalledWith(3, 12, 'book.epub', stream, { id: 5, roles: [] });
+    expect(uploadService.upload).toHaveBeenCalledWith(3, 12, 'book.epub', stream, { id: 5, isSuperuser: false, permissions: [] });
   });
 });

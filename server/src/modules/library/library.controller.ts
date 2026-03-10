@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
+import { Permission } from '@projectx/types';
 import type { BookQuery, LibraryFileSyncProgressEvent, WriteResult } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -49,7 +50,7 @@ export class LibraryController {
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
     return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.findOne(id));
   }
 
@@ -59,52 +60,52 @@ export class LibraryController {
   }
 
   @Post()
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   create(@Body() dto: CreateLibraryDto) {
     return this.libraryService.create(dto);
   }
 
   @Patch(':id')
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibraryDto) {
     return this.libraryService.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.libraryService.remove(id);
   }
 
   @Post('prescan')
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   prescan(@Body() dto: PrescanLibraryDto) {
     return this.libraryService.prescan(dto);
   }
 
   @Post('reorder')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   reorder(@Body() dto: ReorderLibrariesDto) {
     return this.libraryService.reorder(dto);
   }
 
   @Get(':id/stats')
   getStats(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
     return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.getStats(id));
   }
 
   @Post(':id/write-metadata-to-files')
-  @RequirePermission('library_edit_metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
   async writeMetadataToFiles(
     @Param('id', ParseIntPipe) libraryId: number,
     @Query('dryRun') dryRunParam: string | undefined,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
-    const isSuperuser = user.roles.some((r) => r.isSuperuser);
+    const isSuperuser = user.isSuperuser;
     await this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser);
 
     const dryRun = dryRunParam === 'true';
@@ -152,19 +153,19 @@ export class LibraryController {
   // ── Library access management ─────────────────────────────────────────────
 
   @Get(':libraryId/access')
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   getAccess(@Param('libraryId', ParseIntPipe) libraryId: number) {
     return this.libraryService.getAccess(libraryId);
   }
 
   @Post(':libraryId/access')
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   grantAccess(@Param('libraryId', ParseIntPipe) libraryId: number, @Body() dto: GrantLibraryAccessDto) {
     return this.libraryService.grantAccess(libraryId, dto);
   }
 
   @Patch(':libraryId/access/:userId')
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   updateAccess(
     @Param('libraryId', ParseIntPipe) libraryId: number,
     @Param('userId', ParseIntPipe) userId: number,
@@ -175,7 +176,7 @@ export class LibraryController {
 
   @Delete(':libraryId/access/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission('manage_libraries')
+  @RequirePermission(Permission.ManageLibraries)
   revokeAccess(@Param('libraryId', ParseIntPipe) libraryId: number, @Param('userId', ParseIntPipe) userId: number) {
     return this.libraryService.revokeAccess(libraryId, userId);
   }

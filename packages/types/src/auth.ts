@@ -1,19 +1,3 @@
-export interface Permission {
-  id: number;
-  name: string;
-  description?: string;
-  isSystem: boolean;
-}
-
-export interface Role {
-  id: number;
-  name: string;
-  description?: string;
-  isSuperuser: boolean;
-  isSystem: boolean;
-  permissions: Permission[];
-}
-
 export interface UserSettings {
   syncReaderPreferences?: boolean;
 }
@@ -24,12 +8,12 @@ export interface AuthUser {
   name: string;
   email?: string;
   active: boolean;
+  isSuperuser: boolean;
   isDefaultPassword: boolean;
   settings: UserSettings;
   avatarUrl?: string | null;
   provisioningMethod: "local" | "oidc";
-  roles: Role[];
-  permissions: string[]; // flat list; '*' means superuser
+  permissions: string[];
 }
 
 export interface OidcPublicConfig {

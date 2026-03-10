@@ -51,7 +51,7 @@ export class OpdsAuthGuard implements CanActivate {
       const userId = parseCoverToken(tokenParam, secret);
       if (!userId) throw new UnauthorizedException('Invalid token');
 
-      const fullUser = await this.userService.findByIdWithRolesAndPermissions(userId);
+      const fullUser = await this.userService.findByIdWithPermissions(userId);
       if (!fullUser || !fullUser.active) throw new UnauthorizedException('Account not found or disabled');
       if (!this.permissionService.userHas(fullUser, 'opds_access')) throw new ForbiddenException('OPDS access revoked');
 
@@ -60,7 +60,7 @@ export class OpdsAuthGuard implements CanActivate {
         userId: fullUser.id,
         username: fullUser.username,
         sortOrder: 'recent',
-        isSuperuser: fullUser.roles.some((r) => r.isSuperuser),
+        isSuperuser: fullUser.isSuperuser,
         coverToken: tokenParam,
       } satisfies OpdsRequestUser;
 
@@ -93,7 +93,7 @@ export class OpdsAuthGuard implements CanActivate {
       throw new UnauthorizedException('Account is disabled');
     }
 
-    const fullUser = await this.userService.findByIdWithRolesAndPermissions(result.parentUser.id);
+    const fullUser = await this.userService.findByIdWithPermissions(result.parentUser.id);
     if (!fullUser) {
       throw new UnauthorizedException('Account not found');
     }
@@ -109,7 +109,7 @@ export class OpdsAuthGuard implements CanActivate {
       userId: result.parentUser.id,
       username: result.opdsUser.username,
       sortOrder: result.opdsUser.sortOrder,
-      isSuperuser: fullUser.roles.some((r) => r.isSuperuser),
+      isSuperuser: fullUser.isSuperuser,
       coverToken: createCoverToken(result.parentUser.id, secret),
     } satisfies OpdsRequestUser;
 

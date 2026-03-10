@@ -1,3 +1,4 @@
+import { Permission } from '@projectx/types';
 import { Controller, Get, Param, ParseIntPipe, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
@@ -11,13 +12,13 @@ export class EpubController {
   constructor(private readonly epubService: EpubService) {}
 
   @Get(':bookId/info')
-  @RequirePermission('library_download')
+  @RequirePermission(Permission.LibraryDownload)
   getBookInfo(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
     return this.epubService.getBookInfo(bookId, user);
   }
 
   @Get(':bookId/file/*')
-  @RequirePermission('library_download')
+  @RequirePermission(Permission.LibraryDownload)
   async getFile(
     @Param('bookId', ParseIntPipe) bookId: number,
     @Param('*') encodedPath: string,
