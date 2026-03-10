@@ -56,6 +56,11 @@ const showDropdown = computed(
     (globalResults.value.length > 0 || globalSearchLoading.value || globalSearchSettled.value),
 )
 
+function onSearchBlur() {
+  searchFocused.value = false
+  selectedIndex.value = -1
+}
+
 watch(globalSearchQuery, () => {
   selectedIndex.value = -1
 })
@@ -243,10 +248,7 @@ function formatBadgeClass(fmt: string): string {
           ref="desktopSearchInput"
           v-model="globalSearchQuery"
           @focus="searchFocused = true"
-          @blur="
-            searchFocused = false
-            selectedIndex = -1
-          "
+          @blur="onSearchBlur"
           @keydown="handleSearchKeydown"
           placeholder="Search all books..."
           class="w-full h-8 pl-9 pr-8 text-[13px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
