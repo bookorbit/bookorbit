@@ -85,18 +85,5 @@ export class SeedService implements OnApplicationBootstrap {
         isSystem: true,
       });
     }
-
-    const emailRelayDefaults: Array<{ key: string; value: string }> = [
-      { key: 'email_relay_enabled', value: 'false' },
-      { key: 'email_relay_smtp', value: '{}' },
-      { key: 'email_relay_from_strategy', value: 'system' },
-      { key: 'email_relay_allow_user_override', value: 'true' },
-      { key: 'email_domain_allowlist', value: '[]' },
-      { key: 'email_domain_blocklist', value: '[]' },
-    ];
-
-    for (const setting of emailRelayDefaults) {
-      await this.db.insert(schema.appSettings).values(setting).onConflictDoNothing({ target: schema.appSettings.key });
-    }
   }
 }

@@ -22,14 +22,12 @@ import ThemePicker from '@/components/ThemePicker.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
-import { useSettingsDrawer } from '@/composables/useSettingsDrawer'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 
 const router = useRouter()
 const { user, logout } = useAuth()
-const { open: openSettings } = useSettingsDrawer()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
 
@@ -401,7 +399,12 @@ function formatBadgeClass(fmt: string): string {
 
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground" @click="openSettings()">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground"
+              @click="router.push({ name: 'settings-libraries' })"
+            >
               <Settings :size="15" />
             </Button>
           </TooltipTrigger>

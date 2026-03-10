@@ -79,7 +79,7 @@
 }
 
 .dark {
-  --tint-c: 0.01;
+  --tint-c: 0.025;
   --tint-c-surface: var(--tint-c);
   --bg-lift: 0;
 
