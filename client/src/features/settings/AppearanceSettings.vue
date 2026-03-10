@@ -164,20 +164,35 @@ function toggleOverlay(key: CardOverlayKey) {
             <p class="settings-hint">Pattern shown behind the book grid</p>
           </div>
         </div>
-        <div class="flex items-center gap-4 flex-wrap">
-          <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
-            <TooltipTrigger as-child>
-              <button
-                type="button"
-                class="w-18 h-12 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
-                :class="themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'"
-                @click="themeStore.setBackground(opt.id)"
-              >
-                <div class="w-full h-full bg-background [transform:translate(0)]" :class="opt.cssClass" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ opt.label }}</TooltipContent>
-          </Tooltip>
+        <div class="space-y-6">
+          <div
+            v-for="group in [
+              { label: 'Fundamental', ids: ['none', 'dots', 'cross', 'terminal', 'millimeter'] },
+              { label: 'Structural', ids: ['blueprint', 'brushed', 'scanlines', 'vinyl', 'carbon', 'perforated'] },
+              { label: 'Ambient', ids: ['aurora', 'horizon', 'glow', 'mesh', 'elevation'] },
+              { label: 'Refractive', ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse', 'nova', 'golden-ratio'] },
+            ]"
+            :key="group.label"
+          >
+            <p class="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-2.5 ml-0.5">{{ group.label }}</p>
+            <div class="flex items-center gap-4 flex-wrap">
+              <Tooltip v-for="opt in BACKGROUND_OPTIONS.filter((o) => group.ids.includes(o.id))" :key="opt.id">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="w-18 h-12 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
+                    :class="
+                      themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
+                    "
+                    @click="themeStore.setBackground(opt.id)"
+                  >
+                    <div class="w-full h-full bg-background [transform:translate(0)] pattern-preview" :class="opt.cssClass" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ opt.label }}</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
         </div>
       </div>
     </div>

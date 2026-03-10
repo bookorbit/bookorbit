@@ -14,7 +14,7 @@ const themeStore = useThemeStore()
             class="w-full h-8 rounded overflow-hidden ring-2 transition-all"
             :class="themeStore.background === opt.id ? 'ring-primary' : 'ring-border hover:ring-muted-foreground/40'"
           >
-            <div class="w-full h-full bg-background" :class="opt.cssClass" />
+            <div class="w-full h-full bg-background pattern-preview" :class="opt.cssClass" />
           </div>
         </button>
       </TooltipTrigger>

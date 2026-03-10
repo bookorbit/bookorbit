@@ -43,17 +43,26 @@ export type Background =
   | 'none'
   | 'dots'
   | 'cross'
+  | 'terminal'
+  | 'millimeter'
+  | 'blueprint'
+  | 'brushed'
+  | 'scanlines'
+  | 'carbon'
+  | 'vinyl'
+  | 'perforated'
   | 'aurora'
   | 'horizon'
-  | 'mesh'
   | 'glow'
-  | 'scanlines'
-  | 'brushed'
+  | 'mesh'
+  | 'elevation'
   | 'prism'
   | 'spectrum'
-  | 'polar-aurora'
-  | 'elevation'
-  | 'terminal'
+  | 'spectrum-x'
+  | 'spectrum-plus'
+  | 'eclipse'
+  | 'nova'
+  | 'golden-ratio'
 
 export const ACCENT_VIVID: { id: Accent; label: string; color: string }[] = [
   { id: 'white', label: 'White', color: '#fafafa' },
@@ -103,27 +112,36 @@ export const RADIUS_OPTIONS: { id: Radius; label: string }[] = [
 ]
 
 export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: string }[] = [
-  // Basic
+  // Fundamental
   { id: 'none', label: 'None', cssClass: '' },
   { id: 'dots', label: 'Dots', cssClass: 'pattern-dots' },
   { id: 'cross', label: 'Cross', cssClass: 'pattern-cross' },
+  { id: 'terminal', label: 'Terminal', cssClass: 'pattern-terminal' },
+  { id: 'millimeter', label: 'Millimeter', cssClass: 'pattern-millimeter' },
 
-  // Atmospheric
+  // Structural
+  { id: 'blueprint', label: 'Blueprint', cssClass: 'pattern-blueprint' },
+  { id: 'brushed', label: 'Brushed', cssClass: 'pattern-brushed' },
+  { id: 'scanlines', label: 'Scanlines', cssClass: 'pattern-scanlines' },
+  { id: 'vinyl', label: 'Vinyl', cssClass: 'pattern-vinyl' },
+  { id: 'carbon', label: 'Carbon', cssClass: 'pattern-carbon' },
+  { id: 'perforated', label: 'Perforated', cssClass: 'pattern-perforated' },
+
+  // Ambient
   { id: 'aurora', label: 'Aurora', cssClass: 'pattern-aurora' },
   { id: 'horizon', label: 'Horizon', cssClass: 'pattern-horizon' },
   { id: 'glow', label: 'Glow', cssClass: 'pattern-glow' },
   { id: 'mesh', label: 'Mesh', cssClass: 'pattern-mesh' },
-
-  // Technical
-  { id: 'scanlines', label: 'Scanlines', cssClass: 'pattern-scanlines' },
-  { id: 'terminal', label: 'Terminal', cssClass: 'pattern-terminal' },
-  { id: 'brushed', label: 'Brushed', cssClass: 'pattern-brushed' },
-
-  // Architectural
   { id: 'elevation', label: 'Elevation', cssClass: 'pattern-elevation' },
+
+  // Refractive
   { id: 'prism', label: 'Prism', cssClass: 'pattern-prism' },
   { id: 'spectrum', label: 'Spectrum', cssClass: 'pattern-spectrum' },
-  { id: 'polar-aurora', label: 'Polar Aurora', cssClass: 'pattern-polar-aurora' },
+  { id: 'spectrum-x', label: 'Spectrum X', cssClass: 'pattern-spectrum-x' },
+  { id: 'spectrum-plus', label: 'Spectrum Plus', cssClass: 'pattern-spectrum-plus' },
+  { id: 'eclipse', label: 'Eclipse', cssClass: 'pattern-eclipse' },
+  { id: 'nova', label: 'Nova', cssClass: 'pattern-nova' },
+  { id: 'golden-ratio', label: 'Golden Ratio', cssClass: 'pattern-golden-ratio' },
 ]
 
 const ACCENT_IDS = ACCENT_OPTIONS.map((a) => a.id)

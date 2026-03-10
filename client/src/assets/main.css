@@ -10,10 +10,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── Background patterns ─────────────────────────────────────
-   Applied as a class on the library/lens/collection content area.
-   Uses --dot-color and --primary from the active theme.
-────────────────────────────────────────────────────────────── */
+.pattern-preview {
+  position: relative;
+  overflow: hidden;
+}
+
+.pattern-preview[class*='pattern-']::before {
+  position: absolute;
+  z-index: 1;
+}
 .pattern-dots {
   background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -97,24 +102,82 @@
   filter: contrast(160%) brightness(110%);
 }
 
-.pattern-polar-aurora {
-  background-image:
-    radial-gradient(120% 58% at 0% 22%, oklch(0.76 0.14 calc(var(--tint-h) + 20) / 0.13), transparent 68%),
-    radial-gradient(120% 58% at 100% 34%, oklch(0.74 0.14 calc(var(--tint-h) + 190) / 0.12), transparent 68%),
-    radial-gradient(130% 62% at 50% -12%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 72%);
-}
-
-.pattern-isogrid::before {
+.pattern-spectrum-x::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.08;
-  background-color: var(--primary);
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='50' height='86' viewBox='0 0 50 86' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 21.5L25 36l25-14.5v29L25 65 0 50.5V21.5z' fill='none' stroke='black' stroke-width='1'/%3E%3Cpath d='M25 36v29M0 21.5L25 7M50 21.5L25 7' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg width='50' height='86' viewBox='0 0 50 86' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 21.5L25 36l25-14.5v29L25 65 0 50.5V21.5z' fill='none' stroke='black' stroke-width='1'/%3E%3Cpath d='M25 36v29M0 21.5L25 7M50 21.5L25 7' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E");
-  mask-size: 100px 172px;
+  background-image:
+    linear-gradient(135deg, oklch(0.7 0.15 var(--tint-h) / 0.08) 0%, transparent 50%),
+    linear-gradient(225deg, oklch(0.7 0.15 calc(var(--tint-h) + 90) / 0.08) 0%, transparent 50%),
+    linear-gradient(315deg, oklch(0.7 0.15 calc(var(--tint-h) + 180) / 0.08) 0%, transparent 50%),
+    linear-gradient(45deg, oklch(0.7 0.15 calc(var(--tint-h) + 270) / 0.08) 0%, transparent 50%);
+  filter: contrast(160%) brightness(110%);
+}
+
+.pattern-spectrum-plus::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to bottom, oklch(0.7 0.15 var(--tint-h) / 0.08) 0%, transparent 50%),
+    linear-gradient(to left, oklch(0.7 0.15 calc(var(--tint-h) + 90) / 0.08) 0%, transparent 50%),
+    linear-gradient(to top, oklch(0.7 0.15 calc(var(--tint-h) + 180) / 0.08) 0%, transparent 50%),
+    linear-gradient(to right, oklch(0.7 0.15 calc(var(--tint-h) + 270) / 0.08) 0%, transparent 50%);
+  filter: contrast(160%) brightness(110%);
+}
+
+.pattern-eclipse::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(at 0% 0%, oklch(0.7 0.15 var(--tint-h) / 0.12) 0%, transparent 65%),
+    radial-gradient(at 100% 100%, oklch(0.7 0.15 calc(var(--tint-h) + 180) / 0.12) 0%, transparent 65%);
+  filter: contrast(150%) brightness(110%);
+}
+
+.pattern-nova::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(at 50% 50%, oklch(0.7 0.15 var(--tint-h) / 0.12) 0%, transparent 60%),
+    linear-gradient(to bottom, oklch(0.7 0.15 calc(var(--tint-h) + 150) / 0.08) 0%, transparent 40%),
+    linear-gradient(to top, oklch(0.7 0.15 calc(var(--tint-h) + 210) / 0.08) 0%, transparent 40%);
+  filter: contrast(150%) brightness(110%);
+}
+
+.pattern-golden-ratio::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(at 38.2% 38.2%, oklch(0.7 0.15 var(--tint-h) / 0.1) 0%, transparent 55%),
+    radial-gradient(at 61.8% 61.8%, oklch(0.7 0.15 calc(var(--tint-h) + 137.5) / 0.1) 0%, transparent 55%),
+    radial-gradient(at 80% 20%, oklch(0.7 0.15 calc(var(--tint-h) + 275) / 0.08) 0%, transparent 50%);
+  filter: contrast(150%) brightness(110%);
+}
+
+.pattern-millimeter::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--primary) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--primary) 5%, transparent) 1px, transparent 1px);
+  background-size: 2px 2px;
 }
 
 .pattern-elevation::before {
@@ -136,6 +199,51 @@
   pointer-events: none;
   opacity: 0.05;
   background-image: repeating-linear-gradient(90deg, var(--primary), var(--primary) 1px, transparent 1px, transparent 40px);
+}
+
+.pattern-vinyl::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-radial-gradient(circle at 50% -25%, transparent, transparent 3px, color-mix(in oklch, var(--primary) 7%, transparent) 3.75px, transparent 4.5px);
+}
+
+.pattern-carbon::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(45deg, color-mix(in oklch, var(--primary) 5%, transparent) 25%, transparent 25%),
+    linear-gradient(-45deg, color-mix(in oklch, var(--primary) 5%, transparent) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, color-mix(in oklch, var(--primary) 5%, transparent) 75%),
+    linear-gradient(-45deg, transparent 75%, color-mix(in oklch, var(--primary) 5%, transparent) 75%);
+  background-size: 8px 8px;
+}
+
+.pattern-perforated::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(circle at center, color-mix(in oklch, var(--primary) 8%, transparent) 1.5px, transparent 2px);
+  background-size: 12px 12px;
+}
+
+.pattern-blueprint::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--primary) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--primary) 4%, transparent) 1px, transparent 1px);
+  background-size: 4px 4px;
 }
 
 .pattern-wireframe::before {
