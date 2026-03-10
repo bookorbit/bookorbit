@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, Pencil, RefreshCcw, UsersRound } from 'lucide-vue-next'
+import { ChevronLeft } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 import type { AuthorSummary, BookCard } from '@projectx/types'
@@ -305,42 +305,26 @@ watch(authorName, () => {
       :preview-description="metadataPreview?.description ?? null"
       :preview-provider="metadataPreview?.provider ?? null"
       :loading-preview="loadingMetadataPreview"
+      :can-update="canUpdate"
+      :can-merge="canMerge"
+      :refreshing="refreshingMetadata"
+      @edit="
+        editOpen = !editOpen
+        if (editOpen) mergeOpen = false
+      "
+      @merge="
+        mergeOpen = !mergeOpen
+        if (mergeOpen) editOpen = false
+      "
+      @refresh="refreshMetadata"
     />
 
     <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
       Could not load external author preview metadata right now.
     </div>
 
-    <section v-if="author && (canUpdate || canMerge)" class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <button
-          v-if="canUpdate"
-          class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          @click="editOpen = !editOpen"
-        >
-          <Pencil :size="13" />
-          {{ editOpen ? 'Close Edit' : 'Edit Author' }}
-        </button>
-        <button
-          v-if="canMerge"
-          class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          @click="mergeOpen = !mergeOpen"
-        >
-          <UsersRound :size="13" />
-          {{ mergeOpen ? 'Close Merge' : 'Merge Authors' }}
-        </button>
-        <button
-          v-if="canUpdate"
-          :disabled="refreshingMetadata"
-          class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
-          @click="refreshMetadata"
-        >
-          <RefreshCcw :size="13" />
-          {{ refreshingMetadata ? 'Refreshing...' : 'Refresh Metadata' }}
-        </button>
-      </div>
-
-      <div v-if="editOpen && canUpdate" class="mt-3 space-y-2 rounded-lg border border-border/70 bg-background/40 p-3">
+    <section v-if="author && (editOpen || mergeOpen)" class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3 space-y-3">
+      <div v-if="editOpen && canUpdate" class="space-y-2">
         <div class="grid gap-2 md:grid-cols-2">
           <label class="text-xs text-muted-foreground">
             Name
@@ -369,7 +353,7 @@ watch(authorName, () => {
         </div>
       </div>
 
-      <div v-if="mergeOpen && canMerge" class="mt-3 space-y-2 rounded-lg border border-border/70 bg-background/40 p-3">
+      <div v-if="mergeOpen && canMerge" class="space-y-2">
         <input
           v-model="mergeQuery"
           class="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
