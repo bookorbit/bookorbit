@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, useSlots, watch } from 'vue'
 import { Download, FolderMinus, FolderPlus, ImageDown, Mail, RefreshCw, Trash2, X } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -24,6 +24,8 @@ const emit = defineEmits<{
 
 const confirmingDelete = ref(false)
 const exportMenuOpen = ref(false)
+const slots = useSlots()
+const hasCustomContent = computed(() => Boolean(slots.content))
 
 function onExport(allFormats: boolean) {
   emit('export', allFormats)
@@ -60,7 +62,10 @@ watch(
       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-2.5 py-2 rounded-full bg-card/90 backdrop-blur-xl border border-primary/40 shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
     >
       <TooltipProvider :delay-duration="0">
-        <template v-if="!confirmingDelete && !exportMenuOpen">
+        <template v-if="hasCustomContent">
+          <slot name="content" :count="count" />
+        </template>
+        <template v-else-if="!confirmingDelete && !exportMenuOpen">
           <!-- Count -->
           <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{ count }}</span>
 

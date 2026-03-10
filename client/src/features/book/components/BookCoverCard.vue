@@ -44,6 +44,7 @@ const emit = defineEmits<{
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
+const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
   const idx = props.book.seriesIndex
@@ -112,6 +113,11 @@ function handleCardClick(event: MouseEvent) {
     return
   }
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+}
+
+function openAuthorBrowse() {
+  if (!authorQuery.value) return
+  void router.push({ name: 'authors', query: { q: authorQuery.value } })
 }
 </script>
 
@@ -222,9 +228,14 @@ function handleCardClick(event: MouseEvent) {
         <p class="text-xs font-bold leading-tight line-clamp-3" :style="{ color: coverStyle.color }">
           {{ book.title ?? '-' }}
         </p>
-        <p v-if="authorLine" class="text-[10px] mt-0.5 opacity-80 truncate" :style="{ color: coverStyle.color }">
+        <button
+          v-if="authorLine"
+          class="text-[10px] mt-0.5 opacity-80 truncate hover:underline"
+          :style="{ color: coverStyle.color }"
+          @click.stop="openAuthorBrowse"
+        >
           {{ authorLine }}
-        </p>
+        </button>
       </div>
 
       <!-- Refresh spinner overlay -->
@@ -258,7 +269,9 @@ function handleCardClick(event: MouseEvent) {
         <div class="flex items-end justify-between gap-2">
           <div v-if="coverLoaded" class="min-w-0 flex-1">
             <p class="text-xs font-semibold text-white leading-tight line-clamp-2">{{ book.title ?? '-' }}</p>
-            <p v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5">{{ authorLine }}</p>
+            <button v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5 hover:underline" @click.stop="openAuthorBrowse">
+              {{ authorLine }}
+            </button>
           </div>
           <div v-else class="flex-1" />
 

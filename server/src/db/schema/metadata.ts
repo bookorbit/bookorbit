@@ -59,6 +59,7 @@ export const authors = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 500 }).notNull(),
     sortName: varchar('sort_name', { length: 500 }),
+    description: text('description'),
   },
   (t) => [index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
 );
@@ -74,7 +75,7 @@ export const bookAuthors = pgTable(
       .references(() => authors.id),
     displayOrder: integer('display_order').notNull().default(0),
   },
-  (t) => [primaryKey({ columns: [t.bookId, t.authorId] })],
+  (t) => [primaryKey({ columns: [t.bookId, t.authorId] }), index('book_authors_author_id_idx').on(t.authorId)],
 );
 
 export const genres = pgTable('genres', {

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from 'lucide-vue-next'
-import { Aperture, ChevronDown, FolderOpen, LayoutDashboard, PackageOpen, Plus } from 'lucide-vue-next'
+import { Aperture, ChevronDown, FolderOpen, LayoutDashboard, PackageOpen, Plus, Users } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
@@ -72,6 +72,7 @@ const activeLibraryId = computed(() => {
 
 const isDashboardActive = computed(() => route.name === 'dashboard')
 const isStagingActive = computed(() => route.name === 'staging')
+const isAuthorsActive = computed(() => route.name === 'authors' || route.name === 'author-detail')
 
 const activeLensId = computed(() => {
   const id = route.params.id
@@ -215,6 +216,25 @@ onMounted(async () => {
                 >
                   {{ stagingSummary.total }}
                 </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                :is-active="isAuthorsActive"
+                tooltip="Authors"
+                class="relative h-9 gap-2.5 rounded-xl px-2 transition-[background-color,box-shadow] duration-200 before:absolute before:-left-1.5 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:scale-y-75 before:rounded-full before:bg-primary before:opacity-0 before:transition-all before:duration-200 hover:bg-primary/8 data-[active=true]:bg-primary/15 data-[active=true]:shadow-[inset_0_0_0_1px_var(--sidebar-border)] data-[active=true]:before:scale-y-100 data-[active=true]:before:opacity-100 group/item group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-1.5"
+                @click="router.push({ name: 'authors' })"
+              >
+                <span class="inline-flex h-[1.65rem] w-[1.65rem] shrink-0 items-center justify-center rounded-lg transition-colors">
+                  <Users
+                    :size="16"
+                    class="text-sidebar-foreground/70 transition-colors group-hover/item:text-sidebar-foreground group-data-[active=true]/item:text-primary"
+                  />
+                </span>
+                <span
+                  class="text-[13.5px] font-semibold tracking-[0.005em] text-sidebar-foreground/80 transition-colors group-hover/item:text-sidebar-foreground group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                  >Authors</span
+                >
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

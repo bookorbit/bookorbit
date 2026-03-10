@@ -26,10 +26,10 @@ const greeting = computed(() => {
 <template>
   <main class="flex-none">
     <!-- Greeting -->
-    <div class="flex items-center justify-between px-1 h-10 ml-5 pt-4 mr-4 mb-2 sticky top-0 z-20 transition-all duration-300">
+    <div class="flex items-center justify-between px-1 h-10 pt-4 mr-4 mb-2 sticky top-0 z-20 transition-all duration-300">
       <div class="flex items-center gap-2.5">
         <div class="w-1 h-4 bg-primary/40 rounded-full" />
-        <h1 class="text-[16px] font-bold text-foreground/90 tracking-tight">{{ greeting }}</h1>
+        <h1 class="text-[17px] font-bold text-foreground/90 tracking-tight">{{ greeting }}</h1>
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -45,20 +45,20 @@ const greeting = computed(() => {
     </div>
 
     <!-- Scrollers -->
-    <div class="space-y-5 px-4 pb-8 pt-2 sm:px-6">
-        <DashboardScroller
-          v-for="scroller in enabledScrollers"
-          :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"
-          :type="scroller.type"
-          :title="scroller.label"
-          :limit="scroller.limit"
-          :lens-id="scroller.lensId"
-        />
-        <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
-          <p class="text-sm text-muted-foreground">All shelves are hidden.</p>
-          <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">Customize dashboard</button>
-        </div>
+    <div class="space-y-5 pb-8 pt-2 sm:pr-2">
+      <DashboardScroller
+        v-for="scroller in enabledScrollers"
+        :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"
+        :type="scroller.type"
+        :title="scroller.label"
+        :limit="scroller.limit"
+        :lens-id="scroller.lensId"
+      />
+      <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
+        <p class="text-sm text-muted-foreground">All shelves are hidden.</p>
+        <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">Customize dashboard</button>
       </div>
+    </div>
   </main>
 
   <DashboardSettingsSheet v-model:open="settingsOpen" />

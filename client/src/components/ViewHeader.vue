@@ -19,7 +19,6 @@ defineProps<{
   title: string
   icon?: string
   total: number
-  loaded: number
   coverSize: number
   gridGap: number
   viewMode: 'grid' | 'list'
@@ -41,21 +40,19 @@ function getIconComponent(name: string) {
 </script>
 
 <template>
-  <div class="flex h-10 shrink-0 items-center gap-2 px-1 mr-4 mt-2 ml-0 mb-2 sticky top-0 z-20 transition-all duration-300">
+  <div
+    class="flex h-10 shrink-0 items-center gap-2 p-2 mr-4 mt-2 ml-0 mb-2 sticky top-0 z-20 transition-all duration-300 bg-background/80 backdrop-blur-md"
+  >
     <!-- Left: optional icon + title + count -->
-    <div class="flex items-center gap-2.5 flex-1 min-w-0">
-      <div class="w-1 h-4 bg-primary/40 rounded-full" />
-      <component v-if="icon" :is="getIconComponent(icon)" :size="14" class="shrink-0 text-muted-foreground/60" />
+    <div class="flex items-center gap-2 flex-1 min-w-0">
+      <component v-if="icon" :is="getIconComponent(icon)" :size="16" class="shrink-0 text-muted-foreground/90" />
       <span class="font-bold text-[16px] text-foreground/90 tracking-tight truncate">{{ title }}</span>
-      <span class="text-[12px] font-bold text-primary/60 tabular-nums uppercase tracking-wider ml-1">
-        {{ loaded.toLocaleString() }}<span class="text-muted-foreground/30 mx-0.5 font-normal">/</span>{{ total.toLocaleString() }}
-      </span>
+      <span class="text-[12px] font-semibold text-primary/70 tabular-nums">({{ total.toLocaleString() }})</span>
     </div>
 
     <!-- Right -->
     <div class="flex items-center gap-1 shrink-0">
       <slot name="toolbar" />
-      <div class="w-px h-3.5 bg-border/40 mx-1.5" />
       <slot name="actions" />
 
       <!-- Select mode toggle -->
@@ -98,8 +95,6 @@ function getIconComponent(name: string) {
           <List :size="14" />
         </Button>
       </div>
-
-      <div class="hidden md:block w-px h-3.5 bg-border/40 mx-1.5" />
 
       <!-- Desktop: display settings popover -->
       <Popover>

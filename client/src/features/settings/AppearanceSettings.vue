@@ -173,7 +173,7 @@ function toggleOverlay(key: CardOverlayKey) {
                 :class="themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'"
                 @click="themeStore.setBackground(opt.id)"
               >
-                <div class="w-full h-full bg-background" :class="opt.cssClass" />
+                <div class="w-full h-full bg-background [transform:translate(0)]" :class="opt.cssClass" />
               </button>
             </TooltipTrigger>
             <TooltipContent>{{ opt.label }}</TooltipContent>

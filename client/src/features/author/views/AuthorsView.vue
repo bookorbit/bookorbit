@@ -1,0 +1,718 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { CheckCheck, ChevronsUpDown, Filter, RefreshCcw, Search, Trash2, X } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+
+import SelectionActionBar from '@/components/SelectionActionBar.vue'
+import ViewHeader from '@/components/ViewHeader.vue'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraries } from '@/features/library/composables/useLibraries'
+import type { AuthorDuplicateSuggestion } from '@projectx/types'
+import { bulkRefreshAuthorsMetadata, deleteAuthors, mergeAuthors, refreshAuthorMetadata } from '../api/author'
+import AuthorCard from '../components/AuthorCard.vue'
+import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
+import AuthorDuplicateSuggestionsPanel from '../components/AuthorDuplicateSuggestionsPanel.vue'
+import AuthorFilters from '../components/AuthorFilters.vue'
+import AuthorInsightsPanel from '../components/AuthorInsightsPanel.vue'
+import AuthorListRow from '../components/AuthorListRow.vue'
+import { useAuthorInsights } from '../composables/useAuthorInsights'
+import { useAuthorSelection } from '../composables/useAuthorSelection'
+import { useAuthorsList } from '../composables/useAuthorsList'
+import { useDuplicateSuggestions } from '../composables/useDuplicateSuggestions'
+import { useRefreshingAuthors } from '../composables/useRefreshingAuthors'
+import type { AuthorListSort, SortDirection } from '../types/author'
+
+const router = useRouter()
+const route = useRoute()
+const { coverSize, gridGap, viewMode } = useDisplaySettings()
+const { libraries, fetchLibraries } = useLibraries()
+const { hasPermission, isSuperuser } = usePermissions()
+const { items, total, loading, error, hasMore, q, sort, order, libraryId, load } = useAuthorsList()
+const { insights, loading: loadingInsights, error: insightsError, load: loadInsights } = useAuthorInsights()
+const { suggestions, loading: loadingSuggestions, error: suggestionsError, load: loadSuggestions } = useDuplicateSuggestions()
+const { markRefreshing, clearRefreshing, isRefreshing } = useRefreshingAuthors()
+const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleAuthor, rangeSelectTo, selectAll, isSelected } =
+  useAuthorSelection()
+
+const hydrating = ref(true)
+const suppressAutoReload = ref(false)
+const filtersOpen = ref(false)
+const showSecondaryPanels = ref(false)
+const secondarySheetOpen = ref(false)
+const initialLoadComplete = ref(false)
+const INITIAL_SKELETON_COUNT = 18
+
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+const quickMerging = ref(false)
+const bulkRefreshing = ref(false)
+const bulkDeleting = ref(false)
+const deletingAuthorId = ref<number | null>(null)
+const confirmingBulkDelete = ref(false)
+
+const pendingDeleteIds = ref<number[]>([])
+const deleteDialogOpen = ref(false)
+
+const pendingQuickMerge = ref<AuthorDuplicateSuggestion | null>(null)
+const quickMergeDialogOpen = ref(false)
+
+const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata'))
+const canDeleteAuthors = computed(() => isSuperuser.value)
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (q.value.trim()) count += 1
+  if (sort.value !== 'name') count += 1
+  if (order.value !== 'asc') count += 1
+  if (libraryId.value !== null) count += 1
+  return count
+})
+
+const secondaryVisible = computed(() => showSecondaryPanels.value || secondarySheetOpen.value)
+
+const deleteDialogLoading = computed(() => {
+  if (bulkDeleting.value) return true
+  if (pendingDeleteIds.value.length !== 1) return false
+  return deletingAuthorId.value === pendingDeleteIds.value[0]
+})
+
+const deleteDialogTitle = computed(() => {
+  if (pendingDeleteIds.value.length > 1) return `Delete ${pendingDeleteIds.value.length} authors?`
+  return 'Delete author?'
+})
+
+const deleteDialogDescription = computed(() => {
+  if (pendingDeleteIds.value.length > 1) {
+    return 'This removes selected authors from the catalog and unlinks them from associated books. This action cannot be undone.'
+  }
+  return 'This removes the author from the catalog and unlinks it from associated books. This action cannot be undone.'
+})
+
+const quickMergeDialogTitle = computed(() => {
+  if (!pendingQuickMerge.value) return 'Merge duplicate authors?'
+  return `Merge "${pendingQuickMerge.value.right.name}" into "${pendingQuickMerge.value.left.name}"?`
+})
+
+const quickMergeDialogDescription = computed(() => {
+  if (!pendingQuickMerge.value) return 'This cannot be undone.'
+  return `${pendingQuickMerge.value.right.name} will be merged into ${pendingQuickMerge.value.left.name}. This cannot be undone.`
+})
+
+function showRefreshResultToast(updated: { imageUrl?: string | null }) {
+  if (!updated.imageUrl) {
+    toast.warning('Metadata refreshed, but no author image was found.')
+    return
+  }
+  toast.success('Author metadata refreshed')
+}
+
+function parseSort(value: unknown): AuthorListSort {
+  return value === 'bookCount' || value === 'lastAddedAt' || value === 'name' ? value : 'name'
+}
+
+function parseOrder(value: unknown): SortDirection {
+  return value === 'desc' || value === 'asc' ? value : 'asc'
+}
+
+function parseLibraryId(value: unknown): number | null {
+  const raw = typeof value === 'string' ? Number(value) : NaN
+  return Number.isInteger(raw) && raw > 0 ? raw : null
+}
+
+function syncRouteQuery() {
+  void router.replace({
+    name: 'authors',
+    query: {
+      q: q.value.trim() || undefined,
+      sort: sort.value !== 'name' ? sort.value : undefined,
+      order: order.value !== 'asc' ? order.value : undefined,
+      libraryId: libraryId.value ? String(libraryId.value) : undefined,
+    },
+  })
+}
+
+function openAuthor(authorId: number) {
+  void router.push({ name: 'author-detail', params: { id: authorId }, query: { from: route.fullPath } })
+}
+
+function handleAuthorSelect(authorId: number, event: MouseEvent) {
+  if (!selectionMode.value) {
+    enterSelectionMode()
+  }
+
+  if (event.shiftKey) {
+    rangeSelectTo(
+      authorId,
+      items.value.map((item) => item.id),
+    )
+    return
+  }
+  toggleAuthor(authorId)
+}
+
+function toggleSelectionMode() {
+  if (selectionMode.value) exitSelectionMode()
+  else enterSelectionMode()
+}
+
+function selectAllVisible() {
+  selectAll(items.value.map((item) => item.id))
+}
+
+async function clearFilters() {
+  if (selectionMode.value) exitSelectionMode()
+  if (searchTimer) clearTimeout(searchTimer)
+
+  suppressAutoReload.value = true
+  q.value = ''
+  sort.value = 'name'
+  order.value = 'asc'
+  libraryId.value = null
+
+  syncRouteQuery()
+  await load(true)
+  await maybeLoadSecondaryPanels()
+  filtersOpen.value = false
+
+  await nextTick()
+  suppressAutoReload.value = false
+}
+
+async function refreshSelectedAuthorsMetadata() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0 || bulkRefreshing.value) return
+
+  bulkRefreshing.value = true
+  markRefreshing(ids)
+  try {
+    const result = await bulkRefreshAuthorsMetadata(ids, (event) => {
+      if (event.imageUpdated && event.imageUrl) {
+        const index = items.value.findIndex((item) => item.id === event.authorId)
+        if (index !== -1) {
+          const next = [...items.value]
+          next[index] = {
+            ...next[index],
+            imageUrl: event.imageUrl,
+          }
+          items.value = next
+        }
+      }
+      clearRefreshing([event.authorId])
+    })
+    await maybeLoadSecondaryPanels()
+
+    if (result.failed > 0) {
+      toast.warning(`Refreshed ${result.updated} author(s), ${result.failed} failed`)
+    } else {
+      toast.success(`Refreshed metadata for ${result.updated} author(s)`)
+    }
+  } catch (actionError) {
+    toast.error(actionError instanceof Error ? actionError.message : 'Failed to refresh selected authors')
+  } finally {
+    clearRefreshing(ids)
+    bulkRefreshing.value = false
+  }
+}
+
+async function refreshSingleAuthorMetadata(authorId: number) {
+  if (!canRefreshMetadata.value || isRefreshing(authorId)) return
+
+  markRefreshing([authorId])
+  try {
+    const updated = await refreshAuthorMetadata(authorId)
+    const index = items.value.findIndex((item) => item.id === authorId)
+    if (index !== -1) {
+      const next = [...items.value]
+      next[index] = { ...next[index], ...updated }
+      items.value = next
+    }
+    void maybeLoadSecondaryPanels()
+    showRefreshResultToast(updated)
+  } catch (actionError) {
+    toast.error(actionError instanceof Error ? actionError.message : 'Failed to refresh author metadata')
+  } finally {
+    clearRefreshing([authorId])
+  }
+}
+
+function promptDeleteSingleAuthor(authorId: number) {
+  if (!canDeleteAuthors.value || deletingAuthorId.value === authorId) return
+  pendingDeleteIds.value = [authorId]
+  deleteDialogOpen.value = true
+}
+
+function confirmDeleteSelectedFromPopover() {
+  if (!canDeleteAuthors.value || selectedCount.value === 0 || bulkDeleting.value) return
+  pendingDeleteIds.value = [...selectedIds.value]
+  confirmingBulkDelete.value = false
+  void confirmDeleteAuthors()
+}
+
+function cancelDeleteAuthors() {
+  if (deleteDialogLoading.value) return
+  deleteDialogOpen.value = false
+  pendingDeleteIds.value = []
+}
+
+async function confirmDeleteAuthors() {
+  const ids = [...pendingDeleteIds.value]
+  if (!canDeleteAuthors.value || ids.length === 0) return
+
+  const singleAuthorId: number | null = ids.length === 1 ? (ids[0] ?? null) : null
+  deleteDialogOpen.value = false
+
+  if (singleAuthorId !== null) {
+    deletingAuthorId.value = singleAuthorId
+  } else {
+    bulkDeleting.value = true
+  }
+
+  try {
+    const result = await deleteAuthors({ authorIds: ids })
+    await Promise.all([load(true), maybeLoadSecondaryPanels()])
+    if (ids.length > 1) exitSelectionMode()
+
+    const noun = result.deletedAuthorIds.length === 1 ? 'author' : 'authors'
+    toast.success(`Deleted ${result.deletedAuthorIds.length} ${noun}; affected ${result.affectedBookCount} books`)
+  } catch (actionError) {
+    toast.error(actionError instanceof Error ? actionError.message : 'Failed to delete author(s)')
+  } finally {
+    if (singleAuthorId !== null) {
+      deletingAuthorId.value = null
+    } else {
+      bulkDeleting.value = false
+    }
+    pendingDeleteIds.value = []
+  }
+}
+
+async function loadPhase4Panels() {
+  await Promise.all([loadInsights(libraryId.value), loadSuggestions(libraryId.value)])
+}
+
+async function maybeLoadSecondaryPanels() {
+  if (!secondaryVisible.value) return
+  await loadPhase4Panels()
+}
+
+function requestQuickMergeSuggestion(suggestion: AuthorDuplicateSuggestion) {
+  if (quickMerging.value) return
+  pendingQuickMerge.value = suggestion
+  quickMergeDialogOpen.value = true
+}
+
+function cancelQuickMerge() {
+  if (quickMerging.value) return
+  quickMergeDialogOpen.value = false
+  pendingQuickMerge.value = null
+}
+
+async function confirmQuickMergeSuggestion() {
+  const suggestion = pendingQuickMerge.value
+  if (!suggestion || quickMerging.value) return
+
+  quickMergeDialogOpen.value = false
+  quickMerging.value = true
+  try {
+    await mergeAuthors({
+      targetAuthorId: suggestion.left.id,
+      sourceAuthorIds: [suggestion.right.id],
+    })
+    toast.success(`Merged ${suggestion.right.name} into ${suggestion.left.name}`)
+    await Promise.all([load(true), maybeLoadSecondaryPanels()])
+  } catch (actionError) {
+    toast.error(actionError instanceof Error ? actionError.message : 'Failed to merge suggested duplicate')
+  } finally {
+    quickMerging.value = false
+    pendingQuickMerge.value = null
+  }
+}
+
+function loadIfSentinelVisible() {
+  if (loading.value || !hasMore.value || !sentinel.value) return
+  if (sentinel.value.getBoundingClientRect().top < window.innerHeight + 250) {
+    void load()
+  }
+}
+
+onMounted(async () => {
+  q.value = typeof route.query.q === 'string' ? route.query.q : ''
+  sort.value = parseSort(route.query.sort)
+  order.value = parseOrder(route.query.order)
+  libraryId.value = parseLibraryId(route.query.libraryId)
+
+  await fetchLibraries()
+  hydrating.value = false
+  filtersOpen.value = activeFilterCount.value > 0
+
+  await load(true)
+  initialLoadComplete.value = true
+
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && !loading.value) {
+        void load()
+      }
+    },
+    { rootMargin: '280px' },
+  )
+
+  await nextTick()
+  if (sentinel.value) observer.observe(sentinel.value)
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+  if (searchTimer) clearTimeout(searchTimer)
+})
+
+watch([sort, order, libraryId], () => {
+  if (hydrating.value || suppressAutoReload.value) return
+  if (selectionMode.value) exitSelectionMode()
+  syncRouteQuery()
+  void load(true)
+  void maybeLoadSecondaryPanels()
+})
+
+watch(q, () => {
+  if (hydrating.value || suppressAutoReload.value) return
+  if (selectionMode.value) exitSelectionMode()
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    syncRouteQuery()
+    void load(true)
+  }, 250)
+})
+
+watch(
+  loading,
+  (isLoading) => {
+    if (!isLoading) loadIfSentinelVisible()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  secondaryVisible,
+  (visible) => {
+    if (!visible) return
+    void loadPhase4Panels()
+  },
+  { immediate: false },
+)
+
+watch(
+  [selectionMode, selectedCount],
+  ([mode, count]) => {
+    if (!mode || count === 0) confirmingBulkDelete.value = false
+  },
+  { flush: 'post' },
+)
+</script>
+
+<template>
+  <ViewHeader
+    title="Authors"
+    icon="Users"
+    :total="total"
+    v-model:coverSize="coverSize"
+    v-model:gridGap="gridGap"
+    v-model:viewMode="viewMode"
+    :selection-mode="selectionMode"
+    @toggle-selection="toggleSelectionMode"
+  >
+    <template #toolbar>
+      <div class="hidden lg:flex h-8 w-64 items-center rounded-md border border-input bg-background px-2.5">
+        <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/70" />
+        <input
+          v-model="q"
+          type="search"
+          placeholder="Search authors"
+          class="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+        />
+        <button v-if="q.trim()" class="ml-1 text-muted-foreground/70 transition-colors hover:text-foreground" @click="q = ''">
+          <X :size="12" />
+        </button>
+      </div>
+
+      <div class="h-5 w-px shrink-0 bg-border" />
+
+      <button
+        @click="filtersOpen = !filtersOpen"
+        class="flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
+        :class="
+          activeFilterCount > 0
+            ? 'border-primary text-primary bg-primary/10'
+            : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+        "
+      >
+        <Filter :size="13" />
+        <span>Filters</span>
+        <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
+      </button>
+
+      <button
+        v-if="activeFilterCount > 0"
+        @click="clearFilters"
+        class="flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
+      >
+        <X :size="13" />
+        Clear
+      </button>
+    </template>
+
+    <template #actions>
+      <button
+        class="hidden h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
+        @click="showSecondaryPanels = !showSecondaryPanels"
+      >
+        <ChevronsUpDown :size="13" />
+        {{ showSecondaryPanels ? 'Hide Insights' : 'Show Insights' }}
+      </button>
+
+      <button
+        class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+        title="Author insights"
+        @click="secondarySheetOpen = true"
+      >
+        <ChevronsUpDown :size="14" />
+      </button>
+    </template>
+  </ViewHeader>
+
+  <main class="flex-none pr-2">
+    <AuthorFilters
+      v-if="filtersOpen"
+      v-model:search="q"
+      v-model:sort="sort"
+      v-model:order="order"
+      v-model:library-id="libraryId"
+      :active-count="activeFilterCount"
+      :libraries="libraries.map((library) => ({ id: library.id, name: library.name }))"
+      @clear="clearFilters"
+    />
+
+    <div v-if="showSecondaryPanels" class="mb-4 space-y-3">
+      <AuthorInsightsPanel :insights="insights" :loading="loadingInsights" :error="insightsError" />
+
+      <AuthorDuplicateSuggestionsPanel
+        :suggestions="suggestions"
+        :loading="loadingSuggestions"
+        :error="suggestionsError"
+        :can-merge="isSuperuser"
+        :merging="quickMerging"
+        @open-author="openAuthor"
+        @quick-merge="requestQuickMergeSuggestion"
+      />
+    </div>
+
+    <div v-if="error" class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+      {{ error }}
+    </div>
+
+    <div
+      v-if="!initialLoadComplete && loading"
+      class="grid"
+      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+    >
+      <div
+        v-for="index in INITIAL_SKELETON_COUNT"
+        :key="`author-skeleton-${index}`"
+        class="w-full animate-pulse rounded-sm bg-muted/50"
+        style="aspect-ratio: 2/3"
+      />
+    </div>
+
+    <div v-if="!loading && items.length === 0" class="flex flex-col items-center justify-center gap-2 py-24 text-center">
+      <p class="text-sm font-medium text-foreground">No authors found</p>
+      <p class="text-xs text-muted-foreground">Try changing search text, sort, or library filter.</p>
+    </div>
+
+    <div
+      v-show="viewMode === 'grid' && items.length > 0"
+      class="grid"
+      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+    >
+      <AuthorCard
+        v-for="author in items"
+        :key="author.id"
+        :author="author"
+        :selection-mode="selectionMode"
+        :selected="isSelected(author.id)"
+        :can-refresh="canRefreshMetadata"
+        :can-delete="canDeleteAuthors"
+        :refreshing="isRefreshing(author.id)"
+        :deleting="deletingAuthorId === author.id"
+        @open="openAuthor"
+        @select="handleAuthorSelect(author.id, $event)"
+        @refresh="refreshSingleAuthorMetadata"
+        @delete="promptDeleteSingleAuthor"
+      />
+    </div>
+
+    <div v-show="viewMode === 'list' && items.length > 0" class="flex flex-col divide-y divide-border">
+      <AuthorListRow
+        v-for="author in items"
+        :key="author.id"
+        :author="author"
+        :selection-mode="selectionMode"
+        :selected="isSelected(author.id)"
+        :refreshing="isRefreshing(author.id)"
+        @open="openAuthor"
+        @select="handleAuthorSelect(author.id, $event)"
+      />
+    </div>
+
+    <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
+      <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+      <span v-else-if="initialLoadComplete && !hasMore && items.length > 0" class="text-xs text-muted-foreground">
+        All {{ total.toLocaleString() }} authors loaded
+      </span>
+    </div>
+  </main>
+
+  <SelectionActionBar :visible="selectionMode" :count="selectedCount" @exit="exitSelectionMode">
+    <template #content>
+      <template v-if="!confirmingBulkDelete">
+        <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{
+          selectedCount
+        }}</span>
+
+        <div class="w-px h-5 bg-border mx-1 shrink-0" />
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              :disabled="selectedCount === 0"
+              class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
+              :class="
+                selectedCount > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/30 cursor-not-allowed'
+              "
+              @click="selectAllVisible"
+            >
+              <CheckCheck :size="17" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Select visible</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              :disabled="selectedCount === 0 || bulkRefreshing"
+              class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
+              :class="selectedCount > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/30 cursor-not-allowed'"
+              @click="refreshSelectedAuthorsMetadata"
+            >
+              <RefreshCcw :size="17" :class="bulkRefreshing ? 'animate-spin' : ''" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{{ bulkRefreshing ? 'Refreshing metadata...' : 'Refresh metadata' }}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip v-if="canDeleteAuthors">
+          <TooltipTrigger as-child>
+            <button
+              :disabled="selectedCount === 0 || bulkDeleting"
+              class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
+              :class="
+                selectedCount > 0
+                  ? 'text-destructive hover:bg-destructive hover:text-destructive-foreground'
+                  : 'text-muted-foreground/30 cursor-not-allowed'
+              "
+              @click="confirmingBulkDelete = true"
+            >
+              <Trash2 :size="17" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{{ bulkDeleting ? 'Deleting...' : 'Delete selected' }}</TooltipContent>
+        </Tooltip>
+
+        <div class="w-px h-5 bg-border mx-1 shrink-0" />
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="exitSelectionMode"
+            >
+              <X :size="17" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Exit selection</TooltipContent>
+        </Tooltip>
+      </template>
+
+      <template v-else>
+        <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap"
+          >Delete {{ selectedCount }} author{{ selectedCount === 1 ? '' : 's' }}?</span
+        >
+
+        <div class="w-px h-5 bg-border mx-1 shrink-0" />
+
+        <button
+          class="h-8 px-3 rounded-full text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+          :disabled="bulkDeleting"
+          @click="confirmDeleteSelectedFromPopover"
+        >
+          {{ bulkDeleting ? 'Deleting...' : 'Delete' }}
+        </button>
+
+        <button
+          class="h-8 px-3 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          :disabled="bulkDeleting"
+          @click="confirmingBulkDelete = false"
+        >
+          Cancel
+        </button>
+      </template>
+    </template>
+  </SelectionActionBar>
+
+  <Sheet v-model:open="secondarySheetOpen">
+    <SheetContent side="bottom" class="max-h-[85vh]">
+      <SheetHeader>
+        <SheetTitle>Author Insights</SheetTitle>
+      </SheetHeader>
+      <div class="mt-4 space-y-3 overflow-y-auto pb-2 pr-1">
+        <AuthorInsightsPanel :insights="insights" :loading="loadingInsights" :error="insightsError" />
+        <AuthorDuplicateSuggestionsPanel
+          :suggestions="suggestions"
+          :loading="loadingSuggestions"
+          :error="suggestionsError"
+          :can-merge="isSuperuser"
+          :merging="quickMerging"
+          @open-author="openAuthor"
+          @quick-merge="requestQuickMergeSuggestion"
+        />
+      </div>
+    </SheetContent>
+  </Sheet>
+
+  <AuthorConfirmDialog
+    :open="deleteDialogOpen"
+    :title="deleteDialogTitle"
+    :description="deleteDialogDescription"
+    confirm-label="Delete"
+    :loading="deleteDialogLoading"
+    destructive
+    @confirm="confirmDeleteAuthors"
+    @cancel="cancelDeleteAuthors"
+  />
+
+  <AuthorConfirmDialog
+    :open="quickMergeDialogOpen"
+    :title="quickMergeDialogTitle"
+    :description="quickMergeDialogDescription"
+    confirm-label="Merge"
+    :loading="quickMerging"
+    @confirm="confirmQuickMergeSuggestion"
+    @cancel="cancelQuickMerge"
+  />
+</template>

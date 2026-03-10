@@ -15,3 +15,4 @@ export * from "./kobo";
 export * from "./staging";
 export * from "./file-write";
 export * from "./epub";
+export * from "./author";

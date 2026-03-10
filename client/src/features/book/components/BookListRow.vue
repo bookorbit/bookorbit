@@ -46,6 +46,7 @@ const showSendDialog = ref(false)
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
+const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
   const idx = props.book.seriesIndex
@@ -100,6 +101,11 @@ function openFile(file: BookFileRef) {
     query: { format: file.format ?? 'epub' },
   })
 }
+
+function openAuthorBrowse() {
+  if (!authorQuery.value) return
+  void router.push({ name: 'authors', query: { q: authorQuery.value } })
+}
 </script>
 
 <template>
@@ -142,7 +148,9 @@ function openFile(file: BookFileRef) {
     <!-- Main info -->
     <div class="flex flex-col min-w-0 flex-1 gap-0.5">
       <span class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{ book.title ?? '-' }}</span>
-      <span v-if="authorLine" class="text-xs text-muted-foreground truncate">{{ authorLine }}</span>
+      <button v-if="authorLine" class="w-fit max-w-full text-xs text-muted-foreground truncate hover:underline" @click.stop="openAuthorBrowse">
+        {{ authorLine }}
+      </button>
       <span v-if="seriesLine" class="text-xs text-muted-foreground truncate italic">{{ seriesLine }}</span>
       <span v-if="metaLine" class="text-xs text-muted-foreground truncate">{{ metaLine }}</span>
       <div v-if="visibleTags.length > 0" class="flex items-center gap-1 flex-wrap">

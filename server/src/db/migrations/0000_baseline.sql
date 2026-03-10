@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS pg_trgm;--> statement-breakpoint
 CREATE TYPE "public"."library_access_level" AS ENUM('viewer', 'editor', 'owner');--> statement-breakpoint
 CREATE TYPE "public"."opds_sort_order" AS ENUM('recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc');--> statement-breakpoint
 CREATE TABLE "app_settings" (
@@ -281,7 +283,8 @@ CREATE TABLE "lenses" (
 CREATE TABLE "authors" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(500) NOT NULL,
-	"sort_name" varchar(500)
+	"sort_name" varchar(500),
+	"description" text
 );
 --> statement-breakpoint
 CREATE TABLE "book_authors" (
@@ -585,6 +588,7 @@ CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user
 CREATE UNIQUE INDEX "email_templates_system_name_unique" ON "email_templates" USING btree ("name") WHERE "email_templates"."user_id" is null;--> statement-breakpoint
 CREATE INDEX "fwl_book_id_idx" ON "file_write_log" USING btree ("book_id");--> statement-breakpoint
 CREATE INDEX "authors_name_trgm_idx" ON "authors" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "book_authors_author_id_idx" ON "book_authors" USING btree ("author_id");--> statement-breakpoint
 CREATE INDEX "bm_title_trgm_idx" ON "book_metadata" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_series_trgm_idx" ON "book_metadata" USING gin ("series_name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_publisher_trgm_idx" ON "book_metadata" USING gin ("publisher" gin_trgm_ops);--> statement-breakpoint

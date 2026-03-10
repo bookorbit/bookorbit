@@ -34,7 +34,9 @@ const { libraries } = useLibraries()
 
 const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
 
-const title = computed(() => libraries.value.find((l) => l.id === libraryId.value)?.name ?? 'Library')
+const currentLibrary = computed(() => libraries.value.find((l) => l.id === libraryId.value))
+const title = computed(() => currentLibrary.value?.name ?? 'Library')
+const libraryIcon = computed(() => currentLibrary.value?.icon ?? 'BookOpen')
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 
@@ -212,17 +214,20 @@ watch(
 )
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
-const { pendingId: deleteBookId, deleting: deletingBook, promptDelete, cancelDelete, confirmDelete } = useDeleteBook((id) => {
+const {
+  pendingId: deleteBookId,
+  deleting: deletingBook,
+  promptDelete,
+  cancelDelete,
+  confirmDelete,
+} = useDeleteBook((id) => {
   books.value = books.value.filter((b) => b.id !== id)
 })
-const { handleBulkRefreshMetadata, handleBulkReExtractCover, handleExport, handleDeleteSelected } = useBookBulkActions(
-  selectedIds,
-  (ids) => {
-    const deleted = new Set(ids)
-    books.value = books.value.filter((b) => !deleted.has(b.id))
-    exitSelectionMode()
-  },
-)
+const { handleBulkRefreshMetadata, handleBulkReExtractCover, handleExport, handleDeleteSelected } = useBookBulkActions(selectedIds, (ids) => {
+  const deleted = new Set(ids)
+  books.value = books.value.filter((b) => !deleted.has(b.id))
+  exitSelectionMode()
+})
 
 function handleSelect(id: number, event: MouseEvent) {
   if (event.shiftKey)
@@ -241,7 +246,6 @@ function toggleSelectionMode() {
 const addToCollectionOpen = ref(false)
 const sendBookOpen = ref(false)
 const saveAsLensOpen = ref(false)
-
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
@@ -270,172 +274,172 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 
 <template>
   <ViewHeader
-      :title="title"
-      :total="total"
-      :loaded="books.length"
-      v-model:coverSize="coverSize"
-      v-model:gridGap="gridGap"
-      v-model:viewMode="viewMode"
-      :selection-mode="selectionMode"
-      @toggle-selection="toggleSelectionMode"
-    >
-      <template #toolbar>
-        <div class="flex items-center gap-1">
-          <Popover>
-            <PopoverTrigger as-child>
-              <button
-                class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-                :class="
-                  !isDefaultSort
-                    ? 'border-primary text-primary bg-primary/10'
-                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                "
+    :title="title"
+    :icon="libraryIcon"
+    :total="total"
+    v-model:coverSize="coverSize"
+    v-model:gridGap="gridGap"
+    v-model:viewMode="viewMode"
+    :selection-mode="selectionMode"
+    @toggle-selection="toggleSelectionMode"
+  >
+    <template #toolbar>
+      <div class="flex items-center gap-1">
+        <Popover>
+          <PopoverTrigger as-child>
+            <button
+              class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
+              :class="
+                !isDefaultSort
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+              "
+            >
+              <ArrowUpDown :size="13" />
+              <span class="hidden lg:inline">{{ sortSummary }}</span>
+              <span class="lg:hidden"
+                >Sort<template v-if="!isDefaultSort"> ({{ sort.length }})</template></span
               >
-                <ArrowUpDown :size="13" />
-                <span class="hidden lg:inline">{{ sortSummary }}</span>
-                <span class="lg:hidden"
-                  >Sort<template v-if="!isDefaultSort"> ({{ sort.length }})</template></span
-                >
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" class="w-80 p-3">
-              <BookSortBuilder v-model="sortModel" />
-            </PopoverContent>
-          </Popover>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="!isDefaultSort"
-                @click="resetSort"
-                class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <X :size="13" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Reset sort to default</TooltipContent>
-          </Tooltip>
-        </div>
-        <div class="w-px h-5 bg-border shrink-0" />
-        <button
-          @click="filterOpen = !filterOpen"
-          class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-          :class="
-            activeFilterCount > 0
-              ? 'border-primary text-primary bg-primary/10'
-              : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-          "
-        >
-          <Filter :size="13" />
-          <span>Filters</span>
-          <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
-        </button>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" class="w-80 p-3">
+            <BookSortBuilder v-model="sortModel" />
+          </PopoverContent>
+        </Popover>
         <Tooltip>
           <TooltipTrigger as-child>
             <button
-              v-if="activeFilterCount > 0"
-              @click="clearFilters"
-              class="flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
+              v-if="!isDefaultSort"
+              @click="resetSort"
+              class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
             >
               <X :size="13" />
-              Clear
             </button>
           </TooltipTrigger>
-          <TooltipContent>Clear all filters</TooltipContent>
+          <TooltipContent>Reset sort to default</TooltipContent>
         </Tooltip>
-      </template>
-    </ViewHeader>
-
-    <main class="flex-none pr-4 pb-2">
-      <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
-
-      <!-- Filter builder panel -->
-      <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
-        <div class="flex items-center justify-between mb-3">
-          <span class="text-xs font-medium text-muted-foreground">Filter rules</span>
-          <div class="flex items-center gap-1.5">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="activeFilterCount > 0"
-                  @click="saveAsLensOpen = true"
-                  class="flex items-center gap-1.5 h-7 px-3 rounded-md border border-input text-xs font-medium text-muted-foreground bg-background hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <Telescope :size="13" />
-                  Save as Lens
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Save this filter as a named lens</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="activeFilterCount > 0"
-                  @click="saveFilter"
-                  class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
-                  :class="
-                    isFilterSaved
-                      ? 'border-primary/40 text-primary bg-primary/8'
-                      : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                  "
-                >
-                  <BookmarkCheck v-if="isFilterSaved" :size="13" />
-                  <Bookmark v-else :size="13" />
-                  {{ isFilterSaved ? 'Saved' : 'Save filter' }}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ isFilterSaved ? 'Filter saved' : 'Save filter for this library' }}</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="hasSavedFilter"
-                  @click="forgetSavedFilter"
-                  class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <X :size="11" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Remove saved filter</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-        <BookFilterBuilder v-model="filter" />
       </div>
-
-      <!-- Grid view -->
-      <div
-        v-show="viewMode === 'grid'"
-        class="grid"
-        :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+      <div class="w-px h-5 bg-border shrink-0" />
+      <button
+        @click="filterOpen = !filterOpen"
+        class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
+        :class="
+          activeFilterCount > 0
+            ? 'border-primary text-primary bg-primary/10'
+            : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+        "
       >
-        <BookCoverCard
-          v-for="book in books"
-          :key="book.id"
-          :book="book"
-          :selection-mode="selectionMode"
-          :selected="isSelected(book.id)"
-          @action="handleBookAction(book, $event)"
-          @select="handleSelect(book.id, $event)"
-        />
-      </div>
+        <Filter :size="13" />
+        <span>Filters</span>
+        <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
+      </button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            v-if="activeFilterCount > 0"
+            @click="clearFilters"
+            class="flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <X :size="13" />
+            Clear
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Clear all filters</TooltipContent>
+      </Tooltip>
+    </template>
+  </ViewHeader>
 
-      <!-- List view -->
-      <div v-show="viewMode === 'list'" class="flex flex-col divide-y divide-border">
-        <BookListRow
-          v-for="book in books"
-          :key="book.id"
-          :book="book"
-          :selection-mode="selectionMode"
-          :selected="isSelected(book.id)"
-          @action="handleBookAction(book, $event)"
-          @select="handleSelect(book.id, $event)"
-        />
-      </div>
+  <main class="flex-none pr-2">
+    <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
-      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-        <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+    <!-- Filter builder panel -->
+    <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-medium text-muted-foreground">Filter rules</span>
+        <div class="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="activeFilterCount > 0"
+                @click="saveAsLensOpen = true"
+                class="flex items-center gap-1.5 h-7 px-3 rounded-md border border-input text-xs font-medium text-muted-foreground bg-background hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Telescope :size="13" />
+                Save as Lens
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Save this filter as a named lens</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="activeFilterCount > 0"
+                @click="saveFilter"
+                class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
+                :class="
+                  isFilterSaved
+                    ? 'border-primary/40 text-primary bg-primary/8'
+                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                "
+              >
+                <BookmarkCheck v-if="isFilterSaved" :size="13" />
+                <Bookmark v-else :size="13" />
+                {{ isFilterSaved ? 'Saved' : 'Save filter' }}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ isFilterSaved ? 'Filter saved' : 'Save filter for this library' }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="hasSavedFilter"
+                @click="forgetSavedFilter"
+                class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <X :size="11" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Remove saved filter</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
+      <BookFilterBuilder v-model="filter" />
+    </div>
+
+    <!-- Grid view -->
+    <div
+      v-show="viewMode === 'grid'"
+      class="grid"
+      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+    >
+      <BookCoverCard
+        v-for="book in books"
+        :key="book.id"
+        :book="book"
+        :selection-mode="selectionMode"
+        :selected="isSelected(book.id)"
+        @action="handleBookAction(book, $event)"
+        @select="handleSelect(book.id, $event)"
+      />
+    </div>
+
+    <!-- List view -->
+    <div v-show="viewMode === 'list'" class="flex flex-col divide-y divide-border">
+      <BookListRow
+        v-for="book in books"
+        :key="book.id"
+        :book="book"
+        :selection-mode="selectionMode"
+        :selected="isSelected(book.id)"
+        @action="handleBookAction(book, $event)"
+        @select="handleSelect(book.id, $event)"
+      />
+    </div>
+
+    <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+      <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+      <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+    </div>
   </main>
 
   <BookQuickView

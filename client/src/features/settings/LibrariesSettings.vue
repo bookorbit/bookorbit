@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Plus, RefreshCw, Pencil, Trash2, Images, FileEdit } from 'lucide-vue-next'
+import * as LucideIcons from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import type { GlobalFileWriteSettings, Library as LibraryType, LibraryStats } from '@projectx/types'
@@ -30,6 +31,11 @@ const confirmSyncLibrary = ref<LibraryType | null>(null)
 
 const { syncAll: syncAllFiles } = useLibraryFileSync()
 
+function getIconComponent(name: string | null | undefined) {
+  if (!name) return FolderOpen
+  return (LucideIcons as Record<string, unknown>)[name] ?? FolderOpen
+}
+
 function promptSyncFiles(lib: LibraryType) {
   confirmSyncLibrary.value = lib
 }
@@ -53,7 +59,6 @@ async function confirmSyncFiles() {
     fileSyncingMap.value[lib.id] = false
   }
 }
-
 
 async function loadAllStats() {
   await Promise.all(
@@ -270,7 +275,7 @@ function coverRefreshLabel(libraryId: number): string {
           :to="{ name: 'library', params: { id: lib.id } }"
           class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
         >
-          <FolderOpen :size="17" class="text-primary" />
+          <component :is="getIconComponent(lib.icon)" :size="17" class="text-primary" />
         </RouterLink>
         <div class="flex-1 min-w-0">
           <RouterLink :to="{ name: 'library', params: { id: lib.id } }" class="settings-label hover:text-primary transition-colors truncate block">{{

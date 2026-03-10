@@ -41,6 +41,7 @@ import { EpubModule } from './modules/epub/epub.module';
 import { StagingModule } from './modules/staging/staging.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
+import { AuthorsModule } from './modules/authors/authors.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { UserModule } from './modules/user/user.module';
     AuthModule,
     AppSettingsModule,
     UserModule,
+    AuthorsModule,
     RoleModule,
     LibraryModule,
     PathModule,
