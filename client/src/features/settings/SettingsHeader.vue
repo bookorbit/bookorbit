@@ -82,7 +82,7 @@ const groups = computed<Group[]>(() => {
 </script>
 
 <template>
-  <div class="flex items-stretch h-11 px-2 border-b overflow-x-auto shrink-0 scrollbar-none">
+  <div class="flex items-stretch h-11 px-6 border-b overflow-x-auto shrink-0 scrollbar-none">
     <template v-for="group in groups" :key="group.id">
       <span
         class="flex items-center px-2 text-[10px] font-semibold text-muted-foreground/35 uppercase tracking-widest whitespace-nowrap shrink-0 select-none"

@@ -95,6 +95,16 @@ function goBack() {
   void router.push({ name: 'authors' })
 }
 
+function toggleEdit() {
+  editOpen.value = !editOpen.value
+  if (editOpen.value) mergeOpen.value = false
+}
+
+function toggleMerge() {
+  mergeOpen.value = !mergeOpen.value
+  if (mergeOpen.value) editOpen.value = false
+}
+
 function handleBookAction(book: BookCard, action: 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete') {
   if (action === 'quick-view') {
     void router.push({ name: 'book-detail', params: { bookId: book.id } })
@@ -308,14 +318,8 @@ watch(authorName, () => {
       :can-update="canUpdate"
       :can-merge="canMerge"
       :refreshing="refreshingMetadata"
-      @edit="
-        editOpen = !editOpen
-        if (editOpen) mergeOpen = false
-      "
-      @merge="
-        mergeOpen = !mergeOpen
-        if (mergeOpen) editOpen = false
-      "
+      @edit="toggleEdit"
+      @merge="toggleMerge"
       @refresh="refreshMetadata"
     />
 

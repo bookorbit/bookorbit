@@ -8,7 +8,7 @@ defineProps<{
   customScale: number
   zoomLabel: string
   spread: 'none' | 'odd' | 'even'
-  scrollMode: 'continuous' | 'page'
+  scrollMode: 'vertical' | 'page'
   rotation: 0 | 90 | 180 | 270
 }>()
 
@@ -16,7 +16,7 @@ const emit = defineEmits<{
   close: []
   applyZoomPreset: [value: string]
   'update:spread': [v: 'none' | 'odd' | 'even']
-  'update:scrollMode': [v: 'continuous' | 'page']
+  'update:scrollMode': [v: 'vertical' | 'page']
   rotate: []
 }>()
 
@@ -106,13 +106,13 @@ const activeTab = ref<Tab>('zoom')
               <button
                 class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"
                 :class="
-                  scrollMode === 'continuous'
+                  scrollMode === 'vertical'
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border hover:border-muted-foreground/40 hover:bg-muted text-foreground'
                 "
-                @click="emit('update:scrollMode', 'continuous')"
+                @click="emit('update:scrollMode', 'vertical')"
               >
-                Continuous
+                Scrolled
               </button>
               <button
                 class="py-2.5 rounded-xl text-sm font-medium border-2 transition-colors"

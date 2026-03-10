@@ -2,6 +2,7 @@
 import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@projectx/types'
 import FieldGroupSection from './FieldGroupSection.vue'
 import ProviderReservoir from './ProviderReservoir.vue'
+import { Info } from 'lucide-vue-next'
 
 defineProps<{
   preferences: MetadataFetchPreferences
@@ -26,16 +27,30 @@ const GROUPS: { label: string; fields: MetadataField[] }[] = [
 </script>
 
 <template>
-  <div>
-    <ProviderReservoir :statuses="statuses" />
-
-    <!-- Column headers (desktop only) -->
-    <div class="hidden sm:flex items-center gap-2 px-4 py-2 border-b border-border/60 bg-muted/10">
-      <span class="w-36 shrink-0 text-xs text-muted-foreground">Field</span>
-      <span class="flex-1 text-xs text-muted-foreground">Providers</span>
-      <span class="shrink-0 text-xs text-muted-foreground pr-2">Strategy</span>
+  <div class="space-y-0">
+    <!-- Reservoir with context -->
+    <div class="px-6 py-4 bg-muted/30 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-2.5">
+        <Info :size="14" class="text-primary" />
+        <p class="settings-hint !mt-0 uppercase tracking-wider">Drag providers from here onto any field to add them</p>
+      </div>
+      <ProviderReservoir :statuses="statuses" />
     </div>
 
+    <!-- Table Header (desktop) -->
+    <div class="hidden md:flex items-center gap-4 px-6 py-3 bg-muted/10 border-b border-border/60">
+      <div class="w-48 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field</div>
+      <div class="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Providers (ordered by priority)</div>
+      <div class="w-44 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Merge Strategy</div>
+      <div
+        v-if="overriddenFields !== undefined"
+        class="w-16 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center"
+      >
+        Status
+      </div>
+    </div>
+
+    <!-- Content -->
     <div class="divide-y divide-border/60">
       <FieldGroupSection
         v-for="group in GROUPS"

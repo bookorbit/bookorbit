@@ -137,7 +137,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.HARDCOVER,
       MetadataProviderKey.OPEN_LIBRARY,
     ]);
-    expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('API key recommended');
+    expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('Recommended for higher rate limits');
     expect(statuses.find((s) => s.key === MetadataProviderKey.AMAZON)?.hint).toContain('Cookie recommended');
     expect(statuses.find((s) => s.key === MetadataProviderKey.HARDCOVER)?.configured).toBe(false);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOODREADS)?.enabled).toBe(false);

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Plus, Trash2, Copy, Check, Pencil, X, Tablet } from 'lucide-vue-next'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import SettingsPageHeader from './SettingsPageHeader.vue'
 import { useKoboDevices } from '@/features/kobo/composables/useKoboDevices'
 import { useKoboSettings } from '@/features/kobo/composables/useKoboSettings'
 import type { KoboDevice } from '@projectx/types'
@@ -154,127 +156,120 @@ async function saveSettings() {
 </script>
 
 <template>
-    <div class="mb-8">
-      <h2 class="settings-title">Kobo Sync</h2>
-      <p class="settings-subtitle">
-        Pair your Kobo device to sync your library. Enable "Sync to Kobo" on any collection to push those books to your device.
-      </p>
-    </div>
+  <SettingsPageHeader title="Kobo Sync" subtitle="Pair your Kobo device to sync your library and reading progress." />
 
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
-    <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
-    <template v-else>
-      <!-- New device token display -->
-      <div v-if="newDeviceSyncUrl" class="mb-6 border border-primary/30 rounded-lg p-5 bg-primary/5">
-        <div class="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <p class="text-sm font-semibold text-foreground">Device paired successfully</p>
-            <p class="settings-hint">
-              Copy this URL and enter it on your Kobo device under Settings - Account - Add account - Other.
-            </p>
+  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+  <template v-else>
+    <!-- New device token display -->
+    <div v-if="newDeviceSyncUrl" class="mb-8 border-2 border-primary/30 rounded-xl p-6 bg-primary/5 shadow-sm">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+            <Check :size="18" stroke-width="3" />
           </div>
-          <button @click="dismissToken()" class="text-muted-foreground hover:text-foreground transition-colors shrink-0">
-            <X :size="16" />
-          </button>
+          <div>
+            <p class="text-base font-semibold text-foreground leading-none mb-1">Device paired successfully</p>
+            <p class="settings-hint">You're ready to set up your Kobo. Follow the instructions below.</p>
+          </div>
         </div>
-        <div class="flex items-center gap-2 px-3 py-2.5 rounded-md border border-border bg-background">
-          <Tablet :size="14" class="text-muted-foreground shrink-0" />
-          <span class="flex-1 text-sm text-foreground font-mono select-all truncate min-w-0">{{ newDeviceSyncUrl }}</span>
-          <button
-            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-muted transition-colors shrink-0"
-            @click="copyToken()"
-          >
-            <component :is="tokenCopied ? Check : Copy" :size="12" />
-            {{ tokenCopied ? 'Copied' : 'Copy' }}
-          </button>
-        </div>
-        <p class="mt-2 text-xs text-muted-foreground">This URL will not be shown again. Keep it private.</p>
+        <button @click="dismissToken()" class="text-muted-foreground hover:text-foreground transition-colors p-1 shrink-0">
+          <X :size="18" />
+        </button>
       </div>
 
-      <!-- Devices -->
-      <div class="mb-6">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Devices</p>
-          <button
-            v-if="!showCreateForm"
-            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            @click="showCreateForm = true"
-          >
-            <Plus :size="12" />
-            Add device
+      <div class="space-y-4">
+        <div class="bg-background rounded-lg border border-border p-4">
+          <p class="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2.5">Sync URL</p>
+          <div class="flex items-center gap-2 px-3 py-2.5 rounded-md border border-border bg-muted/30">
+            <Tablet :size="14" class="text-muted-foreground shrink-0" />
+            <span class="flex-1 text-sm text-foreground font-mono select-all truncate min-w-0">{{ newDeviceSyncUrl }}</span>
+            <button
+              class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
+              @click="copyToken()"
+            >
+              <component :is="tokenCopied ? Check : Copy" :size="12" />
+              {{ tokenCopied ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <p class="mt-3 text-xs text-muted-foreground leading-relaxed">
+            On your Kobo device, go to <span class="font-semibold text-foreground">Settings → Account → Add account → Other</span> and enter this URL.
+            Any username/password will work.
+          </p>
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md border border-amber-200 dark:border-amber-900/50"
+        >
+          <X :size="14" class="shrink-0" />
+          This URL will not be shown again. Keep it private.
+        </div>
+      </div>
+    </div>
+
+    <!-- Devices -->
+    <div class="mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <p class="settings-group-label mb-0">Registered Devices</p>
+        <button v-if="!showCreateForm" class="settings-btn-primary" @click="showCreateForm = true">
+          <Plus :size="12" />
+          Add device
+        </button>
+      </div>
+
+      <!-- Create form -->
+      <div v-if="showCreateForm" class="border border-border rounded-lg p-5 bg-card mb-4 space-y-4 shadow-sm">
+        <div>
+          <label class="settings-label block mb-1.5">Device name</label>
+          <input v-model="newDeviceName" type="text" placeholder="e.g. My Kobo Libra" autofocus class="input-field w-full" />
+        </div>
+        <div v-if="createError" class="text-xs text-destructive">{{ createError }}</div>
+        <div class="flex items-center gap-2 pt-1">
+          <button class="settings-btn-primary" :disabled="creating || !newDeviceName.trim()" @click="submitCreate()">
+            {{ creating ? 'Creating...' : 'Create device' }}
           </button>
+          <button class="settings-btn-outline" @click="cancelCreate()">Cancel</button>
         </div>
+      </div>
 
-        <!-- Create form -->
-        <div v-if="showCreateForm" class="border border-border rounded-lg p-5 bg-card mb-4 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Device name</label>
-            <input
-              v-model="newDeviceName"
-              type="text"
-              placeholder="e.g. Kobo Libra 2"
-              autofocus
-              class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div v-if="createError" class="text-xs text-destructive">{{ createError }}</div>
-          <div class="flex items-center gap-2">
-            <button
-              class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              :disabled="creating || !newDeviceName.trim()"
-              @click="submitCreate()"
-            >
-              {{ creating ? 'Creating...' : 'Create' }}
-            </button>
-            <button
-              class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-              @click="cancelCreate()"
-            >
-              Cancel
+      <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-10 bg-card text-center shadow-sm">
+        <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+          <Tablet :size="24" class="text-muted-foreground/50" />
+        </div>
+        <p class="text-sm font-medium text-foreground">No devices yet</p>
+        <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">
+          Add a device to start syncing your books and reading progress to your Kobo.
+        </p>
+      </div>
+
+      <div v-else-if="devices.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div v-for="device in devices" :key="device.id" class="px-5 py-4 bg-card transition-colors hover:bg-muted/30">
+          <div v-if="renamingId === device.id" class="flex items-center gap-2">
+            <input v-model="renameValue" type="text" class="flex-1 input-field" @keydown.enter="submitRename(device)" @keydown.esc="cancelRename()" />
+            <button class="settings-btn-primary" :disabled="renaming || !renameValue.trim()" @click="submitRename(device)">Save</button>
+            <button class="settings-btn-outline h-9 w-9 p-0 flex items-center justify-center" @click="cancelRename()">
+              <X :size="14" />
             </button>
           </div>
-        </div>
-
-        <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
-          <p class="text-sm text-muted-foreground">No devices yet. Add a device to start syncing your library.</p>
-        </div>
-
-        <div v-else-if="devices.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <div v-for="device in devices" :key="device.id" class="px-5 py-3.5 bg-card">
-            <div v-if="renamingId === device.id" class="flex items-center gap-2">
-              <input
-                v-model="renameValue"
-                type="text"
-                class="flex-1 h-8 px-2.5 text-sm border border-primary rounded-md bg-background text-foreground focus:outline-none"
-                @keydown.enter="submitRename(device)"
-                @keydown.esc="cancelRename()"
-              />
-              <button
-                class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                :disabled="renaming || !renameValue.trim()"
-                @click="submitRename(device)"
-              >
-                Save
-              </button>
-              <button class="text-muted-foreground hover:text-foreground transition-colors" @click="cancelRename()">
-                <X :size="14" />
-              </button>
+          <div v-else class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
+              <Tablet :size="20" />
             </div>
-            <div v-else class="flex items-center gap-3">
-              <Tablet :size="16" class="text-muted-foreground shrink-0" />
-              <div class="flex-1 min-w-0">
-                <p class="settings-label truncate">{{ device.name }}</p>
-                <p class="settings-hint">Last seen: {{ formatLastSeen(device.lastSeenAt) }}</p>
-              </div>
+            <div class="flex-1 min-w-0">
+              <p class="settings-label truncate leading-none mb-1.5">{{ device.name }}</p>
+              <p class="settings-hint leading-none">Last sync: {{ formatLastSeen(device.lastSeenAt) }}</p>
+            </div>
+            <div class="flex items-center gap-1">
               <button
-                class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                class="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 @click="startRename(device)"
+                title="Rename device"
               >
-                <Pencil :size="13" />
+                <Pencil :size="14" />
               </button>
               <button
-                class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                class="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 @click="revoke(device)"
+                title="Revoke access"
               >
                 <Trash2 :size="14" />
               </button>
@@ -282,127 +277,122 @@ async function saveSettings() {
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Sync settings -->
-      <div class="mb-6">
-        <p class="settings-group-label">Progress Thresholds</p>
-        <div class="border border-border rounded-lg p-5 bg-card space-y-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="settings-label">Convert EPUB to KEPUB</p>
-              <p class="settings-hint">Optimizes ebooks for Kobo devices. Requires kepubify on first use.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="convertToKepub"
-              class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-              :class="convertToKepub ? 'bg-primary' : 'bg-muted'"
-              @click="convertToKepub = !convertToKepub"
-            >
-              <span
-                class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                :class="convertToKepub ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </button>
+    <!-- Sync settings -->
+    <div class="mb-8">
+      <p class="settings-group-label">Sync Preferences</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div class="pr-8">
+            <p class="settings-label">Convert to KEPUB</p>
+            <p class="settings-hint">Optimizes ebooks for Kobo devices with better performance and features.</p>
+          </div>
+          <ToggleSwitch v-model="convertToKepub" />
+        </div>
+
+        <div v-if="convertToKepub" class="flex items-center justify-between px-5 py-4 bg-card">
+          <div class="pr-8">
+            <p class="settings-label">Force hyphenation</p>
+            <p class="settings-hint">Ensures consistent text justification. This will regenerate cached KEPUBs.</p>
+          </div>
+          <ToggleSwitch v-model="forceEnableHyphenation" />
+        </div>
+
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div class="pr-8">
+            <p class="settings-label">Two-way progress sync</p>
+            <p class="settings-hint">Pushes progress from the web reader to your device during sync.</p>
+          </div>
+          <ToggleSwitch v-model="twoWayProgressSync" />
+        </div>
+
+        <div class="px-5 py-5 bg-card space-y-5">
+          <div>
+            <p class="settings-label mb-1">Progress Thresholds</p>
+            <p class="settings-hint">Define when Kobo reading progress updates your library status.</p>
           </div>
 
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="settings-label">Force hyphenation</p>
-              <p class="settings-hint">Passes --hyphenate to kepubify. Cached files are regenerated.</p>
+          <div class="grid sm:grid-cols-2 gap-6">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Reading</label>
+                <span class="text-xs font-mono text-primary font-bold">{{ readingThreshold }}%</span>
+              </div>
+              <input v-model.number="readingThreshold" type="range" min="0" max="99" step="1" class="w-full accent-primary cursor-pointer" />
+              <p class="text-[10px] text-muted-foreground leading-tight">Minimum percentage to move a book to "Reading".</p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="forceEnableHyphenation"
-              class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-              :class="forceEnableHyphenation ? 'bg-primary' : 'bg-muted'"
-              @click="forceEnableHyphenation = !forceEnableHyphenation"
-            >
-              <span
-                class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                :class="forceEnableHyphenation ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="settings-label">Two-way progress sync</p>
-              <p class="settings-hint">Pushes web reader progress to your Kobo device on sync.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="twoWayProgressSync"
-              class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-              :class="twoWayProgressSync ? 'bg-primary' : 'bg-muted'"
-              @click="twoWayProgressSync = !twoWayProgressSync"
-            >
-              <span
-                class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                :class="twoWayProgressSync ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </button>
-          </div>
-
-          <p class="text-xs text-muted-foreground">Define when Kobo reading progress marks a book as "Reading" or "Finished" in your library.</p>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-muted-foreground mb-1.5">Mark as Reading (%)</label>
-              <input
-                v-model.number="readingThreshold"
-                type="number"
-                min="0"
-                max="99"
-                class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-muted-foreground mb-1.5">Mark as Finished (%)</label>
-              <input
-                v-model.number="finishedThreshold"
-                type="number"
-                min="1"
-                max="100"
-                class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-muted-foreground mb-1.5">KEPUB conversion limit (MB)</label>
-              <input
-                v-model.number="kepubConversionLimitMb"
-                type="number"
-                min="1"
-                class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Finished</label>
+                <span class="text-xs font-mono text-primary font-bold">{{ finishedThreshold }}%</span>
+              </div>
+              <input v-model.number="finishedThreshold" type="range" min="1" max="100" step="1" class="w-full accent-primary cursor-pointer" />
+              <p class="text-[10px] text-muted-foreground leading-tight">Percentage threshold to mark a book as "Finished".</p>
             </div>
           </div>
 
-          <div v-if="settingsError" class="text-xs text-destructive">{{ settingsError }}</div>
+          <div class="pt-2">
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">KEPUB conversion limit</label>
+              <span class="text-xs font-mono text-primary font-bold">{{ kepubConversionLimitMb }} MB</span>
+            </div>
+            <input v-model.number="kepubConversionLimitMb" type="range" min="1" max="500" step="5" class="w-full accent-primary cursor-pointer" />
+            <p class="text-[10px] text-muted-foreground mt-2">Skip conversion for files larger than this to save server resources.</p>
+          </div>
+        </div>
 
-          <button
-            class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-            :disabled="savingSettings"
-            @click="saveSettings()"
-          >
-            {{ savingSettings ? 'Saving...' : 'Save' }}
+        <div class="px-5 py-4 bg-muted/30 flex items-center justify-between">
+          <div v-if="settingsError" class="text-xs text-destructive font-medium flex items-center gap-1.5"><X :size="14" /> {{ settingsError }}</div>
+          <div v-else class="text-[10px] text-muted-foreground italic">Changes must be saved to take effect.</div>
+
+          <button class="settings-btn-primary" :disabled="savingSettings" @click="saveSettings()">
+            {{ savingSettings ? 'Saving...' : 'Save Sync Settings' }}
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- Help -->
-      <div class="border border-border rounded-lg p-5 bg-card">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">How to sync</p>
-        <ol class="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-          <li>Add a device above and copy the sync URL.</li>
-          <li>On your Kobo device, go to Settings - Account - Add account - Other.</li>
-          <li>Enter the sync URL and any username/password (both are ignored).</li>
-          <li>Enable "Sync to Kobo" on any collection from the Collections view.</li>
-          <li>Sync your Kobo device.</li>
-        </ol>
+    <!-- Help -->
+    <div class="border border-border rounded-lg bg-muted/40 p-6">
+      <div class="flex items-center gap-2 mb-4 text-foreground/80">
+        <Tablet :size="18" />
+        <p class="text-sm font-bold uppercase tracking-widest">Setup Guide</p>
       </div>
-    </template>
+      <div class="grid sm:grid-cols-2 gap-8">
+        <div class="space-y-4">
+          <div class="flex gap-4">
+            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">1</div>
+            <p class="text-sm text-muted-foreground leading-relaxed">
+              Register your device above and copy the unique <span class="text-foreground font-medium">Sync URL</span>.
+            </p>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">2</div>
+            <p class="text-sm text-muted-foreground leading-relaxed">
+              On your Kobo, go to <span class="text-foreground font-medium">Settings → Account → Add account → Other</span>.
+            </p>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">3</div>
+            <p class="text-sm text-muted-foreground leading-relaxed">Enter the URL. Use any dummy text for username/password.</p>
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div class="flex gap-4">
+            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">4</div>
+            <p class="text-sm text-muted-foreground leading-relaxed">
+              Enable <span class="text-foreground font-medium">"Sync to Kobo"</span> on any collection in the app.
+            </p>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">5</div>
+            <p class="text-sm text-muted-foreground leading-relaxed">
+              Perform a <span class="text-foreground font-medium">Sync</span> on your device to fetch your books.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
 </template>

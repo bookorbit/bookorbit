@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Loader2 } from 'lucide-vue-next'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 
@@ -98,102 +100,73 @@ async function onThresholdChange() {
 </script>
 
 <template>
-    <div class="mb-8">
-      <h2 class="settings-title">Staging</h2>
-      <p class="settings-subtitle">Configure how files are processed when they enter the staging area.</p>
-    </div>
+  <SettingsPageHeader title="Staging" subtitle="Configure how files are processed when they enter the staging area." />
 
-    <div v-if="loading" class="flex items-center justify-center py-8">
-      <Loader2 class="size-5 animate-spin text-muted-foreground" />
-    </div>
+  <div v-if="loading" class="flex items-center justify-center py-8">
+    <Loader2 class="size-5 animate-spin text-muted-foreground" />
+  </div>
 
-    <div v-else class="space-y-6">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Metadata</p>
+  <div v-else class="space-y-6">
+    <p class="settings-group-label">Metadata</p>
 
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-        <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer select-none group" @click="toggle">
-          <div>
-            <p class="settings-label">Auto-fetch metadata from providers</p>
-            <p class="settings-hint">
-              Automatically fetch metadata from configured providers (Google Books, Open Library, etc.) after a file is added to staging.
-            </p>
-          </div>
-          <span
-            class="relative ml-4 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
-            :class="autoFetch ? 'bg-primary' : 'bg-muted'"
-          >
-            <span
-              class="inline-block size-4 rounded-full bg-white shadow transition-transform"
-              :class="autoFetch ? 'translate-x-6' : 'translate-x-1'"
-            />
-          </span>
-        </label>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="flex items-center justify-between px-5 py-4 bg-card">
+        <div>
+          <p class="settings-label">Auto-fetch metadata from providers</p>
+          <p class="settings-hint">
+            Automatically fetch metadata from configured providers (Google Books, Open Library, etc.) after a file is added to staging.
+          </p>
+        </div>
+        <ToggleSwitch :model-value="autoFetch" :disabled="saving" class="ml-4" @update:model-value="() => toggle()" />
       </div>
+    </div>
 
-      <div class="mt-6 space-y-4">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Auto-finalize</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer select-none" @click="toggleAutoFinalize">
-            <div>
-              <p class="settings-label">Enable auto-finalize</p>
-              <p class="settings-hint">
-                Files with a metadata confidence score at or above the threshold will be finalized automatically.
-              </p>
+    <div class="mt-6 space-y-4">
+      <p class="settings-group-label">Auto-finalize</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div>
+            <p class="settings-label">Enable auto-finalize</p>
+            <p class="settings-hint">Files with a metadata confidence score at or above the threshold will be finalized automatically.</p>
+          </div>
+          <ToggleSwitch :model-value="autoFinalizeEnabled" :disabled="saving" class="ml-4" @update:model-value="() => toggleAutoFinalize()" />
+        </div>
+
+        <div v-if="autoFinalizeEnabled" class="px-5 py-4 bg-card space-y-4">
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">Confidence threshold: {{ autoFinalizeThreshold }}%</span>
+            <input
+              v-model.number="autoFinalizeThreshold"
+              type="range"
+              min="50"
+              max="100"
+              step="5"
+              class="mt-1 w-full accent-primary"
+              @change="onThresholdChange"
+            />
+            <div class="flex justify-between settings-hint">
+              <span>50%</span>
+              <span>100%</span>
             </div>
-            <span
-              class="relative ml-4 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
-              :class="autoFinalizeEnabled ? 'bg-primary' : 'bg-muted'"
-            >
-              <span
-                class="inline-block size-4 rounded-full bg-white shadow transition-transform"
-                :class="autoFinalizeEnabled ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </span>
           </label>
 
-          <div v-if="autoFinalizeEnabled" class="px-5 py-4 bg-card space-y-4">
-            <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Confidence threshold: {{ autoFinalizeThreshold }}%</span>
-              <input
-                v-model.number="autoFinalizeThreshold"
-                type="range"
-                min="50"
-                max="100"
-                step="5"
-                class="mt-1 w-full accent-primary"
-                @change="onThresholdChange"
-              />
-              <div class="flex justify-between settings-hint">
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </label>
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">Destination library</span>
+            <select class="select-field mt-1 w-full" :value="autoFinalizeLibraryId ?? ''" @change="onLibraryChange">
+              <option value="" disabled>Select a library...</option>
+              <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
+            </select>
+          </label>
 
-            <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Destination library</span>
-              <select
-                class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                :value="autoFinalizeLibraryId ?? ''"
-                @change="onLibraryChange"
-              >
-                <option value="" disabled>Select a library...</option>
-                <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
-              </select>
-            </label>
-
-            <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Destination folder</span>
-              <select
-                class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                :value="autoFinalizeFolderId ?? ''"
-                @change="onFolderChange"
-              >
-                <option value="" disabled>Select a folder...</option>
-                <option v-for="folder in autoFinalizeFolders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
-              </select>
-            </label>
-          </div>
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">Destination folder</span>
+            <select class="select-field mt-1 w-full" :value="autoFinalizeFolderId ?? ''" @change="onFolderChange">
+              <option value="" disabled>Select a folder...</option>
+              <option v-for="folder in autoFinalizeFolders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
+            </select>
+          </label>
         </div>
       </div>
     </div>
+  </div>
 </template>

@@ -87,7 +87,7 @@ const router = createRouter({
               path: 'admin/file-naming',
               name: 'settings-admin-file-naming',
               component: () => import('@/features/settings/FileNamingSettings.vue'),
-              meta: { maxWidth: 'max-w-4xl' },
+              meta: { maxWidth: 'max-w-6xl' },
             },
             {
               path: 'admin/staging',

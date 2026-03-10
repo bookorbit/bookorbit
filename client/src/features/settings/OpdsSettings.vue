@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { Plus, Trash2, Copy, Check, Rss } from 'lucide-vue-next'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import type { OpdsUser, OpdsSortOrder } from '@projectx/types'
@@ -124,143 +126,116 @@ async function deleteUser(user: OpdsUser) {
 </script>
 
 <template>
-    <div class="mb-8">
-      <h2 class="settings-title">OPDS</h2>
-      <p class="settings-subtitle">
-        Connect OPDS-compatible reading apps like KOReader, Moon+ Reader, or Thorium Reader to your library.
-      </p>
+  <SettingsPageHeader title="OPDS" subtitle="Connect OPDS-compatible reading apps like KOReader, Moon+ Reader, or Thorium Reader to your library." />
+
+  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+  <template v-else>
+    <!-- Server Toggle -->
+    <div v-if="canManageSettings" class="mb-6">
+      <p class="settings-group-label">Server</p>
+      <div class="border border-border rounded-lg overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div>
+            <p class="settings-label">OPDS Catalog Server</p>
+            <p class="settings-hint">Allow OPDS clients to browse and download books</p>
+          </div>
+          <ToggleSwitch :model-value="opdsEnabled" @update:model-value="toggleOpds()" />
+        </div>
+      </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
-    <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
-    <template v-else>
-      <!-- Server Toggle -->
-      <div v-if="canManageSettings" class="mb-6">
-        <p class="settings-group-label">Server</p>
-        <div class="border border-border rounded-lg overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 bg-card">
-            <div>
-              <p class="settings-label">OPDS Catalog Server</p>
-              <p class="settings-hint">Allow OPDS clients to browse and download books</p>
-            </div>
-            <button
-              class="w-11 h-6 rounded-full transition-colors relative shrink-0"
-              :class="opdsEnabled ? 'bg-primary' : 'bg-muted'"
-              @click="toggleOpds()"
-            >
-              <div
-                class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
-                :class="opdsEnabled ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Endpoint URL -->
-      <div v-if="opdsEnabled" class="mb-6">
-        <p class="settings-group-label">Endpoint</p>
-        <div class="border border-border rounded-lg overflow-hidden">
-          <div class="flex items-center gap-2 px-5 py-4 bg-card">
-            <Rss :size="14" class="text-muted-foreground shrink-0" />
-            <input :value="opdsUrl" readonly class="flex-1 text-sm bg-transparent text-foreground outline-none select-all min-w-0" />
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
-              @click="copyUrl()"
-            >
-              <component :is="copied ? Check : Copy" :size="12" />
-              {{ copied ? 'Copied' : 'Copy' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- OPDS Users -->
-      <div v-if="opdsEnabled" class="mb-6">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">OPDS Accounts</p>
+    <!-- Endpoint URL -->
+    <div v-if="opdsEnabled" class="mb-6">
+      <p class="settings-group-label">Endpoint</p>
+      <div class="border border-border rounded-lg overflow-hidden">
+        <div class="flex items-center gap-2 px-5 py-4 bg-card">
+          <Rss :size="14" class="text-muted-foreground shrink-0" />
+          <input :value="opdsUrl" readonly class="flex-1 text-sm bg-transparent text-foreground outline-none select-all min-w-0" />
           <button
-            v-if="!showCreateForm"
-            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            @click="showCreateForm = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
+            @click="copyUrl()"
           >
-            <Plus :size="12" />
-            Add
+            <component :is="copied ? Check : Copy" :size="12" />
+            {{ copied ? 'Copied' : 'Copy' }}
           </button>
         </div>
+      </div>
+    </div>
 
-        <!-- Create form -->
-        <div v-if="showCreateForm" class="border border-border rounded-lg p-5 bg-card mb-4 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Username</label>
-            <input
-              v-model="createUsername"
-              type="text"
-              placeholder="e.g. koreader"
-              class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Password</label>
-            <input
-              v-model="createPassword"
-              type="password"
-              placeholder="Min 8 characters"
-              class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Default Sort</label>
-            <select
-              v-model="createSortOrder"
-              class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div v-if="createError" class="text-xs text-destructive">{{ createError }}</div>
-          <div class="flex items-center gap-2 pt-1">
-            <button
-              class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              :disabled="creating || !createUsername || !createPassword"
-              @click="createUser()"
-            >
-              {{ creating ? 'Creating...' : 'Create' }}
-            </button>
-            <button
-              class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-              @click="cancelCreate()"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+    <!-- OPDS Users -->
+    <div v-if="opdsEnabled" class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <p class="settings-group-label mb-0">OPDS Accounts</p>
+        <button
+          v-if="!showCreateForm"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          @click="showCreateForm = true"
+        >
+          <Plus :size="12" />
+          Add
+        </button>
+      </div>
 
-        <!-- Users list -->
-        <div v-if="opdsUsers.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
-          <p class="text-sm text-muted-foreground">No OPDS accounts yet. Create one to start using OPDS clients.</p>
+      <!-- Create form -->
+      <div v-if="showCreateForm" class="border border-border rounded-lg p-5 bg-card mb-4 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Username</label>
+          <input v-model="createUsername" type="text" placeholder="e.g. koreader" class="input-field w-full" />
         </div>
-        <div v-else-if="opdsUsers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-          <div v-for="user in opdsUsers" :key="user.id" class="flex items-center gap-3 px-5 py-3.5 bg-card">
-            <div class="flex-1 min-w-0">
-              <p class="settings-label truncate">{{ user.username }}</p>
-              <p class="settings-hint">{{ sortOrderLabel(user.sortOrder) }}</p>
-            </div>
-            <select
-              :value="user.sortOrder"
-              class="text-xs border border-border rounded-md px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              @change="updateSortOrder(user, ($event.target as HTMLSelectElement).value as OpdsSortOrder)"
-            >
-              <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <button
-              class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              @click="deleteUser(user)"
-            >
-              <Trash2 :size="14" />
-            </button>
-          </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Password</label>
+          <input v-model="createPassword" type="password" placeholder="Min 8 characters" class="input-field w-full" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Default Sort</label>
+          <select v-model="createSortOrder" class="select-field w-full">
+            <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div v-if="createError" class="text-xs text-destructive">{{ createError }}</div>
+        <div class="flex items-center gap-2 pt-1">
+          <button
+            class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            :disabled="creating || !createUsername || !createPassword"
+            @click="createUser()"
+          >
+            {{ creating ? 'Creating...' : 'Create' }}
+          </button>
+          <button
+            class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
+            @click="cancelCreate()"
+          >
+            Cancel
+          </button>
         </div>
       </div>
-    </template>
+
+      <!-- Users list -->
+      <div v-if="opdsUsers.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+        <p class="text-sm text-muted-foreground">No OPDS accounts yet. Create one to start using OPDS clients.</p>
+      </div>
+      <div v-else-if="opdsUsers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        <div v-for="user in opdsUsers" :key="user.id" class="flex items-center gap-3 px-5 py-3.5 bg-card">
+          <div class="flex-1 min-w-0">
+            <p class="settings-label truncate">{{ user.username }}</p>
+            <p class="settings-hint">{{ sortOrderLabel(user.sortOrder) }}</p>
+          </div>
+          <select
+            :value="user.sortOrder"
+            class="select-field text-xs h-auto py-1"
+            @change="updateSortOrder(user, ($event.target as HTMLSelectElement).value as OpdsSortOrder)"
+          >
+            <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <button
+            class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            @click="deleteUser(user)"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
 </template>

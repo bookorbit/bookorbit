@@ -8,6 +8,7 @@ export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
   fb2: 'epub',
   txt: 'epub',
   pdf: 'pdf',
+  cbx: 'cbx',
   cbz: 'cbx',
   cbr: 'cbx',
   cb7: 'cbx',
@@ -76,7 +77,7 @@ export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
 }
 
 export const PDF_READER_DEFAULTS: PdfReaderSettings = {
-  scrollMode: 'vertical',
+  scrollMode: 'page',
   spread: 'none',
   zoomMode: 'fit-page',
   customScale: 1.0,

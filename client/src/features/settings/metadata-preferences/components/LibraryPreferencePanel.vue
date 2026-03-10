@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, RotateCcw, Library } from 'lucide-vue-next'
 import type { FieldPreference, LibraryMetadataPreferences, MetadataField, ProviderStatus } from '@projectx/types'
 import FieldPreferenceTable from './FieldPreferenceTable.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
   libraryName: string
@@ -46,34 +47,52 @@ function onReset() {
 </script>
 
 <template>
-  <div class="border border-border rounded-lg bg-card overflow-hidden">
-    <div class="flex items-center gap-3 px-5 py-3.5">
-      <button class="flex items-center gap-2 flex-1 min-w-0 text-left" @click="open = !open">
-        <component :is="open ? ChevronDown : ChevronRight" :size="14" class="text-muted-foreground shrink-0" />
-        <span class="settings-label truncate">{{ libraryName }}</span>
-        <span
-          class="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded"
-          :class="hasOverrides ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
+  <div
+    class="border border-border rounded-xl bg-card overflow-hidden shadow-sm transition-all"
+    :class="open ? 'ring-1 ring-primary/20' : 'hover:border-primary/30'"
+  >
+    <div class="flex items-center gap-3 px-6 py-4 cursor-pointer select-none" @click="open = !open">
+      <div class="flex items-center gap-4 flex-1 min-w-0">
+        <div
+          class="flex items-center justify-center w-8 h-8 rounded-lg bg-muted shrink-0 text-muted-foreground transition-colors"
+          :class="open ? 'bg-primary/10 text-primary' : ''"
         >
-          {{ hasOverrides ? `${overriddenFields.size} override${overriddenFields.size === 1 ? '' : 's'}` : 'using global' }}
-        </span>
-      </button>
+          <Library :size="16" />
+        </div>
+        <div class="min-w-0 space-y-0.5">
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-semibold text-foreground truncate">{{ libraryName }}</span>
+            <Badge v-if="hasOverrides" variant="secondary" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight">
+              {{ overriddenFields.size }} {{ overriddenFields.size === 1 ? 'Override' : 'Overrides' }}
+            </Badge>
+            <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight opacity-60"> Global Defaults </Badge>
+          </div>
+          <p class="text-[11px] text-muted-foreground font-mono truncate" v-if="!open">
+            {{ hasOverrides ? `Overriding: ${Array.from(overriddenFields).join(', ')}` : 'Inheriting all global metadata rules' }}
+          </p>
+        </div>
+      </div>
 
-      <Tooltip v-if="hasOverrides">
-        <TooltipTrigger as-child>
-          <button
-            class="shrink-0 flex items-center gap-1 h-6 px-2 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            @click="onReset"
-          >
-            <RotateCcw :size="11" />
-            Reset all
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>Reset all to global</TooltipContent>
-      </Tooltip>
+      <div class="flex items-center gap-3">
+        <Tooltip v-if="hasOverrides">
+          <TooltipTrigger as-child>
+            <button
+              class="shrink-0 flex items-center justify-center h-8 w-8 rounded-md border border-border bg-background text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/30 transition-all"
+              @click.stop="onReset"
+            >
+              <RotateCcw :size="13" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Reset library to global defaults</TooltipContent>
+        </Tooltip>
+
+        <div class="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors">
+          <component :is="open ? ChevronDown : ChevronRight" :size="16" class="text-muted-foreground" />
+        </div>
+      </div>
     </div>
 
-    <div v-if="open && libraryPrefs" class="border-t border-border">
+    <div v-if="open && libraryPrefs" class="border-t border-border bg-muted/5 animate-in fade-in slide-in-from-top-1 duration-200">
       <FieldPreferenceTable
         :preferences="libraryPrefs.effective"
         :statuses="statuses"
@@ -85,6 +104,8 @@ function onReset() {
       />
     </div>
 
-    <div v-else-if="open && !libraryPrefs" class="border-t border-border px-5 py-4 text-sm text-muted-foreground">Loading...</div>
+    <div v-else-if="open && !libraryPrefs" class="border-t border-border px-6 py-10 flex items-center justify-center">
+      <Loader2 :size="20" class="animate-spin text-muted-foreground" />
+    </div>
   </div>
 </template>

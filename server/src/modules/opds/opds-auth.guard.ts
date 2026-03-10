@@ -4,6 +4,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { Permission } from '@projectx/types';
 import { PermissionService } from '../../common/services/permission.service';
 import { OpdsUserService } from './opds-user.service';
 import { UserService } from '../user/user.service';
@@ -53,7 +54,7 @@ export class OpdsAuthGuard implements CanActivate {
 
       const fullUser = await this.userService.findByIdWithPermissions(userId);
       if (!fullUser || !fullUser.active) throw new UnauthorizedException('Account not found or disabled');
-      if (!this.permissionService.userHas(fullUser, 'opds_access')) throw new ForbiddenException('OPDS access revoked');
+      if (!this.permissionService.userHas(fullUser, Permission.OpdsAccess)) throw new ForbiddenException('OPDS access revoked');
 
       (request as unknown as Record<string, unknown>).opdsUser = {
         opdsUserId: 0,
@@ -98,7 +99,7 @@ export class OpdsAuthGuard implements CanActivate {
       throw new UnauthorizedException('Account not found');
     }
 
-    if (!this.permissionService.userHas(fullUser, 'opds_access')) {
+    if (!this.permissionService.userHas(fullUser, Permission.OpdsAccess)) {
       throw new ForbiddenException('OPDS access revoked');
     }
 

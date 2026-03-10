@@ -141,9 +141,9 @@ function onManualKeydown(e: KeyboardEvent) {
       <!-- Folder list -->
       <div class="mt-4 space-y-2">
         <div v-for="(folder, index) in folders" :key="folder" class="rounded-lg border border-border bg-card px-4 py-3">
-          <div class="flex items-start gap-3">
+          <div class="flex items-center gap-3">
             <FolderOpen :size="15" class="text-muted-foreground shrink-0 mt-0.5" />
-            <span class="flex-1 text-sm text-foreground font-mono break-all">{{ folder }}</span>
+            <span class="flex-1 text-xs text-foreground font-mono break-all">{{ folder }}</span>
             <button
               class="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
               @click="removeFolder(index)"

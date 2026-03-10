@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
-import { MetadataProviderKey, resolveUploadPath } from '@projectx/types';
+import { MetadataProviderKey, Permission, resolveUploadPath } from '@projectx/types';
 import type { BookKoboState, BookQuery, BooksPage, MetadataField } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
@@ -44,7 +44,7 @@ export class BookService {
     return user.isSuperuser;
   }
 
-  private hasPermission(user: RequestUser, permissionName: string): boolean {
+  private hasPermission(user: RequestUser, permissionName: Permission): boolean {
     return user.isSuperuser || user.permissions.includes(permissionName);
   }
 
@@ -357,7 +357,7 @@ export class BookService {
   async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {
     await this.verifyBookAccess(id, user);
 
-    if (!this.hasPermission(user, 'kobo_sync')) {
+    if (!this.hasPermission(user, Permission.KoboSync)) {
       return {
         eligibleForKoboSync: false,
         syncCollections: [],

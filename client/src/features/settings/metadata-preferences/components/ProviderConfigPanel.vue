@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Loader2, Save } from 'lucide-vue-next'
 import type { ProviderConfigurations, ProviderStatus } from '@projectx/types'
+import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
   config: ProviderConfigurations | null
@@ -43,42 +44,32 @@ const AMAZON_DOMAINS = [
   'amazon.tr',
 ]
 
-type FieldDef =
-  | { key: string; label: string; type: 'text' | 'password' | 'select'; hint?: string; options?: string[] }
+type FieldDef = { key: string; label: string; type: 'text' | 'password' | 'select'; options?: string[] }
 
-const rows: { key: keyof ProviderConfigurations; label: string; fields: FieldDef[] }[] = [
+const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; fields: FieldDef[] }[] = [
   {
     key: 'google',
     label: 'Google Books',
-    fields: [
-      {
-        key: 'apiKey',
-        label: 'API key',
-        type: 'password',
-        hint: 'Recommended for higher rate limits. Works without one.',
-      },
-    ],
+    hint: 'Recommended for higher rate limits.',
+    fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
   },
   {
     key: 'amazon',
     label: 'Amazon',
+    hint: 'Provides richer metadata and avoids rate limiting.',
     fields: [
       { key: 'domain', label: 'Region', type: 'select', options: AMAZON_DOMAINS },
-      {
-        key: 'cookie',
-        label: 'Cookie',
-        type: 'password',
-        hint: 'Optional but highly recommended - provides richer metadata and avoids rate limiting.',
-      },
+      { key: 'cookie', label: 'Cookie', type: 'password' },
     ],
   },
-  { key: 'goodreads', label: 'Goodreads', fields: [] },
+  { key: 'goodreads', label: 'Goodreads', hint: 'Standard community metadata.', fields: [] },
   {
     key: 'hardcover',
     label: 'Hardcover',
-    fields: [{ key: 'apiKey', label: 'API key', type: 'password' }],
+    hint: 'Social book tracking platform.',
+    fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
   },
-  { key: 'openLibrary', label: 'Open Library', fields: [] },
+  { key: 'openLibrary', label: 'Open Library', hint: 'The internet archive for books.', fields: [] },
 ]
 
 function statusFor(key: string) {
@@ -92,62 +83,95 @@ function save() {
 </script>
 
 <template>
-  <div class="border border-border rounded-lg bg-card overflow-hidden">
-    <div class="px-5 py-4 border-b border-border flex items-center justify-between">
-      <div>
-        <p class="text-sm font-semibold text-foreground">Metadata Providers</p>
-        <p class="settings-hint">Enable providers and configure API keys or cookies where needed.</p>
+  <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
+    <!-- Card Header -->
+    <div class="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/20">
+      <div class="flex items-center gap-2">
+        <span class="settings-group-label !mb-0">Available Sources</span>
       </div>
       <button
-        class="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        class="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
         :disabled="saving || !draft"
         @click="save"
       >
-        <Loader2 v-if="saving" :size="13" class="animate-spin" />
-        <Save v-else :size="13" />
-        Save
+        <Loader2 v-if="saving" :size="14" class="animate-spin" />
+        <Save v-else :size="14" />
+        <span>Save Changes</span>
       </button>
     </div>
 
-    <div v-if="draft" class="divide-y divide-border/60">
-      <div v-for="row in rows" :key="row.key" class="px-5 py-3.5 flex flex-col sm:flex-row sm:items-start gap-3">
-        <div class="flex items-start gap-3 sm:w-44 shrink-0 pt-0.5">
-          <input v-model="draft[row.key].enabled" type="checkbox" class="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer mt-0.5" />
-          <div>
-            <p class="settings-label">{{ row.label }}</p>
+    <div v-if="draft" class="divide-y divide-border/50">
+      <div v-for="row in rows" :key="row.key" class="px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <!-- Left: Provider Info -->
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-3">
+            <span class="settings-label">{{ row.label }}</span>
             <template v-if="statusFor(row.key)">
-              <p v-if="!statusFor(row.key)?.configured" class="text-xs text-amber-600">API key required</p>
-              <p v-else-if="statusFor(row.key)?.hint" class="text-xs text-amber-500">{{ statusFor(row.key)?.hint }}</p>
-              <p v-else class="text-xs text-emerald-600">Configured</p>
+              <Badge
+                v-if="!statusFor(row.key)?.configured"
+                variant="destructive"
+                class="h-4.5 px-1.5 text-[9px] font-black uppercase tracking-tighter"
+              >
+                Setup Required
+              </Badge>
+              <Badge
+                v-else
+                variant="outline"
+                class="h-4.5 px-1.5 text-[9px] font-black uppercase tracking-tighter text-emerald-600 border-emerald-500/30 bg-emerald-500/5"
+              >
+                Ready
+              </Badge>
             </template>
           </div>
+          <p v-if="row.hint" class="text-xs text-muted-foreground max-w-sm leading-relaxed">
+            {{ row.hint }}
+          </p>
         </div>
 
-        <div v-if="row.fields.length" class="flex flex-col gap-2 flex-1">
-          <div v-for="field in row.fields" :key="field.key">
-            <select
-              v-if="field.type === 'select'"
-              v-model="(draft[row.key] as Record<string, string>)[field.key]"
-              :disabled="!draft[row.key].enabled"
-              class="w-full h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 cursor-pointer"
-            >
-              <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-            <template v-else>
+        <!-- Right: Config & Toggle -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <!-- Fields -->
+          <div v-if="row.fields.length" class="flex flex-wrap items-center gap-2">
+            <div v-for="field in row.fields" :key="field.key" class="relative">
+              <select
+                v-if="field.type === 'select'"
+                v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
+                :disabled="!draft[row.key].enabled"
+                class="h-8 rounded border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+              >
+                <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
               <input
-                v-model="(draft[row.key] as Record<string, string>)[field.key]"
+                v-else
+                v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
                 :type="field.type"
                 :placeholder="field.label"
                 :disabled="!draft[row.key].enabled"
-                class="w-full h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                class="h-8 w-96 rounded border border-input bg-background px-2.5 text-xs font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
               />
-              <p v-if="field.hint" class="settings-hint">{{ field.hint }}</p>
-            </template>
+            </div>
           </div>
+
+          <!-- Switch -->
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="draft[row.key].enabled"
+            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none"
+            :class="draft[row.key].enabled ? 'bg-primary' : 'bg-muted border border-border'"
+            @click="draft[row.key].enabled = !draft[row.key].enabled"
+          >
+            <span
+              class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
+              :class="draft[row.key].enabled ? 'translate-x-4.5' : 'translate-x-0.5'"
+            />
+          </button>
         </div>
       </div>
     </div>
 
-    <div v-else class="px-5 py-6 text-sm text-muted-foreground">Loading...</div>
+    <div v-else class="px-6 py-12 flex items-center justify-center">
+      <Loader2 :size="24" class="animate-spin text-muted-foreground" />
+    </div>
   </div>
 </template>

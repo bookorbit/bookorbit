@@ -59,8 +59,8 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
       <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Library name</label>
       <div class="flex items-center gap-3">
         <!-- Icon preview -->
-        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <component :is="selectedIconComponent" :size="18" class="text-primary" />
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20">
+          <component :is="selectedIconComponent" :size="24" class="text-primary" />
         </div>
         <!-- Name input -->
         <input
@@ -90,7 +90,7 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
       <div class="flex flex-col rounded-lg border border-border bg-card overflow-hidden flex-1 min-h-0">
         <!-- Search -->
         <div class="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
-          <Search :size="13" class="text-muted-foreground shrink-0" />
+          <Search :size="13" class="text-foreground/60 shrink-0" />
           <input
             v-model="search"
             type="text"
@@ -111,10 +111,10 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
                   <button
                     class="flex items-center justify-center rounded-md transition-colors"
                     style="width: calc(100% / 10); aspect-ratio: 1"
-                    :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+                    :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-foreground/60 hover:bg-muted hover:text-foreground'"
                     @click="emit('update:icon', icon === iconName ? null : iconName)"
                   >
-                    <component :is="getIconComponent(iconName)" :size="16" />
+                    <component :is="getIconComponent(iconName)" :size="17" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>{{ iconName }}</TooltipContent>

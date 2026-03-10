@@ -45,8 +45,24 @@
 
 .pattern-topo {
   background-image:
-    repeating-radial-gradient(circle at 0% 0%, transparent 0, transparent 40px, color-mix(in oklch, var(--dot-color) 50%, transparent) 40px, color-mix(in oklch, var(--dot-color) 50%, transparent) 41px, transparent 41px, transparent 80px),
-    repeating-radial-gradient(circle at 100% 100%, transparent 0, transparent 40px, color-mix(in oklch, var(--dot-color) 50%, transparent) 40px, color-mix(in oklch, var(--dot-color) 50%, transparent) 41px, transparent 41px, transparent 80px);
+    repeating-radial-gradient(
+      circle at 0% 0%,
+      transparent 0,
+      transparent 40px,
+      color-mix(in oklch, var(--dot-color) 50%, transparent) 40px,
+      color-mix(in oklch, var(--dot-color) 50%, transparent) 41px,
+      transparent 41px,
+      transparent 80px
+    ),
+    repeating-radial-gradient(
+      circle at 100% 100%,
+      transparent 0,
+      transparent 40px,
+      color-mix(in oklch, var(--dot-color) 50%, transparent) 40px,
+      color-mix(in oklch, var(--dot-color) 50%, transparent) 41px,
+      transparent 41px,
+      transparent 80px
+    );
 }
 
 .pattern-mesh {
@@ -73,7 +89,13 @@
 }
 
 .pattern-brushed {
-  background-image: repeating-linear-gradient(45deg, transparent, transparent 1px, color-mix(in oklch, var(--primary) 6%, transparent) 1px, color-mix(in oklch, var(--primary) 6%, transparent) 2px);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 1px,
+    color-mix(in oklch, var(--primary) 6%, transparent) 1px,
+    color-mix(in oklch, var(--primary) 6%, transparent) 2px
+  );
 }
 
 .pattern-prism::before {
@@ -83,8 +105,7 @@
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(135deg, rgba(255, 0, 0, 0.03) 0%, transparent 50%),
-    linear-gradient(225deg, rgba(0, 0, 255, 0.03) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(255, 0, 0, 0.03) 0%, transparent 50%), linear-gradient(225deg, rgba(0, 0, 255, 0.03) 0%, transparent 50%),
     linear-gradient(45deg, rgba(0, 255, 0, 0.03) 0%, transparent 50%);
   filter: contrast(150%) brightness(110%);
 }
@@ -207,7 +228,13 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: repeating-radial-gradient(circle at 50% -25%, transparent, transparent 3px, color-mix(in oklch, var(--primary) 7%, transparent) 3.75px, transparent 4.5px);
+  background-image: repeating-radial-gradient(
+    circle at 50% -25%,
+    transparent,
+    transparent 3px,
+    color-mix(in oklch, var(--primary) 7%, transparent) 3.75px,
+    transparent 4.5px
+  );
 }
 
 .pattern-carbon::before {
@@ -315,5 +342,36 @@
   }
   .settings-value {
     @apply text-sm font-medium tabular-nums text-foreground;
+  }
+
+  /* ── Settings form controls ─────────────────────────────────
+     Use .input-field on <input> and .select-field on <select>
+     to get consistent sizing and focus rings across all tabs.
+  ────────────────────────────────────────────────────────────── */
+  .input-field {
+    @apply h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground
+           placeholder:text-muted-foreground/50
+           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+           disabled:opacity-50 transition-colors;
+  }
+  .select-field {
+    @apply h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground cursor-pointer
+           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+           disabled:opacity-50 transition-colors;
+  }
+
+  /* ── Settings action buttons ─────────────────────────────────
+     Use these on <button> elements in settings panels (headers,
+     card rows, inline forms). Matches the Kobo "Add device" size.
+  ────────────────────────────────────────────────────────────── */
+  .settings-btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium shrink-0
+           bg-primary text-primary-foreground hover:bg-primary/90
+           disabled:opacity-50 transition-colors;
+  }
+  .settings-btn-outline {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium shrink-0
+           border border-border bg-background text-foreground hover:bg-muted
+           disabled:opacity-50 transition-colors;
   }
 }

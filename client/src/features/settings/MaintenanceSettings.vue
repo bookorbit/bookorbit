@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Check, RefreshCw, Sparkles, FileEdit } from 'lucide-vue-next'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import SettingsPageHeader from './SettingsPageHeader.vue'
 import type { GlobalFileWriteSettings } from '@projectx/types'
 import { DEFAULT_FILE_WRITE_SETTINGS } from '@projectx/types'
 
@@ -96,10 +98,7 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
 </script>
 
 <template>
-  <div class="mb-8">
-    <h2 class="settings-title">Maintenance</h2>
-    <p class="settings-subtitle">System maintenance and data operations.</p>
-  </div>
+  <SettingsPageHeader title="Maintenance" subtitle="System maintenance and data operations." />
 
   <div>
     <p class="settings-group-label">Recommendations</p>
@@ -121,11 +120,7 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
             <p v-if="error" class="text-xs text-destructive mt-2">{{ error }}</p>
           </div>
         </div>
-        <button
-          class="flex shrink-0 items-center gap-2 h-8 px-3 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="running"
-          @click="rebuildEmbeddings"
-        >
+        <button class="settings-btn-outline" :disabled="running" @click="rebuildEmbeddings">
           <RefreshCw :size="13" :class="running ? 'animate-spin' : ''" />
           {{ running ? 'Running...' : 'Run' }}
         </button>
@@ -149,22 +144,16 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
             </p>
           </div>
         </div>
-        <button
-          class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
-          :class="writeSettings.enabled ? 'bg-primary' : 'bg-muted'"
+        <ToggleSwitch
+          :model-value="writeSettings.enabled"
           :disabled="writeSaving"
-          @click="
+          @update:model-value="
             toggle(
               () => writeSettings.enabled,
               (v) => (writeSettings.enabled = v),
             )
           "
-        >
-          <span
-            class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-            :class="writeSettings.enabled ? 'translate-x-4' : 'translate-x-0'"
-          />
-        </button>
+        />
       </div>
 
       <template v-if="writeSettings.enabled">
@@ -174,22 +163,16 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
             <p class="settings-label">Include cover image</p>
             <p class="settings-hint">Writes the stored cover back into the file (EPUB only).</p>
           </div>
-          <button
-            class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
-            :class="writeSettings.writeCover ? 'bg-primary' : 'bg-muted'"
+          <ToggleSwitch
+            :model-value="writeSettings.writeCover"
             :disabled="writeSaving"
-            @click="
+            @update:model-value="
               toggle(
                 () => writeSettings.writeCover,
                 (v) => (writeSettings.writeCover = v),
               )
             "
-          >
-            <span
-              class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-              :class="writeSettings.writeCover ? 'translate-x-4' : 'translate-x-0'"
-            />
-          </button>
+          />
         </div>
 
         <!-- EPUB row -->
@@ -199,22 +182,16 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
               <p class="settings-label">EPUB</p>
               <p class="settings-hint">Writes metadata into the OPF file inside the EPUB archive.</p>
             </div>
-            <button
-              class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
-              :class="writeSettings.epub.enabled ? 'bg-primary' : 'bg-muted'"
+            <ToggleSwitch
+              :model-value="writeSettings.epub.enabled"
               :disabled="writeSaving"
-              @click="
+              @update:model-value="
                 toggle(
                   () => writeSettings.epub.enabled,
                   (v) => (writeSettings.epub.enabled = v),
                 )
               "
-            >
-              <span
-                class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-                :class="writeSettings.epub.enabled ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </button>
+            />
           </div>
           <div v-if="writeSettings.epub.enabled" class="flex items-center justify-between gap-4 pl-0">
             <p class="text-sm text-muted-foreground">Max file size (MB)</p>
@@ -224,7 +201,7 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
               min="1"
               max="2000"
               :disabled="writeSaving"
-              class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              class="input-field w-24"
               @change="saveWriteSettings"
             />
           </div>
@@ -237,22 +214,16 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
               <p class="settings-label">PDF</p>
               <p class="settings-hint">Embeds metadata into PDF Info dictionary and XMP stream.</p>
             </div>
-            <button
-              class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
-              :class="writeSettings.pdf.enabled ? 'bg-primary' : 'bg-muted'"
+            <ToggleSwitch
+              :model-value="writeSettings.pdf.enabled"
               :disabled="writeSaving"
-              @click="
+              @update:model-value="
                 toggle(
                   () => writeSettings.pdf.enabled,
                   (v) => (writeSettings.pdf.enabled = v),
                 )
               "
-            >
-              <span
-                class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-                :class="writeSettings.pdf.enabled ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </button>
+            />
           </div>
           <div v-if="writeSettings.pdf.enabled" class="flex items-center justify-between gap-4">
             <p class="text-sm text-muted-foreground">Max file size (MB)</p>
@@ -262,7 +233,7 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
               min="1"
               max="2000"
               :disabled="writeSaving"
-              class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              class="input-field w-24"
               @change="saveWriteSettings"
             />
           </div>
@@ -275,22 +246,16 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
               <p class="settings-label">Comic archives</p>
               <p class="settings-hint">Writes ComicInfo.xml into CBZ and CB7 archives.</p>
             </div>
-            <button
-              class="relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-50"
-              :class="writeSettings.cbx.enabled ? 'bg-primary' : 'bg-muted'"
+            <ToggleSwitch
+              :model-value="writeSettings.cbx.enabled"
               :disabled="writeSaving"
-              @click="
+              @update:model-value="
                 toggle(
                   () => writeSettings.cbx.enabled,
                   (v) => (writeSettings.cbx.enabled = v),
                 )
               "
-            >
-              <span
-                class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-                :class="writeSettings.cbx.enabled ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </button>
+            />
           </div>
           <template v-if="writeSettings.cbx.enabled">
             <div class="flex items-center gap-2 flex-wrap">
@@ -322,7 +287,7 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
                 min="1"
                 max="5000"
                 :disabled="writeSaving"
-                class="w-24 text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                class="input-field w-24"
                 @change="saveWriteSettings"
               />
             </div>

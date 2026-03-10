@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { Permission } from '@projectx/types';
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
 import { PermissionService } from '../../../common/services/permission.service';
@@ -36,7 +37,7 @@ export class KoboTokenGuard implements CanActivate {
 
     const user = await this.userService.findByIdWithPermissions(device.userId);
     if (!user || !user.active) throw new UnauthorizedException('Account not found or disabled');
-    if (!this.permissionService.userHas(user, 'kobo_sync')) throw new UnauthorizedException('Kobo sync permission revoked');
+    if (!this.permissionService.userHas(user, Permission.KoboSync)) throw new UnauthorizedException('Kobo sync permission revoked');
 
     // Update last seen asynchronously so it doesn't block the request
     this.db

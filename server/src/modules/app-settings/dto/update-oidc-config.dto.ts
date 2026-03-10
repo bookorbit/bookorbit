@@ -22,10 +22,9 @@ class AutoProvisionDto {
   @IsBoolean()
   allowLocalLinking: boolean;
 
-  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  defaultPermissionNames?: string[];
+  defaultPermissionNames: string[] = [];
 }
 
 export class UpdateOidcConfigDto {

@@ -89,7 +89,7 @@ export class ProviderConfigService {
         label: PROVIDER_LABELS[MetadataProviderKey.GOOGLE],
         enabled: cfg.google.enabled,
         configured: true,
-        hint: !cfg.google.apiKey ? 'API key recommended for higher rate limits' : undefined,
+        hint: !cfg.google.apiKey ? 'Recommended for higher rate limits' : undefined,
       },
       {
         key: MetadataProviderKey.AMAZON,

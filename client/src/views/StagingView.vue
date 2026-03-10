@@ -252,7 +252,7 @@ onUnmounted(() => {
 
 <template>
   <main class="flex-1" @dragover="onDragOver" @dragenter="onDragEnter" @dragleave="onDragLeave" @drop="onDrop">
-    <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-7xl mx-auto w-full">
+    <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-7xl w-full">
       <div class="flex items-center gap-2.5">
         <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">
           <PackageOpen class="size-4.5 text-primary" />

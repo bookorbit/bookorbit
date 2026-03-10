@@ -7,6 +7,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 
 interface Library {
   id: number
@@ -86,19 +87,12 @@ function onSaved(newResetUrl?: string) {
 </script>
 
 <template>
-  <div class="flex items-start justify-between mb-8">
-    <div>
-      <h2 class="settings-title">Users</h2>
-      <p class="settings-subtitle">Manage user accounts and permission assignments.</p>
-    </div>
-    <button
-      @click="openCreate"
-      class="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 ml-4"
-    >
+  <SettingsPageHeader title="Users" subtitle="Manage user accounts and permission assignments.">
+    <button class="settings-btn-primary" @click="openCreate">
       <UserPlus :size="14" />
       Create user
     </button>
-  </div>
+  </SettingsPageHeader>
 
   <div v-if="error" class="mb-4 text-sm text-destructive">{{ error }}</div>
   <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>

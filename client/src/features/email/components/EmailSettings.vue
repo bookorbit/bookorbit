@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import ProvidersTab from './ProvidersTab.vue'
+import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import RecipientsTab from './RecipientsTab.vue'
 import GroupsTab from './GroupsTab.vue'
 import TemplatesTab from './TemplatesTab.vue'
@@ -43,36 +44,33 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="mb-6">
-      <h2 class="settings-title">Email</h2>
-      <p class="settings-subtitle">Send books to your e-reader via email.</p>
+  <SettingsPageHeader title="Email" subtitle="Send books to your e-reader via email." />
+
+  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+  <template v-else>
+    <!-- Tab bar -->
+    <div class="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        class="px-3 py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors"
+        :class="
+          activeTab === tab.id
+            ? 'border-primary text-foreground'
+            : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+        "
+        @click="activeTab = tab.id"
+      >
+        {{ tab.label }}
+      </button>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
-    <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
-    <template v-else>
-      <!-- Tab bar -->
-      <div class="flex gap-1 mb-6 border-b border-border overflow-x-auto">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="px-3 py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors"
-          :class="
-            activeTab === tab.id
-              ? 'border-primary text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-          "
-          @click="activeTab = tab.id"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-
-      <ProvidersTab v-if="activeTab === 'providers'" />
-      <RecipientsTab v-else-if="activeTab === 'recipients'" />
-      <GroupsTab v-else-if="activeTab === 'groups'" />
-      <TemplatesTab v-else-if="activeTab === 'templates'" />
-      <PreferencesTab v-else-if="activeTab === 'preferences'" />
-      <HistoryTab v-else-if="activeTab === 'history'" />
-    </template>
+    <ProvidersTab v-if="activeTab === 'providers'" />
+    <RecipientsTab v-else-if="activeTab === 'recipients'" />
+    <GroupsTab v-else-if="activeTab === 'groups'" />
+    <TemplatesTab v-else-if="activeTab === 'templates'" />
+    <PreferencesTab v-else-if="activeTab === 'preferences'" />
+    <HistoryTab v-else-if="activeTab === 'history'" />
+  </template>
 </template>

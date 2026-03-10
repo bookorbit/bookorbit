@@ -3,6 +3,8 @@ import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThe
 import { Moon, Sun } from 'lucide-vue-next'
 import { useDisplaySettings, type CardOverlayKey } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import SettingsPageHeader from './SettingsPageHeader.vue'
 
 const themeStore = useThemeStore()
 const { coverSize, gridGap, cardOverlays, lensFilterExpanded } = useDisplaySettings()
@@ -24,10 +26,7 @@ function toggleOverlay(key: CardOverlayKey) {
 </script>
 
 <template>
-  <div class="mb-8">
-    <h2 class="settings-title">Appearance</h2>
-    <p class="settings-subtitle">Customize how the app looks and feels.</p>
-  </div>
+  <SettingsPageHeader title="Appearance" subtitle="Customize how the app looks and feels." />
 
   <!-- Theme & colors -->
   <div class="mb-6">
@@ -241,22 +240,12 @@ function toggleOverlay(key: CardOverlayKey) {
     <!-- Card overlays -->
     <p class="settings-group-label mt-6">Card Overlays</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div
-        v-for="opt in OVERLAY_OPTIONS"
-        :key="opt.key"
-        class="flex items-center justify-between px-5 py-3.5 bg-card cursor-pointer"
-        @click="toggleOverlay(opt.key)"
-      >
+      <div v-for="opt in OVERLAY_OPTIONS" :key="opt.key" class="flex items-center justify-between px-5 py-3.5 bg-card">
         <div>
           <p class="settings-label">{{ opt.label }}</p>
           <p class="settings-hint">{{ opt.hint }}</p>
         </div>
-        <div class="w-9 h-5 rounded-full transition-colors shrink-0" :class="cardOverlays.includes(opt.key) ? 'bg-primary' : 'bg-muted'">
-          <div
-            class="mt-0.5 size-4 rounded-full bg-white shadow-sm transition-transform"
-            :class="cardOverlays.includes(opt.key) ? 'translate-x-4' : 'translate-x-0.5'"
-          />
-        </div>
+        <ToggleSwitch :model-value="cardOverlays.includes(opt.key)" @update:model-value="toggleOverlay(opt.key)" />
       </div>
     </div>
   </div>
@@ -265,17 +254,12 @@ function toggleOverlay(key: CardOverlayKey) {
   <div class="mt-8">
     <p class="settings-group-label">Lenses</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div class="flex items-center justify-between px-5 py-3.5 bg-card cursor-pointer" @click="lensFilterExpanded = !lensFilterExpanded">
+      <div class="flex items-center justify-between px-5 py-3.5 bg-card">
         <div>
           <p class="settings-label">Show filter preview by default</p>
           <p class="settings-hint">Expand the active filter and sort summary when opening a lens</p>
         </div>
-        <div class="w-9 h-5 rounded-full transition-colors shrink-0" :class="lensFilterExpanded ? 'bg-primary' : 'bg-muted'">
-          <div
-            class="mt-0.5 size-4 rounded-full bg-white shadow-sm transition-transform"
-            :class="lensFilterExpanded ? 'translate-x-4' : 'translate-x-0.5'"
-          />
-        </div>
+        <ToggleSwitch v-model="lensFilterExpanded" />
       </div>
     </div>
   </div>
