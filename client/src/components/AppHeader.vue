@@ -18,7 +18,7 @@ import AccentPicker from '@/components/AccentPicker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
-import ThemeToggle from '@/components/ThemeToggle.vue'
+import ThemePicker from '@/components/ThemePicker.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
@@ -243,7 +243,10 @@ function formatBadgeClass(fmt: string): string {
           ref="desktopSearchInput"
           v-model="globalSearchQuery"
           @focus="searchFocused = true"
-          @blur="searchFocused = false; selectedIndex = -1"
+          @blur="
+            searchFocused = false
+            selectedIndex = -1
+          "
           @keydown="handleSearchKeydown"
           placeholder="Search all books..."
           class="w-full h-8 pl-9 pr-8 text-[13px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
@@ -252,7 +255,10 @@ function formatBadgeClass(fmt: string): string {
           <button v-if="globalSearchQuery" @click="clearSearch()" class="text-muted-foreground/60 hover:text-foreground transition-colors">
             <X :size="13" />
           </button>
-          <kbd v-else class="hidden lg:inline-flex h-4.5 select-none items-center gap-1 rounded border border-sidebar-border/50 bg-background/50 px-1.5 font-mono text-[9px] font-medium text-muted-foreground/40 opacity-100">
+          <kbd
+            v-else
+            class="hidden lg:inline-flex h-4.5 select-none items-center gap-1 rounded border border-sidebar-border/50 bg-background/50 px-1.5 font-mono text-[9px] font-medium text-muted-foreground/40 opacity-100"
+          >
             <span class="text-xs">⌘</span>K
           </kbd>
         </div>
@@ -370,6 +376,10 @@ function formatBadgeClass(fmt: string): string {
               <div class="space-y-4">
                 <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
                 <div class="space-y-1.5">
+                  <span class="text-xs text-muted-foreground">Theme</span>
+                  <ThemePicker />
+                </div>
+                <div class="space-y-1.5">
                   <span class="text-xs text-muted-foreground">Accent</span>
                   <AccentPicker />
                 </div>
@@ -395,8 +405,6 @@ function formatBadgeClass(fmt: string): string {
           </TooltipTrigger>
           <TooltipContent>Settings</TooltipContent>
         </Tooltip>
-
-        <ThemeToggle />
 
         <!-- User avatar dropdown -->
         <DropdownMenu v-if="user">

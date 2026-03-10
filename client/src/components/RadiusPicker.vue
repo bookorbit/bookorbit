@@ -5,19 +5,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 const themeStore = useThemeStore()
 
 const shapes = [
-  { id: 'sharp' as const, rx: '1' },
-  { id: 'default' as const, rx: '4' },
-  { id: 'rounded' as const, rx: '9' },
-  { id: 'pill' as const, rx: '999' },
+  { id: 'sharp' as const, rx: '0' },
+  { id: 'default' as const, rx: '3' },
+  { id: 'rounded' as const, rx: '8' },
+  { id: 'pill' as const, rx: '99' },
 ]
 </script>
 
 <template>
-  <div class="flex items-center gap-1">
+  <div class="flex items-center gap-1.5">
     <Tooltip v-for="s in shapes" :key="s.id">
       <TooltipTrigger as-child>
         <button
-          class="w-4 h-4 border-2 transition-colors focus:outline-none"
+          class="w-8 h-5 border-2 transition-colors focus:outline-none"
           :style="{
             borderRadius: `${s.rx}px`,
             borderColor: themeStore.radius === s.id ? 'var(--primary)' : 'var(--muted-foreground)',

@@ -7,7 +7,7 @@ const themeStore = useThemeStore()
 
 <template>
   <div class="space-y-1.5">
-    <div class="flex items-center gap-0.5">
+    <div class="flex items-center gap-0.5 flex-wrap">
       <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
         <TooltipTrigger as-child>
           <button
@@ -24,7 +24,7 @@ const themeStore = useThemeStore()
         <TooltipContent>{{ opt.label }}</TooltipContent>
       </Tooltip>
     </div>
-    <div class="flex items-center gap-0.5">
+    <div class="flex items-center gap-0.5 flex-wrap">
       <Tooltip v-for="opt in ACCENT_PASTEL" :key="opt.id">
         <TooltipTrigger as-child>
           <button

@@ -4,6 +4,7 @@ import { storage } from '@/services/storage'
 
 type Theme = 'light' | 'dark'
 export type Accent =
+  | 'grey'
   // Vivid — rainbow order
   | 'rose'
   | 'orange'
@@ -21,6 +22,7 @@ export type Accent =
   | 'fuchsia'
   | 'pink'
   // Pastel — rainbow order
+  | 'white'
   | 'coral'
   | 'peach'
   | 'butter'
@@ -54,6 +56,7 @@ export type Background =
   | 'terminal'
 
 export const ACCENT_VIVID: { id: Accent; label: string; color: string }[] = [
+  { id: 'white', label: 'White', color: '#fafafa' },
   { id: 'rose', label: 'Rose', color: '#e11d48' },
   { id: 'orange', label: 'Orange', color: '#ea580c' },
   { id: 'amber', label: 'Amber', color: '#d97706' },
@@ -72,6 +75,7 @@ export const ACCENT_VIVID: { id: Accent; label: string; color: string }[] = [
 ]
 
 export const ACCENT_PASTEL: { id: Accent; label: string; color: string }[] = [
+  { id: 'grey', label: 'Grey', color: '#737373' },
   { id: 'coral', label: 'Coral', color: '#e8968a' },
   { id: 'peach', label: 'Peach', color: '#e8b08a' },
   { id: 'butter', label: 'Butter', color: '#d4be7a' },
