@@ -10,7 +10,6 @@ export function useBookDetail() {
   async function fetch(bookId: number) {
     loading.value = true
     error.value = null
-    detail.value = null
     try {
       const res = await api(`/api/v1/books/${bookId}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
