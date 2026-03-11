@@ -1,8 +1,12 @@
+import path from 'path'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
+    alias: {
+      '@projectx/types': path.resolve(__dirname, '../packages/types/src/index.ts'),
+    },
   },
   test: {
     globals: true,
