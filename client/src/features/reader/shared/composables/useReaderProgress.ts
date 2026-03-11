@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { FoliateRenderer, RelocateDetail } from './useFoliate'
+import type { FoliateRenderer, RelocateDetail } from '../../epub/composables/useFoliate'
 
 export function useReaderProgress(bookId: number, fileId: number) {
   const cfi = ref<string | null>(null)

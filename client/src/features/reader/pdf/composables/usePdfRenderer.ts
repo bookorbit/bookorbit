@@ -66,7 +66,8 @@ export function usePdfRenderer(
       if (activeRenders.get(pageNum) !== task) continue
       activeRenders.delete(pageNum)
 
-      onDimUpdate(pageNum, { width: canvas.width / scale.value, height: canvas.height / scale.value })
+      const dpr = window.devicePixelRatio || 1
+      onDimUpdate(pageNum, { width: canvas.width / (scale.value * dpr), height: canvas.height / (scale.value * dpr) })
       rendered.add(pageNum)
       await buildTextLayer(pageNum)
     }

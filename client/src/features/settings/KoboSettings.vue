@@ -316,35 +316,35 @@ async function saveSettings() {
           <div class="grid sm:grid-cols-2 gap-6">
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Reading</label>
+                <label class="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Reading</label>
                 <span class="text-xs font-mono text-primary font-bold">{{ readingThreshold }}%</span>
               </div>
               <input v-model.number="readingThreshold" type="range" min="0" max="99" step="1" class="w-full accent-primary cursor-pointer" />
-              <p class="text-[10px] text-muted-foreground leading-tight">Minimum percentage to move a book to "Reading".</p>
+              <p class="text-[12px] text-muted-foreground leading-tight">Minimum percentage to move a book to "Reading".</p>
             </div>
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Finished</label>
+                <label class="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Finished</label>
                 <span class="text-xs font-mono text-primary font-bold">{{ finishedThreshold }}%</span>
               </div>
               <input v-model.number="finishedThreshold" type="range" min="1" max="100" step="1" class="w-full accent-primary cursor-pointer" />
-              <p class="text-[10px] text-muted-foreground leading-tight">Percentage threshold to mark a book as "Finished".</p>
+              <p class="text-[12px] text-muted-foreground leading-tight">Percentage threshold to mark a book as "Finished".</p>
             </div>
           </div>
 
           <div class="pt-2">
             <div class="flex items-center justify-between mb-2">
-              <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">KEPUB conversion limit</label>
+              <label class="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">KEPUB conversion limit</label>
               <span class="text-xs font-mono text-primary font-bold">{{ kepubConversionLimitMb }} MB</span>
             </div>
             <input v-model.number="kepubConversionLimitMb" type="range" min="1" max="500" step="5" class="w-full accent-primary cursor-pointer" />
-            <p class="text-[10px] text-muted-foreground mt-2">Skip conversion for files larger than this to save server resources.</p>
+            <p class="text-[12px] text-muted-foreground mt-2">Skip conversion for files larger than this to save server resources.</p>
           </div>
         </div>
 
         <div class="px-5 py-4 bg-muted/30 flex items-center justify-between">
           <div v-if="settingsError" class="text-xs text-destructive font-medium flex items-center gap-1.5"><X :size="14" /> {{ settingsError }}</div>
-          <div v-else class="text-[10px] text-muted-foreground italic">Changes must be saved to take effect.</div>
+          <div v-else class="text-[12px] text-muted-foreground italic">Changes must be saved to take effect.</div>
 
           <button class="settings-btn-primary" :disabled="savingSettings" @click="saveSettings()">
             {{ savingSettings ? 'Saving...' : 'Save Sync Settings' }}

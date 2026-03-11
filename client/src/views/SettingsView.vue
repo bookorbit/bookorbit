@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import SettingsHeader from '@/features/settings/SettingsHeader.vue'
 
 const route = useRoute()
-const maxWidth = computed(() => route.meta.maxWidth as string | undefined)
+const maxWidth = computed(() => (route.meta.maxWidth as string | undefined) ?? 'max-w-3xl')
 </script>
 
 <template>

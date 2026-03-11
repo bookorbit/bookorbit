@@ -2,12 +2,12 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings } from 'lucide-vue-next'
-import { useVisibility } from '../composables/useVisibility'
-import { useReaderProgress } from '../composables/useReaderProgress'
-import { useCbz } from '../composables/useCbz'
-import { useCbzSettings } from '../composables/useCbzSettings'
-import { useReaderSettings } from '../composables/useReaderSettings'
-import CbzSettingsPanel from './CbzSettingsPanel.vue'
+import { useVisibility } from '../shared/composables/useVisibility'
+import { useReaderProgress } from '../shared/composables/useReaderProgress'
+import { useCbz } from './composables/useCbz'
+import { useCbzSettings } from './composables/useCbzSettings'
+import { useReaderSettings } from '../shared/composables/useReaderSettings'
+import CbzSettingsPanel from './components/SettingsPanel.vue'
 import type { CbxReaderSettings } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -246,21 +246,13 @@ onUnmounted(() => {
       class="absolute top-0 inset-x-0 z-50 transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
     >
-      <div
-        class="h-12 flex items-center gap-2 px-3"
-        style="
-          background: rgba(18, 18, 20, 0.92);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        "
-      >
+      <div class="h-12 flex items-center gap-2 px-3 bg-background/90 backdrop-blur-md border-b border-border">
         <button class="viewer-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
         <div class="flex-1 min-w-0 flex flex-col justify-center">
-          <span v-if="bookTitle" class="text-sm text-white/90 truncate leading-tight">{{ bookTitle }}</span>
-          <span class="text-xs text-white/40 tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
+          <span v-if="bookTitle" class="text-sm font-serif text-foreground truncate leading-tight">{{ bookTitle }}</span>
+          <span class="text-xs text-muted-foreground tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
         </div>
-        <button class="viewer-btn" :class="showSettings ? 'bg-white/20 text-white' : ''" @click="showSettings = !showSettings">
+        <button class="viewer-btn" :class="showSettings ? '!bg-muted !text-foreground' : ''" @click="showSettings = !showSettings">
           <Settings :size="15" />
         </button>
       </div>
@@ -276,7 +268,7 @@ onUnmounted(() => {
       @wheel.prevent="onWheel"
     >
       <div v-if="!currentImageLoaded && !error" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-        <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
+        <div class="w-8 h-8 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
       </div>
 
       <div
@@ -321,15 +313,7 @@ onUnmounted(() => {
       class="absolute bottom-0 inset-x-0 z-50 transition-all duration-300"
       :class="footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'"
     >
-      <div
-        class="h-14 flex items-center gap-3 px-4"
-        style="
-          background: rgba(18, 18, 20, 0.92);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-        "
-      >
+      <div class="h-14 flex items-center gap-3 px-4 bg-background/90 backdrop-blur-md border-t border-border">
         <Tooltip>
           <TooltipTrigger as-child>
             <button class="viewer-btn" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
@@ -345,7 +329,8 @@ onUnmounted(() => {
             :max="Math.max(0, pageCount - 1)"
             :value="currentPage"
             list="cbz-ticks"
-            class="flex-1 w-full accent-blue-400 cursor-pointer"
+            class="flex-1 w-full cursor-pointer"
+            style="accent-color: var(--primary)"
             @input="goToPage(Number(($event.target as HTMLInputElement).value))"
           />
           <datalist id="cbz-ticks">
@@ -368,15 +353,15 @@ onUnmounted(() => {
     <div class="absolute bottom-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showFooter()" />
 
     <!-- ── Loading / error overlays ─────────────────────────────────────────── -->
-    <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-50">
+    <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-50 bg-background">
       <div class="flex flex-col items-center gap-3">
-        <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
-        <p class="text-sm text-white/50">Loading…</p>
+        <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <p class="text-sm text-muted-foreground">Loading…</p>
       </div>
     </div>
 
-    <div v-if="error" class="absolute inset-0 flex items-center justify-center z-50 p-8 text-center">
-      <p class="text-sm text-white/70">{{ error }}</p>
+    <div v-if="error" class="absolute inset-0 flex items-center justify-center z-50 p-8 text-center bg-background">
+      <p class="text-sm text-foreground">{{ error }}</p>
     </div>
 
     <!-- ── Settings panel ────────────────────────────────────────────────────── -->
@@ -396,8 +381,8 @@ onUnmounted(() => {
     />
 
     <!-- Progress bar -->
-    <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 z-30">
-      <div class="h-full bg-blue-400/60 transition-all duration-300" :style="{ width: `${((currentPage + 1) / pageCount) * 100}%` }" />
+    <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-30">
+      <div class="h-full bg-primary/60 transition-all duration-300" :style="{ width: `${((currentPage + 1) / pageCount) * 100}%` }" />
     </div>
   </div>
 </template>

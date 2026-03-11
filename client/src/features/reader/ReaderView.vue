@@ -1,27 +1,27 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useFoliate, type RelocateDetail } from './composables/useFoliate'
-import { useReaderProgress } from './composables/useReaderProgress'
-import { useReaderState } from './composables/useReaderState'
-import { useReaderSettings } from './composables/useReaderSettings'
-import { useVisibility } from './composables/useVisibility'
-import { useBookmarks } from './composables/useBookmarks'
-import { useAnnotations } from './composables/useAnnotations'
-import { useToc } from './composables/useToc'
-import { useSearch } from './composables/useSearch'
-import { useReaderSelection } from './composables/useReaderSelection'
-import ReaderHeader from './components/ReaderHeader.vue'
-import ReaderFooter from './components/ReaderFooter.vue'
-import ReaderSidebar from './components/ReaderSidebar.vue'
-import ReaderSettingsPanel from './components/ReaderSettingsPanel.vue'
-import SelectionPopup from './components/SelectionPopup.vue'
-import ReaderSearchPanel from './components/ReaderSearchPanel.vue'
-import NoteDialog from './components/NoteDialog.vue'
-import PdfReaderView from './components/PdfReaderView.vue'
-import CbzReaderView from './components/CbzReaderView.vue'
-import type { ReaderState } from './composables/useReaderState'
-import type { FoliateRenderer } from './composables/useFoliate'
+import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
+import { useReaderProgress } from './shared/composables/useReaderProgress'
+import { useReaderState } from './epub/composables/useReaderState'
+import { useReaderSettings } from './shared/composables/useReaderSettings'
+import { useVisibility } from './shared/composables/useVisibility'
+import { useBookmarks } from './epub/composables/useBookmarks'
+import { useAnnotations } from './epub/composables/useAnnotations'
+import { useToc } from './epub/composables/useToc'
+import { useSearch } from './epub/composables/useSearch'
+import { useReaderSelection } from './epub/composables/useReaderSelection'
+import ReaderHeader from './epub/components/ReaderHeader.vue'
+import ReaderFooter from './epub/components/ReaderFooter.vue'
+import ReaderSidebar from './epub/components/ReaderSidebar.vue'
+import ReaderSettingsPanel from './epub/components/ReaderSettingsPanel.vue'
+import SelectionPopup from './epub/components/SelectionPopup.vue'
+import ReaderSearchPanel from './epub/components/ReaderSearchPanel.vue'
+import NoteDialog from './epub/components/NoteDialog.vue'
+import PdfReaderView from './pdf/PdfReaderView.vue'
+import CbzReaderView from './cbz/CbzReaderView.vue'
+import type { ReaderState } from './epub/composables/useReaderState'
+import type { FoliateRenderer } from './epub/composables/useFoliate'
 import type { EpubReaderSettings } from '@projectx/types'
 
 const route = useRoute()
@@ -256,6 +256,12 @@ function onSearchClear() {
 function navigateSearch(cfiTarget: string) {
   goTo(cfiTarget)
 }
+
+function closeSearch() {
+  onSearchClear()
+  searchInitialQuery.value = ''
+  showSearch.value = false
+}
 </script>
 
 <template>
@@ -284,20 +290,17 @@ function navigateSearch(cfiTarget: string) {
     />
 
     <div class="absolute inset-0">
-      <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-10" :style="{ background: activeMode.bg }">
+      <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-10 bg-background">
         <div class="flex flex-col items-center gap-3">
-          <div
-            class="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-            :style="{ borderColor: activeMode.fg, borderTopColor: 'transparent' }"
-          />
-          <p class="text-sm" :style="{ color: activeMode.fg, opacity: 0.6 }">Loading book…</p>
+          <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p class="text-sm text-muted-foreground">Loading book…</p>
         </div>
       </div>
 
-      <div v-if="error && !loading" class="absolute inset-0 flex items-center justify-center z-10 p-8" :style="{ background: activeMode.bg }">
+      <div v-if="error && !loading" class="absolute inset-0 flex items-center justify-center z-10 p-8 bg-background">
         <div class="text-center max-w-sm">
-          <p class="text-sm font-medium mb-2" :style="{ color: activeMode.fg }">Failed to load book</p>
-          <p class="text-xs opacity-60" :style="{ color: activeMode.fg }">{{ error }}</p>
+          <p class="text-sm font-medium mb-2 text-foreground">Failed to load book</p>
+          <p class="text-xs text-muted-foreground">{{ error }}</p>
         </div>
       </div>
 
@@ -345,7 +348,7 @@ function navigateSearch(cfiTarget: string) {
       @search="onSearchQuery"
       @clear="onSearchClear"
       @navigate="navigateSearch($event)"
-      @close="onSearchClear(); searchInitialQuery = ''; showSearch = false"
+      @close="closeSearch"
     />
 
     <ReaderSettingsPanel v-if="showSettings" :state="state" @update="applyUpdate" @close="showSettings = false" />

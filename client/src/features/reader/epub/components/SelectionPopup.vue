@@ -159,7 +159,9 @@ function onCopy() {
                   <button
                     class="w-6 h-6 rounded text-xs font-bold transition-colors border"
                     :class="
-                      selectedStyle === s.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted text-muted-foreground'
+                      selectedStyle === s.id
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border hover:bg-muted text-muted-foreground'
                     "
                     @click="selectedStyle = s.id"
                   >

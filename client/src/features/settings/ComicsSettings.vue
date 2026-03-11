@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import type { CbxReaderSettings } from '@projectx/types'
-import { useReaderDefaultSettings } from '@/features/reader/composables/useReaderSettings'
+import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
 const { effective, load, update, reset } = useReaderDefaultSettings<CbxReaderSettings>('cbx')

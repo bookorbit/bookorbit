@@ -28,16 +28,7 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
 </script>
 
 <template>
-  <header
-    class="fixed top-0 left-0 right-0 h-12 z-50 flex items-center px-3 gap-1"
-    style="
-      background: rgba(18, 18, 20, 0.92);
-      color: white;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    "
-  >
+  <header class="fixed top-0 left-0 right-0 h-12 z-50 flex items-center px-3 gap-1 bg-background/90 backdrop-blur-md border-b border-border">
     <Tooltip>
       <TooltipTrigger as-child>
         <button class="viewer-btn" @click="emit('back')">
@@ -60,7 +51,7 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
 
     <Tooltip>
       <TooltipTrigger as-child>
-        <button class="viewer-btn" :class="isBookmarked ? '!text-red-400' : ''" @click="emit('toggleBookmark')">
+        <button class="viewer-btn" :class="isBookmarked ? '!text-primary' : ''" @click="emit('toggleBookmark')">
           <BookmarkCheck v-if="isBookmarked" :size="18" />
           <Bookmark v-else :size="18" />
         </button>
@@ -78,7 +69,7 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
     </Tooltip>
 
     <div class="flex-1 min-w-0 px-3">
-      <p class="text-sm font-medium truncate text-center text-white/60">{{ chapterTitle }}</p>
+      <p class="text-sm font-serif font-medium truncate text-center text-muted-foreground">{{ chapterTitle }}</p>
     </div>
 
     <Tooltip>

@@ -39,7 +39,7 @@ function formatGap(v: number) {
 <template>
   <div class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="emit('close')">
     <div
-      class="bg-card text-card-foreground rounded-t-xl max-h-[85vh] overflow-y-auto shadow-2xl border-t border-border w-full max-w-2xl mx-auto"
+      class="settings-sheet bg-card text-card-foreground rounded-t-xl max-h-[85vh] overflow-y-auto shadow-2xl border-t border-border w-full max-w-2xl mx-auto"
       @click.stop
     >
       <div class="sticky top-0 bg-card z-10 flex items-center justify-between px-5 py-4 border-b border-border">
@@ -303,3 +303,18 @@ function formatGap(v: number) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.settings-sheet {
+  animation: slideInFromBottom 0.25s ease;
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+</style>

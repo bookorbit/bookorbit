@@ -12,6 +12,9 @@ import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBo
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
+import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 
 type FileProgress = {
   percentage: number
@@ -47,6 +50,18 @@ type ProviderLink = {
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
+
+const addToCollectionOpen = ref(false)
+
+const {
+  pendingId: deleteBookId,
+  deleting: deletingBook,
+  promptDelete,
+  cancelDelete,
+  confirmDelete,
+} = useDeleteBook(() => {
+  router.back()
+})
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
@@ -405,6 +420,7 @@ watch(
               <TooltipTrigger as-child>
                 <button
                   class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+                  @click="addToCollectionOpen = true"
                 >
                   <FolderPlus class="size-3.5" />
                 </button>
@@ -415,6 +431,7 @@ watch(
               <TooltipTrigger as-child>
                 <button
                   class="flex flex-1 items-center justify-center h-9 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="promptDelete(book.id)"
                 >
                   <Trash2 class="size-3.5" />
                 </button>
@@ -495,7 +512,16 @@ watch(
 
       <!-- Metadata grid -->
       <dl
-        v-if="book.publisher || book.publishedYear || book.language || book.pageCount || book.isbn13 || book.isbn10 || book.rating != null || book.lastWrittenAt"
+        v-if="
+          book.publisher ||
+          book.publishedYear ||
+          book.language ||
+          book.pageCount ||
+          book.isbn13 ||
+          book.isbn10 ||
+          book.rating != null ||
+          book.lastWrittenAt
+        "
         class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-4"
       >
         <div v-if="book.publisher" class="min-w-0">
@@ -548,7 +574,10 @@ watch(
         <div class="rounded-md border border-border bg-muted/20 px-3 py-2.5">
           <div class="flex items-center justify-between gap-3">
             <p class="text-xs text-foreground truncate">{{ activitySummaryLine }}</p>
-            <button class="text-[11px] text-muted-foreground hover:text-foreground transition-colors shrink-0" @click="activityExpanded = !activityExpanded">
+            <button
+              class="text-[11px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              @click="activityExpanded = !activityExpanded"
+            >
               {{ activityExpanded ? 'Hide details' : 'Show details' }}
             </button>
           </div>
@@ -560,11 +589,7 @@ watch(
             Latest bookmark: {{ latestBookmark.title }} · {{ formatRelative(latestBookmark.createdAt) }}
           </p>
 
-          <div
-            v-for="{ file, progress } in detailProgressRows"
-            :key="file.id"
-            class="rounded-md border border-border px-3 py-2.5 bg-background/60"
-          >
+          <div v-for="{ file, progress } in detailProgressRows" :key="file.id" class="rounded-md border border-border px-3 py-2.5 bg-background/60">
             <div class="flex items-center justify-between gap-3">
               <p class="text-xs font-medium truncate min-w-0">
                 {{ file.filename ?? `File #${file.id}` }}
@@ -631,6 +656,15 @@ watch(
   </div>
 
   <RecommendedBooksRow :book-id="book.id" />
+
+  <AddToCollectionSheet
+    :open="addToCollectionOpen"
+    :book-ids="[book.id]"
+    @update:open="addToCollectionOpen = $event"
+    @done="void loadSupplemental()"
+  />
+
+  <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 
   <!-- Cover lightbox -->
   <DialogRoot :open="coverLightboxOpen" @update:open="coverLightboxOpen = $event">

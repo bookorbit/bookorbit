@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import type { EpubReaderSettings } from '@projectx/types'
-import { useReaderDefaultSettings } from '@/features/reader/composables/useReaderSettings'
-import { themes } from '@/features/reader/constants/themes'
+import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
+import { themes } from '@/features/reader/epub/constants/themes'
 import { Check } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'

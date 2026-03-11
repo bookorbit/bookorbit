@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useRecommendations } from '@/features/book/composables/useRecommendations'
@@ -11,12 +12,39 @@ const router = useRouter()
 const { recommendations, loading, fetch } = useRecommendations()
 const { coverUrl } = useCoverVersions()
 
-watch(() => props.bookId, (id) => fetch(id), { immediate: true })
+const scrollEl = ref<HTMLElement | null>(null)
+
+watch(
+  () => props.bookId,
+  (id) => fetch(id),
+  { immediate: true },
+)
+
+function scroll(direction: 'left' | 'right') {
+  if (!scrollEl.value) return
+  scrollEl.value.scrollBy({ left: direction === 'left' ? -240 : 240, behavior: 'smooth' })
+}
 </script>
 
 <template>
   <div v-if="loading || recommendations.length > 0" class="mt-8 pt-6 border-t border-border">
-    <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">More Like This</p>
+    <div class="flex items-center justify-between mb-4">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">More Like This</p>
+      <div class="flex items-center gap-1">
+        <button
+          class="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          @click="scroll('left')"
+        >
+          <ChevronLeft :size="14" />
+        </button>
+        <button
+          class="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          @click="scroll('right')"
+        >
+          <ChevronRight :size="14" />
+        </button>
+      </div>
+    </div>
 
     <div v-if="loading" class="flex gap-3 overflow-x-auto pb-2">
       <div v-for="i in 10" :key="i" class="w-24 shrink-0">
@@ -24,7 +52,7 @@ watch(() => props.bookId, (id) => fetch(id), { immediate: true })
       </div>
     </div>
 
-    <div v-else class="flex gap-6 overflow-x-auto pb-2">
+    <div v-else ref="scrollEl" class="flex gap-6 overflow-x-auto pb-2">
       <button
         v-for="rec in recommendations"
         :key="rec.book.id"

@@ -22,15 +22,7 @@ function onSeek(e: Event) {
 </script>
 
 <template>
-  <footer
-    class="fixed bottom-0 left-0 right-0 h-14 z-50 flex items-center gap-3 px-4"
-    style="
-      background: rgba(18, 18, 20, 0.92);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-    "
-  >
+  <footer class="fixed bottom-0 left-0 right-0 h-14 z-50 flex items-center gap-3 px-4 bg-background/90 backdrop-blur-md border-t border-border">
     <Tooltip>
       <TooltipTrigger as-child>
         <button class="viewer-btn" :disabled="sectionIndex === 0" @click="emit('prevSection')">
@@ -50,20 +42,20 @@ function onSeek(e: Event) {
         @input="onSeek"
         class="w-full h-1 rounded-full appearance-none cursor-pointer"
         :style="{
-          accentColor: 'rgba(255,255,255,0.8)',
-          background: `linear-gradient(to right, rgba(255,255,255,0.6) ${fraction * 100}%, rgba(255,255,255,0.2) ${fraction * 100}%)`,
+          accentColor: 'var(--primary)',
+          background: `linear-gradient(to right, var(--primary) ${fraction * 100}%, var(--border) ${fraction * 100}%)`,
         }"
       />
       <template v-for="(sf, idx) in sectionFractions" :key="idx">
         <div
           v-if="sf > 0 && sf < 1"
           class="absolute top-1/2 -translate-y-1/2 w-px h-3 pointer-events-none"
-          :style="{ left: `${sf * 100}%`, background: 'rgba(255,255,255,0.35)' }"
+          :style="{ left: `${sf * 100}%`, background: 'var(--muted-foreground)' }"
         />
       </template>
     </div>
 
-    <span class="text-xs tabular-nums shrink-0 min-w-[3rem] text-center text-white/50"> {{ Math.round(fraction * 100) }}% </span>
+    <span class="text-xs tabular-nums shrink-0 min-w-[3rem] text-center text-muted-foreground"> {{ Math.round(fraction * 100) }}% </span>
 
     <Tooltip>
       <TooltipTrigger as-child>

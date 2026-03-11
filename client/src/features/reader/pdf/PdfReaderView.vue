@@ -2,18 +2,18 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import { useRouter } from 'vue-router'
-import { usePdf } from '../composables/usePdf'
-import { usePdfZoom } from '../composables/usePdfZoom'
-import { usePdfLayout, PAGE_GAP, type ScrollMode } from '../composables/usePdfLayout'
-import { usePdfRenderer } from '../composables/usePdfRenderer'
-import { usePdfFind } from '../composables/usePdfFind'
-import { usePdfOutline } from '../composables/usePdfOutline'
-import { useReaderProgress } from '../composables/useReaderProgress'
-import { useReaderSettings } from '../composables/useReaderSettings'
-import PdfToolbar from './PdfToolbar.vue'
-import PdfFindBar from './PdfFindBar.vue'
-import PdfSidebar from './PdfSidebar.vue'
-import type { PageDim } from '../composables/usePdf'
+import { usePdf } from './composables/usePdf'
+import { usePdfZoom } from './composables/usePdfZoom'
+import { usePdfLayout, PAGE_GAP, type ScrollMode } from './composables/usePdfLayout'
+import { usePdfRenderer } from './composables/usePdfRenderer'
+import { usePdfFind } from './composables/usePdfFind'
+import { usePdfOutline } from './composables/usePdfOutline'
+import { useReaderProgress } from '../shared/composables/useReaderProgress'
+import { useReaderSettings } from '../shared/composables/useReaderSettings'
+import PdfToolbar from './components/PdfToolbar.vue'
+import PdfFindBar from './components/FindBar.vue'
+import PdfSidebar from './components/PdfSidebar.vue'
+import type { PageDim } from './composables/usePdf'
 import type { PdfReaderSettings } from '@projectx/types'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
@@ -42,8 +42,12 @@ const effectiveDims = computed(() =>
   pageDims.value.map((d) => (rotation.value === 90 || rotation.value === 270 ? { width: d.height, height: d.width } : d)),
 )
 
-function rotateCw() { rotation.value = ((rotation.value + 90) % 360) as 0 | 90 | 180 | 270 }
-function rotateCcw() { rotation.value = ((rotation.value + 270) % 360) as 0 | 90 | 180 | 270 }
+function rotateCw() {
+  rotation.value = ((rotation.value + 90) % 360) as 0 | 90 | 180 | 270
+}
+function rotateCcw() {
+  rotation.value = ((rotation.value + 270) % 360) as 0 | 90 | 180 | 270
+}
 
 // ── Spread ────────────────────────────────────────────────────────────────────
 const spread = ref<'none' | 'odd' | 'even'>('none')
@@ -80,7 +84,6 @@ function closeFind() {
   findBarRef.value?.clear()
 }
 
-
 // ── Outline ───────────────────────────────────────────────────────────────────
 const outline = usePdfOutline(pdfDoc)
 
@@ -109,7 +112,9 @@ function onScrollMouseMove(e: MouseEvent) {
   lastX = e.clientX
   lastY = e.clientY
 }
-function onScrollMouseUp() { isDragging = false }
+function onScrollMouseUp() {
+  isDragging = false
+}
 
 // ── Fullscreen ────────────────────────────────────────────────────────────────
 const isFullscreen = ref(false)
@@ -117,11 +122,6 @@ const isFullscreen = ref(false)
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen?.()
   else document.documentElement.requestFullscreen?.()
-}
-
-// ── Print ─────────────────────────────────────────────────────────────────────
-function printPdf() {
-  window.open(`/api/v1/books/files/${props.fileId}/serve`, '_blank')
 }
 
 // ── Invalidation ──────────────────────────────────────────────────────────────
@@ -154,24 +154,49 @@ const scrollStyle = computed((): CSSProperties => {
   return { overflowY: 'auto' }
 })
 
-
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 function onKeyDown(e: KeyboardEvent) {
   if (showFind.value && (e.target as HTMLElement)?.tagName === 'INPUT') return
-  if ((e.metaKey || e.ctrlKey) && e.key === 'f') { e.preventDefault(); openFind(); return }
-  if (e.key === 'Escape') { closeFind(); return }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    e.preventDefault()
+    openFind()
+    return
+  }
+  if (e.key === 'Escape') {
+    closeFind()
+    return
+  }
 
   const el = scrollRef.value
   if (!el) return
   const ph = (rowHeights.value[pageRows.value.findIndex((r) => r.includes(currentPage.value))] ?? containerH.value) + PAGE_GAP
-  if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); el.scrollBy({ top: ph, behavior: 'smooth' }) }
-  else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); el.scrollBy({ top: -ph, behavior: 'smooth' }) }
-  else if (e.key === 'Home') goToPage(1)
+  if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+    e.preventDefault()
+    el.scrollBy({ top: ph, behavior: 'smooth' })
+  } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+    e.preventDefault()
+    el.scrollBy({ top: -ph, behavior: 'smooth' })
+  } else if (e.key === 'Home') goToPage(1)
   else if (e.key === 'End') goToPage(totalPages.value)
 }
 
 function onPageCommit(page: number) {
   if (!isNaN(page)) goToPage(page)
+}
+
+function onFindSearch(q: string) {
+  find.query.value = q
+  find.search()
+}
+
+function onFindMatchCase(v: boolean) {
+  find.matchCase.value = v
+  find.search()
+}
+
+function onFindWholeWord(v: boolean) {
+  find.wholeWord.value = v
+  find.search()
 }
 
 // ── Mount / unmount ───────────────────────────────────────────────────────────
@@ -226,7 +251,10 @@ onMounted(async () => {
     setupIO(scrollRef.value)
   }
 
-  onUnmounted(() => { ro?.disconnect(); ro = null })
+  onUnmounted(() => {
+    ro?.disconnect()
+    ro = null
+  })
 
   if (progress.pageNumber.value && progress.pageNumber.value > 1) {
     await nextTick()
@@ -244,8 +272,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fixed inset-0 flex flex-col overflow-hidden select-none" style="background: #525659">
-
+  <div class="fixed inset-0 flex flex-col overflow-hidden select-none bg-muted">
     <!-- Toolbar (always visible) -->
     <PdfToolbar
       :current-page="currentPage"
@@ -280,7 +307,6 @@ onUnmounted(() => {
       @update:spread="spread = $event"
       @update:scroll-mode="scrollMode = $event"
       @update:cursor-tool="cursorTool = $event"
-      @print="printPdf()"
     />
 
     <!-- Find bar -->
@@ -290,17 +316,16 @@ onUnmounted(() => {
       :match-count="find.matchCount.value"
       :current-index="find.currentIndex.value"
       @close="closeFind()"
-      @search="(q) => { find.query.value = q; find.search() }"
+      @search="onFindSearch"
       @next="find.next()"
       @prev="find.prev()"
-      @update:match-case="find.matchCase.value = $event; find.search()"
-      @update:whole-word="find.wholeWord.value = $event; find.search()"
+      @update:match-case="onFindMatchCase"
+      @update:whole-word="onFindWholeWord"
       @update:highlight-all="find.highlightAll.value = $event"
     />
 
     <!-- Body: sidebar + pages -->
     <div class="flex flex-1 min-h-0 min-w-0">
-
       <!-- Sidebar -->
       <PdfSidebar
         v-if="showSidebar"
@@ -313,18 +338,17 @@ onUnmounted(() => {
 
       <!-- PDF Viewport -->
       <div class="flex-1 min-w-0 relative">
-
-        <div v-if="loading" class="absolute inset-0 flex items-center justify-center">
+        <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-background">
           <div class="flex flex-col items-center gap-3">
-            <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
-            <p class="text-sm text-white/50">Loading PDF...</p>
+            <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <p class="text-sm text-muted-foreground">Loading PDF...</p>
           </div>
         </div>
 
-        <div v-else-if="error" class="absolute inset-0 flex items-center justify-center p-8 text-center">
+        <div v-else-if="error" class="absolute inset-0 flex items-center justify-center p-8 text-center bg-background">
           <div>
-            <p class="text-sm font-medium text-white/80 mb-1">Failed to load PDF</p>
-            <p class="text-xs text-white/40">{{ error }}</p>
+            <p class="text-sm font-medium text-foreground mb-1">Failed to load PDF</p>
+            <p class="text-xs text-muted-foreground">{{ error }}</p>
           </div>
         </div>
 
@@ -365,24 +389,28 @@ onUnmounted(() => {
               >
                 <canvas
                   class="block"
-                  :ref="(el) => { if (el) canvasMap.set(pageNum, el as HTMLCanvasElement) }"
+                  :ref="
+                    (el) => {
+                      if (el) canvasMap.set(pageNum, el as HTMLCanvasElement)
+                    }
+                  "
                 />
                 <div
                   data-text-layer
                   class="absolute inset-0 overflow-hidden"
-                  style="pointer-events: none"
-                  :ref="(el) => { if (el) textLayerMap.set(pageNum, el as HTMLElement) }"
+                  :class="cursorTool === 'select' ? 'select-text' : 'select-none pointer-events-none'"
+                  :ref="
+                    (el) => {
+                      if (el) textLayerMap.set(pageNum, el as HTMLElement)
+                    }
+                  "
                 />
               </div>
             </div>
           </div>
 
           <!-- Horizontal mode: single row, scrolls left-right -->
-          <div
-            v-else
-            class="flex flex-row items-center"
-            :style="{ gap: `${PAGE_GAP}px`, padding: '16px', height: '100%' }"
-          >
+          <div v-else class="flex flex-row items-center" :style="{ gap: `${PAGE_GAP}px`, padding: '16px', height: '100%' }">
             <div
               v-for="pageNum in totalPages"
               :key="pageNum"
@@ -395,21 +423,29 @@ onUnmounted(() => {
             >
               <canvas
                 class="block"
-                :ref="(el) => { if (el) canvasMap.set(pageNum, el as HTMLCanvasElement) }"
+                :ref="
+                  (el) => {
+                    if (el) canvasMap.set(pageNum, el as HTMLCanvasElement)
+                  }
+                "
               />
               <div
                 data-text-layer
                 class="absolute inset-0 overflow-hidden"
                 style="pointer-events: none"
-                :ref="(el) => { if (el) textLayerMap.set(pageNum, el as HTMLElement) }"
+                :ref="
+                  (el) => {
+                    if (el) textLayerMap.set(pageNum, el as HTMLElement)
+                  }
+                "
               />
             </div>
           </div>
         </div>
 
         <!-- Progress bar -->
-        <div v-if="!loading && !error && totalPages > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 z-10">
-          <div class="h-full bg-blue-400/60 transition-all duration-500" :style="{ width: `${progressPct}%` }" />
+        <div v-if="!loading && !error && totalPages > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-10">
+          <div class="h-full bg-primary/60 transition-all duration-500" :style="{ width: `${progressPct}%` }" />
         </div>
       </div>
     </div>

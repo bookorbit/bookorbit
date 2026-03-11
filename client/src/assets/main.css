@@ -316,10 +316,10 @@
   }
 
   .viewer-btn {
-    @apply flex items-center justify-center w-8 h-8 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
+    @apply flex items-center justify-center w-8 h-8 rounded text-foreground/60 hover:text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
   }
   .viewer-sep {
-    @apply w-px h-5 mx-1 bg-white/15 shrink-0;
+    @apply w-px h-5 mx-1 bg-border shrink-0;
   }
 
   /* ── Settings typography scale ──────────────────────────────

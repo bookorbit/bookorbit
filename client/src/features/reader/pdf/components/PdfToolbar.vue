@@ -10,16 +10,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Expand,
   Grab,
   LayoutGrid,
   Maximize,
   Minimize,
   Minus,
+  MoreHorizontal,
   MousePointer,
   PanelLeft,
   Plus,
-  Printer,
   RotateCcw,
   RotateCw,
   Search,
@@ -39,7 +38,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ScrollMode } from '../composables/usePdfLayout'
-
 
 const props = defineProps<{
   currentPage: number
@@ -77,7 +75,6 @@ const emit = defineEmits<{
   'update:spread': [v: 'none' | 'odd' | 'even']
   'update:scrollMode': [v: ScrollMode]
   'update:cursorTool': [v: 'select' | 'hand']
-  print: []
 }>()
 
 const ZOOM_PERCENT_PRESETS = [
@@ -118,14 +115,7 @@ function currentZoomValue(): string {
 </script>
 
 <template>
-  <div
-    class="h-11 flex items-center px-2 gap-0.5 shrink-0 z-50"
-    style="
-      background: rgba(50, 54, 57, 1);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.35);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    "
-  >
+  <div class="h-11 flex items-center px-2 gap-0.5 shrink-0 z-50 bg-background border-b border-border shadow-sm">
     <!-- Back -->
     <Tooltip>
       <TooltipTrigger as-child>
@@ -139,7 +129,7 @@ function currentZoomValue(): string {
     <!-- Sidebar toggle -->
     <Tooltip>
       <TooltipTrigger as-child>
-        <button class="viewer-btn" :class="showSidebar ? 'bg-white/15 text-white' : ''" @click="emit('toggleSidebar')">
+        <button class="viewer-btn" :class="showSidebar ? '!bg-muted !text-foreground' : ''" @click="emit('toggleSidebar')">
           <PanelLeft :size="15" />
         </button>
       </TooltipTrigger>
@@ -149,7 +139,7 @@ function currentZoomValue(): string {
     <!-- Find toggle -->
     <Tooltip>
       <TooltipTrigger as-child>
-        <button class="viewer-btn" :class="showFind ? 'bg-white/15 text-white' : ''" @click="emit('toggleFind')">
+        <button class="viewer-btn" :class="showFind ? '!bg-muted !text-foreground' : ''" @click="emit('toggleFind')">
           <Search :size="14" />
         </button>
       </TooltipTrigger>
@@ -174,13 +164,12 @@ function currentZoomValue(): string {
         type="number"
         min="1"
         :max="totalPages"
-        class="w-10 text-center rounded px-1 py-0.5 text-white/90 text-xs outline-none focus:bg-white/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        style="background: rgba(255,255,255,0.12)"
+        class="w-10 text-center rounded px-1 py-0.5 bg-muted text-foreground text-xs outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         @keydown.enter="onPageInput"
         @blur="onPageInput"
       />
-      <span class="text-white/40 text-xs">/</span>
-      <span class="text-white/70 text-xs tabular-nums">{{ totalPages }}</span>
+      <span class="text-muted-foreground text-xs">/</span>
+      <span class="text-muted-foreground text-xs tabular-nums">{{ totalPages }}</span>
     </div>
 
     <Tooltip>
@@ -205,24 +194,19 @@ function currentZoomValue(): string {
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
         <button
-          class="flex items-center gap-1 px-2 h-7 rounded text-white/80 hover:text-white hover:bg-white/10 text-xs tabular-nums transition-colors"
+          class="flex items-center gap-1 px-2 h-7 rounded text-foreground/80 hover:text-foreground hover:bg-muted text-xs tabular-nums transition-colors"
           style="min-width: 84px"
         >
           <span class="flex-1 text-center">{{ zoomLabel }}</span>
-          <ChevronDown :size="10" class="text-white/40" />
+          <ChevronDown :size="10" class="text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" class="min-w-[9rem]" style="background: #3a3f44; border-color: rgba(255,255,255,0.1)">
+      <DropdownMenuContent align="center" class="min-w-[9rem]">
         <DropdownMenuRadioGroup :model-value="currentZoomValue()" @update:model-value="emit('applyZoomPreset', $event)">
-          <DropdownMenuRadioItem value="fit-page" class="text-white/80 focus:bg-white/10 focus:text-white text-xs">Page Fit</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="fit-width" class="text-white/80 focus:bg-white/10 focus:text-white text-xs">Page Width</DropdownMenuRadioItem>
-          <DropdownMenuSeparator style="background: rgba(255,255,255,0.1)" />
-          <DropdownMenuRadioItem
-            v-for="preset in ZOOM_PERCENT_PRESETS"
-            :key="preset.value"
-            :value="preset.value"
-            class="text-white/80 focus:bg-white/10 focus:text-white text-xs"
-          >
+          <DropdownMenuRadioItem value="fit-page" class="text-xs">Page Fit</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="fit-width" class="text-xs">Page Width</DropdownMenuRadioItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuRadioItem v-for="preset in ZOOM_PERCENT_PRESETS" :key="preset.value" :value="preset.value" class="text-xs">
             {{ preset.label }}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
@@ -252,17 +236,7 @@ function currentZoomValue(): string {
 
     <Tooltip>
       <TooltipTrigger as-child>
-        <button class="viewer-btn" @click="emit('print')"><Printer :size="14" /></button>
-      </TooltipTrigger>
-      <TooltipContent>Print</TooltipContent>
-    </Tooltip>
-
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <a
-          :href="`/api/v1/books/files/${fileId}/serve?download=1`"
-          class="viewer-btn flex items-center justify-center"
-        >
+        <a :href="`/api/v1/books/files/${fileId}/serve?download=1`" class="viewer-btn flex items-center justify-center">
           <Download :size="14" />
         </a>
       </TooltipTrigger>
@@ -275,72 +249,48 @@ function currentZoomValue(): string {
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
         <button class="viewer-btn" title="More Tools">
-          <Expand :size="14" />
+          <MoreHorizontal :size="16" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" class="w-52" style="background: #3a3f44; border-color: rgba(255,255,255,0.1)">
-
+      <DropdownMenuContent align="end" class="w-52">
         <DropdownMenuGroup>
-          <DropdownMenuItem class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2" @click="emit('firstPage')">
-            <ChevronFirst :size="13" /> First Page
-          </DropdownMenuItem>
-          <DropdownMenuItem class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2" @click="emit('lastPage')">
-            <ChevronLast :size="13" /> Last Page
-          </DropdownMenuItem>
+          <DropdownMenuItem class="text-xs gap-2" @click="emit('firstPage')"> <ChevronFirst :size="13" /> First Page </DropdownMenuItem>
+          <DropdownMenuItem class="text-xs gap-2" @click="emit('lastPage')"> <ChevronLast :size="13" /> Last Page </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        <DropdownMenuSeparator style="background: rgba(255,255,255,0.1)" />
+        <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2" @click="emit('rotateCw')">
-            <RotateCw :size="13" /> Rotate Clockwise
-          </DropdownMenuItem>
-          <DropdownMenuItem class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2" @click="emit('rotateCcw')">
-            <RotateCcw :size="13" /> Rotate Counterclockwise
-          </DropdownMenuItem>
+          <DropdownMenuItem class="text-xs gap-2" @click="emit('rotateCw')"> <RotateCw :size="13" /> Rotate Clockwise </DropdownMenuItem>
+          <DropdownMenuItem class="text-xs gap-2" @click="emit('rotateCcw')"> <RotateCcw :size="13" /> Rotate Counterclockwise </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        <DropdownMenuSeparator style="background: rgba(255,255,255,0.1)" />
+        <DropdownMenuSeparator />
 
-        <DropdownMenuLabel class="text-white/40 text-xs px-2 py-1">Cursor Tool</DropdownMenuLabel>
+        <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Cursor Tool</DropdownMenuLabel>
         <DropdownMenuRadioGroup :model-value="cursorTool" @update:model-value="emit('update:cursorTool', $event as 'select' | 'hand')">
-          <DropdownMenuRadioItem value="select" class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2">
-            <MousePointer :size="13" /> Text Selection
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="hand" class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2">
-            <Grab :size="13" /> Hand Tool
-          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="select" class="text-xs gap-2"> <MousePointer :size="13" /> Text Selection </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="hand" class="text-xs gap-2"> <Grab :size="13" /> Hand Tool </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
 
-        <DropdownMenuSeparator style="background: rgba(255,255,255,0.1)" />
+        <DropdownMenuSeparator />
 
-        <DropdownMenuLabel class="text-white/40 text-xs px-2 py-1">Scroll Mode</DropdownMenuLabel>
+        <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Scroll Mode</DropdownMenuLabel>
         <DropdownMenuRadioGroup :model-value="scrollMode" @update:model-value="emit('update:scrollMode', $event as ScrollMode)">
-          <DropdownMenuRadioItem
-            v-for="sm in SCROLL_MODES"
-            :key="sm.value"
-            :value="sm.value"
-            class="text-white/80 focus:bg-white/10 focus:text-white text-xs gap-2"
-          >
+          <DropdownMenuRadioItem v-for="sm in SCROLL_MODES" :key="sm.value" :value="sm.value" class="text-xs gap-2">
             <component :is="sm.icon" :size="13" />
             {{ sm.label }}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
 
-        <DropdownMenuSeparator style="background: rgba(255,255,255,0.1)" />
+        <DropdownMenuSeparator />
 
-        <DropdownMenuLabel class="text-white/40 text-xs px-2 py-1">Page Spread</DropdownMenuLabel>
+        <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Page Spread</DropdownMenuLabel>
         <DropdownMenuRadioGroup :model-value="spread" @update:model-value="emit('update:spread', $event as 'none' | 'odd' | 'even')">
-          <DropdownMenuRadioItem
-            v-for="sp in SPREAD_MODES"
-            :key="sp.value"
-            :value="sp.value"
-            class="text-white/80 focus:bg-white/10 focus:text-white text-xs"
-          >
+          <DropdownMenuRadioItem v-for="sp in SPREAD_MODES" :key="sp.value" :value="sp.value" class="text-xs">
             <WrapText :size="13" /> {{ sp.label }}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
-
       </DropdownMenuContent>
     </DropdownMenu>
   </div>

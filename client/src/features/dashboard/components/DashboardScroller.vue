@@ -2,9 +2,13 @@
 import { computed, ref } from 'vue'
 import { Aperture, BookMarked, ChevronLeft, ChevronRight, RefreshCw, Shuffle, Sparkles } from 'lucide-vue-next'
 
-import type { ScrollerType } from '@projectx/types'
-import DashboardBookCard from './DashboardBookCard.vue'
+import type { BookCard, ScrollerType } from '@projectx/types'
+import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
+import BookQuickView from '@/features/book/components/BookQuickView.vue'
+import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useDashboardScroller } from '../composables/useDashboardScroller'
+import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 
 const props = defineProps<{
   type: ScrollerType
@@ -29,6 +33,40 @@ const typeIcon = computed(() => {
 })
 
 const SKELETONS = Array.from({ length: 8 })
+
+type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+
+const quickViewBookId = ref<number | null>(null)
+const quickViewOpen = ref(false)
+
+const addToCollectionOpen = ref(false)
+const addToCollectionBookId = ref<number | null>(null)
+
+const {
+  pendingId: deleteBookId,
+  deleting: deletingBook,
+  promptDelete,
+  cancelDelete,
+  confirmDelete,
+} = useDeleteBook((id) => {
+  books.value = books.value.filter((b) => b.id !== id)
+})
+
+function handleBookAction(book: BookCard, action: BookActionType) {
+  if (action === 'quick-view') {
+    quickViewBookId.value = book.id
+    quickViewOpen.value = true
+    return
+  }
+  if (action === 'add-to-collection') {
+    addToCollectionBookId.value = book.id
+    addToCollectionOpen.value = true
+    return
+  }
+  if (action === 'delete') {
+    promptDelete(book.id)
+  }
+}
 </script>
 
 <template>
@@ -89,7 +127,7 @@ const SKELETONS = Array.from({ length: 8 })
       </p>
     </div>
 
-    <!-- Books row — card's overflow:hidden gives clean edge, no gradient needed -->
+    <!-- Books row -->
     <div v-else ref="scrollEl" class="flex gap-5 overflow-x-auto px-5 pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div
         v-for="(book, index) in books"
@@ -98,10 +136,20 @@ const SKELETONS = Array.from({ length: 8 })
         style="animation: dashboardFadeUp 0.35s ease both"
         :style="{ animationDelay: `${index * 35}ms` }"
       >
-        <DashboardBookCard :book="book" :show-progress="type === 'continue-reading'" />
+        <BookCoverCard :book="book" @action="handleBookAction(book, $event)" />
       </div>
     </div>
   </section>
+
+  <BookQuickView :book-id="quickViewBookId" :open="quickViewOpen" @update:open="quickViewOpen = $event" />
+
+  <AddToCollectionSheet
+    :open="addToCollectionOpen"
+    :book-ids="addToCollectionBookId ? [addToCollectionBookId] : []"
+    @update:open="addToCollectionOpen = $event"
+  />
+
+  <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 </template>
 
 <style scoped>

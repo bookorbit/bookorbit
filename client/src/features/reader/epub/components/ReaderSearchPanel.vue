@@ -39,7 +39,7 @@ function onClear() {
 
 <template>
   <div class="fixed inset-0 z-50 flex">
-    <div class="w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
+    <div class="search-panel w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
       <div class="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <Search :size="16" class="text-muted-foreground shrink-0" />
         <input
@@ -108,3 +108,18 @@ function onClear() {
     <div class="flex-1" @click="emit('close')" />
   </div>
 </template>
+
+<style scoped>
+.search-panel {
+  animation: slideInFromLeft 0.25s ease;
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+</style>

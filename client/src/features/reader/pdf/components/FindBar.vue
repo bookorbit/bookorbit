@@ -42,13 +42,13 @@ defineExpose({
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5 px-3 py-1.5 shrink-0" style="background: rgba(60, 65, 70, 1); border-bottom: 1px solid rgba(0, 0, 0, 0.3)">
+  <div class="flex items-center gap-1.5 px-3 py-1.5 shrink-0 bg-card border-b border-border">
     <input
       ref="inputRef"
       v-model="query"
       type="search"
       placeholder="Find in document..."
-      class="flex-1 min-w-0 bg-transparent text-sm text-white/90 outline-none placeholder:text-white/30"
+      class="flex-1 min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
       style="max-width: 260px"
       @keydown.enter.exact="emit('next')"
       @keydown.enter.shift.exact.prevent="emit('prev')"
@@ -56,7 +56,7 @@ defineExpose({
     />
 
     <!-- Match count -->
-    <span class="text-xs text-white/40 tabular-nums shrink-0 min-w-[48px]">
+    <span class="text-xs text-muted-foreground tabular-nums shrink-0 min-w-[48px]">
       <template v-if="query && matchCount > 0">{{ currentIndex + 1 }} of {{ matchCount }}</template>
       <template v-else-if="query && matchCount === 0">No results</template>
     </span>
@@ -69,23 +69,23 @@ defineExpose({
       <ChevronDown :size="13" />
     </button>
 
-    <div class="w-px h-4 bg-white/15 mx-0.5 shrink-0" />
+    <div class="w-px h-4 bg-border mx-0.5 shrink-0" />
 
     <!-- Options -->
-    <label class="flex items-center gap-1 text-xs text-white/60 hover:text-white/90 cursor-pointer select-none transition-colors">
-      <input v-model="matchCase" type="checkbox" class="accent-blue-400 w-3 h-3" />
+    <label class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none transition-colors">
+      <input v-model="matchCase" type="checkbox" class="w-3 h-3" style="accent-color: var(--primary)" />
       Match Case
     </label>
-    <label class="flex items-center gap-1 text-xs text-white/60 hover:text-white/90 cursor-pointer select-none transition-colors">
-      <input v-model="wholeWord" type="checkbox" class="accent-blue-400 w-3 h-3" />
+    <label class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none transition-colors">
+      <input v-model="wholeWord" type="checkbox" class="w-3 h-3" style="accent-color: var(--primary)" />
       Whole Words
     </label>
-    <label class="flex items-center gap-1 text-xs text-white/60 hover:text-white/90 cursor-pointer select-none transition-colors">
-      <input v-model="highlightAll" type="checkbox" class="accent-blue-400 w-3 h-3" />
+    <label class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none transition-colors">
+      <input v-model="highlightAll" type="checkbox" class="w-3 h-3" style="accent-color: var(--primary)" />
       Highlight All
     </label>
 
-    <div class="w-px h-4 bg-white/15 mx-0.5 shrink-0" />
+    <div class="w-px h-4 bg-border mx-0.5 shrink-0" />
 
     <button class="viewer-btn w-7 h-7" title="Close find bar" @click="emit('close')">
       <X :size="13" />

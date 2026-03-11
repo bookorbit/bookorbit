@@ -106,4 +106,3 @@ export function usePdfFind(textLayerMap: Ref<Map<number, HTMLElement>>) {
 
   return { query, matchCase, wholeWord, highlightAll, matchCount, currentIndex, search, next, prev, clear }
 }
-

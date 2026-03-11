@@ -4,7 +4,6 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
-
 export interface PageDim {
   width: number
   height: number
@@ -62,9 +61,12 @@ export function usePdf() {
         page.cleanup()
         return
       }
-      const viewport = page.getViewport({ scale })
+      const dpr = window.devicePixelRatio || 1
+      const viewport = page.getViewport({ scale: scale * dpr })
       canvas.width = viewport.width
       canvas.height = viewport.height
+      canvas.style.width = `${Math.round(viewport.width / dpr)}px`
+      canvas.style.height = `${Math.round(viewport.height / dpr)}px`
       renderTask = page.render({ canvas, viewport })
       try {
         await renderTask.promise

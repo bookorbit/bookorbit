@@ -30,7 +30,7 @@ const activeTab = ref<Tab>('chapters')
 
 <template>
   <div class="fixed inset-0 z-50 flex">
-    <div class="w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
+    <div class="sidebar-panel w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
       <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div class="flex gap-1">
           <button
@@ -196,3 +196,18 @@ const TocList = defineComponent({
   },
 })
 </script>
+
+<style scoped>
+.sidebar-panel {
+  animation: slideInFromLeft 0.25s ease;
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+</style>

@@ -7,8 +7,8 @@ const router = useRouter()
 
 const tabs = [
   { label: 'Details', routeName: 'book-detail' },
-  { label: 'Files', routeName: 'book-files' },
   { label: 'Edit Metadata', routeName: 'book-edit' },
+  { label: 'Files', routeName: 'book-files' },
 ]
 
 function navigate(routeName: string) {
