@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Check, RefreshCw, Sparkles, FileEdit } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import type { GlobalFileWriteSettings } from '@projectx/types'
@@ -21,8 +22,10 @@ async function rebuildEmbeddings() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: { queued: number } = await res.json()
     queued.value = data.queued
+    toast.success(`${data.queued} books queued for embedding`)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed'
+    toast.error(`Failed to rebuild embeddings: ${error.value ?? 'Unknown error'}`)
   } finally {
     running.value = false
   }
@@ -30,7 +33,6 @@ async function rebuildEmbeddings() {
 
 const writeSettings = ref<GlobalFileWriteSettings>(structuredClone(DEFAULT_FILE_WRITE_SETTINGS))
 const writeSaving = ref(false)
-const writeSaved = ref(false)
 
 const epubMaxMb = computed({
   get: () => Math.round(writeSettings.value.epub.maxFileSizeBytes / (1024 * 1024)),
@@ -61,7 +63,6 @@ onMounted(async () => {
 async function saveWriteSettings() {
   if (writeSaving.value) return
   writeSaving.value = true
-  writeSaved.value = false
   try {
     const res = await api('/api/v1/app-settings/file-write-settings', {
       method: 'PUT',
@@ -70,11 +71,12 @@ async function saveWriteSettings() {
     })
     if (res.ok) {
       writeSettings.value = await res.json()
-      writeSaved.value = true
-      setTimeout(() => {
-        writeSaved.value = false
-      }, 2000)
+      toast.success('Metadata sync settings saved')
+    } else {
+      toast.error('Failed to save metadata sync settings')
     }
+  } catch {
+    toast.error('Failed to save metadata sync settings')
   } finally {
     writeSaving.value = false
   }
@@ -294,11 +296,6 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
           </template>
         </div>
       </template>
-
-      <div v-if="writeSaved" class="px-5 py-3 flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-        <Check :size="12" />
-        Settings saved
-      </div>
     </div>
   </div>
 </template>

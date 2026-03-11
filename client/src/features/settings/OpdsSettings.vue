@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
-import { Plus, Trash2, Copy, Check, Rss } from 'lucide-vue-next'
+import { Plus, Trash2, Copy, Rss } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
@@ -14,7 +15,6 @@ const opdsEnabled = ref(true)
 const opdsUsers = ref<OpdsUser[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const copied = ref(false)
 
 const showCreateForm = ref(false)
 const createUsername = ref('')
@@ -59,18 +59,26 @@ onMounted(async () => {
 
 async function toggleOpds() {
   const newVal = !opdsEnabled.value
-  const res = await api('/api/v1/app-settings/opds_enabled', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value: String(newVal) }),
-  })
-  if (res.ok) opdsEnabled.value = newVal
+  try {
+    const res = await api('/api/v1/app-settings/opds_enabled', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: String(newVal) }),
+    })
+    if (res.ok) {
+      opdsEnabled.value = newVal
+      toast.success(`OPDS server ${newVal ? 'enabled' : 'disabled'}`)
+    } else {
+      toast.error('Failed to update OPDS settings')
+    }
+  } catch {
+    toast.error('Failed to update OPDS settings')
+  }
 }
 
 async function copyUrl() {
   await navigator.clipboard.writeText(opdsUrl.value)
-  copied.value = true
-  setTimeout(() => (copied.value = false), 2000)
+  toast.success('OPDS URL copied to clipboard')
 }
 
 async function createUser() {
@@ -85,6 +93,7 @@ async function createUser() {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       createError.value = data.message ?? 'Failed to create OPDS user'
+      toast.error(createError.value ?? 'Failed to create OPDS user')
       return
     }
     const user = await res.json()
@@ -93,21 +102,31 @@ async function createUser() {
     createUsername.value = ''
     createPassword.value = ''
     createSortOrder.value = 'recent'
+    toast.success(`OPDS user "${user.username}" created`)
+  } catch {
+    toast.error('Failed to create OPDS user')
   } finally {
     creating.value = false
   }
 }
 
 async function updateSortOrder(user: OpdsUser, sortOrder: OpdsSortOrder) {
-  const res = await api(`/api/v1/opds-users/${user.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sortOrder }),
-  })
-  if (res.ok) {
-    const updated = await res.json()
-    const idx = opdsUsers.value.findIndex((u) => u.id === user.id)
-    if (idx >= 0) opdsUsers.value[idx] = updated
+  try {
+    const res = await api(`/api/v1/opds-users/${user.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sortOrder }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      const idx = opdsUsers.value.findIndex((u) => u.id === user.id)
+      if (idx >= 0) opdsUsers.value[idx] = updated
+      toast.success(`Sort order updated for "${user.username}"`)
+    } else {
+      toast.error('Failed to update sort order')
+    }
+  } catch {
+    toast.error('Failed to update sort order')
   }
 }
 
@@ -118,9 +137,16 @@ function cancelCreate() {
 
 async function deleteUser(user: OpdsUser) {
   if (!confirm(`Delete OPDS user "${user.username}"? This cannot be undone.`)) return
-  const res = await api(`/api/v1/opds-users/${user.id}`, { method: 'DELETE' })
-  if (res.ok) {
-    opdsUsers.value = opdsUsers.value.filter((u) => u.id !== user.id)
+  try {
+    const res = await api(`/api/v1/opds-users/${user.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      opdsUsers.value = opdsUsers.value.filter((u) => u.id !== user.id)
+      toast.success(`OPDS user "${user.username}" deleted`)
+    } else {
+      toast.error('Failed to delete OPDS user')
+    }
+  } catch {
+    toast.error('Failed to delete OPDS user')
   }
 }
 </script>
@@ -156,8 +182,8 @@ async function deleteUser(user: OpdsUser) {
             class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
             @click="copyUrl()"
           >
-            <component :is="copied ? Check : Copy" :size="12" />
-            {{ copied ? 'Copied' : 'Copy' }}
+            <Copy :size="12" />
+            Copy
           </button>
         </div>
       </div>

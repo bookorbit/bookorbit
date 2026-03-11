@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { type ReaderFormatGroup, type ReaderSettings, READER_GROUP_DEFAULTS, getFormatGroup } from '@projectx/types'
@@ -191,6 +192,7 @@ export function useReaderDefaultSettings<T extends ReaderSettings>(format: strin
     if (syncEnabled.value) {
       api(`/api/v1/reader/defaults/${group}`, { method: 'DELETE' }).catch(() => {})
     }
+    toast.success('Settings reset to defaults')
   }
 
   return { effective, load, update, reset }

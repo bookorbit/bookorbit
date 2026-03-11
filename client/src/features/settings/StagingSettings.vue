@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Loader2 } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
@@ -39,11 +40,14 @@ onMounted(async () => {
 })
 
 async function saveSetting(key: string, value: string) {
-  await api(`/api/v1/app-settings/${key}`, {
+  const res = await api(`/api/v1/app-settings/${key}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value }),
   })
+  if (!res.ok) {
+    toast.error('Failed to save setting')
+  }
 }
 
 async function toggle() {
@@ -56,7 +60,12 @@ async function toggle() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: String(newVal) }),
     })
-    if (res.ok) autoFetch.value = newVal
+    if (res.ok) {
+      autoFetch.value = newVal
+      toast.success(newVal ? 'Auto-fetch enabled' : 'Auto-fetch disabled')
+    } else {
+      toast.error('Failed to update setting')
+    }
   } finally {
     saving.value = false
   }
@@ -72,7 +81,12 @@ async function toggleAutoFinalize() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: String(newVal) }),
     })
-    if (res.ok) autoFinalizeEnabled.value = newVal
+    if (res.ok) {
+      autoFinalizeEnabled.value = newVal
+      toast.success(newVal ? 'Auto-finalize enabled' : 'Auto-finalize disabled')
+    } else {
+      toast.error('Failed to update setting')
+    }
   } finally {
     saving.value = false
   }
@@ -87,15 +101,18 @@ async function onLibraryChange(event: Event) {
     saveSetting('staging_auto_finalize_library_id', String(id)),
     saveSetting('staging_auto_finalize_folder_id', String(autoFinalizeFolderId.value ?? '')),
   ])
+  toast.success('Destination library updated')
 }
 
 async function onFolderChange(event: Event) {
   autoFinalizeFolderId.value = Number((event.target as HTMLSelectElement).value)
   await saveSetting('staging_auto_finalize_folder_id', String(autoFinalizeFolderId.value))
+  toast.success('Destination folder updated')
 }
 
 async function onThresholdChange() {
   await saveSetting('staging_auto_finalize_threshold', String(autoFinalizeThreshold.value))
+  toast.success('Confidence threshold updated')
 }
 </script>
 

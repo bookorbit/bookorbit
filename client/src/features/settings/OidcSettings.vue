@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
+import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
@@ -19,7 +20,6 @@ const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const saveError = ref<string | null>(null)
-const saveSuccess = ref(false)
 const testResult = ref<{ success: boolean; message: string } | null>(null)
 
 const form = reactive<OidcConfig>({
@@ -48,7 +48,6 @@ onMounted(async () => {
 
 async function save() {
   saveError.value = null
-  saveSuccess.value = false
   saving.value = true
   try {
     const body: Partial<OidcConfig> = { ...form }
@@ -63,12 +62,10 @@ async function save() {
       const err = await res.json().catch(() => ({}))
       throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to save')
     }
-    saveSuccess.value = true
-    setTimeout(() => {
-      saveSuccess.value = false
-    }, 3000)
+    toast.success('OIDC settings saved')
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : 'Failed to save settings'
+    toast.error(saveError.value)
   } finally {
     saving.value = false
   }
@@ -222,7 +219,6 @@ async function testConnection() {
       <button type="submit" :disabled="saving" class="settings-btn-primary">
         {{ saving ? 'Saving...' : 'Save changes' }}
       </button>
-      <p v-if="saveSuccess" class="text-sm text-green-600">Saved.</p>
       <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
     </div>
   </form>

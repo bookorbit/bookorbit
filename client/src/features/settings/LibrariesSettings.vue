@@ -168,7 +168,12 @@ async function onSaved(library: LibraryType) {
   creatorOpen.value = false
   editingLibrary.value = null
   subscribeLibrary(library.id)
-  if (isNew) pendingNavigateLibraryId.value = library.id
+  if (isNew) {
+    pendingNavigateLibraryId.value = library.id
+    toast.success(`Library "${library.name}" created`)
+  } else {
+    toast.success(`Library "${library.name}" updated`)
+  }
   await refreshLibraries()
   loadAllStats()
 }

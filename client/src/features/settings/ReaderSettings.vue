@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Monitor, Cloud } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -11,13 +12,20 @@ const syncEnabled = computed(() => user.value?.settings?.syncReaderPreferences ?
 
 async function setStorageMode(sync: boolean) {
   if (!user.value || syncEnabled.value === sync) return
-  const res = await api('/api/v1/users/me', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ settings: { syncReaderPreferences: sync } }),
-  })
-  if (res.ok) {
-    user.value = { ...user.value, settings: { ...user.value.settings, syncReaderPreferences: sync } }
+  try {
+    const res = await api('/api/v1/users/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { syncReaderPreferences: sync } }),
+    })
+    if (res.ok) {
+      user.value = { ...user.value, settings: { ...user.value.settings, syncReaderPreferences: sync } }
+      toast.success(sync ? 'Preferences will now be synced' : 'Preferences will stay on this device')
+    } else {
+      toast.error('Failed to update storage mode')
+    }
+  } catch {
+    toast.error('An error occurred while updating storage mode')
   }
 }
 </script>

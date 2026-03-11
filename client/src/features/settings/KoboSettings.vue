@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Plus, Trash2, Copy, Check, Pencil, X, Tablet } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { useKoboDevices } from '@/features/kobo/composables/useKoboDevices'
@@ -22,7 +23,6 @@ const createError = ref<string | null>(null)
 // New device token display
 const newDeviceToken = ref<string | null>(null)
 const newDeviceSyncUrl = ref<string | null>(null)
-const tokenCopied = ref(false)
 
 // Rename
 const renamingId = ref<number | null>(null)
@@ -79,8 +79,10 @@ async function submitCreate() {
     newDeviceSyncUrl.value = `${window.location.origin}/api/v1/kobo/${device.token}`
     showCreateForm.value = false
     newDeviceName.value = ''
+    toast.success(`Device "${device.name}" registered`)
   } catch (e) {
     createError.value = e instanceof Error ? e.message : 'Failed to create device'
+    toast.error(createError.value ?? 'Failed to create device')
   } finally {
     creating.value = false
   }
@@ -95,14 +97,12 @@ function cancelCreate() {
 function dismissToken() {
   newDeviceToken.value = null
   newDeviceSyncUrl.value = null
-  tokenCopied.value = false
 }
 
 async function copyToken() {
   if (!newDeviceSyncUrl.value) return
   await navigator.clipboard.writeText(newDeviceSyncUrl.value)
-  tokenCopied.value = true
-  setTimeout(() => (tokenCopied.value = false), 2000)
+  toast.success('Sync URL copied to clipboard')
 }
 
 function startRename(device: KoboDevice) {
@@ -120,7 +120,10 @@ async function submitRename(device: KoboDevice) {
   renaming.value = true
   try {
     await renameDevice(device.id, renameValue.value.trim())
+    toast.success('Device renamed')
     renamingId.value = null
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Failed to rename device')
   } finally {
     renaming.value = false
   }
@@ -128,12 +131,18 @@ async function submitRename(device: KoboDevice) {
 
 async function revoke(device: KoboDevice) {
   if (!confirm(`Revoke access for "${device.name}"? The device will not be able to sync until re-paired.`)) return
-  await revokeDevice(device.id)
+  try {
+    await revokeDevice(device.id)
+    toast.success(`Access revoked for "${device.name}"`)
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Failed to revoke access')
+  }
 }
 
 async function saveSettings() {
   if (readingThreshold.value >= finishedThreshold.value) {
     settingsError.value = 'Reading threshold must be less than finished threshold'
+    toast.error(settingsError.value ?? 'Failed to save settings')
     return
   }
   savingSettings.value = true
@@ -147,8 +156,10 @@ async function saveSettings() {
       forceEnableHyphenation: forceEnableHyphenation.value,
       kepubConversionLimitMb: kepubConversionLimitMb.value,
     })
+    toast.success('Kobo sync settings saved')
   } catch (e) {
     settingsError.value = e instanceof Error ? e.message : 'Failed to save'
+    toast.error(settingsError.value ?? 'Failed to save settings')
   } finally {
     savingSettings.value = false
   }
@@ -188,8 +199,8 @@ async function saveSettings() {
               class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
               @click="copyToken()"
             >
-              <component :is="tokenCopied ? Check : Copy" :size="12" />
-              {{ tokenCopied ? 'Copied' : 'Copy' }}
+              <Copy :size="12" />
+              Copy
             </button>
           </div>
           <p class="mt-3 text-xs text-muted-foreground leading-relaxed">
