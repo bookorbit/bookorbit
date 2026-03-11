@@ -8,7 +8,8 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/ packages/
 COPY client/package.json ./client/
-RUN pnpm install --filter client... --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --filter client... --frozen-lockfile
 
 COPY client/ ./client/
 RUN pnpm --filter client run build-only
@@ -21,7 +22,8 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/ packages/
 COPY server/package.json ./server/
-RUN pnpm install --filter server... --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --filter server... --frozen-lockfile
 
 COPY server/ ./server/
 RUN pnpm --filter server run build
