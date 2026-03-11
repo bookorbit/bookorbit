@@ -5,7 +5,7 @@ import type { StagingBulkEditResult, StagingMetadata } from '@projectx/types'
 import { api } from '@/lib/api'
 
 const props = defineProps<{
-  selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[] }
+  selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
   selectionCount: number
 }>()
 
@@ -50,12 +50,15 @@ async function submit() {
     if (!enabledFields.has(f.key)) continue
     const raw = values[f.key] ?? ''
     if (f.type === 'array') {
-      (fields as Record<string, unknown>)[f.key] = raw.split(',').map((s) => s.trim()).filter(Boolean)
+      ;(fields as Record<string, unknown>)[f.key] = raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     } else if (f.type === 'number') {
       const n = parseFloat(raw)
       if (!isNaN(n)) (fields as Record<string, unknown>)[f.key] = n
     } else {
-      (fields as Record<string, unknown>)[f.key] = raw || undefined
+      ;(fields as Record<string, unknown>)[f.key] = raw || undefined
     }
   }
 
@@ -98,7 +101,10 @@ function handleClose() {
           <h2 class="text-base font-semibold text-foreground">
             {{ result ? 'Bulk Edit Results' : `Bulk Edit ${selectionCount} file${selectionCount === 1 ? '' : 's'}` }}
           </h2>
-          <button class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all" @click="handleClose">
+          <button
+            class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            @click="handleClose"
+          >
             <X class="size-4" />
           </button>
         </div>
@@ -108,10 +114,20 @@ function handleClose() {
 
           <div class="space-y-2">
             <div v-for="f in FIELDS" :key="f.key" class="flex items-center gap-2">
-              <input type="checkbox" :checked="enabledFields.has(f.key)" class="size-3.5 rounded border-input accent-primary shrink-0" @change="toggleField(f.key)" />
+              <input
+                type="checkbox"
+                :checked="enabledFields.has(f.key)"
+                class="size-3.5 rounded border-input accent-primary shrink-0"
+                @change="toggleField(f.key)"
+              />
               <label class="flex-1">
                 <span class="text-xs font-medium text-muted-foreground block mb-0.5">{{ f.label }}</span>
-                <input v-model="values[f.key]" :disabled="!enabledFields.has(f.key)" :placeholder="f.type === 'array' ? 'comma-separated' : ''" class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-40" />
+                <input
+                  v-model="values[f.key]"
+                  :disabled="!enabledFields.has(f.key)"
+                  :placeholder="f.type === 'array' ? 'comma-separated' : ''"
+                  class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+                />
               </label>
             </div>
           </div>
@@ -127,7 +143,11 @@ function handleClose() {
             <button class="h-8 px-4 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-all" @click="handleClose">
               Cancel
             </button>
-            <button class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50" :disabled="enabledFields.size === 0 || loading" @click="submit">
+            <button
+              class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+              :disabled="enabledFields.size === 0 || loading"
+              @click="submit"
+            >
               <Loader2 v-if="loading" class="size-3.5 animate-spin" />
               Apply
             </button>
@@ -140,7 +160,10 @@ function handleClose() {
             <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">{{ result.failed }} failed</p>
           </div>
           <div class="flex justify-end">
-            <button class="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95" @click="handleClose">
+            <button
+              class="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95"
+              @click="handleClose"
+            >
               Done
             </button>
           </div>
@@ -149,4 +172,3 @@ function handleClose() {
     </div>
   </Teleport>
 </template>
-

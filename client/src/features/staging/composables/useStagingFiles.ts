@@ -22,10 +22,12 @@ export function useStagingFiles() {
   const selectedIds = ref<Set<number>>(new Set())
   const selectAll = ref(false)
   const excludedIds = ref<Set<number>>(new Set())
+  let fetchReqSeq = 0
 
   const pageCount = computed(() => Math.ceil(total.value / filters.limit) || 1)
 
   async function fetchFiles() {
+    const reqId = ++fetchReqSeq
     loading.value = true
     try {
       const params = new URLSearchParams()
@@ -39,21 +41,25 @@ export function useStagingFiles() {
       const res = await api(`/api/v1/staging/files?${params}`)
       if (res.ok) {
         const data: StagingFilesPage = await res.json()
+        if (reqId !== fetchReqSeq) return
         items.value = data.items
         total.value = data.total
       }
     } finally {
+      if (reqId !== fetchReqSeq) return
       loading.value = false
     }
   }
 
   function setStatus(status: StagingFileStatus | undefined) {
+    clearSelection()
     filters.status = status
     filters.page = 1
     fetchFiles()
   }
 
   function setSearch(search: string) {
+    clearSelection()
     filters.search = search
     filters.page = 1
     fetchFiles()
@@ -108,15 +114,20 @@ export function useStagingFiles() {
   }
 
   const selectionCount = computed(() => {
-    if (selectAll.value) return total.value - excludedIds.value.size
+    if (selectAll.value) return Math.max(0, total.value - excludedIds.value.size)
     return selectedIds.value.size
   })
 
   const hasSelection = computed(() => selectionCount.value > 0)
 
-  function getSelectionPayload(): { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[] } {
+  function getSelectionPayload(): { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: StagingFileStatus; search?: string } {
     if (selectAll.value) {
-      return { selectAll: true, excludedIds: [...excludedIds.value] }
+      return {
+        selectAll: true,
+        excludedIds: [...excludedIds.value],
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.search ? { search: filters.search } : {}),
+      }
     }
     return { fileIds: [...selectedIds.value] }
   }

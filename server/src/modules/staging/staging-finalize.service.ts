@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { basename, extname, join } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
-import { and, eq, ilike, or } from 'drizzle-orm';
+import { and, eq, ilike, inArray, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { StagingFinalizeFileResult, StagingFinalizeResult, StagingMetadata } from '@projectx/types';
@@ -23,6 +23,23 @@ import type { StagingFileRow } from '../../db/schema';
 type Db = NodePgDatabase<typeof schema>;
 
 const BATCH_SIZE = 100;
+
+type NormalizedFinalizeMetadata = {
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  language: string | null;
+  pageCount: number | null;
+  seriesName: string | null;
+  seriesIndex: number | null;
+  authors: string[];
+  genres: string[];
+  coverUrl: string | null;
+};
 
 @Injectable()
 export class StagingFinalizeService implements OnModuleInit {
@@ -53,11 +70,13 @@ export class StagingFinalizeService implements OnModuleInit {
     fileIds: number[] | undefined,
     selectAll: boolean | undefined,
     excludedIds: number[] | undefined,
-    defaultLibraryId: number,
-    defaultFolderId: number,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
     overrides?: Array<{ fileId: number; libraryId?: number; folderId?: number }>,
+    status?: string,
+    search?: string,
   ): Promise<StagingFinalizeResult> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds) : (fileIds ?? []);
+    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
     const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
 
     const results: StagingFinalizeFileResult[] = [];
@@ -83,16 +102,25 @@ export class StagingFinalizeService implements OnModuleInit {
 
   private async finalizeFile(
     row: StagingFileRow,
-    defaultLibraryId: number,
-    defaultFolderId: number,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
     overrideMap: Map<number, { libraryId?: number; folderId?: number }>,
     userId: number,
     isSuperuser: boolean,
   ): Promise<StagingFinalizeFileResult> {
     try {
       const override = overrideMap.get(row.id);
-      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId;
-      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId;
+      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
+      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
+
+      if (libraryId === null || folderId === null) {
+        return {
+          fileId: row.id,
+          fileName: row.fileName,
+          success: false,
+          message: 'Destination is not set for this file',
+        };
+      }
 
       const library = await this.findLibraryOrFail(libraryId);
       await this.libraryService.verifyUserAccess(userId, libraryId, isSuperuser);
@@ -110,7 +138,7 @@ export class StagingFinalizeService implements OnModuleInit {
         return { fileId: row.id, fileName: row.fileName, success: false, message: 'A file with this name already exists at the target location' };
       }
 
-      const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
+      const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
       const existingBookId = await this.findDuplicate(libraryId, meta);
       if (existingBookId !== null) {
         return {
@@ -174,19 +202,27 @@ export class StagingFinalizeService implements OnModuleInit {
     fileIds: number[] | undefined,
     selectAll: boolean | undefined,
     excludedIds: number[] | undefined,
-    defaultLibraryId: number,
+    defaultLibraryId: number | undefined,
+    status?: string,
+    search?: string,
   ): Promise<{ fileId: number; fileName: string; newName: string }[]> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds) : (fileIds ?? []);
+    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
     if (!ids.length) return [];
 
     const rows = await this.repo.findByIds(ids);
-    const library = await this.findLibraryOrFail(defaultLibraryId);
-    const pattern = library.fileNamingPattern ?? (await this.appSettings.getUploadPattern());
+    const appPattern = await this.appSettings.getUploadPattern();
+    const libraryIds = [...new Set(rows.map((row) => row.targetLibraryId ?? defaultLibraryId).filter((id): id is number => id != null))];
+    const libraryMap = libraryIds.length
+      ? new Map((await this.db.select().from(libraries).where(inArray(libraries.id, libraryIds))).map((lib) => [lib.id, lib]))
+      : new Map<number, typeof libraries.$inferSelect>();
 
     return rows.map((row) => {
       const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
       const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
       let newName = row.fileName;
+      const effectiveLibraryId = row.targetLibraryId ?? defaultLibraryId ?? null;
+      const libraryPattern = effectiveLibraryId !== null ? (libraryMap.get(effectiveLibraryId)?.fileNamingPattern ?? null) : null;
+      const pattern = libraryPattern ?? appPattern;
 
       if (pattern) {
         const tokens = this.buildPatternTokens(meta, row.fileName, format);
@@ -198,7 +234,7 @@ export class StagingFinalizeService implements OnModuleInit {
     });
   }
 
-  private async findDuplicate(libraryId: number, meta: StagingMetadata): Promise<number | null> {
+  private async findDuplicate(libraryId: number, meta: Pick<NormalizedFinalizeMetadata, 'isbn13' | 'isbn10' | 'title'>): Promise<number | null> {
     const isbn = meta.isbn13 ?? meta.isbn10;
 
     if (isbn) {
@@ -271,7 +307,15 @@ export class StagingFinalizeService implements OnModuleInit {
   }
 
   private async applyMetadata(bookId: number, row: StagingFileRow): Promise<void> {
-    if (row.coverPath) {
+    const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata);
+    let selectedCoverApplied = false;
+
+    const selectedCoverUrl = meta.coverUrl;
+    if (selectedCoverUrl) {
+      selectedCoverApplied = await this.metadataService.downloadAndSaveCover(selectedCoverUrl, bookId);
+    }
+
+    if (!selectedCoverApplied && row.coverPath) {
       try {
         const bytes = await readFile(row.coverPath);
         await this.metadataService.saveExtractedCoverBytes(bookId, bytes);
@@ -279,9 +323,6 @@ export class StagingFinalizeService implements OnModuleInit {
         this.logger.warn(`Failed to copy staging cover to book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-
-    const meta = row.selectedMetadata ?? row.embeddedMetadata;
-    if (!meta) return;
 
     await this.db
       .update(bookMetadata)
@@ -301,14 +342,14 @@ export class StagingFinalizeService implements OnModuleInit {
       })
       .where(eq(bookMetadata.bookId, bookId));
 
-    if (meta.authors && meta.authors.length > 0) {
+    if (meta.authors.length > 0) {
       await this.metadataService.replaceAuthors(
         bookId,
         meta.authors.map((name) => ({ name, sortName: null })),
       );
     }
 
-    if (meta.genres && meta.genres.length > 0) {
+    if (meta.genres.length > 0) {
       await this.metadataService.replaceGenres(bookId, meta.genres);
     }
   }
@@ -346,4 +387,75 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // file may already be deleted
   }
+}
+
+function normalizeText(value: unknown, maxLength?: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!maxLength) return trimmed;
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeInteger(value: unknown): number | null {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseInt(value.trim(), 10) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
+}
+
+function normalizeReal(value: unknown): number | null {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value.trim()) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function normalizeIsbn(value: unknown, len: 10 | 13): string | null {
+  if (typeof value !== 'string') return null;
+  const compact = value.replace(/[\s-]+/g, '').toUpperCase();
+  if (!compact) return null;
+  if (len === 10) {
+    return /^[0-9]{9}[0-9X]$/.test(compact) ? compact : null;
+  }
+  return /^[0-9]{13}$/.test(compact) ? compact : null;
+}
+
+function normalizeLanguage(value: unknown): string | null {
+  const raw = normalizeText(value);
+  if (!raw) return null;
+  const primary = raw.split(/[;,/|]/)[0]?.trim() ?? '';
+  if (primary.length > 0 && primary.length <= 10) return primary;
+  const firstWord = primary.split(/\s+/)[0]?.trim() ?? '';
+  if (firstWord.length > 0 && firstWord.length <= 10) return firstWord;
+  return raw.length <= 10 ? raw : null;
+}
+
+function normalizeStringArray(value: unknown, maxLength: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const normalized: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    normalized.push(trimmed.slice(0, maxLength));
+  }
+  return normalized;
+}
+
+function normalizeFinalizeMetadata(meta: StagingMetadata | null | undefined): NormalizedFinalizeMetadata {
+  return {
+    title: normalizeText(meta?.title, 1000),
+    subtitle: normalizeText(meta?.subtitle, 1000),
+    description: normalizeText(meta?.description),
+    isbn10: normalizeIsbn(meta?.isbn10, 10),
+    isbn13: normalizeIsbn(meta?.isbn13, 13),
+    publisher: normalizeText(meta?.publisher, 500),
+    publishedYear: normalizeInteger(meta?.publishedYear),
+    language: normalizeLanguage(meta?.language),
+    pageCount: normalizeInteger(meta?.pageCount),
+    seriesName: normalizeText(meta?.seriesName, 500),
+    seriesIndex: normalizeReal(meta?.seriesIndex),
+    authors: normalizeStringArray(meta?.authors, 500),
+    genres: normalizeStringArray(meta?.genres, 200),
+    coverUrl: normalizeText(meta?.coverUrl),
+  };
 }

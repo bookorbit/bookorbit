@@ -117,7 +117,7 @@ describe('MetadataService', () => {
       arrayBuffer: () => Promise.resolve(Buffer.from('image-bytes')),
     }) as never;
 
-    await service.downloadAndSaveCover('https://img.example/cover.png', 9);
+    await expect(service.downloadAndSaveCover('https://img.example/cover.png', 9)).resolves.toBe(true);
 
     expect(mockMkdir).toHaveBeenCalledWith('/books/covers/9', { recursive: true });
     expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/9/cover_extracted.png', Buffer.from('image-bytes'));
@@ -134,13 +134,13 @@ describe('MetadataService', () => {
       ok: true,
       arrayBuffer: () => Promise.resolve(Buffer.alloc(0)),
     }) as never;
-    await service.downloadAndSaveCover('https://img.example/empty.png', 4);
+    await expect(service.downloadAndSaveCover('https://img.example/empty.png', 4)).resolves.toBe(false);
 
     expect(mockWriteFile).not.toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
 
     (global.fetch as jest.Mock).mockRejectedValue(new Error('timeout'));
-    await expect(service.downloadAndSaveCover('https://img.example/fail.png', 4)).resolves.toBeUndefined();
+    await expect(service.downloadAndSaveCover('https://img.example/fail.png', 4)).resolves.toBe(false);
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from 'lucide-vue-next'
 import { Aperture, FolderOpen, LayoutDashboard, PackageOpen, Users } from 'lucide-vue-next'
@@ -22,6 +22,7 @@ import { useCollections } from '@/features/collection/composables/useCollections
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
+import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import type { Library } from '@projectx/types'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
@@ -49,6 +50,7 @@ const { collections, fetchCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
 const { summary: stagingSummary, fetchSummary: fetchStagingSummary, subscribe: subscribeStagingSummary } = useStagingSummary()
+const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const createLensOpen = ref(false)
 const createCollectionOpen = ref(false)
@@ -114,6 +116,14 @@ onMounted(async () => {
     subscribeStagingSummary()
   }
 })
+
+const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
+  if (event.uploadedCount > 0) {
+    refreshLibraries()
+  }
+})
+
+onUnmounted(() => stopUploadCompletedListener())
 </script>
 
 <template>

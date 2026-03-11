@@ -8,7 +8,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useStagingFinalize } from '../composables/useStagingFinalize'
 
 const props = defineProps<{
-  selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[] }
+  selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
   selectionCount: number
 }>()
 
@@ -24,56 +24,102 @@ const { result, loading, error, finalize, reset } = useStagingFinalize()
 const defaultLibraryId = ref<number | null>(null)
 const defaultFolderId = ref<number | null>(null)
 const expandedErrors = ref<Set<number>>(new Set())
+const selectionSummary = ref<{ total: number; withDestination: number; withoutDestination: number } | null>(null)
 
 const duplicateCount = computed(() => result.value?.results.filter((r) => r.isDuplicate).length ?? 0)
 
 const namePreview = ref<{ fileId: number; fileName: string; newName: string }[]>([])
 const previewLoading = ref(false)
+let previewReqSeq = 0
 
 const selectedLibrary = computed(() => libraries.value.find((l) => l.id === defaultLibraryId.value))
 const folders = computed(() => selectedLibrary.value?.folders ?? [])
 
-const canStart = computed(() => defaultLibraryId.value !== null && defaultFolderId.value !== null)
+const requiresDefaultDestination = computed(() => (selectionSummary.value?.withoutDestination ?? props.selectionCount) > 0)
+const canStart = computed(() => {
+  if (!selectionSummary.value) return false
+  if (!requiresDefaultDestination.value) return true
+  return defaultLibraryId.value !== null && defaultFolderId.value !== null
+})
 
 onMounted(async () => {
-  await fetchLibraries()
+  await Promise.all([fetchLibraries(), fetchSelectionSummary()])
   const first = libraries.value[0]
-  if (first) {
+  if (requiresDefaultDestination.value && first) {
     defaultLibraryId.value = first.id
     const firstFolder = first.folders?.[0]
     if (firstFolder) defaultFolderId.value = firstFolder.id
   }
-  void fetchNamePreview(defaultLibraryId.value)
+  void fetchNamePreview(requiresDefaultDestination.value ? defaultLibraryId.value : null)
 })
 
 function onLibraryChange(event: Event) {
-  const id = Number((event.target as HTMLSelectElement).value)
+  const raw = Number((event.target as HTMLSelectElement).value)
+  const id = Number.isFinite(raw) && raw > 0 ? raw : null
+  if (id === null) {
+    defaultLibraryId.value = null
+    defaultFolderId.value = null
+    return
+  }
   defaultLibraryId.value = id
   const lib = libraries.value.find((l) => l.id === id)
   defaultFolderId.value = lib?.folders?.[0]?.id ?? null
 }
 
+function onFolderChange(event: Event) {
+  const raw = Number((event.target as HTMLSelectElement).value)
+  defaultFolderId.value = Number.isFinite(raw) && raw > 0 ? raw : null
+}
+
 async function fetchNamePreview(libId: number | null) {
-  if (!libId) {
+  if (requiresDefaultDestination.value && !libId) {
     namePreview.value = []
+    previewLoading.value = false
     return
   }
+  const reqId = ++previewReqSeq
   previewLoading.value = true
   try {
+    const payload = {
+      ...props.selectionPayload,
+      ...(requiresDefaultDestination.value && libId ? { defaultLibraryId: libId } : {}),
+    }
     const res = await api('/api/v1/staging/files/preview-names', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...props.selectionPayload, defaultLibraryId: libId }),
+      body: JSON.stringify(payload),
     })
-    namePreview.value = res.ok ? await res.json() : []
+    if (!res.ok || reqId !== previewReqSeq) return
+    const rows: { fileId: number; fileName: string; newName: string }[] = await res.json()
+    if (reqId !== previewReqSeq) return
+    namePreview.value = rows
   } catch {
+    if (reqId !== previewReqSeq) return
     namePreview.value = []
   } finally {
+    if (reqId !== previewReqSeq) return
     previewLoading.value = false
   }
 }
 
-watch(defaultLibraryId, (libId) => {
+async function fetchSelectionSummary() {
+  try {
+    const res = await api('/api/v1/staging/files/selection-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(props.selectionPayload),
+    })
+    if (res.ok) {
+      selectionSummary.value = await res.json()
+      return
+    }
+  } catch {
+    // fallback handled below
+  }
+  selectionSummary.value = { total: props.selectionCount, withDestination: 0, withoutDestination: props.selectionCount }
+}
+
+watch([defaultLibraryId, requiresDefaultDestination], ([libId]) => {
   void fetchNamePreview(libId)
 })
 
@@ -81,8 +127,12 @@ async function start() {
   if (!canStart.value) return
   await finalize({
     ...props.selectionPayload,
-    defaultLibraryId: defaultLibraryId.value!,
-    defaultFolderId: defaultFolderId.value!,
+    ...(requiresDefaultDestination.value
+      ? {
+          defaultLibraryId: defaultLibraryId.value!,
+          defaultFolderId: defaultFolderId.value!,
+        }
+      : {}),
   })
   if (result.value?.succeeded) refreshLibraries()
 }
@@ -117,9 +167,19 @@ function goToBook(bookId: number) {
         </div>
 
         <div v-if="!result" class="px-5 py-4 space-y-4">
-          <div class="space-y-3">
+          <div v-if="selectionSummary" class="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+            <p class="text-xs text-muted-foreground">
+              {{
+                requiresDefaultDestination
+                  ? `${selectionSummary.withoutDestination} of ${selectionSummary.total} selected file${selectionSummary.total === 1 ? '' : 's'} need a destination`
+                  : 'All selected files already have destination set'
+              }}
+            </p>
+          </div>
+
+          <div v-if="requiresDefaultDestination" class="space-y-3">
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Destination Library</span>
+              <span class="text-xs font-medium text-muted-foreground">Default Destination Library</span>
               <select
                 class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="defaultLibraryId ?? ''"
@@ -130,11 +190,11 @@ function goToBook(bookId: number) {
             </label>
 
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Destination Folder</span>
+              <span class="text-xs font-medium text-muted-foreground">Default Destination Folder</span>
               <select
                 class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="defaultFolderId ?? ''"
-                @change="defaultFolderId = Number(($event.target as HTMLSelectElement).value)"
+                @change="onFolderChange"
               >
                 <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
               </select>

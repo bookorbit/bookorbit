@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -25,11 +26,13 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
+import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 
 const router = useRouter()
 const { user, logout } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
+const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const uploadOpen = ref(false)
 
@@ -113,7 +116,29 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
-onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
+
+const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
+  if (event.uploadedCount === 0 && event.failedCount === 0) return
+
+  const uploadedLabel = `${event.uploadedCount} book${event.uploadedCount === 1 ? '' : 's'}`
+  const failedLabel = `${event.failedCount} file${event.failedCount === 1 ? '' : 's'}`
+
+  if (event.failedCount === 0) {
+    toast.success(`Uploaded ${uploadedLabel}`)
+    return
+  }
+  if (event.uploadedCount === 0) {
+    toast.error(`Upload failed for ${failedLabel}`)
+    return
+  }
+
+  toast.warning(`Uploaded ${uploadedLabel}, ${failedLabel} failed`)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+  stopUploadCompletedListener()
+})
 
 function highlightSegments(text: string | null, query: string) {
   if (!text || !query.trim()) return [{ text: text ?? '', match: false }]

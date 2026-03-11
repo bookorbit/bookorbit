@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { BookOpen, FileText, Wand2, Pencil } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
+import { BookOpen, FileText, Wand2, Pencil, X } from 'lucide-vue-next'
 import type { StagingFile, StagingMetadata } from '@projectx/types'
+import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { formatBytes } from '@/lib/formatting'
 import StagingStatusBadge from './StagingStatusBadge.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useLibraries } from '@/features/library/composables/useLibraries'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     items: StagingFile[]
     loading: boolean
     isSelected: (id: number) => boolean
     selectAll: boolean
+    namePreviewByFileId?: Record<number, string>
     emptyMessage?: string
   }>(),
   {
+    namePreviewByFileId: () => ({}),
     emptyMessage: 'Upload files or drop them in the staging folder',
   },
 )
@@ -29,18 +34,62 @@ function backendCoverUrl(file: StagingFile): string {
   return `/api/v1/staging/files/${file.id}/cover?v=${new Date(file.updatedAt).getTime()}`
 }
 
-function coverUrl(file: StagingFile): string {
+function selectedCoverUrl(file: StagingFile): string | null {
+  const url = file.selectedMetadata?.coverUrl?.trim()
+  return url ? url : null
+}
+
+function newCoverUrl(file: StagingFile): string | null {
+  const selected = selectedCoverUrl(file)
+  if (selected) return selected
+  const fetched = file.fetchedMetadata?.coverUrl?.trim()
+  return fetched ? fetched : null
+}
+
+function currentCoverUrl(file: StagingFile): string {
   return backendCoverUrl(file)
 }
 
-function onCoverError(event: Event, file: StagingFile) {
+function onCurrentCoverError(event: Event) {
   const img = event.target as HTMLImageElement
-  const externalUrl = file.selectedMetadata?.coverUrl ?? file.fetchedMetadata?.coverUrl
-  if (img.src.includes('/api/v1/staging/files/') && externalUrl) {
-    img.src = externalUrl
-  } else {
-    img.style.display = 'none'
+  img.style.display = 'none'
+}
+
+function onFetchedCoverError(event: Event) {
+  const img = event.target as HTMLImageElement
+  img.style.display = 'none'
+}
+
+function currentCoverLightboxFallback(): null {
+  return null
+}
+
+const coverLightbox = ref<{ src: string; fallback: string | null; title: string } | null>(null)
+
+function openCoverLightbox(src: string, title: string, fallback: string | null = null) {
+  coverLightbox.value = { src, fallback, title }
+}
+
+function closeCoverLightbox() {
+  coverLightbox.value = null
+}
+
+function onLightboxOpenChange(open: boolean) {
+  if (!open) closeCoverLightbox()
+}
+
+function onLightboxCoverError(event: Event) {
+  const img = event.target as HTMLImageElement
+  const fallback = coverLightbox.value?.fallback
+  if (fallback) {
+    const currentSrc = img.currentSrc || img.src
+    const resolvedFallback = new URL(fallback, window.location.origin).href
+    if (currentSrc !== resolvedFallback) {
+      img.src = fallback
+      return
+    }
   }
+  img.style.display = 'none'
 }
 
 function displayTitle(file: StagingFile): string {
@@ -74,6 +123,35 @@ function confidenceBadgeClass(file: StagingFile): string {
   if (c >= 50) return 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
   return 'bg-red-500/15 text-red-600 dark:text-red-400'
 }
+
+const { libraries, fetchLibraries } = useLibraries()
+
+onMounted(() => {
+  void fetchLibraries()
+})
+
+function joinTargetPath(folderPath: string, fileName: string): string {
+  const base = folderPath.replace(/[\\/]+$/, '')
+  const separator = base.includes('\\') ? '\\' : '/'
+  return `${base}${separator}${fileName}`
+}
+
+function targetSummary(file: StagingFile): string {
+  const lib = file.targetLibraryId != null ? libraries.value.find((l) => l.id === file.targetLibraryId) : null
+  const folder = file.targetFolderId != null ? lib?.folders.find((f) => f.id === file.targetFolderId) : null
+  const libLabel = lib?.name ?? (file.targetLibraryId != null ? 'Unknown library' : 'Unassigned')
+  const previewName = props.namePreviewByFileId?.[file.id] ?? file.fileName
+
+  if (lib && folder?.path) {
+    return `Target: ${libLabel} · ${joinTargetPath(folder.path, previewName)}`
+  }
+
+  if (file.targetLibraryId == null || file.targetFolderId == null) {
+    return 'Target: Unassigned'
+  }
+
+  return `Target: ${libLabel} · Unknown destination path`
+}
 </script>
 
 <template>
@@ -101,6 +179,8 @@ function confidenceBadgeClass(file: StagingFile): string {
     <div v-else class="divide-y divide-border">
       <div class="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b border-border">
         <input type="checkbox" :checked="selectAll" class="size-3.5 rounded border-input accent-primary" @change="$emit('selectAll')" />
+        <span class="text-xs font-medium text-muted-foreground w-12 text-center shrink-0">Current</span>
+        <span class="text-xs font-medium text-muted-foreground w-12 text-center shrink-0">New</span>
         <span class="text-xs font-medium text-muted-foreground flex-1">File</span>
         <span class="text-xs font-medium text-muted-foreground w-16 text-right hidden sm:block">Size</span>
         <span class="text-xs font-medium text-muted-foreground w-12 text-center hidden sm:block">Format</span>
@@ -112,7 +192,7 @@ function confidenceBadgeClass(file: StagingFile): string {
       <button
         v-for="file in items"
         :key="file.id"
-        class="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-muted/50 transition-colors cursor-pointer"
+        class="flex items-center gap-3 px-4 py-3.5 w-full text-left hover:bg-muted/50 transition-colors cursor-pointer"
         @click="$emit('open', file)"
       >
         <input
@@ -123,9 +203,38 @@ function confidenceBadgeClass(file: StagingFile): string {
           @change.stop="$emit('select', file.id)"
         />
 
-        <div class="relative size-10 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-          <img :src="coverUrl(file)" alt="" class="size-full object-cover" @load="($event.target as HTMLImageElement).style.display = ''" @error="onCoverError($event, file)" />
-          <BookOpen class="size-4 text-muted-foreground absolute" />
+        <div class="w-12 shrink-0 flex justify-center">
+          <div
+            class="relative size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden cursor-zoom-in ring-1 ring-border"
+            @click.stop="openCoverLightbox(currentCoverUrl(file), `${displayTitle(file)} current cover`, currentCoverLightboxFallback())"
+          >
+            <img
+              :src="currentCoverUrl(file)"
+              alt=""
+              class="size-full object-cover"
+              @load="($event.target as HTMLImageElement).style.display = ''"
+              @error="onCurrentCoverError"
+            />
+            <BookOpen class="size-4 text-muted-foreground absolute" />
+          </div>
+        </div>
+
+        <div class="w-12 shrink-0 flex justify-center">
+          <div
+            v-if="newCoverUrl(file)"
+            class="relative size-12 rounded-lg bg-amber-500/5 border border-amber-500/30 flex items-center justify-center overflow-hidden cursor-zoom-in"
+            @click.stop="openCoverLightbox(newCoverUrl(file)!, `${displayTitle(file)} new cover`)"
+          >
+            <img
+              :src="newCoverUrl(file)!"
+              alt=""
+              class="size-full object-cover"
+              @load="($event.target as HTMLImageElement).style.display = ''"
+              @error="onFetchedCoverError($event)"
+            />
+            <Wand2 class="size-3 text-amber-500 absolute" />
+          </div>
+          <div v-else class="size-12 rounded-lg border border-dashed border-border/70 bg-muted/30" />
         </div>
 
         <div class="flex-1 min-w-0">
@@ -148,6 +257,7 @@ function confidenceBadgeClass(file: StagingFile): string {
               Edited
             </span>
           </div>
+          <p class="mt-0.5 text-[11px] text-muted-foreground truncate">{{ targetSummary(file) }}</p>
         </div>
 
         <span class="text-xs text-muted-foreground w-16 text-right shrink-0 hidden sm:block tabular-nums">
@@ -188,5 +298,31 @@ function confidenceBadgeClass(file: StagingFile): string {
         </div>
       </button>
     </div>
+
+    <DialogRoot :open="!!coverLightbox" @update:open="onLightboxOpenChange">
+      <DialogPortal>
+        <DialogOverlay
+          class="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        />
+        <DialogContent
+          class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+        >
+          <DialogTitle class="sr-only">{{ coverLightbox?.title ?? 'Cover preview' }}</DialogTitle>
+          <DialogDescription class="sr-only">Enlarged cover image preview dialog.</DialogDescription>
+          <img
+            v-if="coverLightbox"
+            :src="coverLightbox.src"
+            :alt="coverLightbox.title"
+            class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain"
+            @error="onLightboxCoverError"
+          />
+          <DialogClose
+            class="absolute -top-3 -right-3 p-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X class="size-4" />
+          </DialogClose>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
   </div>
 </template>

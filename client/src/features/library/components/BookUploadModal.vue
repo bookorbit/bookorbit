@@ -4,6 +4,7 @@ import { CheckCircle2, FileUp, Loader2, Upload, X, XCircle } from 'lucide-vue-ne
 import { api } from '@/lib/api'
 import type { Library } from '@projectx/types'
 import { SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT, useBookUpload } from '../composables/useBookUpload'
+import { emitLibraryUploadCompleted } from '../composables/useLibraryUploadEvents'
 import { useLibraries } from '../composables/useLibraries'
 
 const props = defineProps<{
@@ -92,8 +93,29 @@ function onFileInputChange(e: Event) {
 }
 
 async function handleUpload() {
-  if (selectedLibraryId.value === undefined) return
-  await startUpload(selectedLibraryId.value, selectedFolderId.value)
+  const libraryId = selectedLibraryId.value
+  if (libraryId === undefined) return
+  const folderId = selectedFolderId.value
+
+  const pendingAtStart = files.value.filter((f) => f.status === 'pending').length
+  if (pendingAtStart === 0) return
+
+  const uploadedBefore = new Set(files.value.filter((f) => f.status === 'done' && f.bookId !== undefined).map((f) => f.bookId!))
+  const errorCountBefore = files.value.filter((f) => f.status === 'error').length
+
+  await startUpload(libraryId, folderId)
+
+  const uploadedAfter = files.value.filter((f) => f.status === 'done' && f.bookId !== undefined).map((f) => f.bookId!)
+  const uploadedBookIds = uploadedAfter.filter((id) => !uploadedBefore.has(id))
+  const errorCountAfter = files.value.filter((f) => f.status === 'error').length
+
+  emitLibraryUploadCompleted({
+    libraryId,
+    uploadedBookIds,
+    uploadedCount: uploadedBookIds.length,
+    failedCount: Math.max(0, errorCountAfter - errorCountBefore),
+    attemptedCount: pendingAtStart,
+  })
 }
 
 function formatBytes(bytes: number): string {

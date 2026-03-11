@@ -11,14 +11,28 @@ const changeListeners = new Set<() => void>()
 let fetchPromise: Promise<void> | null = null
 let loaded = false
 
-async function restFetchSummary() {
+function requestSummary(markLoading: boolean): Promise<void> {
   if (fetchPromise) return fetchPromise
-  try {
-    const res = await api('/api/v1/staging/summary')
-    if (res.ok) summary.value = await res.json()
-  } catch {
-    // best-effort refresh on reconnect
-  }
+  if (markLoading) loading.value = true
+  fetchPromise = api('/api/v1/staging/summary')
+    .then(async (res) => {
+      if (res.ok) {
+        summary.value = await res.json()
+        loaded = true
+      }
+    })
+    .catch(() => {
+      // best-effort refresh on reconnect
+    })
+    .finally(() => {
+      if (markLoading) loading.value = false
+      fetchPromise = null
+    })
+  return fetchPromise
+}
+
+async function restFetchSummary() {
+  return requestSummary(false)
 }
 
 function getSocket(): Socket {
@@ -49,22 +63,9 @@ function getSocket(): Socket {
 }
 
 export function useStagingSummary() {
-  async function fetchSummary(): Promise<void> {
-    if (loaded) return
-    if (fetchPromise) return fetchPromise
-    loading.value = true
-    fetchPromise = api('/api/v1/staging/summary')
-      .then(async (res) => {
-        if (res.ok) {
-          summary.value = await res.json()
-          loaded = true
-        }
-      })
-      .finally(() => {
-        loading.value = false
-        fetchPromise = null
-      })
-    return fetchPromise
+  async function fetchSummary(force = false): Promise<void> {
+    if (!force && loaded) return
+    return requestSummary(true)
   }
 
   function subscribe() {

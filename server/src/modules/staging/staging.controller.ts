@@ -38,7 +38,9 @@ import {
   BulkEditStagingDto,
   BulkApplyFetchedDto,
   BulkRetryFetchDto,
+  BulkSetTargetDto,
   PreviewNamesDto,
+  SelectionSummaryDto,
 } from './dto/index';
 import { MAX_UPLOAD_BYTES } from '../upload/upload-storage.service';
 
@@ -125,17 +127,35 @@ export class StagingController {
   @Post('files/discard')
   @HttpCode(HttpStatus.NO_CONTENT)
   bulkDiscard(@Body() dto: BulkDiscardDto) {
-    return this.service.bulkDiscard(dto.fileIds ?? [], dto.selectAll, dto.excludedIds);
+    return this.service.bulkDiscard(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search);
   }
 
   @Post('files/apply-fetched')
   applyFetched(@Body() dto: BulkApplyFetchedDto) {
-    return this.service.bulkApplyFetched(dto.fileIds ?? [], dto.selectAll, dto.excludedIds);
+    return this.service.bulkApplyFetched(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search);
   }
 
   @Post('files/retry-fetch')
   retryFetch(@Body() dto: BulkRetryFetchDto) {
-    return this.service.bulkRetryFetch(dto.fileIds, dto.selectAll, dto.excludedIds);
+    return this.service.bulkRetryFetch(dto.fileIds, dto.selectAll, dto.excludedIds, dto.status, dto.search);
+  }
+
+  @Post('files/set-target')
+  setTarget(@Body() dto: BulkSetTargetDto) {
+    return this.service.bulkSetTarget(
+      dto.fileIds ?? [],
+      dto.selectAll,
+      dto.excludedIds,
+      dto.targetLibraryId ?? null,
+      dto.targetFolderId ?? null,
+      dto.status,
+      dto.search,
+    );
+  }
+
+  @Post('files/selection-summary')
+  selectionSummary(@Body() dto: SelectionSummaryDto) {
+    return this.service.selectionSummary(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search);
   }
 
   @Post('files/bulk-edit')
@@ -147,12 +167,14 @@ export class StagingController {
       dto.fields as Partial<StagingMetadata & Record<string, unknown>>,
       dto.enabledFields,
       dto.mergeArrays,
+      dto.status,
+      dto.search,
     );
   }
 
   @Post('files/preview-names')
   previewNames(@Body() dto: PreviewNamesDto) {
-    return this.finalizeService.previewNames(dto.fileIds, dto.selectAll, dto.excludedIds, dto.defaultLibraryId);
+    return this.finalizeService.previewNames(dto.fileIds, dto.selectAll, dto.excludedIds, dto.defaultLibraryId, dto.status, dto.search);
   }
 
   @Post('finalize')
@@ -167,6 +189,8 @@ export class StagingController {
       dto.defaultLibraryId,
       dto.defaultFolderId,
       dto.overrides,
+      dto.status,
+      dto.search,
     );
   }
 

@@ -13,6 +13,14 @@ import StagingFileList from '@/features/staging/components/StagingFileList.vue'
 import StagingFileSheet from '@/features/staging/components/StagingFileSheet.vue'
 import StagingFinalizeDialog from '@/features/staging/components/StagingFinalizeDialog.vue'
 import StagingBulkEditDialog from '@/features/staging/components/StagingBulkEditDialog.vue'
+import StagingSetDestinationDialog from '@/features/staging/components/StagingSetDestinationDialog.vue'
+
+type ApplyFetchedResult = {
+  total: number
+  applied: number
+  skipped: number
+  skippedEdited: number
+}
 
 const {
   items,
@@ -40,15 +48,19 @@ const { addFiles, isUploading } = useStagingUpload()
 const selectedFile = ref<StagingFile | null>(null)
 const showFinalizeDialog = ref(false)
 const showBulkEditDialog = ref(false)
+const showSetDestinationDialog = ref(false)
 const dragOver = ref(false)
 const newFilesDetected = ref(false)
-const applyFetchedResult = ref<{ applied: number; skipped: number; skippedEdited: number } | null>(null)
+const namePreviewByFileId = ref<Record<number, string>>({})
+const applyFetchedResult = ref<ApplyFetchedResult | null>(null)
 const rescanFailed = ref(false)
 const retryQueued = ref<number | null>(null)
 let newFilesTimer: ReturnType<typeof setTimeout> | null = null
 let applyFetchedTimer: ReturnType<typeof setTimeout> | null = null
 let rescanFailedTimer: ReturnType<typeof setTimeout> | null = null
 let retryQueuedTimer: ReturnType<typeof setTimeout> | null = null
+let namePreviewTimer: ReturnType<typeof setTimeout> | null = null
+let namePreviewReqSeq = 0
 
 let prevTotal = -1
 
@@ -80,7 +92,7 @@ function onDiscarded() {
 
 function refresh() {
   fetchFiles()
-  fetchSummary()
+  fetchSummary(true)
   void fetchStatistics()
 }
 
@@ -88,6 +100,7 @@ function onFileUpdated(updated: StagingFile) {
   const idx = items.value.findIndex((f) => f.id === updated.id)
   if (idx !== -1) items.value[idx] = updated
   if (selectedFile.value?.id === updated.id) selectedFile.value = updated
+  scheduleVisibleNamePreview()
 }
 
 function hasContent(obj: Record<string, unknown> | null | undefined): boolean {
@@ -131,7 +144,12 @@ async function handleApplyFetched() {
   })
   if (res.ok) {
     const result = await res.json()
-    applyFetchedResult.value = { applied: result.applied, skipped: result.skipped, skippedEdited: result.skippedEdited ?? 0 }
+    applyFetchedResult.value = {
+      total: result.total ?? 0,
+      applied: result.applied ?? 0,
+      skipped: result.skipped ?? 0,
+      skippedEdited: result.skippedEdited ?? 0,
+    }
     if (applyFetchedTimer) clearTimeout(applyFetchedTimer)
     applyFetchedTimer = setTimeout(() => {
       applyFetchedResult.value = null
@@ -160,15 +178,46 @@ async function handleRetryFetch() {
 async function handleInlineApplyFetched(fileId: number) {
   const file = items.value.find((f) => f.id === fileId)
   if (!file?.fetchedMetadata) return
-  const res = await api(`/api/v1/staging/files/${fileId}`, {
-    method: 'PATCH',
+  const res = await api('/api/v1/staging/files/apply-fetched', {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selectedMetadata: file.fetchedMetadata }),
+    body: JSON.stringify({ fileIds: [fileId] }),
   })
   if (res.ok) {
-    const updated: StagingFile = await res.json()
-    onFileUpdated(updated)
+    const result = await res.json()
+    applyFetchedResult.value = {
+      total: result.total ?? 0,
+      applied: result.applied ?? 0,
+      skipped: result.skipped ?? 0,
+      skippedEdited: result.skippedEdited ?? 0,
+    }
+    if (applyFetchedTimer) clearTimeout(applyFetchedTimer)
+    applyFetchedTimer = setTimeout(() => {
+      applyFetchedResult.value = null
+    }, 4000)
+    refresh()
+    scheduleVisibleNamePreview()
   }
+}
+
+function pluralizeFiles(count: number): string {
+  return `${count} file${count === 1 ? '' : 's'}`
+}
+
+function applyFetchedResultMessage(result: ApplyFetchedResult): string {
+  const reasons: string[] = []
+  if (result.skippedEdited > 0)
+    reasons.push(`skipped ${pluralizeFiles(result.skippedEdited)} because ${result.skippedEdited === 1 ? 'it has' : 'they have'} manual edits`)
+  if (result.skipped > 0)
+    reasons.push(`skipped ${pluralizeFiles(result.skipped)} because ${result.skipped === 1 ? 'it has' : 'they have'} no fetched metadata`)
+
+  if (result.applied > 0) {
+    const base = `Applied to ${pluralizeFiles(result.applied)}`
+    return reasons.length ? `${base}; ${reasons.join('; ')}` : base
+  }
+
+  if (reasons.length) return `No files applied; ${reasons.join('; ')}`
+  return 'No files selected'
 }
 
 function handleRescanError() {
@@ -185,6 +234,10 @@ function openBulkEdit() {
   showBulkEditDialog.value = true
 }
 
+function openSetDestination() {
+  showSetDestinationDialog.value = true
+}
+
 function onFinalized() {
   showFinalizeDialog.value = false
   clearSelection()
@@ -195,6 +248,43 @@ function onBulkEdited() {
   showBulkEditDialog.value = false
   clearSelection()
   refresh()
+}
+
+function onDestinationSet() {
+  showSetDestinationDialog.value = false
+  refresh()
+  scheduleVisibleNamePreview()
+}
+
+async function fetchVisibleNamePreview() {
+  const ids = items.value.map((f) => f.id)
+  if (!ids.length) {
+    namePreviewByFileId.value = {}
+    return
+  }
+
+  const reqId = ++namePreviewReqSeq
+  try {
+    const res = await api('/api/v1/staging/files/preview-names', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileIds: ids }),
+    })
+    if (!res.ok || reqId !== namePreviewReqSeq) return
+    const rows: { fileId: number; newName: string }[] = await res.json()
+    if (reqId !== namePreviewReqSeq) return
+    namePreviewByFileId.value = Object.fromEntries(rows.map((r) => [r.fileId, r.newName]))
+  } catch {
+    if (reqId !== namePreviewReqSeq) return
+    namePreviewByFileId.value = {}
+  }
+}
+
+function scheduleVisibleNamePreview() {
+  if (namePreviewTimer) clearTimeout(namePreviewTimer)
+  namePreviewTimer = setTimeout(() => {
+    void fetchVisibleNamePreview()
+  }, 120)
 }
 
 function onDragOver(e: DragEvent) {
@@ -210,7 +300,7 @@ function onDragEnter(e: DragEvent) {
 }
 
 function onDragLeave() {
-  dragCounter--
+  dragCounter = Math.max(0, dragCounter - 1)
   if (dragCounter === 0) dragOver.value = false
 }
 
@@ -234,9 +324,16 @@ watch(isUploading, (uploading, was) => {
   if (was && !uploading) refresh()
 })
 
+watch(
+  () => items.value.map((f) => `${f.id}:${f.updatedAt}:${f.targetLibraryId ?? ''}:${f.targetFolderId ?? ''}`).join('|'),
+  () => {
+    scheduleVisibleNamePreview()
+  },
+)
+
 onMounted(() => {
   fetchFiles()
-  fetchSummary()
+  fetchSummary(true)
   fetchStatistics()
   subscribe()
 })
@@ -247,12 +344,13 @@ onUnmounted(() => {
   if (applyFetchedTimer) clearTimeout(applyFetchedTimer)
   if (rescanFailedTimer) clearTimeout(rescanFailedTimer)
   if (retryQueuedTimer) clearTimeout(retryQueuedTimer)
+  if (namePreviewTimer) clearTimeout(namePreviewTimer)
 })
 </script>
 
 <template>
   <main class="flex-1" @dragover="onDragOver" @dragenter="onDragEnter" @dragleave="onDragLeave" @drop="onDrop">
-    <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-7xl w-full">
+    <div class="flex flex-col gap-4 p-4 sm:p-6 max-w-8xl w-full">
       <div class="flex items-center gap-2.5">
         <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">
           <PackageOpen class="size-4.5 text-primary" />
@@ -279,11 +377,7 @@ onUnmounted(() => {
             class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
           >
             <CheckCircle2 class="size-3.5" />
-            {{
-              applyFetchedResult.applied === 0
-                ? 'No fetched metadata to apply'
-                : `Applied to ${applyFetchedResult.applied} file${applyFetchedResult.applied !== 1 ? 's' : ''}${applyFetchedResult.skippedEdited > 0 ? `, skipped ${applyFetchedResult.skippedEdited} with manual edits` : ''}`
-            }}
+            {{ applyFetchedResultMessage(applyFetchedResult) }}
           </span>
         </Transition>
         <Transition name="fade">
@@ -329,6 +423,7 @@ onUnmounted(() => {
         @bulk-discard="handleBulkDiscard"
         @finalize="openFinalize"
         @bulk-edit="openBulkEdit"
+        @set-destination="openSetDestination"
         @refresh="refresh"
         @apply-fetched="handleApplyFetched"
       />
@@ -360,6 +455,7 @@ onUnmounted(() => {
         :loading="loading"
         :is-selected="isSelected"
         :select-all="selectAll"
+        :name-preview-by-file-id="namePreviewByFileId"
         :empty-message="emptyMessage"
         @select="toggleSelect"
         @select-all="toggleSelectAll"
@@ -399,6 +495,14 @@ onUnmounted(() => {
     :selection-count="selectionCount"
     @close="showBulkEditDialog = false"
     @edited="onBulkEdited"
+  />
+
+  <StagingSetDestinationDialog
+    v-if="showSetDestinationDialog"
+    :selection-payload="getSelectionPayload()"
+    :selection-count="selectionCount"
+    @close="showSetDestinationDialog = false"
+    @updated="onDestinationSet"
   />
 </template>
 

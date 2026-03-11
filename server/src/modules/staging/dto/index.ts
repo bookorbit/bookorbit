@@ -46,11 +46,23 @@ export class FinalizeStagingDto {
   @IsInt({ each: true })
   excludedIds?: number[];
 
-  @IsInt()
-  defaultLibraryId: number;
+  @IsOptional()
+  @IsString()
+  status?: string;
 
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
-  defaultFolderId: number;
+  defaultLibraryId?: number;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  defaultFolderId?: number;
 
   @IsOptional()
   @IsArray()
@@ -73,6 +85,14 @@ export class BulkDiscardDto {
   @IsArray()
   @IsInt({ each: true })
   excludedIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export class PreviewNamesDto {
@@ -90,8 +110,18 @@ export class PreviewNamesDto {
   @IsInt({ each: true })
   excludedIds?: number[];
 
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
-  defaultLibraryId: number;
+  defaultLibraryId?: number;
 }
 
 export class BulkRetryFetchDto {
@@ -108,6 +138,14 @@ export class BulkRetryFetchDto {
   @IsArray()
   @IsInt({ each: true })
   excludedIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export class BulkApplyFetchedDto {
@@ -124,6 +162,72 @@ export class BulkApplyFetchedDto {
   @IsArray()
   @IsInt({ each: true })
   excludedIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class BulkSetTargetDto {
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  fileIds?: number[];
+
+  @IsOptional()
+  @IsBoolean()
+  selectAll?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  excludedIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  targetLibraryId?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  targetFolderId?: number | null;
+}
+
+export class SelectionSummaryDto {
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  fileIds?: number[];
+
+  @IsOptional()
+  @IsBoolean()
+  selectAll?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  excludedIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export class StagingMetadataFieldsDto {
@@ -157,6 +261,14 @@ export class BulkEditStagingDto {
   @IsArray()
   @IsInt({ each: true })
   excludedIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 
   @ValidateNested()
   @Type(() => StagingMetadataFieldsDto)

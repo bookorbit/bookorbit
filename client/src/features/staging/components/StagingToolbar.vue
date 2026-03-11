@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw } from 'lucide-vue-next'
+import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus } from 'lucide-vue-next'
 import type { StagingFileStatus } from '@projectx/types'
 import { api } from '@/lib/api'
 import { SUPPORTED_FORMATS_ACCEPT, useStagingUpload } from '../composables/useStagingUpload'
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   rescan: []
   rescanError: []
   retryFetch: []
+  setDestination: []
   bulkDiscard: []
   bulkEdit: []
   finalize: []
@@ -148,6 +149,13 @@ function clearSearch() {
         <FileText class="size-3.5" />
         Finalize
       </button>
+      <button
+        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all active:scale-95"
+        @click="$emit('setDestination')"
+      >
+        <FolderPlus class="size-3.5" />
+        Set Destination
+      </button>
       <Tooltip v-if="fetchedCount > 0">
         <TooltipTrigger as-child>
           <button
@@ -167,7 +175,7 @@ function clearSearch() {
       <Tooltip v-if="errorCount > 0">
         <TooltipTrigger as-child>
           <button
-            class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
+            class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-sky-500/12 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 transition-all active:scale-95"
             @click="$emit('retryFetch')"
           >
             <RefreshCw class="size-3.5" />
@@ -181,7 +189,7 @@ function clearSearch() {
         <TooltipContent>Retry metadata fetch for {{ errorCount }} error file{{ errorCount !== 1 ? 's' : '' }}</TooltipContent>
       </Tooltip>
       <button
-        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
+        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-violet-500/12 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 transition-all active:scale-95"
         @click="$emit('bulkEdit')"
       >
         <PenLine class="size-3.5" />

@@ -24,6 +24,7 @@ import { useBookNavigation } from '@/features/book/composables/useBookNavigation
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import type { GroupRule, SortSpec } from '@projectx/types'
@@ -39,6 +40,7 @@ const title = computed(() => currentLibrary.value?.name ?? 'Library')
 const libraryIcon = computed(() => currentLibrary.value?.icon ?? 'BookOpen')
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const { setBookContext, registerLoadMore } = useBookNavigation()
 watch(
@@ -198,6 +200,15 @@ onMounted(() => {
 })
 
 onUnmounted(() => observer?.disconnect())
+
+const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
+  if (event.uploadedCount === 0) return
+  if (libraryId.value === event.libraryId) {
+    load(true)
+  }
+})
+
+onUnmounted(() => stopUploadCompletedListener())
 
 watch(libraryId, (newId) => {
   if (newId === null) clear()

@@ -54,13 +54,18 @@ export function useStagingDetail() {
     debounceTimer = setTimeout(() => saveMetadata(id, metadata), 1000)
   }
 
-  async function setTarget(id: number, libraryId: number | null, folderId: number | null) {
+  async function setTarget(id: number, libraryId: number | null, folderId: number | null): Promise<StagingFile | null> {
     const res = await api(`/api/v1/staging/files/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetLibraryId: libraryId, targetFolderId: folderId }),
     })
-    if (res.ok) file.value = await res.json()
+    if (res.ok) {
+      const updated: StagingFile = await res.json()
+      file.value = updated
+      return updated
+    }
+    return null
   }
 
   async function discardFile(id: number) {

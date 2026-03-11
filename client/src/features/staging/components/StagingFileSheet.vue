@@ -50,6 +50,7 @@ const form = reactive({
   seriesIndex: '',
   genres: '',
 })
+const selectedCoverUrl = ref('')
 
 watch(
   () => props.file.id,
@@ -67,6 +68,7 @@ watch(
     form.seriesName = m.seriesName ?? ''
     form.seriesIndex = m.seriesIndex != null ? String(m.seriesIndex) : ''
     form.genres = m.genres?.join(', ') ?? ''
+    selectedCoverUrl.value = m.coverUrl ?? ''
     metaView.value = 'editor'
 
     targetLibraryId.value = props.file.targetLibraryId ?? libraries.value[0]?.id ?? null
@@ -96,49 +98,57 @@ onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
 })
 
+function buildMetadataPatchFromForm(): Partial<StagingMetadata> {
+  return {
+    title: form.title || undefined,
+    subtitle: form.subtitle || undefined,
+    authors: form.authors
+      ? form.authors
+          .split(',')
+          .map((a) => a.trim())
+          .filter(Boolean)
+      : undefined,
+    description: form.description || undefined,
+    publisher: form.publisher || undefined,
+    publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? undefined : n))(parseInt(form.publishedYear, 10)) : undefined,
+    language: form.language || undefined,
+    isbn13: form.isbn13 || undefined,
+    isbn10: form.isbn10 || undefined,
+    seriesName: form.seriesName || undefined,
+    seriesIndex: form.seriesIndex ? ((n) => (isNaN(n) ? undefined : n))(parseFloat(form.seriesIndex)) : undefined,
+    genres: form.genres
+      ? form.genres
+          .split(',')
+          .map((g) => g.trim())
+          .filter(Boolean)
+      : undefined,
+    coverUrl: selectedCoverUrl.value || undefined,
+  }
+}
+
 function onFieldChange() {
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(async () => {
-    const patch: Partial<StagingMetadata> = {
-      title: form.title || undefined,
-      subtitle: form.subtitle || undefined,
-      authors: form.authors
-        ? form.authors
-            .split(',')
-            .map((a) => a.trim())
-            .filter(Boolean)
-        : undefined,
-      description: form.description || undefined,
-      publisher: form.publisher || undefined,
-      publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? undefined : n))(parseInt(form.publishedYear, 10)) : undefined,
-      language: form.language || undefined,
-      isbn13: form.isbn13 || undefined,
-      isbn10: form.isbn10 || undefined,
-      seriesName: form.seriesName || undefined,
-      seriesIndex: form.seriesIndex ? ((n) => (isNaN(n) ? undefined : n))(parseFloat(form.seriesIndex)) : undefined,
-      genres: form.genres
-        ? form.genres
-            .split(',')
-            .map((g) => g.trim())
-            .filter(Boolean)
-        : undefined,
-    }
-    const updated = await saveMetadata(props.file.id, patch)
+    const updated = await saveMetadata(props.file.id, buildMetadataPatchFromForm())
     if (updated) emit('updated', updated)
   }, 1000)
 }
 
-function onLibraryChange(event: Event) {
-  const id = Number((event.target as HTMLSelectElement).value)
+async function onLibraryChange(event: Event) {
+  const raw = Number((event.target as HTMLSelectElement).value)
+  const id = Number.isFinite(raw) && raw > 0 ? raw : null
   targetLibraryId.value = id
-  const lib = libraries.value.find((l) => l.id === id)
+  const lib = libraries.value.find((l) => l.id === targetLibraryId.value)
   targetFolderId.value = lib?.folders?.[0]?.id ?? null
-  setTarget(props.file.id, targetLibraryId.value, targetFolderId.value)
+  const updated = await setTarget(props.file.id, targetLibraryId.value, targetFolderId.value)
+  if (updated) emit('updated', updated)
 }
 
-function onFolderChange(event: Event) {
-  targetFolderId.value = Number((event.target as HTMLSelectElement).value)
-  setTarget(props.file.id, targetLibraryId.value, targetFolderId.value)
+async function onFolderChange(event: Event) {
+  const raw = Number((event.target as HTMLSelectElement).value)
+  targetFolderId.value = Number.isFinite(raw) && raw > 0 ? raw : null
+  const updated = await setTarget(props.file.id, targetLibraryId.value, targetFolderId.value)
+  if (updated) emit('updated', updated)
 }
 
 function formatDate(iso: string): string {
@@ -221,25 +231,30 @@ function backFromDiff() {
 
 async function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
   const p = patch.formPatch
-  if (p.title != null) form.title = p.title
-  if (p.subtitle != null) form.subtitle = p.subtitle
-  if (p.description != null) form.description = p.description
-  if (p.publisher != null) form.publisher = p.publisher
-  if (p.publishedYear != null) form.publishedYear = String(p.publishedYear)
-  if (p.language != null) form.language = p.language
-  if (p.isbn13 != null) form.isbn13 = p.isbn13
-  if (p.isbn10 != null) form.isbn10 = p.isbn10
-  if (p.seriesName != null) form.seriesName = p.seriesName
-  if (p.seriesIndex != null) form.seriesIndex = String(p.seriesIndex)
-  if (p.authors) form.authors = p.authors.join(', ')
-  if (p.genres) form.genres = p.genres.join(', ')
+  if ('title' in p) form.title = p.title ?? ''
+  if ('subtitle' in p) form.subtitle = p.subtitle ?? ''
+  if ('description' in p) form.description = p.description ?? ''
+  if ('publisher' in p) form.publisher = p.publisher ?? ''
+  if ('publishedYear' in p) form.publishedYear = p.publishedYear == null ? '' : String(p.publishedYear)
+  if ('language' in p) form.language = p.language ?? ''
+  if ('isbn13' in p) form.isbn13 = p.isbn13 ?? ''
+  if ('isbn10' in p) form.isbn10 = p.isbn10 ?? ''
+  if ('seriesName' in p) form.seriesName = p.seriesName ?? ''
+  if ('seriesIndex' in p) form.seriesIndex = p.seriesIndex == null ? '' : String(p.seriesIndex)
+  if ('authors' in p) form.authors = (p.authors ?? []).join(', ')
+  if ('genres' in p) form.genres = (p.genres ?? []).join(', ')
 
-  if (patch.coverUrl) {
-    const updated = await saveMetadata(props.file.id, { coverUrl: patch.coverUrl })
-    if (updated) emit('updated', updated)
+  if (patch.coverUrl !== undefined) {
+    selectedCoverUrl.value = patch.coverUrl
   }
 
-  onFieldChange()
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  const updated = await saveMetadata(props.file.id, buildMetadataPatchFromForm())
+  if (updated) emit('updated', updated)
+
   metaView.value = 'editor'
   selectedCandidate.value = null
 }
@@ -250,7 +265,28 @@ const hasFetchedMetadata = computed(() => {
   return Object.values(f).some((v) => v !== undefined && v !== null && v !== '')
 })
 
-const currentStagingCoverUrl = computed(() => `${coverUrl(props.file.id)}?v=${new Date(props.file.updatedAt).getTime()}`)
+const backendStagingCoverUrl = computed(() => `${coverUrl(props.file.id)}?v=${new Date(props.file.updatedAt).getTime()}`)
+const normalizedSelectedCoverUrl = computed(() => selectedCoverUrl.value.trim())
+const currentStagingCoverUrl = computed(() => normalizedSelectedCoverUrl.value || backendStagingCoverUrl.value)
+const currentStagingCoverFallbackUrl = computed(() => (normalizedSelectedCoverUrl.value ? backendStagingCoverUrl.value : null))
+
+function onCurrentStagingCoverError(event: Event) {
+  const img = event.target as HTMLImageElement
+  const fallback = currentStagingCoverFallbackUrl.value
+  if (!fallback) {
+    img.style.display = 'none'
+    return
+  }
+
+  const resolvedFallback = new URL(fallback, window.location.origin).href
+  const currentSrc = img.currentSrc || img.src
+  if (currentSrc !== resolvedFallback) {
+    img.src = fallback
+    return
+  }
+
+  img.style.display = 'none'
+}
 
 function openFetchedDiff() {
   const f = props.file.fetchedMetadata
@@ -306,7 +342,8 @@ onMounted(() => {
             :src="currentStagingCoverUrl"
             alt=""
             class="size-full object-cover"
-            @error="($event.target as HTMLImageElement).style.display = 'none'"
+            @load="($event.target as HTMLImageElement).style.display = ''"
+            @error="onCurrentStagingCoverError"
           />
           <BookOpen class="size-5 text-muted-foreground absolute" />
         </div>
@@ -487,7 +524,10 @@ onMounted(() => {
           <div class="flex items-center gap-2">
             <button
               class="flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all active:scale-95"
-              style="background: linear-gradient(to right, var(--primary), color-mix(in oklch, var(--primary) 65%, oklch(0.7 0.25 280))); box-shadow: 0 2px 10px color-mix(in oklch, var(--primary) 45%, transparent);"
+              style="
+                background: linear-gradient(to right, var(--primary), color-mix(in oklch, var(--primary) 65%, oklch(0.7 0.25 280)));
+                box-shadow: 0 2px 10px color-mix(in oklch, var(--primary) 45%, transparent);
+              "
               @click="openSearch"
             >
               <Sparkles class="size-3.5" />

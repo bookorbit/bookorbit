@@ -38,12 +38,12 @@ export class MetadataService {
     await Promise.all([this.extractMetadata(bookId, absolutePath, format), this.extractCover(bookId, absolutePath, format)]);
   }
 
-  async downloadAndSaveCover(url: string, bookId: number): Promise<void> {
+  async downloadAndSaveCover(url: string, bookId: number): Promise<boolean> {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const buffer = Buffer.from(await res.arrayBuffer());
-      if (buffer.length === 0) return;
+      if (buffer.length === 0) return false;
 
       const ext = imageExt(buffer);
       const dir = join(this.booksPath, 'covers', String(bookId));
@@ -54,8 +54,10 @@ export class MetadataService {
       await this.db.update(bookMetadata).set({ coverSource: 'extracted', updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId));
 
       this.logger.debug(`Online cover saved for book ${bookId}`);
+      return true;
     } catch (err) {
       this.logger.warn(`Cover download failed for book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
     }
   }
 

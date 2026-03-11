@@ -60,8 +60,10 @@ export interface StagingFinalizeRequest {
   fileIds?: number[];
   selectAll?: boolean;
   excludedIds?: number[];
-  defaultLibraryId: number;
-  defaultFolderId: number;
+  status?: StagingFileStatus;
+  search?: string;
+  defaultLibraryId?: number;
+  defaultFolderId?: number;
   overrides?: StagingFinalizeOverride[];
 }
 
@@ -87,6 +89,8 @@ export interface StagingBulkEditRequest {
   fileIds?: number[];
   selectAll?: boolean;
   excludedIds?: number[];
+  status?: StagingFileStatus;
+  search?: string;
   fields: Partial<StagingMetadata>;
   enabledFields: string[];
   mergeArrays: boolean;

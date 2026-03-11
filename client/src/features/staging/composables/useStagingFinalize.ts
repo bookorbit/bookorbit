@@ -11,8 +11,10 @@ export function useStagingFinalize() {
     fileIds?: number[]
     selectAll?: boolean
     excludedIds?: number[]
-    defaultLibraryId: number
-    defaultFolderId: number
+    status?: string
+    search?: string
+    defaultLibraryId?: number
+    defaultFolderId?: number
     overrides?: StagingFinalizeOverride[]
   }) {
     loading.value = true
@@ -46,4 +48,3 @@ export function useStagingFinalize() {
 
   return { result, loading, error, finalize, reset }
 }
-

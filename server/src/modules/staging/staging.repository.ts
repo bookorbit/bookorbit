@@ -30,13 +30,7 @@ export class StagingRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findAll(opts: ListOptions): Promise<{ items: StagingFileRow[]; total: number }> {
-    const conditions: SQL[] = [];
-    if (opts.status === 'pending') {
-      conditions.push(inArray(stagingFiles.status, ['pending', 'extracting', 'fetching']));
-    } else if (opts.status) {
-      conditions.push(eq(stagingFiles.status, opts.status));
-    }
-    if (opts.search) conditions.push(ilike(stagingFiles.fileName, `%${opts.search}%`));
+    const conditions = this.buildSelectionConditions(opts.status, opts.search);
 
     const where = conditions.length ? and(...conditions) : undefined;
 
@@ -91,8 +85,10 @@ export class StagingRepository {
     await this.db.delete(stagingFiles).where(eq(stagingFiles.absolutePath, path));
   }
 
-  async findAllIds(excludedIds?: number[]): Promise<number[]> {
-    const where = excludedIds?.length ? notInArray(stagingFiles.id, excludedIds) : undefined;
+  async findAllIds(excludedIds?: number[], status?: string, search?: string): Promise<number[]> {
+    const conditions = this.buildSelectionConditions(status, search);
+    if (excludedIds?.length) conditions.push(notInArray(stagingFiles.id, excludedIds));
+    const where = conditions.length ? and(...conditions) : undefined;
     const rows = await this.db.select({ id: stagingFiles.id }).from(stagingFiles).where(where);
     return rows.map((r) => r.id);
   }
@@ -143,5 +139,16 @@ export class StagingRepository {
     });
 
     return { totalSizeBytes, byFormat };
+  }
+
+  private buildSelectionConditions(status?: string, search?: string): SQL[] {
+    const conditions: SQL[] = [];
+    if (status === 'pending') {
+      conditions.push(inArray(stagingFiles.status, ['pending', 'extracting', 'fetching']));
+    } else if (status) {
+      conditions.push(eq(stagingFiles.status, status));
+    }
+    if (search) conditions.push(ilike(stagingFiles.fileName, `%${search}%`));
+    return conditions;
   }
 }
