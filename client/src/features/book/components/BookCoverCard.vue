@@ -129,7 +129,7 @@ function openAuthorBrowse() {
   >
     <!-- Cover -->
     <div
-      class="relative w-full rounded-sm overflow-hidden shadow-md transition-all duration-150"
+      class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
       :class="[
         isMissing ? 'ring-2 ring-amber-500' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]',
         selected ? 'ring-2 ring-primary' : '',
@@ -143,6 +143,7 @@ function openAuthorBrowse() {
         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
         :class="coverLoaded ? (isMissing ? 'opacity-100 brightness-50' : 'opacity-100') : 'opacity-0'"
         loading="lazy"
+        decoding="async"
         :alt="book.title ?? ''"
         @load="coverLoaded = true"
         @error="coverFailed = true"
@@ -151,7 +152,7 @@ function openAuthorBrowse() {
       <!-- Series badge -->
       <div v-if="showSeriesOverlay" class="absolute top-1.5 left-1.5 right-1.5 z-10 pointer-events-none">
         <span
-          class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-black/30 backdrop-blur-sm line-clamp-1"
+          class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-black/60 line-clamp-1"
           :style="{ color: coverStyle.color }"
         >
           {{ seriesLine }}
@@ -172,11 +173,11 @@ function openAuthorBrowse() {
         <div v-if="showProgressPill">
           <span
             v-if="book.readingProgress === 100"
-            class="flex items-center gap-0.5 text-[8px] font-semibold px-1.5 py-0.5 rounded bg-green-500/70 text-white backdrop-blur-sm"
+            class="flex items-center gap-0.5 text-[8px] font-semibold px-1.5 py-0.5 rounded bg-green-600/90 text-white"
           >
             <Check :size="8" />
           </span>
-          <span v-else class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/30 backdrop-blur-sm" :style="{ color: coverStyle.color }">
+          <span v-else class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60" :style="{ color: coverStyle.color }">
             {{ Math.floor(book.readingProgress!) }}%
           </span>
         </div>
@@ -215,9 +216,7 @@ function openAuthorBrowse() {
 
       <!-- Missing badge -->
       <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
-        <span
-          class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-500/90 text-white backdrop-blur-sm"
-        >
+        <span class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-600/95 text-white">
           <TriangleAlert class="size-2.5 shrink-0" />
           Missing
         </span>
@@ -240,7 +239,7 @@ function openAuthorBrowse() {
 
       <!-- Refresh spinner overlay -->
       <Transition name="fade">
-        <div v-if="anyRefreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-[1.5px]">
+        <div v-if="anyRefreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/50">
           <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
         </div>
       </Transition>
@@ -248,7 +247,7 @@ function openAuthorBrowse() {
       <!-- Hover overlay -->
       <div
         v-if="!selectionMode"
-        class="absolute inset-0 flex flex-col p-2 bg-black/60 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+        class="absolute inset-0 flex flex-col p-2 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
         @click.stop
       >
         <!-- Center: primary action buttons -->

@@ -76,7 +76,7 @@ describe('BookCoverCard — missing state', () => {
 
   it('renders the amber missing badge with TriangleAlert icon', () => {
     const wrapper = mount(BookCoverCard, { props: { book: missingBook }, global: globalStubs })
-    const badge = wrapper.find('[class*="bg-amber-500"]')
+    const badge = wrapper.find('[class*="bg-amber-600"]')
     expect(badge.exists()).toBe(true)
     expect(badge.text().toLowerCase()).toContain('missing')
   })
@@ -97,7 +97,7 @@ describe('BookCoverCard — present state', () => {
 
   it('does not render the missing badge', () => {
     const wrapper = mount(BookCoverCard, { props: { book: presentBook }, global: globalStubs })
-    expect(wrapper.find('[class*="bg-amber-500"]').exists()).toBe(false)
+    expect(wrapper.find('[class*="bg-amber-600"]').exists()).toBe(false)
   })
 
   it('applies hover-scale to cover container when present', () => {

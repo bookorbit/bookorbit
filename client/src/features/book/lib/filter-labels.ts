@@ -70,4 +70,3 @@ export function ruleToParts(rule: Rule): { field: string; operator: string; valu
   const val = Array.isArray(rule.value) ? (rule.value as string[]).join(', ') : String(rule.value ?? '')
   return { field, operator, value: rule.valueTo !== undefined ? `${val} - ${rule.valueTo}` : val }
 }
-

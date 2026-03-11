@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from 'lucide-vue-next'
-import { Aperture, FolderOpen, LayoutDashboard, PackageOpen, Users } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
@@ -171,7 +170,7 @@ onUnmounted(() => stopUploadCompletedListener())
             <SidebarNavItem
               :is-active="isDashboardActive"
               tooltip="Dashboard"
-              :icon="LayoutDashboard"
+              :icon="Icons.LayoutDashboard"
               label="Dashboard"
               @click="router.push({ name: 'dashboard' })"
             />
@@ -179,20 +178,26 @@ onUnmounted(() => stopUploadCompletedListener())
               v-if="hasPermission('staging_access')"
               :is-active="isStagingActive"
               tooltip="Staging"
-              :icon="PackageOpen"
+              :icon="Icons.PackageOpen"
               label="Staging"
               @click="router.push({ name: 'staging' })"
             >
               <template #badge>
                 <span
                   v-if="stagingSummary.total > 0"
-                  class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-sidebar-foreground/60 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                  class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                 >
                   {{ stagingSummary.total }}
                 </span>
               </template>
             </SidebarNavItem>
-            <SidebarNavItem :is-active="isAuthorsActive" tooltip="Authors" :icon="Users" label="Authors" @click="router.push({ name: 'authors' })" />
+            <SidebarNavItem
+              :is-active="isAuthorsActive"
+              tooltip="Authors"
+              :icon="Icons.Users"
+              label="Authors"
+              @click="router.push({ name: 'authors' })"
+            />
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -226,13 +231,13 @@ onUnmounted(() => stopUploadCompletedListener())
                 <template #badge>
                   <span
                     v-if="getProgress(lib.id)?.status === 'running'"
-                    class="ml-auto shrink-0 rounded-md bg-primary/20 px-1.5 py-px text-[10px] font-medium tabular-nums text-primary group-data-[collapsible=icon]:hidden"
+                    class="ml-auto shrink-0 rounded-md bg-primary/20 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-primary group-data-[collapsible=icon]:hidden"
                   >
                     {{ scanPct(lib.id) }}%
                   </span>
                   <span
                     v-else-if="lib.bookCount !== undefined"
-                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-sidebar-foreground/60 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                   >
                     {{ lib.bookCount.toLocaleString() }}
                   </span>
@@ -282,14 +287,14 @@ onUnmounted(() => stopUploadCompletedListener())
                 :key="lens.id"
                 :is-active="activeLensId === lens.id"
                 :tooltip="lens.name"
-                :icon="resolveIcon(lens.icon, Aperture)"
+                :icon="resolveIcon(lens.icon, Icons.Aperture)"
                 :label="lens.name"
                 @click="router.push({ name: 'lens', params: { id: lens.id } })"
               >
                 <template #badge>
                   <span
                     v-if="lens.bookCount != null && lens.bookCount > 0"
-                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-sidebar-foreground/60 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                   >
                     {{ lens.bookCount.toLocaleString() }}
                   </span>
@@ -324,14 +329,14 @@ onUnmounted(() => stopUploadCompletedListener())
                 :key="collection.id"
                 :is-active="activeCollectionId === collection.id"
                 :tooltip="collection.name"
-                :icon="resolveIcon(collection.icon, FolderOpen)"
+                :icon="resolveIcon(collection.icon, Icons.FolderOpen)"
                 :label="collection.name"
                 @click="router.push({ name: 'collection', params: { id: collection.id } })"
               >
                 <template #badge>
                   <span
                     v-if="collection.bookCount > 0"
-                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-sidebar-foreground/60 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                   >
                     {{ collection.bookCount.toLocaleString() }}
                   </span>

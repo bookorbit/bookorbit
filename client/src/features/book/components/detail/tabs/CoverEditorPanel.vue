@@ -41,6 +41,11 @@ const activeSrc = computed(() => previewSrc.value ?? coverUrl(props.book.id, 'co
 const hasPending = computed(() => !!pendingFile.value || !!pendingUrl.value)
 const isAudiobook = computed(() => props.book.files.some((f) => f.format === 'audiobook' || f.role === 'audiobook'))
 
+function cancelPending() {
+  clearPending()
+  urlInput.value = ''
+}
+
 function onFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) selectFile(file)
@@ -185,7 +190,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         v-if="hasPending"
         class="w-full h-8 rounded-lg border border-input bg-background text-xs hover:bg-muted transition-colors disabled:opacity-50"
         :disabled="uploading"
-        @click="clearPending(); urlInput = ''"
+        @click="cancelPending"
       >
         Cancel
       </button>

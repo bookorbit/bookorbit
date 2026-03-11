@@ -52,9 +52,7 @@ const {
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
-const currentProviderId = computed(() =>
-  selectedCandidate.value ? (props.book.providerIds[selectedCandidate.value.provider] ?? null) : null,
-)
+const currentProviderId = computed(() => (selectedCandidate.value ? (props.book.providerIds[selectedCandidate.value.provider] ?? null) : null))
 
 onMounted(() => {
   loadProviders()

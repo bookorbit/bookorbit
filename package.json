@@ -51,7 +51,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.3.2",
+    "lint-staged": "^16.3.3",
     "prettier": "^3.8.1"
   },
   "lint-staged": {
@@ -59,7 +59,7 @@
       "pnpm exec prettier --write"
     ],
     "client/src/**/*.{ts,vue}": [
-      "pnpm --dir client exec eslint --fix",
+      "pnpm --dir client exec eslint --fix --max-warnings 0",
       "pnpm exec prettier --write"
     ],
     "server/{src,test}/**/*.ts": [

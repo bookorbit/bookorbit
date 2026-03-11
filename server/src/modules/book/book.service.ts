@@ -272,12 +272,16 @@ export class BookService {
     const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
     const isSuperuser = this.isSuperuser(user);
     await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+    const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
     await this.bookRepo.deleteByIds(bookIds);
     for (const { id: bookId } of rows) {
       const coverDir = join(this.booksPath, 'covers', String(bookId));
       rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
         this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
       );
+    }
+    for (const { absolutePath } of files) {
+      rm(absolutePath, { force: true }).catch((err: Error) => this.logger.warn(`Failed to delete book file ${absolutePath}: ${err.message}`));
     }
   }
 

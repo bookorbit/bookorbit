@@ -158,6 +158,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
       await this.scannerRepo.completeScanJob(jobId, totals);
       this.logger.log(`Scan job ${jobId} completed — ${JSON.stringify(totals)}`);
+      this.scanJobStore.increment(libraryId, { added: totals.addedCount, updated: totals.updatedCount });
       this.emitFromStore(libraryId, jobId, 'completed');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -344,7 +345,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     // 3. Hash match — cross-filesystem copy (expensive, last resort).
     const hash = await fingerprintFile(fileStat.absolutePath);
-    const byHash = await this.scannerRepo.findBookFileByHash(hash);
+    const byHash = await this.scannerRepo.findBookFileByHash(hash, libraryFolderId);
     if (byHash) {
       await this.scannerRepo.updateBookFile(byHash.id, {
         absolutePath: fileStat.absolutePath,

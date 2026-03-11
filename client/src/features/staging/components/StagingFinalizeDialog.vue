@@ -93,11 +93,10 @@ async function fetchNamePreview(libId: number | null) {
     const rows: { fileId: number; fileName: string; newName: string }[] = await res.json()
     if (reqId !== previewReqSeq) return
     namePreview.value = rows
+    previewLoading.value = false
   } catch {
     if (reqId !== previewReqSeq) return
     namePreview.value = []
-  } finally {
-    if (reqId !== previewReqSeq) return
     previewLoading.value = false
   }
 }

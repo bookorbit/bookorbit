@@ -61,7 +61,7 @@ function handleDelete() {
     @click="handleClick($event as MouseEvent)"
   >
     <div
-      class="relative w-full rounded-sm overflow-hidden shadow-md transition-all duration-150"
+      class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
       :class="[selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]', selected ? 'ring-2 ring-primary' : '']"
       style="aspect-ratio: 2/3"
       :style="hasImage ? undefined : fallbackStyle"
@@ -141,7 +141,7 @@ function handleDelete() {
       </div>
 
       <Transition name="fade">
-        <div v-if="refreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-[1.5px]">
+        <div v-if="refreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/50">
           <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
         </div>
       </Transition>

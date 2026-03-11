@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
+import { toast } from 'vue-sonner'
 import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types'
 import { getAccessToken } from '@/lib/api'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -22,6 +23,9 @@ function getSocket(): Socket {
       progressMap.value.set(event.libraryId, event)
       progressMap.value = new Map(progressMap.value)
       if (event.status !== 'running') {
+        if (event.status === 'completed' && event.added > 0) {
+          toast.success(`${event.added} new ${event.added === 1 ? 'book' : 'books'} added`)
+        }
         // Keep the final event for a short time so UI can show completion, then clear.
         setTimeout(() => {
           progressMap.value.delete(event.libraryId)

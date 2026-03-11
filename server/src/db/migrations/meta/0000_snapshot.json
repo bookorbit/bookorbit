@@ -1,5 +1,5 @@
 {
-  "id": "f70633be-a75c-405f-9764-e9770dde00e2",
+  "id": "2ab89874-42c9-4e63-8fd4-376a059ca13c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -786,7 +786,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "books_library_id_folder_path_idx": {
+          "name": "books_library_id_folder_path_idx",
+          "columns": [
+            {
+              "expression": "library_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "folder_path",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "books_library_id_libraries_id_fk": {
           "name": "books_library_id_libraries_id_fk",

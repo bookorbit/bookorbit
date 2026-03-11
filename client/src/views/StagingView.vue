@@ -443,10 +443,16 @@ onUnmounted(() => {
 
       <!-- Drag-and-drop overlay -->
       <div v-if="dragOver" class="fixed inset-0 z-40 flex items-center justify-center bg-primary/5 backdrop-blur-sm pointer-events-none">
-        <div class="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary/40 bg-card/80 px-12 py-10 shadow-lg">
-          <PackageOpen class="size-10 text-primary" />
-          <p class="text-sm font-medium text-foreground">Drop files to stage</p>
-          <p class="text-xs text-muted-foreground">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
+        <div
+          class="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-primary/50 bg-card/90 px-12 py-10 shadow-xl max-w-sm w-full"
+        >
+          <div class="flex items-center justify-center size-16 rounded-2xl bg-primary/10 animate-pulse">
+            <PackageOpen class="size-8 text-primary" />
+          </div>
+          <div class="text-center">
+            <p class="text-sm font-medium text-foreground">Drop files to stage</p>
+            <p class="text-xs text-muted-foreground mt-1">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
+          </div>
         </div>
       </div>
 

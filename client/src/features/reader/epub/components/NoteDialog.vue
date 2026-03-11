@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{ selectedText: string; modelValue: string }>()
-const emit = defineEmits<{ save: [note: string]; cancel: [] }>()
+const emit = defineEmits<{ save: [note: string]; cancel: []; 'update:modelValue': [value: string] }>()
 </script>
 
 <template>

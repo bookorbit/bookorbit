@@ -70,9 +70,16 @@ export class ScannerRepository {
   }
 
   async createBook(data: typeof books.$inferInsert) {
-    const [book] = await this.db.insert(books).values(data).returning();
+    const [book] = await this.db
+      .insert(books)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [books.libraryId, books.folderPath],
+        set: { status: 'present', updatedAt: new Date() },
+      })
+      .returning();
     // Always create an empty metadata row so joins never return null.
-    await this.db.insert(bookMetadata).values({ bookId: book.id });
+    await this.db.insert(bookMetadata).values({ bookId: book.id }).onConflictDoNothing();
     return book;
   }
 
@@ -91,8 +98,12 @@ export class ScannerRepository {
     return this.db.select().from(bookFiles).where(eq(bookFiles.libraryFolderId, libraryFolderId));
   }
 
-  async findBookFileByHash(hash: string) {
-    const [file] = await this.db.select().from(bookFiles).where(eq(bookFiles.hash, hash)).limit(1);
+  async findBookFileByHash(hash: string, libraryFolderId: number) {
+    const [file] = await this.db
+      .select()
+      .from(bookFiles)
+      .where(and(eq(bookFiles.hash, hash), eq(bookFiles.libraryFolderId, libraryFolderId)))
+      .limit(1);
     return file ?? null;
   }
 

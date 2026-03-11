@@ -30,7 +30,7 @@ export function useLens(lensId: Ref<number>) {
       if (page.value === 0) {
         items.value = data.items
       } else {
-        items.value.push(...data.items)
+        items.value = [...items.value, ...data.items]
       }
       total.value = data.total
       page.value++

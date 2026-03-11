@@ -7,25 +7,29 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { libraries, libraryFolders } from '../../db/schema';
 import { ScanGateway } from './scan.gateway';
+import { ScannerService } from './scanner.service';
 import { FileEventProcessorService, type FileEventResult } from './file-event-processor.service';
 
 type Db = NodePgDatabase<typeof schema>;
 type EventType = 'delete' | 'create';
 
 const DEBOUNCE_MS = 500;
+const SCAN_DEBOUNCE_MS = 3_000;
 const RECONCILE_MS = 30_000;
 
 @Injectable()
 export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(FileWatcherService.name);
   private readonly subscriptions = new Map<number, AsyncSubscription[]>();
-  private readonly pendingTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; type: EventType }>();
+  private readonly pendingTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; type: EventType; libraryId: number }>();
+  private readonly pendingScanTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private reconcileTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly processor: FileEventProcessorService,
     private readonly gateway: ScanGateway,
+    private readonly scannerService: ScannerService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -47,6 +51,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     if (this.reconcileTimer) clearInterval(this.reconcileTimer);
     for (const entry of this.pendingTimers.values()) clearTimeout(entry.timer);
     this.pendingTimers.clear();
+    for (const timer of this.pendingScanTimers.values()) clearTimeout(timer);
+    this.pendingScanTimers.clear();
     for (const subs of this.subscriptions.values()) {
       for (const sub of subs) await sub.unsubscribe();
     }
@@ -80,7 +86,7 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
         }
         for (const event of events) {
           if (event.type === 'delete' || event.type === 'create') {
-            this.schedule(event.type, event.path);
+            this.schedule(event.type, event.path, libraryId);
           }
         }
       });
@@ -98,20 +104,34 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     this.subscriptions.delete(libraryId);
   }
 
-  private schedule(type: EventType, path: string): void {
+  private scheduleScan(libraryId: number): void {
+    const existing = this.pendingScanTimers.get(libraryId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      this.pendingScanTimers.delete(libraryId);
+      this.scannerService.startScanAsync(libraryId);
+    }, SCAN_DEBOUNCE_MS);
+    this.pendingScanTimers.set(libraryId, timer);
+  }
+
+  private schedule(type: EventType, path: string, libraryId: number): void {
     const existing = this.pendingTimers.get(path);
     if (existing) clearTimeout(existing.timer);
     const timer = setTimeout(() => {
       this.pendingTimers.delete(path);
-      this.process(type, path).catch((err) => this.logger.error(`Failed to process ${type} for ${path}: ${(err as Error).message}`));
+      this.process(type, path, libraryId).catch((err) => this.logger.error(`Failed to process ${type} for ${path}: ${(err as Error).message}`));
     }, DEBOUNCE_MS);
-    this.pendingTimers.set(path, { timer, type });
+    this.pendingTimers.set(path, { timer, type, libraryId });
   }
 
-  private async process(type: EventType, path: string): Promise<void> {
+  private async process(type: EventType, path: string, libraryId: number): Promise<void> {
     let result: FileEventResult;
     if (type === 'create') {
       result = await this.processor.handleCreate(path);
+      if (result.type === 'noop') {
+        this.scheduleScan(libraryId);
+        return;
+      }
     } else {
       result = await this.processor.handleUnlink(path);
       if (result.type === 'noop') {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-vue-next'
+import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown, Aperture } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -38,7 +38,7 @@ watch(
       newTotal,
     )
   },
-  { deep: true, immediate: true },
+  { immediate: true },
 )
 
 onMounted(() => {
@@ -291,6 +291,9 @@ watch(
 
     <!-- Empty state: rules set but no matches -->
     <div v-else-if="!loading && books.length === 0 && lens?.filter" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+      <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+        <Aperture :size="28" class="text-muted-foreground/50" />
+      </div>
       <p class="text-sm font-medium text-foreground">No books match this lens</p>
       <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>
       <button @click="editorOpen = true" class="text-xs text-primary hover:underline">Edit Lens</button>

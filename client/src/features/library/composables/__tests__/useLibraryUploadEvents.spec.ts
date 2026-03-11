@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { emitLibraryUploadCompleted, useLibraryUploadEvents } from '../useLibraryUploadEvents'
+import { emitLibraryUploadCompleted, useLibraryUploadEvents, type LibraryUploadCompletedEvent } from '../useLibraryUploadEvents'
 
 describe('useLibraryUploadEvents', () => {
   it('notifies subscribers with the emitted event payload', () => {
     const { onLibraryUploadCompleted } = useLibraryUploadEvents()
-    const cb = vi.fn()
+    const cb = vi.fn<(event: LibraryUploadCompletedEvent) => void>()
     const off = onLibraryUploadCompleted(cb)
 
     const event = {
@@ -26,7 +26,7 @@ describe('useLibraryUploadEvents', () => {
 
   it('stops notifying once unsubscribed', () => {
     const { onLibraryUploadCompleted } = useLibraryUploadEvents()
-    const cb = vi.fn()
+    const cb = vi.fn<(event: LibraryUploadCompletedEvent) => void>()
     const off = onLibraryUploadCompleted(cb)
 
     off()

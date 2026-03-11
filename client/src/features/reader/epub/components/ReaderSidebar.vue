@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Bookmark, BookOpen, ChevronDown, ChevronRight, Highlighter, Trash2, X } from 'lucide-vue-next'
+import { Bookmark, BookOpen, Highlighter, Trash2, X } from 'lucide-vue-next'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
@@ -124,24 +124,30 @@ const activeTab = ref<Tab>('chapters')
 </template>
 
 <script lang="ts">
-import { defineComponent, h } from 'vue'
-import { stripFragment } from '../utils'
+import { defineComponent, h, type VNode, type Component } from 'vue'
+import { ChevronDown, ChevronRight } from 'lucide-vue-next'
+
+interface LocalTocItem {
+  label: string
+  href: string
+  subitems?: LocalTocItem[]
+}
 
 const TocList = defineComponent({
   name: 'TocList',
   props: {
-    items: { type: Array as () => TocItem[], required: true },
+    items: { type: Array as () => LocalTocItem[], required: true },
     activeHref: { type: String, required: true },
     expandedHrefs: { type: Object as () => Set<string>, required: true },
     depth: { type: Number, default: 0 },
   },
   emits: ['navigate', 'toggleExpand'],
   setup(props, { emit }) {
-    function isActive(href: string) {
+    function isActive(href: string): boolean {
       return stripFragment(props.activeHref) === stripFragment(href)
     }
 
-    return () =>
+    return (): VNode =>
       h(
         'ul',
         { class: 'py-1' },
@@ -174,14 +180,14 @@ const TocList = defineComponent({
                           emit('toggleExpand', item.href)
                         },
                       },
-                      [expanded ? h(ChevronDown, { size: 14 }) : h(ChevronRight, { size: 14 })],
+                      [expanded ? h(ChevronDown as Component, { size: 14 }) : h(ChevronRight as Component, { size: 14 })],
                     )
                   : h('span', { class: 'w-3.5 shrink-0' }),
                 h('span', { class: 'truncate' }, item.label),
               ],
             ),
             hasChildren && expanded
-              ? h(TocList, {
+              ? h(TocList as Component, {
                   items: item.subitems!,
                   activeHref: props.activeHref,
                   expandedHrefs: props.expandedHrefs,

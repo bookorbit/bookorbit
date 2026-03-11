@@ -42,4 +42,3 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
     </div>
   </Teleport>
 </template>
-

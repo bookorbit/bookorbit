@@ -19,8 +19,8 @@ const index = computed(() => currentIndex(props.bookId))
 watch(
   [() => props.bookId, bookIds],
   async ([id]) => {
-    prevId.value = getPrevId(id)
-    nextId.value = await getNextId(id)
+    prevId.value = getPrevId(id) ?? null
+    nextId.value = (await getNextId(id)) ?? null
   },
   { immediate: true },
 )

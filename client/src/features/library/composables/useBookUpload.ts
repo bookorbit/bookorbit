@@ -105,6 +105,14 @@ export function useBookUpload() {
     files.value = files.value.filter((f) => f.id !== id)
   }
 
+  function retryFile(id: string) {
+    const item = files.value.find((f) => f.id === id)
+    if (!item || item.status !== 'error') return
+    item.status = 'pending'
+    item.error = undefined
+    item.progress = 0
+  }
+
   function reset() {
     files.value = []
   }
@@ -138,6 +146,7 @@ export function useBookUpload() {
     uploadedBookIds,
     addFiles,
     removeFile,
+    retryFile,
     reset,
     startUpload,
   }

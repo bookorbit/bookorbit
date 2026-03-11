@@ -77,14 +77,24 @@ function removeScroller(index: number) {
 function moveUp(index: number) {
   if (index === 0) return
   const items = [...draft.value]
-  ;[items[index - 1], items[index]] = [items[index], items[index - 1]]
+  const current = items[index]
+  const prev = items[index - 1]
+  if (current && prev) {
+    items[index - 1] = current
+    items[index] = prev
+  }
   draft.value = items
 }
 
 function moveDown(index: number) {
   if (index === draft.value.length - 1) return
   const items = [...draft.value]
-  ;[items[index], items[index + 1]] = [items[index + 1], items[index]]
+  const current = items[index]
+  const next = items[index + 1]
+  if (current && next) {
+    items[index + 1] = current
+    items[index] = next
+  }
   draft.value = items
 }
 

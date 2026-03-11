@@ -38,4 +38,3 @@ export function useDeleteBook(onDeleted: (id: number) => void) {
 
   return { pendingId, deleting, promptDelete, cancelDelete, confirmDelete }
 }
-

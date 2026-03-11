@@ -23,25 +23,18 @@ defineProps<{
       </span>
 
       <!-- Leaf rule: color-coded field / operator / value -->
-      <span
-        v-if="rule.type === 'rule'"
-        class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border bg-muted/40 border-border/60"
-      >
+      <span v-if="rule.type === 'rule'" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border bg-muted/40 border-border/60">
         <span class="font-semibold text-foreground">{{ ruleToParts(rule as Rule).field }}</span>
-        <span
-          class="font-normal"
-          :class="ruleToParts(rule as Rule).value === null ? 'text-primary font-semibold' : 'text-muted-foreground'"
-        >{{ ruleToParts(rule as Rule).operator }}</span>
+        <span class="font-normal" :class="ruleToParts(rule as Rule).value === null ? 'text-primary font-semibold' : 'text-muted-foreground'">{{
+          ruleToParts(rule as Rule).operator
+        }}</span>
         <span v-if="ruleToParts(rule as Rule).value !== null" class="font-semibold text-primary">
           {{ ruleToParts(rule as Rule).value }}
         </span>
       </span>
 
       <!-- Nested group -->
-      <span
-        v-else
-        class="inline-flex flex-wrap items-center gap-1 px-2 py-0.5 rounded-lg border border-border/50 bg-muted/30"
-      >
+      <span v-else class="inline-flex flex-wrap items-center gap-1 px-2 py-0.5 rounded-lg border border-border/50 bg-muted/30">
         <FilterSummary :node="rule as GroupRule" :depth="(depth ?? 0) + 1" />
       </span>
     </template>

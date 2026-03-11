@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowUpDown, Bookmark, BookmarkCheck, Filter, Telescope, X } from 'lucide-vue-next'
+import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, Filter, Telescope, X } from 'lucide-vue-next'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -51,7 +51,7 @@ watch(
       newTotal,
     )
   },
-  { deep: true, immediate: true },
+  { immediate: true },
 )
 onMounted(() => {
   registerLoadMore(async () => {
@@ -417,9 +417,27 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       <BookFilterBuilder v-model="filter" />
     </div>
 
+    <!-- Empty state: no matches with filters -->
+    <div v-if="!loading && books.length === 0 && activeFilterCount > 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+      <p class="text-sm font-medium text-foreground">No books match your filters</p>
+      <p class="text-xs text-muted-foreground">Try adjusting or clearing your filters to see more books.</p>
+      <button @click="clearFilters" class="text-xs text-primary hover:underline">Clear filters</button>
+    </div>
+
+    <!-- Empty state: no books in library -->
+    <div v-else-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
+      <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+        <BookOpen :size="28" class="text-muted-foreground/50" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <p class="text-sm font-medium text-foreground">Your library is empty</p>
+        <p class="text-xs text-muted-foreground max-w-xs">Once you add books to this library, they will appear here.</p>
+      </div>
+    </div>
+
     <!-- Grid view -->
     <div
-      v-show="viewMode === 'grid'"
+      v-show="viewMode === 'grid' && books.length > 0"
       class="grid"
       :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
     >
@@ -435,7 +453,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     </div>
 
     <!-- List view -->
-    <div v-show="viewMode === 'list'" class="flex flex-col divide-y divide-border">
+    <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
       <BookListRow
         v-for="book in books"
         :key="book.id"

@@ -92,11 +92,13 @@ function handleImageClick(e: MouseEvent) {
 let touchStartX = 0
 
 function onTouchStart(e: TouchEvent) {
-  touchStartX = e.touches[0].clientX
+  if (e.touches[0]) touchStartX = e.touches[0].clientX
 }
 
 function onTouchEnd(e: TouchEvent) {
-  const dx = e.changedTouches[0].clientX - touchStartX
+  const touch = e.changedTouches[0]
+  if (!touch) return
+  const dx = touch.clientX - touchStartX
   if (Math.abs(dx) < 50) return
   if (dx < 0) {
     if (direction.value === 'rtl') prevPage()

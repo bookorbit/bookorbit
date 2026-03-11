@@ -40,7 +40,7 @@ watch(
       newTotal,
     )
   },
-  { deep: true, immediate: true },
+  { immediate: true },
 )
 
 onMounted(() => {

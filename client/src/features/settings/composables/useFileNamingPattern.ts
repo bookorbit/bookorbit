@@ -1,13 +1,7 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import {
-  DEFAULT_DOWNLOAD_PATTERN,
-  EXAMPLE_PATTERN_METADATA,
-  resolveDownloadFilename,
-  resolveUploadPath,
-  validatePattern,
-} from '@projectx/types'
+import { DEFAULT_DOWNLOAD_PATTERN, EXAMPLE_PATTERN_METADATA, resolveDownloadFilename, resolveUploadPath, validatePattern } from '@projectx/types'
 import type { Library } from '@projectx/types'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 

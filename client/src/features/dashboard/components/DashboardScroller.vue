@@ -118,12 +118,15 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     </div>
 
     <!-- Empty -->
-    <div v-else-if="books.length === 0" class="px-5 pb-4 pt-1">
+    <div v-else-if="books.length === 0" class="flex flex-col items-center justify-center py-10 gap-3 text-center">
+      <div class="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+        <component :is="typeIcon" :size="20" class="text-muted-foreground/40" />
+      </div>
       <p class="text-sm text-muted-foreground">
         <template v-if="type === 'continue-reading'">No books in progress yet. Start reading one to see it here.</template>
         <template v-else-if="type === 'recently-added'">No books in your library yet.</template>
         <template v-else-if="type === 'lens'">No books match this lens.</template>
-        <template v-else>No unread books found.</template>
+        <template v-else>No books found.</template>
       </p>
     </div>
 

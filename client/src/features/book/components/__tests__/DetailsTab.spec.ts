@@ -39,6 +39,8 @@ const globalStubs = {
     DialogOverlay: { template: '<div />' },
     DialogContent: { template: '<div><slot /></div>' },
     DialogClose: { template: '<button><slot /></button>' },
+    AddToCollectionSheet: true,
+    DeleteBookDialog: true,
   },
 }
 

@@ -46,7 +46,7 @@ export function useBookQuery(libraryId: Ref<number | null>) {
       if (pagination.page === 0) {
         items.value = page.items
       } else {
-        items.value.push(...page.items)
+        items.value = [...items.value, ...page.items]
       }
       total.value = page.total
       pagination.page++

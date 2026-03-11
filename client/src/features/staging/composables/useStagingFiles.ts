@@ -44,10 +44,12 @@ export function useStagingFiles() {
         if (reqId !== fetchReqSeq) return
         items.value = data.items
         total.value = data.total
+        loading.value = false
       }
-    } finally {
-      if (reqId !== fetchReqSeq) return
-      loading.value = false
+    } catch {
+      if (reqId === fetchReqSeq) {
+        loading.value = false
+      }
     }
   }
 

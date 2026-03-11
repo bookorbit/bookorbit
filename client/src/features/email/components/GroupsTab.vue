@@ -43,6 +43,11 @@ async function remove(g: EmailGroup) {
   }
 }
 
+function cancelCreate() {
+  showCreate.value = false
+  newGroupName.value = ''
+}
+
 function toggleExpand(id: number) {
   expandedGroupId.value = expandedGroupId.value === id ? null : id
   if (expandedGroupId.value !== id) addingToGroupId.value = null
@@ -120,7 +125,7 @@ function availableRecipients(group: EmailGroup) {
         </button>
         <button
           class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-          @click="showCreate = false; newGroupName = ''"
+          @click="cancelCreate"
         >
           Cancel
         </button>

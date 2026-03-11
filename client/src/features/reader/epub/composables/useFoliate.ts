@@ -109,7 +109,8 @@ export function useFoliate(
         const infoRes = await api(`/api/v1/epub/${bookId}/info`)
         if (!infoRes.ok) throw new Error(`Failed to fetch EPUB info: ${infoRes.status}`)
         const bookInfo = await infoRes.json()
-        const makeStreamingBook = (window as Record<string, unknown>).makeStreamingBook as
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const makeStreamingBook = (window as any).makeStreamingBook as
           | ((id: number, base: string, info: unknown, token: string | null) => Promise<unknown>)
           | undefined
         if (!makeStreamingBook) throw new Error('makeStreamingBook not available')

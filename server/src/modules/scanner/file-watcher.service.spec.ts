@@ -1,6 +1,7 @@
 import { FileWatcherService } from './file-watcher.service';
 import { FileEventProcessorService } from './file-event-processor.service';
 import { ScanGateway } from './scan.gateway';
+import { ScannerService } from './scanner.service';
 
 function makeService() {
   const processor = {
@@ -15,9 +16,13 @@ function makeService() {
     emitBookRestored: jest.fn(),
   } as unknown as ScanGateway;
 
+  const scannerService = {
+    startScanAsync: jest.fn(),
+  } as unknown as ScannerService;
+
   const db = {} as any;
-  const service = new FileWatcherService(db, processor, gateway);
-  return { service, processor, gateway };
+  const service = new FileWatcherService(db, processor, gateway, scannerService);
+  return { service, processor, gateway, scannerService };
 }
 
 beforeEach(() => jest.useFakeTimers());
@@ -31,7 +36,7 @@ describe('process()', () => {
     const missing = { type: 'book-missing', libraryId: 1, bookIds: [10, 11] };
     processor.handleUnlink = jest.fn().mockResolvedValue(missing);
 
-    await (service as any).process('delete', '/books/Author/book.epub');
+    await (service as any).process('delete', '/books/Author/book.epub', 1);
 
     expect(gateway.emitBookMissing).toHaveBeenCalledWith({ libraryId: 1, bookIds: [10, 11] });
   });
@@ -42,7 +47,7 @@ describe('process()', () => {
     processor.handleUnlink = jest.fn().mockResolvedValue({ type: 'noop' });
     processor.handleUnlinkDir = jest.fn().mockResolvedValue(missing);
 
-    await (service as any).process('delete', '/books/Author');
+    await (service as any).process('delete', '/books/Author', 3);
 
     expect(processor.handleUnlink).toHaveBeenCalledWith('/books/Author');
     expect(processor.handleUnlinkDir).toHaveBeenCalledWith('/books/Author');
@@ -54,17 +59,27 @@ describe('process()', () => {
     const restored = { type: 'book-restored', libraryId: 1, bookIds: [7] };
     processor.handleCreate = jest.fn().mockResolvedValue(restored);
 
-    await (service as any).process('create', '/books/Author/book.epub');
+    await (service as any).process('create', '/books/Author/book.epub', 1);
 
     expect(processor.handleCreate).toHaveBeenCalledWith('/books/Author/book.epub');
     expect((gateway as any).emitBookRestored).toHaveBeenCalledWith({ libraryId: 1, bookIds: [7] });
     expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
 
+  it('schedules a scan when handleCreate returns noop (genuinely new file)', async () => {
+    const { service, scannerService } = makeService();
+    const scheduleScanSpy = jest.spyOn(service as any, 'scheduleScan');
+
+    await (service as any).process('create', '/books/new.epub', 5);
+
+    expect(scheduleScanSpy).toHaveBeenCalledWith(5);
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled(); // called after debounce, not immediately
+  });
+
   it('emits nothing when both handlers return noop', async () => {
     const { service, gateway } = makeService();
 
-    await (service as any).process('delete', '/nowhere/file.epub');
+    await (service as any).process('delete', '/nowhere/file.epub', 1);
 
     expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
@@ -77,37 +92,37 @@ describe('schedule() debounce', () => {
     const { service } = makeService();
     const processSpy = jest.spyOn(service as any, 'process').mockResolvedValue(undefined);
 
-    (service as any).schedule('delete', '/books/file.epub');
-    (service as any).schedule('delete', '/books/file.epub');
-    (service as any).schedule('delete', '/books/file.epub');
+    (service as any).schedule('delete', '/books/file.epub', 1);
+    (service as any).schedule('delete', '/books/file.epub', 1);
+    (service as any).schedule('delete', '/books/file.epub', 1);
 
     jest.runAllTimers();
     await Promise.resolve();
 
     expect(processSpy).toHaveBeenCalledTimes(1);
-    expect(processSpy).toHaveBeenCalledWith('delete', '/books/file.epub');
+    expect(processSpy).toHaveBeenCalledWith('delete', '/books/file.epub', 1);
   });
 
   it('last event type wins when delete and create race for the same path', async () => {
     const { service } = makeService();
     const processSpy = jest.spyOn(service as any, 'process').mockResolvedValue(undefined);
 
-    (service as any).schedule('delete', '/books/file.epub');
-    (service as any).schedule('create', '/books/file.epub'); // overrides delete
+    (service as any).schedule('delete', '/books/file.epub', 1);
+    (service as any).schedule('create', '/books/file.epub', 1); // overrides delete
 
     jest.runAllTimers();
     await Promise.resolve();
 
     expect(processSpy).toHaveBeenCalledTimes(1);
-    expect(processSpy).toHaveBeenCalledWith('create', '/books/file.epub');
+    expect(processSpy).toHaveBeenCalledWith('create', '/books/file.epub', 1);
   });
 
   it('does not debounce events for different paths', async () => {
     const { service } = makeService();
     const processSpy = jest.spyOn(service as any, 'process').mockResolvedValue(undefined);
 
-    (service as any).schedule('delete', '/books/file-a.epub');
-    (service as any).schedule('delete', '/books/file-b.epub');
+    (service as any).schedule('delete', '/books/file-a.epub', 1);
+    (service as any).schedule('delete', '/books/file-b.epub', 1);
 
     jest.runAllTimers();
     await Promise.resolve();

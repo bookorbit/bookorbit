@@ -33,7 +33,7 @@ function useDragList(getList: () => string[], onUpdate: (v: string[]) => void) {
     if (dragFrom.value === null || dragOver.value === null || dragFrom.value === dragOver.value) return
     const list = [...getList()]
     const [item] = list.splice(dragFrom.value, 1)
-    list.splice(dragOver.value, 0, item)
+    if (item !== undefined) list.splice(dragOver.value, 0, item)
     onUpdate(list)
     dragFrom.value = null
     dragOver.value = null

@@ -4,10 +4,7 @@ import { toast } from 'vue-sonner'
 import { useCoverVersions } from './useCoverVersions'
 import { useRefreshingBooks } from './useRefreshingBooks'
 
-export function useBookBulkActions(
-  selectedIds: Ref<Set<number>>,
-  onDeleted: (ids: number[]) => void,
-) {
+export function useBookBulkActions(selectedIds: Ref<Set<number>>, onDeleted: (ids: number[]) => void) {
   const { bumpVersion } = useCoverVersions()
   const { markRefreshing, clearRefreshing } = useRefreshingBooks()
 
@@ -37,9 +34,17 @@ export function useBookBulkActions(
           if (!line.startsWith('data: ')) continue
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.bookId !== undefined) { bumpVersion(data.bookId); clearRefreshing([data.bookId]) }
-            if (data.done) { processed = data.processed; failed = data.failed }
-          } catch { /* ignore malformed SSE line */ }
+            if (data.bookId !== undefined) {
+              bumpVersion(data.bookId)
+              clearRefreshing([data.bookId])
+            }
+            if (data.done) {
+              processed = data.processed
+              failed = data.failed
+            }
+          } catch {
+            /* ignore malformed SSE line */
+          }
         }
       }
     } finally {
@@ -78,9 +83,17 @@ export function useBookBulkActions(
           if (!line.startsWith('data: ')) continue
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.bookId !== undefined) { bumpVersion(data.bookId); clearRefreshing([data.bookId]) }
-            if (data.done) { processed = data.processed; updated = data.updated }
-          } catch { /* ignore malformed SSE line */ }
+            if (data.bookId !== undefined) {
+              bumpVersion(data.bookId)
+              clearRefreshing([data.bookId])
+            }
+            if (data.done) {
+              processed = data.processed
+              updated = data.updated
+            }
+          } catch {
+            /* ignore malformed SSE line */
+          }
         }
       }
     } finally {
@@ -135,4 +148,3 @@ export function useBookBulkActions(
     handleDeleteSelected,
   }
 }
-

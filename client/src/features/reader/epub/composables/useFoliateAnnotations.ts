@@ -78,25 +78,29 @@ export function useFoliateAnnotations() {
 
   function addAnnotation(view: unknown, cfi: string, color = '#FACC15', style = 'highlight') {
     annotationStyleMap.set(cfi, { color, style })
-    ;(view as Record<string, unknown> | null)?.addAnnotation?.({ value: cfi })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(view as any)?.addAnnotation?.({ value: cfi })
   }
 
   function addAnnotations(view: unknown, anns: { cfi: string; color: string; style: string }[]) {
     for (const ann of anns) {
       annotationStyleMap.set(ann.cfi, { color: ann.color, style: ann.style })
-      ;(view as Record<string, unknown> | null)?.addAnnotation?.({ value: ann.cfi })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(view as any)?.addAnnotation?.({ value: ann.cfi })
     }
   }
 
   function deleteAnnotation(view: unknown, cfi: string) {
     annotationStyleMap.delete(cfi)
-    ;(view as Record<string, unknown> | null)?.deleteAnnotation?.({ value: cfi })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(view as any)?.deleteAnnotation?.({ value: cfi })
   }
 
   function reAddAll(view: unknown) {
     setTimeout(() => {
       for (const [cfi] of annotationStyleMap) {
-        ;(view as Record<string, unknown> | null)?.addAnnotation?.({ value: cfi })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(view as any)?.addAnnotation?.({ value: cfi })
       }
     }, 100)
   }

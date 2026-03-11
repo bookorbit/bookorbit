@@ -554,7 +554,7 @@ describe('BookService', () => {
       expect(onProgress).toHaveBeenNthCalledWith(2, 2);
     });
 
-    it('deleteBooks verifies access and removes cover directories without failing on rm errors', async () => {
+    it('deleteBooks verifies access, removes book files, and removes cover directories without failing on rm errors', async () => {
       const { service, bookRepo, libraryService } = makeService();
       const user = makeUser();
       const warnSpy = jest.spyOn((service as unknown as { logger: { warn: (message: string) => void } }).logger, 'warn').mockImplementation();
@@ -562,6 +562,10 @@ describe('BookService', () => {
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
         { id: 3, libraryId: 7 },
         { id: 4, libraryId: 9 },
+      ]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+        { bookId: 3, absolutePath: '/tmp/library/book3.epub', format: 'epub' },
+        { bookId: 4, absolutePath: '/tmp/library/book4.pdf', format: 'pdf' },
       ]);
       bookRepo.deleteByIds.mockResolvedValue(undefined);
       mockRm.mockRejectedValue(new Error('cannot delete'));
@@ -573,6 +577,8 @@ describe('BookService', () => {
       expect(bookRepo.deleteByIds).toHaveBeenCalledWith([3, 4]);
       expect(mockRm).toHaveBeenCalledWith('/tmp/books/covers/3', { recursive: true, force: true });
       expect(mockRm).toHaveBeenCalledWith('/tmp/books/covers/4', { recursive: true, force: true });
+      expect(mockRm).toHaveBeenCalledWith('/tmp/library/book3.epub', { force: true });
+      expect(mockRm).toHaveBeenCalledWith('/tmp/library/book4.pdf', { force: true });
       expect(warnSpy).toHaveBeenCalled();
     });
   });

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus } from 'lucide-vue-next'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2 } from 'lucide-vue-next'
 import type { StagingFileStatus } from '@projectx/types'
 import { api } from '@/lib/api'
 import { SUPPORTED_FORMATS_ACCEPT, useStagingUpload } from '../composables/useStagingUpload'
@@ -28,11 +28,35 @@ const emit = defineEmits<{
   applyFetched: []
 }>()
 
-const { addFiles } = useStagingUpload()
+const { files: uploadFiles, isUploading, addFiles, clearCompleted } = useStagingUpload()
 const fileInput = ref<HTMLInputElement | null>(null)
 const rescanning = ref(false)
 const searchQuery = ref('')
 const showSearch = ref(false)
+const showUploadPopover = ref(false)
+
+const uploadTotal = computed(() => uploadFiles.value.length)
+const uploadDone = computed(() => uploadFiles.value.filter((f) => f.status === 'done').length)
+const uploadError = computed(() => uploadFiles.value.filter((f) => f.status === 'error').length)
+const uploadProgress = computed(() => (uploadTotal.value > 0 ? Math.round((uploadDone.value / uploadTotal.value) * 100) : 0))
+
+let popoverTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(isUploading, (uploading) => {
+  if (uploading) {
+    showUploadPopover.value = true
+    if (popoverTimer) clearTimeout(popoverTimer)
+  } else if (showUploadPopover.value) {
+    if (popoverTimer) clearTimeout(popoverTimer)
+    popoverTimer = setTimeout(() => {
+      showUploadPopover.value = false
+    }, 3000)
+  }
+})
+
+onUnmounted(() => {
+  if (popoverTimer) clearTimeout(popoverTimer)
+})
 
 const tabs: { label: string; value: StagingFileStatus | undefined }[] = [
   { label: 'All', value: undefined },
@@ -42,6 +66,7 @@ const tabs: { label: string; value: StagingFileStatus | undefined }[] = [
 ]
 
 function openFilePicker() {
+  clearCompleted()
   fileInput.value?.click()
 }
 
@@ -130,13 +155,40 @@ function clearSearch() {
         Rescan
       </button>
 
-      <button
-        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95"
-        @click="openFilePicker"
-      >
-        <Upload class="size-3.5" />
-        Upload
-      </button>
+      <div class="relative">
+        <button
+          class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95"
+          @click="openFilePicker"
+        >
+          <Loader2 v-if="isUploading" class="size-3.5 animate-spin" />
+          <Upload v-else class="size-3.5" />
+          Upload
+        </button>
+
+        <div
+          v-if="showUploadPopover"
+          class="absolute right-0 top-full mt-1.5 z-20 w-52 rounded-xl border border-border bg-card shadow-lg p-3 space-y-2.5"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-foreground">{{ isUploading ? 'Uploading...' : 'Done' }}</span>
+            <button class="text-muted-foreground hover:text-foreground transition-colors" @click="showUploadPopover = false">
+              <X class="size-3" />
+            </button>
+          </div>
+          <div class="h-1 rounded-full bg-muted overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all duration-300"
+              :class="uploadError > 0 && !isUploading ? 'bg-destructive' : 'bg-primary'"
+              :style="{ width: `${uploadProgress}%` }"
+            />
+          </div>
+          <div class="flex items-center gap-3 text-[11px]">
+            <span class="text-emerald-600 dark:text-emerald-400 tabular-nums">{{ uploadDone }} done</span>
+            <span v-if="uploadError > 0" class="text-destructive tabular-nums">{{ uploadError }} failed</span>
+            <span class="text-muted-foreground tabular-nums ml-auto">{{ uploadTotal }} total</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="hasSelection" class="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
