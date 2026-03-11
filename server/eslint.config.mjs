@@ -15,7 +15,7 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.jest,
+        ...globals.vitest,
       },
       sourceType: 'commonjs',
       parserOptions: {
@@ -39,7 +39,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',

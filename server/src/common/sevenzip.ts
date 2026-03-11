@@ -24,9 +24,11 @@ export async function getSevenZip(): Promise<SevenZipModule> {
   if (_instance) return _instance;
 
   if (!_instancePromise) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const factory = require('7z-wasm') as (opts?: object) => Promise<SevenZipModule>;
-    _instancePromise = factory()
+    _instancePromise = import('7z-wasm')
+      .then((mod) => {
+        const factory = (mod.default ?? mod) as unknown as (opts?: object) => Promise<SevenZipModule>;
+        return factory();
+      })
       .then((module) => {
         _instance = module;
         return module;
