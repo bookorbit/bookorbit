@@ -173,14 +173,14 @@ async function saveSettings() {
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
   <template v-else>
     <!-- New device token display -->
-    <div v-if="newDeviceSyncUrl" class="mb-8 border-2 border-primary/30 rounded-xl p-6 bg-primary/5 shadow-sm">
-      <div class="flex items-start justify-between gap-4 mb-4">
+    <div v-if="newDeviceSyncUrl" class="mb-8 border-2 border-primary/30 rounded-xl p-4 bg-primary/5 shadow-sm">
+      <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
-            <Check :size="18" stroke-width="3" />
+          <div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+            <Check :size="13" stroke-width="3" />
           </div>
           <div>
-            <p class="text-base font-semibold text-foreground leading-none mb-1">Device paired successfully</p>
+            <p class="settings-label leading-none mb-0.5">Device paired successfully</p>
             <p class="settings-hint">You're ready to set up your Kobo. Follow the instructions below.</p>
           </div>
         </div>
@@ -243,8 +243,8 @@ async function saveSettings() {
       </div>
 
       <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-10 bg-card text-center shadow-sm">
-        <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-          <Tablet :size="24" class="text-muted-foreground/50" />
+        <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+          <Tablet :size="18" class="text-muted-foreground/50" />
         </div>
         <p class="text-sm font-medium text-foreground">No devices yet</p>
         <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">
@@ -261,9 +261,9 @@ async function saveSettings() {
               <X :size="14" />
             </button>
           </div>
-          <div v-else class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
-              <Tablet :size="20" />
+          <div v-else class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
+              <Tablet :size="16" />
             </div>
             <div class="flex-1 min-w-0">
               <p class="settings-label truncate leading-none mb-1.5">{{ device.name }}</p>
@@ -330,7 +330,7 @@ async function saveSettings() {
                 <label class="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Reading</label>
                 <span class="text-xs font-mono text-primary font-bold">{{ readingThreshold }}%</span>
               </div>
-              <input v-model.number="readingThreshold" type="range" min="0" max="99" step="1" class="w-full accent-primary cursor-pointer" />
+              <input v-model.number="readingThreshold" type="range" min="0.5" max="10" step="0.5" class="w-full accent-primary cursor-pointer" />
               <p class="text-[12px] text-muted-foreground leading-tight">Minimum percentage to move a book to "Reading".</p>
             </div>
             <div class="space-y-2">
@@ -338,7 +338,7 @@ async function saveSettings() {
                 <label class="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">Mark as Finished</label>
                 <span class="text-xs font-mono text-primary font-bold">{{ finishedThreshold }}%</span>
               </div>
-              <input v-model.number="finishedThreshold" type="range" min="1" max="100" step="1" class="w-full accent-primary cursor-pointer" />
+              <input v-model.number="finishedThreshold" type="range" min="75" max="100" step="1" class="w-full accent-primary cursor-pointer" />
               <p class="text-[12px] text-muted-foreground leading-tight">Percentage threshold to mark a book as "Finished".</p>
             </div>
           </div>
@@ -360,48 +360,6 @@ async function saveSettings() {
           <button class="settings-btn-primary" :disabled="savingSettings" @click="saveSettings()">
             {{ savingSettings ? 'Saving...' : 'Save Sync Settings' }}
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Help -->
-    <div class="border border-border rounded-lg bg-muted/40 p-6">
-      <div class="flex items-center gap-2 mb-4 text-foreground/80">
-        <Tablet :size="18" />
-        <p class="text-sm font-bold uppercase tracking-widest">Setup Guide</p>
-      </div>
-      <div class="grid sm:grid-cols-2 gap-8">
-        <div class="space-y-4">
-          <div class="flex gap-4">
-            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">1</div>
-            <p class="text-sm text-muted-foreground leading-relaxed">
-              Register your device above and copy the unique <span class="text-foreground font-medium">Sync URL</span>.
-            </p>
-          </div>
-          <div class="flex gap-4">
-            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">2</div>
-            <p class="text-sm text-muted-foreground leading-relaxed">
-              On your Kobo, go to <span class="text-foreground font-medium">Settings → Account → Add account → Other</span>.
-            </p>
-          </div>
-          <div class="flex gap-4">
-            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">3</div>
-            <p class="text-sm text-muted-foreground leading-relaxed">Enter the URL. Use any dummy text for username/password.</p>
-          </div>
-        </div>
-        <div class="space-y-4">
-          <div class="flex gap-4">
-            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">4</div>
-            <p class="text-sm text-muted-foreground leading-relaxed">
-              Enable <span class="text-foreground font-medium">"Sync to Kobo"</span> on any collection in the app.
-            </p>
-          </div>
-          <div class="flex gap-4">
-            <div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">5</div>
-            <p class="text-sm text-muted-foreground leading-relaxed">
-              Perform a <span class="text-foreground font-medium">Sync</span> on your device to fetch your books.
-            </p>
-          </div>
         </div>
       </div>
     </div>

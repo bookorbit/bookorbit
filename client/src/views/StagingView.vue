@@ -155,7 +155,6 @@ async function handleApplyFetched() {
       applyFetchedResult.value = null
     }, 4000)
   }
-  clearSelection()
   refresh()
 }
 

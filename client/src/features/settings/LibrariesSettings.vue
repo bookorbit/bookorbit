@@ -262,24 +262,24 @@ function coverRefreshLabel(libraryId: number): string {
   <div class="space-y-3">
     <div v-for="lib in libraries" :key="lib.id" class="rounded-xl border border-border bg-card overflow-hidden">
       <div class="px-5 py-4">
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
           <!-- Icon -->
           <RouterLink
             :to="{ name: 'library', params: { id: lib.id } }"
-            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 hover:bg-primary/15 transition-colors"
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
           >
-            <component :is="getIconComponent(lib.icon)" :size="22" class="text-primary" />
+            <component :is="getIconComponent(lib.icon)" :size="16" class="text-primary" />
           </RouterLink>
 
           <!-- Name + stats -->
           <div class="flex-1 min-w-0">
             <RouterLink
               :to="{ name: 'library', params: { id: lib.id } }"
-              class="text-base font-semibold text-foreground hover:text-primary transition-colors truncate block leading-snug"
+              class="settings-label hover:text-primary transition-colors truncate block leading-snug"
             >
               {{ lib.name }}
             </RouterLink>
-            <div class="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5">
+            <div class="flex items-center flex-wrap gap-x-3 gap-y-1 mt-0.5">
               <span v-if="stats[lib.id]" class="flex items-center gap-1 text-xs text-muted-foreground">
                 <BookOpen :size="11" />
                 {{ stats[lib.id]?.totalBooks }} book{{ stats[lib.id]?.totalBooks === 1 ? '' : 's' }}
@@ -377,8 +377,8 @@ function coverRefreshLabel(libraryId: number): string {
 
     <!-- Empty state -->
     <div v-if="libraries.length === 0" class="rounded-xl border border-dashed border-border bg-card/50 px-8 py-16 text-center">
-      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mx-auto mb-4">
-        <FolderOpen :size="32" class="text-muted-foreground/60" />
+      <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mx-auto mb-4">
+        <FolderOpen :size="22" class="text-muted-foreground/60" />
       </div>
       <p class="text-sm font-medium text-foreground mb-1">No libraries yet</p>
       <p class="text-sm text-muted-foreground mb-5">Add a library to start organizing your books.</p>

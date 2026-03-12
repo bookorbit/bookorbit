@@ -3,13 +3,13 @@ import { IsBoolean, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validato
 export class UpdateSettingsDto {
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(100)
+  @Min(0.5)
+  @Max(10)
   readingThreshold?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Min(75)
   @Max(100)
   finishedThreshold?: number;
 
@@ -28,6 +28,6 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(10000)
+  @Max(500)
   kepubConversionLimitMb?: number;
 }

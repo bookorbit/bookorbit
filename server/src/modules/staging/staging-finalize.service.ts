@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { basename, extname, join } from 'path';
+import { basename, dirname, extname, join } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, ilike, inArray, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -156,10 +156,11 @@ export class StagingFinalizeService implements OnModuleInit {
       let bookId: number;
       try {
         const { size } = await stat(destPath);
+        const bookFolderPath = dirname(destPath) === folder.path ? destPath : dirname(destPath);
         ({ bookId } = await this.processor.createBookRecord(
           libraryId,
           folder.id,
-          folder.path,
+          bookFolderPath,
           destPath,
           destPath.substring(folder.path.length + 1),
           format,

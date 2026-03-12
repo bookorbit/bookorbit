@@ -65,7 +65,7 @@ function toggleOverlay(key: CardOverlayKey) {
             <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
               <TooltipTrigger as-child>
                 <button
-                  class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                  class="w-5 h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
                   :style="{
                     backgroundColor: opt.color,
                     outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
@@ -82,7 +82,7 @@ function toggleOverlay(key: CardOverlayKey) {
             <Tooltip v-for="opt in ACCENT_PASTEL" :key="opt.id">
               <TooltipTrigger as-child>
                 <button
-                  class="w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                  class="w-5 h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
                   :style="{
                     backgroundColor: opt.color,
                     outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',

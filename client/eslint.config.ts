@@ -33,14 +33,7 @@ export default defineConfigWithVueTs(
     },
   },
 
-  {
-    files: ['src/**/*.vue'],
-    rules: {
-      'vue/v-on-handler-style': ['warn', ['method', 'inline-function']],
-    },
-  },
-
-  ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
+...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
   skipFormatting,
 )

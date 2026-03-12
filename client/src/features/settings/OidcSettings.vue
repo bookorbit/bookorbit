@@ -119,7 +119,7 @@ async function testConnection() {
             <p class="settings-label">Provider Name</p>
             <p class="settings-hint">Shown on the login button.</p>
           </div>
-          <input v-model="form.providerName" type="text" placeholder="Authentik" class="input-field w-52" />
+          <input v-model="form.providerName" type="text" placeholder="Authentik" class="input-field w-72" />
         </div>
         <div class="flex items-start justify-between gap-8 px-5 py-4 bg-card">
           <div class="shrink-0 pt-0.5">
@@ -128,7 +128,7 @@ async function testConnection() {
           </div>
           <div class="flex flex-col items-end gap-2">
             <div class="flex items-center gap-2">
-              <input v-model="form.issuerUri" type="url" placeholder="https://accounts.example.com" class="input-field w-64" />
+              <input v-model="form.issuerUri" type="url" placeholder="https://accounts.example.com" class="input-field w-80" />
               <button
                 type="button"
                 :disabled="testing || !form.issuerUri"
@@ -151,7 +151,7 @@ async function testConnection() {
         </div>
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Client ID</p>
-          <input v-model="form.clientId" type="text" class="input-field w-52" />
+          <input v-model="form.clientId" type="text" class="input-field w-72" />
         </div>
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Client Secret</p>
@@ -160,12 +160,12 @@ async function testConnection() {
             type="password"
             placeholder="Leave blank to keep existing"
             autocomplete="new-password"
-            class="input-field w-52"
+            class="input-field w-72"
           />
         </div>
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Scopes</p>
-          <input v-model="form.scopes" type="text" class="input-field w-52" />
+          <input v-model="form.scopes" type="text" class="input-field w-72" />
         </div>
       </div>
     </div>
@@ -176,19 +176,19 @@ async function testConnection() {
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Username claim</p>
-          <input v-model="form.claimMapping.username" type="text" class="input-field w-52" />
+          <input v-model="form.claimMapping.username" type="text" class="input-field w-72" />
         </div>
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Name claim</p>
-          <input v-model="form.claimMapping.name" type="text" class="input-field w-52" />
+          <input v-model="form.claimMapping.name" type="text" class="input-field w-72" />
         </div>
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Email claim</p>
-          <input v-model="form.claimMapping.email" type="text" class="input-field w-52" />
+          <input v-model="form.claimMapping.email" type="text" class="input-field w-72" />
         </div>
         <div class="flex items-center justify-between gap-8 px-5 py-4 bg-card">
           <p class="settings-label shrink-0">Groups claim</p>
-          <input v-model="form.claimMapping.groups" type="text" class="input-field w-52" />
+          <input v-model="form.claimMapping.groups" type="text" class="input-field w-72" />
         </div>
       </div>
     </div>

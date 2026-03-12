@@ -107,7 +107,7 @@ onMounted(async () => {
                 <p v-if="globalError" class="absolute -bottom-5 left-0 text-[11px] text-destructive font-medium">{{ globalError }}</p>
               </div>
               <button
-                class="flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                class="flex items-center gap-2 h-8 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                 :disabled="savingGlobal || !!globalError || loadingGlobal"
                 @click="saveGlobalPattern"
               >
@@ -145,7 +145,7 @@ onMounted(async () => {
                 <p v-if="downloadError" class="absolute -bottom-5 left-0 text-[11px] text-destructive font-medium">{{ downloadError }}</p>
               </div>
               <button
-                class="flex items-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                class="flex items-center gap-2 h-8 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                 :disabled="savingDownload || !!downloadError || loadingDownload"
                 @click="saveDownloadPattern"
               >
