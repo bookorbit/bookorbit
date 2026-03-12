@@ -22,6 +22,7 @@ export interface MetadataRefreshPreview {
   amazonId?: string | null
   hardcoverId?: string | null
   openLibraryId?: string | null
+  itunesId?: string | null
 }
 
 export function useRefreshMetadata() {

@@ -43,6 +43,7 @@ export class MetadataFetchService {
         amazonId: true,
         hardcoverId: true,
         openLibraryId: true,
+        itunesId: true,
       },
     });
     if (!row) return {};
@@ -52,6 +53,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.AMAZON]: row.amazonId ?? undefined,
       [MetadataProviderKey.HARDCOVER]: row.hardcoverId ?? undefined,
       [MetadataProviderKey.OPEN_LIBRARY]: row.openLibraryId ?? undefined,
+      [MetadataProviderKey.ITUNES]: row.itunesId ?? undefined,
     };
   }
 

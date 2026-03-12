@@ -28,6 +28,7 @@ const providerIdFields = [
   { field: 'amazonId' as const, label: 'Amazon' },
   { field: 'hardcoverId' as const, label: 'Hardcover' },
   { field: 'openLibraryId' as const, label: 'OpenLibrary' },
+  { field: 'itunesId' as const, label: 'iTunes' },
 ]
 
 function setIntField(field: 'publishedYear' | 'pageCount', e: Event) {
@@ -98,6 +99,7 @@ async function autoFill() {
   if (preview.amazonId != null) form.amazonId = preview.amazonId
   if (preview.hardcoverId != null) form.hardcoverId = preview.hardcoverId
   if (preview.openLibraryId != null) form.openLibraryId = preview.openLibraryId
+  if (preview.itunesId != null) form.itunesId = preview.itunesId
   if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
 }
 </script>

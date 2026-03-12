@@ -27,6 +27,7 @@ export function useMetadataEditor() {
     amazonId: null as string | null,
     hardcoverId: null as string | null,
     openLibraryId: null as string | null,
+    itunesId: null as string | null,
   })
 
   const snapshot = ref(JSON.stringify(form))
@@ -54,6 +55,7 @@ export function useMetadataEditor() {
     form.amazonId = book.providerIds.amazon ?? null
     form.hardcoverId = book.providerIds.hardcover ?? null
     form.openLibraryId = book.providerIds.openLibrary ?? null
+    form.itunesId = book.providerIds.itunes ?? null
     snapshot.value = JSON.stringify(form)
     error.value = null
   }

@@ -22,6 +22,7 @@ export interface XmpParsed {
   amazonId: string | null;
   hardcoverId: string | null;
   openLibraryId: string | null;
+  itunesId: string | null;
 }
 
 const xmpParser = new XMLParser({
@@ -147,5 +148,6 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     amazonId: str(merged[`${px}:amazonId`]),
     hardcoverId: str(merged[`${px}:hardcoverId`]),
     openLibraryId: str(merged[`${px}:openLibraryId`]),
+    itunesId: str(merged[`${px}:itunesId`]),
   };
 }

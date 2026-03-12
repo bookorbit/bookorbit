@@ -100,6 +100,9 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
   if (fieldMask.has('openLibraryId') && payload.openLibraryId != null) {
     lines.push(elem(`${px}:openLibraryId`, payload.openLibraryId));
   }
+  if (fieldMask.has('itunesId') && payload.itunesId != null) {
+    lines.push(elem(`${px}:itunesId`, payload.itunesId));
+  }
   if (fieldMask.has('tags') && payload.tags?.length) {
     lines.push(bagElem(`${px}:tags`, payload.tags));
   }

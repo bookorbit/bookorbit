@@ -70,6 +70,7 @@ const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; f
     fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
   },
   { key: 'openLibrary', label: 'Open Library', hint: 'The internet archive for books.', fields: [] },
+  { key: 'itunes', label: 'iTunes', hint: 'Apple Books and Audiobooks.', fields: [] },
 ]
 
 function statusFor(key: string) {

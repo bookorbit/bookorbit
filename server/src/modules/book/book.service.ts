@@ -54,6 +54,7 @@ export class BookService {
     amazonId?: string | null;
     hardcoverId?: string | null;
     openLibraryId?: string | null;
+    itunesId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -61,11 +62,12 @@ export class BookService {
     if (meta.amazonId) providerIds[MetadataProviderKey.AMAZON] = meta.amazonId;
     if (meta.hardcoverId) providerIds[MetadataProviderKey.HARDCOVER] = meta.hardcoverId;
     if (meta.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
+    if (meta.itunesId) providerIds[MetadataProviderKey.ITUNES] = meta.itunesId;
     return providerIds;
   }
 
   private applyResolvedProviderIds(
-    dto: Pick<UpdateBookMetadataDto, 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId'>,
+    dto: Pick<UpdateBookMetadataDto, 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId'>,
     providerIds: Partial<Record<MetadataProviderKey, string>>,
   ): void {
     if (providerIds[MetadataProviderKey.GOOGLE]) dto.googleBooksId = providerIds[MetadataProviderKey.GOOGLE];
@@ -73,6 +75,7 @@ export class BookService {
     if (providerIds[MetadataProviderKey.AMAZON]) dto.amazonId = providerIds[MetadataProviderKey.AMAZON];
     if (providerIds[MetadataProviderKey.HARDCOVER]) dto.hardcoverId = providerIds[MetadataProviderKey.HARDCOVER];
     if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) dto.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
+    if (providerIds[MetadataProviderKey.ITUNES]) dto.itunesId = providerIds[MetadataProviderKey.ITUNES];
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -306,6 +309,7 @@ export class BookService {
     if ('amazonId' in dto) scalarFields.amazonId = dto.amazonId ?? null;
     if ('hardcoverId' in dto) scalarFields.hardcoverId = dto.hardcoverId ?? null;
     if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
+    if ('itunesId' in dto) scalarFields.itunesId = dto.itunesId ?? null;
 
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();
@@ -454,6 +458,7 @@ export class BookService {
         amazonId?: string;
         hardcoverId?: string;
         openLibraryId?: string;
+        itunesId?: string;
       } = { ...resolved };
       this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
       return previewResult;
@@ -601,6 +606,7 @@ export class BookService {
         [MetadataProviderKey.AMAZON]: meta?.amazonId ?? null,
         [MetadataProviderKey.HARDCOVER]: meta?.hardcoverId ?? null,
         [MetadataProviderKey.OPEN_LIBRARY]: meta?.openLibraryId ?? null,
+        [MetadataProviderKey.ITUNES]: meta?.itunesId ?? null,
       },
       authors: authorRows,
       genres: genreRows.map((g) => g.name),

@@ -17,6 +17,7 @@ const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
   MetadataProviderKey.AMAZON,
   MetadataProviderKey.GOODREADS,
   MetadataProviderKey.OPEN_LIBRARY,
+  MetadataProviderKey.ITUNES,
 ];
 
 const DEFAULT_MERGE_STRATEGY: MergeStrategy = 'overwriteIfProvided';

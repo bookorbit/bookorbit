@@ -80,6 +80,7 @@ export class FileWriteRepository {
       amazonId: meta.amazonId,
       hardcoverId: meta.hardcoverId,
       openLibraryId: meta.openLibraryId,
+      itunesId: meta.itunesId,
       authors: authorRows,
       genres: genreRows.map((g) => g.name),
       tags: tagRows.map((t) => t.name),

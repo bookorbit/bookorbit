@@ -39,6 +39,7 @@ describe('ProviderConfigService', () => {
       goodreads: { enabled: true },
       hardcover: { enabled: false, apiKey: '' },
       openLibrary: { enabled: true },
+      itunes: { enabled: true },
     });
   });
 
@@ -128,6 +129,7 @@ describe('ProviderConfigService', () => {
       goodreads: { enabled: false },
       hardcover: { enabled: true, apiKey: '' },
       openLibrary: { enabled: true },
+      itunes: { enabled: true },
     });
 
     expect(statuses.map((s) => s.key)).toEqual([
@@ -136,6 +138,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.GOODREADS,
       MetadataProviderKey.HARDCOVER,
       MetadataProviderKey.OPEN_LIBRARY,
+      MetadataProviderKey.ITUNES,
     ]);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('Recommended for higher rate limits');
     expect(statuses.find((s) => s.key === MetadataProviderKey.AMAZON)?.hint).toContain('Cookie recommended');
@@ -150,6 +153,7 @@ describe('ProviderConfigService', () => {
       goodreads: { enabled: true },
       hardcover: { enabled: true, apiKey: 'h-key' },
       openLibrary: { enabled: true },
+      itunes: { enabled: true },
     });
 
     expect(statuses.find((s) => s.key === MetadataProviderKey.HARDCOVER)?.configured).toBe(true);

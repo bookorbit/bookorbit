@@ -1,5 +1,5 @@
 {
-  "id": "2ab89874-42c9-4e63-8fd4-376a059ca13c",
+  "id": "63e55df9-2027-4680-adfd-3b3d0ae8f1be",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1341,6 +1341,12 @@
         },
         "open_library_id": {
           "name": "open_library_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "itunes_id": {
+          "name": "itunes_id",
           "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false

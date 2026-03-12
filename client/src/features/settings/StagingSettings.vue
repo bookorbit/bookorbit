@@ -144,7 +144,7 @@ async function onMetadataModeChange(event: Event) {
         <div>
           <p class="settings-label">Auto-fetch metadata from providers</p>
           <p class="settings-hint">
-            Automatically fetch metadata from configured providers (Google Books, Open Library, etc.) after a file is added to staging.
+            Automatically fetch metadata from configured providers (Google Books, iTunes, Open Library, etc.) after a file is added to staging.
           </p>
         </div>
         <ToggleSwitch :model-value="autoFetch" :disabled="saving" class="ml-4" @update:model-value="() => toggle()" />

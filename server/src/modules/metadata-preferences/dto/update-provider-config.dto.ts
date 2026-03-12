@@ -27,4 +27,5 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) goodreads?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => HardcoverProviderConfigDto) hardcover?: HardcoverProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) openLibrary?: SimpleProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) itunes?: SimpleProviderConfigDto;
 }

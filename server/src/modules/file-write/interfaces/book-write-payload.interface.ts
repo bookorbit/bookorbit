@@ -19,6 +19,7 @@ export interface BookWritePayload {
   amazonId?: string | null;
   hardcoverId?: string | null;
   openLibraryId?: string | null;
+  itunesId?: string | null;
   coverBytes?: Buffer | null;
 }
 

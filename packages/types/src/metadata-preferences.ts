@@ -86,6 +86,7 @@ export interface ProviderConfigurations {
   goodreads: SimpleProviderConfig;
   hardcover: HardcoverProviderConfig;
   openLibrary: SimpleProviderConfig;
+  itunes: SimpleProviderConfig;
 }
 
 export interface ProviderStatus {

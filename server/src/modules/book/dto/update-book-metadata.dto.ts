@@ -21,4 +21,5 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(20) amazonId?: string | null;
   @IsOptional() @IsString() @MaxLength(50) hardcoverId?: string | null;
   @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
 }

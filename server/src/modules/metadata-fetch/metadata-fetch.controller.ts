@@ -7,21 +7,27 @@ import { MetadataSearchDto } from './dto/metadata-search.dto';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { MetadataSearchParams } from './providers/metadata-search-params';
+import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 
 @Controller('metadata-fetch')
 export class MetadataFetchController {
   constructor(
     private readonly metadataFetchService: MetadataFetchService,
     private readonly registry: ProviderRegistry,
+    private readonly providerConfig: ProviderConfigService,
   ) {}
 
   @Get('providers')
-  listProviders(): MetadataProviderInfo[] {
-    return this.registry.all().map((p) => ({
-      key: p.key,
-      label: p.label,
-      identifiable: p.identifiable,
-    }));
+  async listProviders(): Promise<MetadataProviderInfo[]> {
+    const config = await this.providerConfig.getConfig();
+    return this.registry
+      .all()
+      .filter((p) => config[p.key]?.enabled !== false)
+      .map((p) => ({
+        key: p.key,
+        label: p.label,
+        identifiable: p.identifiable,
+      }));
   }
 
   @Sse('stream')

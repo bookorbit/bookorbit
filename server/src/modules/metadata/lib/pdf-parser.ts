@@ -30,6 +30,7 @@ export interface PdfParsed {
   amazonId: string | null;
   hardcoverId: string | null;
   openLibraryId: string | null;
+  itunesId: string | null;
   coverBuffer: Buffer | null;
 }
 
@@ -110,6 +111,7 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
       amazonId: xmp?.amazonId ?? null,
       hardcoverId: xmp?.hardcoverId ?? null,
       openLibraryId: xmp?.openLibraryId ?? null,
+      itunesId: xmp?.itunesId ?? null,
       coverBuffer,
     };
   } catch {

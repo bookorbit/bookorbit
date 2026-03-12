@@ -50,6 +50,7 @@ export interface MetadataPatch {
   amazonId?: string | null
   hardcoverId?: string | null
   openLibraryId?: string | null
+  itunesId?: string | null
 }
 
 const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
@@ -69,7 +70,7 @@ const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'genres', label: 'Genres' },
 ]
 
-type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId'
+type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId'
 
 const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
@@ -77,6 +78,7 @@ const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | unde
   amazon: 'amazonId',
   hardcover: 'hardcoverId',
   openLibrary: 'openLibraryId',
+  itunes: 'itunesId',
 }
 
 const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
@@ -85,6 +87,7 @@ const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
   amazon: 'Amazon ID',
   hardcover: 'Hardcover ID',
   openLibrary: 'Open Library ID',
+  itunes: 'iTunes ID',
 }
 
 export function useMetadataDiff(current: MetadataSource, candidate: MetadataCandidate, currentCoverUrl?: string, currentProviderId?: string | null) {

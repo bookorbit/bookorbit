@@ -271,6 +271,7 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
     { field: 'hardcoverId', urnPrefix: 'urn:hardcover:' },
     { field: 'googleBooksId', urnPrefix: 'urn:google:' },
     { field: 'openLibraryId', urnPrefix: 'urn:openlibrary:' },
+    { field: 'itunesId', urnPrefix: 'urn:itunes:' },
   ];
 
   for (const { field, urnPrefix } of providerMappings) {

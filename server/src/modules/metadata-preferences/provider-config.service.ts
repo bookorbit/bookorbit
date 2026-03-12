@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   goodreads: { enabled: true },
   hardcover: { enabled: false, apiKey: '' },
   openLibrary: { enabled: true },
+  itunes: { enabled: true },
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -28,6 +29,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.GOODREADS]: 'Goodreads',
   [MetadataProviderKey.HARDCOVER]: 'Hardcover',
   [MetadataProviderKey.OPEN_LIBRARY]: 'Open Library',
+  [MetadataProviderKey.ITUNES]: 'iTunes',
 };
 
 @Injectable()
@@ -41,6 +43,7 @@ export class ProviderConfigService {
       goodreads: { ...DEFAULT_CONFIG.goodreads },
       hardcover: { ...DEFAULT_CONFIG.hardcover },
       openLibrary: { ...DEFAULT_CONFIG.openLibrary },
+      itunes: { ...DEFAULT_CONFIG.itunes },
     };
   }
 
@@ -58,6 +61,7 @@ export class ProviderConfigService {
         goodreads: { ...defaults.goodreads, ...asObject(stored.goodreads) },
         hardcover: { ...defaults.hardcover, ...asObject(stored.hardcover) },
         openLibrary: { ...defaults.openLibrary, ...asObject(stored.openLibrary) },
+        itunes: { ...defaults.itunes, ...asObject(stored.itunes) },
       };
     } catch {
       return defaults;
@@ -72,6 +76,7 @@ export class ProviderConfigService {
       goodreads: { ...current.goodreads, ...asObject(patch.goodreads) },
       hardcover: { ...current.hardcover, ...asObject(patch.hardcover) },
       openLibrary: { ...current.openLibrary, ...asObject(patch.openLibrary) },
+      itunes: { ...current.itunes, ...asObject(patch.itunes) },
     };
     const value = JSON.stringify(next);
     await this.db
@@ -114,6 +119,12 @@ export class ProviderConfigService {
         key: MetadataProviderKey.OPEN_LIBRARY,
         label: PROVIDER_LABELS[MetadataProviderKey.OPEN_LIBRARY],
         enabled: cfg.openLibrary.enabled,
+        configured: true,
+      },
+      {
+        key: MetadataProviderKey.ITUNES,
+        label: PROVIDER_LABELS[MetadataProviderKey.ITUNES],
+        enabled: cfg.itunes.enabled,
         configured: true,
       },
     ];

@@ -11,8 +11,9 @@ import { AmazonProvider } from './providers/amazon/amazon.provider';
 import { GoogleProvider } from './providers/google/google.provider';
 import { GoodreadsProvider } from './providers/goodreads/goodreads.provider';
 import { OpenLibraryProvider } from './providers/open-library/open-library.provider';
+import { ITunesProvider } from './providers/itunes/itunes.provider';
 
-const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider];
+const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider, ITunesProvider];
 
 @Module({
   imports: [MetadataPreferencesModule],

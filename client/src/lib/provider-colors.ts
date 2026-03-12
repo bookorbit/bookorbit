@@ -6,6 +6,7 @@ const PROVIDER_HEX: Record<string, string> = {
   amazon: '#FF9900',
   hardcover: '#4F47E5',
   openLibrary: '#E83B2A',
+  itunes: '#E252E9',
   auto: '#8B5CF6',
 }
 
@@ -17,6 +18,7 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   goodreads: 'Goodreads',
   hardcover: 'Hardcover',
   openLibrary: 'Open Lib',
+  itunes: 'iTunes',
   auto: 'Fetched',
 }
 

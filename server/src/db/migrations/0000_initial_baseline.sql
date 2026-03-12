@@ -188,6 +188,7 @@ CREATE TABLE "book_metadata" (
 	"amazon_id" varchar(20),
 	"hardcover_id" varchar(50),
 	"open_library_id" varchar(50),
+	"itunes_id" varchar(50),
 	"embedding" vector(256),
 	"last_written_at" timestamp,
 	"updated_at" timestamp DEFAULT now() NOT NULL

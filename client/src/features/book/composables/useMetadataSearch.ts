@@ -83,7 +83,7 @@ export function useMetadataSearch() {
     }
   }
 
-  const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'goodreads', 'hardcover', 'google', 'openLibrary']
+  const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'goodreads', 'hardcover', 'google', 'itunes', 'openLibrary']
 
   function sortResults(list: MetadataCandidate[]): MetadataCandidate[] {
     const byProvider = new Map<string, MetadataCandidate[]>()

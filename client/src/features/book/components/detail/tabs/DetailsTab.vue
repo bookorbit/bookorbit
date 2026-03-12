@@ -137,6 +137,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       fallback: 'OL',
     })
   }
+  if (ids.itunes) {
+    out.push({
+      key: 'itunes',
+      label: 'Apple Books',
+      url: `https://books.apple.com/book/id${ids.itunes}`,
+      iconUrl: 'https://www.apple.com/favicon.ico',
+      fallback: '',
+    })
+  }
   return out
 })
 

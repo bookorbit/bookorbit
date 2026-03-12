@@ -31,6 +31,7 @@ const ALL_FIELDS = new Set<BookWritePayloadKey>([
   'amazonId',
   'hardcoverId',
   'openLibraryId',
+  'itunesId',
   'coverBytes',
 ]);
 

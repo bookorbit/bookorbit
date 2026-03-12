@@ -4,6 +4,7 @@ export const MetadataProviderKey = {
   AMAZON: 'amazon',
   HARDCOVER: 'hardcover',
   OPEN_LIBRARY: 'openLibrary',
+  ITUNES: 'itunes',
 } as const;
 
 export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof MetadataProviderKey];
