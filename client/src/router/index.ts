@@ -49,22 +49,22 @@ const router = createRouter({
             {
               path: 'reader',
               name: 'settings-reader-general',
-              component: () => import('@/features/settings/ReaderSettings.vue'),
+              component: () => import('@/features/settings/ReaderAllSettings.vue'),
             },
             {
               path: 'reader/ebook',
               name: 'settings-reader-ebook',
-              component: () => import('@/features/settings/EbookSettings.vue'),
+              redirect: { name: 'settings-reader-general', query: { tab: 'ebook' } },
             },
             {
               path: 'reader/pdf',
               name: 'settings-reader-pdf',
-              component: () => import('@/features/settings/PdfSettings.vue'),
+              redirect: { name: 'settings-reader-general', query: { tab: 'pdf' } },
             },
             {
               path: 'reader/comics',
               name: 'settings-reader-comics',
-              component: () => import('@/features/settings/ComicsSettings.vue'),
+              redirect: { name: 'settings-reader-general', query: { tab: 'comics' } },
             },
             {
               path: 'admin/users',

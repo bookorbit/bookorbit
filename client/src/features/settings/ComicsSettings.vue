@@ -4,17 +4,31 @@ import type { CbxReaderSettings } from '@projectx/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const { effective, load, update, reset } = useReaderDefaultSettings<CbxReaderSettings>('cbx')
 
 onMounted(load)
 </script>
 
 <template>
-  <SettingsPageHeader title="Comics Reader" subtitle="Default settings applied when opening CBZ, CBR, and CB7 files.">
+  <SettingsPageHeader v-if="!props.embedded" title="Comics Reader" subtitle="Default settings applied when opening CBZ, CBR, and CB7 files.">
     <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
       Reset to defaults
     </button>
   </SettingsPageHeader>
+  <div v-else class="flex justify-end mb-4">
+    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
+      Reset to defaults
+    </button>
+  </div>
 
   <!-- View -->
   <div class="mb-6">

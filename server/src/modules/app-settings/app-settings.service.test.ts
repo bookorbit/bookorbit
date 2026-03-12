@@ -140,6 +140,7 @@ describe('AppSettingsService', () => {
       expect(result.threshold).toBe(85);
       expect(result.libraryId).toBeNull();
       expect(result.folderId).toBeNull();
+      expect(result.metadataMode).toBe('safe_merge');
     });
 
     it('parses stored values correctly', async () => {
@@ -148,6 +149,7 @@ describe('AppSettingsService', () => {
         { key: 'staging_auto_finalize_threshold', value: '90' },
         { key: 'staging_auto_finalize_library_id', value: '5' },
         { key: 'staging_auto_finalize_folder_id', value: '12' },
+        { key: 'staging_auto_finalize_metadata_mode', value: 'fetched_only' },
       ]);
 
       const result = await service.getAutoFinalizeSettings();
@@ -155,6 +157,7 @@ describe('AppSettingsService', () => {
       expect(result.threshold).toBe(90);
       expect(result.libraryId).toBe(5);
       expect(result.folderId).toBe(12);
+      expect(result.metadataMode).toBe('fetched_only');
     });
 
     it('returns null for library/folder when values are not valid numbers', async () => {
@@ -166,6 +169,14 @@ describe('AppSettingsService', () => {
       const result = await service.getAutoFinalizeSettings();
       expect(result.libraryId).toBeNull();
       expect(result.folderId).toBeNull();
+      expect(result.metadataMode).toBe('safe_merge');
+    });
+
+    it('falls back to safe_merge when metadata mode is invalid', async () => {
+      db.where.mockResolvedValue([{ key: 'staging_auto_finalize_metadata_mode', value: 'invalid_mode' }]);
+
+      const result = await service.getAutoFinalizeSettings();
+      expect(result.metadataMode).toBe('safe_merge');
     });
   });
 

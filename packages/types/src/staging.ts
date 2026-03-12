@@ -1,4 +1,5 @@
 export type StagingFileStatus = "pending" | "extracting" | "fetching" | "ready" | "error";
+export type StagingAutoFinalizeMetadataMode = "safe_merge" | "fetched_only" | "embedded_only";
 
 export interface StagingMetadata {
   title?: string;

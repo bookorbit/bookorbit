@@ -47,6 +47,11 @@ export class SeedService implements OnApplicationBootstrap {
       .values({ key: 'staging_auto_finalize_folder_id', value: '' })
       .onConflictDoNothing({ target: schema.appSettings.key });
 
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'staging_auto_finalize_metadata_mode', value: 'safe_merge' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
     const defaultOidcConfig = JSON.stringify({
       enabled: false,
       issuerUri: '',

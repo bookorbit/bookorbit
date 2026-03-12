@@ -6,6 +6,15 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const { user } = useAuth()
 
 const syncEnabled = computed(() => user.value?.settings?.syncReaderPreferences ?? false)
@@ -31,7 +40,7 @@ async function setStorageMode(sync: boolean) {
 </script>
 
 <template>
-  <SettingsPageHeader title="Reading" subtitle="General behavior that applies across all reader types." />
+  <SettingsPageHeader v-if="!props.embedded" title="Reading" subtitle="General behavior that applies across all reader types." />
 
   <!-- Preference storage -->
   <div class="mb-2">

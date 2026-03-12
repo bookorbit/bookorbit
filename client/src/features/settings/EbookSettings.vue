@@ -7,6 +7,15 @@ import { Check } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const { effective, load, update, reset } = useReaderDefaultSettings<EpubReaderSettings>('epub')
 
 onMounted(load)
@@ -22,11 +31,16 @@ const fontFamilies: { id: string | null; label: string }[] = [
 </script>
 
 <template>
-  <SettingsPageHeader title="eBook Reader" subtitle="Default settings applied when opening EPUB, MOBI, FB2, and TXT files.">
+  <SettingsPageHeader v-if="!props.embedded" title="eBook Reader" subtitle="Default settings applied when opening EPUB, MOBI, FB2, and TXT files.">
     <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
       Reset to defaults
     </button>
   </SettingsPageHeader>
+  <div v-else class="flex justify-end mb-4">
+    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
+      Reset to defaults
+    </button>
+  </div>
 
   <!-- Formatting source -->
   <div class="mb-6">

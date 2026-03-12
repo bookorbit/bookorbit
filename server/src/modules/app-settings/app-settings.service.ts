@@ -2,7 +2,12 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DEFAULT_UPLOAD_PATTERN, DEFAULT_FILE_WRITE_SETTINGS, type GlobalFileWriteSettings } from '@projectx/types';
+import {
+  DEFAULT_UPLOAD_PATTERN,
+  DEFAULT_FILE_WRITE_SETTINGS,
+  type GlobalFileWriteSettings,
+  type StagingAutoFinalizeMetadataMode,
+} from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -16,6 +21,7 @@ const APP_SETTING_KEYS = {
   STAGING_AUTO_FINALIZE_THRESHOLD: 'staging_auto_finalize_threshold',
   STAGING_AUTO_FINALIZE_LIBRARY_ID: 'staging_auto_finalize_library_id',
   STAGING_AUTO_FINALIZE_FOLDER_ID: 'staging_auto_finalize_folder_id',
+  STAGING_AUTO_FINALIZE_METADATA_MODE: 'staging_auto_finalize_metadata_mode',
   FILE_WRITE_SETTINGS: 'file_write_settings',
 } as const;
 
@@ -136,12 +142,14 @@ export class AppSettingsService {
     threshold: number;
     libraryId: number | null;
     folderId: number | null;
+    metadataMode: StagingAutoFinalizeMetadataMode;
   }> {
     const keys = [
       APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_ENABLED,
       APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_THRESHOLD,
       APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_LIBRARY_ID,
       APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_FOLDER_ID,
+      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_METADATA_MODE,
     ];
     const rows = await this.db.select().from(schema.appSettings).where(inArray(schema.appSettings.key, keys));
     const map = new Map(rows.map((r) => [r.key, r.value]));
@@ -156,6 +164,7 @@ export class AppSettingsService {
       threshold: parseInt(map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_THRESHOLD) ?? '85', 10),
       libraryId: libId && !isNaN(libId) ? libId : null,
       folderId: folderId && !isNaN(folderId) ? folderId : null,
+      metadataMode: parseAutoFinalizeMetadataMode(map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_METADATA_MODE)),
     };
   }
 
@@ -178,6 +187,11 @@ export class AppSettingsService {
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
     return merged;
   }
+}
+
+function parseAutoFinalizeMetadataMode(value: string | undefined): StagingAutoFinalizeMetadataMode {
+  if (value === 'fetched_only' || value === 'embedded_only') return value;
+  return 'safe_merge';
 }
 
 function mergeFileWriteSettings(base: GlobalFileWriteSettings, patch: Partial<GlobalFileWriteSettings>): GlobalFileWriteSettings {

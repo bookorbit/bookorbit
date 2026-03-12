@@ -4,7 +4,7 @@ import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, ilike, inArray, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { StagingFinalizeFileResult, StagingFinalizeResult, StagingMetadata } from '@projectx/types';
+import type { StagingAutoFinalizeMetadataMode, StagingFinalizeFileResult, StagingFinalizeResult, StagingMetadata } from '@projectx/types';
 import { resolveUploadPath } from '@projectx/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -188,9 +188,18 @@ export class StagingFinalizeService implements OnModuleInit {
     if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return;
 
     const row = await this.repo.findById(fileId);
-    if (!row || row.confidence === null || row.confidence < settings.threshold) return;
+    if (!row) return;
+    if (!shouldAutoFinalize(row, settings.metadataMode, settings.threshold)) return;
 
-    const result = await this.finalizeFile(row, settings.libraryId, settings.folderId, new Map(), 0, true);
+    const autoFinalizeMetadata = resolveAutoFinalizeMetadata(settings.metadataMode, row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata);
+    const rowForFinalize = autoFinalizeMetadata
+      ? {
+          ...row,
+          selectedMetadata: autoFinalizeMetadata,
+        }
+      : row;
+
+    const result = await this.finalizeFile(rowForFinalize, settings.libraryId, settings.folderId, new Map(), 0, true);
     if (result.success) {
       this.logger.log(`Auto-finalized staging file ${fileId} -> book ${result.bookId} (confidence ${row.confidence}%)`);
       await this.emitSummary();
@@ -459,4 +468,35 @@ function normalizeFinalizeMetadata(meta: StagingMetadata | null | undefined): No
     genres: normalizeStringArray(meta?.genres, 200),
     coverUrl: normalizeText(meta?.coverUrl),
   };
+}
+
+function mergeStagingMetadata(
+  embedded: StagingMetadata | null | undefined,
+  fetched: StagingMetadata | null | undefined,
+  selected: StagingMetadata | null | undefined,
+): StagingMetadata | null {
+  const merged: StagingMetadata = {
+    ...(embedded ?? {}),
+    ...(fetched ?? {}),
+    ...(selected ?? {}),
+  };
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
+function resolveAutoFinalizeMetadata(
+  mode: StagingAutoFinalizeMetadataMode,
+  embedded: StagingMetadata | null | undefined,
+  fetched: StagingMetadata | null | undefined,
+  selected: StagingMetadata | null | undefined,
+): StagingMetadata | null {
+  if (mode === 'embedded_only') return mergeStagingMetadata(embedded, null, selected);
+  if (mode === 'fetched_only') return mergeStagingMetadata(null, fetched, selected);
+  return mergeStagingMetadata(embedded, fetched, selected);
+}
+
+function shouldAutoFinalize(row: StagingFileRow, mode: StagingAutoFinalizeMetadataMode, threshold: number): boolean {
+  if (mode === 'embedded_only') {
+    return row.status === 'ready';
+  }
+  return row.confidence !== null && row.confidence >= threshold;
 }

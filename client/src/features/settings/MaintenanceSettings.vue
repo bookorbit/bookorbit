@@ -100,7 +100,7 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
 </script>
 
 <template>
-  <SettingsPageHeader title="Maintenance" subtitle="System maintenance and data operations." />
+  <SettingsPageHeader title="Operations" subtitle="Background jobs and data operations." />
 
   <div>
     <p class="settings-group-label">Recommendations</p>

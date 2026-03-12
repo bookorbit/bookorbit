@@ -4,6 +4,15 @@ import type { PdfReaderSettings } from '@projectx/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean
+  }>(),
+  {
+    embedded: false,
+  },
+)
+
 const { effective, load, update, reset } = useReaderDefaultSettings<PdfReaderSettings>('pdf')
 
 onMounted(load)
@@ -12,11 +21,16 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
 </script>
 
 <template>
-  <SettingsPageHeader title="PDF Reader" subtitle="Default settings applied when opening PDF files.">
+  <SettingsPageHeader v-if="!props.embedded" title="PDF Reader" subtitle="Default settings applied when opening PDF files.">
     <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
       Reset to defaults
     </button>
   </SettingsPageHeader>
+  <div v-else class="flex justify-end mb-4">
+    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
+      Reset to defaults
+    </button>
+  </div>
 
   <!-- Layout -->
   <div class="mb-6">
