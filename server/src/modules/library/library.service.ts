@@ -5,6 +5,7 @@ import { join } from 'path';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { isPrimaryFormat } from '../scanner/lib/classify';
+import { FileWatcherService } from '../scanner/file-watcher.service';
 import { ScannerService } from '../scanner/scanner.service';
 import { CreateLibraryDto } from './dto/create-library.dto';
 import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
@@ -22,6 +23,7 @@ export class LibraryService {
     private readonly libraryRepo: LibraryRepository,
     private readonly config: ConfigService,
     private readonly scannerService: ScannerService,
+    private readonly fileWatcherService: FileWatcherService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -76,6 +78,13 @@ export class LibraryService {
 
     const folders = await Promise.all(dto.folders.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));
 
+    if (library.watch) {
+      await this.fileWatcherService.startWatcher(
+        library.id,
+        folders.map(([f]) => f.path),
+      );
+    }
+
     this.scannerService.startScanAsync(library.id);
 
     return { ...library, folders: folders.map(([f]) => f) };
@@ -106,12 +115,33 @@ export class LibraryService {
     }
 
     const folders = await this.libraryRepo.findFoldersByLibrary(id);
+
+    const watchChanged = dto.watch !== undefined && dto.watch !== existing.watch;
+    const nextWatch = dto.watch ?? existing.watch;
+    if (watchChanged) {
+      if (nextWatch) {
+        await this.fileWatcherService.startWatcher(
+          id,
+          folders.map((f) => f.path),
+        );
+      } else {
+        await this.fileWatcherService.stopWatcher(id);
+      }
+    } else if (nextWatch && folderPaths !== undefined) {
+      await this.fileWatcherService.startWatcher(
+        id,
+        folders.map((f) => f.path),
+      );
+    }
+
     return { ...updated, folders };
   }
 
   async remove(id: number) {
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
+
+    await this.fileWatcherService.stopWatcher(id);
 
     const bookRows = await this.libraryRepo.findBookIdsByLibrary(id);
     await this.libraryRepo.delete(id);

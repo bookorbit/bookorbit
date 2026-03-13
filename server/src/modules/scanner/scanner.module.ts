@@ -27,6 +27,6 @@ import { ScannerService } from './scanner.service';
   ],
   controllers: [ScannerController],
   providers: [ScannerService, ScannerRepository, ScanGateway, ScanJobStore, FileEventProcessorService, FileWatcherService],
-  exports: [ScannerService],
+  exports: [ScannerService, FileWatcherService],
 })
 export class ScannerModule {}

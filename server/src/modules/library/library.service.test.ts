@@ -55,13 +55,14 @@ describe('LibraryService', () => {
 
   const config = { get: vi.fn().mockReturnValue('/books') };
   const scannerService = { startScanAsync: vi.fn() };
+  const fileWatcherService = { startWatcher: vi.fn(), stopWatcher: vi.fn() };
 
   let service: LibraryService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('/books');
-    service = new LibraryService(libraryRepo as any, config as any, scannerService as any);
+    service = new LibraryService(libraryRepo as any, config as any, scannerService as any, fileWatcherService as any);
 
     mockAccess.mockResolvedValue(undefined);
     mockStat.mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
@@ -98,10 +99,22 @@ describe('LibraryService', () => {
       }),
     );
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(5);
+    expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
     expect(result.folders).toEqual([
       { id: 11, path: '/a' },
       { id: 12, path: '/b' },
     ]);
+  });
+
+  it('create starts watcher immediately when watch is enabled', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 6, name: 'Watched', watch: true }]);
+    libraryRepo.insertFolder.mockResolvedValueOnce([{ id: 21, path: '/watch-a' }]).mockResolvedValueOnce([{ id: 22, path: '/watch-b' }]);
+
+    await service.create({ name: 'Watched', folders: ['/watch-a', '/watch-b'], watch: true } as any);
+
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(6, ['/watch-a', '/watch-b']);
+    expect(scannerService.startScanAsync).toHaveBeenCalledWith(6);
   });
 
   it('create rejects duplicate library names', async () => {
@@ -111,7 +124,7 @@ describe('LibraryService', () => {
   });
 
   it('update synchronizes folder additions and removals', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 3, name: 'Current' }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 3, name: 'Current', watch: false }]);
     libraryRepo.update.mockResolvedValue([{ id: 3, name: 'Updated' }]);
     libraryRepo.findFoldersByLibrary
       .mockResolvedValueOnce([
@@ -127,6 +140,48 @@ describe('LibraryService', () => {
 
     expect(libraryRepo.deleteFolder).toHaveBeenCalledWith(2);
     expect(libraryRepo.insertFolder).toHaveBeenCalledWith({ libraryId: 3, path: '/add' });
+    expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
+    expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
+  });
+
+  it('update starts watcher when watch toggles on', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 7, name: 'Current', watch: false }]);
+    libraryRepo.update.mockResolvedValue([{ id: 7, name: 'Current', watch: true }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 31, path: '/watched' }]);
+
+    await service.update(7, { watch: true } as any);
+
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(7, ['/watched']);
+    expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
+  });
+
+  it('update stops watcher when watch toggles off', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Current', watch: true }]);
+    libraryRepo.update.mockResolvedValue([{ id: 8, name: 'Current', watch: false }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 41, path: '/watched' }]);
+
+    await service.update(8, { watch: false } as any);
+
+    expect(fileWatcherService.stopWatcher).toHaveBeenCalledWith(8);
+    expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
+  });
+
+  it('update rebinds watcher when folders change and watch remains on', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Current', watch: true }]);
+    libraryRepo.update.mockResolvedValue([{ id: 9, name: 'Current', watch: true }]);
+    libraryRepo.findFoldersByLibrary
+      .mockResolvedValueOnce([
+        { id: 1, path: '/keep' },
+        { id: 2, path: '/remove' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 1, path: '/keep' },
+        { id: 3, path: '/add' },
+      ]);
+
+    await service.update(9, { folders: ['/keep', '/add'] } as any);
+
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(9, ['/keep', '/add']);
   });
 
   it('remove deletes library and cleans related cover directories', async () => {
@@ -135,6 +190,7 @@ describe('LibraryService', () => {
 
     await service.remove(4);
 
+    expect(fileWatcherService.stopWatcher).toHaveBeenCalledWith(4);
     expect(libraryRepo.delete).toHaveBeenCalledWith(4);
     expect(mockRm).toHaveBeenCalledWith('/books/covers/101', { recursive: true, force: true });
     expect(mockRm).toHaveBeenCalledWith('/books/covers/102', { recursive: true, force: true });
