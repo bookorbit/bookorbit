@@ -131,10 +131,11 @@ export class CoverService {
   }
 
   private async setCoverSource(bookId: number, source: 'extracted' | 'custom' | null): Promise<void> {
+    const now = new Date();
     await this.db
       .insert(bookMetadata)
-      .values({ bookId, coverSource: source, updatedAt: new Date() })
-      .onConflictDoUpdate({ target: bookMetadata.bookId, set: { coverSource: source } });
+      .values({ bookId, coverSource: source, updatedAt: now })
+      .onConflictDoUpdate({ target: bookMetadata.bookId, set: { coverSource: source, updatedAt: now } });
   }
 
   private async fetchImageFromUrl(url: string): Promise<Buffer> {

@@ -20,6 +20,7 @@ describe('MetadataPreferenceResolver', () => {
         MetadataProviderKey.AMAZON,
         MetadataProviderKey.GOODREADS,
         MetadataProviderKey.OPEN_LIBRARY,
+        MetadataProviderKey.ITUNES,
       ]);
     }
 

@@ -50,7 +50,9 @@ async function bootstrap() {
 
   app.useWebSocketAdapter(new IoAdapter(app));
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['api/kobo/:deviceToken/(.*)'],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

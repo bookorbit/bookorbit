@@ -7,10 +7,12 @@ import { MetadataSearchDto } from './dto/metadata-search.dto';
 import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
+import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 
 describe('MetadataFetchController', () => {
   let service: Mocked<MetadataFetchService>;
   let registry: Mocked<ProviderRegistry>;
+  let providerConfig: Mocked<ProviderConfigService>;
   let controller: MetadataFetchController;
 
   beforeEach(() => {
@@ -24,16 +26,20 @@ describe('MetadataFetchController', () => {
       all: vi.fn(),
     } as unknown as Mocked<ProviderRegistry>;
 
-    controller = new MetadataFetchController(service, registry);
+    providerConfig = {
+      getConfig: vi.fn().mockResolvedValue({}),
+    } as unknown as Mocked<ProviderConfigService>;
+
+    controller = new MetadataFetchController(service, registry, providerConfig);
   });
 
-  it('returns provider metadata for UI configuration', () => {
+  it('returns provider metadata for UI configuration', async () => {
     registry.all.mockReturnValue([
       { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
       { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false },
     ] as never);
 
-    expect(controller.listProviders()).toEqual([
+    await expect(controller.listProviders()).resolves.toEqual([
       { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
       { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false },
     ]);

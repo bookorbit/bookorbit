@@ -26,6 +26,7 @@ export interface KoboBookEntry {
   fileSizeBytes: number | null;
   fileHash: string | null;
   metadataHash: string;
+  metadataUpdatedAt: Date | null;
   collectionNames: string[];
   addedAt: Date;
   updatedAt: Date;
@@ -341,7 +342,7 @@ export class KoboSyncService {
   private buildBookMetadata(book: KoboBookEntry, deviceToken: string, baseUrl: string) {
     const id = String(book.bookId);
     const format = book.fileFormat.toLowerCase() === 'pdf' ? 'PDF' : 'EPUB3';
-    const downloadUrl = `${baseUrl}/api/kobo/${deviceToken}/v1/books/${book.bookId}/download`;
+    const downloadUrl = `${baseUrl}/api/v1/kobo/${deviceToken}/v1/books/${book.bookId}/download`;
     const slug = book.title ? book.title.toLowerCase().replace(/[^a-z0-9]/g, '-') : id;
     const publicationDate = book.publishedYear ? new Date(Date.UTC(book.publishedYear, 0, 1)).toISOString() : null;
     const publisher = book.publisher ? { Name: book.publisher, Imprint: book.publisher } : null;
@@ -353,6 +354,8 @@ export class KoboSyncService {
           NumberFloat: book.seriesIndex ?? 1.0,
         }
       : { Id: '', Name: '', Number: '', NumberFloat: 0.0 };
+
+    const coverImageId = book.metadataUpdatedAt ? `${id}-${book.metadataUpdatedAt.getTime()}` : id;
 
     return {
       CrossRevisionId: id,
@@ -366,7 +369,7 @@ export class KoboSyncService {
       PublicationDate: publicationDate,
       Language: book.language ?? 'en',
       Genre: '00000000-0000-0000-0000-000000000001',
-      CoverImageId: id,
+      CoverImageId: coverImageId,
       Contributors: book.authors,
       ContributorRoles: [],
       Series: series,
@@ -427,7 +430,7 @@ export class KoboSyncService {
           eq(schema.collections.syncToKobo, true),
         ),
       )
-      .where(and(eq(schema.books.status, 'present'), sql`lower(${schema.bookFiles.format}) in ('epub', 'pdf')`))
+      .where(and(eq(schema.books.status, 'present'), sql`lower(${schema.bookFiles.format}) in ('epub')`))
       .groupBy(
         schema.books.id,
         schema.bookMetadata.title,
@@ -506,6 +509,7 @@ export class KoboSyncService {
         fileSizeBytes: r.fileSizeBytes,
         fileHash: r.fileHash,
         metadataHash,
+        metadataUpdatedAt: r.metadataUpdatedAt,
         collectionNames: collectionsByBook.get(r.bookId) ?? [],
         addedAt: r.addedAt,
         updatedAt: r.updatedAt,

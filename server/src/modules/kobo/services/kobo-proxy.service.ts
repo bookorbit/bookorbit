@@ -5,16 +5,17 @@ const KOBO_API_BASE = 'https://storeapi.kobo.com';
 
 const FORWARD_HEADERS = [
   'accept',
-  'accept-encoding',
   'accept-language',
   'authorization',
   'content-type',
   'user-agent',
+  'x-kobo-affiliatename',
   'x-kobo-appversion',
+  'x-kobo-deviceid',
   'x-kobo-devicemodel',
   'x-kobo-deviceos',
   'x-kobo-deviceosversion',
-  'x-kobo-platform',
+  'x-kobo-platformid',
   'x-kobo-synctokenversion',
 ];
 
@@ -24,7 +25,7 @@ export class KoboProxyService {
 
   async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string) {
     const rawUrl = req.url;
-    const prefix = `/api/kobo/${deviceToken}`;
+    const prefix = `/api/v1/kobo/${deviceToken}`;
     const koboPath = rawUrl.startsWith(prefix) ? rawUrl.slice(prefix.length) : rawUrl;
 
     const targetUrl = `${KOBO_API_BASE}${koboPath}`;
@@ -49,7 +50,7 @@ export class KoboProxyService {
 
       reply.status(upstream.status);
       upstream.headers.forEach((value, key) => {
-        if (!['transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+        if (!['transfer-encoding', 'connection', 'content-encoding', 'content-length'].includes(key.toLowerCase())) {
           reply.header(key, value);
         }
       });

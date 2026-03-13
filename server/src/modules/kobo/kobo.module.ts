@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 
 import { CommonModule } from '../../common/common.module';
 import { UserModule } from '../user/user.module';
+import { KoboAuthController } from './kobo-auth.controller';
 import { KoboDeviceController } from './kobo-device.controller';
+import { KoboSyncController } from './kobo-sync.controller';
 import { KoboUserController } from './kobo-user.controller';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { KepubifyBinaryService } from './services/kepubify-binary.service';
@@ -16,7 +18,7 @@ import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 
 @Module({
   imports: [CommonModule, UserModule],
-  controllers: [KoboUserController, KoboDeviceController],
+  controllers: [KoboUserController, KoboAuthController, KoboSyncController, KoboDeviceController],
   providers: [
     KoboTokenGuard,
     KepubifyBinaryService,
