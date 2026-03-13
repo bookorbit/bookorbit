@@ -79,6 +79,7 @@ const descriptionExpanded = ref(false)
 
 const { hasPermission } = usePermissions()
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
+const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const { coverUrl } = useCoverVersions()
@@ -87,6 +88,35 @@ const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const authorLine = computed(() => props.book.authors.map((a) => a.name).join(', ') || null)
 const formats = computed(() => [...new Set(props.book.files.map((f) => f.format ?? '?'))])
+
+const localRating = ref<number | null>(null)
+const hoverRating = ref<number | null>(null)
+const displayRating = computed(() => hoverRating.value ?? localRating.value)
+
+watch(
+  () => props.book.rating,
+  (val) => {
+    localRating.value = val ?? null
+  },
+  { immediate: true },
+)
+
+async function setRating(star: number) {
+  if (!canEditMetadata.value) return
+  const newRating = localRating.value === star ? null : star
+  localRating.value = newRating
+  try {
+    const res = await api(`/api/v1/books/${props.book.id}/metadata`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating: newRating }),
+    })
+    if (!res.ok) throw new Error()
+  } catch {
+    localRating.value = props.book.rating ?? null
+  }
+}
+
 const ratingStars = [1, 2, 3, 4, 5]
 
 const fileProgressById = ref<Record<number, FileProgress>>({})
@@ -469,7 +499,7 @@ watch(
     <!-- Right column -->
     <div class="flex-1 min-w-0">
       <!-- Identity block -->
-      <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1">
+      <div class="flex items-center flex-wrap gap-x-3 gap-y-2">
         <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
         <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
           <PopoverTrigger as-child>
@@ -499,7 +529,7 @@ watch(
               loading="lazy"
               @error="providerIconErrors[link.key] = true"
             />
-            <span v-else class="text-[9px] font-bold leading-none text-foreground/90">{{ link.fallback }}</span>
+            <span v-else class="text-[8px] font-bold leading-none text-foreground/90">{{ link.fallback }}</span>
           </a>
         </div>
       </div>
@@ -543,19 +573,7 @@ watch(
       </div>
 
       <!-- Metadata grid -->
-      <dl
-        v-if="
-          book.publisher ||
-          book.publishedYear ||
-          book.language ||
-          book.pageCount ||
-          book.isbn13 ||
-          book.isbn10 ||
-          book.rating != null ||
-          book.lastWrittenAt
-        "
-        class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-4"
-      >
+      <dl class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-4">
         <div v-if="book.publisher" class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Publisher</dt>
           <dd class="text-sm text-foreground mt-0.5 leading-snug">{{ book.publisher }}</dd>
@@ -580,16 +598,28 @@ watch(
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-10</dt>
           <dd class="text-sm text-foreground mt-0.5 font-mono">{{ book.isbn10 }}</dd>
         </div>
-        <div v-if="book.rating != null" class="min-w-0">
+        <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Rating</dt>
-          <dd class="mt-0.5 flex items-center gap-1">
-            <Star
-              v-for="star in ratingStars"
-              :key="star"
-              class="size-3.5"
-              :class="book.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
-            />
-            <span class="text-xs text-muted-foreground ml-1">{{ book.rating }}/5</span>
+          <dd class="mt-0.5 flex items-center gap-1" @mouseleave="hoverRating = null">
+            <template v-if="canEditMetadata">
+              <Tooltip v-for="star in ratingStars" :key="star">
+                <TooltipTrigger as-child>
+                  <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
+                    <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Rate {{ star }}</TooltipContent>
+              </Tooltip>
+            </template>
+            <template v-else>
+              <Star
+                v-for="star in ratingStars"
+                :key="star"
+                class="size-3.5"
+                :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
+              />
+            </template>
+            <span class="text-xs text-muted-foreground ml-1">{{ localRating ?? 0 }}/5</span>
           </dd>
         </div>
         <div v-if="book.lastWrittenAt" class="min-w-0">

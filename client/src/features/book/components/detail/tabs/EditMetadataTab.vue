@@ -9,7 +9,7 @@ import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
-import { useGenreSearch } from '../../../composables/useTagSearch'
+import { useGenreSearch, useTagSearch } from '../../../composables/useTagSearch'
 import { useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 
 const props = defineProps<{ book: BookDetail }>()
@@ -18,6 +18,7 @@ const emit = defineEmits<{ saved: [BookDetail]; coverChanged: ['extracted' | 'cu
 const { form, saving, error, isDirty, load, reset, save } = useMetadataEditor()
 const { search: searchAuthors } = useAuthorSearch()
 const { search: searchGenres } = useGenreSearch()
+const { search: searchTags } = useTagSearch()
 
 const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 const searchOpen = ref(false)
@@ -188,6 +189,12 @@ async function autoFill() {
         <ChipInput v-model="form.genres" placeholder="Add genre..." :search-fn="searchGenres" />
       </div>
 
+      <!-- Tags -->
+      <div class="space-y-1">
+        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</label>
+        <ChipInput v-model="form.tags" placeholder="Add tag..." :search-fn="searchTags" />
+      </div>
+
       <!-- Series + Index + Rating -->
       <div class="grid grid-cols-6 gap-3">
         <div class="col-span-4 space-y-1">
@@ -302,7 +309,7 @@ async function autoFill() {
       <!-- Provider IDs -->
       <div class="space-y-1">
         <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Provider IDs</label>
-        <div class="rounded-lg border border-border bg-muted/30 p-3 grid grid-cols-5 gap-3">
+        <div class="rounded-lg border border-border bg-muted/30 p-3 grid grid-cols-6 gap-3">
           <div v-for="{ field, label } in providerIdFields" :key="field" class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ label }}</label>
             <input
