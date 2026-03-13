@@ -73,3 +73,20 @@ export type AuthorMetadataProviderInfo = {
   label: string;
   identifiable: boolean;
 };
+
+export type AuthorEnrichmentStatus = {
+  queued: number;
+  processing: number;
+  rateLimited: number;
+  failed: number;
+  done: number;
+  total: number;
+};
+
+export const AuthorAutoEnrichmentWriteMode = {
+  MISSING_ONLY: 'missing_only',
+  ALWAYS_REFETCH: 'always_refetch',
+} as const;
+
+export type AuthorAutoEnrichmentWriteMode =
+  (typeof AuthorAutoEnrichmentWriteMode)[keyof typeof AuthorAutoEnrichmentWriteMode];

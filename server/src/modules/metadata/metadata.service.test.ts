@@ -42,6 +42,7 @@ import { extractAndSaveCover, generateThumbnail, imageExt } from './lib/cover';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
 import { parsePdfFile } from './lib/pdf-parser';
+import { METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
 
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
@@ -345,5 +346,46 @@ describe('MetadataService', () => {
     await service.replaceAuthors(6, [{ name: 'Known Author', sortName: null }]);
 
     expect(insertedBookAuthors).toEqual([{ bookId: 6, authorId: 9, displayOrder: 0 }]);
+  });
+
+  it('replaceAuthors emits author replaced event with linked author ids', async () => {
+    const { db } = makeDb();
+    const metadataEvents = { emit: vi.fn() };
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+      metadataEvents as never,
+    );
+
+    db.select.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    }));
+    db.insert.mockImplementation((table: unknown) => {
+      if (table === authors) {
+        return {
+          values: () => ({
+            returning: () => Promise.resolve([{ id: 81 }]),
+          }),
+        };
+      }
+      if (table === bookAuthors) {
+        return {
+          values: () => ({
+            onConflictDoNothing: () => Promise.resolve(undefined),
+          }),
+        };
+      }
+      throw new Error('unexpected table in insert');
+    });
+
+    await service.replaceAuthors(7, [{ name: 'New Author', sortName: null }]);
+
+    expect(metadataEvents.emit).toHaveBeenCalledWith(METADATA_AUTHORS_REPLACED, { bookId: 7, authorIds: [81] });
   });
 });

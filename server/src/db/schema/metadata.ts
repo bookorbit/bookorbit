@@ -1,4 +1,5 @@
-import { customType, index, integer, pgTable, primaryKey, real, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { customType, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
@@ -80,6 +81,35 @@ export const bookAuthors = pgTable(
   (t) => [primaryKey({ columns: [t.bookId, t.authorId] }), index('book_authors_author_id_idx').on(t.authorId)],
 );
 
+export const authorEnrichmentQueue = pgTable(
+  'author_enrichment_queue',
+  {
+    authorId: integer('author_id')
+      .primaryKey()
+      .references(() => authors.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 20 }).notNull().default('queued'),
+    reason: varchar('reason', { length: 50 }).notNull().default('unknown'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at').notNull().defaultNow(),
+    lastAttemptAt: timestamp('last_attempt_at'),
+    lastSuccessAt: timestamp('last_success_at'),
+    lastError: text('last_error'),
+    lastHttpStatus: integer('last_http_status'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    index('author_enrichment_queue_status_next_attempt_idx').on(t.status, t.nextAttemptAt),
+    index('author_enrichment_queue_next_attempt_idx').on(t.nextAttemptAt),
+    uniqueIndex('author_enrichment_queue_single_processing_idx')
+      .on(t.status)
+      .where(sql`${t.status} = 'processing'`),
+  ],
+);
+
 export const genres = pgTable('genres', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 200 }).notNull().unique(),
@@ -127,3 +157,6 @@ export type NewGenre = typeof genres.$inferInsert;
 
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
+
+export type AuthorEnrichmentQueue = typeof authorEnrichmentQueue.$inferSelect;
+export type NewAuthorEnrichmentQueue = typeof authorEnrichmentQueue.$inferInsert;

@@ -20,6 +20,8 @@ import { books } from '../../db/schema';
 import { BookRepository } from '../book/book.repository';
 import { LibraryService } from '../library/library.service';
 import { AuthorImageStorageService } from './author-image-storage.service';
+import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
+import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
 import { AuthorsRepository } from './authors.repository';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
@@ -44,6 +46,8 @@ export class AuthorsService {
     private readonly libraryService: LibraryService,
     private readonly authorMetadataFetchService: AuthorMetadataFetchService,
     private readonly authorImageStorage: AuthorImageStorageService,
+    private readonly enrichmentExecutor: AuthorEnrichmentExecutorService,
+    private readonly enrichmentOrchestrator: AuthorEnrichmentOrchestratorService,
   ) {}
 
   async findAll(user: RequestUser, dto: ListAuthorsDto): Promise<AuthorsPage> {
@@ -274,6 +278,9 @@ export class AuthorsService {
 
     const updated = await this.authorsRepo.updateAuthorById(authorId, values);
     if (!updated) throw new NotFoundException('Author not found');
+    if (values.name !== undefined) {
+      await this.enrichmentOrchestrator.schedule(authorId, 'author_rename');
+    }
     this.logger.log(`author.update userId=${user.id} authorId=${authorId} fields=${Object.keys(values).join(',')}`);
 
     return this.findOne(user, authorId);
@@ -294,6 +301,7 @@ export class AuthorsService {
 
     const affectedBookCount = await this.authorsRepo.countDistinctBooks(uniqueSourceIds);
     await this.authorsRepo.mergeAuthors(dto.targetAuthorId, uniqueSourceIds);
+    await this.enrichmentOrchestrator.schedule(dto.targetAuthorId, 'author_merge_target');
     this.logger.log(
       `author.merge userId=${user.id} targetAuthorId=${dto.targetAuthorId} sourceAuthorIds=${uniqueSourceIds.join(',')} affectedBookCount=${affectedBookCount}`,
     );
@@ -322,6 +330,12 @@ export class AuthorsService {
       deletedAuthorIds: authorIds,
       affectedBookCount,
     };
+  }
+
+  async enqueueBackfill(): Promise<{ queued: number }> {
+    const queued = await this.enrichmentOrchestrator.backfillLinkedAuthors();
+    this.logger.log(`author.enrichment.backfill queued=${queued}`);
+    return { queued };
   }
 
   async refreshEnrichment(user: RequestUser, authorId: number): Promise<AuthorDetail> {
@@ -496,27 +510,26 @@ export class AuthorsService {
   private async refreshEnrichmentInternal(
     authorId: number,
   ): Promise<{ descriptionUpdated: boolean; imageUpdated: boolean; provider: string | null }> {
-    const author = await this.authorsRepo.findByIdForEnrichment(authorId);
-    if (!author) throw new NotFoundException('Author not found');
-
-    const metadata = await this.authorMetadataFetchService.quickSearch({
-      name: author.name,
-      region: 'us',
-      limit: 1,
+    const result = await this.enrichmentExecutor.execute({
+      authorId,
+      writeMode: 'missing_only',
+      audnexusEnabled: true,
     });
-    const resolvedDescription = metadata?.description?.trim() || null;
 
-    let descriptionUpdated = false;
-    if (resolvedDescription && !author.description?.trim()) {
-      descriptionUpdated = await this.authorsRepo.updateAuthorDescriptionIfEmpty(author.id, resolvedDescription);
+    if (result.kind === 'skipped' && result.reason === 'author_not_found') {
+      throw new NotFoundException('Author not found');
     }
 
-    let imageUpdated = false;
-    if (metadata?.imageUrl) {
-      imageUpdated = await this.authorImageStorage.saveFromUrl(author.id, metadata.imageUrl);
+    if (result.kind === 'failed') {
+      this.logger.warn(`author.enrichment.refresh.failed authorId=${authorId} status=${result.httpStatus ?? 'none'} message=${result.message}`);
+      return { descriptionUpdated: false, imageUpdated: false, provider: result.provider };
     }
 
-    return { descriptionUpdated, imageUpdated, provider: metadata?.provider ?? null };
+    return {
+      descriptionUpdated: result.descriptionUpdated,
+      imageUpdated: result.imageUpdated,
+      provider: result.provider,
+    };
   }
 
   private scorePotentialDuplicate(

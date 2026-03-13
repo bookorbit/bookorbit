@@ -63,6 +63,36 @@ describe('AppSettingsService', () => {
     });
   });
 
+  describe('author auto-enrichment settings', () => {
+    it('isAuthorsAutoEnrichmentEnabled defaults to true when missing', async () => {
+      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      expect(await service.isAuthorsAutoEnrichmentEnabled()).toBe(true);
+    });
+
+    it('isAuthorsAutoEnrichmentEnabled reads stored false values', async () => {
+      db.query.appSettings.findFirst.mockResolvedValue({ key: 'authors_auto_enrichment_enabled', value: 'false' });
+      expect(await service.isAuthorsAutoEnrichmentEnabled()).toBe(false);
+    });
+
+    it('getAuthorsAutoEnrichmentWriteMode defaults to missing_only', async () => {
+      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('missing_only');
+    });
+
+    it('getAuthorsAutoEnrichmentWriteMode accepts always_refetch', async () => {
+      db.query.appSettings.findFirst.mockResolvedValue({ key: 'authors_auto_enrichment_write_mode', value: 'always_refetch' });
+      expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('always_refetch');
+    });
+
+    it('isAuthorsProviderAudnexusEnabled defaults to true and reads false', async () => {
+      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(true);
+
+      db.query.appSettings.findFirst.mockResolvedValue({ key: 'authors_provider_audnexus_enabled', value: 'false' });
+      expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(false);
+    });
+  });
+
   describe('getOidcConfig', () => {
     it('returns default config when no row in db', async () => {
       db.query.appSettings.findFirst.mockResolvedValue(undefined);

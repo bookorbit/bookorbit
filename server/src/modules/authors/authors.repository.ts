@@ -192,7 +192,7 @@ export class AuthorsRepository {
     const updated = await this.db
       .update(authors)
       .set({ description })
-      .where(and(eq(authors.id, authorId), or(isNull(authors.description), eq(authors.description, ''))))
+      .where(and(eq(authors.id, authorId), or(isNull(authors.description), eq(sql`btrim(${authors.description})`, ''))))
       .returning({ id: authors.id });
     return updated.length > 0;
   }

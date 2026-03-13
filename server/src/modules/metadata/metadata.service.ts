@@ -17,6 +17,7 @@ import { parseBookFilename } from './lib/filename-parser';
 import { parseFb2File } from './lib/fb2-parser';
 import { parseMobiFile } from './lib/mobi-parser';
 import { parsePdfFile } from './lib/pdf-parser';
+import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -30,6 +31,7 @@ export class MetadataService {
     private readonly config: ConfigService,
     private readonly scoreService: MetadataScoreService,
     @Optional() private readonly embedder: BookEmbedderService,
+    @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -287,6 +289,8 @@ export class MetadataService {
       return true;
     });
 
+    const linkedAuthorIds: number[] = [];
+
     for (let i = 0; i < unique.length; i++) {
       const { name, sortName } = unique[i];
 
@@ -297,6 +301,14 @@ export class MetadataService {
       }
 
       await this.db.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: i }).onConflictDoNothing();
+      linkedAuthorIds.push(author.id);
+    }
+
+    if (linkedAuthorIds.length > 0) {
+      this.metadataEvents?.emit(METADATA_AUTHORS_REPLACED, {
+        bookId,
+        authorIds: linkedAuthorIds,
+      });
     }
   }
 

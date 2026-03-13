@@ -3,6 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import {
+  AuthorAutoEnrichmentWriteMode,
   DEFAULT_UPLOAD_PATTERN,
   DEFAULT_FILE_WRITE_SETTINGS,
   DEFAULT_METADATA_SCORE_WEIGHTS,
@@ -26,6 +27,9 @@ const APP_SETTING_KEYS = {
   STAGING_AUTO_FINALIZE_METADATA_MODE: 'staging_auto_finalize_metadata_mode',
   FILE_WRITE_SETTINGS: 'file_write_settings',
   METADATA_SCORE_WEIGHTS: 'metadata_score_weights',
+  AUTHORS_AUTO_ENRICHMENT_ENABLED: 'authors_auto_enrichment_enabled',
+  AUTHORS_AUTO_ENRICHMENT_WRITE_MODE: 'authors_auto_enrichment_write_mode',
+  AUTHORS_PROVIDER_AUDNEXUS_ENABLED: 'authors_provider_audnexus_enabled',
 } as const;
 
 type Db = NodePgDatabase<typeof schema>;
@@ -89,6 +93,29 @@ export class AppSettingsService {
   async isStagingAutoFetchEnabled(): Promise<boolean> {
     const row = await this.db.query.appSettings.findFirst({
       where: eq(schema.appSettings.key, APP_SETTING_KEYS.STAGING_AUTO_FETCH_METADATA),
+    });
+    return row?.value !== 'false';
+  }
+
+  async isAuthorsAutoEnrichmentEnabled(): Promise<boolean> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.AUTHORS_AUTO_ENRICHMENT_ENABLED),
+    });
+    return row?.value !== 'false';
+  }
+
+  async getAuthorsAutoEnrichmentWriteMode(): Promise<AuthorAutoEnrichmentWriteMode> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.AUTHORS_AUTO_ENRICHMENT_WRITE_MODE),
+    });
+    const mode = row?.value?.trim();
+    if (mode === AuthorAutoEnrichmentWriteMode.ALWAYS_REFETCH) return mode;
+    return AuthorAutoEnrichmentWriteMode.MISSING_ONLY;
+  }
+
+  async isAuthorsProviderAudnexusEnabled(): Promise<boolean> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.AUTHORS_PROVIDER_AUDNEXUS_ENABLED),
     });
     return row?.value !== 'false';
   }

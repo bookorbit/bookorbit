@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@projectx/types';
 
-import { AuthorMetadataSearchParams, IdentifiableAuthorMetadataProvider } from '../author-metadata-provider';
+import { AuthorMetadataProviderError, AuthorMetadataSearchParams, IdentifiableAuthorMetadataProvider } from '../author-metadata-provider';
 import { AudnexusAuthorResponse } from './audnexus.types';
 
 const BASE_URL = 'https://api.audnex.us';
@@ -68,14 +68,25 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
       if (!res.ok) {
-        this.logger.warn(`Audnexus request failed: ${res.status} (${url})`);
-        return null;
+        const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
+        const message = `Audnexus request failed: ${res.status} (${url})`;
+        this.logger.warn(message);
+        throw new AuthorMetadataProviderError(message, {
+          httpStatus: res.status,
+          retryAfterMs,
+          transient: res.status === 429 || res.status >= 500,
+        });
       }
       return (await res.json()) as T;
     } catch (error) {
+      if (error instanceof AuthorMetadataProviderError) {
+        throw error;
+      }
       const message = error instanceof Error ? error.message : 'unknown error';
       this.logger.warn(`Audnexus request error (${url}): ${message}`);
-      return null;
+      throw new AuthorMetadataProviderError(`Audnexus request error (${url}): ${message}`, {
+        transient: true,
+      });
     }
   }
 
@@ -110,4 +121,17 @@ function normalizeUrl(value: string | undefined): string {
   if (trimmed.startsWith('//')) return `https:${trimmed}`;
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
   return '';
+}
+
+function parseRetryAfterMs(value: string | null): number | null {
+  if (!value) return null;
+  const seconds = Number.parseInt(value, 10);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return seconds * 1000;
+  }
+
+  const dateMs = new Date(value).getTime();
+  if (!Number.isFinite(dateMs)) return null;
+  const delta = dateMs - Date.now();
+  return delta > 0 ? delta : null;
 }

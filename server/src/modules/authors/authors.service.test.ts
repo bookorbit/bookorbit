@@ -49,6 +49,15 @@ describe('AuthorsService', () => {
     getImageUrlIfExists: vi.fn(),
   };
 
+  const enrichmentExecutor = {
+    execute: vi.fn(),
+  };
+
+  const enrichmentOrchestrator = {
+    schedule: vi.fn(),
+    backfillLinkedAuthors: vi.fn(),
+  };
+
   let service: AuthorsService;
 
   beforeEach(() => {
@@ -59,10 +68,14 @@ describe('AuthorsService', () => {
       libraryService as any,
       authorMetadataFetchService as any,
       authorImageStorage as any,
+      enrichmentExecutor as any,
+      enrichmentOrchestrator as any,
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue(null);
     authorImageStorage.getImageUrlIfExists.mockResolvedValue(null);
+    enrichmentOrchestrator.schedule.mockResolvedValue(1);
+    enrichmentOrchestrator.backfillLinkedAuthors.mockResolvedValue(8);
   });
 
   it('merge rejects when sources do not contain any id different from target', async () => {
@@ -115,6 +128,7 @@ describe('AuthorsService', () => {
     const result = await service.merge(reqUser(7, true), { targetAuthorId: 10, sourceAuthorIds: [10, 11, 11, 12] });
 
     expect(authorsRepo.mergeAuthors).toHaveBeenCalledWith(10, [11, 12]);
+    expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(10, 'author_merge_target');
     expect(result.mergedAuthorIds).toEqual([11, 12]);
     expect(result.affectedBookCount).toBe(8);
   });
@@ -143,6 +157,7 @@ describe('AuthorsService', () => {
       sortName: null,
       description: 'Bio',
     });
+    expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(20, 'author_rename');
   });
 
   it('findOne returns not found when author is outside user-accessible libraries', async () => {
@@ -153,20 +168,11 @@ describe('AuthorsService', () => {
   it('refreshEnrichment fills description when missing and returns updated author', async () => {
     authorsRepo.findVisibleAuthorIds.mockResolvedValue([20]);
     authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
-    authorsRepo.findByIdForEnrichment.mockResolvedValue({
-      id: 20,
-      name: 'Jane Doe',
-      sortName: 'Doe, Jane',
-      description: null,
-      bookCount: 2,
-      lastAddedAt: null,
-    });
-    authorsRepo.updateAuthorDescriptionIfEmpty.mockResolvedValue(true);
-    authorMetadataFetchService.quickSearch.mockResolvedValue({
+    enrichmentExecutor.execute.mockResolvedValue({
+      kind: 'done',
       provider: 'audnexus',
-      providerId: 'B123',
-      name: 'Jane Doe',
-      description: 'Provider description',
+      descriptionUpdated: true,
+      imageUpdated: false,
     });
     authorsRepo.findById.mockResolvedValue({
       id: 20,
@@ -179,28 +185,23 @@ describe('AuthorsService', () => {
 
     const result = await service.refreshEnrichment(reqUser(), 20);
 
-    expect(authorsRepo.updateAuthorDescriptionIfEmpty).toHaveBeenCalledWith(20, 'Provider description');
+    expect(enrichmentExecutor.execute).toHaveBeenCalledWith({
+      authorId: 20,
+      writeMode: 'missing_only',
+      audnexusEnabled: true,
+    });
     expect(result.description).toBe('Provider description');
   });
 
   it('refreshEnrichment stores fetched author image on disk when provider returns one', async () => {
     authorsRepo.findVisibleAuthorIds.mockResolvedValue([21]);
     authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
-    authorsRepo.findByIdForEnrichment.mockResolvedValue({
-      id: 21,
-      name: 'John Doe',
-      sortName: 'Doe, John',
-      description: 'Existing bio',
-      bookCount: 4,
-      lastAddedAt: null,
-    });
-    authorMetadataFetchService.quickSearch.mockResolvedValue({
+    enrichmentExecutor.execute.mockResolvedValue({
+      kind: 'done',
       provider: 'audnexus',
-      providerId: 'B999',
-      name: 'John Doe',
-      imageUrl: 'https://images.example.com/john.jpg',
+      descriptionUpdated: false,
+      imageUpdated: true,
     });
-    authorImageStorage.saveFromUrl.mockResolvedValue(true);
     authorsRepo.findById.mockResolvedValue({
       id: 21,
       name: 'John Doe',
@@ -212,6 +213,15 @@ describe('AuthorsService', () => {
 
     await service.refreshEnrichment(reqUser(), 21);
 
-    expect(authorImageStorage.saveFromUrl).toHaveBeenCalledWith(21, 'https://images.example.com/john.jpg');
+    expect(enrichmentExecutor.execute).toHaveBeenCalledWith({
+      authorId: 21,
+      writeMode: 'missing_only',
+      audnexusEnabled: true,
+    });
+  });
+
+  it('enqueueBackfill delegates to orchestrator and returns queued count', async () => {
+    await expect(service.enqueueBackfill()).resolves.toEqual({ queued: 8 });
+    expect(enrichmentOrchestrator.backfillLinkedAuthors).toHaveBeenCalled();
   });
 });

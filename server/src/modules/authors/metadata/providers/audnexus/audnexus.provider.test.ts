@@ -71,10 +71,10 @@ describe('AudnexusAuthorMetadataProvider', () => {
     });
   });
 
-  it('returns empty results when upstream fails', async () => {
+  it('throws when upstream fails so callers can apply retry policy', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false });
 
-    await expect(provider.search({ name: 'Any' })).resolves.toEqual([]);
-    await expect(provider.lookupById('A1')).resolves.toBeNull();
+    await expect(provider.search({ name: 'Any' })).rejects.toThrow();
+    await expect(provider.lookupById('A1')).rejects.toThrow();
   });
 });

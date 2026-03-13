@@ -21,3 +21,24 @@ export interface IdentifiableAuthorMetadataProvider extends AuthorMetadataProvid
 export function isIdentifiableAuthorProvider(p: AuthorMetadataProvider): p is IdentifiableAuthorMetadataProvider {
   return p.identifiable === true;
 }
+
+export class AuthorMetadataProviderError extends Error {
+  readonly httpStatus: number | null;
+  readonly retryAfterMs: number | null;
+  readonly transient: boolean;
+
+  constructor(
+    message: string,
+    options?: {
+      httpStatus?: number | null;
+      retryAfterMs?: number | null;
+      transient?: boolean;
+    },
+  ) {
+    super(message);
+    this.name = 'AuthorMetadataProviderError';
+    this.httpStatus = options?.httpStatus ?? null;
+    this.retryAfterMs = options?.retryAfterMs ?? null;
+    this.transient = options?.transient ?? false;
+  }
+}

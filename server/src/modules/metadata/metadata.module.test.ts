@@ -3,11 +3,12 @@ import 'reflect-metadata';
 vi.mock('../embedding/embedding.module', () => ({ EmbeddingModule: class EmbeddingModule {} }));
 
 import { MetadataModule } from './metadata.module';
+import { MetadataEventsService } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
 
 describe('MetadataModule', () => {
   it('registers MetadataService provider/export', () => {
-    expect(Reflect.getMetadata('providers', MetadataModule)).toEqual([MetadataService]);
-    expect(Reflect.getMetadata('exports', MetadataModule)).toEqual([MetadataService]);
+    expect(Reflect.getMetadata('providers', MetadataModule)).toEqual([MetadataService, MetadataEventsService]);
+    expect(Reflect.getMetadata('exports', MetadataModule)).toEqual([MetadataService, MetadataEventsService]);
   });
 });

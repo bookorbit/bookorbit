@@ -76,6 +76,12 @@ export class AuthorsController {
     reply.raw.end();
   }
 
+  @Post('enrichment/backfill')
+  @RequirePermission(Permission.ManageAppSettings)
+  enqueueBackfill() {
+    return this.authorsService.enqueueBackfill();
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
     return this.authorsService.findOne(user, id);

@@ -12,7 +12,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
-    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'test/**/*.test.ts', 'test/**/*.e2e-spec.ts'],
     passWithNoTests: true,
     reporters: process.env.CI ? ['default', 'github-actions'] : ['default'],
     coverage: {

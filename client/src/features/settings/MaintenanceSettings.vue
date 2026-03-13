@@ -4,10 +4,11 @@ import { Check, RefreshCw, Sparkles, FileEdit } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import type { GlobalFileWriteSettings } from '@projectx/types'
+import type { AuthorAutoEnrichmentWriteMode, GlobalFileWriteSettings } from '@projectx/types'
 import { DEFAULT_FILE_WRITE_SETTINGS } from '@projectx/types'
 
 import { api } from '@/lib/api'
+import { useAuthorEnrichmentStatus } from './composables/useAuthorEnrichmentStatus'
 
 const running = ref(false)
 const queued = ref<number | null>(null)
@@ -33,6 +34,15 @@ async function rebuildEmbeddings() {
 
 const writeSettings = ref<GlobalFileWriteSettings>(structuredClone(DEFAULT_FILE_WRITE_SETTINGS))
 const writeSaving = ref(false)
+const authorAutoEnabled = ref(true)
+const authorWriteMode = ref<AuthorAutoEnrichmentWriteMode>('missing_only')
+const authorProviderEnabled = ref(true)
+const authorSaving = ref(false)
+const authorBackfillRunning = ref(false)
+const { status: authorEnrichmentStatus, subscribe: subscribeAuthorEnrichmentStatus } = useAuthorEnrichmentStatus()
+const isAuthorEnrichmentTaskRunning = computed(
+  () => authorEnrichmentStatus.value.processing > 0 || authorEnrichmentStatus.value.queued > 0 || authorEnrichmentStatus.value.rateLimited > 0,
+)
 
 const epubMaxMb = computed({
   get: () => Math.round(writeSettings.value.epub.maxFileSizeBytes / (1024 * 1024)),
@@ -54,9 +64,17 @@ const cbxMaxMb = computed({
 })
 
 onMounted(async () => {
-  const res = await api('/api/v1/app-settings/file-write-settings')
-  if (res.ok) {
-    writeSettings.value = await res.json()
+  subscribeAuthorEnrichmentStatus()
+  const [writeRes, settingsRes] = await Promise.all([api('/api/v1/app-settings/file-write-settings'), api('/api/v1/app-settings')])
+  if (writeRes.ok) {
+    writeSettings.value = await writeRes.json()
+  }
+  if (settingsRes.ok) {
+    const settings: { key: string; value: string }[] = await settingsRes.json()
+    const get = (key: string) => settings.find((s) => s.key === key)?.value
+    authorAutoEnabled.value = get('authors_auto_enrichment_enabled') !== 'false'
+    authorProviderEnabled.value = get('authors_provider_audnexus_enabled') !== 'false'
+    authorWriteMode.value = get('authors_auto_enrichment_write_mode') === 'always_refetch' ? 'always_refetch' : 'missing_only'
   }
 })
 
@@ -97,6 +115,76 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
   }
   void saveWriteSettings()
 }
+
+async function saveAuthorSetting(key: string, value: string, successMessage: string): Promise<boolean> {
+  if (authorSaving.value) return false
+  authorSaving.value = true
+  try {
+    const res = await api(`/api/v1/app-settings/${key}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    })
+    if (res.ok) {
+      toast.success(successMessage)
+      return true
+    } else {
+      toast.error('Failed to save author enrichment setting')
+    }
+  } catch {
+    toast.error('Failed to save author enrichment setting')
+  } finally {
+    authorSaving.value = false
+  }
+  return false
+}
+
+async function toggleAuthorAutoEnabled() {
+  const next = !authorAutoEnabled.value
+  const saved = await saveAuthorSetting(
+    'authors_auto_enrichment_enabled',
+    String(next),
+    next ? 'Auto author enrichment enabled' : 'Auto author enrichment disabled',
+  )
+  if (saved) {
+    authorAutoEnabled.value = next
+  }
+}
+
+async function toggleAuthorProvider() {
+  const next = !authorProviderEnabled.value
+  const saved = await saveAuthorSetting(
+    'authors_provider_audnexus_enabled',
+    String(next),
+    next ? 'Audnexus provider enabled' : 'Audnexus provider disabled',
+  )
+  if (saved) {
+    authorProviderEnabled.value = next
+  }
+}
+
+async function onAuthorWriteModeChange(event: Event) {
+  const mode = (event.target as HTMLSelectElement).value as AuthorAutoEnrichmentWriteMode
+  const saved = await saveAuthorSetting('authors_auto_enrichment_write_mode', mode, 'Author write mode updated')
+  if (saved) {
+    authorWriteMode.value = mode
+  }
+}
+
+async function runAuthorBackfill() {
+  if (authorBackfillRunning.value) return
+  authorBackfillRunning.value = true
+  try {
+    const res = await api('/api/v1/authors/enrichment/backfill', { method: 'POST' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data: { queued: number } = await res.json()
+    toast.success(`${data.queued} authors queued for enrichment`)
+  } catch {
+    toast.error('Failed to queue author backfill')
+  } finally {
+    authorBackfillRunning.value = false
+  }
+}
 </script>
 
 <template>
@@ -126,6 +214,56 @@ function toggleCbxFormat(fmt: 'cbz' | 'cb7') {
           <RefreshCw :size="13" :class="running ? 'animate-spin' : ''" />
           {{ running ? 'Running...' : 'Run' }}
         </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8">
+    <p class="settings-group-label">Author Enrichment</p>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border bg-card">
+      <div class="px-5 py-4 flex items-center justify-between gap-6">
+        <div>
+          <p class="settings-label">Enable auto author enrichment</p>
+          <p class="settings-hint">Automatically queue and enrich authors when books are scanned, uploaded, or metadata is edited.</p>
+        </div>
+        <ToggleSwitch :model-value="authorAutoEnabled" :disabled="authorSaving" @update:model-value="() => toggleAuthorAutoEnabled()" />
+      </div>
+
+      <div class="px-5 py-4 flex items-center justify-between gap-6">
+        <div>
+          <p class="settings-label">Audnexus provider</p>
+          <p class="settings-hint">Use Audnexus as the source for author descriptions and images.</p>
+        </div>
+        <ToggleSwitch :model-value="authorProviderEnabled" :disabled="authorSaving" @update:model-value="() => toggleAuthorProvider()" />
+      </div>
+
+      <div class="px-5 py-4 flex items-center justify-between gap-6">
+        <div>
+          <p class="settings-label">Write mode</p>
+          <p class="settings-hint">Choose whether auto enrichment only fills missing fields or always refreshes descriptions.</p>
+        </div>
+        <select class="select-field w-48" :value="authorWriteMode" :disabled="authorSaving" @change="onAuthorWriteModeChange">
+          <option value="missing_only">Missing only (recommended)</option>
+          <option value="always_refetch">Always refetch</option>
+        </select>
+      </div>
+
+      <div class="px-5 py-4 flex items-center justify-between gap-6">
+        <div>
+          <p class="settings-label">Backfill existing authors</p>
+          <p class="settings-hint">Queue all currently linked authors for enrichment.</p>
+        </div>
+        <button class="settings-btn-outline" :disabled="authorBackfillRunning" @click="runAuthorBackfill">
+          <RefreshCw :size="13" :class="authorBackfillRunning || isAuthorEnrichmentTaskRunning ? 'animate-spin' : ''" />
+          {{ authorBackfillRunning ? 'Queueing...' : isAuthorEnrichmentTaskRunning ? 'Task Running' : 'Queue All' }}
+        </button>
+      </div>
+      <div class="px-5 py-3 bg-muted/30 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>Queued: {{ authorEnrichmentStatus.queued }}</span>
+        <span>Processing: {{ authorEnrichmentStatus.processing }}</span>
+        <span>Rate limited: {{ authorEnrichmentStatus.rateLimited }}</span>
+        <span>Failed: {{ authorEnrichmentStatus.failed }}</span>
+        <span>Done: {{ authorEnrichmentStatus.done }}</span>
       </div>
     </div>
   </div>

@@ -36,6 +36,7 @@ const userRole = {
 };
 
 function makeUser(permissionNames: string[]): RequestUser {
+  const permissions = permissionNames as RequestUser['permissions'];
   return {
     id: 1,
     username: 'smoke-user',
@@ -47,6 +48,7 @@ function makeUser(permissionNames: string[]): RequestUser {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
+    permissions,
     roles: [
       {
         ...userRole,

@@ -25,7 +25,10 @@ pnpm run db:migrate
 echo "Re-seeding baseline data..."
 pnpm run db:seed
 
-echo "Cleaning generated local covers..."
-rm -rf local/data/covers local/data/staging/covers
+echo "Cleaning generated local data (covers, authors)..."
+rm -rf "$ROOT_DIR/local/data/covers" && mkdir -p "$ROOT_DIR/local/data/covers"
+rm -rf "$ROOT_DIR/local/data/staging/covers" && mkdir -p "$ROOT_DIR/local/data/staging/covers"
+rm -rf "$ROOT_DIR/local/data/authors" && mkdir -p "$ROOT_DIR/local/data/authors"
+rm -rf "$ROOT_DIR/local/data/staging/authors" && mkdir -p "$ROOT_DIR/local/data/staging/authors"
 
 echo "Database reset complete."
