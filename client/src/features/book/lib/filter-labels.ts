@@ -31,6 +31,7 @@ export const FIELD_LABELS: Record<RuleField, string> = {
   readProgress: 'Reading Progress',
   description: 'Description',
   isbn: 'ISBN',
+  metadataScore: 'Metadata Score',
 }
 
 export const OPERATOR_LABELS: Record<RuleOperator, string> = {

@@ -83,6 +83,9 @@ function makeService() {
   const appSettings = {
     getDownloadPattern: vi.fn().mockResolvedValue('{originalFilename}'),
   };
+  const scoreService = {
+    calculateAndSave: vi.fn().mockResolvedValue(undefined),
+  };
   const embedder = {
     embedBook: vi.fn().mockResolvedValue(undefined),
   };
@@ -95,6 +98,7 @@ function makeService() {
     libraryService as never,
     queryBuilder as never,
     metadataService as never,
+    scoreService as never,
     pipeline as never,
     config as never,
     appSettings as never,

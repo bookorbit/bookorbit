@@ -110,7 +110,12 @@ describe('MetadataService', () => {
 
   it('downloadAndSaveCover writes cover/thumbnail and updates metadata when download is valid', async () => {
     const { db, updateSet } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -128,7 +133,12 @@ describe('MetadataService', () => {
 
   it('downloadAndSaveCover no-ops on empty payloads and network failures', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -146,7 +156,12 @@ describe('MetadataService', () => {
 
   it('refreshCoverForBook returns false and avoids db writes when extractor reports no cover', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
     mockExtractAndSaveCover.mockResolvedValue('');
 
     await expect(service.refreshCoverForBook(7, '/book.epub', 'epub')).resolves.toBe(false);
@@ -155,7 +170,12 @@ describe('MetadataService', () => {
 
   it('extractAndSave triggers both metadata and cover extraction and propagates metadata errors', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
     const metadataSpy = vi.spyOn(service as never, 'extractMetadata').mockRejectedValue(new Error('bad metadata'));
     const coverSpy = vi.spyOn(service as never, 'extractCover').mockResolvedValue(undefined);
 
@@ -166,7 +186,12 @@ describe('MetadataService', () => {
 
   it('extractMetadata(pdf) persists fallback title/year, page count, and extracted cover bytes', async () => {
     const { db, updateSet } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
     const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
     const replaceGenresSpy = vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
     const savePdfCoverSpy = vi.spyOn(service as never, 'savePdfCover').mockResolvedValue(undefined);
@@ -209,7 +234,12 @@ describe('MetadataService', () => {
 
   it('extractMetadata(mobi) ignores malformed publishedDate values from providers', async () => {
     const { db, updateSet } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
     vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
     vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
 
@@ -231,7 +261,12 @@ describe('MetadataService', () => {
 
   it('replaceAuthors normalizes names and deduplicates case-insensitively before db writes', async () => {
     const { db, deleteWhere } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
     const insertedBookAuthors: Array<{ bookId: number; authorId: number; displayOrder: number }> = [];
 
@@ -277,7 +312,12 @@ describe('MetadataService', () => {
 
   it('replaceAuthors reuses existing authors and only inserts join rows', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(db as never, config as never, embedder as never);
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
     const insertedBookAuthors: Array<{ bookId: number; authorId: number; displayOrder: number }> = [];
 
     db.select.mockImplementation(() => ({

@@ -24,6 +24,7 @@ const RULE_FIELDS = [
   'readProgress',
   'description',
   'isbn',
+  'metadataScore',
 ] as const;
 const RULE_OPERATORS = [
   'contains',
@@ -71,6 +72,7 @@ const VALID_OPERATORS_BY_FIELD: Record<string, string[]> = {
   readProgress: ['isUnread', 'isInProgress', 'isFinished'],
   description: ['isEmpty', 'isNotEmpty'],
   isbn: ['isEmpty', 'isNotEmpty', 'eq'],
+  metadataScore: ['gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
 };
 
 const ruleSchema: z.ZodType<Rule> = z

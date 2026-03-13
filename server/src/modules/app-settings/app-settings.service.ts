@@ -5,7 +5,9 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   DEFAULT_UPLOAD_PATTERN,
   DEFAULT_FILE_WRITE_SETTINGS,
+  DEFAULT_METADATA_SCORE_WEIGHTS,
   type GlobalFileWriteSettings,
+  type MetadataScoreWeights,
   type StagingAutoFinalizeMetadataMode,
 } from '@projectx/types';
 
@@ -23,6 +25,7 @@ const APP_SETTING_KEYS = {
   STAGING_AUTO_FINALIZE_FOLDER_ID: 'staging_auto_finalize_folder_id',
   STAGING_AUTO_FINALIZE_METADATA_MODE: 'staging_auto_finalize_metadata_mode',
   FILE_WRITE_SETTINGS: 'file_write_settings',
+  METADATA_SCORE_WEIGHTS: 'metadata_score_weights',
 } as const;
 
 type Db = NodePgDatabase<typeof schema>;
@@ -175,6 +178,23 @@ export class AppSettingsService {
     if (!row?.value) return { ...DEFAULT_FILE_WRITE_SETTINGS };
     const stored = parseSafe<Partial<GlobalFileWriteSettings>>(row.value, {});
     return mergeFileWriteSettings(DEFAULT_FILE_WRITE_SETTINGS, stored);
+  }
+
+  async getMetadataScoreWeights(): Promise<MetadataScoreWeights> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.METADATA_SCORE_WEIGHTS),
+    });
+    const stored = parseSafe<Partial<MetadataScoreWeights>>(row?.value, {});
+    return { ...DEFAULT_METADATA_SCORE_WEIGHTS, ...stored };
+  }
+
+  async setMetadataScoreWeights(weights: MetadataScoreWeights): Promise<MetadataScoreWeights> {
+    const value = JSON.stringify(weights);
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: APP_SETTING_KEYS.METADATA_SCORE_WEIGHTS, value })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
+    return weights;
   }
 
   async updateFileWriteSettings(patch: Partial<GlobalFileWriteSettings>): Promise<GlobalFileWriteSettings> {

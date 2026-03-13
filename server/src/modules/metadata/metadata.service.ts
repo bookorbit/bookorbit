@@ -8,6 +8,7 @@ import { join } from 'path';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
+import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
 import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover, generateThumbnail, imageExt } from './lib/cover';
@@ -27,6 +28,7 @@ export class MetadataService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly config: ConfigService,
+    private readonly scoreService: MetadataScoreService,
     @Optional() private readonly embedder: BookEmbedderService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
@@ -36,6 +38,7 @@ export class MetadataService {
 
   async extractAndSave(bookId: number, absolutePath: string, format: string): Promise<void> {
     await Promise.all([this.extractMetadata(bookId, absolutePath, format), this.extractCover(bookId, absolutePath, format)]);
+    this.scoreService.calculateAndSave(bookId).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${bookId}: ${err.message}`));
   }
 
   async downloadAndSaveCover(url: string, bookId: number): Promise<boolean> {

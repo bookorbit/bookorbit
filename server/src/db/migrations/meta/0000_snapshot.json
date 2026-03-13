@@ -1,5 +1,5 @@
 {
-  "id": "63e55df9-2027-4680-adfd-3b3d0ae8f1be",
+  "id": "9db12dad-097f-4fec-80be-6741fa851f50",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1348,6 +1348,12 @@
         "itunes_id": {
           "name": "itunes_id",
           "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata_score": {
+          "name": "metadata_score",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

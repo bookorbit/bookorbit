@@ -17,11 +17,18 @@ const emit = defineEmits<{
 }>()
 
 const MAX_DEPTH = 5
-const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'rating']
+const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'rating', 'metadataScore']
 const DATE_FIELDS: RuleField[] = ['addedAt']
 const NO_VALUE_OPERATORS: RuleOperator[] = ['isEmpty', 'isNotEmpty', 'isMissing', 'isPresent', 'isUnread', 'isInProgress', 'isFinished']
 const BETWEEN_OPERATORS: RuleOperator[] = ['between']
 const COLLECTION_OPERATORS: RuleOperator[] = ['includesAny', 'includesAll', 'excludesAll']
+
+const SCORE_PRESETS = [
+  { label: 'Outstanding', gte: 90 },
+  { label: 'Good', gte: 70 },
+  { label: 'Fair', gte: 50 },
+  { label: 'Poor', lt: 50 },
+] as const
 
 const CHIP_TYPEAHEAD_FIELDS: RuleField[] = ['author', 'genre', 'tag', 'collection']
 const TEXT_TYPEAHEAD_FIELDS: RuleField[] = ['publisher', 'series', 'language']
@@ -108,7 +115,8 @@ watch(
 function isRuleComplete(r: EditableRule): boolean {
   if (NO_VALUE_OPERATORS.includes(r.operator)) return true
   if (COLLECTION_OPERATORS.includes(r.operator)) return r.valueChips.length > 0
-  return r.value.trim() !== ''
+  if (BETWEEN_OPERATORS.includes(r.operator)) return String(r.value).trim() !== '' && String(r.valueTo).trim() !== ''
+  return String(r.value).trim() !== ''
 }
 
 function emitUpdate() {
@@ -206,6 +214,20 @@ function onSubGroupUpdate(index: number, val: GroupRule | undefined) {
   emitUpdate()
 }
 
+function applyScorePreset(index: number, preset: (typeof SCORE_PRESETS)[number]) {
+  const node = nodes.value[index]
+  if (node?.kind !== 'rule') return
+  if ('lt' in preset) {
+    node.rule.operator = 'lt'
+    node.rule.value = String(preset.lt)
+  } else {
+    node.rule.operator = 'gte'
+    node.rule.value = String(preset.gte)
+  }
+  node.rule.valueTo = ''
+  emitUpdate()
+}
+
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
   if (DATE_FIELDS.includes(field)) return operator === 'withinLast' ? 'number' : 'date'
@@ -300,6 +322,47 @@ function showValueToInput(operator: RuleOperator): boolean {
           :endpoint="ENDPOINT_BY_FIELD[node.rule.field]!"
           @update:model-value="emitUpdate"
         />
+        <!-- Metadata score: preset range chips + numeric input -->
+        <template v-else-if="node.rule.field === 'metadataScore' && !NO_VALUE_OPERATORS.includes(node.rule.operator)">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button
+              v-for="preset in SCORE_PRESETS"
+              :key="preset.label"
+              type="button"
+              class="h-7 px-2.5 rounded-md text-xs border transition-colors"
+              :class="
+                ('gte' in preset && node.rule.operator === 'gte' && node.rule.value === String(preset.gte)) ||
+                ('lt' in preset && node.rule.operator === 'lt' && node.rule.value === String(preset.lt))
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-foreground border-input hover:bg-muted'
+              "
+              @click="applyScorePreset(index, preset)"
+            >
+              {{ preset.label }}
+            </button>
+          </div>
+          <input
+            v-model="node.rule.value"
+            @input="emitUpdate"
+            type="number"
+            min="0"
+            max="100"
+            placeholder="0-100"
+            class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary w-24"
+          />
+          <template v-if="showValueToInput(node.rule.operator)">
+            <span class="text-xs text-muted-foreground">to</span>
+            <input
+              v-model="node.rule.valueTo"
+              @input="emitUpdate"
+              type="number"
+              min="0"
+              max="100"
+              placeholder="100"
+              class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary w-24"
+            />
+          </template>
+        </template>
         <!-- Standard input: text, number, date -->
         <template v-else-if="!NO_VALUE_OPERATORS.includes(node.rule.operator)">
           <input

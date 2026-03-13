@@ -39,6 +39,7 @@ export const bookMetadata = pgTable(
     hardcoverId: varchar('hardcover_id', { length: 50 }),
     openLibraryId: varchar('open_library_id', { length: 50 }),
     itunesId: varchar('itunes_id', { length: 50 }),
+    metadataScore: integer('metadata_score'),
     embedding: embedding256('embedding'),
     lastWrittenAt: timestamp('last_written_at'),
     updatedAt: timestamp('updated_at')

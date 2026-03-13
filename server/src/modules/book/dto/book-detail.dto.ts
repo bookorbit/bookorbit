@@ -34,4 +34,5 @@ export class BookDetailDto {
   tags: string[];
   files: BookFileDto[];
   lastWrittenAt: Date | null;
+  metadataScore: number | null;
 }

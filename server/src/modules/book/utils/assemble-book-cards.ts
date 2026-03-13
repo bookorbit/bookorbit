@@ -13,6 +13,7 @@ type BookRow = {
   publishedYear: number | null;
   language: string | null;
   rating: number | null;
+  metadataScore?: number | null;
 };
 
 type NameRow = { bookId: number; name: string };
@@ -78,6 +79,7 @@ export function assembleBookCards(
       genres: genresByBook.get(row.id) ?? [],
       tags: tagsByBook.get(row.id) ?? [],
       rating: row.rating ?? null,
+      metadataScore: row.metadataScore !== undefined ? (row.metadataScore ?? null) : null,
       readingProgress,
       addedAt: row.addedAt.toISOString(),
     };

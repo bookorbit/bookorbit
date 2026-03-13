@@ -139,6 +139,8 @@ export class BookQueryBuilder {
         return this.textRuleToSql(bookMetadata.description, operator, value as string);
       case 'isbn':
         return this.isbnRuleToSql(operator, value as string | undefined);
+      case 'metadataScore':
+        return this.numericRuleToSql(bookMetadata.metadataScore, operator, value as number, valueTo as number | undefined);
       default:
         throw new BadRequestException(`Unknown filter field: ${String(field)}`);
     }

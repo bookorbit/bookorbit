@@ -9,6 +9,7 @@ import { useProviderConfig } from './composables/useProviderConfig'
 import { useMetadataPreferences } from './composables/useMetadataPreferences'
 import { Info } from 'lucide-vue-next'
 import SettingsPageHeader from '../SettingsPageHeader.vue'
+import MetadataScoreWeightsSettings from '../MetadataScoreWeightsSettings.vue'
 
 const { config, statuses, saving: savingProviders, fetchConfig, saveConfig } = useProviderConfig()
 const { globalPrefs, libraryPrefs, savingGlobal, savingField, fetchGlobal, saveGlobal, fetchLibrary, saveFieldOverride, resetLibrary } =
@@ -91,6 +92,11 @@ async function onResetLibrary(libraryId: number) {
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- Metadata Score Weights -->
+    <section class="space-y-4 pt-4 border-t border-border">
+      <MetadataScoreWeightsSettings />
     </section>
   </div>
 </template>

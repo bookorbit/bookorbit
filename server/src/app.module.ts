@@ -42,6 +42,7 @@ import { StagingModule } from './modules/staging/staging.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthorsModule } from './modules/authors/authors.module';
+import { MetadataScoreModule } from './modules/metadata-score/metadata-score.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { AuthorsModule } from './modules/authors/authors.module';
     EpubModule,
     StagingModule,
     EmailModule,
+    MetadataScoreModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

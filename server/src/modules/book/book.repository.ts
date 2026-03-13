@@ -58,6 +58,7 @@ export class BookRepository {
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
           rating: bookMetadata.rating,
+          metadataScore: bookMetadata.metadataScore,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))

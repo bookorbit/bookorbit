@@ -69,6 +69,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     files: [],
     folderPath: '/books',
     lastWrittenAt: null,
+    metadataScore: null,
     ...overrides,
   }
 }

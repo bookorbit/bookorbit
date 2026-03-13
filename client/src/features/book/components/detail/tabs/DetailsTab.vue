@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, Download, FolderPlus, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
@@ -10,11 +10,15 @@ import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import type { BookDetail, BookKoboState } from '@projectx/types'
 import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import MetadataScoreBadge from '@/features/metadata-score/components/MetadataScoreBadge.vue'
+import MetadataScoreBreakdown from '@/features/metadata-score/components/MetadataScoreBreakdown.vue'
+import { useMetadataScoreWeights } from '@/features/metadata-score/composables/useMetadataScoreWeights'
 
 type FileProgress = {
   percentage: number
@@ -52,6 +56,11 @@ const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
 
 const addToCollectionOpen = ref(false)
+const scoreBreakdownOpen = ref(false)
+
+const { weights: scoreWeights, fetchWeights } = useMetadataScoreWeights()
+
+onMounted(fetchWeights)
 
 const {
   pendingId: deleteBookId,
@@ -238,6 +247,11 @@ function providerLinkStyle(provider: string) {
     borderColor: `${color}66`,
     backgroundColor: `${color}12`,
   }
+}
+
+function handleEditMetadataFromScore() {
+  scoreBreakdownOpen.value = false
+  router.push({ name: 'book-edit', params: { bookId: props.book.id } })
 }
 
 function openBook() {
@@ -457,6 +471,15 @@ watch(
       <!-- Identity block -->
       <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1">
         <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
+        <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
+          <PopoverTrigger as-child>
+            <MetadataScoreBadge :score="book.metadataScore" />
+          </PopoverTrigger>
+          <PopoverContent class="w-72 p-4" align="start">
+            <p class="text-sm font-semibold mb-3">Metadata Score</p>
+            <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
+          </PopoverContent>
+        </Popover>
         <div v-if="providerLinks.length" class="flex items-center gap-1.5 shrink-0">
           <a
             v-for="link in providerLinks"

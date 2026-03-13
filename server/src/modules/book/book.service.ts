@@ -10,6 +10,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataService } from '../metadata/metadata.service';
+import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { LibraryService } from '../library/library.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
@@ -31,6 +32,7 @@ export class BookService {
     private readonly libraryService: LibraryService,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly metadataService: MetadataService,
+    private readonly scoreService: MetadataScoreService,
     private readonly pipeline: MetadataFetchPipeline,
     private readonly config: ConfigService,
     private readonly appSettings: AppSettingsService,
@@ -331,6 +333,7 @@ export class BookService {
 
     this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
     this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
+    this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
     return this.getDetail(id, user);
   }
 
@@ -621,6 +624,7 @@ export class BookService {
         filename: basename(f.absolutePath),
       })),
       lastWrittenAt: meta?.lastWrittenAt ?? null,
+      metadataScore: meta?.metadataScore ?? null,
     };
   }
 }

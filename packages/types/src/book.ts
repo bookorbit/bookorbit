@@ -23,6 +23,7 @@ export type BookCard = {
   tags: string[];
   rating: number | null;
   readingProgress: number | null;
+  metadataScore: number | null;
   addedAt: string;
 };
 
@@ -62,6 +63,7 @@ export type BookDetail = {
   tags: string[];
   files: BookDetailFile[];
   lastWrittenAt: string | null;
+  metadataScore: number | null;
 };
 
 export type BookKoboReadingState = {

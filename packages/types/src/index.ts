@@ -17,3 +17,4 @@ export * from "./staging";
 export * from "./file-write";
 export * from "./epub";
 export * from "./author";
+export * from "./metadata-score";
