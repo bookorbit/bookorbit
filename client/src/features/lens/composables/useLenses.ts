@@ -1,27 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { GroupRule, SortSpec } from '@projectx/types'
-
-export interface Lens {
-  id: number
-  userId: number
-  name: string
-  icon: string | null
-  filter: GroupRule | null
-  defaultSort: SortSpec[]
-  isPublic: boolean
-  bookCount?: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateLensPayload {
-  name: string
-  icon?: string
-  filter?: GroupRule
-  defaultSort: SortSpec[]
-  isPublic?: boolean
-}
+import type { CreateLensPayload, Lens } from '@projectx/types'
 
 const lenses = ref<Lens[]>([])
 const loaded = ref(false)
@@ -73,5 +52,14 @@ export function useLenses() {
     lenses.value = lenses.value.filter((l) => l.id !== id)
   }
 
-  return { lenses, fetchLenses, refreshLenses, createLens, updateLens, deleteLens }
+  async function reorderLenses(order: { id: number; displayOrder: number }[]): Promise<void> {
+    const res = await api('/api/v1/lenses/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  }
+
+  return { lenses, fetchLenses, refreshLenses, createLens, updateLens, deleteLens, reorderLenses }
 }

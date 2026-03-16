@@ -18,6 +18,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
+import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { CollectionService } from './collection.service';
 
@@ -41,6 +42,12 @@ export class CollectionController {
   @Post()
   create(@Body() dto: CreateCollectionDto, @CurrentUser() user: RequestUser) {
     return this.collectionService.create(dto, user);
+  }
+
+  @Post('reorder')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  reorder(@Body() dto: ReorderCollectionsDto, @CurrentUser() user: RequestUser) {
+    return this.collectionService.reorder(dto, user);
   }
 
   @Patch(':id')

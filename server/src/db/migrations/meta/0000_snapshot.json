@@ -1,5 +1,5 @@
 {
-  "id": "48aed1fe-9e4e-4aa3-9d20-cd6fa135eca5",
+  "id": "a347778a-4f66-401f-9715-92371d971b86",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -950,6 +950,13 @@
           "notNull": true,
           "default": false
         },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1030,6 +1037,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",

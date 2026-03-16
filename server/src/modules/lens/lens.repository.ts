@@ -17,7 +17,7 @@ export class LensRepository {
       .select()
       .from(lenses)
       .where(or(eq(lenses.userId, userId), eq(lenses.isPublic, true)))
-      .orderBy(lenses.name);
+      .orderBy(lenses.displayOrder, lenses.name);
   }
 
   findById(id: number) {
@@ -41,5 +41,14 @@ export class LensRepository {
       .delete(lenses)
       .where(and(eq(lenses.id, id), eq(lenses.userId, userId)))
       .returning();
+  }
+
+  async updateDisplayOrders(userId: number, order: { id: number; displayOrder: number }[]) {
+    for (const item of order) {
+      await this.db
+        .update(lenses)
+        .set({ displayOrder: item.displayOrder })
+        .where(and(eq(lenses.id, item.id), eq(lenses.userId, userId)));
+    }
   }
 }

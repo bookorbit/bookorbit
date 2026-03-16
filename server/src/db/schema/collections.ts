@@ -12,6 +12,7 @@ export const collections = pgTable('collections', {
   icon: text('icon'),
   description: text('description'),
   syncToKobo: boolean('sync_to_kobo').notNull().default(false),
+  displayOrder: integer('display_order').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
     .defaultNow()

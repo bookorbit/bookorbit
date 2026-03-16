@@ -8,6 +8,7 @@ import { BookRepository } from '../book/book.repository';
 import { validateGroupRule } from '../book/utils/group-rule.validator';
 import { LibraryService } from '../library/library.service';
 import { CreateLensDto } from './dto/create-lens.dto';
+import { ReorderLensesDto } from './dto/reorder-lenses.dto';
 import { UpdateLensDto } from './dto/update-lens.dto';
 import { LensRepository } from './lens.repository';
 
@@ -81,6 +82,10 @@ export class LensService {
     if (lens.userId !== user.id && !this.isSuperuser(user)) throw new ForbiddenException('Cannot delete this lens');
 
     await this.lensRepo.delete(id, lens.userId);
+  }
+
+  async reorder(dto: ReorderLensesDto, user: RequestUser) {
+    await this.lensRepo.updateDisplayOrders(user.id, dto.order);
   }
 
   async executeLens(id: number, user: RequestUser, page: number, size: number): Promise<BooksPage> {

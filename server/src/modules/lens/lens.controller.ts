@@ -3,6 +3,7 @@ import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, HttpStatus, 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateLensDto } from './dto/create-lens.dto';
+import { ReorderLensesDto } from './dto/reorder-lenses.dto';
 import { UpdateLensDto } from './dto/update-lens.dto';
 import { LensService } from './lens.service';
 
@@ -23,6 +24,12 @@ export class LensController {
   @Post()
   create(@Body() dto: CreateLensDto, @CurrentUser() user: RequestUser) {
     return this.lensService.create(dto, user);
+  }
+
+  @Post('reorder')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  reorder(@Body() dto: ReorderLensesDto, @CurrentUser() user: RequestUser) {
+    return this.lensService.reorder(dto, user);
   }
 
   @Patch(':id')

@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from 'lucide-vue-next'
+import { VueDraggable } from 'vue-draggable-plus'
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +23,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
+import { useDraggableOrder } from '@/composables/useDraggableOrder'
 import type { Library } from '@projectx/types'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
@@ -43,9 +45,9 @@ function useSidebarSection(key: string) {
 
 const router = useRouter()
 const route = useRoute()
-const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
-const { lenses, fetchLenses } = useLenses()
-const { collections, fetchCollections } = useCollections()
+const { libraries, fetchLibraries, refreshLibraries, reorderLibraries } = useLibraries()
+const { lenses, fetchLenses, reorderLenses } = useLenses()
+const { collections, fetchCollections, reorderCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
 const { summary: stagingSummary, fetchSummary: fetchStagingSummary, subscribe: subscribeStagingSummary } = useStagingSummary()
@@ -59,6 +61,28 @@ const scanningLibraryId = ref<number | null>(null)
 const { isOpen: librariesOpen, toggle: toggleLibraries } = useSidebarSection('libraries')
 const { isOpen: lensesOpen, toggle: toggleLenses } = useSidebarSection('lenses')
 const { isOpen: collectionsOpen, toggle: toggleCollections } = useSidebarSection('collections')
+
+const isReorderingLibraries = ref(false)
+const isReorderingLenses = ref(false)
+const isReorderingCollections = ref(false)
+
+const {
+  localItems: localLibraries,
+  onDragStart: onLibraryDragStart,
+  onDragEnd: onLibraryDragEnd,
+} = useDraggableOrder({ source: libraries, persist: reorderLibraries })
+
+const {
+  localItems: localLenses,
+  onDragStart: onLensDragStart,
+  onDragEnd: onLensDragEnd,
+} = useDraggableOrder({ source: lenses, persist: reorderLenses })
+
+const {
+  localItems: localCollections,
+  onDragStart: onCollectionDragStart,
+  onDragEnd: onCollectionDragEnd,
+} = useDraggableOrder({ source: collections, persist: reorderCollections })
 
 const isDashboardActive = computed(() => route.name === 'dashboard')
 const isStagingActive = computed(() => route.name === 'staging')
@@ -212,14 +236,26 @@ onUnmounted(() => stopUploadCompletedListener())
           :collapsed-count="libraries.length"
           :can-add="hasPermission('manage_libraries')"
           add-title="New Library"
+          :can-reorder="hasPermission('manage_libraries')"
+          :is-reordering="isReorderingLibraries"
           @toggle="toggleLibraries"
           @add="createLibraryOpen = true"
+          @toggle-reorder="isReorderingLibraries = !isReorderingLibraries"
         />
         <div v-show="librariesOpen">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <VueDraggable
+              v-model="localLibraries"
+              tag="ul"
+              :animation="150"
+              handle=".drag-handle"
+              :disabled="!isReorderingLibraries"
+              class="contents"
+              @start="onLibraryDragStart"
+              @end="onLibraryDragEnd"
+            >
               <SidebarNavItem
-                v-for="lib in libraries"
+                v-for="lib in localLibraries"
                 :key="lib.id"
                 :is-active="activeLibraryId === lib.id"
                 :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
@@ -241,6 +277,11 @@ onUnmounted(() => stopUploadCompletedListener())
                   >
                     {{ lib.bookCount.toLocaleString() }}
                   </span>
+                  <Icons.GripVertical
+                    v-if="isReorderingLibraries"
+                    class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
+                    @click.stop
+                  />
                 </template>
                 <template #extra>
                   <Transition name="scan-progress">
@@ -261,7 +302,7 @@ onUnmounted(() => stopUploadCompletedListener())
                   </Transition>
                 </template>
               </SidebarNavItem>
-            </SidebarMenu>
+            </VueDraggable>
           </SidebarGroupContent>
         </div>
       </SidebarGroup>
@@ -276,14 +317,26 @@ onUnmounted(() => stopUploadCompletedListener())
           :collapsed-count="lenses.length"
           :can-add="true"
           add-title="New Lens"
+          :can-reorder="lenses.length > 1"
+          :is-reordering="isReorderingLenses"
           @toggle="toggleLenses"
           @add="createLensOpen = true"
+          @toggle-reorder="isReorderingLenses = !isReorderingLenses"
         />
         <div v-show="lensesOpen">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <VueDraggable
+              v-model="localLenses"
+              tag="ul"
+              :animation="150"
+              handle=".drag-handle"
+              :disabled="!isReorderingLenses"
+              class="contents"
+              @start="onLensDragStart"
+              @end="onLensDragEnd"
+            >
               <SidebarNavItem
-                v-for="lens in lenses"
+                v-for="lens in localLenses"
                 :key="lens.id"
                 :is-active="activeLensId === lens.id"
                 :tooltip="lens.name"
@@ -298,12 +351,17 @@ onUnmounted(() => stopUploadCompletedListener())
                   >
                     {{ lens.bookCount.toLocaleString() }}
                   </span>
+                  <Icons.GripVertical
+                    v-if="isReorderingLenses"
+                    class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
+                    @click.stop
+                  />
                 </template>
               </SidebarNavItem>
-              <SidebarMenuItem v-if="lenses.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
-              </SidebarMenuItem>
-            </SidebarMenu>
+            </VueDraggable>
+            <SidebarMenuItem v-if="localLenses.length === 0">
+              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
+            </SidebarMenuItem>
           </SidebarGroupContent>
         </div>
       </SidebarGroup>
@@ -318,14 +376,26 @@ onUnmounted(() => stopUploadCompletedListener())
           :collapsed-count="collections.length"
           :can-add="true"
           add-title="New Collection"
+          :can-reorder="collections.length > 1"
+          :is-reordering="isReorderingCollections"
           @toggle="toggleCollections"
           @add="createCollectionOpen = true"
+          @toggle-reorder="isReorderingCollections = !isReorderingCollections"
         />
         <div v-show="collectionsOpen">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <VueDraggable
+              v-model="localCollections"
+              tag="ul"
+              :animation="150"
+              handle=".drag-handle"
+              :disabled="!isReorderingCollections"
+              class="contents"
+              @start="onCollectionDragStart"
+              @end="onCollectionDragEnd"
+            >
               <SidebarNavItem
-                v-for="collection in collections"
+                v-for="collection in localCollections"
                 :key="collection.id"
                 :is-active="activeCollectionId === collection.id"
                 :tooltip="collection.name"
@@ -340,12 +410,17 @@ onUnmounted(() => stopUploadCompletedListener())
                   >
                     {{ collection.bookCount.toLocaleString() }}
                   </span>
+                  <Icons.GripVertical
+                    v-if="isReorderingCollections"
+                    class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
+                    @click.stop
+                  />
                 </template>
               </SidebarNavItem>
-              <SidebarMenuItem v-if="collections.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No collections yet</span>
-              </SidebarMenuItem>
-            </SidebarMenu>
+            </VueDraggable>
+            <SidebarMenuItem v-if="localCollections.length === 0">
+              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No collections yet</span>
+            </SidebarMenuItem>
           </SidebarGroupContent>
         </div>
       </SidebarGroup>

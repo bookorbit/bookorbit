@@ -76,6 +76,15 @@ export function useCollections() {
     return updated
   }
 
+  async function reorderCollections(order: { id: number; displayOrder: number }[]): Promise<void> {
+    const res = await api('/api/v1/collections/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    })
+    if (!res.ok) throw new Error('Failed to reorder collections')
+  }
+
   return {
     collections,
     fetchCollections,
@@ -84,5 +93,6 @@ export function useCollections() {
     updateCollection,
     addBooksToCollection,
     removeBooksFromCollection,
+    reorderCollections,
   }
 }

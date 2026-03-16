@@ -8,6 +8,7 @@ import { books } from '../../db/schema';
 import { BookRepository } from '../book/book.repository';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
+import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { CollectionRepository } from './collection.repository';
 
@@ -73,6 +74,10 @@ export class CollectionService {
     if (!existing) throw new NotFoundException('Collection not found');
     this.assertAccess(existing.userId, user);
     await this.collectionRepo.delete(id, existing.userId);
+  }
+
+  async reorder(dto: ReorderCollectionsDto, user: RequestUser) {
+    await this.collectionRepo.updateDisplayOrders(user.id, dto.order);
   }
 
   async addBooks(id: number, dto: CollectionBooksDto, user: RequestUser) {

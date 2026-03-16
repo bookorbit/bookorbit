@@ -134,6 +134,7 @@ CREATE TABLE "collections" (
 	"icon" text,
 	"description" text,
 	"sync_to_kobo" boolean DEFAULT false NOT NULL,
+	"display_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -146,6 +147,7 @@ CREATE TABLE "lenses" (
 	"filter" jsonb,
 	"default_sort" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"is_public" boolean DEFAULT false NOT NULL,
+	"display_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "lenses_user_id_name_unique" UNIQUE("user_id","name")

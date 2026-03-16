@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ChevronDown, Plus } from 'lucide-vue-next'
+import { ChevronDown, Plus, GripVertical, Check, MoreVertical } from 'lucide-vue-next'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
-defineProps<{
+const props = defineProps<{
   label: string
   isOpen: boolean
   collapsedCount?: number
   canAdd?: boolean
   addTitle?: string
+  canReorder?: boolean
+  isReordering?: boolean
 }>()
 
-const emit = defineEmits<{ toggle: []; add: [] }>()
+const emit = defineEmits<{ toggle: []; add: []; toggleReorder: [] }>()
+
+const hasMenu = () => props.canAdd || props.canReorder
 </script>
 
 <template>
@@ -33,13 +38,26 @@ const emit = defineEmits<{ toggle: []; add: [] }>()
         :class="isOpen ? 'rotate-0' : '-rotate-90'"
       />
     </button>
-    <button
-      v-if="canAdd"
-      class="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground/90"
-      :title="addTitle"
-      @click="emit('add')"
-    >
-      <Plus :size="15" :stroke-width="2.2" />
-    </button>
+    <DropdownMenu v-if="hasMenu()">
+      <DropdownMenuTrigger
+        class="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent"
+        :class="isReordering ? 'text-primary' : 'text-sidebar-foreground/45 hover:text-sidebar-foreground/90'"
+        @click.stop
+      >
+        <MoreVertical :size="15" :stroke-width="2.2" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" :side-offset="4">
+        <DropdownMenuItem v-if="canAdd" @click="emit('add')">
+          <Plus class="size-4" />
+          {{ addTitle ?? 'Add' }}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator v-if="canAdd && canReorder" />
+        <DropdownMenuItem v-if="canReorder" @click="emit('toggleReorder')">
+          <Check v-if="isReordering" class="size-4 text-primary" />
+          <GripVertical v-else class="size-4" />
+          {{ isReordering ? 'Done reordering' : 'Reorder' }}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   </div>
 </template>

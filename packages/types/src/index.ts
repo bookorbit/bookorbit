@@ -5,6 +5,7 @@ export * from "./dashboard";
 export * from "./book";
 export * from "./upload";
 export * from "./collection";
+export * from "./lens";
 export * from "./library";
 export * from "./metadata-fetch";
 export * from "./pattern-resolver";

@@ -15,6 +15,7 @@ const collectionFields = {
   icon: collections.icon,
   description: collections.description,
   syncToKobo: collections.syncToKobo,
+  displayOrder: collections.displayOrder,
   createdAt: collections.createdAt,
   updatedAt: collections.updatedAt,
   bookCount: count(collectionBooks.bookId),
@@ -31,7 +32,7 @@ export class CollectionRepository {
       .leftJoin(collectionBooks, eq(collections.id, collectionBooks.collectionId))
       .where(eq(collections.userId, userId))
       .groupBy(collections.id, collections.userId)
-      .orderBy(collections.name);
+      .orderBy(collections.displayOrder, collections.name);
   }
 
   findAllForUserWithMembership(userId: number, bookIds: number[]) {
@@ -48,7 +49,7 @@ export class CollectionRepository {
       .leftJoin(collectionBooks, eq(collections.id, collectionBooks.collectionId))
       .where(eq(collections.userId, userId))
       .groupBy(collections.id, collections.userId)
-      .orderBy(collections.name);
+      .orderBy(collections.displayOrder, collections.name);
   }
 
   findById(id: number) {
@@ -94,5 +95,14 @@ export class CollectionRepository {
 
   findBookIds(collectionId: number) {
     return this.db.select({ bookId: collectionBooks.bookId }).from(collectionBooks).where(eq(collectionBooks.collectionId, collectionId));
+  }
+
+  async updateDisplayOrders(userId: number, order: { id: number; displayOrder: number }[]) {
+    for (const item of order) {
+      await this.db
+        .update(collections)
+        .set({ displayOrder: item.displayOrder })
+        .where(and(eq(collections.id, item.id), eq(collections.userId, userId)));
+    }
   }
 }

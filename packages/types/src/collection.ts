@@ -4,6 +4,7 @@ export type Collection = {
   icon: string | null;
   description: string | null;
   syncToKobo: boolean;
+  displayOrder: number;
   bookCount: number;
   memberCount?: number;
   createdAt: string;
