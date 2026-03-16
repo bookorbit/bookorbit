@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional }
 import type { BookMetadataFetchReason, MetadataField } from '@projectx/types';
 import { MetadataProviderKey } from '@projectx/types';
 import { BookRepository } from '../book/book.repository';
+import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
@@ -222,7 +223,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     existingGenreRows: { name: string }[],
   ): Promise<void> {
     const r = resolved as Record<string, unknown>;
-    const scalarFields: Partial<typeof bookMetadata.$inferInsert> = {};
+    const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
 
     if (r.title !== undefined) scalarFields.title = (r.title as string | null) ?? null;
     if (r.subtitle !== undefined) scalarFields.subtitle = (r.subtitle as string | null) ?? null;

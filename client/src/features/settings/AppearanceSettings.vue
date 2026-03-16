@@ -15,7 +15,7 @@ const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = 
   { key: 'progress-pill', label: 'Progress pill', hint: '% badge at bottom-left' },
   { key: 'format', label: 'File format', hint: 'Color-coded EPUB, PDF, CBZ badge at bottom-right' },
   { key: 'rating', label: 'Rating dots', hint: '5-dot rating indicator at bottom-left' },
-  { key: 'new', label: 'New indicator', hint: 'Accent dot on books added in the last 14 days' },
+  { key: 'new', label: 'New indicator', hint: 'Accent dot on books added in the last 7 days' },
 ]
 
 function toggleOverlay(key: CardOverlayKey) {

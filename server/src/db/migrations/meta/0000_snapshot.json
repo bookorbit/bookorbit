@@ -1,5 +1,5 @@
 {
-  "id": "cb5ce237-4cd9-4bc6-ba30-81eb92053150",
+  "id": "48aed1fe-9e4e-4aa3-9d20-cd6fa135eca5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3011,7 +3011,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "two_way_progress_sync": {
           "name": "two_way_progress_sync",

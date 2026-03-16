@@ -149,8 +149,7 @@ const RADIUS_IDS = RADIUS_OPTIONS.map((r) => r.id)
 const BACKGROUND_IDS = BACKGROUND_OPTIONS.map((b) => b.id)
 
 export const useThemeStore = defineStore('theme', () => {
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const theme = ref<Theme>(storage.get<Theme>('theme', prefersDark ? 'dark' : 'light'))
+  const theme = ref<Theme>(storage.get<Theme>('theme', 'dark'))
 
   const storedAccent = storage.get<Accent>('accent', 'blue')
   const accent = ref<Accent>(ACCENT_IDS.includes(storedAccent) ? storedAccent : 'blue')
@@ -158,10 +157,10 @@ export const useThemeStore = defineStore('theme', () => {
   const storedRadius = storage.get<Radius>('radius', 'default')
   const radius = ref<Radius>(RADIUS_IDS.includes(storedRadius) ? storedRadius : 'default')
 
-  const storedBackground = storage.get<Background>('background', 'dots')
+  const storedBackground = storage.get<Background>('background', 'vinyl')
   const background = ref<Background>(BACKGROUND_IDS.includes(storedBackground) ? storedBackground : 'dots')
 
-  const brightness = ref<number>(storage.get<number>('brightness', 0))
+  const brightness = ref<number>(storage.get<number>('brightness', 50))
 
   function applyTheme(t: Theme) {
     document.documentElement.classList.toggle('dark', t === 'dark')

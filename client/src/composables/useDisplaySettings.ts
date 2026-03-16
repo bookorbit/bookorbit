@@ -3,10 +3,10 @@ import { storage } from '@/services/storage'
 
 export type CardOverlayKey = 'series' | 'progress-bar' | 'progress-pill' | 'format' | 'rating' | 'new'
 
-const coverSize = ref(storage.get('coverSize', 150))
-const gridGap = ref(storage.get('gridGap', 16))
+const coverSize = ref(storage.get('coverSize', 140))
+const gridGap = ref(storage.get('gridGap', 20))
 const viewMode = ref<'grid' | 'list'>(storage.get('viewMode', 'grid'))
-const cardOverlays = ref<CardOverlayKey[]>(storage.get('cardOverlays', ['series', 'progress-bar', 'progress-pill', 'format']))
+const cardOverlays = ref<CardOverlayKey[]>(storage.get('cardOverlays', ['progress-bar', 'format', 'rating']))
 const lensFilterExpanded = ref(storage.get('lensFilterExpanded', true))
 
 watch(coverSize, (v) => storage.set('coverSize', v))

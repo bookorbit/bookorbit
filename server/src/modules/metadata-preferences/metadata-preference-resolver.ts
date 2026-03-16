@@ -13,11 +13,10 @@ import {
 } from '@projectx/types';
 
 const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
+  MetadataProviderKey.GOODREADS,
   MetadataProviderKey.GOOGLE,
   MetadataProviderKey.AMAZON,
-  MetadataProviderKey.GOODREADS,
   MetadataProviderKey.OPEN_LIBRARY,
-  MetadataProviderKey.ITUNES,
 ];
 
 const DEFAULT_MERGE_STRATEGY: MergeStrategy = 'overwriteIfProvided';
@@ -25,8 +24,29 @@ const MERGE_STRATEGIES: Set<MergeStrategy> = new Set(['fillMissing', 'overwrite'
 const GENRE_MERGE_MODES: Set<GenreMergeMode> = new Set(['firstProvider', 'merge']);
 const GENRE_PROVIDER_SCOPES: Set<GenreProviderScope> = new Set(['selectedProviders', 'allConfiguredProviders']);
 
+const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
+  MetadataProviderKey.GOODREADS,
+  MetadataProviderKey.GOOGLE,
+  MetadataProviderKey.ITUNES,
+  MetadataProviderKey.AMAZON,
+  MetadataProviderKey.OPEN_LIBRARY,
+];
+
 const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> = {
-  title: { mergeStrategy: 'fillMissing' },
+  title: { mergeStrategy: 'fillMissing', providers: PROVIDERS_WITH_ITUNES },
+  subtitle: { providers: PROVIDERS_WITH_ITUNES },
+  description: { providers: PROVIDERS_WITH_ITUNES },
+  cover: {
+    providers: [
+      MetadataProviderKey.AMAZON,
+      MetadataProviderKey.ITUNES,
+      MetadataProviderKey.GOODREADS,
+      MetadataProviderKey.GOOGLE,
+      MetadataProviderKey.OPEN_LIBRARY,
+    ],
+  },
+  authors: { providers: PROVIDERS_WITH_ITUNES },
+  genres: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES] },
 };
 
 @Injectable()
@@ -34,19 +54,20 @@ export class MetadataPreferenceResolver {
   getDefaultPreferences(): MetadataFetchPreferences {
     const fields = {} as Record<MetadataField, FieldPreference>;
     for (const field of ALL_METADATA_FIELDS) {
+      const fieldDefault = FIELD_DEFAULTS[field];
       fields[field] = {
         enabled: true,
-        providers: [...DEFAULT_PROVIDER_ORDER],
+        providers: fieldDefault?.providers ? [...fieldDefault.providers] : [...DEFAULT_PROVIDER_ORDER],
         mergeStrategy: DEFAULT_MERGE_STRATEGY,
-        ...FIELD_DEFAULTS[field],
+        ...(fieldDefault?.mergeStrategy ? { mergeStrategy: fieldDefault.mergeStrategy } : {}),
       };
     }
     const options: MetadataFetchOptions = {
       genres: {
-        mode: 'firstProvider',
-        providerScope: 'selectedProviders',
+        mode: 'merge',
+        providerScope: 'allConfiguredProviders',
       },
-      saveProviderIds: false,
+      saveProviderIds: true,
     };
     return { fields, options };
   }

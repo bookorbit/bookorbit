@@ -22,7 +22,7 @@ export const koboSyncSettings = pgTable('kobo_sync_settings', {
     .unique(),
   readingThreshold: real('reading_threshold').notNull().default(1),
   finishedThreshold: real('finished_threshold').notNull().default(99),
-  convertToKepub: boolean('convert_to_kepub').notNull().default(true),
+  convertToKepub: boolean('convert_to_kepub').notNull().default(false),
   twoWayProgressSync: boolean('two_way_progress_sync').notNull().default(false),
   forceEnableHyphenation: boolean('force_enable_hyphenation').notNull().default(false),
   kepubConversionLimitMb: integer('kepub_conversion_limit_mb').notNull().default(100),

@@ -32,10 +32,14 @@ describe('AuthorEnrichmentRepository', () => {
       orderBy: vi.fn(),
       limit: vi.fn(),
       groupBy: vi.fn(),
+      leftJoin: vi.fn(),
+      offset: vi.fn(),
     };
     selectBuilder.from.mockReturnValue(selectBuilder);
     selectBuilder.where.mockReturnValue(selectBuilder);
     selectBuilder.orderBy.mockReturnValue(selectBuilder);
+    selectBuilder.leftJoin.mockReturnValue(selectBuilder);
+    selectBuilder.offset.mockReturnValue(selectBuilder);
     selectBuilder.limit.mockResolvedValue([]);
     selectBuilder.groupBy.mockResolvedValue([]);
 
@@ -195,8 +199,8 @@ describe('AuthorEnrichmentRepository', () => {
       processing: 1,
       rateLimited: 2,
       failed: 3,
-      done: 10,
-      total: 20,
+      done: 0,
+      total: 10,
     });
   });
 });

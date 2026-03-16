@@ -17,6 +17,7 @@ import {
   Pencil,
   RefreshCw,
   Send,
+  Star,
   Trash2,
   TriangleAlert,
 } from 'lucide-vue-next'
@@ -86,7 +87,16 @@ const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') &
 const showNewOverlay = computed(() => {
   if (!cardOverlays.value.includes('new')) return false
   const addedAt = new Date(props.book.addedAt)
-  return Date.now() - addedAt.getTime() < 14 * 24 * 60 * 60 * 1000
+  return Date.now() - addedAt.getTime() < 7 * 24 * 60 * 60 * 1000
+})
+
+const ratingColor = computed(() => {
+  const r = Math.round(props.book.rating ?? 0)
+  if (r <= 1) return '#dc2626'
+  if (r === 2) return '#ea580c'
+  if (r === 3) return '#ca8a04'
+  if (r === 4) return '#65a30d'
+  return '#059669'
 })
 
 const coverLoaded = ref(false)
@@ -167,9 +177,6 @@ function openAuthorBrowse() {
         v-if="(showRatingOverlay || showProgressPill) && !selectionMode"
         class="absolute bottom-1.5 left-1.5 z-10 flex flex-col gap-0.5 items-start pointer-events-none"
       >
-        <div v-if="showRatingOverlay" class="flex gap-[3px]">
-          <span v-for="i in 5" :key="i" class="size-[5px] rounded-full" :class="i <= Math.round(book.rating!) ? 'bg-white/90' : 'bg-white/20'" />
-        </div>
         <div v-if="showProgressPill">
           <span
             v-if="book.readingProgress === 100"
@@ -179,6 +186,12 @@ function openAuthorBrowse() {
           </span>
           <span v-else class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60" :style="{ color: coverStyle.color }">
             {{ Math.floor(book.readingProgress!) }}%
+          </span>
+        </div>
+        <div v-if="showRatingOverlay" class="relative flex items-center justify-center size-5 group-hover:opacity-0 transition-opacity duration-150">
+          <Star class="size-5" :style="{ fill: ratingColor, color: ratingColor }" />
+          <span class="absolute text-[7px] font-black text-white leading-none" style="margin-top: 1px">
+            {{ Math.round(book.rating!) }}
           </span>
         </div>
       </div>

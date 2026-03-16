@@ -13,22 +13,52 @@ describe('MetadataPreferenceResolver', () => {
     const defaults = resolver.getDefaultPreferences();
 
     expect(Object.keys(defaults.fields)).toHaveLength(ALL_METADATA_FIELDS.length);
-    for (const field of ALL_METADATA_FIELDS) {
+
+    const fieldsWithItunes: (keyof typeof defaults.fields)[] = ['title', 'subtitle', 'description', 'authors'];
+    for (const field of fieldsWithItunes) {
       expect(defaults.fields[field].enabled).toBe(true);
       expect(defaults.fields[field].providers).toEqual([
+        MetadataProviderKey.GOODREADS,
+        MetadataProviderKey.GOOGLE,
+        MetadataProviderKey.ITUNES,
+        MetadataProviderKey.AMAZON,
+        MetadataProviderKey.OPEN_LIBRARY,
+      ]);
+    }
+
+    expect(defaults.fields.cover.providers).toEqual([
+      MetadataProviderKey.AMAZON,
+      MetadataProviderKey.ITUNES,
+      MetadataProviderKey.GOODREADS,
+      MetadataProviderKey.GOOGLE,
+      MetadataProviderKey.OPEN_LIBRARY,
+    ]);
+
+    expect(defaults.fields.genres.providers).toEqual([MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES]);
+
+    const fieldsWithoutItunes: (keyof typeof defaults.fields)[] = [
+      'publisher',
+      'publishedYear',
+      'language',
+      'pageCount',
+      'seriesName',
+      'seriesIndex',
+    ];
+    for (const field of fieldsWithoutItunes) {
+      expect(defaults.fields[field].enabled).toBe(true);
+      expect(defaults.fields[field].providers).toEqual([
+        MetadataProviderKey.GOODREADS,
         MetadataProviderKey.GOOGLE,
         MetadataProviderKey.AMAZON,
-        MetadataProviderKey.GOODREADS,
         MetadataProviderKey.OPEN_LIBRARY,
-        MetadataProviderKey.ITUNES,
       ]);
     }
 
     expect(defaults.fields.title.mergeStrategy).toBe('fillMissing');
     expect(defaults.fields.description.mergeStrategy).toBe('overwriteIfProvided');
     expect(defaults.options).toEqual({
-      genres: { mode: 'firstProvider', providerScope: 'selectedProviders' },
-      saveProviderIds: false,
+      genres: { mode: 'merge', providerScope: 'allConfiguredProviders' },
+      saveProviderIds: true,
     });
   });
 

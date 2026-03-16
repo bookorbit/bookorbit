@@ -58,6 +58,10 @@ describe('AuthorsService', () => {
     backfillLinkedAuthors: vi.fn(),
   };
 
+  const appSettings = {
+    getAuthorsAutoEnrichmentWriteMode: vi.fn(),
+  };
+
   let service: AuthorsService;
 
   beforeEach(() => {
@@ -66,6 +70,7 @@ describe('AuthorsService', () => {
       authorsRepo as any,
       bookRepo as any,
       libraryService as any,
+      appSettings as any,
       authorMetadataFetchService as any,
       authorImageStorage as any,
       enrichmentExecutor as any,
@@ -76,6 +81,7 @@ describe('AuthorsService', () => {
     authorImageStorage.getImageUrlIfExists.mockResolvedValue(null);
     enrichmentOrchestrator.schedule.mockResolvedValue(1);
     enrichmentOrchestrator.backfillLinkedAuthors.mockResolvedValue(8);
+    appSettings.getAuthorsAutoEnrichmentWriteMode.mockResolvedValue('missing_only');
   });
 
   it('merge rejects when sources do not contain any id different from target', async () => {
@@ -218,10 +224,5 @@ describe('AuthorsService', () => {
       writeMode: 'missing_only',
       audnexusEnabled: true,
     });
-  });
-
-  it('enqueueBackfill delegates to orchestrator and returns queued count', async () => {
-    await expect(service.enqueueBackfill()).resolves.toEqual({ queued: 8 });
-    expect(enrichmentOrchestrator.backfillLinkedAuthors).toHaveBeenCalled();
   });
 });

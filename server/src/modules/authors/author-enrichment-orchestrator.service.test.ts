@@ -1,13 +1,17 @@
 import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
 
+import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
 
 describe('AuthorEnrichmentOrchestratorService', () => {
   const queueRepo = {
     upsertSchedule: vi.fn(),
     enqueueAllLinkedAuthors: vi.fn(),
+    enqueueEligibleLinkedAuthors: vi.fn(),
+    filterEligibleAuthorIds: vi.fn(),
     getStatusSummary: vi.fn(),
     recoverStuckProcessing: vi.fn(),
+    resetAllProcessingOnBoot: vi.fn(),
     fetchDue: vi.fn(),
     markProcessing: vi.fn(),
     markDone: vi.fn(),
@@ -19,9 +23,13 @@ describe('AuthorEnrichmentOrchestratorService', () => {
   };
 
   const appSettings = {
-    isAuthorsAutoEnrichmentEnabled: vi.fn(),
-    getAuthorsAutoEnrichmentWriteMode: vi.fn(),
     isAuthorsProviderAudnexusEnabled: vi.fn(),
+  };
+
+  const enrichmentConfig = {
+    getConfig: vi.fn(),
+    isPaused: vi.fn(),
+    setPaused: vi.fn(),
   };
 
   const metadataEvents = {
@@ -33,12 +41,18 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     emitStatus: vi.fn(),
   };
 
+  let session: AuthorEnrichmentSessionService;
   let service: AuthorEnrichmentOrchestratorService;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    session = new AuthorEnrichmentSessionService();
+
     queueRepo.upsertSchedule.mockResolvedValue(0);
     queueRepo.enqueueAllLinkedAuthors.mockResolvedValue(0);
+    queueRepo.enqueueEligibleLinkedAuthors.mockResolvedValue(0);
+    queueRepo.filterEligibleAuthorIds.mockImplementation((ids: number[]) => Promise.resolve(ids));
+    queueRepo.resetAllProcessingOnBoot.mockResolvedValue(0);
     queueRepo.recoverStuckProcessing.mockResolvedValue(0);
     queueRepo.getStatusSummary.mockResolvedValue({
       queued: 0,
@@ -60,28 +74,41 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       imageUpdated: false,
     });
 
-    appSettings.isAuthorsAutoEnrichmentEnabled.mockResolvedValue(true);
-    appSettings.getAuthorsAutoEnrichmentWriteMode.mockResolvedValue(AuthorAutoEnrichmentWriteMode.MISSING_ONLY);
     appSettings.isAuthorsProviderAudnexusEnabled.mockResolvedValue(true);
+    enrichmentConfig.getConfig.mockResolvedValue({
+      enabled: true,
+      triggerOnImport: true,
+      writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
+      conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
+    });
+    enrichmentConfig.isPaused.mockResolvedValue(false);
+    enrichmentConfig.setPaused.mockResolvedValue(undefined);
 
     service = new AuthorEnrichmentOrchestratorService(
       queueRepo as never,
       executor as never,
       appSettings as never,
+      enrichmentConfig as never,
       metadataEvents as never,
+      session,
       gateway as never,
     );
   });
 
   it('does not auto-schedule when auto enrichment is disabled', async () => {
-    appSettings.isAuthorsAutoEnrichmentEnabled.mockResolvedValue(false);
+    enrichmentConfig.getConfig.mockResolvedValue({
+      enabled: false,
+      triggerOnImport: true,
+      writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
+      conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
+    });
 
     await expect(service.scheduleMany([1, 2], 'metadata_replace')).resolves.toBe(0);
     expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
   });
 
   it('pollOnce processes due rows and marks them done on success', async () => {
-    queueRepo.fetchDue.mockResolvedValue([{ authorId: 22, attemptCount: 0 }]);
+    queueRepo.fetchDue.mockResolvedValue([{ authorId: 22, attemptCount: 0, authorName: null }]);
 
     await (service as any).pollOnce();
 
@@ -91,7 +118,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
       audnexusEnabled: true,
     });
-    expect(queueRepo.markDone).toHaveBeenCalledWith(22);
+    expect(queueRepo.markDone).toHaveBeenCalledWith(22, false);
     expect(queueRepo.markFailed).not.toHaveBeenCalled();
   });
 
@@ -143,13 +170,11 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     );
   });
 
-  it('recovers stale processing rows on bootstrap', async () => {
-    queueRepo.recoverStuckProcessing.mockResolvedValue(2);
-
+  it('resets processing rows and starts polling on bootstrap', async () => {
     await service.onApplicationBootstrap();
     service.onModuleDestroy();
 
-    expect(queueRepo.recoverStuckProcessing).toHaveBeenCalledWith(expect.any(Date));
-    expect(gateway.emitStatus).toHaveBeenCalled();
+    expect(queueRepo.resetAllProcessingOnBoot).toHaveBeenCalled();
+    expect(enrichmentConfig.isPaused).toHaveBeenCalled();
   });
 });

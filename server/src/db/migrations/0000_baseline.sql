@@ -388,7 +388,7 @@ CREATE TABLE "kobo_sync_settings" (
 	"user_id" integer NOT NULL,
 	"reading_threshold" real DEFAULT 1 NOT NULL,
 	"finished_threshold" real DEFAULT 99 NOT NULL,
-	"convert_to_kepub" boolean DEFAULT true NOT NULL,
+	"convert_to_kepub" boolean DEFAULT false NOT NULL,
 	"two_way_progress_sync" boolean DEFAULT false NOT NULL,
 	"force_enable_hyphenation" boolean DEFAULT false NOT NULL,
 	"kepub_conversion_limit_mb" integer DEFAULT 100 NOT NULL,
