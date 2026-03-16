@@ -213,7 +213,7 @@ export class MetadataScoreService {
       this.scoreString(data.openLibraryId, weights.openLibraryId) +
       this.scoreString(data.itunesId, weights.itunesId);
 
-    const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+    const total = (Object.values(weights) as number[]).reduce((sum, w) => sum + w, 0);
     if (total === 0) return 0;
     return Math.floor((earned / total) * 100);
   }

@@ -588,8 +588,10 @@ export class BookService {
     return {
       id: book.books.id,
       libraryId: book.books.libraryId,
+      libraryName: book.libraries?.name ?? '',
       status: book.books.status,
       folderPath: book.books.folderPath,
+      addedAt: book.books.addedAt,
       title: meta?.title ?? null,
       subtitle: meta?.subtitle ?? null,
       description: meta?.description ?? null,

@@ -115,7 +115,13 @@ export class BookRepository {
   }
 
   async findById(id: number) {
-    const [book] = await this.db.select().from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(eq(books.id, id)).limit(1);
+    const [book] = await this.db
+      .select()
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .leftJoin(libraries, eq(libraries.id, books.libraryId))
+      .where(eq(books.id, id))
+      .limit(1);
 
     if (!book) return null;
 

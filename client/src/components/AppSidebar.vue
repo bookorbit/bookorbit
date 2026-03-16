@@ -131,7 +131,7 @@ onUnmounted(() => stopUploadCompletedListener())
   <LibraryCreatorModal v-if="createLibraryOpen" @close="createLibraryOpen = false" @saved="onLibrarySaved" />
 
   <Sidebar variant="floating" collapsible="icon" style="--sidebar-border: color-mix(in oklch, var(--primary) 18%, transparent)">
-    <SidebarHeader class="border-b border-sidebar-border/80 bg-gradient-to-b from-primary/10 via-primary/4 to-transparent rounded-t-xl">
+    <SidebarHeader class="border-b border-sidebar-border/80 bg-linear-to-b from-primary/10 via-primary/4 to-transparent rounded-t-xl">
       <div
         class="flex items-center gap-2.5 px-1.5 py-1.5 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
       >
@@ -164,9 +164,9 @@ onUnmounted(() => stopUploadCompletedListener())
 
     <SidebarContent>
       <!-- Dashboard / Staging / Authors -->
-      <SidebarGroup class="py-2">
+      <SidebarGroup>
         <SidebarGroupContent>
-          <SidebarMenu>
+          <SidebarMenu class="gap-px">
             <SidebarNavItem
               :is-active="isDashboardActive"
               tooltip="Dashboard"
@@ -205,7 +205,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Libraries -->
-      <SidebarGroup class="py-2">
+      <SidebarGroup class="mt-1">
         <SidebarSectionHeader
           label="Libraries"
           :is-open="librariesOpen"
@@ -269,7 +269,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Lenses -->
-      <SidebarGroup class="py-2">
+      <SidebarGroup class="mt-1">
         <SidebarSectionHeader
           label="Lenses"
           :is-open="lensesOpen"
@@ -311,7 +311,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Collections -->
-      <SidebarGroup class="py-2">
+      <SidebarGroup class="mt-1">
         <SidebarSectionHeader
           label="Collections"
           :is-open="collectionsOpen"
