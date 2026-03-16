@@ -1,6 +1,7 @@
 import { extname, basename } from 'path';
 
-const PRIMARY_FORMATS = new Set(['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2']);
+export const DEFAULT_FORMAT_PRIORITY = ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2'];
+const PRIMARY_FORMATS = new Set(DEFAULT_FORMAT_PRIORITY);
 
 const COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
 const COVER_BASENAMES = new Set(['cover', 'folder', 'thumbnail', 'artwork', 'front']);

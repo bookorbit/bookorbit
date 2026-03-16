@@ -16,18 +16,54 @@ export interface BookCandidate {
   files: FileStat[]; // all files in this folder
 }
 
+const MAX_PATH_LENGTH = 4096;
+
+function matchesExcludePattern(name: string, patterns: string[]): boolean {
+  for (const pattern of patterns) {
+    if (!pattern.includes('*')) {
+      if (name === pattern) return true;
+    } else {
+      const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+      if (new RegExp(`^${escaped}$`).test(name)) return true;
+    }
+  }
+  return false;
+}
+
 // Recursively collect files, grouped by their parent directory.
-async function collectByDir(dir: string, libraryRoot: string, acc: Map<string, FileStat[]>): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true });
+async function collectByDir(
+  dir: string,
+  libraryRoot: string,
+  acc: Map<string, FileStat[]>,
+  excludePatterns: string[],
+  logger?: (msg: string) => void,
+): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') {
+      logger?.(`Permission denied reading folder, skipping: ${dir}`);
+      return;
+    }
+    throw err;
+  }
 
   for (const entry of entries) {
     const full = join(dir, entry.name);
 
     if (entry.name.startsWith('.')) continue;
+    if (excludePatterns.length > 0 && matchesExcludePattern(entry.name, excludePatterns)) continue;
 
     if (entry.isDirectory()) {
-      await collectByDir(full, libraryRoot, acc);
+      await collectByDir(full, libraryRoot, acc, excludePatterns, logger);
     } else if (entry.isFile()) {
+      if (full.length > MAX_PATH_LENGTH) {
+        logger?.(`Path exceeds ${MAX_PATH_LENGTH} characters, skipping: ${full}`);
+        continue;
+      }
+
       const s = await stat(full);
       const fileInfo: FileStat = {
         absolutePath: full,
@@ -49,6 +85,13 @@ function stemOf(absolutePath: string): string {
   return dot !== -1 ? name.substring(0, dot) : name;
 }
 
+// Lowercase-only version used for grouping comparisons so that Book.epub and
+// book.jpg pair correctly on case-sensitive filesystems, without changing the
+// original stem used for the DB folderPath key.
+function normStemOf(absolutePath: string): string {
+  return stemOf(absolutePath).toLowerCase();
+}
+
 /**
  * Walk a library folder and return book candidates.
  *
@@ -62,9 +105,13 @@ function stemOf(absolutePath: string): string {
  *    files = primary files for that stem + any non-primary files with matching stem.
  *  - Directories with no primary files are skipped (author/grouping folders).
  */
-export async function findBookCandidates(libraryFolderPath: string): Promise<BookCandidate[]> {
+export async function findBookCandidates(
+  libraryFolderPath: string,
+  excludePatterns: string[] = [],
+  logger?: (msg: string) => void,
+): Promise<BookCandidate[]> {
   const byDir = new Map<string, FileStat[]>();
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir);
+  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, excludePatterns, logger);
 
   const candidates: BookCandidate[] = [];
 
@@ -80,12 +127,17 @@ export async function findBookCandidates(libraryFolderPath: string): Promise<Boo
       continue;
     }
 
-    // Group primary files by stem — same stem = same book in multiple formats.
-    const stemGroups = new Map<string, FileStat[]>();
+    // Group primary files by normalised stem so that Book.epub and book.mobi
+    // are treated as the same book on case-sensitive filesystems. The original
+    // stem (from the first primary found) is preserved for the folderPath key
+    // so existing DB records are not invalidated.
+    const stemGroups = new Map<string, { origStem: string; files: FileStat[] }>();
     for (const f of primaryFiles) {
-      const stem = stemOf(f.absolutePath);
-      if (!stemGroups.has(stem)) stemGroups.set(stem, []);
-      stemGroups.get(stem)!.push(f);
+      const norm = normStemOf(f.absolutePath);
+      if (!stemGroups.has(norm)) {
+        stemGroups.set(norm, { origStem: stemOf(f.absolutePath), files: [] });
+      }
+      stemGroups.get(norm)!.files.push(f);
     }
 
     if (stemGroups.size === 1) {
@@ -94,10 +146,10 @@ export async function findBookCandidates(libraryFolderPath: string): Promise<Boo
     } else {
       // Multiple books sharing a folder (series folder pattern).
       const nonPrimary = files.filter((f) => !isPrimaryFormat(f.absolutePath));
-      for (const [stem, stemPrimaries] of stemGroups) {
-        const sidecar = nonPrimary.filter((f) => stemOf(f.absolutePath) === stem);
+      for (const [normStem, { origStem, files: stemPrimaries }] of stemGroups) {
+        const sidecar = nonPrimary.filter((f) => normStemOf(f.absolutePath) === normStem);
         candidates.push({
-          folderPath: join(dir, stem), // virtual unique key, not a real path
+          folderPath: join(dir, origStem), // virtual unique key, not a real path
           files: [...stemPrimaries, ...sidecar],
         });
       }

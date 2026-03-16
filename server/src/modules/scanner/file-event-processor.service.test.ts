@@ -27,6 +27,7 @@ const mockRepo: Mocked<
     | 'markBooksAsPresent'
     | 'findBookFileWithContextByIno'
     | 'updateBookFolderPath'
+    | 'findLibraryFolderPath'
   >
 > = {
   findBookFileByAbsolutePath: vi.fn(),
@@ -41,6 +42,7 @@ const mockRepo: Mocked<
   markBooksAsPresent: vi.fn(),
   findBookFileWithContextByIno: vi.fn(),
   updateBookFolderPath: vi.fn(),
+  findLibraryFolderPath: vi.fn(),
 };
 
 function makeService() {
@@ -65,6 +67,7 @@ beforeEach(() => {
   mockRepo.updateBookFile.mockResolvedValue({} as any);
   mockRepo.findBookFileWithContextByIno.mockResolvedValue(null);
   mockRepo.updateBookFolderPath.mockResolvedValue(undefined);
+  mockRepo.findLibraryFolderPath.mockResolvedValue('/books');
   mockReaddir.mockResolvedValue([]);
 });
 

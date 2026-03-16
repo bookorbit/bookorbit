@@ -56,11 +56,7 @@ export class FileEventProcessorService {
         (await this.scannerRepo.findMissingBookByFolderPath(absolutePath));
       if (!book) return { type: 'noop' };
 
-      await this.scannerRepo.updateBookFile(existing.file.id, {
-        ino: Number(fileStat.ino),
-        sizeBytes: Number(fileStat.size),
-        mtime: fileStat.mtime,
-      });
+      await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
       await this.scannerRepo.markBooksAsPresent([book.id]);
       this.logger.log(`Book ${book.id} restored — file returned: ${absolutePath}`);
       return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
@@ -70,13 +66,13 @@ export class FileEventProcessorService {
     const book =
       (await this.scannerRepo.findMissingBookByFolderPath(folderPath)) ?? (await this.scannerRepo.findMissingBookByFolderPath(absolutePath));
     if (book) {
+      const libraryFolderPath = await this.scannerRepo.findLibraryFolderPath(book.libraryFolderId);
       await this.scannerRepo.createBookFile({
         bookId: book.id,
         libraryFolderId: book.libraryFolderId,
         absolutePath,
-        ino: Number(fileStat.ino),
-        sizeBytes: Number(fileStat.size),
-        mtime: fileStat.mtime,
+        relPath: libraryFolderPath ? relative(libraryFolderPath, absolutePath) : undefined,
+        ...this.statToFileInfo(fileStat),
         format,
         role: 'primary',
       });
@@ -110,11 +106,7 @@ export class FileEventProcessorService {
       const s = await stat(file.absolutePath).catch(() => null);
       if (!s || !s.isFile()) continue;
 
-      await this.scannerRepo.updateBookFile(file.id, {
-        ino: Number(s.ino),
-        sizeBytes: Number(s.size),
-        mtime: s.mtime,
-      });
+      await this.scannerRepo.updateBookFile(file.id, this.statToFileInfo(s));
       await this.scannerRepo.markBooksAsPresent([book.id]);
       this.logger.log(`Book ${book.id} restored — file returned: ${file.absolutePath}`);
       return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
@@ -133,9 +125,7 @@ export class FileEventProcessorService {
     await this.scannerRepo.updateBookFile(file.id, {
       absolutePath: newAbsolutePath,
       relPath: relative(libraryFolderPath, newAbsolutePath),
-      ino: Number(fileStat.ino),
-      sizeBytes: Number(fileStat.size),
-      mtime: fileStat.mtime,
+      ...this.statToFileInfo(fileStat),
     });
 
     if (newFolderPath !== oldFolderPath) {
@@ -145,6 +135,10 @@ export class FileEventProcessorService {
     await this.scannerRepo.markBooksAsPresent([file.bookId]);
     this.logger.log(`Book ${file.bookId} moved: ${file.absolutePath} → ${newAbsolutePath}`);
     return { type: 'book-moved', libraryId, bookIds: [file.bookId] };
+  }
+
+  private statToFileInfo(s: Awaited<ReturnType<typeof stat>>): { ino: number; sizeBytes: number; mtime: Date } {
+    return { ino: Number(s.ino), sizeBytes: Number(s.size), mtime: s.mtime };
   }
 
   private async detectMovedBooksInDir(dirPath: string): Promise<FileEventResult> {

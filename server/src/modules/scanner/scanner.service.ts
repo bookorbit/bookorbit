@@ -5,7 +5,7 @@ import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/boo
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
-import { classifyFile, FileRole } from './lib/classify';
+import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole } from './lib/classify';
 import { fingerprintFile } from './lib/hash';
 import { waitForStability } from './lib/stability';
 import { BookCandidate, FileStat, findBookCandidates } from './lib/walk';
@@ -45,14 +45,15 @@ export class ScannerService implements OnApplicationBootstrap {
     if (folders.length === 0) throw new NotFoundException(`Library ${libraryId} has no folders`);
 
     const allowedFormats = settings?.allowedFormats ?? [];
-    const formatPriority = settings?.formatPriority ?? ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2'];
+    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
+    const excludePatterns = settings?.excludePatterns ?? [];
 
     const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
 
     this.scanJobStore.create(job.id, libraryId, 0);
     this.emitFromStore(libraryId, job.id, 'running');
 
-    this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority).catch((err) =>
+    this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns).catch((err) =>
       this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`),
     );
 
@@ -99,6 +100,7 @@ export class ScannerService implements OnApplicationBootstrap {
     folders: Awaited<ReturnType<ScannerRepository['findLibraryFolders']>>,
     allowedFormats: string[],
     formatPriority: string[],
+    excludePatterns: string[],
   ): Promise<void> {
     this.logger.log(`Scan job ${jobId} started for library ${libraryId}`);
 
@@ -119,7 +121,7 @@ export class ScannerService implements OnApplicationBootstrap {
     for (const folder of folders) {
       let candidates: BookCandidate[] = [];
       try {
-        candidates = await findBookCandidates(folder.path);
+        candidates = await findBookCandidates(folder.path, excludePatterns, (msg) => this.logger.warn(msg));
       } catch (err) {
         this.logger.warn(`Cannot walk ${folder.path}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -151,8 +153,8 @@ export class ScannerService implements OnApplicationBootstrap {
     const totals: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
     try {
-      for (const { id: folderId, path: folderPath, candidates, knownBooks, knownFiles } of folderWork) {
-        const counts = await this.scanFolderCandidates(folderId, libraryId, folderPath, candidates, knownBooks, knownFiles, jobId, formatPriority);
+      for (const { id: folderId, candidates, knownBooks, knownFiles } of folderWork) {
+        const counts = await this.scanFolderCandidates(folderId, libraryId, candidates, knownBooks, knownFiles, jobId, formatPriority);
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;
@@ -177,7 +179,6 @@ export class ScannerService implements OnApplicationBootstrap {
   private async scanFolderCandidates(
     libraryFolderId: number,
     libraryId: number,
-    _folderPath: string,
     candidates: BookCandidate[],
     knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>,
     knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>,
@@ -239,12 +240,19 @@ export class ScannerService implements OnApplicationBootstrap {
     counts.updated += fileCounts.updatedCount;
 
     // Determine which format gets the 'primary' role when multiple primary-format files exist.
-    const primaryFiles = candidate.files.filter((f) => classifyFile(f.absolutePath).role === 'primary');
+    // Exclude zero-byte files from the election so a corrupt/empty file doesn't shadow a valid one.
+    const primaryFiles = candidate.files.filter((f) => classifyFile(f.absolutePath).role === 'primary' && f.sizeBytes > 0);
     const chosenFormat =
       primaryFiles.length > 1 ? (formatPriority.find((fmt) => primaryFiles.some((f) => classifyFile(f.absolutePath).format === fmt)) ?? null) : null;
 
     for (const fileStat of candidate.files) {
       const { format, role: classifiedRole } = classifyFile(fileStat.absolutePath);
+
+      if (classifiedRole === 'primary' && fileStat.sizeBytes === 0) {
+        this.logger.warn(`Zero-byte primary file skipped: ${fileStat.absolutePath}`);
+        continue;
+      }
+
       const role: FileRole =
         chosenFormat !== null && classifiedRole === 'primary' ? (format === chosenFormat ? 'primary' : 'supplementary') : classifiedRole;
 
@@ -349,7 +357,17 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     // 3. Hash match — cross-filesystem copy (expensive, last resort).
-    const hash = await fingerprintFile(fileStat.absolutePath);
+    let hash: string;
+    try {
+      hash = await fingerprintFile(fileStat.absolutePath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'EACCES') {
+        this.logger.debug(`File no longer accessible, skipping: ${fileStat.absolutePath}`);
+        return false;
+      }
+      throw err;
+    }
     const byHash = await this.scannerRepo.findBookFileByHash(hash, libraryFolderId);
     if (byHash) {
       await this.scannerRepo.updateBookFile(byHash.id, {

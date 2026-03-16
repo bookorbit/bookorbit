@@ -42,10 +42,15 @@ export class ScannerRepository {
 
   async findLibrarySettings(libraryId: number) {
     const [row] = await this.db
-      .select({ allowedFormats: libraries.allowedFormats, formatPriority: libraries.formatPriority })
+      .select({ allowedFormats: libraries.allowedFormats, formatPriority: libraries.formatPriority, excludePatterns: libraries.excludePatterns })
       .from(libraries)
       .where(eq(libraries.id, libraryId));
     return row ?? null;
+  }
+
+  async findLibraryFolderPath(libraryFolderId: number): Promise<string | null> {
+    const [row] = await this.db.select({ path: libraryFolders.path }).from(libraryFolders).where(eq(libraryFolders.id, libraryFolderId)).limit(1);
+    return row?.path ?? null;
   }
 
   // ── Books ──────────────────────────────────────────────────────────────────
