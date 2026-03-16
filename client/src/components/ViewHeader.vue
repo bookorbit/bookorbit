@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { CheckSquare, LayoutGrid, List, MoreHorizontal, SlidersHorizontal, Square } from 'lucide-vue-next'
+import { CheckSquare, Circle, LayoutGrid, List, MoreHorizontal, SlidersHorizontal, Square } from 'lucide-vue-next'
 import * as LucideIcons from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -23,6 +23,7 @@ defineProps<{
   gridGap: number
   viewMode: 'grid' | 'list'
   selectionMode?: boolean
+  coverShape?: 'square' | 'circle'
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +31,7 @@ const emit = defineEmits<{
   'update:gridGap': [value: number]
   'update:viewMode': [value: 'grid' | 'list']
   'toggle-selection': []
+  'update:coverShape': [value: 'square' | 'circle']
 }>()
 
 const mobileDisplayOpen = ref(false)
@@ -140,6 +142,33 @@ function getIconComponent(name: string) {
                 class="w-full accent-primary cursor-pointer"
               />
             </div>
+            <div v-if="coverShape !== undefined" class="space-y-1.5">
+              <span class="text-xs text-muted-foreground">Cover shape</span>
+              <div class="flex items-center gap-1 mt-1.5">
+                <button
+                  class="flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-colors"
+                  :class="
+                    coverShape === 'circle'
+                      ? 'border-primary text-primary bg-primary/8'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+                  "
+                  @click="emit('update:coverShape', 'circle')"
+                >
+                  <Circle :size="12" /> Circle
+                </button>
+                <button
+                  class="flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-colors"
+                  :class="
+                    coverShape === 'square'
+                      ? 'border-primary text-primary bg-primary/8'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+                  "
+                  @click="emit('update:coverShape', 'square')"
+                >
+                  <Square :size="12" /> Square
+                </button>
+              </div>
+            </div>
           </div>
         </PopoverContent>
       </Popover>
@@ -208,6 +237,33 @@ function getIconComponent(name: string) {
             step="4"
             class="w-full accent-primary cursor-pointer"
           />
+        </div>
+        <div v-if="coverShape !== undefined" class="space-y-1.5">
+          <span class="text-xs text-muted-foreground">Cover shape</span>
+          <div class="flex items-center gap-1 mt-1.5">
+            <button
+              class="flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-colors"
+              :class="
+                coverShape === 'circle'
+                  ? 'border-primary text-primary bg-primary/8'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+              "
+              @click="emit('update:coverShape', 'circle')"
+            >
+              <Circle :size="12" /> Circle
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-colors"
+              :class="
+                coverShape === 'square'
+                  ? 'border-primary text-primary bg-primary/8'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+              "
+              @click="emit('update:coverShape', 'square')"
+            >
+              <Square :size="12" /> Square
+            </button>
+          </div>
         </div>
       </div>
     </SheetContent>

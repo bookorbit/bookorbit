@@ -13,6 +13,7 @@ const props = defineProps<{
   canDelete?: boolean
   refreshing?: boolean
   deleting?: boolean
+  shape?: 'square' | 'circle'
 }>()
 
 const emit = defineEmits<{
@@ -55,7 +56,9 @@ function handleDelete() {
 </script>
 
 <template>
+  <!-- Square layout (default) -->
   <div
+    v-if="shape !== 'circle'"
     class="group flex flex-col @container"
     :class="[selectionMode ? 'select-none' : '', 'cursor-pointer']"
     @click="handleClick($event as MouseEvent)"
@@ -145,6 +148,98 @@ function handleDelete() {
           <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
         </div>
       </Transition>
+    </div>
+  </div>
+
+  <!-- Circle layout -->
+  <div
+    v-else
+    class="group flex flex-col items-center gap-2 py-2 @container"
+    :class="[selectionMode ? 'select-none' : '', 'cursor-pointer']"
+    @click="handleClick($event as MouseEvent)"
+  >
+    <div class="relative w-full aspect-square">
+      <div
+        class="w-full h-full rounded-full overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
+        :class="[
+          selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]',
+          selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '',
+        ]"
+        :style="hasImage ? undefined : fallbackStyle"
+      >
+        <img
+          v-if="hasImage"
+          :src="imageSrc"
+          :alt="`${author.name} portrait`"
+          class="absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          fetchpriority="low"
+          @error="imageFailed = true"
+        />
+        <div v-else class="absolute inset-0 flex items-center justify-center text-3xl font-semibold" :style="{ color: fallbackStyle.color }">
+          {{ initial }}
+        </div>
+
+        <div v-if="selectionMode" class="absolute inset-0 z-30 pointer-events-none rounded-full" :class="selected ? 'bg-primary/20' : ''" />
+
+        <Transition name="fade">
+          <div v-if="refreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/50 rounded-full">
+            <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
+          </div>
+        </Transition>
+      </div>
+
+      <div v-if="selectionMode" class="absolute top-1 left-1 z-30">
+        <div
+          class="h-5 w-5 rounded flex items-center justify-center transition-colors"
+          :class="selected ? 'bg-primary' : 'bg-black/40 border border-white/50'"
+        >
+          <Check v-if="selected" class="text-primary-foreground" :size="12" />
+        </div>
+      </div>
+
+      <span
+        v-if="!selectionMode"
+        class="absolute bottom-0.5 left-0.5 z-20 h-6 w-6 rounded-full border border-border bg-card shadow-sm flex items-center justify-center text-[10px] font-semibold text-foreground"
+      >
+        {{ author.bookCount.toLocaleString() }}
+      </span>
+
+      <DropdownMenu v-if="!selectionMode">
+        <DropdownMenuTrigger as-child>
+          <button
+            class="absolute bottom-0.5 right-0.5 z-20 h-6 w-6 rounded-full border border-border bg-card shadow-sm flex items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            @click.stop
+          >
+            <MoreHorizontal :size="12" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem @click="emit('open', author.id)">
+            <ExternalLink class="mr-2 h-4 w-4" />
+            View Author Details
+          </DropdownMenuItem>
+          <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
+            <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />
+            <RefreshCw v-else class="mr-2 h-4 w-4" />
+            Refresh Metadata
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            :disabled="!canDelete || deleting"
+            :class="canDelete ? 'text-destructive focus:text-destructive' : ''"
+            @click="handleDelete"
+          >
+            <Loader2 v-if="deleting" class="mr-2 h-4 w-4 animate-spin" />
+            <Trash2 v-else class="mr-2 h-4 w-4" />
+            Delete Author
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+
+    <div class="flex flex-col items-center gap-0.5 w-full min-w-0 px-1 text-center">
+      <h3 class="w-full truncate text-xs font-semibold text-foreground leading-tight">{{ author.name }}</h3>
     </div>
   </div>
 </template>

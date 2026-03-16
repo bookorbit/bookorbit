@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
-import { Moon, Sun } from 'lucide-vue-next'
+import { Circle, Moon, Square, Sun } from 'lucide-vue-next'
 import { useDisplaySettings, type CardOverlayKey } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
 const themeStore = useThemeStore()
-const { coverSize, gridGap, cardOverlays, lensFilterExpanded } = useDisplaySettings()
+const { coverSize, gridGap, cardOverlays, lensFilterExpanded, authorCoverSize, authorCoverShape } = useDisplaySettings()
 
 const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
   { key: 'series', label: 'Series name', hint: 'Series title and index badge at top-left' },
@@ -238,7 +238,55 @@ function toggleOverlay(key: CardOverlayKey) {
     </div>
 
     <!-- Card overlays -->
-    <p class="settings-group-label mt-6">Card Overlays</p>
+    <p class="settings-group-label mt-6">Author Grid</p>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-6">
+      <!-- Author cover size -->
+      <div class="px-5 py-4 bg-card">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <p class="settings-label">Cover size</p>
+            <p class="settings-hint">Width of author covers in the grid</p>
+          </div>
+          <span class="settings-value">{{ authorCoverSize }}px</span>
+        </div>
+        <input
+          :value="authorCoverSize"
+          @input="authorCoverSize = Number(($event.target as HTMLInputElement).value)"
+          type="range"
+          min="80"
+          max="280"
+          step="10"
+          class="w-full accent-primary cursor-pointer"
+        />
+      </div>
+
+      <!-- Author cover shape -->
+      <div class="flex items-center justify-between px-5 py-4 bg-card">
+        <div>
+          <p class="settings-label">Cover shape</p>
+          <p class="settings-hint">Shape of author covers in the grid</p>
+        </div>
+        <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
+          <button
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            :class="authorCoverShape === 'circle' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            @click="authorCoverShape = 'circle'"
+          >
+            <Circle :size="12" /> Circle
+          </button>
+          <button
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            :class="authorCoverShape === 'square' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            @click="authorCoverShape = 'square'"
+          >
+            <Square :size="12" /> Square
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card overlays -->
+    <p class="settings-group-label">Card Overlays</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
       <div v-for="opt in OVERLAY_OPTIONS" :key="opt.key" class="flex items-center justify-between px-5 py-3.5 bg-card">
         <div>

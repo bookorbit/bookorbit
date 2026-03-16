@@ -28,7 +28,7 @@ import type { AuthorListSort, SortDirection } from '../types/author'
 
 const router = useRouter()
 const route = useRoute()
-const { coverSize, gridGap, viewMode } = useDisplaySettings()
+const { gridGap, viewMode, authorCoverSize, authorCoverShape } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
 const { hasPermission, isSuperuser } = usePermissions()
 const { items, total, loading, error, hasMore, q, sort, order, libraryId, load } = useAuthorsList()
@@ -425,9 +425,10 @@ watch(
     title="Authors"
     icon="Users"
     :total="total"
-    v-model:coverSize="coverSize"
+    v-model:coverSize="authorCoverSize"
     v-model:gridGap="gridGap"
     v-model:viewMode="viewMode"
+    v-model:coverShape="authorCoverShape"
     :selection-mode="selectionMode"
     @toggle-selection="toggleSelectionMode"
   >
@@ -523,13 +524,13 @@ watch(
     <div
       v-if="!initialLoadComplete && loading"
       class="grid"
-      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${authorCoverSize}px, 1fr))`, gap: `${gridGap}px` }"
     >
       <div
         v-for="index in INITIAL_SKELETON_COUNT"
         :key="`author-skeleton-${index}`"
-        class="w-full animate-pulse rounded-sm bg-muted/50"
-        style="aspect-ratio: 2/3"
+        class="w-full animate-pulse bg-muted/50"
+        :class="authorCoverShape === 'circle' ? 'rounded-full aspect-square' : 'rounded-sm aspect-[2/3]'"
       />
     </div>
 
@@ -541,12 +542,13 @@ watch(
     <div
       v-show="viewMode === 'grid' && items.length > 0"
       class="grid"
-      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${authorCoverSize}px, 1fr))`, gap: `${gridGap}px` }"
     >
       <AuthorCard
         v-for="author in items"
         :key="author.id"
         :author="author"
+        :shape="authorCoverShape"
         :selection-mode="selectionMode"
         :selected="isSelected(author.id)"
         :can-refresh="canRefreshMetadata"

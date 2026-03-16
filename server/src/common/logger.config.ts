@@ -1,19 +1,15 @@
 import type { Params } from 'nestjs-pino';
 import type { IncomingMessage, ServerResponse } from 'http';
-import { RequestMethod } from '@nestjs/common';
 
 const isDev = process.env.NODE_ENV !== 'production';
+const logLevel = process.env.LOG_LEVEL ?? (isDev ? 'debug' : 'info');
 
 const FRAMEWORK_CONTEXTS = new Set(['InstanceLoader', 'RouterExplorer', 'RoutesResolver']);
 
 export const loggerConfig: Params = {
-  exclude: [
-    { method: RequestMethod.GET, path: 'books/:id/thumbnail' },
-    { method: RequestMethod.GET, path: 'books/:id/cover' },
-    { method: RequestMethod.GET, path: 'cbz/files/:id/pages/:page' },
-  ],
+  exclude: [],
   pinoHttp: {
-    level: isDev ? 'debug' : 'info',
+    level: logLevel,
     hooks: {
       logMethod: function (inputArgs, method) {
         const first = inputArgs[0];
@@ -30,15 +26,15 @@ export const loggerConfig: Params = {
     },
     customProps: () => ({ context: 'HTTP' }),
     customSuccessMessage: (req: IncomingMessage, res: ServerResponse, responseTime: number) => {
-      return `${req.method} ${req.url} ${res.statusCode} +${Math.round(responseTime)}ms`;
+      return `[HTTP] ${req.method} ${req.url} ${res.statusCode} +${Math.round(responseTime)}ms`;
     },
     customErrorMessage: (req: IncomingMessage, res: ServerResponse, err: Error) => {
-      return `${req.method} ${req.url} ${res.statusCode} - ${err?.message ?? 'error'}`;
+      return `[HTTP] ${req.method} ${req.url} ${res.statusCode} - ${err?.message ?? 'error'}`;
     },
     customLogLevel: (_req: IncomingMessage, res: ServerResponse, err?: Error) => {
       if (err || res.statusCode >= 500) return 'error';
       if (res.statusCode >= 400) return 'warn';
-      return 'info';
+      return 'debug';
     },
     serializers: {
       req: (req: IncomingMessage & { id?: string }) => ({ id: req.id, method: req.method, url: req.url }),
@@ -53,7 +49,7 @@ export const loggerConfig: Params = {
               singleLine: true,
               translateTime: 'SYS:HH:MM:ss.l',
               ignore: 'pid,hostname,req,res,responseTime',
-              messageFormat: '[{context}] {msg}',
+              messageFormat: '{msg}',
             },
           },
         }
