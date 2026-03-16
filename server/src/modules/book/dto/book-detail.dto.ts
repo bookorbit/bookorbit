@@ -13,8 +13,10 @@ export class BookFileDto {
 export class BookDetailDto {
   id: number;
   libraryId: number;
+  libraryName: string;
   status: string;
   folderPath: string;
+  addedAt: Date;
   title: string | null;
   subtitle: string | null;
   description: string | null;

@@ -48,6 +48,8 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
     id: 1,
     libraryId: 1,
+    libraryName: 'Test Library',
+    addedAt: '2024-01-01T00:00:00.000Z',
     status: 'present',
     title: 'Test Book',
     subtitle: null,

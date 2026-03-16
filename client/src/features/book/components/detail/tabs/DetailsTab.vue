@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, FolderPlus, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { BookOpen, Download, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
@@ -27,16 +27,6 @@ type FileProgress = {
   updatedAt: string | null
 }
 
-type BookmarkItem = {
-  id: number
-  title: string
-  createdAt: string
-}
-
-type AnnotationItem = {
-  id: number
-}
-
 type CollectionMembership = {
   id: number
   name: string
@@ -57,6 +47,7 @@ const router = useRouter()
 
 const addToCollectionOpen = ref(false)
 const scoreBreakdownOpen = ref(false)
+const moreMenuOpen = ref(false)
 
 const { weights: scoreWeights, fetchWeights } = useMetadataScoreWeights()
 
@@ -120,8 +111,6 @@ async function setRating(star: number) {
 const ratingStars = [1, 2, 3, 4, 5]
 
 const fileProgressById = ref<Record<number, FileProgress>>({})
-const bookmarks = ref<BookmarkItem[]>([])
-const annotations = ref<AnnotationItem[]>([])
 const collections = ref<CollectionMembership[]>([])
 const koboState = ref<BookKoboState | null>(null)
 const supplementalLoading = ref(false)
@@ -188,11 +177,6 @@ const providerLinks = computed<ProviderLink[]>(() => {
   return out
 })
 
-const latestBookmark = computed(() => {
-  if (bookmarks.value.length === 0) return null
-  return [...bookmarks.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-})
-
 const fileProgressRows = computed(() =>
   props.book.files.map((file) => ({
     file,
@@ -205,30 +189,57 @@ const fileProgressRows = computed(() =>
   })),
 )
 const detailProgressRows = computed(() => fileProgressRows.value.filter(({ progress }) => progress.percentage > 0))
-const activityExpanded = ref(false)
-const hasReadingSignals = computed(() => detailProgressRows.value.length > 0 || bookmarks.value.length > 0 || annotations.value.length > 0)
-const hasKoboSignals = computed(() => {
-  if (!canViewKobo.value || !koboState.value) return false
-  const state = koboState.value
-  const hasSnapshotFlags =
-    state.snapshot != null &&
-    (state.snapshot.inSnapshot ||
-      state.snapshot.synced != null ||
-      state.snapshot.pendingDelete != null ||
-      state.snapshot.isNew != null ||
-      state.snapshot.removedByDevice != null)
-  return state.syncCollections.length > 0 || state.readingState != null || hasSnapshotFlags
+
+type ProgressRow = {
+  label: string
+  percentage: number
+  color: string
+  badgeStyle: Record<string, string>
+  tooltipText: string
+  finished: boolean
+}
+
+const KOBO_COLOR = '#f59e0b'
+
+const leftColumnProgressRows = computed<ProgressRow[]>(() => {
+  const rows: ProgressRow[] = []
+  for (const { file, progress } of detailProgressRows.value) {
+    const color = getFormatColor(file.format ?? '?')
+    rows.push({
+      label: (file.format ?? '?').toUpperCase(),
+      percentage: progress.percentage,
+      color,
+      badgeStyle: { color, borderColor: `${color}66`, backgroundColor: `${color}1a` },
+      tooltipText: file.absolutePath,
+      finished: progress.percentage >= 100,
+    })
+  }
+  const koboPercent = koboState.value?.readingState?.progressPercent
+  if (canViewKobo.value && koboPercent != null && koboPercent > 0) {
+    const syncCols = koboState.value?.syncCollections ?? []
+    rows.push({
+      label: 'Kobo',
+      percentage: koboPercent,
+      color: KOBO_COLOR,
+      badgeStyle: { color: KOBO_COLOR, borderColor: `${KOBO_COLOR}66`, backgroundColor: `${KOBO_COLOR}1a` },
+      tooltipText: syncCols.length > 0 ? `Via: ${syncCols.join(', ')}` : 'Kobo device',
+      finished: koboPercent >= 100,
+    })
+  }
+  return rows
 })
-const showActivitySummary = computed(() => hasReadingSignals.value || hasKoboSignals.value)
-const activitySummaryLine = computed(() => {
-  const parts: string[] = []
-  const maxProgress = detailProgressRows.value.length > 0 ? Math.max(...detailProgressRows.value.map((r) => r.progress.percentage)) : 0
-  if (maxProgress > 0) parts.push(`Progress ${formatPercent(maxProgress)}`)
-  if (bookmarks.value.length > 0) parts.push(`Bookmarks ${bookmarks.value.length}`)
-  if (annotations.value.length > 0) parts.push(`Highlights ${annotations.value.length}`)
-  const koboProgress = koboState.value?.readingState?.progressPercent
-  if (koboProgress != null) parts.push(`Kobo ${formatPercent(koboProgress)}`)
-  return parts.length > 0 ? parts.join(' · ') : 'No reading activity yet'
+
+const leftColumnProgressVisible = computed(() => leftColumnProgressRows.value.slice(0, 3))
+const leftColumnProgressOverflow = computed(() => Math.max(0, leftColumnProgressRows.value.length - 3))
+
+const koboAnomaly = computed(() => {
+  if (!canViewKobo.value) return null
+  const snap = koboState.value?.snapshot
+  if (!snap) return null
+  if (snap.pendingDelete) return 'Pending delete from device'
+  if (snap.removedByDevice) return 'Removed by device'
+  if (snap.synced === false) return 'Not synced'
+  return null
 })
 
 const seriesLine = computed(() => {
@@ -241,25 +252,18 @@ function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const s = Math.floor(diff / 1000)
-  if (s < 60) return `${s}s ago`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return `${d}d ago`
-}
-
 function formatPercent(value: number): string {
   return `${Math.max(0, Math.min(100, Math.round(value)))}%`
 }
 
-function boolState(value: boolean | null | undefined): string {
-  if (value == null) return 'n/a'
-  return value ? 'yes' : 'no'
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatFileSize(bytes: number | null | undefined): string {
+  if (!bytes) return '-'
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatBadgeStyle(fmt: string) {
@@ -282,6 +286,11 @@ function providerLinkStyle(provider: string) {
 function handleEditMetadataFromScore() {
   scoreBreakdownOpen.value = false
   router.push({ name: 'book-edit', params: { bookId: props.book.id } })
+}
+
+function handleDeleteFromMenu() {
+  moreMenuOpen.value = false
+  promptDelete(props.book.id)
 }
 
 function openBook() {
@@ -325,18 +334,10 @@ async function loadSupplemental() {
       }
     })
 
-    const bookmarksPromise = api(`/api/v1/books/${props.book.id}/bookmarks`)
-    const annotationsPromise = api(`/api/v1/books/${props.book.id}/annotations`)
     const collectionsPromise = api(`/api/v1/collections?bookIds=${props.book.id}`)
     const koboPromise = canViewKobo.value ? api(`/api/v1/books/${props.book.id}/kobo-state`) : Promise.resolve(null)
 
-    const [progressRows, bookmarksRes, annotationsRes, collectionsRes, koboRes] = await Promise.all([
-      Promise.all(progressPromises),
-      bookmarksPromise,
-      annotationsPromise,
-      collectionsPromise,
-      koboPromise,
-    ])
+    const [progressRows, collectionsRes, koboRes] = await Promise.all([Promise.all(progressPromises), collectionsPromise, koboPromise])
 
     if (requestId !== supplementalRequestId) return
 
@@ -351,8 +352,6 @@ async function loadSupplemental() {
     }
     fileProgressById.value = progressMap
 
-    bookmarks.value = bookmarksRes.ok ? ((await bookmarksRes.json()) as BookmarkItem[]) : []
-    annotations.value = annotationsRes.ok ? ((await annotationsRes.json()) as AnnotationItem[]) : []
     collections.value = collectionsRes.ok ? ((await collectionsRes.json()) as CollectionMembership[]) : []
 
     if (canViewKobo.value) {
@@ -377,8 +376,6 @@ async function loadSupplemental() {
   } catch {
     if (requestId !== supplementalRequestId) return
     fileProgressById.value = {}
-    bookmarks.value = []
-    annotations.value = []
     collections.value = []
     koboState.value = canViewKobo.value
       ? {
@@ -396,7 +393,6 @@ async function loadSupplemental() {
 watch(
   () => `${props.book.id}:${props.book.files.map((f) => f.id).join(',')}:${canViewKobo.value ? 'kobo' : 'nokobo'}`,
   () => {
-    activityExpanded.value = false
     providerIconErrors.value = {}
     void loadSupplemental()
   },
@@ -480,17 +476,67 @@ watch(
               </TooltipTrigger>
               <TooltipContent>Add to collection</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
+            <Popover :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
+              <PopoverTrigger as-child>
                 <button
-                  class="flex flex-1 items-center justify-center h-9 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                  @click="promptDelete(book.id)"
+                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+                >
+                  <MoreHorizontal class="size-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent class="w-36 p-1" align="end">
+                <button
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="handleDeleteFromMenu"
                 >
                   <Trash2 class="size-3.5" />
+                  Delete
                 </button>
-              </TooltipTrigger>
-              <TooltipContent>Delete</TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        <div v-if="leftColumnProgressVisible.length" class="mt-4 space-y-2">
+          <Tooltip v-for="row in leftColumnProgressVisible" :key="row.label">
+            <TooltipTrigger as-child>
+              <div class="flex items-center gap-2 cursor-default">
+                <span
+                  class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                  :style="row.badgeStyle"
+                  >{{ row.label }}</span
+                >
+                <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    class="h-full rounded-full"
+                    :style="{
+                      width: `${Math.min(100, row.percentage)}%`,
+                      backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
+                      opacity: row.finished ? '1' : '0.75',
+                    }"
+                  />
+                </div>
+                <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
+                <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>{{ row.tooltipText }}</TooltipContent>
+          </Tooltip>
+          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
+        </div>
+        <div v-if="koboAnomaly" class="mt-2 flex items-center gap-1.5">
+          <TriangleAlert class="size-3 text-amber-500 shrink-0" />
+          <p class="text-[11px] text-amber-500">{{ koboAnomaly }}</p>
+        </div>
+        <div v-if="collections.length" class="mt-3">
+          <span class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground block mb-1.5">Collections</span>
+          <div class="flex flex-wrap gap-1">
+            <span
+              v-for="col in collections"
+              :key="col.id"
+              class="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border"
+            >
+              {{ col.name }}
+            </span>
           </div>
         </div>
       </div>
@@ -510,7 +556,53 @@ watch(
             <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
           </PopoverContent>
         </Popover>
-        <div v-if="providerLinks.length" class="flex items-center gap-1.5 shrink-0">
+      </div>
+      <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
+
+      <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
+        <p v-if="authorLine" class="text-sm">
+          <span class="text-muted-foreground">by</span>
+          <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
+        </p>
+        <template v-if="seriesLine">
+          <span class="text-muted-foreground/40 text-xs">·</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+        </template>
+      </div>
+
+      <div class="mt-2 flex items-center gap-1" @mouseleave="hoverRating = null">
+        <template v-if="canEditMetadata">
+          <Tooltip v-for="star in ratingStars" :key="star">
+            <TooltipTrigger as-child>
+              <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
+                <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Rate {{ star }}</TooltipContent>
+          </Tooltip>
+        </template>
+        <template v-else>
+          <Star
+            v-for="star in ratingStars"
+            :key="star"
+            class="size-3.5"
+            :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
+          />
+        </template>
+      </div>
+
+      <!-- Format badges + provider links -->
+      <div v-if="formats.length || providerLinks.length" class="flex items-center flex-wrap gap-2 mt-4">
+        <span
+          v-for="fmt in formats"
+          :key="fmt"
+          class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+          :style="formatBadgeStyle(fmt)"
+        >
+          {{ fmt }}
+        </span>
+        <div v-if="providerLinks.length" class="flex items-center gap-2 shrink-0">
+          <div class="w-px h-3.5 bg-border" />
           <a
             v-for="link in providerLinks"
             :key="link.key"
@@ -533,168 +625,76 @@ watch(
           </a>
         </div>
       </div>
-      <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
 
-      <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
-        <p v-if="authorLine" class="text-sm">
-          <span class="text-muted-foreground">by</span>
-          <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
-        </p>
-        <template v-if="seriesLine">
-          <span class="text-muted-foreground/40 text-xs">·</span>
-          <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
-        </template>
-      </div>
-
-      <!-- Format badges -->
-      <div v-if="formats.length" class="flex flex-wrap gap-1.5 mt-4">
-        <span
-          v-for="fmt in formats"
-          :key="fmt"
-          class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
-          :style="formatBadgeStyle(fmt)"
-        >
-          {{ fmt }}
-        </span>
-      </div>
-
-      <!-- Genres -->
-      <div v-if="book.genres.length" class="flex flex-wrap gap-1.5 mt-4">
+      <!-- Genres + Tags -->
+      <div v-if="book.genres.length || book.tags.length" class="flex flex-wrap gap-1.5 mt-4">
         <span v-for="genre in book.genres" :key="genre" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
           {{ genre }}
         </span>
-      </div>
-
-      <!-- Tags -->
-      <div v-if="book.tags.length" class="flex flex-wrap gap-1.5 mt-3">
-        <span v-for="tag in book.tags" :key="tag" class="text-xs px-2.5 py-0.5 rounded-full border border-border bg-muted/40 text-muted-foreground">
+        <span
+          v-for="tag in book.tags"
+          :key="tag"
+          class="text-xs px-2.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        >
           #{{ tag }}
         </span>
       </div>
 
       <!-- Metadata grid -->
       <dl class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-4">
-        <div v-if="book.publisher" class="min-w-0">
+        <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Publisher</dt>
-          <dd class="text-sm text-foreground mt-0.5 leading-snug">{{ book.publisher }}</dd>
+          <template v-if="book.publisher">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <dd class="text-sm text-foreground mt-0.5 truncate cursor-default">{{ book.publisher }}</dd>
+              </TooltipTrigger>
+              <TooltipContent>{{ book.publisher }}</TooltipContent>
+            </Tooltip>
+          </template>
+          <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
-        <div v-if="book.publishedYear">
+        <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Published</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedYear }}</dd>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedYear || '-' }}</dd>
         </div>
-        <div v-if="book.language">
+        <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Language</dt>
-          <dd class="text-sm text-foreground mt-0.5 capitalize">{{ book.language }}</dd>
+          <dd class="text-sm text-foreground mt-0.5 capitalize">{{ book.language || '-' }}</dd>
         </div>
-        <div v-if="book.pageCount">
+        <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Pages</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ book.pageCount }}</dd>
-        </div>
-        <div v-if="book.isbn13" class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-13</dt>
-          <dd class="text-sm text-foreground mt-0.5 font-mono">{{ book.isbn13 }}</dd>
-        </div>
-        <div v-if="book.isbn10" class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN-10</dt>
-          <dd class="text-sm text-foreground mt-0.5 font-mono">{{ book.isbn10 }}</dd>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.pageCount || '-' }}</dd>
         </div>
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Rating</dt>
-          <dd class="mt-0.5 flex items-center gap-1" @mouseleave="hoverRating = null">
-            <template v-if="canEditMetadata">
-              <Tooltip v-for="star in ratingStars" :key="star">
-                <TooltipTrigger as-child>
-                  <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
-                    <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Rate {{ star }}</TooltipContent>
-              </Tooltip>
-            </template>
-            <template v-else>
-              <Star
-                v-for="star in ratingStars"
-                :key="star"
-                class="size-3.5"
-                :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
-              />
-            </template>
-            <span class="text-xs text-muted-foreground ml-1">{{ localRating ?? 0 }}/5</span>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN</dt>
+          <dd v-if="book.isbn13 || book.isbn10" class="text-sm text-foreground mt-0.5 font-mono space-y-0.5">
+            <div v-if="book.isbn13">{{ book.isbn13 }}</div>
+            <div v-if="book.isbn10" :class="book.isbn13 ? 'text-xs text-muted-foreground' : ''">{{ book.isbn10 }}</div>
           </dd>
+          <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
-        <div v-if="book.lastWrittenAt" class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Last File Sync</dt>
-          <dd class="text-sm text-foreground mt-0.5">
-            {{ formatDateTime(book.lastWrittenAt) }}
-            <span class="text-xs text-muted-foreground ml-1">({{ formatRelative(book.lastWrittenAt) }})</span>
-          </dd>
+        <div>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">File Size</dt>
+          <dd class="text-sm text-foreground mt-0.5">{{ formatFileSize(primaryFile?.sizeBytes) }}</dd>
+        </div>
+        <div class="min-w-0">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Library</dt>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.libraryName || '-' }}</dd>
+        </div>
+        <div class="min-w-0">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Added</dt>
+          <template v-if="book.addedAt">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <dd class="text-sm text-foreground mt-0.5 truncate cursor-default">{{ formatDate(book.addedAt) }}</dd>
+              </TooltipTrigger>
+              <TooltipContent>{{ formatDateTime(book.addedAt) }}</TooltipContent>
+            </Tooltip>
+          </template>
+          <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
       </dl>
-
-      <!-- Compact reading + sync summary -->
-      <div v-if="showActivitySummary" class="mt-5 pt-5 border-t border-border">
-        <div class="rounded-md border border-border bg-muted/20 px-3 py-2.5">
-          <div class="flex items-center justify-between gap-3">
-            <p class="text-xs text-foreground truncate">{{ activitySummaryLine }}</p>
-            <button
-              class="text-[11px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
-              @click="activityExpanded = !activityExpanded"
-            >
-              {{ activityExpanded ? 'Hide details' : 'Show details' }}
-            </button>
-          </div>
-          <p v-if="supplementalLoading" class="text-[11px] text-muted-foreground mt-1">Refreshing…</p>
-        </div>
-
-        <div v-if="activityExpanded" class="mt-3 space-y-2">
-          <p v-if="latestBookmark" class="text-xs text-muted-foreground truncate" :title="latestBookmark.title">
-            Latest bookmark: {{ latestBookmark.title }} · {{ formatRelative(latestBookmark.createdAt) }}
-          </p>
-
-          <div v-for="{ file, progress } in detailProgressRows" :key="file.id" class="rounded-md border border-border px-3 py-2.5 bg-background/60">
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-xs font-medium truncate min-w-0">
-                {{ file.filename ?? `File #${file.id}` }}
-                <span class="text-muted-foreground font-normal ml-1">({{ (file.format ?? '?').toUpperCase() }})</span>
-              </p>
-              <span class="text-xs font-semibold">{{ formatPercent(progress.percentage) }}</span>
-            </div>
-            <div class="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                class="h-full rounded-full transition-all"
-                :class="progress.percentage >= 100 ? 'bg-green-500/80' : 'bg-primary/70'"
-                :style="{ width: `${Math.max(0, Math.min(100, progress.percentage))}%` }"
-              />
-            </div>
-          </div>
-
-          <div v-if="hasKoboSignals" class="rounded-md border border-border px-3 py-2.5 bg-background/60 space-y-1.5">
-            <p class="text-xs text-muted-foreground">
-              Kobo status:
-              <span class="text-foreground">{{ koboState?.readingState?.status ?? 'unknown' }}</span>
-              <span v-if="koboState?.readingState?.progressPercent != null">· {{ formatPercent(koboState.readingState.progressPercent) }}</span>
-            </p>
-            <p v-if="koboState?.readingState?.updatedAt" class="text-xs text-muted-foreground">
-              Kobo updated {{ formatRelative(koboState.readingState.updatedAt) }}
-            </p>
-            <p v-if="koboState?.syncCollections?.length" class="text-xs text-muted-foreground truncate">
-              Sync collections: {{ koboState.syncCollections.join(', ') }}
-            </p>
-            <p v-if="koboState?.snapshot?.inSnapshot" class="text-xs text-muted-foreground">
-              Snapshot: in sync queue
-              <span v-if="koboState?.snapshot?.synced != null"> · synced {{ boolState(koboState.snapshot.synced) }}</span>
-            </p>
-            <p
-              v-if="koboState?.snapshot?.pendingDelete || koboState?.snapshot?.isNew || koboState?.snapshot?.removedByDevice"
-              class="text-xs text-muted-foreground"
-            >
-              <span v-if="koboState?.snapshot?.pendingDelete">pending delete</span>
-              <span v-if="koboState?.snapshot?.isNew" class="ml-2">new</span>
-              <span v-if="koboState?.snapshot?.removedByDevice" class="ml-2">removed by device</span>
-            </p>
-          </div>
-        </div>
-      </div>
 
       <!-- Synopsis -->
       <div class="mt-6 pt-5 border-t border-border">

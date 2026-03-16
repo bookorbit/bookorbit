@@ -1,6 +1,6 @@
-import type { MetadataProviderKey } from './metadata-fetch';
+import type { MetadataProviderKey } from "./metadata-fetch";
 
-export const BOOK_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2'] as const;
+export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2"] as const;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
 export type BookFileRef = {
@@ -42,8 +42,10 @@ export type ProviderIds = Partial<Record<MetadataProviderKey, string | null>>;
 export type BookDetail = {
   id: number;
   libraryId: number;
+  libraryName: string;
   status: string;
   folderPath: string;
+  addedAt: string;
   title: string | null;
   subtitle: string | null;
   description: string | null;
@@ -56,7 +58,7 @@ export type BookDetail = {
   seriesName: string | null;
   seriesIndex: number | null;
   rating: number | null;
-  coverSource: 'extracted' | 'custom' | null;
+  coverSource: "extracted" | "custom" | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];
