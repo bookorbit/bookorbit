@@ -5,9 +5,12 @@ import { BookOpen, Download, Files, History } from 'lucide-vue-next'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
+import { useBookDownload } from '@/features/book/composables/useBookDownload'
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
+
+const { downloadFile: downloadBookFile } = useBookDownload()
 
 const READABLE_FORMATS = new Set(['epub', 'pdf', 'cbz'])
 
@@ -44,9 +47,7 @@ function openFile(file: BookDetailFile) {
 }
 
 function downloadFile(file: BookDetailFile) {
-  const a = document.createElement('a')
-  a.href = `/api/v1/books/files/${file.id}/serve?download=1`
-  a.click()
+  void downloadBookFile(file.id)
 }
 
 function fileIconBg(format: string | null): string {

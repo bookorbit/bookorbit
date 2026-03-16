@@ -22,6 +22,9 @@ const globalStubs = {
     DropdownMenuItem: { template: '<div><slot /></div>' },
     DropdownMenuTrigger: { template: '<div><slot /></div>' },
     DropdownMenuSeparator: { template: '<div />' },
+    DropdownMenuSub: { template: '<div><slot /></div>' },
+    DropdownMenuSubTrigger: { template: '<div><slot /></div>' },
+    DropdownMenuSubContent: { template: '<div><slot /></div>' },
   },
 }
 

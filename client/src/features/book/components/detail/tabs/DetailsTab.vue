@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { BookOpen, ChevronDown, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { FORMAT_TO_GROUP } from '@projectx/types'
 import type { BookDetail, BookKoboState } from '@projectx/types'
+import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -48,6 +50,7 @@ const router = useRouter()
 const addToCollectionOpen = ref(false)
 const scoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
+const readMenuOpen = ref(false)
 
 const { weights: scoreWeights, fetchWeights } = useMetadataScoreWeights()
 
@@ -77,6 +80,8 @@ const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const readableFiles = computed(() => props.book.files.filter((f) => f.format && f.format in FORMAT_TO_GROUP))
+const hasMultipleFiles = computed(() => readableFiles.value.length > 1)
 const authorLine = computed(() => props.book.authors.map((a) => a.name).join(', ') || null)
 const formats = computed(() => [...new Set(props.book.files.map((f) => f.format ?? '?'))])
 
@@ -302,11 +307,13 @@ function openBook() {
   })
 }
 
-function downloadFile() {
-  if (!primaryFile.value) return
-  const a = document.createElement('a')
-  a.href = `/api/v1/books/files/${primaryFile.value.id}/serve?download=1`
-  a.click()
+function openBookFile(file: BookDetail['files'][number]) {
+  readMenuOpen.value = false
+  router.push({
+    name: 'reader',
+    params: { bookId: props.book.id, fileId: file.id },
+    query: { format: file.format ?? 'epub' },
+  })
 }
 
 let supplementalRequestId = 0
@@ -444,7 +451,46 @@ watch(
         </div>
 
         <div class="mt-4 space-y-2">
+          <!-- Read button: split when multiple files, plain when single -->
+          <div v-if="hasMultipleFiles" class="flex w-full h-9 rounded-md overflow-hidden">
+            <button
+              class="flex flex-1 items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              :disabled="!primaryFile"
+              @click="openBook"
+            >
+              <BookOpen class="size-4" />
+              Read
+            </button>
+            <div class="w-px bg-primary-foreground/20 shrink-0" />
+            <Popover :open="readMenuOpen" @update:open="(v) => (readMenuOpen = v)">
+              <PopoverTrigger as-child>
+                <button
+                  class="w-8 shrink-0 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  title="Choose format"
+                >
+                  <ChevronDown class="size-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent class="w-52 p-1" align="end">
+                <button
+                  v-for="file in readableFiles"
+                  :key="file.id"
+                  class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                  @click="openBookFile(file)"
+                >
+                  <span
+                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0"
+                    :style="formatBadgeStyle(file.format ?? '?')"
+                    >{{ file.format ?? '?' }}</span
+                  >
+                  <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ formatFileSize(file.sizeBytes) }}</span>
+                  <span v-if="file.role === 'primary'" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
           <button
+            v-else
             class="flex w-full items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             :disabled="!primaryFile"
             @click="openBook"
@@ -452,19 +498,11 @@ watch(
             <BookOpen class="size-4" />
             Read
           </button>
+
           <div class="flex gap-2">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
-                  :disabled="!primaryFile"
-                  @click="downloadFile"
-                >
-                  <Download class="size-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Download</TooltipContent>
-            </Tooltip>
+            <div class="flex-1">
+              <BookDownloadButton :files="book.files" :book-id="book.id" />
+            </div>
             <Tooltip>
               <TooltipTrigger as-child>
                 <button

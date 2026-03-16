@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import {
   BookOpen,
   Check,
+  Download,
   ExternalLink,
   FolderPlus,
   Image,
@@ -21,12 +22,22 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-vue-next'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 
 const router = useRouter()
@@ -54,7 +65,6 @@ const seriesLine = computed(() => {
 
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && f.format in FORMAT_TO_GROUP))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
-const extraFiles = computed(() => readableFiles.value.filter((f) => f !== primaryFile.value))
 
 const { coverUrl, bumpVersion } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
@@ -128,6 +138,16 @@ function handleCardClick(event: MouseEvent) {
 function openAuthorBrowse() {
   if (!authorQuery.value) return
   void router.push({ name: 'authors', query: { q: authorQuery.value } })
+}
+
+const { downloadFile, exportBooks } = useBookDownload()
+
+function handleDownloadFile(file: BookFileRef) {
+  void downloadFile(file.id)
+}
+
+function handleExportAll() {
+  void exportBooks([props.book.id], true)
 }
 </script>
 
@@ -294,33 +314,71 @@ function openAuthorBrowse() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem v-if="primaryFile" @click="openFile(primaryFile)">
+              <!-- Open submenu (only when multiple readable files; single file = direct item) -->
+              <DropdownMenuItem v-if="readableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
                 <BookOpen class="size-4 mr-2" />
-                {{ extraFiles.length > 0 ? `Open as ${primaryFile.format?.toUpperCase() ?? 'primary'}` : 'Open' }}
+                Open
               </DropdownMenuItem>
-              <DropdownMenuItem v-for="file in extraFiles" :key="file.id" @click="openFile(file)">
-                <BookOpen class="size-4 mr-2" />
-                Open as {{ file.format?.toUpperCase() ?? '?' }}
+              <DropdownMenuSub v-else-if="readableFiles.length > 1 && !isMissing">
+                <DropdownMenuSubTrigger>
+                  <BookOpen class="size-4 mr-2" />
+                  Open
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem v-for="file in readableFiles" :key="file.id" @click="openFile(file)">
+                    {{ file.format?.toUpperCase() ?? '?' }}
+                    <span v-if="file.role === 'primary'" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
+              <!-- Download submenu -->
+              <DropdownMenuItem v-if="readableFiles.length === 1 && primaryFile" @click="handleDownloadFile(primaryFile)">
+                <Download class="size-4 mr-2" />
+                Download
               </DropdownMenuItem>
+              <DropdownMenuSub v-else-if="readableFiles.length > 1">
+                <DropdownMenuSubTrigger>
+                  <Download class="size-4 mr-2" />
+                  Download
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem v-for="file in readableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                    {{ file.format?.toUpperCase() ?? '?' }}
+                    <span v-if="file.role === 'primary'" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
               <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
                 <ExternalLink class="size-4 mr-2" />
                 Book Details
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
-                <Pencil class="size-4 mr-2" />
-                Edit Metadata
-              </DropdownMenuItem>
-              <DropdownMenuItem :disabled="anyRefreshing" @click="refreshWithFeedback(book.id)">
-                <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
-                <RefreshCw v-else class="size-4 mr-2" />
-                Refresh Metadata
-              </DropdownMenuItem>
-              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="reExtractingCover" @click="reExtractCover()">
-                <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
-                <Image v-else class="size-4 mr-2" />
-                Regenerate Cover
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Pencil class="size-4 mr-2" />
+                  Metadata
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
+                    <Pencil class="size-4 mr-2" />
+                    Edit Metadata
+                  </DropdownMenuItem>
+                  <DropdownMenuItem :disabled="anyRefreshing" @click="refreshWithFeedback(book.id)">
+                    <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
+                    <RefreshCw v-else class="size-4 mr-2" />
+                    Refresh Metadata
+                  </DropdownMenuItem>
+                  <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="reExtractingCover" @click="reExtractCover()">
+                    <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
+                    <Image v-else class="size-4 mr-2" />
+                    Regenerate Cover
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuItem @click="emit('action', 'add-to-collection')">
                 <FolderPlus class="size-4 mr-2" />
                 Add to Collection

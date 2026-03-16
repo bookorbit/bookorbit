@@ -3,10 +3,12 @@ import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
 import { useCoverVersions } from './useCoverVersions'
 import { useRefreshingBooks } from './useRefreshingBooks'
+import { useBookDownload } from './useBookDownload'
 
 export function useBookBulkActions(selectedIds: Ref<Set<number>>, onDeleted: (ids: number[]) => void) {
   const { bumpVersion } = useCoverVersions()
   const { markRefreshing, clearRefreshing } = useRefreshingBooks()
+  const { exportBooks } = useBookDownload()
 
   async function handleBulkRefreshMetadata() {
     const ids = [...selectedIds.value]
@@ -104,25 +106,7 @@ export function useBookBulkActions(selectedIds: Ref<Set<number>>, onDeleted: (id
 
   async function handleExport(allFormats: boolean) {
     const ids = [...selectedIds.value]
-    if (ids.length === 0) return
-    const toastId = toast.loading(`Preparing ${ids.length} book${ids.length === 1 ? '' : 's'} for download...`)
-    const res = await api('/api/v1/books/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookIds: ids, allFormats }),
-    })
-    toast.dismiss(toastId)
-    if (!res.ok) {
-      toast.error('Export failed')
-      return
-    }
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'books.zip'
-    a.click()
-    URL.revokeObjectURL(url)
+    await exportBooks(ids, allFormats)
   }
 
   async function handleDeleteSelected() {
