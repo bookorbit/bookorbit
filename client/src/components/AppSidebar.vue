@@ -166,7 +166,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <!-- Dashboard / Staging / Authors -->
       <SidebarGroup>
         <SidebarGroupContent>
-          <SidebarMenu class="gap-px">
+          <SidebarMenu>
             <SidebarNavItem
               :is-active="isDashboardActive"
               tooltip="Dashboard"
@@ -205,7 +205,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Libraries -->
-      <SidebarGroup class="mt-1">
+      <SidebarGroup>
         <SidebarSectionHeader
           label="Libraries"
           :is-open="librariesOpen"
@@ -269,7 +269,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Lenses -->
-      <SidebarGroup class="mt-1">
+      <SidebarGroup>
         <SidebarSectionHeader
           label="Lenses"
           :is-open="lensesOpen"
@@ -311,7 +311,7 @@ onUnmounted(() => stopUploadCompletedListener())
       <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
 
       <!-- Collections -->
-      <SidebarGroup class="mt-1">
+      <SidebarGroup>
         <SidebarSectionHeader
           label="Collections"
           :is-open="collectionsOpen"
