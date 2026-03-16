@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { GripVertical } from 'lucide-vue-next'
 import type { ProviderStatus } from '@projectx/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 
@@ -32,7 +33,8 @@ function onDragStart(key: string, e: DragEvent) {
       "
       @dragstart="onDragStart(status.key, $event)"
     >
-      {{ PROVIDER_SHORT_LABELS[status.key] ?? status.key }}
+      <GripVertical v-if="status.enabled && status.configured" :size="10" class="shrink-0 -ml-1 opacity-50" />
+      <span>{{ PROVIDER_SHORT_LABELS[status.key] ?? status.key }}</span>
     </div>
   </div>
 </template>

@@ -102,7 +102,7 @@ function handleDelete() {
       >
         <div class="flex items-end justify-between gap-2">
           <div class="min-w-0">
-            <h3 class="line-clamp-2 text-sm font-semibold leading-tight" :style="hasImage ? undefined : { color: fallbackStyle.color }">
+            <h3 class="line-clamp-2 text-xs leading-tight" :style="hasImage ? undefined : { color: fallbackStyle.color }">
               {{ author.name }}
             </h3>
           </div>

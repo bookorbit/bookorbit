@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
-import { RefreshCw, Save } from 'lucide-vue-next'
+import { RefreshCw, Save, RotateCcw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import type { MetadataScoreWeights, MetadataScoreField } from '@projectx/types'
 import { DEFAULT_METADATA_SCORE_WEIGHTS, METADATA_SCORE_FIELDS, METADATA_SCORE_GROUP_LABELS, type MetadataScoreGroup } from '@projectx/types'
@@ -12,6 +12,8 @@ const { resetFetchCache } = useMetadataScoreWeights()
 const weights = reactive<MetadataScoreWeights>({ ...DEFAULT_METADATA_SCORE_WEIGHTS })
 const saving = ref(false)
 const recalculating = ref(false)
+const resetConfirming = ref(false)
+let resetConfirmTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   const res = await api('/api/v1/metadata-score/weights')
@@ -80,60 +82,72 @@ async function recalculateAll() {
     recalculating.value = false
   }
 }
+
+function handleResetClick() {
+  if (!resetConfirming.value) {
+    resetConfirming.value = true
+    resetConfirmTimer = setTimeout(() => {
+      resetConfirming.value = false
+    }, 3000)
+    return
+  }
+  if (resetConfirmTimer) clearTimeout(resetConfirmTimer)
+  resetConfirmTimer = null
+  resetConfirming.value = false
+  Object.assign(weights, DEFAULT_METADATA_SCORE_WEIGHTS)
+  toast.success('Weights reset to defaults. Save to apply.')
+}
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between gap-4">
-      <div>
-        <h2 class="text-sm font-semibold">Metadata Score Weights</h2>
-        <p class="text-xs text-muted-foreground mt-0.5">
-          Assign a weight to each field. Fields with weight 0 are excluded from the score. Total max weight:
-          <span class="font-medium text-foreground">{{ totalWeight }}</span
-          >.
-        </p>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <button
-          type="button"
-          class="flex items-center gap-1.5 h-8 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="recalculating"
-          @click="recalculateAll"
-        >
-          <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
-          Recalculate All
-        </button>
-        <button
-          type="button"
-          class="flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
-          :disabled="saving"
-          @click="saveWeights"
-        >
-          <Save class="size-3.5" />
-          Save
-        </button>
-      </div>
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <p class="settings-group-label !mb-0">Score Weights</p>
+      <p class="settings-hint mt-0.5">
+        Assign a weight to each field. Total weight:
+        <span class="font-medium text-foreground">{{ totalWeight }}</span
+        >.
+      </p>
     </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button
+        type="button"
+        class="settings-btn-outline"
+        :class="resetConfirming ? '!border-destructive !text-destructive hover:!bg-destructive/10' : ''"
+        @click="handleResetClick"
+      >
+        <RotateCcw class="size-3.5" />
+        {{ resetConfirming ? 'Are you sure?' : 'Reset to defaults' }}
+      </button>
+      <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
+        <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
+        Recalculate all
+      </button>
+      <button type="button" class="settings-btn-primary" :disabled="saving" @click="saveWeights">
+        <Save class="size-3.5" />
+        Save
+      </button>
+    </div>
+  </div>
 
-    <div class="space-y-6">
-      <div v-for="group in groups" :key="group.group">
-        <div class="flex items-baseline justify-between mb-3">
-          <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{{ group.label }}</h3>
-          <span class="text-xs text-muted-foreground">subtotal: {{ groupTotal(group) }}</span>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div v-for="entry in group.fields" :key="entry.field" class="flex items-center gap-2">
-            <label :for="`weight-${entry.field}`" class="text-sm text-foreground flex-1 min-w-0 truncate">
-              {{ entry.label }}
-            </label>
-            <input
-              :id="`weight-${entry.field}`"
-              v-model.number="weights[entry.field]"
-              type="number"
-              min="0"
-              class="w-16 h-8 px-2 text-sm text-right rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
+  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div v-for="group in groups" :key="group.group" class="px-5 py-4 bg-card">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{{ group.label }}</p>
+        <span class="text-xs text-muted-foreground">subtotal: {{ groupTotal(group) }}</span>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2.5">
+        <div v-for="entry in group.fields" :key="entry.field" class="flex items-center gap-2">
+          <input
+            :id="`weight-${entry.field}`"
+            v-model.number="weights[entry.field]"
+            type="number"
+            min="0"
+            class="w-14 h-7 px-2 text-xs text-center rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+          />
+          <label :for="`weight-${entry.field}`" class="settings-label truncate">
+            {{ entry.label }}
+          </label>
         </div>
       </div>
     </div>

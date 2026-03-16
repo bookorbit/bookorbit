@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "author_enrichment_queue_single_processing_idx" ON "author_enrichment_queue" USING btree ("status") WHERE "author_enrichment_queue"."status" = 'processing';

@@ -53,16 +53,12 @@ function setGenreMerge(enabled: boolean) {
 
 <template>
   <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
-    <div class="px-6 py-5 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/20">
+    <div class="px-5 py-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30">
       <div>
-        <p class="settings-label">Global Defaults</p>
+        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Defaults</span>
         <p class="settings-hint">Default rules applied to every library. Override per-library below.</p>
       </div>
-      <button
-        class="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        :disabled="saving || !draft"
-        @click="save"
-      >
+      <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
         <Loader2 v-if="saving" :size="14" class="animate-spin" />
         <Save v-else :size="14" />
         <span>Save Defaults</span>

@@ -1,15 +1,19 @@
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
-import type { AuthorEnrichmentStatus } from '@projectx/types'
+import type { AuthorEnrichmentStatusEvent } from '@projectx/types'
 import { getAccessToken } from '@/lib/api'
 
-const status = ref<AuthorEnrichmentStatus>({
+const status = ref<AuthorEnrichmentStatusEvent>({
   queued: 0,
   processing: 0,
   rateLimited: 0,
   failed: 0,
   done: 0,
   total: 0,
+  paused: false,
+  sessionTotal: 0,
+  sessionDone: 0,
+  currentItemName: null,
 })
 const socketConnected = ref(true)
 let socket: Socket | null = null
@@ -24,7 +28,7 @@ function getSocket(): Socket {
       reconnectionDelayMax: 10000,
     })
 
-    socket.on('author-enrichment:status', (data: AuthorEnrichmentStatus) => {
+    socket.on('author-enrichment:status', (data: AuthorEnrichmentStatusEvent) => {
       status.value = data
     })
 
@@ -45,4 +49,24 @@ export function useAuthorEnrichmentStatus() {
   }
 
   return { status, socketConnected, subscribe }
+}
+
+export function disconnectAuthorEnrichmentSocket() {
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
+  status.value = {
+    queued: 0,
+    processing: 0,
+    rateLimited: 0,
+    failed: 0,
+    done: 0,
+    total: 0,
+    paused: false,
+    sessionTotal: 0,
+    sessionDone: 0,
+    currentItemName: null,
+  }
+  socketConnected.value = true
 }

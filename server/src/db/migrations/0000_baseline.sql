@@ -78,6 +78,9 @@ CREATE TABLE "libraries" (
 	"mark_as_finished_percent_complete" integer,
 	"file_naming_pattern" varchar(500),
 	"metadata_fetch_preferences" jsonb,
+	"book_metadata_fetch_config" jsonb,
+	"book_metadata_fetch_last_run_at" timestamp,
+	"book_metadata_fetch_last_queued_count" integer,
 	"scan_mode" varchar(20) DEFAULT 'auto' NOT NULL,
 	"poll_interval_seconds" integer DEFAULT 300,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -148,11 +151,27 @@ CREATE TABLE "lenses" (
 	CONSTRAINT "lenses_user_id_name_unique" UNIQUE("user_id","name")
 );
 --> statement-breakpoint
+CREATE TABLE "author_enrichment_queue" (
+	"author_id" integer PRIMARY KEY NOT NULL,
+	"status" varchar(20) DEFAULT 'queued' NOT NULL,
+	"reason" varchar(50) DEFAULT 'unknown' NOT NULL,
+	"attempt_count" integer DEFAULT 0 NOT NULL,
+	"next_attempt_at" timestamp DEFAULT now() NOT NULL,
+	"last_attempt_at" timestamp,
+	"last_success_at" timestamp,
+	"last_error" text,
+	"last_http_status" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "authors" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(500) NOT NULL,
 	"sort_name" varchar(500),
-	"description" text
+	"description" text,
+	"has_photo" boolean DEFAULT false NOT NULL,
+	"last_enriched_at" timestamp
 );
 --> statement-breakpoint
 CREATE TABLE "book_authors" (
@@ -177,7 +196,7 @@ CREATE TABLE "book_metadata" (
 	"isbn13" varchar(13),
 	"publisher" varchar(500),
 	"published_year" integer,
-	"language" varchar(10),
+	"language" varchar(100),
 	"page_count" integer,
 	"series_name" varchar(500),
 	"series_index" real,
@@ -190,8 +209,21 @@ CREATE TABLE "book_metadata" (
 	"open_library_id" varchar(50),
 	"itunes_id" varchar(50),
 	"metadata_score" integer,
+	"last_metadata_fetch_at" timestamp,
 	"embedding" vector(256),
 	"last_written_at" timestamp,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "book_metadata_fetch_queue" (
+	"book_id" integer PRIMARY KEY NOT NULL,
+	"status" varchar(20) DEFAULT 'queued' NOT NULL,
+	"reason" varchar(50) DEFAULT 'manual_trigger' NOT NULL,
+	"attempt_count" integer DEFAULT 0 NOT NULL,
+	"last_attempt_at" timestamp,
+	"last_error" text,
+	"last_http_status" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -508,11 +540,13 @@ ALTER TABLE "collection_books" ADD CONSTRAINT "collection_books_collection_id_co
 ALTER TABLE "collection_books" ADD CONSTRAINT "collection_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collections" ADD CONSTRAINT "collections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lenses" ADD CONSTRAINT "lenses_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "author_enrichment_queue" ADD CONSTRAINT "author_enrichment_queue_author_id_authors_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."authors"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_authors" ADD CONSTRAINT "book_authors_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_authors" ADD CONSTRAINT "book_authors_author_id_authors_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."authors"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_genres" ADD CONSTRAINT "book_genres_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_genres" ADD CONSTRAINT "book_genres_genre_id_genres_id_fk" FOREIGN KEY ("genre_id") REFERENCES "public"."genres"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_metadata" ADD CONSTRAINT "book_metadata_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_metadata_fetch_queue" ADD CONSTRAINT "book_metadata_fetch_queue_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_tags" ADD CONSTRAINT "book_tags_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_tags" ADD CONSTRAINT "book_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scan_jobs" ADD CONSTRAINT "scan_jobs_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -559,12 +593,17 @@ ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_te
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "books_library_id_folder_path_idx" ON "books" USING btree ("library_id","folder_path");--> statement-breakpoint
+CREATE INDEX "author_enrichment_queue_status_next_attempt_idx" ON "author_enrichment_queue" USING btree ("status","next_attempt_at");--> statement-breakpoint
+CREATE INDEX "author_enrichment_queue_next_attempt_idx" ON "author_enrichment_queue" USING btree ("next_attempt_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "author_enrichment_queue_single_processing_idx" ON "author_enrichment_queue" USING btree ("status") WHERE "author_enrichment_queue"."status" = 'processing';--> statement-breakpoint
 CREATE INDEX "authors_name_trgm_idx" ON "authors" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "book_authors_author_id_idx" ON "book_authors" USING btree ("author_id");--> statement-breakpoint
 CREATE INDEX "bm_title_trgm_idx" ON "book_metadata" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_series_trgm_idx" ON "book_metadata" USING gin ("series_name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_publisher_trgm_idx" ON "book_metadata" USING gin ("publisher" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_language_idx" ON "book_metadata" USING btree ("language");--> statement-breakpoint
+CREATE INDEX "bmfq_status_idx" ON "book_metadata_fetch_queue" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "bmfq_created_at_idx" ON "book_metadata_fetch_queue" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint

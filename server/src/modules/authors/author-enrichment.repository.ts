@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AuthorEnrichmentStatus } from '@projectx/types';
+import type { AuthorEnrichmentConditions, AuthorEnrichmentFailedItem, AuthorEnrichmentStatus } from '@projectx/types';
+import type { SQL } from 'drizzle-orm';
 import { and, asc, count, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authorEnrichmentQueue, bookAuthors } from '../../db/schema';
+import { authorEnrichmentQueue, authors, bookAuthors } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -57,14 +58,48 @@ export class AuthorEnrichmentRepository {
     return this.upsertSchedule(authorIds, reason);
   }
 
-  async fetchDue(limit: number): Promise<AuthorEnrichmentQueueRow[]> {
+  async filterEligibleAuthorIds(authorIds: number[], conditions: AuthorEnrichmentConditions): Promise<number[]> {
+    if (authorIds.length === 0) return [];
+
+    const clauses: SQL[] = [];
+    if (conditions.neverEnriched) clauses.push(isNull(authors.lastEnrichedAt));
+    if (conditions.missingBio) clauses.push(isNull(authors.description));
+    if (conditions.missingPhoto) clauses.push(eq(authors.hasPhoto, false));
+
+    if (clauses.length === 0) return [];
+
+    const rows = await this.db
+      .select({ id: authors.id })
+      .from(authors)
+      .where(and(inArray(authors.id, authorIds), or(...clauses)));
+
+    return rows.map((r) => r.id);
+  }
+
+  async enqueueEligibleLinkedAuthors(reason: string, conditions: AuthorEnrichmentConditions): Promise<number> {
+    const allRows = await this.db.selectDistinct({ authorId: bookAuthors.authorId }).from(bookAuthors);
+    const allIds = allRows.map((r) => r.authorId);
+    const eligibleIds = await this.filterEligibleAuthorIds(allIds, conditions);
+    return this.upsertSchedule(eligibleIds, reason);
+  }
+
+  async countEligibleLinkedAuthors(conditions: AuthorEnrichmentConditions): Promise<number> {
+    const allRows = await this.db.selectDistinct({ authorId: bookAuthors.authorId }).from(bookAuthors);
+    const allIds = allRows.map((r) => r.authorId);
+    const eligibleIds = await this.filterEligibleAuthorIds(allIds, conditions);
+    return eligibleIds.length;
+  }
+
+  async fetchDue(limit: number): Promise<(AuthorEnrichmentQueueRow & { authorName: string | null })[]> {
     if (limit <= 0) return [];
-    return this.db
-      .select()
+    const rows = await this.db
+      .select({ queue: authorEnrichmentQueue, authorName: authors.name })
       .from(authorEnrichmentQueue)
+      .leftJoin(authors, eq(authors.id, authorEnrichmentQueue.authorId))
       .where(and(inArray(authorEnrichmentQueue.status, [...AUTHOR_ENRICHMENT_ACTIVE_STATUSES]), lte(authorEnrichmentQueue.nextAttemptAt, new Date())))
       .orderBy(asc(authorEnrichmentQueue.nextAttemptAt), asc(authorEnrichmentQueue.authorId))
       .limit(limit);
+    return rows.map((r) => ({ ...r.queue, authorName: r.authorName }));
   }
 
   async getStatusSummary(): Promise<AuthorEnrichmentStatus> {
@@ -87,15 +122,13 @@ export class AuthorEnrichmentRepository {
 
     for (const row of rows) {
       const value = Number(row.cnt);
-      summary.total += value;
-
       if (row.status === 'queued') summary.queued = value;
       else if (row.status === 'processing') summary.processing = value;
       else if (row.status === 'rate_limited') summary.rateLimited = value;
       else if (row.status === 'failed') summary.failed = value;
-      else if (row.status === 'done') summary.done = value;
     }
 
+    summary.total = summary.queued + summary.processing + summary.rateLimited + summary.failed;
     return summary;
   }
 
@@ -124,20 +157,15 @@ export class AuthorEnrichmentRepository {
     }
   }
 
-  async markDone(authorId: number): Promise<void> {
+  async markDone(authorId: number, imageUpdated: boolean): Promise<void> {
     const now = new Date();
-    await this.db
-      .update(authorEnrichmentQueue)
-      .set({
-        status: 'done',
-        attemptCount: 0,
-        lastSuccessAt: now,
-        lastError: null,
-        lastHttpStatus: null,
-        nextAttemptAt: now,
-        updatedAt: now,
-      })
-      .where(eq(authorEnrichmentQueue.authorId, authorId));
+    const authorUpdate: { lastEnrichedAt: Date; hasPhoto?: true } = { lastEnrichedAt: now };
+    if (imageUpdated) authorUpdate.hasPhoto = true;
+
+    await Promise.all([
+      this.db.delete(authorEnrichmentQueue).where(eq(authorEnrichmentQueue.authorId, authorId)),
+      this.db.update(authors).set(authorUpdate).where(eq(authors.id, authorId)),
+    ]);
   }
 
   async recoverStuckProcessing(staleBefore: Date): Promise<number> {
@@ -158,6 +186,65 @@ export class AuthorEnrichmentRepository {
       .returning({ authorId: authorEnrichmentQueue.authorId });
 
     return updated.length;
+  }
+
+  async cancelPending(): Promise<number> {
+    const deleted = await this.db
+      .delete(authorEnrichmentQueue)
+      .where(inArray(authorEnrichmentQueue.status, ['queued', 'rate_limited']))
+      .returning({ authorId: authorEnrichmentQueue.authorId });
+    return deleted.length;
+  }
+
+  async requeueFailed(): Promise<number> {
+    const now = new Date();
+    const updated = await this.db
+      .update(authorEnrichmentQueue)
+      .set({ status: 'queued', attemptCount: 0, nextAttemptAt: now, lastError: null, lastHttpStatus: null, updatedAt: now })
+      .where(eq(authorEnrichmentQueue.status, 'failed'))
+      .returning({ authorId: authorEnrichmentQueue.authorId });
+    return updated.length;
+  }
+
+  async resetAllProcessingOnBoot(): Promise<number> {
+    const now = new Date();
+    const updated = await this.db
+      .update(authorEnrichmentQueue)
+      .set({ status: 'queued', nextAttemptAt: now, updatedAt: now })
+      .where(eq(authorEnrichmentQueue.status, 'processing'))
+      .returning({ authorId: authorEnrichmentQueue.authorId });
+    return updated.length;
+  }
+
+  async getFailedItems(page: number, limit: number): Promise<{ items: AuthorEnrichmentFailedItem[]; total: number }> {
+    const offset = (page - 1) * limit;
+    const [rows, totalRows] = await Promise.all([
+      this.db
+        .select({
+          authorId: authorEnrichmentQueue.authorId,
+          name: authors.name,
+          error: authorEnrichmentQueue.lastError,
+          httpStatus: authorEnrichmentQueue.lastHttpStatus,
+          failedAt: authorEnrichmentQueue.updatedAt,
+        })
+        .from(authorEnrichmentQueue)
+        .leftJoin(authors, eq(authors.id, authorEnrichmentQueue.authorId))
+        .where(eq(authorEnrichmentQueue.status, 'failed'))
+        .orderBy(asc(authorEnrichmentQueue.updatedAt))
+        .limit(limit)
+        .offset(offset),
+      this.db.select({ cnt: count() }).from(authorEnrichmentQueue).where(eq(authorEnrichmentQueue.status, 'failed')),
+    ]);
+    return {
+      items: rows.map((r) => ({
+        authorId: r.authorId,
+        name: r.name ?? null,
+        error: r.error ?? null,
+        httpStatus: r.httpStatus ?? null,
+        failedAt: r.failedAt.toISOString(),
+      })),
+      total: Number(totalRows[0]?.cnt ?? 0),
+    };
   }
 
   async markFailed(params: {

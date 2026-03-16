@@ -29,16 +29,20 @@ const GROUPS: { label: string; fields: MetadataField[] }[] = [
 <template>
   <div class="space-y-0">
     <!-- Reservoir with context -->
-    <div class="px-6 py-4 bg-muted/30 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="px-5 py-4 bg-muted/30 border-b border-border flex flex-col gap-3">
       <div class="flex items-center gap-2.5">
-        <Info :size="14" class="text-primary" />
-        <p class="settings-hint !mt-0 uppercase tracking-wider">Drag providers from here onto any field to add them</p>
+        <Info :size="14" class="text-primary shrink-0" />
+        <p class="text-[11px] font-medium text-muted-foreground uppercase tracking-widest leading-none">
+          Drag providers from here onto any field to add them
+        </p>
       </div>
-      <ProviderReservoir :statuses="statuses" />
+      <div class="flex items-center">
+        <ProviderReservoir :statuses="statuses" />
+      </div>
     </div>
 
     <!-- Table Header (desktop) -->
-    <div class="hidden md:flex items-center gap-4 px-6 py-3 bg-muted/10 border-b border-border/60">
+    <div class="hidden md:flex items-center gap-4 px-5 py-3 bg-muted/10 border-b border-border/60">
       <div class="w-48 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field</div>
       <div class="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Providers (ordered by priority)</div>
       <div class="w-44 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Merge Strategy</div>

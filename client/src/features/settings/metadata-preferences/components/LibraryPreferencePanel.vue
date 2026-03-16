@@ -51,7 +51,7 @@ function onReset() {
     class="border border-border rounded-xl bg-card overflow-hidden shadow-sm transition-all"
     :class="open ? 'ring-1 ring-primary/20' : 'hover:border-primary/30'"
   >
-    <div class="flex items-center gap-3 px-6 py-4 cursor-pointer select-none" @click="open = !open">
+    <div class="flex items-center gap-3 px-5 py-4 cursor-pointer select-none" @click="open = !open">
       <div class="flex items-center gap-4 flex-1 min-w-0">
         <div
           class="flex items-center justify-center w-8 h-8 rounded-lg bg-muted shrink-0 text-muted-foreground transition-colors"

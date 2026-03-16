@@ -50,27 +50,27 @@ const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; f
   {
     key: 'google',
     label: 'Google Books',
-    hint: 'Recommended for higher rate limits.',
+    hint: "Broad coverage from Google's book index. Add an API key to avoid rate limits.",
     fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
   },
   {
     key: 'amazon',
     label: 'Amazon',
-    hint: 'Provides richer metadata and avoids rate limiting.',
+    hint: 'Pulls from Amazon product pages. A session cookie is highly recommended.',
     fields: [
       { key: 'domain', label: 'Region', type: 'select', options: AMAZON_DOMAINS },
       { key: 'cookie', label: 'Cookie', type: 'password' },
     ],
   },
-  { key: 'goodreads', label: 'Goodreads', hint: 'Standard community metadata.', fields: [] },
+  { key: 'goodreads', label: 'Goodreads', hint: 'The largest reading community on the web. No setup required.', fields: [] },
   {
     key: 'hardcover',
     label: 'Hardcover',
-    hint: 'Social book tracking platform.',
+    hint: 'A modern alternative to Goodreads. Free API key required from hardcover.app.',
     fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
   },
-  { key: 'openLibrary', label: 'Open Library', hint: 'The internet archive for books.', fields: [] },
-  { key: 'itunes', label: 'iTunes', hint: 'Apple Books and Audiobooks.', fields: [] },
+  { key: 'openLibrary', label: 'Open Library', hint: "The Internet Archive's free book catalog. No setup required.", fields: [] },
+  { key: 'itunes', label: 'iTunes', hint: "Apple's digital book catalog. No setup required.", fields: [] },
 ]
 
 function statusFor(key: string) {
@@ -86,45 +86,41 @@ function save() {
 <template>
   <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
     <!-- Card Header -->
-    <div class="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/20">
+    <div class="px-5 py-4 border-b border-border flex items-center justify-between bg-muted/30">
       <div class="flex items-center gap-2">
-        <span class="settings-group-label !mb-0">Available Sources</span>
+        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Available Sources</span>
       </div>
-      <button
-        class="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        :disabled="saving || !draft"
-        @click="save"
-      >
+      <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
         <Loader2 v-if="saving" :size="14" class="animate-spin" />
         <Save v-else :size="14" />
         <span>Save Changes</span>
       </button>
     </div>
 
-    <div v-if="draft" class="divide-y divide-border/50">
-      <div v-for="row in rows" :key="row.key" class="px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+    <div v-if="draft" class="divide-y divide-border">
+      <div
+        v-for="row in rows"
+        :key="row.key"
+        class="px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card transition-colors hover:bg-muted/30"
+      >
         <!-- Left: Provider Info -->
-        <div class="space-y-1.5">
+        <div class="space-y-1">
           <div class="flex items-center gap-3">
             <span class="settings-label">{{ row.label }}</span>
             <template v-if="statusFor(row.key)">
-              <Badge
-                v-if="!statusFor(row.key)?.configured"
-                variant="destructive"
-                class="h-4.5 px-1.5 text-[9px] font-black uppercase tracking-tighter"
-              >
+              <Badge v-if="!statusFor(row.key)?.configured" variant="destructive" class="h-4 px-1.5 text-[9px] font-bold uppercase tracking-wide">
                 Setup Required
               </Badge>
               <Badge
                 v-else
                 variant="outline"
-                class="h-4.5 px-1.5 text-[9px] font-black uppercase tracking-tighter text-emerald-600 border-emerald-500/30 bg-emerald-500/5"
+                class="h-4 px-1.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600 border-emerald-500/30 bg-emerald-500/5"
               >
                 Ready
               </Badge>
             </template>
           </div>
-          <p v-if="row.hint" class="text-xs text-muted-foreground max-w-sm leading-relaxed">
+          <p v-if="row.hint" class="settings-hint max-w-sm">
             {{ row.hint }}
           </p>
         </div>
@@ -138,7 +134,7 @@ function save() {
                 v-if="field.type === 'select'"
                 v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
                 :disabled="!draft[row.key].enabled"
-                class="h-8 rounded border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+                class="h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
               >
                 <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
               </select>
@@ -148,7 +144,7 @@ function save() {
                 :type="field.type"
                 :placeholder="field.label"
                 :disabled="!draft[row.key].enabled"
-                class="h-8 w-96 rounded border border-input bg-background px-2.5 text-xs font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+                class="h-9 w-64 lg:w-80 rounded-md border border-input bg-background px-3 text-xs font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
               />
             </div>
           </div>

@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 
 import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
@@ -28,6 +29,7 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly metadataService: MetadataService,
     private readonly scanJobStore: ScanJobStore,
     private readonly scanGateway: ScanGateway,
+    @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -288,6 +290,9 @@ export class ScannerService implements OnApplicationBootstrap {
         status: 'present',
       });
       counts.addedCount++;
+      this.autoFetchOrchestrator
+        ?.scheduleIfEligible(book.id, libraryId, 'event_import')
+        .catch((err: Error) => this.logger.warn(`book-metadata-fetch schedule failed for book ${book.id}: ${err.message}`));
       return book;
     }
 

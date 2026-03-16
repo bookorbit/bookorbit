@@ -3,6 +3,8 @@ import type { AuthUser, AuthResponse } from '@projectx/types'
 import { api, setAccessToken, setOnAuthFailure } from '@/lib/api'
 import router from '@/router'
 import { useSetupStatus } from './useSetupStatus'
+import { disconnectAuthorEnrichmentSocket } from '@/features/settings/composables/useAuthorEnrichmentStatus'
+import { disconnectBookMetadataFetchSocket } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchStatus'
 
 const user = ref<AuthUser | null>(null)
 const isLoading = ref(false)
@@ -10,6 +12,8 @@ const isLoading = ref(false)
 function clearAuth() {
   user.value = null
   setAccessToken(null)
+  disconnectAuthorEnrichmentSocket()
+  disconnectBookMetadataFetchSocket()
 }
 
 setOnAuthFailure(() => {

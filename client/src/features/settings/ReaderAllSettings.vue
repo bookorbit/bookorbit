@@ -13,11 +13,15 @@ const route = useRoute()
 const router = useRouter()
 
 function normalizeTab(value: unknown): Tab {
-  if (value === 'ebook' || value === 'pdf' || value === 'comics') return value
-  return 'general'
+  if (value === 'general' || value === 'ebook' || value === 'pdf' || value === 'comics') return value
+  return 'ebook'
 }
 
 const activeTab = ref<Tab>(normalizeTab(route.query.tab))
+
+if (!route.query.tab) {
+  router.replace({ name: 'settings-reader-general', query: { ...route.query, tab: activeTab.value } })
+}
 
 watch(
   () => route.query.tab,
@@ -35,13 +39,7 @@ const tabs: { id: Tab; label: string }[] = [
 
 function selectTab(tab: Tab) {
   activeTab.value = tab
-  const query = { ...route.query }
-  if (tab === 'general') {
-    delete query.tab
-  } else {
-    query.tab = tab
-  }
-  router.replace({ name: 'settings-reader-general', query })
+  router.replace({ name: 'settings-reader-general', query: { ...route.query, tab } })
 }
 </script>
 

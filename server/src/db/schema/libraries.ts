@@ -1,5 +1,5 @@
 import { boolean, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
-import { FieldPreferenceOverrides } from '@projectx/types';
+import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride } from '@projectx/types';
 
 export const libraries = pgTable('libraries', {
   id: serial('id').primaryKey(),
@@ -30,6 +30,13 @@ export const libraries = pgTable('libraries', {
 
   // Metadata fetch preferences override (null = inherit global defaults)
   metadataFetchPreferences: jsonb('metadata_fetch_preferences').$type<FieldPreferenceOverrides>(),
+
+  // Book metadata auto-fetch config override (null = inherit global defaults)
+  bookMetadataFetchConfig: jsonb('book_metadata_fetch_config').$type<BookMetadataFetchConfigOverride>(),
+
+  // Last manual/scheduled run info for this library (null = never run)
+  bookMetadataFetchLastRunAt: timestamp('book_metadata_fetch_last_run_at'),
+  bookMetadataFetchLastQueuedCount: integer('book_metadata_fetch_last_queued_count'),
 
   // Legacy — kept for scanner compatibility
   scanMode: varchar('scan_mode', { length: 20 }).notNull().default('auto'),

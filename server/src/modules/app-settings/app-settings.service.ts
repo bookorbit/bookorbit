@@ -30,6 +30,7 @@ const APP_SETTING_KEYS = {
   AUTHORS_AUTO_ENRICHMENT_ENABLED: 'authors_auto_enrichment_enabled',
   AUTHORS_AUTO_ENRICHMENT_WRITE_MODE: 'authors_auto_enrichment_write_mode',
   AUTHORS_PROVIDER_AUDNEXUS_ENABLED: 'authors_provider_audnexus_enabled',
+  AUTHORS_ENRICHMENT_PAUSED: 'authors_enrichment_paused',
 } as const;
 
 type Db = NodePgDatabase<typeof schema>;
@@ -118,6 +119,21 @@ export class AppSettingsService {
       where: eq(schema.appSettings.key, APP_SETTING_KEYS.AUTHORS_PROVIDER_AUDNEXUS_ENABLED),
     });
     return row?.value !== 'false';
+  }
+
+  async isAuthorEnrichmentPaused(): Promise<boolean> {
+    const row = await this.db.query.appSettings.findFirst({
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.AUTHORS_ENRICHMENT_PAUSED),
+    });
+    return row?.value === 'true';
+  }
+
+  async setAuthorEnrichmentPaused(paused: boolean): Promise<void> {
+    const value = paused ? 'true' : 'false';
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: APP_SETTING_KEYS.AUTHORS_ENRICHMENT_PAUSED, value })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
   }
 
   async getOidcConfig(): Promise<OidcFullConfig> {

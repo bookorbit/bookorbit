@@ -1,5 +1,5 @@
 {
-  "id": "9db12dad-097f-4fec-80be-6741fa851f50",
+  "id": "cb5ce237-4cd9-4bc6-ba30-81eb92053150",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -538,6 +538,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "book_metadata_fetch_config": {
+          "name": "book_metadata_fetch_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "book_metadata_fetch_last_run_at": {
+          "name": "book_metadata_fetch_last_run_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "book_metadata_fetch_last_queued_count": {
+          "name": "book_metadata_fetch_last_queued_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "scan_mode": {
           "name": "scan_mode",
           "type": "varchar(20)",
@@ -1052,6 +1070,154 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.author_enrichment_queue": {
+      "name": "author_enrichment_queue",
+      "schema": "",
+      "columns": {
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_attempt_at": {
+          "name": "last_attempt_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_success_at": {
+          "name": "last_success_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_http_status": {
+          "name": "last_http_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "author_enrichment_queue_status_next_attempt_idx": {
+          "name": "author_enrichment_queue_status_next_attempt_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "author_enrichment_queue_next_attempt_idx": {
+          "name": "author_enrichment_queue_next_attempt_idx",
+          "columns": [
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "author_enrichment_queue_single_processing_idx": {
+          "name": "author_enrichment_queue_single_processing_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"author_enrichment_queue\".\"status\" = 'processing'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "author_enrichment_queue_author_id_authors_id_fk": {
+          "name": "author_enrichment_queue_author_id_authors_id_fk",
+          "tableFrom": "author_enrichment_queue",
+          "tableTo": "authors",
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.authors": {
       "name": "authors",
       "schema": "",
@@ -1077,6 +1243,19 @@
         "description": {
           "name": "description",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_photo": {
+          "name": "has_photo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "last_enriched_at": {
+          "name": "last_enriched_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         }
@@ -1281,7 +1460,7 @@
         },
         "language": {
           "name": "language",
-          "type": "varchar(10)",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1354,6 +1533,12 @@
         "metadata_score": {
           "name": "metadata_score",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_metadata_fetch_at": {
+          "name": "last_metadata_fetch_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -1446,6 +1631,119 @@
         "book_metadata_book_id_books_id_fk": {
           "name": "book_metadata_book_id_books_id_fk",
           "tableFrom": "book_metadata",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.book_metadata_fetch_queue": {
+      "name": "book_metadata_fetch_queue",
+      "schema": "",
+      "columns": {
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual_trigger'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_attempt_at": {
+          "name": "last_attempt_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_http_status": {
+          "name": "last_http_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "bmfq_status_idx": {
+          "name": "bmfq_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bmfq_created_at_idx": {
+          "name": "bmfq_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "book_metadata_fetch_queue_book_id_books_id_fk": {
+          "name": "book_metadata_fetch_queue_book_id_books_id_fk",
+          "tableFrom": "book_metadata_fetch_queue",
           "tableTo": "books",
           "columnsFrom": ["book_id"],
           "columnsTo": ["id"],

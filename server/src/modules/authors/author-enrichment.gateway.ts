@@ -1,12 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Permission, type AuthorEnrichmentStatus } from '@projectx/types';
+import { Permission, type AuthorEnrichmentStatusEvent } from '@projectx/types';
 import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from '../auth/auth.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 import { AuthorEnrichmentRepository } from './author-enrichment.repository';
+import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 
 export const AUTHOR_ENRICHMENT_STATUS_EVENT = 'author-enrichment:status';
 
@@ -19,6 +21,8 @@ export class AuthorEnrichmentGateway implements OnGatewayConnection, OnGatewayDi
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
     private readonly queueRepo: AuthorEnrichmentRepository,
+    private readonly appSettings: AppSettingsService,
+    private readonly session: AuthorEnrichmentSessionService,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
@@ -33,8 +37,8 @@ export class AuthorEnrichmentGateway implements OnGatewayConnection, OnGatewayDi
       this.assertCanViewStatus(user);
       (client.data as Record<string, unknown>).user = user;
       this.logger.debug(`WS connected: user=${user.id} socket=${client.id}`);
-      const status = await this.queueRepo.getStatusSummary();
-      client.emit(AUTHOR_ENRICHMENT_STATUS_EVENT, status);
+      const [summary, paused] = await Promise.all([this.queueRepo.getStatusSummary(), this.appSettings.isAuthorEnrichmentPaused()]);
+      client.emit(AUTHOR_ENRICHMENT_STATUS_EVENT, { ...summary, paused, ...this.session.getSnapshot() });
     } catch (err) {
       this.logger.warn(`WS rejected: ${(err as Error).message} socket=${client.id}`);
       client.disconnect();
@@ -45,13 +49,14 @@ export class AuthorEnrichmentGateway implements OnGatewayConnection, OnGatewayDi
     this.logger.debug(`WS disconnected: socket=${client.id}`);
   }
 
-  emitStatus(status: AuthorEnrichmentStatus): void {
+  emitStatus(status: AuthorEnrichmentStatusEvent): void {
     this.server?.emit(AUTHOR_ENRICHMENT_STATUS_EVENT, status);
   }
 
   private assertCanViewStatus(user: RequestUser): void {
     if (user.isSuperuser) return;
     if (user.permissions.includes(Permission.ManageAppSettings)) return;
-    throw new Error('Missing permission: manage_app_settings');
+    if (user.permissions.includes(Permission.ManageMetadataConfig)) return;
+    throw new Error('Missing permission: manage_app_settings or manage_metadata_config');
   }
 }

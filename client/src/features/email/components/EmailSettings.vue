@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ProvidersTab from './ProvidersTab.vue'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import RecipientsTab from './RecipientsTab.vue'
@@ -19,7 +20,40 @@ const { fetchGroups } = useEmailGroups()
 
 type Tab = 'providers' | 'recipients' | 'groups' | 'templates' | 'preferences' | 'history'
 
-const activeTab = ref<Tab>('providers')
+const route = useRoute()
+const router = useRouter()
+
+function normalizeTab(value: unknown): Tab {
+  if (
+    value === 'providers' ||
+    value === 'recipients' ||
+    value === 'groups' ||
+    value === 'templates' ||
+    value === 'preferences' ||
+    value === 'history'
+  )
+    return value
+  return 'providers'
+}
+
+const activeTab = ref<Tab>(normalizeTab(route.query.tab))
+
+if (!route.query.tab) {
+  router.replace({ name: 'settings-email', query: { ...route.query, tab: activeTab.value } })
+}
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    activeTab.value = normalizeTab(value)
+  },
+)
+
+function selectTab(tab: Tab) {
+  activeTab.value = tab
+  router.replace({ name: 'settings-email', query: { ...route.query, tab } })
+}
+
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -60,7 +94,7 @@ onMounted(async () => {
             ? 'border-primary text-foreground'
             : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
         "
-        @click="activeTab = tab.id"
+        @click="selectTab(tab.id)"
       >
         {{ tab.label }}
       </button>

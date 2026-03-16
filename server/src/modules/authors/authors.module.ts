@@ -9,6 +9,7 @@ import { BookModule } from '../book/book.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { AuthorImageStorageService } from './author-image-storage.service';
+import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
@@ -19,6 +20,7 @@ import { AUTHOR_METADATA_PROVIDERS } from './metadata/constants';
 import { AuthorMetadataProviderRegistry } from './metadata/provider-registry';
 import { AudnexusAuthorMetadataProvider } from './metadata/providers/audnexus/audnexus.provider';
 import { AuthorMetadataProvider } from './metadata/providers/author-metadata-provider';
+import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 import { AuthorsRepository } from './authors.repository';
 import { AuthorsService } from './authors.service';
 
@@ -41,6 +43,8 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider];
   ],
   controllers: [AuthorsController],
   providers: [
+    AuthorEnrichmentConfigService,
+    AuthorEnrichmentSessionService,
     ...AUTHOR_PROVIDER_CLASSES,
     {
       provide: AUTHOR_METADATA_PROVIDERS,

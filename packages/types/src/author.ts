@@ -83,6 +83,28 @@ export type AuthorEnrichmentStatus = {
   total: number;
 };
 
+export type AuthorEnrichmentStatusEvent = AuthorEnrichmentStatus & {
+  paused: boolean;
+  sessionTotal: number;
+  sessionDone: number;
+  currentItemName: string | null;
+};
+
+export type AuthorEnrichmentFailedItem = {
+  authorId: number;
+  name: string | null;
+  error: string | null;
+  httpStatus: number | null;
+  failedAt: string;
+};
+
+export type AuthorEnrichmentFailedPage = {
+  items: AuthorEnrichmentFailedItem[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
 export const AuthorAutoEnrichmentWriteMode = {
   MISSING_ONLY: 'missing_only',
   ALWAYS_REFETCH: 'always_refetch',
@@ -90,3 +112,16 @@ export const AuthorAutoEnrichmentWriteMode = {
 
 export type AuthorAutoEnrichmentWriteMode =
   (typeof AuthorAutoEnrichmentWriteMode)[keyof typeof AuthorAutoEnrichmentWriteMode];
+
+export type AuthorEnrichmentConditions = {
+  neverEnriched: boolean;
+  missingBio: boolean;
+  missingPhoto: boolean;
+};
+
+export type AuthorAutoEnrichmentConfig = {
+  enabled: boolean;
+  triggerOnImport: boolean;
+  writeMode: AuthorAutoEnrichmentWriteMode;
+  conditions: AuthorEnrichmentConditions;
+};

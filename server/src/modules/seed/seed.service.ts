@@ -54,12 +54,23 @@ export class SeedService implements OnApplicationBootstrap {
 
     await this.db
       .insert(schema.appSettings)
-      .values({ key: 'authors_auto_enrichment_enabled', value: 'true' })
+      .values({ key: 'authors_auto_enrichment_enabled', value: 'false' })
       .onConflictDoNothing({ target: schema.appSettings.key });
 
     await this.db
       .insert(schema.appSettings)
       .values({ key: 'authors_auto_enrichment_write_mode', value: 'missing_only' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
+    const defaultAuthorEnrichmentConfig = JSON.stringify({
+      enabled: false,
+      triggerOnImport: true,
+      writeMode: 'missing_only',
+      conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
+    });
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'authors_auto_enrichment_config', value: defaultAuthorEnrichmentConfig })
       .onConflictDoNothing({ target: schema.appSettings.key });
 
     await this.db

@@ -1,4 +1,21 @@
-import { Body, Controller, Delete, Get, MessageEvent, Param, ParseIntPipe, Patch, Post, Query, Res, Sse } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  MessageEvent,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  Sse,
+} from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
@@ -9,7 +26,8 @@ import { Permission } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import type { AuthorMetadataCandidate } from '@projectx/types';
+import type { AuthorAutoEnrichmentConfig, AuthorEnrichmentConditions, AuthorMetadataCandidate } from '@projectx/types';
+import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { BulkAuthorIdsDto } from './dto/bulk-author-ids.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
@@ -21,10 +39,17 @@ import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 import { AuthorsService } from './authors.service';
+import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
+import { AuthorEnrichmentRepository } from './author-enrichment.repository';
 
 @Controller('authors')
 export class AuthorsController {
-  constructor(private readonly authorsService: AuthorsService) {}
+  constructor(
+    private readonly authorsService: AuthorsService,
+    private readonly enrichmentOrchestrator: AuthorEnrichmentOrchestratorService,
+    private readonly enrichmentConfig: AuthorEnrichmentConfigService,
+    private readonly queueRepo: AuthorEnrichmentRepository,
+  ) {}
 
   @Get()
   findAll(@CurrentUser() user: RequestUser, @Query() dto: ListAuthorsDto) {
@@ -76,10 +101,76 @@ export class AuthorsController {
     reply.raw.end();
   }
 
+  @Get('enrichment/config')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  getEnrichmentConfig() {
+    return this.enrichmentConfig.getConfig();
+  }
+
+  @Put('enrichment/config')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async setEnrichmentConfig(@Body() config: AuthorAutoEnrichmentConfig) {
+    await this.enrichmentConfig.setConfig(config);
+    return this.enrichmentConfig.getConfig();
+  }
+
+  @Post('enrichment/preview-count')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async previewCount(@Body() body: { conditions: AuthorEnrichmentConditions }) {
+    const count = await this.queueRepo.countEligibleLinkedAuthors(body.conditions);
+    return { count };
+  }
+
   @Post('enrichment/backfill')
-  @RequirePermission(Permission.ManageAppSettings)
-  enqueueBackfill() {
-    return this.authorsService.enqueueBackfill();
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async enqueueBackfill() {
+    const queued = await this.enrichmentOrchestrator.backfillLinkedAuthors();
+    return { queued };
+  }
+
+  @Post('enrichment/backfill-all')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async enqueueBackfillAll() {
+    const queued = await this.enrichmentOrchestrator.backfillAllLinkedAuthors();
+    return { queued };
+  }
+
+  @Post('enrichment/pause')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async pauseEnrichment() {
+    await this.enrichmentOrchestrator.pause();
+    return { paused: true };
+  }
+
+  @Post('enrichment/resume')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async resumeEnrichment() {
+    await this.enrichmentOrchestrator.resume();
+    return { paused: false };
+  }
+
+  @Post('enrichment/cancel')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async cancelEnrichment() {
+    await this.enrichmentOrchestrator.cancelPending();
+    return { cancelled: true };
+  }
+
+  @Post('enrichment/retry-failed')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async retryFailedEnrichment() {
+    const requeued = await this.enrichmentOrchestrator.requeueFailed();
+    return { requeued };
+  }
+
+  @Get('enrichment/failed')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  getFailedEnrichment(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.enrichmentOrchestrator.getFailedItems(page, Math.min(limit, 100));
   }
 
   @Get(':id')

@@ -1,10 +1,11 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, bookMetadata, books } from '../../db/schema';
+import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { fingerprintFile } from '../scanner/lib/hash';
 
@@ -19,6 +20,7 @@ export class UploadProcessorService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly metadataService: MetadataService,
+    @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
   ) {}
 
   async createBookRecord(
@@ -49,6 +51,10 @@ export class UploadProcessorService {
       format,
       role: 'primary',
     });
+
+    this.autoFetchOrchestrator
+      ?.scheduleIfEligible(book.id, libraryId, 'event_import')
+      .catch((err: Error) => this.logger.warn(`book-metadata-fetch schedule failed for book ${book.id}: ${err.message}`));
 
     return { bookId: book.id };
   }

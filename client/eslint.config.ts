@@ -33,7 +33,7 @@ export default defineConfigWithVueTs(
     },
   },
 
-...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
+  ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
   skipFormatting,
 )

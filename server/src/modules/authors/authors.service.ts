@@ -19,6 +19,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { books } from '../../db/schema';
 import { BookRepository } from '../book/book.repository';
 import { LibraryService } from '../library/library.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 import { AuthorImageStorageService } from './author-image-storage.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
@@ -44,6 +45,7 @@ export class AuthorsService {
     private readonly authorsRepo: AuthorsRepository,
     private readonly bookRepo: BookRepository,
     private readonly libraryService: LibraryService,
+    private readonly appSettings: AppSettingsService,
     private readonly authorMetadataFetchService: AuthorMetadataFetchService,
     private readonly authorImageStorage: AuthorImageStorageService,
     private readonly enrichmentExecutor: AuthorEnrichmentExecutorService,
@@ -332,12 +334,6 @@ export class AuthorsService {
     };
   }
 
-  async enqueueBackfill(): Promise<{ queued: number }> {
-    const queued = await this.enrichmentOrchestrator.backfillLinkedAuthors();
-    this.logger.log(`author.enrichment.backfill queued=${queued}`);
-    return { queued };
-  }
-
   async refreshEnrichment(user: RequestUser, authorId: number): Promise<AuthorDetail> {
     await this.assertMutationAccess(user, [authorId]);
 
@@ -510,9 +506,10 @@ export class AuthorsService {
   private async refreshEnrichmentInternal(
     authorId: number,
   ): Promise<{ descriptionUpdated: boolean; imageUpdated: boolean; provider: string | null }> {
+    const writeMode = await this.appSettings.getAuthorsAutoEnrichmentWriteMode();
     const result = await this.enrichmentExecutor.execute({
       authorId,
-      writeMode: 'missing_only',
+      writeMode,
       audnexusEnabled: true,
     });
 

@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773420481905,
-      "tag": "0000_add_metadata_score",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775351329387,
-      "tag": "0001_author_enrichment_queue",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775353187526,
-      "tag": "0002_author_enrichment_single_processing_guard",
+      "when": 1773615413736,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]

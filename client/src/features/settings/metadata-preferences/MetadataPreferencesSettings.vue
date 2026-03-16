@@ -8,8 +8,6 @@ import LibraryPreferencePanel from './components/LibraryPreferencePanel.vue'
 import { useProviderConfig } from './composables/useProviderConfig'
 import { useMetadataPreferences } from './composables/useMetadataPreferences'
 import { Info } from 'lucide-vue-next'
-import SettingsPageHeader from '../SettingsPageHeader.vue'
-import MetadataScoreWeightsSettings from '../MetadataScoreWeightsSettings.vue'
 
 const { config, statuses, saving: savingProviders, fetchConfig, saveConfig } = useProviderConfig()
 const { globalPrefs, libraryPrefs, savingGlobal, savingField, fetchGlobal, saveGlobal, fetchLibrary, saveFieldOverride, resetLibrary } =
@@ -38,15 +36,10 @@ async function onResetLibrary(libraryId: number) {
 </script>
 
 <template>
-  <div class="space-y-10 pb-20">
-    <SettingsPageHeader
-      title="Metadata Preferences"
-      subtitle="Configure how metadata is fetched and merged from different providers. Control priority, merge behavior, and library-specific overrides."
-    />
-
+  <div class="space-y-8">
     <!-- Provider Configuration -->
     <section class="space-y-4">
-      <p class="settings-group-label">Metadata Providers</p>
+      <p class="settings-group-label">External Connections</p>
       <ProviderConfigPanel
         :config="config"
         :statuses="statuses"
@@ -57,16 +50,28 @@ async function onResetLibrary(libraryId: number) {
 
     <!-- Field Preferences -->
     <section class="space-y-6">
-      <div class="space-y-1">
-        <p class="settings-group-label">Field Preferences</p>
-        <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10 max-w-6xl">
-          <Info :size="18" class="text-primary shrink-0 mt-0.5" />
-          <p class="text-sm text-muted-foreground leading-relaxed">
-            Choose which providers to use for each field and in what order (drag to reorder). The merge strategy controls how values are applied:
-            <span class="font-semibold text-foreground">Fill missing</span> only writes when empty,
-            <span class="font-semibold text-foreground">Overwrite if provided</span> writes whenever a provider returns a value, and
-            <span class="font-semibold text-foreground">Always overwrite</span> replaces existing values unconditionally.
-          </p>
+      <div class="space-y-3">
+        <p class="settings-group-label">Field-Level Rules</p>
+        <div class="p-4 rounded-xl bg-primary/5 border border-primary/10 max-w-5xl">
+          <div class="flex items-start gap-3 mb-3">
+            <Info :size="18" class="text-primary shrink-0 mt-0.5" />
+            <p class="text-sm font-medium text-foreground">How Field Rules Work</p>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-xs leading-relaxed text-muted-foreground ml-7">
+            <div>
+              <p class="font-semibold text-foreground mb-1">Priority Order</p>
+              <p>
+                Drag providers in the list to reorder them. The top-most provider that returns a result will be the primary source for that field.
+              </p>
+            </div>
+            <div>
+              <p class="font-semibold text-foreground mb-1">Merge Strategy</p>
+              <ul class="space-y-1">
+                <li><span class="text-foreground">Fill missing:</span> Only write if current value is empty.</li>
+                <li><span class="text-foreground">Overwrite:</span> Replace whenever a provider has data.</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -92,11 +97,6 @@ async function onResetLibrary(libraryId: number) {
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- Metadata Score Weights -->
-    <section class="space-y-4 pt-4 border-t border-border">
-      <MetadataScoreWeightsSettings />
     </section>
   </div>
 </template>

@@ -75,8 +75,13 @@ const router = createRouter({
             {
               path: 'admin/metadata',
               name: 'settings-admin-metadata',
-              component: () => import('@/features/settings/metadata-preferences/MetadataPreferencesSettings.vue'),
-              meta: { maxWidth: 'max-w-5xl' },
+              component: () => import('@/features/settings/MetadataAllSettings.vue'),
+              meta: { maxWidth: 'max-w-7xl' },
+            },
+            {
+              path: 'admin/metadata-auto-fetch',
+              name: 'settings-admin-metadata-auto-fetch',
+              redirect: { name: 'settings-admin-metadata', query: { tab: 'auto-fetch' } },
             },
             {
               path: 'admin/oidc',

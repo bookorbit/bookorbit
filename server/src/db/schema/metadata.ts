@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { customType, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { boolean, customType, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
@@ -28,7 +28,7 @@ export const bookMetadata = pgTable(
     isbn13: varchar('isbn13', { length: 13 }),
     publisher: varchar('publisher', { length: 500 }),
     publishedYear: integer('published_year'),
-    language: varchar('language', { length: 10 }),
+    language: varchar('language', { length: 100 }),
     pageCount: integer('page_count'),
     seriesName: varchar('series_name', { length: 500 }),
     seriesIndex: real('series_index'),
@@ -41,6 +41,7 @@ export const bookMetadata = pgTable(
     openLibraryId: varchar('open_library_id', { length: 50 }),
     itunesId: varchar('itunes_id', { length: 50 }),
     metadataScore: integer('metadata_score'),
+    lastMetadataFetchAt: timestamp('last_metadata_fetch_at'),
     embedding: embedding256('embedding'),
     lastWrittenAt: timestamp('last_written_at'),
     updatedAt: timestamp('updated_at')
@@ -63,6 +64,8 @@ export const authors = pgTable(
     name: varchar('name', { length: 500 }).notNull(),
     sortName: varchar('sort_name', { length: 500 }),
     description: text('description'),
+    hasPhoto: boolean('has_photo').notNull().default(false),
+    lastEnrichedAt: timestamp('last_enriched_at'),
   },
   (t) => [index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
 );
@@ -160,3 +163,27 @@ export type NewTag = typeof tags.$inferInsert;
 
 export type AuthorEnrichmentQueue = typeof authorEnrichmentQueue.$inferSelect;
 export type NewAuthorEnrichmentQueue = typeof authorEnrichmentQueue.$inferInsert;
+
+export const bookMetadataFetchQueue = pgTable(
+  'book_metadata_fetch_queue',
+  {
+    bookId: integer('book_id')
+      .primaryKey()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 20 }).notNull().default('queued'),
+    reason: varchar('reason', { length: 50 }).notNull().default('manual_trigger'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    lastAttemptAt: timestamp('last_attempt_at'),
+    lastError: text('last_error'),
+    lastHttpStatus: integer('last_http_status'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [index('bmfq_status_idx').on(t.status), index('bmfq_created_at_idx').on(t.createdAt)],
+);
+
+export type BookMetadataFetchQueue = typeof bookMetadataFetchQueue.$inferSelect;
+export type NewBookMetadataFetchQueue = typeof bookMetadataFetchQueue.$inferInsert;
