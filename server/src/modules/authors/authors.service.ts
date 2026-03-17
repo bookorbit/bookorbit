@@ -65,6 +65,8 @@ export class AuthorsService {
       sort: dto.sort ?? 'name',
       order: dto.order ?? 'asc',
       libraryIds,
+      hasPhoto: dto.hasPhoto,
+      minBookCount: dto.minBookCount,
     });
 
     const mapped = page.items.map((item) => this.mapAuthorSummary(item));

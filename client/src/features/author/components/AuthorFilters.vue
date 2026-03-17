@@ -1,43 +1,37 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import type { LibraryFilterOption } from '../types/author'
 
-import type { AuthorListSort, LibraryFilterOption, SortDirection } from '../types/author'
-
-const props = defineProps<{
-  search: string
-  sort: AuthorListSort
-  order: SortDirection
+defineProps<{
   libraryId: number | null
   libraries: LibraryFilterOption[]
+  hasPhoto: boolean | null
+  minBookCount: number | null
   activeCount?: number
 }>()
 
 const emit = defineEmits<{
-  'update:search': [value: string]
-  'update:sort': [value: AuthorListSort]
-  'update:order': [value: SortDirection]
   'update:libraryId': [value: number | null]
+  'update:hasPhoto': [value: boolean | null]
+  'update:minBookCount': [value: number | null]
   clear: []
 }>()
-
-const searchModel = computed({
-  get: () => props.search,
-  set: (value: string) => emit('update:search', value),
-})
-
-const sortModel = computed({
-  get: () => props.sort,
-  set: (value: AuthorListSort) => emit('update:sort', value),
-})
-
-const orderModel = computed({
-  get: () => props.order,
-  set: (value: SortDirection) => emit('update:order', value),
-})
 
 function onLibraryChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   emit('update:libraryId', value ? Number(value) : null)
+}
+
+function onHasPhotoChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (value === 'true') emit('update:hasPhoto', true)
+  else if (value === 'false') emit('update:hasPhoto', false)
+  else emit('update:hasPhoto', null)
+}
+
+function onMinBookCountChange(event: Event) {
+  const raw = (event.target as HTMLInputElement).value
+  const num = parseInt(raw, 10)
+  emit('update:minBookCount', Number.isInteger(num) && num >= 1 ? num : null)
 }
 </script>
 
@@ -54,40 +48,36 @@ function onLibraryChange(event: Event) {
       </button>
     </div>
 
-    <div class="flex flex-col gap-2.5 md:flex-row md:items-center">
-      <input
-        v-model="searchModel"
-        type="search"
-        placeholder="Search authors"
-        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60 md:max-w-sm"
-      />
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        :value="libraryId ?? ''"
+        class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+        @change="onLibraryChange"
+      >
+        <option value="">All Libraries</option>
+        <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+      </select>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <select
-          v-model="sortModel"
-          class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-        >
-          <option value="name">Name</option>
-          <option value="bookCount">Book Count</option>
-          <option value="lastAddedAt">Recent Additions</option>
-        </select>
+      <select
+        :value="hasPhoto === true ? 'true' : hasPhoto === false ? 'false' : ''"
+        class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+        @change="onHasPhotoChange"
+      >
+        <option value="">All authors</option>
+        <option value="true">Has photo</option>
+        <option value="false">Missing photo</option>
+      </select>
 
-        <select
-          v-model="orderModel"
-          class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-        >
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
-        </select>
-
-        <select
-          :value="libraryId ?? ''"
-          class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-          @change="onLibraryChange"
-        >
-          <option value="">All Libraries</option>
-          <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-        </select>
+      <div class="flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-2.5">
+        <span class="text-sm text-muted-foreground">Min books</span>
+        <input
+          type="number"
+          :value="minBookCount ?? ''"
+          min="1"
+          placeholder="Any"
+          class="w-14 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+          @change="onMinBookCountChange"
+        />
       </div>
     </div>
   </section>

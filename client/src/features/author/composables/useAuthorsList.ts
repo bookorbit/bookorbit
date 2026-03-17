@@ -16,6 +16,8 @@ export function useAuthorsList() {
   const sort = ref<AuthorListSort>('name')
   const order = ref<SortDirection>('asc')
   const libraryId = ref<number | null>(null)
+  const hasPhoto = ref<boolean | null>(null)
+  const minBookCount = ref<number | null>(null)
 
   const page = ref(0)
   const hasMore = computed(() => items.value.length < total.value)
@@ -40,6 +42,8 @@ export function useAuthorsList() {
         sort: sort.value,
         order: order.value,
         libraryId: libraryId.value,
+        hasPhoto: hasPhoto.value,
+        minBookCount: minBookCount.value,
       })
 
       items.value = reset ? data.items : [...items.value, ...data.items]
@@ -62,6 +66,8 @@ export function useAuthorsList() {
     sort,
     order,
     libraryId,
+    hasPhoto,
+    minBookCount,
     load,
   }
 }

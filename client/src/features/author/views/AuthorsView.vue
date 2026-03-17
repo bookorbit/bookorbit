@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CheckCheck, ChevronsUpDown, Filter, RefreshCcw, Search, Trash2, X } from 'lucide-vue-next'
+import { ArrowUpDown, CheckCheck, ChevronsUpDown, Filter, RefreshCcw, Search, Trash2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -31,7 +32,7 @@ const route = useRoute()
 const { gridGap, viewMode, authorCoverSize, authorCoverShape } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
 const { hasPermission, isSuperuser } = usePermissions()
-const { items, total, loading, error, hasMore, q, sort, order, libraryId, load } = useAuthorsList()
+const { items, total, loading, error, hasMore, q, sort, order, libraryId, hasPhoto, minBookCount, load } = useAuthorsList()
 const { insights, loading: loadingInsights, error: insightsError, load: loadInsights } = useAuthorInsights()
 const { suggestions, loading: loadingSuggestions, error: suggestionsError, load: loadSuggestions } = useDuplicateSuggestions()
 const { markRefreshing, clearRefreshing, isRefreshing } = useRefreshingAuthors()
@@ -65,12 +66,24 @@ const quickMergeDialogOpen = ref(false)
 const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata'))
 const canDeleteAuthors = computed(() => isSuperuser.value)
 
+const SORT_LABELS: Record<AuthorListSort, string> = {
+  name: 'Name',
+  sortName: 'Sort Name',
+  bookCount: 'Book Count',
+  lastAddedAt: 'Recent Additions',
+  lastEnrichedAt: 'Last Enriched',
+}
+
+const isDefaultSort = computed(() => sort.value === 'name' && order.value === 'asc')
+
+const sortSummary = computed(() => `${SORT_LABELS[sort.value]} ${order.value === 'asc' ? '↑' : '↓'}`)
+
 const activeFilterCount = computed(() => {
   let count = 0
   if (q.value.trim()) count += 1
-  if (sort.value !== 'name') count += 1
-  if (order.value !== 'asc') count += 1
   if (libraryId.value !== null) count += 1
+  if (hasPhoto.value !== null) count += 1
+  if (minBookCount.value !== null) count += 1
   return count
 })
 
@@ -113,7 +126,7 @@ function showRefreshResultToast(updated: { imageUrl?: string | null }) {
 }
 
 function parseSort(value: unknown): AuthorListSort {
-  return value === 'bookCount' || value === 'lastAddedAt' || value === 'name' ? value : 'name'
+  return value === 'sortName' || value === 'bookCount' || value === 'lastAddedAt' || value === 'lastEnrichedAt' || value === 'name' ? value : 'name'
 }
 
 function parseOrder(value: unknown): SortDirection {
@@ -125,6 +138,17 @@ function parseLibraryId(value: unknown): number | null {
   return Number.isInteger(raw) && raw > 0 ? raw : null
 }
 
+function parseHasPhoto(value: unknown): boolean | null {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return null
+}
+
+function parseMinBookCount(value: unknown): number | null {
+  const raw = typeof value === 'string' ? parseInt(value, 10) : NaN
+  return Number.isInteger(raw) && raw >= 1 ? raw : null
+}
+
 function syncRouteQuery() {
   void router.replace({
     name: 'authors',
@@ -133,12 +157,28 @@ function syncRouteQuery() {
       sort: sort.value !== 'name' ? sort.value : undefined,
       order: order.value !== 'asc' ? order.value : undefined,
       libraryId: libraryId.value ? String(libraryId.value) : undefined,
+      hasPhoto: hasPhoto.value !== null ? String(hasPhoto.value) : undefined,
+      minBookCount: minBookCount.value !== null ? String(minBookCount.value) : undefined,
     },
   })
 }
 
 function openAuthor(authorId: number) {
   void router.push({ name: 'author-detail', params: { id: authorId }, query: { from: route.fullPath } })
+}
+
+function setSortField(field: AuthorListSort) {
+  sort.value = field
+  order.value = 'asc'
+}
+
+function setSortOrder(dir: SortDirection) {
+  order.value = dir
+}
+
+function resetSort() {
+  sort.value = 'name'
+  order.value = 'asc'
 }
 
 function handleAuthorSelect(authorId: number, event: MouseEvent) {
@@ -174,6 +214,8 @@ async function clearFilters() {
   sort.value = 'name'
   order.value = 'asc'
   libraryId.value = null
+  hasPhoto.value = null
+  minBookCount.value = null
 
   syncRouteQuery()
   await load(true)
@@ -350,6 +392,8 @@ onMounted(async () => {
   sort.value = parseSort(route.query.sort)
   order.value = parseOrder(route.query.order)
   libraryId.value = parseLibraryId(route.query.libraryId)
+  hasPhoto.value = parseHasPhoto(route.query.hasPhoto)
+  minBookCount.value = parseMinBookCount(route.query.minBookCount)
 
   await fetchLibraries()
   hydrating.value = false
@@ -376,7 +420,7 @@ onUnmounted(() => {
   if (searchTimer) clearTimeout(searchTimer)
 })
 
-watch([sort, order, libraryId], () => {
+watch([sort, order, libraryId, hasPhoto, minBookCount], () => {
   if (hydrating.value || suppressAutoReload.value) return
   if (selectionMode.value) exitSelectionMode()
   syncRouteQuery()
@@ -448,6 +492,61 @@ watch(
 
       <div class="h-5 w-px shrink-0 bg-border" />
 
+      <div class="flex items-center gap-1">
+        <Popover>
+          <PopoverTrigger as-child>
+            <button
+              class="flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
+              :class="
+                !isDefaultSort
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+              "
+            >
+              <ArrowUpDown :size="13" />
+              <span class="hidden lg:inline">{{ sortSummary }}</span>
+              <span class="lg:hidden">Sort</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" class="w-56 p-2">
+            <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">Sort by</div>
+            <div class="flex flex-col gap-0.5">
+              <button
+                v-for="field in ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt'] as const"
+                :key="field"
+                class="flex items-center justify-between rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+                :class="sort === field ? 'text-foreground font-medium' : 'text-muted-foreground'"
+                @click="setSortField(field)"
+              >
+                {{ SORT_LABELS[field] }}
+                <span v-if="sort === field" class="text-xs text-primary">{{ order === 'asc' ? '↑' : '↓' }}</span>
+              </button>
+            </div>
+            <div class="my-2 border-t border-border" />
+            <div class="flex gap-1">
+              <button
+                v-for="dir in ['asc', 'desc'] as const"
+                :key="dir"
+                class="flex-1 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+                :class="order === dir ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'"
+                @click="setSortOrder(dir)"
+              >
+                {{ dir === 'asc' ? 'Ascending' : 'Descending' }}
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
+        <button
+          v-if="!isDefaultSort"
+          class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive hover:bg-muted"
+          @click="resetSort"
+        >
+          <X :size="13" />
+        </button>
+      </div>
+
+      <div class="h-5 w-px shrink-0 bg-border" />
+
       <button
         @click="filtersOpen = !filtersOpen"
         class="flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
@@ -463,7 +562,7 @@ watch(
       </button>
 
       <button
-        v-if="activeFilterCount > 0"
+        v-if="activeFilterCount > 0 || !isDefaultSort"
         @click="clearFilters"
         class="flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
       >
@@ -494,10 +593,9 @@ watch(
   <main class="flex-none pr-2">
     <AuthorFilters
       v-if="filtersOpen"
-      v-model:search="q"
-      v-model:sort="sort"
-      v-model:order="order"
       v-model:library-id="libraryId"
+      v-model:has-photo="hasPhoto"
+      v-model:min-book-count="minBookCount"
       :active-count="activeFilterCount"
       :libraries="libraries.map((library) => ({ id: library.id, name: library.name }))"
       @clear="clearFilters"

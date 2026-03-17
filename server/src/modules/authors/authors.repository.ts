@@ -54,43 +54,71 @@ export class AuthorsRepository {
     sort: AuthorListSort;
     order: SortDirection;
     libraryIds: number[];
+    hasPhoto?: boolean;
+    minBookCount?: number;
   }): Promise<{ items: AuthorSummaryRow[]; total: number; page: number; size: number }> {
-    const where = this.buildAuthorWhere({ q: params.q, libraryIds: params.libraryIds });
+    const where = this.buildAuthorWhere({ q: params.q, libraryIds: params.libraryIds, hasPhoto: params.hasPhoto });
     const bookCountExpr = sql<number>`count(distinct ${books.id})`;
     const lastAddedExpr = max(books.addedAt);
+
+    const sortNameExpr = sql`COALESCE(${authors.sortName}, ${authors.name})`;
 
     const orderBy =
       params.sort === 'bookCount'
         ? this.orderByDirection(bookCountExpr, params.order)
         : params.sort === 'lastAddedAt'
           ? this.orderByDirection(lastAddedExpr, params.order)
-          : this.orderByDirection(authors.sortName, params.order);
+          : params.sort === 'lastEnrichedAt'
+            ? sql`${authors.lastEnrichedAt} ${sql.raw(params.order.toUpperCase())} NULLS LAST`
+            : params.sort === 'sortName'
+              ? sql`${sortNameExpr} ${sql.raw(params.order.toUpperCase())}`
+              : sql`${authors.name} ${sql.raw(params.order.toUpperCase())}`;
 
-    const [items, [{ total }]] = await Promise.all([
-      this.db
-        .select({
-          id: authors.id,
-          name: authors.name,
-          sortName: authors.sortName,
-          description: authors.description,
-          bookCount: sql<number>`count(distinct ${books.id})::int`,
-          lastAddedAt: lastAddedExpr,
-        })
-        .from(authors)
-        .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-        .innerJoin(books, eq(books.id, bookAuthors.bookId))
-        .where(where)
-        .groupBy(authors.id, authors.name, authors.sortName, authors.description)
-        .orderBy(orderBy, asc(authors.sortName), asc(authors.name))
-        .limit(params.size)
-        .offset(params.page * params.size),
-      this.db
-        .select({ total: sql<number>`count(distinct ${authors.id})::int` })
-        .from(authors)
-        .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-        .innerJoin(books, eq(books.id, bookAuthors.bookId))
-        .where(where),
-    ]);
+    const having = params.minBookCount !== undefined ? sql`count(distinct ${books.id}) >= ${params.minBookCount}` : undefined;
+
+    const dataQuery = this.db
+      .select({
+        id: authors.id,
+        name: authors.name,
+        sortName: authors.sortName,
+        description: authors.description,
+        bookCount: sql<number>`count(distinct ${books.id})::int`,
+        lastAddedAt: lastAddedExpr,
+      })
+      .from(authors)
+      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
+      .innerJoin(books, eq(books.id, bookAuthors.bookId))
+      .where(where)
+      .groupBy(authors.id, authors.name, authors.sortName, authors.description)
+      .having(having)
+      .orderBy(orderBy, sql`${sortNameExpr} ASC`, asc(authors.name))
+      .limit(params.size)
+      .offset(params.page * params.size);
+
+    // When minBookCount is set, HAVING must be applied per-author before counting,
+    // which requires a subquery. For the common case, use the cheaper scalar count.
+    const countQuery = having
+      ? this.db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(
+            this.db
+              .select({ id: authors.id })
+              .from(authors)
+              .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
+              .innerJoin(books, eq(books.id, bookAuthors.bookId))
+              .where(where)
+              .groupBy(authors.id)
+              .having(having)
+              .as('filtered_authors'),
+          )
+      : this.db
+          .select({ total: sql<number>`count(distinct ${authors.id})::int` })
+          .from(authors)
+          .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
+          .innerJoin(books, eq(books.id, bookAuthors.bookId))
+          .where(where);
+
+    const [items, [{ total }]] = await Promise.all([dataQuery, countQuery]);
 
     return { items, total: Number(total), page: params.page, size: params.size };
   }
@@ -367,11 +395,14 @@ export class AuthorsRepository {
     });
   }
 
-  private buildAuthorWhere(params: { q?: string; libraryIds: number[] }): SQL {
+  private buildAuthorWhere(params: { q?: string; libraryIds: number[]; hasPhoto?: boolean }): SQL {
     const clauses: SQL[] = [inArray(books.libraryId, params.libraryIds)];
     const query = params.q?.trim();
     if (query) {
       clauses.push(ilike(authors.name, `%${query}%`));
+    }
+    if (params.hasPhoto !== undefined) {
+      clauses.push(eq(authors.hasPhoto, params.hasPhoto));
     }
     return and(...clauses)!;
   }

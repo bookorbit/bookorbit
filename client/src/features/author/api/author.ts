@@ -18,6 +18,8 @@ type ListAuthorsParams = {
   sort: AuthorListSort
   order: SortDirection
   libraryId?: number | null
+  hasPhoto?: boolean | null
+  minBookCount?: number | null
 }
 
 type ListAuthorBooksParams = {
@@ -100,6 +102,8 @@ export async function fetchAuthors(params: ListAuthorsParams): Promise<AuthorsPa
     sort: params.sort,
     order: params.order,
     libraryId: params.libraryId ?? undefined,
+    hasPhoto: params.hasPhoto != null ? String(params.hasPhoto) : undefined,
+    minBookCount: params.minBookCount ?? undefined,
   })
 
   const res = await api(`/api/v1/authors${query}`)
