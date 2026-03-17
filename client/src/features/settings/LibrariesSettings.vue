@@ -52,7 +52,7 @@ async function confirmSyncFiles() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
     if (msg.includes('400')) {
-      toast.error('Metadata file write is not enabled. Turn it on in Operations settings.')
+      toast.error('Metadata file write is not enabled. Turn it on in Maintenance settings.')
     } else {
       toast.error(`File sync failed for "${lib.name}"`)
     }

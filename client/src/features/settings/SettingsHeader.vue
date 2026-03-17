@@ -25,7 +25,7 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
   }
   if (su || perms.includes('manage_app_settings')) {
-    result.push({ label: 'Operations', routeName: 'settings-admin-maintenance' })
+    result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
   }
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'Staging', routeName: 'settings-admin-staging' })

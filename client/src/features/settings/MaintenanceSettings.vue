@@ -31,7 +31,7 @@ onMounted(() => {})
 </script>
 
 <template>
-  <SettingsPageHeader title="Operations" subtitle="Background jobs and data operations." />
+  <SettingsPageHeader title="Maintenance" subtitle="Manage background tasks, system indices, and maintenance operations." />
 
   <div>
     <p class="settings-group-label">Recommendations</p>
@@ -42,9 +42,9 @@ onMounted(() => {})
             <Sparkles :size="16" class="text-primary" />
           </div>
           <div>
-            <p class="settings-label">Rebuild recommendation embeddings</p>
+            <p class="settings-label">Refresh recommendation index</p>
             <p class="settings-hint leading-relaxed max-w-sm">
-              Generates vector embeddings for all books. Run this after a large import or if recommendations seem off. Processes in the background.
+              Update the recommendations engine with your latest library changes. This process runs in the background.
             </p>
             <p v-if="queued !== null" class="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 mt-2">
               <Check :size="12" />
