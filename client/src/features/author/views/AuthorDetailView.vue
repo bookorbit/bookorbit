@@ -5,7 +5,7 @@ import { ChevronLeft } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 import type { AuthorSummary, BookCard } from '@projectx/types'
-import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
+import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -242,7 +242,7 @@ onMounted(async () => {
 
   observer = new IntersectionObserver(
     (entries) => {
-      if (entries[0]?.isIntersecting && !loadingBooks.value) {
+      if (entries[0]?.isIntersecting && !loadingBooks.value && hasMore.value) {
         void loadBooks()
       }
     },
@@ -290,7 +290,7 @@ watch(authorName, () => {
 </script>
 
 <template>
-  <main class="flex-none pr-2">
+  <main class="flex min-h-full flex-col pr-2">
     <div class="mb-3 mt-2 mr-4 flex items-center gap-2 px-1">
       <button
         class="inline-flex h-8 items-center gap-1 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -431,15 +431,15 @@ watch(authorName, () => {
         <p class="text-xs text-muted-foreground">Try changing sort/order or selecting another library.</p>
       </div>
 
-      <div
-        v-show="viewMode === 'grid' && books.length > 0"
-        class="grid"
-        :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
-      >
-        <BookCoverCard v-for="book in books" :key="book.id" :book="book" />
-      </div>
+      <VirtualBookGrid
+        v-if="viewMode === 'grid' && books.length > 0"
+        :books="books"
+        :cover-size="coverSize"
+        :grid-gap="gridGap"
+        @action="handleBookAction"
+      />
 
-      <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+      <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
         <BookListRow v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
       </div>
 

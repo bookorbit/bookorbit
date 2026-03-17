@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Pencil } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
+import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
@@ -129,7 +129,7 @@ onMounted(async () => {
   load(true)
   observer = new IntersectionObserver(
     (entries) => {
-      if (entries[0]?.isIntersecting && !loading.value) load()
+      if (entries[0]?.isIntersecting && !loading.value && hasMore.value) load()
     },
     { rootMargin: '300px' },
   )
@@ -142,7 +142,7 @@ watch(collectionId, () => load(true))
 watch(
   loading,
   (isLoading) => {
-    if (!isLoading && sentinel.value) {
+    if (!isLoading && hasMore.value && sentinel.value) {
       const rect = sentinel.value.getBoundingClientRect()
       if (rect.top < window.innerHeight + 300) load()
     }
@@ -184,72 +184,69 @@ watch(
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 
-  <ViewHeader
-    :title="collection?.name ?? 'Collection'"
-    :icon="collection?.icon || 'FolderOpen'"
-    :total="total"
-    v-model:coverSize="coverSize"
-    v-model:gridGap="gridGap"
-    v-model:viewMode="viewMode"
-    :selection-mode="selectionMode"
-    @toggle-selection="toggleSelectionMode"
-  >
-    <template #toolbar>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button
-            v-if="collection"
-            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            @click="editCollectionOpen = true"
-          >
-            <Pencil :size="14" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>Edit collection</TooltipContent>
-      </Tooltip>
-    </template>
-  </ViewHeader>
-
-  <main class="flex-none pr-2">
-    <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
-      <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-        <FolderOpen :size="28" class="text-muted-foreground/50" />
-      </div>
-      <p class="text-sm font-medium text-foreground">No books in this collection</p>
-      <p class="text-xs text-muted-foreground">Select books from your library and add them here.</p>
-    </div>
-
-    <div
-      v-show="viewMode === 'grid' && books.length > 0"
-      class="grid"
-      :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverSize}px, 1fr))`, gap: `${gridGap}px` }"
+  <section class="flex min-h-full flex-col">
+    <ViewHeader
+      :title="collection?.name ?? 'Collection'"
+      :icon="collection?.icon || 'FolderOpen'"
+      :total="total"
+      v-model:coverSize="coverSize"
+      v-model:gridGap="gridGap"
+      v-model:viewMode="viewMode"
+      :selection-mode="selectionMode"
+      @toggle-selection="toggleSelectionMode"
     >
-      <BookCoverCard
-        v-for="book in books"
-        :key="book.id"
-        :book="book"
-        :selection-mode="selectionMode"
-        :selected="isSelected(book.id)"
-        @action="handleBookAction(book, $event)"
-        @select="handleSelect(book.id, $event)"
-      />
-    </div>
+      <template #toolbar>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              v-if="collection"
+              class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="editCollectionOpen = true"
+            >
+              <Pencil :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Edit collection</TooltipContent>
+        </Tooltip>
+      </template>
+    </ViewHeader>
 
-    <div v-show="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-      <BookListRow
-        v-for="book in books"
-        :key="book.id"
-        :book="book"
-        :selection-mode="selectionMode"
-        :selected="isSelected(book.id)"
-        @action="handleBookAction(book, $event)"
-        @select="handleSelect(book.id, $event)"
-      />
-    </div>
+    <main class="flex-1 min-h-0">
+      <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+        <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+          <FolderOpen :size="28" class="text-muted-foreground/50" />
+        </div>
+        <p class="text-sm font-medium text-foreground">No books in this collection</p>
+        <p class="text-xs text-muted-foreground">Select books from your library and add them here.</p>
+      </div>
 
-    <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-      <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-      <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
-    </div>
-  </main>
+      <VirtualBookGrid
+        v-if="viewMode === 'grid' && books.length > 0"
+        :books="books"
+        :cover-size="coverSize"
+        :grid-gap="gridGap"
+        :selection-mode="selectionMode"
+        :is-selected="isSelected"
+        @action="handleBookAction"
+        @select="handleSelect"
+      />
+
+      <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <BookListRow
+          v-for="book in books"
+          :key="book.id"
+          :book="book"
+          :selection-mode="selectionMode"
+          :selected="isSelected(book.id)"
+          @action="handleBookAction(book, $event)"
+          @select="handleSelect(book.id, $event)"
+        />
+      </div>
+
+      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+        <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+      </div>
+    </main>
+  </section>
 </template>

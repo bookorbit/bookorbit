@@ -42,9 +42,7 @@ function getIconComponent(name: string) {
 </script>
 
 <template>
-  <div
-    class="flex h-10 shrink-0 items-center gap-2 p-2 mr-4 mt-2 ml-0 mb-2 sticky top-0 z-20 transition-all duration-300 bg-background/80 backdrop-blur-md"
-  >
+  <div class="sticky top-0 z-20 mb-2 mt-2 flex h-10 shrink-0 items-center gap-2 p-2 transition-all duration-300 bg-background/80 backdrop-blur-md">
     <!-- Left: optional icon + title + count -->
     <div class="flex items-center gap-2 flex-1 min-w-0">
       <component v-if="icon" :is="getIconComponent(icon)" :size="16" class="shrink-0 text-muted-foreground/90" />
