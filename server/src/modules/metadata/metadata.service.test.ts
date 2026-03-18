@@ -283,7 +283,11 @@ describe('MetadataService', () => {
         return {
           values: (row: { name: string; sortName: string | null }) => {
             insertedAuthors.push(row);
-            return { returning: () => Promise.resolve([{ id: 81 }]) };
+            return {
+              onConflictDoNothing: () => ({
+                returning: () => Promise.resolve([{ id: 81 }]),
+              }),
+            };
           },
         };
       }
@@ -306,7 +310,7 @@ describe('MetadataService', () => {
 
     expect(db.delete).toHaveBeenCalledWith(bookAuthors);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
-    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(db.select).not.toHaveBeenCalled();
     expect(insertedAuthors).toEqual([{ name: 'Alice', sortName: null }]);
     expect(insertedBookAuthors).toEqual([{ bookId: 5, authorId: 81, displayOrder: 0 }]);
   });
@@ -319,6 +323,7 @@ describe('MetadataService', () => {
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
+    const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
     const insertedBookAuthors: Array<{ bookId: number; authorId: number; displayOrder: number }> = [];
 
     db.select.mockImplementation(() => ({
@@ -329,6 +334,18 @@ describe('MetadataService', () => {
       }),
     }));
     db.insert.mockImplementation((table: unknown) => {
+      if (table === authors) {
+        return {
+          values: (row: { name: string; sortName: string | null }) => {
+            insertedAuthors.push(row);
+            return {
+              onConflictDoNothing: () => ({
+                returning: () => Promise.resolve([]),
+              }),
+            };
+          },
+        };
+      }
       if (table === bookAuthors) {
         return {
           values: (row: { bookId: number; authorId: number; displayOrder: number }) => {
@@ -337,14 +354,12 @@ describe('MetadataService', () => {
           },
         };
       }
-      if (table === authors) {
-        throw new Error('should not insert existing author');
-      }
       throw new Error('unexpected table in insert');
     });
 
     await service.replaceAuthors(6, [{ name: 'Known Author', sortName: null }]);
 
+    expect(insertedAuthors).toEqual([{ name: 'Known Author', sortName: null }]);
     expect(insertedBookAuthors).toEqual([{ bookId: 6, authorId: 9, displayOrder: 0 }]);
   });
 
@@ -370,7 +385,9 @@ describe('MetadataService', () => {
       if (table === authors) {
         return {
           values: () => ({
-            returning: () => Promise.resolve([{ id: 81 }]),
+            onConflictDoNothing: () => ({
+              returning: () => Promise.resolve([{ id: 81 }]),
+            }),
           }),
         };
       }
