@@ -117,6 +117,11 @@ const router = createRouter({
           component: () => import('@/views/StagingView.vue'),
         },
         {
+          path: '/statistics',
+          name: 'statistics',
+          component: () => import('@/features/statistics/components/StatisticsPage.vue'),
+        },
+        {
           path: '/library/:id',
           name: 'library',
           component: () => import('@/views/HomeView.vue'),

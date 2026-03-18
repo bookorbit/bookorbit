@@ -20,3 +20,4 @@ export * from "./epub";
 export * from "./author";
 export * from "./metadata-score";
 export * from "./book-metadata-fetch";
+export * from "./statistics";

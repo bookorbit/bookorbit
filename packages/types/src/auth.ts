@@ -1,5 +1,6 @@
 export interface UserSettings {
   syncReaderPreferences?: boolean;
+  statisticsConfig?: import('./statistics').StatisticsSettings;
 }
 
 export interface AuthUser {

@@ -52,11 +52,25 @@
   --sidebar-border: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --sidebar-ring: oklch(0.65 var(--tint-c-surface) var(--tint-h));
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --chart-1: oklch(0.62 0.16 var(--tint-h));
+  --chart-2: oklch(0.6 0.15 calc(var(--tint-h) + 72));
+  --chart-3: oklch(0.58 0.14 calc(var(--tint-h) + 144));
+  --chart-4: oklch(0.64 0.15 calc(var(--tint-h) + 216));
+  --chart-5: oklch(0.62 0.16 calc(var(--tint-h) + 288));
+  --chart-6: oklch(0.44 0.14 calc(var(--tint-h) + 36));
+  --chart-7: oklch(0.42 0.13 calc(var(--tint-h) + 108));
+  --chart-8: oklch(0.4 0.12 calc(var(--tint-h) + 180));
+  --chart-9: oklch(0.46 0.13 calc(var(--tint-h) + 252));
+  --chart-10: oklch(0.43 0.14 calc(var(--tint-h) + 324));
+  --chart-icon-1: oklch(0.58 0.17 var(--tint-h));
+  --chart-icon-2: oklch(0.58 0.17 calc(var(--tint-h) + 45));
+  --chart-icon-3: oklch(0.58 0.17 calc(var(--tint-h) + 90));
+  --chart-icon-4: oklch(0.58 0.17 calc(var(--tint-h) + 135));
+  --chart-icon-5: oklch(0.58 0.17 calc(var(--tint-h) + 180));
+  --chart-icon-6: oklch(0.58 0.17 calc(var(--tint-h) + 225));
+  --chart-icon-7: oklch(0.58 0.17 calc(var(--tint-h) + 270));
+  --chart-icon-8: oklch(0.58 0.17 calc(var(--tint-h) + 315));
+  --chart-icon-9: oklch(0.58 0.17 calc(var(--tint-h) + 337));
 
   /* Elevation surfaces */
   --surface-1: oklch(0.975 var(--tint-c-surface) var(--tint-h));
@@ -120,11 +134,24 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.52 0.008 var(--tint-h));
 
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --chart-1: oklch(0.7 0.16 var(--tint-h));
+  --chart-2: oklch(0.68 0.15 calc(var(--tint-h) + 72));
+  --chart-3: oklch(0.66 0.14 calc(var(--tint-h) + 144));
+  --chart-4: oklch(0.72 0.15 calc(var(--tint-h) + 216));
+  --chart-5: oklch(0.7 0.16 calc(var(--tint-h) + 288));
+  --chart-6: oklch(0.52 0.14 calc(var(--tint-h) + 36));
+  --chart-7: oklch(0.5 0.13 calc(var(--tint-h) + 108));
+  --chart-8: oklch(0.48 0.12 calc(var(--tint-h) + 180));
+  --chart-9: oklch(0.54 0.13 calc(var(--tint-h) + 252));
+  --chart-10: oklch(0.51 0.14 calc(var(--tint-h) + 324));
+  --chart-icon-1: oklch(0.7 0.17 var(--tint-h));
+  --chart-icon-2: oklch(0.7 0.17 calc(var(--tint-h) + 45));
+  --chart-icon-3: oklch(0.7 0.17 calc(var(--tint-h) + 90));
+  --chart-icon-4: oklch(0.7 0.17 calc(var(--tint-h) + 135));
+  --chart-icon-5: oklch(0.7 0.17 calc(var(--tint-h) + 180));
+  --chart-icon-6: oklch(0.7 0.17 calc(var(--tint-h) + 225));
+  --chart-icon-7: oklch(0.7 0.17 calc(var(--tint-h) + 270));
+  --chart-icon-8: oklch(0.7 0.17 calc(var(--tint-h) + 315));
 
   /* Elevation surfaces */
   --surface-1: oklch(calc(0.205 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));

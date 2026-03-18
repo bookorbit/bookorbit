@@ -86,6 +86,7 @@ const {
 
 const isDashboardActive = computed(() => route.name === 'dashboard')
 const isStagingActive = computed(() => route.name === 'staging')
+const isStatisticsActive = computed(() => route.name === 'statistics')
 const isAuthorsActive = computed(() => route.name === 'authors' || route.name === 'author-detail')
 
 const activeLibraryId = computed(() => {
@@ -221,6 +222,13 @@ onUnmounted(() => stopUploadCompletedListener())
               :icon="Icons.Users"
               label="Authors"
               @click="router.push({ name: 'authors' })"
+            />
+            <SidebarNavItem
+              :is-active="isStatisticsActive"
+              tooltip="Statistics"
+              :icon="Icons.BarChart3"
+              label="Statistics"
+              @click="router.push({ name: 'statistics' })"
             />
           </SidebarMenu>
         </SidebarGroupContent>

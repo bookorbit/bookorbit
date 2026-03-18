@@ -44,6 +44,7 @@ import { UserModule } from './modules/user/user.module';
 import { AuthorsModule } from './modules/authors/authors.module';
 import { BookMetadataFetchModule } from './modules/book-metadata-fetch/book-metadata-fetch.module';
 import { MetadataScoreModule } from './modules/metadata-score/metadata-score.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { MetadataScoreModule } from './modules/metadata-score/metadata-score.mod
     StagingModule,
     EmailModule,
     MetadataScoreModule,
+    StatisticsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
