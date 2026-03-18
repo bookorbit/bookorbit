@@ -99,6 +99,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     appSettings as never,
     oidcSessionRepo as never,
     oidcDiscovery as never,
+    { emit: vi.fn() } as never,
     db,
   );
 

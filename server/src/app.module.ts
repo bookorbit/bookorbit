@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 
@@ -8,6 +8,7 @@ import { appConfig, authConfig, dbConfig, emailConfig, externalApiConfig, mailer
 import { validateEnv } from './config/env.validation';
 import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { LibraryAccessGuard } from './common/guards/library-access.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -45,6 +46,7 @@ import { AuthorsModule } from './modules/authors/authors.module';
 import { BookMetadataFetchModule } from './modules/book-metadata-fetch/book-metadata-fetch.module';
 import { MetadataScoreModule } from './modules/metadata-score/metadata-score.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -90,8 +92,10 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
     EmailModule,
     MetadataScoreModule,
     StatisticsModule,
+    AuditModule,
   ],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_GUARD, useClass: LibraryAccessGuard },

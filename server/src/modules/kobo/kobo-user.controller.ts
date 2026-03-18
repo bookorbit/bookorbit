@@ -1,8 +1,9 @@
-import { Permission } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { RenameDeviceDto } from './dto/rename-device.dto';
@@ -24,17 +25,35 @@ export class KoboUserController {
   }
 
   @Post('devices')
+  @Auditable({
+    action: AuditAction.KoboDeviceRegister,
+    resource: AuditResource.KoboDevice,
+    getResourceId: (_, res: unknown) => (res as { id?: number })?.id,
+    description: (req) => `Registered Kobo device '${(req.body as { name?: string })?.name ?? 'unknown'}'`,
+  })
   createDevice(@Body() dto: CreateDeviceDto, @CurrentUser() user: RequestUser) {
     return this.deviceService.createDevice(user.id, dto.name);
   }
 
   @Patch('devices/:id')
+  @Auditable({
+    action: AuditAction.KoboDeviceRename,
+    resource: AuditResource.KoboDevice,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Renamed Kobo device #${req.params['id']} to '${(req.body as { name?: string })?.name ?? 'unknown'}'`,
+  })
   renameDevice(@Param('id', ParseIntPipe) id: number, @Body() dto: RenameDeviceDto, @CurrentUser() user: RequestUser) {
     return this.deviceService.renameDevice(user.id, id, dto.name);
   }
 
   @Delete('devices/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.KoboDeviceRemove,
+    resource: AuditResource.KoboDevice,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Removed Kobo device #${req.params['id']}`,
+  })
   revokeDevice(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.deviceService.revokeDevice(user.id, id);
   }

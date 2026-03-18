@@ -15,10 +15,11 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
-import { Permission } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import type { BookQuery, LibraryFileSyncProgressEvent, WriteResult } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteRepository } from '../file-write/file-write.repository';
 import { FileWriteService } from '../file-write/file-write.service';
@@ -61,12 +62,24 @@ export class LibraryController {
 
   @Post()
   @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryCreate,
+    resource: AuditResource.Library,
+    getResourceId: (_, res: unknown) => (res as { id?: number })?.id,
+    description: (_, res: unknown) => `Created library '${(res as { name?: string })?.name ?? 'unknown'}'`,
+  })
   create(@Body() dto: CreateLibraryDto) {
     return this.libraryService.create(dto);
   }
 
   @Patch(':id')
   @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryUpdate,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated library #${req.params['id']}`,
+  })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibraryDto) {
     return this.libraryService.update(id, dto);
   }
@@ -74,6 +87,12 @@ export class LibraryController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryDelete,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Deleted library #${req.params['id']}`,
+  })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.libraryService.remove(id);
   }
@@ -99,6 +118,12 @@ export class LibraryController {
 
   @Post(':id/write-metadata-to-files')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.LibraryWriteMetadataToFiles,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Wrote metadata to files for library #${req.params['id']}`,
+  })
   async writeMetadataToFiles(
     @Param('id', ParseIntPipe) libraryId: number,
     @Query('dryRun') dryRunParam: string | undefined,
@@ -160,12 +185,24 @@ export class LibraryController {
 
   @Post(':libraryId/access')
   @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryAccessGrant,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['libraryId'] as string, 10),
+    description: (req) => `Granted library #${req.params['libraryId']} access to user #${(req.body as { userId?: number })?.userId}`,
+  })
   grantAccess(@Param('libraryId', ParseIntPipe) libraryId: number, @Body() dto: GrantLibraryAccessDto) {
     return this.libraryService.grantAccess(libraryId, dto);
   }
 
   @Patch(':libraryId/access/:userId')
   @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryAccessUpdate,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['libraryId'] as string, 10),
+    description: (req) => `Updated library #${req.params['libraryId']} access for user #${req.params['userId']}`,
+  })
   updateAccess(
     @Param('libraryId', ParseIntPipe) libraryId: number,
     @Param('userId', ParseIntPipe) userId: number,
@@ -177,6 +214,12 @@ export class LibraryController {
   @Delete(':libraryId/access/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryAccessRevoke,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['libraryId'] as string, 10),
+    description: (req) => `Revoked library #${req.params['libraryId']} access from user #${req.params['userId']}`,
+  })
   revokeAccess(@Param('libraryId', ParseIntPipe) libraryId: number, @Param('userId', ParseIntPipe) userId: number) {
     return this.libraryService.revokeAccess(libraryId, userId);
   }

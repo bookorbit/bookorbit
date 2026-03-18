@@ -105,6 +105,12 @@ const router = createRouter({
               component: () => import('@/features/settings/MaintenanceSettings.vue'),
             },
             {
+              path: 'admin/audit-log',
+              name: 'settings-admin-audit-log',
+              component: () => import('@/features/audit/AuditLogPage.vue'),
+              meta: { maxWidth: 'max-w-7xl' },
+            },
+            {
               path: 'about',
               name: 'settings-about',
               component: () => import('@/features/settings/AboutSettings.vue'),

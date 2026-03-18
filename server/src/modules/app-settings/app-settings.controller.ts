@@ -1,9 +1,10 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 
-import { Permission } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import type { GlobalFileWriteSettings } from '@projectx/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import { AppSettingsService } from './app-settings.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
@@ -21,6 +22,11 @@ export class AppSettingsController {
 
   @Patch(':key')
   @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: (req) => `Updated app setting '${req.params['key']}'`,
+  })
   update(@Param('key') key: string, @Body() dto: UpdateAppSettingDto) {
     return this.appSettingsService.update(key, dto.value);
   }
@@ -32,6 +38,7 @@ export class AppSettingsController {
 
   @Put('upload-pattern')
   @HttpCode(HttpStatus.OK)
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated upload file pattern' })
   async setUploadPattern(@Body() dto: UpdateFilePatternDto) {
     await this.appSettingsService.setUploadPattern(dto.pattern);
     return { pattern: dto.pattern };
@@ -44,6 +51,7 @@ export class AppSettingsController {
 
   @Put('download-pattern')
   @HttpCode(HttpStatus.OK)
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated download file pattern' })
   async setDownloadPattern(@Body() dto: UpdateFilePatternDto) {
     await this.appSettingsService.setDownloadPattern(dto.pattern);
     return { pattern: dto.pattern };
@@ -69,6 +77,7 @@ export class AppSettingsController {
   }
 
   @Put('oidc')
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated OIDC configuration' })
   updateOidcConfig(@Body() dto: UpdateOidcConfigDto) {
     return this.appSettingsService.updateOidcConfig(dto);
   }
@@ -99,6 +108,7 @@ export class AppSettingsController {
 
   @Put('file-write-settings')
   @HttpCode(HttpStatus.OK)
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated file write settings' })
   updateFileWriteSettings(@Body() patch: Partial<GlobalFileWriteSettings>) {
     return this.appSettingsService.updateFileWriteSettings(patch);
   }

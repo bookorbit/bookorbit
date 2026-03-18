@@ -17,8 +17,11 @@ import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { AuditAction } from '@projectx/types';
+
 import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
+import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { MailerService } from '../../common/services/mailer.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -58,6 +61,7 @@ export class AuthService {
     private readonly appSettings: AppSettingsService,
     private readonly oidcSessionRepo: OidcSessionRepository,
     private readonly oidcDiscovery: OidcDiscoveryService,
+    private readonly auditEvents: AuditEventsService,
     @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
@@ -89,6 +93,13 @@ export class AuthService {
           isDefaultPassword: false,
         })
         .returning({ id: schema.users.id, username: schema.users.username, name: schema.users.name });
+
+      this.auditEvents.emit(AUDIT_EVENT, {
+        userId: user.id,
+        actorUsername: user.username,
+        action: AuditAction.AuthRegister,
+        description: `User '${user.username}' registered`,
+      });
 
       return user;
     });
@@ -149,19 +160,32 @@ export class AuthService {
     return this.issueTokensForUser(created.id, reply);
   }
 
-  async login(dto: LoginDto, reply: FastifyReply) {
+  async login(dto: LoginDto, reply: FastifyReply, ip?: string) {
     const user = await this.userService.findByUsername(dto.username);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-
-    if (!user.active) throw new UnauthorizedException('Account disabled');
-
-    const valid = await compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!user || !user.active || !(await compare(dto.password, user.passwordHash))) {
+      this.auditEvents.emit(AUDIT_EVENT, {
+        userId: null,
+        actorUsername: 'system',
+        action: AuditAction.AuthLoginFailed,
+        description: `Failed login attempt for username '${dto.username}'`,
+        ip,
+        meta: { attemptedUsername: dto.username },
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     const fullUser = await this.userService.findByIdWithPermissions(user.id);
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(user.id, user.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
+
+    this.auditEvents.emit(AUDIT_EVENT, {
+      userId: user.id,
+      actorUsername: user.username,
+      action: AuditAction.AuthLogin,
+      description: `User '${user.username}' logged in`,
+      ip,
+    });
 
     return { accessToken, user: this.buildUserResponse(fullUser!) };
   }
@@ -250,6 +274,19 @@ export class AuthService {
 
     this.clearRefreshCookie(reply);
     this.clearAccessCookie(reply);
+
+    if (userId) {
+      const loggedOutUser = await this.db.query.users.findFirst({ where: eq(schema.users.id, userId) });
+      if (loggedOutUser) {
+        this.auditEvents.emit(AUDIT_EVENT, {
+          userId,
+          actorUsername: loggedOutUser.username,
+          action: AuditAction.AuthLogout,
+          description: `User '${loggedOutUser.username}' logged out`,
+          ip: req.ip,
+        });
+      }
+    }
 
     if (!userId) return {};
 
@@ -341,7 +378,7 @@ export class AuthService {
     });
   }
 
-  async changePassword(userId: number, dto: ChangePasswordDto, reply: FastifyReply) {
+  async changePassword(userId: number, dto: ChangePasswordDto, reply: FastifyReply, ip?: string) {
     const user = await this.db.query.users.findFirst({
       where: eq(schema.users.id, userId),
     });
@@ -370,6 +407,14 @@ export class AuthService {
 
     this.clearRefreshCookie(reply);
     this.clearAccessCookie(reply);
+
+    this.auditEvents.emit(AUDIT_EVENT, {
+      userId,
+      actorUsername: user.username,
+      action: AuditAction.AuthPasswordChange,
+      description: `User '${user.username}' changed their password`,
+      ip,
+    });
   }
 
   private async issueTokenPair(userId: number, tokenVersion: number) {

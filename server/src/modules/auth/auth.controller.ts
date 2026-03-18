@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from './auth.service';
@@ -43,8 +45,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto, @Res({ passthrough: true }) reply: FastifyReply) {
-    return this.authService.login(dto, reply);
+  login(@Body() dto: LoginDto, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    return this.authService.login(dto, reply, req.ip);
   }
 
   @Public()
@@ -73,6 +75,12 @@ export class AuthController {
 
   @Delete('sessions/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.AuthSessionRevoke,
+    resource: AuditResource.User,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Revoked session #${req.params['id']}`,
+  })
   revokeSession(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) sessionId: number) {
     return this.authService.revokeSession(user.id, sessionId);
   }
@@ -93,8 +101,13 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.NO_CONTENT)
-  changePassword(@CurrentUser() user: RequestUser, @Body() dto: ChangePasswordDto, @Res({ passthrough: true }) reply: FastifyReply) {
-    return this.authService.changePassword(user.id, dto, reply);
+  changePassword(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: ChangePasswordDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    return this.authService.changePassword(user.id, dto, reply, req.ip);
   }
 
   @Public()
