@@ -106,6 +106,14 @@ async function handleRemoveFromCollection() {
   }
 }
 
+function handleEditSelected() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  setBookContext(ids, ids.length)
+  router.push({ name: 'book-edit', params: { bookId: ids[0] } })
+  exitSelectionMode()
+}
+
 function handleBookAction(book: BookCard, action: 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete') {
   if (action === 'quick-view') {
     quickViewBookId.value = book.id
@@ -167,6 +175,7 @@ watch(
     @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
     @remove-from-collection="handleRemoveFromCollection"
+    @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
     @re-extract-cover="handleBulkReExtractCover"
     @delete="handleDeleteSelected"

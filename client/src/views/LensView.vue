@@ -99,6 +99,14 @@ type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'de
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)
 
+function handleEditSelected() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  setBookContext(ids, ids.length)
+  router.push({ name: 'book-edit', params: { bookId: ids[0] } })
+  exitSelectionMode()
+}
+
 function handleBookAction(book: BookCard, action: BookActionType) {
   if (action === 'quick-view') {
     quickViewBookId.value = book.id
@@ -200,6 +208,7 @@ watch(
     @send="sendBookOpen = true"
     @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
+    @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
     @re-extract-cover="handleBulkReExtractCover"
     @delete="handleDeleteSelected"

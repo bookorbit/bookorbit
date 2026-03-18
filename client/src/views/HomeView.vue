@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, Filter, Telescope, X } from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
@@ -30,6 +30,7 @@ import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import type { GroupRule, SortSpec } from '@projectx/types'
 
 const route = useRoute()
+const router = useRouter()
 const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const { libraries } = useLibraries()
 
@@ -263,6 +264,14 @@ type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'de
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)
 
+function handleEditSelected() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  setBookContext(ids, ids.length)
+  router.push({ name: 'book-edit', params: { bookId: ids[0] } })
+  exitSelectionMode()
+}
+
 function handleBookAction(book: BookCard, action: BookActionType) {
   if (action === 'quick-view') {
     quickViewBookId.value = book.id
@@ -481,6 +490,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     @send="sendBookOpen = true"
     @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
+    @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
     @re-extract-cover="handleBulkReExtractCover"
     @delete="handleDeleteSelected"
