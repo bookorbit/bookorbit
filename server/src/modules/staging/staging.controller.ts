@@ -22,7 +22,9 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Permission } from '@projectx/types';
 import type { StagingMetadata } from '@projectx/types';
 
+import { AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { StagingService } from './staging.service';
@@ -178,6 +180,16 @@ export class StagingController {
   }
 
   @Post('finalize')
+  @Auditable({
+    action: AuditAction.StagingFinalize,
+    resource: AuditResource.StagingFile,
+    description: (req) => {
+      const body = req.body as { fileIds?: number[]; selectAll?: boolean };
+      if (body?.selectAll) return 'Finalized all staged files into library';
+      const count = body?.fileIds?.length ?? 0;
+      return `Finalized ${count} staged file${count !== 1 ? 's' : ''} into library`;
+    },
+  })
   finalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeStagingDto) {
     const isSuperuser = user.isSuperuser;
     return this.finalizeService.finalize(

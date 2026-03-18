@@ -1,8 +1,9 @@
-import { Permission } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateEmailProviderDto } from './dto/create-email-provider.dto';
 import { UpdateEmailProviderDto } from './dto/update-email-provider.dto';
@@ -24,22 +25,46 @@ export class EmailProviderController {
   }
 
   @Post()
+  @Auditable({
+    action: AuditAction.EmailProviderCreate,
+    resource: AuditResource.EmailProvider,
+    getResourceId: (_, res: unknown) => (res as { id?: number })?.id,
+    description: (_, res: unknown) => `Created email provider '${(res as { name?: string })?.name ?? 'unknown'}'`,
+  })
   create(@Body() dto: CreateEmailProviderDto, @CurrentUser() user: RequestUser) {
     return this.service.create(dto, user);
   }
 
   @Put(':id')
+  @Auditable({
+    action: AuditAction.EmailProviderUpdate,
+    resource: AuditResource.EmailProvider,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Updated email provider #${req.params['id']}`,
+  })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmailProviderDto, @CurrentUser() user: RequestUser) {
     return this.service.update(id, dto, user);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.EmailProviderDelete,
+    resource: AuditResource.EmailProvider,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Deleted email provider #${req.params['id']}`,
+  })
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.remove(id, user);
   }
 
   @Patch(':id/default')
+  @Auditable({
+    action: AuditAction.EmailProviderSetDefault,
+    resource: AuditResource.EmailProvider,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Set email provider #${req.params['id']} as default`,
+  })
   setDefault(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.setDefault(id, user);
   }

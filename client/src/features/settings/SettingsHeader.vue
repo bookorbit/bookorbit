@@ -27,6 +27,9 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
   }
+  if (su) {
+    result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
+  }
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'Staging', routeName: 'settings-admin-staging' })
     result.push({ label: 'File Naming', routeName: 'settings-admin-file-naming' })

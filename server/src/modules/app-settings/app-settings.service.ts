@@ -84,6 +84,11 @@ export class AppSettingsService {
     return this.db.select().from(schema.appSettings).orderBy(schema.appSettings.key);
   }
 
+  async getValue(key: string): Promise<string | null> {
+    const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, key) });
+    return row?.value ?? null;
+  }
+
   async update(key: string, value: string) {
     const [setting] = await this.db.update(schema.appSettings).set({ value }).where(eq(schema.appSettings.key, key)).returning();
 

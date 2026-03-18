@@ -20,6 +20,7 @@ import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteRepository } from '../file-write/file-write.repository';
 import { BookService } from './book.service';
@@ -30,7 +31,7 @@ import { ExportBooksDto } from './dto/export-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
-import { Permission } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import type { BookQuery } from '@projectx/types';
 
 function stripLoneSurrogates(value: string): string {
@@ -77,6 +78,14 @@ export class BookController {
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.LibraryDeleteBooks)
+  @Auditable({
+    action: AuditAction.BookBulkDelete,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
+      return `Deleted ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
   deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {
     return this.bookService.deleteBooks(dto.bookIds, user);
   }
@@ -94,6 +103,14 @@ export class BookController {
 
   @Post('bulk-refresh-metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookBulkMetadataRefresh,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
+      return `Bulk refreshed metadata for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
   async bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -109,6 +126,14 @@ export class BookController {
 
   @Post('bulk-re-extract-cover')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookBulkCoverReextract,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
+      return `Bulk re-extracted covers for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
   async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -251,12 +276,24 @@ export class BookController {
 
   @Patch(':id/metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookMetadataUpdate,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated metadata for book #${req.params['id']}`,
+  })
   updateMetadata(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataDto, @CurrentUser() user: RequestUser) {
     return this.bookService.updateMetadata(id, dto, user);
   }
 
   @Post(':id/refresh-metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookMetadataUpdate,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Refreshed metadata for book #${req.params['id']}`,
+  })
   refreshMetadata(@Param('id', ParseIntPipe) id: number, @Query('preview') preview: string | undefined, @CurrentUser() user: RequestUser) {
     return this.bookService.refreshMetadata(id, preview === 'true', user);
   }

@@ -1,0 +1,115 @@
+export enum AuditAction {
+  AuthRegister = 'auth.register',
+  AuthLogin = 'auth.login',
+  AuthLoginFailed = 'auth.login.failed',
+  AuthLogout = 'auth.logout',
+  AuthPasswordChange = 'auth.password.change',
+  AuthPasswordAdminReset = 'auth.password.admin_reset',
+  AuthSessionRevoke = 'auth.session.revoke',
+
+  UserCreate = 'user.create',
+  UserUpdate = 'user.update',
+  UserSelfUpdate = 'user.self_update',
+  UserDelete = 'user.delete',
+  UserPermissionSet = 'user.permission.set',
+  UserSuperuserEnable = 'user.superuser.enable',
+  UserSuperuserDisable = 'user.superuser.disable',
+
+  LibraryCreate = 'library.create',
+  LibraryUpdate = 'library.update',
+  LibraryDelete = 'library.delete',
+  LibraryFolderAdd = 'library.folder.add',
+  LibraryFolderRemove = 'library.folder.remove',
+  LibraryAccessGrant = 'library.access.grant',
+  LibraryAccessUpdate = 'library.access.update',
+  LibraryAccessRevoke = 'library.access.revoke',
+  LibraryWriteMetadataToFiles = 'library.write_metadata_to_files',
+
+  BookUpload = 'book.upload',
+  BookMetadataUpdate = 'book.metadata.update',
+  BookDelete = 'book.delete',
+  BookBulkMetadataRefresh = 'book.bulk.metadata_refresh',
+  BookBulkDelete = 'book.bulk.delete',
+  BookBulkCoverReextract = 'book.bulk.cover_reextract',
+
+  CollectionCreate = 'collection.create',
+  CollectionUpdate = 'collection.update',
+  CollectionDelete = 'collection.delete',
+  CollectionBooksAdd = 'collection.books.add',
+  CollectionBooksRemove = 'collection.books.remove',
+
+  LensCreate = 'lens.create',
+  LensUpdate = 'lens.update',
+  LensDelete = 'lens.delete',
+
+  StagingFinalize = 'staging.finalize',
+
+  AuthorUpdate = 'author.update',
+  AuthorDelete = 'author.delete',
+  AuthorMerge = 'author.merge',
+  AuthorEnrichmentConfigUpdate = 'author.enrichment.config_update',
+  AuthorEnrichmentPause = 'author.enrichment.pause',
+  AuthorEnrichmentResume = 'author.enrichment.resume',
+  AuthorEnrichmentCancel = 'author.enrichment.cancel',
+
+  AppSettingsUpdate = 'app_settings.update',
+
+  KoboDeviceRegister = 'kobo.device.register',
+  KoboDeviceRename = 'kobo.device.rename',
+  KoboDeviceRemove = 'kobo.device.remove',
+
+  EmailProviderCreate = 'email.provider.create',
+  EmailProviderUpdate = 'email.provider.update',
+  EmailProviderDelete = 'email.provider.delete',
+  EmailProviderSetDefault = 'email.provider.set_default',
+
+  EmailTemplateCreate = 'email.template.create',
+  EmailTemplateUpdate = 'email.template.update',
+  EmailTemplateDelete = 'email.template.delete',
+  EmailTemplateSetDefault = 'email.template.set_default',
+
+  EmailRecipientCreate = 'email.recipient.create',
+  EmailRecipientUpdate = 'email.recipient.update',
+  EmailRecipientDelete = 'email.recipient.delete',
+
+  EmailRecipientGroupCreate = 'email.recipient_group.create',
+  EmailRecipientGroupUpdate = 'email.recipient_group.update',
+  EmailRecipientGroupDelete = 'email.recipient_group.delete',
+  EmailRecipientGroupMemberAdd = 'email.recipient_group.member_add',
+  EmailRecipientGroupMemberRemove = 'email.recipient_group.member_remove',
+}
+
+export enum AuditResource {
+  User = 'user',
+  Library = 'library',
+  Book = 'book',
+  Collection = 'collection',
+  Lens = 'lens',
+  StagingFile = 'staging_file',
+  Author = 'author',
+  AppSettings = 'app_settings',
+  KoboDevice = 'kobo_device',
+  EmailProvider = 'email_provider',
+  EmailTemplate = 'email_template',
+  EmailRecipient = 'email_recipient',
+  EmailRecipientGroup = 'email_recipient_group',
+}
+
+export interface AuditLogEntry {
+  id: number;
+  userId: number | null;
+  actorUsername: string;
+  action: string;
+  resource: string | null;
+  resourceId: number | null;
+  description: string;
+  ip: string | null;
+  countryCode: string | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditLogPage {
+  data: AuditLogEntry[];
+  total: number;
+}

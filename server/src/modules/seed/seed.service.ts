@@ -78,6 +78,11 @@ export class SeedService implements OnApplicationBootstrap {
       .values({ key: 'authors_provider_audnexus_enabled', value: 'true' })
       .onConflictDoNothing({ target: schema.appSettings.key });
 
+    await this.db
+      .insert(schema.appSettings)
+      .values({ key: 'audit_retention_days', value: '90' })
+      .onConflictDoNothing({ target: schema.appSettings.key });
+
     const defaultOidcConfig = JSON.stringify({
       enabled: false,
       issuerUri: '',

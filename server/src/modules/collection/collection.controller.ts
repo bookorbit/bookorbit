@@ -14,7 +14,9 @@ import {
   Query,
 } from '@nestjs/common';
 
+import { AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
@@ -40,6 +42,12 @@ export class CollectionController {
   }
 
   @Post()
+  @Auditable({
+    action: AuditAction.CollectionCreate,
+    resource: AuditResource.Collection,
+    getResourceId: (_, res: unknown) => (res as { id?: number })?.id,
+    description: (_, res: unknown) => `Created collection '${(res as { name?: string })?.name ?? 'unknown'}'`,
+  })
   create(@Body() dto: CreateCollectionDto, @CurrentUser() user: RequestUser) {
     return this.collectionService.create(dto, user);
   }
@@ -51,22 +59,52 @@ export class CollectionController {
   }
 
   @Patch(':id')
+  @Auditable({
+    action: AuditAction.CollectionUpdate,
+    resource: AuditResource.Collection,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated collection #${req.params['id']}`,
+  })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCollectionDto, @CurrentUser() user: RequestUser) {
     return this.collectionService.update(id, dto, user);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.CollectionDelete,
+    resource: AuditResource.Collection,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Deleted collection #${req.params['id']}`,
+  })
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.collectionService.remove(id, user);
   }
 
   @Post(':id/books')
+  @Auditable({
+    action: AuditAction.CollectionBooksAdd,
+    resource: AuditResource.Collection,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => {
+      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
+      return `Added ${count} book${count !== 1 ? 's' : ''} to collection #${req.params['id']}`;
+    },
+  })
   addBooks(@Param('id', ParseIntPipe) id: number, @Body() dto: CollectionBooksDto, @CurrentUser() user: RequestUser) {
     return this.collectionService.addBooks(id, dto, user);
   }
 
   @Delete(':id/books')
+  @Auditable({
+    action: AuditAction.CollectionBooksRemove,
+    resource: AuditResource.Collection,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => {
+      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
+      return `Removed ${count} book${count !== 1 ? 's' : ''} from collection #${req.params['id']}`;
+    },
+  })
   removeBooks(@Param('id', ParseIntPipe) id: number, @Body() dto: CollectionBooksDto, @CurrentUser() user: RequestUser) {
     return this.collectionService.removeBooks(id, dto, user);
   }

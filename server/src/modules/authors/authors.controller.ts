@@ -22,8 +22,9 @@ import type { FastifyReply } from 'fastify';
 import { extname } from 'path';
 import { map, Observable } from 'rxjs';
 
-import { Permission } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import type { AuthorAutoEnrichmentConfig, AuthorEnrichmentConditions, AuthorMetadataCandidate } from '@projectx/types';
@@ -110,6 +111,7 @@ export class AuthorsController {
   @Put('enrichment/config')
   @HttpCode(HttpStatus.OK)
   @RequirePermission(Permission.ManageMetadataConfig)
+  @Auditable({ action: AuditAction.AuthorEnrichmentConfigUpdate, description: 'Updated author enrichment configuration' })
   async setEnrichmentConfig(@Body() config: AuthorAutoEnrichmentConfig) {
     await this.enrichmentConfig.setConfig(config);
     return this.enrichmentConfig.getConfig();
@@ -138,6 +140,7 @@ export class AuthorsController {
 
   @Post('enrichment/pause')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @Auditable({ action: AuditAction.AuthorEnrichmentPause, description: 'Paused author enrichment' })
   async pauseEnrichment() {
     await this.enrichmentOrchestrator.pause();
     return { paused: true };
@@ -145,6 +148,7 @@ export class AuthorsController {
 
   @Post('enrichment/resume')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @Auditable({ action: AuditAction.AuthorEnrichmentResume, description: 'Resumed author enrichment' })
   async resumeEnrichment() {
     await this.enrichmentOrchestrator.resume();
     return { paused: false };
@@ -152,6 +156,7 @@ export class AuthorsController {
 
   @Post('enrichment/cancel')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @Auditable({ action: AuditAction.AuthorEnrichmentCancel, description: 'Cancelled pending author enrichment jobs' })
   async cancelEnrichment() {
     await this.enrichmentOrchestrator.cancelPending();
     return { cancelled: true };
@@ -223,18 +228,40 @@ export class AuthorsController {
 
   @Patch(':id')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.AuthorUpdate,
+    resource: AuditResource.Author,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Updated author #${req.params['id']}`,
+  })
   update(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAuthorDto) {
     return this.authorsService.update(user, id, dto);
   }
 
   @Post('merge')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.AuthorMerge,
+    resource: AuditResource.Author,
+    description: (req) => {
+      const body = req.body as { sourceIds?: number[]; targetId?: number };
+      return `Merged ${body?.sourceIds?.length ?? 0} author(s) into author #${body?.targetId ?? 'unknown'}`;
+    },
+  })
   merge(@CurrentUser() user: RequestUser, @Body() dto: MergeAuthorsDto) {
     return this.authorsService.merge(user, dto);
   }
 
   @Delete()
   @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.AuthorDelete,
+    resource: AuditResource.Author,
+    description: (req) => {
+      const count = (req.body as { authorIds?: number[] })?.authorIds?.length ?? 0;
+      return `Deleted ${count} author${count !== 1 ? 's' : ''}`;
+    },
+  })
   delete(@CurrentUser() user: RequestUser, @Body() dto: DeleteAuthorsDto) {
     return this.authorsService.delete(user, dto);
   }
