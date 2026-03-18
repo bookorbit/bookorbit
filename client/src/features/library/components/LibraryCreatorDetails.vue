@@ -68,7 +68,7 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
           :value="name"
           placeholder="My Library"
           maxlength="255"
-          class="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
           @input="emit('update:name', ($event.target as HTMLInputElement).value)"
         />
       </div>
@@ -95,7 +95,7 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
             v-model="search"
             type="text"
             placeholder="Search icons…"
-            class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
           <button v-if="search" class="text-muted-foreground hover:text-foreground" @click="search = ''">
             <X :size="12" />

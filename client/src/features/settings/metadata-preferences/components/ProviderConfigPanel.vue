@@ -144,7 +144,7 @@ function save() {
                 :type="field.type"
                 :placeholder="field.label"
                 :disabled="!draft[row.key].enabled"
-                class="h-9 w-64 lg:w-80 rounded-md border border-input bg-background px-3 text-xs font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+                class="h-9 w-64 lg:w-80 rounded-md border border-input bg-background px-3 text-xs font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
               />
             </div>
           </div>

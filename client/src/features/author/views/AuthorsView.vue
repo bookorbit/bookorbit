@@ -478,14 +478,14 @@ watch(
   >
     <template #toolbar>
       <div class="hidden lg:flex h-8 w-64 items-center rounded-md border border-input bg-background px-2.5">
-        <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/70" />
+        <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
         <input
           v-model="q"
           type="search"
           placeholder="Search authors"
-          class="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+          class="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
         />
-        <button v-if="q.trim()" class="ml-1 text-muted-foreground/70 transition-colors hover:text-foreground" @click="q = ''">
+        <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="q = ''">
           <X :size="12" />
         </button>
       </div>
@@ -696,7 +696,7 @@ watch(
               :disabled="selectedCount === 0"
               class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
               :class="
-                selectedCount > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/30 cursor-not-allowed'
+                selectedCount > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/60 cursor-not-allowed'
               "
               @click="selectAllVisible"
             >
@@ -711,7 +711,7 @@ watch(
             <button
               :disabled="selectedCount === 0 || bulkRefreshing"
               class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-              :class="selectedCount > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/30 cursor-not-allowed'"
+              :class="selectedCount > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
               @click="refreshSelectedAuthorsMetadata"
             >
               <RefreshCcw :size="17" :class="bulkRefreshing ? 'animate-spin' : ''" />
@@ -728,7 +728,7 @@ watch(
               :class="
                 selectedCount > 0
                   ? 'text-destructive hover:bg-destructive hover:text-destructive-foreground'
-                  : 'text-muted-foreground/30 cursor-not-allowed'
+                  : 'text-muted-foreground/60 cursor-not-allowed'
               "
               @click="confirmingBulkDelete = true"
             >

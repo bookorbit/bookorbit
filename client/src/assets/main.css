@@ -78,16 +78,6 @@
   background-image: radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in oklch, var(--primary) 20%, transparent) 0%, transparent 100%);
 }
 
-.pattern-scanlines::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(to bottom, transparent 50%, color-mix(in oklch, var(--primary) 5%, transparent) 50%);
-  background-size: 100% 4px;
-}
-
 .pattern-brushed {
   background-image: repeating-linear-gradient(
     45deg,
@@ -222,6 +212,20 @@
   background-image: repeating-linear-gradient(90deg, var(--primary), var(--primary) 1px, transparent 1px, transparent 40px);
 }
 
+.pattern-scanlines::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    color-mix(in oklch, var(--primary) 5%, transparent) 50%
+  );
+  background-size: 100% 4px;
+}
+
 .pattern-vinyl::before {
   content: '';
   position: fixed;
@@ -232,7 +236,7 @@
     circle at 50% -25%,
     transparent,
     transparent 3px,
-    color-mix(in oklch, var(--primary) 7%, transparent) 3.75px,
+    color-mix(in oklch, var(--primary) 8%, transparent) 3.75px,
     transparent 4.5px
   );
 }
@@ -287,8 +291,7 @@
 }
 
 .glow-wrapper {
-  background-image:
-    url('/topbar.png'), radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
+  background-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
   background-blend-mode: hard-light, color-dodge;
   background-position: top;
   background-repeat: no-repeat;
@@ -350,7 +353,7 @@
   ────────────────────────────────────────────────────────────── */
   .input-field {
     @apply h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground
-           placeholder:text-muted-foreground/50
+           placeholder:text-muted-foreground/70
            focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
            disabled:opacity-50 transition-colors;
   }

@@ -18,7 +18,7 @@ defineProps<{
     </span>
 
     <template v-for="(rule, i) in node.rules" :key="i">
-      <span v-if="i > 0" class="text-[10px] text-muted-foreground/40 font-medium select-none">
+      <span v-if="i > 0" class="text-[10px] text-muted-foreground/60 font-medium select-none">
         {{ node.join === 'AND' ? '·' : '|' }}
       </span>
 

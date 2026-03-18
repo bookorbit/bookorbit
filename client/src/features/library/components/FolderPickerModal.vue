@@ -114,7 +114,7 @@ function selectCurrent() {
             <TooltipContent>Go up</TooltipContent>
           </Tooltip>
           <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
-            <ChevronRight v-if="i > 0" :size="12" class="text-muted-foreground/50 shrink-0" />
+            <ChevronRight v-if="i > 0" :size="12" class="text-muted-foreground/70 shrink-0" />
             <button
               class="text-xs px-1 py-0.5 rounded transition-colors shrink-0 whitespace-nowrap"
               :class="i === breadcrumbs.length - 1 ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
@@ -132,7 +132,7 @@ function selectCurrent() {
             v-model="search"
             type="text"
             placeholder="Filter folders…"
-            class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
           <button v-if="search" class="text-muted-foreground hover:text-foreground" @click="search = ''">
             <X :size="12" />
@@ -163,7 +163,7 @@ function selectCurrent() {
               <Folder :size="15" class="text-primary/70 shrink-0 group-hover:hidden" />
               <FolderOpen :size="15" class="text-primary shrink-0 hidden group-hover:block" />
               <span class="flex-1 text-sm text-foreground text-left truncate">{{ entry.name }}</span>
-              <ChevronRight :size="13" class="text-muted-foreground/40 shrink-0" />
+              <ChevronRight :size="13" class="text-muted-foreground/60 shrink-0" />
             </button>
           </div>
         </div>

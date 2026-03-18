@@ -180,7 +180,7 @@ function formatPillClass(filename: string): string {
     cb7: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
     fb2: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
   }
-  return map[ext] ?? 'bg-muted text-muted-foreground/70'
+  return map[ext] ?? 'bg-muted text-muted-foreground/85'
 }
 </script>
 
@@ -327,7 +327,7 @@ function formatPillClass(filename: string): string {
                 <div class="shrink-0 flex items-center gap-0.5">
                   <button
                     v-if="item.status === 'error'"
-                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
+                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/85 hover:text-primary hover:bg-primary/10 transition-colors"
                     title="Retry"
                     @click="retryFile(item.id)"
                   >
@@ -335,7 +335,7 @@ function formatPillClass(filename: string): string {
                   </button>
                   <button
                     v-if="item.status !== 'uploading'"
-                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
                     @click="removeFile(item.id)"
                   >
                     <X :size="12" />

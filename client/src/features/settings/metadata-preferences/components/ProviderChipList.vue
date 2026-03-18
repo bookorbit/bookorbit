@@ -105,7 +105,7 @@ function removeProvider(index: number) {
       </button>
     </div>
 
-    <span v-if="providers.length === 0 && !disabled" class="text-xs text-muted-foreground/40 italic h-6 flex items-center px-1">
+    <span v-if="providers.length === 0 && !disabled" class="text-xs text-muted-foreground/60 italic h-6 flex items-center px-1">
       drag a provider here
     </span>
   </div>

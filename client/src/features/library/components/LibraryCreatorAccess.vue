@@ -69,7 +69,7 @@ onMounted(loadAccess)
 <template>
   <div class="px-6 py-6 space-y-5">
     <div v-if="!libraryId" class="rounded-lg border border-dashed border-border px-5 py-8 text-center">
-      <UserPlus :size="22" class="text-muted-foreground/30 mx-auto mb-2" />
+      <UserPlus :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
       <p class="text-sm text-muted-foreground">Access can be configured after the library is created.</p>
     </div>
 

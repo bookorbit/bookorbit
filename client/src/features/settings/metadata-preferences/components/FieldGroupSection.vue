@@ -25,7 +25,7 @@ const open = ref(true)
 <template>
   <div class="border-b border-border/60 last:border-0">
     <button
-      class="w-full flex items-center gap-2.5 px-6 py-2.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em] hover:bg-muted/30 hover:text-muted-foreground transition-all group"
+      class="w-full flex items-center gap-2.5 px-6 py-2.5 text-[10px] font-bold text-muted-foreground/80 uppercase tracking-[0.1em] hover:bg-muted/30 hover:text-muted-foreground transition-all group"
       @click="open = !open"
     >
       <component :is="open ? ChevronDown : ChevronRight" :size="12" class="transition-transform duration-200 group-hover:scale-110" />

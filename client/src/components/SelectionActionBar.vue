@@ -76,7 +76,7 @@ watch(
               <button
                 :disabled="count === 0"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-                :class="count > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/30 cursor-not-allowed'"
+                :class="count > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/60 cursor-not-allowed'"
                 @click="emit('send')"
               >
                 <Mail :size="ICON_SIZE" />
@@ -90,7 +90,7 @@ watch(
               <button
                 :disabled="count === 0"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-                :class="count > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/30 cursor-not-allowed'"
+                :class="count > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/60 cursor-not-allowed'"
                 @click="exportMenuOpen = true"
               >
                 <Download :size="ICON_SIZE" />
@@ -104,7 +104,7 @@ watch(
               <button
                 :disabled="count === 0"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-                :class="count > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/30 cursor-not-allowed'"
+                :class="count > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/60 cursor-not-allowed'"
                 @click="emit('add-to-collection')"
               >
                 <FolderPlus :size="ICON_SIZE" />
@@ -121,7 +121,7 @@ watch(
                 :class="
                   count > 0
                     ? 'text-destructive hover:bg-destructive hover:text-destructive-foreground'
-                    : 'text-muted-foreground/30 cursor-not-allowed'
+                    : 'text-muted-foreground/60 cursor-not-allowed'
                 "
                 @click="emit('remove-from-collection')"
               >
@@ -138,7 +138,7 @@ watch(
               <button
                 :disabled="count === 0"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-                :class="count > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/30 cursor-not-allowed'"
+                :class="count > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
                 @click="emit('refresh-metadata')"
               >
                 <RefreshCw :size="ICON_SIZE" />
@@ -152,7 +152,7 @@ watch(
               <button
                 :disabled="count === 0"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-                :class="count > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/30 cursor-not-allowed'"
+                :class="count > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
                 @click="emit('re-extract-cover')"
               >
                 <ImageDown :size="ICON_SIZE" />
@@ -171,7 +171,7 @@ watch(
                 :class="
                   count > 0
                     ? 'text-destructive hover:bg-destructive hover:text-destructive-foreground'
-                    : 'text-muted-foreground/30 cursor-not-allowed'
+                    : 'text-muted-foreground/60 cursor-not-allowed'
                 "
                 @click="confirmingDelete = true"
               >

@@ -305,7 +305,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                   stepIndex === i
                     ? 'bg-background text-foreground font-medium shadow-sm'
                     : mode === 'create' && i > visitedUpTo
-                      ? 'text-muted-foreground/40 cursor-not-allowed'
+                      ? 'text-muted-foreground/60 cursor-not-allowed'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 cursor-pointer',
                 ]"
                 :disabled="mode === 'create' && i > visitedUpTo"
@@ -320,13 +320,13 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                       ? 'bg-primary text-primary-foreground'
                       : stepIndex === i
                         ? 'bg-primary/15 text-primary ring-1 ring-primary'
-                        : 'bg-muted-foreground/15 text-muted-foreground/40'
+                        : 'bg-muted-foreground/15 text-muted-foreground/60'
                   "
                 >
                   <Check v-if="i < stepIndex" :size="10" />
                   <template v-else>{{ i + 1 }}</template>
                 </span>
-                <component v-else :is="section.icon" :size="14" :class="stepIndex === i ? 'text-primary' : 'text-muted-foreground/70'" />
+                <component v-else :is="section.icon" :size="14" :class="stepIndex === i ? 'text-primary' : 'text-muted-foreground/85'" />
 
                 {{ section.label }}
                 <div v-if="stepIndex === i" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-primary" />

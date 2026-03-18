@@ -173,7 +173,7 @@ function openAuthorBrowse() {
         <Tooltip v-for="star in 5" :key="star">
           <TooltipTrigger as-child>
             <button class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
-              <Star class="size-3" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'" />
+              <Star class="size-3" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Rate {{ star }}</TooltipContent>

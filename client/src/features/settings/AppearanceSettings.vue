@@ -173,7 +173,7 @@ function toggleOverlay(key: CardOverlayKey) {
             ]"
             :key="group.label"
           >
-            <p class="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-2.5 ml-0.5">{{ group.label }}</p>
+            <p class="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest mb-2.5 ml-0.5">{{ group.label }}</p>
             <div class="flex items-center gap-4 flex-wrap">
               <Tooltip v-for="opt in BACKGROUND_OPTIONS.filter((o) => group.ids.includes(o.id))" :key="opt.id">
                 <TooltipTrigger as-child>

@@ -157,17 +157,17 @@ function resetToDefault() {
               <!-- Drag handle (desktop) + up/down arrows (mobile fallback) -->
               <div class="flex shrink-0 flex-col items-center">
                 <button
-                  class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                  class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                   :disabled="index === 0"
                   @click="moveUp(index)"
                 >
                   <ChevronUp :size="13" />
                 </button>
-                <div class="drag-handle cursor-grab text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing">
+                <div class="drag-handle cursor-grab text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing">
                   <GripVertical :size="16" />
                 </div>
                 <button
-                  class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                  class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                   :disabled="index === draft.length - 1"
                   @click="moveDown(index)"
                 >
@@ -200,7 +200,7 @@ function resetToDefault() {
 
               <!-- Remove -->
               <button
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
                 :disabled="draft.length <= 1"
                 @click="removeScroller(index)"
               >

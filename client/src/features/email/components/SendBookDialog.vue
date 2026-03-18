@@ -180,7 +180,7 @@ function close() {
                 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors list-none flex items-center gap-1"
               >
                 <span>Options</span>
-                <span class="text-muted-foreground/50 group-open:rotate-90 transition-transform inline-block">›</span>
+                <span class="text-muted-foreground/70 group-open:rotate-90 transition-transform inline-block">›</span>
               </summary>
               <div class="mt-3 space-y-3">
                 <!-- File picker -->

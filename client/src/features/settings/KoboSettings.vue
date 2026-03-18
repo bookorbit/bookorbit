@@ -244,7 +244,7 @@ async function saveSettings() {
 
       <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-10 bg-card text-center shadow-sm">
         <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-          <Tablet :size="18" class="text-muted-foreground/50" />
+          <Tablet :size="18" class="text-muted-foreground/70" />
         </div>
         <p class="text-sm font-medium text-foreground">No devices yet</p>
         <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">

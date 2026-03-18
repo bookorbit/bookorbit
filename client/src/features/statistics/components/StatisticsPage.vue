@@ -194,7 +194,7 @@ function openConfig() {
                 !chart.visible && 'opacity-50',
               ]"
             >
-              <GripVertical class="text-muted-foreground/60 drawer-drag-handle size-4 shrink-0 cursor-grab active:cursor-grabbing" />
+              <GripVertical class="text-muted-foreground/80 drawer-drag-handle size-4 shrink-0 cursor-grab active:cursor-grabbing" />
               <component :is="CHART_ICONS[chart.id]" :class="['size-4 shrink-0', chart.visible ? 'text-primary' : 'text-muted-foreground']" />
               <span :class="['flex-1 text-sm', chart.visible ? 'text-foreground' : 'text-muted-foreground']">
                 {{ CHART_LABELS[chart.id] }}

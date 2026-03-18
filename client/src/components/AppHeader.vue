@@ -229,7 +229,7 @@ function formatBadgeClass(fmt: string): string {
                   <span v-else>{{ seg.text }}</span>
                 </template>
               </p>
-              <p v-if="result.seriesName" class="text-xs text-muted-foreground/70 truncate mt-0.5 italic">
+              <p v-if="result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
                 <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
                   <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
                   <span v-else>{{ seg.text }}</span>
@@ -266,7 +266,7 @@ function formatBadgeClass(fmt: string): string {
         class="hidden md:flex flex-1 mx-4 relative items-center transition-all duration-300"
         :class="searchFocused || globalSearchQuery ? 'max-w-xl' : 'max-w-sm'"
       >
-        <Search class="absolute left-3 text-muted-foreground/60 pointer-events-none" :size="14" />
+        <Search class="absolute left-3 text-muted-foreground/80 pointer-events-none" :size="14" />
         <input
           ref="desktopSearchInput"
           v-model="globalSearchQuery"
@@ -274,17 +274,22 @@ function formatBadgeClass(fmt: string): string {
           @blur="onSearchBlur"
           @keydown="handleSearchKeydown"
           placeholder="Search all books..."
-          class="w-full h-8 pl-9 pr-8 text-[13px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
+          class="w-full h-8 pl-9 pr-8 text-[13.5px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
         />
-        <div class="absolute right-2.5 flex items-center gap-1.5">
-          <button v-if="globalSearchQuery" @click="clearSearch()" class="text-muted-foreground/60 hover:text-foreground transition-colors">
+        <div class="absolute inset-y-0 right-2.5 flex items-center gap-1.5">
+          <button
+            v-if="globalSearchQuery"
+            @click="clearSearch()"
+            class="flex items-center justify-center text-muted-foreground/75 hover:text-foreground transition-colors"
+          >
             <X :size="13" />
           </button>
           <kbd
             v-else
-            class="hidden lg:inline-flex h-4.5 select-none items-center gap-1 rounded border border-sidebar-border/50 bg-background/50 px-1.5 font-mono text-[9px] font-medium text-muted-foreground/40 opacity-100"
+            class="hidden lg:inline-flex h-5.5 select-none items-center gap-1 rounded border border-sidebar-border/50 bg-background/50 px-2 font-mono text-[11px] font-bold text-muted-foreground/85 opacity-100"
           >
-            <span class="text-xs">⌘</span>K
+            <span class="text-[16px] leading-none">⌘</span>
+            <span class="text-[12px] leading-none">K</span>
           </kbd>
         </div>
 
@@ -329,7 +334,7 @@ function formatBadgeClass(fmt: string): string {
                   <span v-else>{{ seg.text }}</span>
                 </template>
               </p>
-              <p v-if="result.seriesName" class="text-xs text-muted-foreground/70 truncate mt-0.5 italic">
+              <p v-if="result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
                 <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
                   <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
                   <span v-else>{{ seg.text }}</span>

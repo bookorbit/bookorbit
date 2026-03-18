@@ -170,7 +170,7 @@ async function save() {
                   v-model="draftName"
                   type="text"
                   placeholder="e.g. Unread Sci-Fi"
-                  class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground/40"
+                  class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground/60"
                 />
               </div>
               <div class="flex-1 flex flex-col gap-1.5">

@@ -105,7 +105,7 @@ function onManualKeydown(e: KeyboardEvent) {
               v-model="manualPath"
               type="text"
               placeholder="/path/to/books"
-              class="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground/40 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+              class="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
               :class="testResult === 'ok' ? 'border-emerald-500' : testResult === 'error' ? 'border-destructive' : 'border-border'"
               @input="onManualInput"
               @keydown="onManualKeydown"
@@ -172,7 +172,7 @@ function onManualKeydown(e: KeyboardEvent) {
         </div>
 
         <div v-if="folders.length === 0" class="rounded-lg border border-dashed border-border px-4 py-6 text-center">
-          <FolderOpen :size="22" class="text-muted-foreground/30 mx-auto mb-2" />
+          <FolderOpen :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
           <p class="text-xs text-muted-foreground">No folders added yet</p>
         </div>
       </div>

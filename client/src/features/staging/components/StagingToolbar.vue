@@ -127,7 +127,7 @@ function clearSearch() {
         <input
           v-model="searchQuery"
           placeholder="Search files..."
-          class="h-full w-32 sm:w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+          class="h-full w-32 sm:w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground/80"
           @input="onSearchInput"
         />
         <button class="text-muted-foreground hover:text-foreground shrink-0" @click="clearSearch">

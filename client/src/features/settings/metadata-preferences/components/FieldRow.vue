@@ -135,7 +135,7 @@ function onDrop(e: DragEvent) {
         >
           {{ PROVIDER_SHORT_LABELS[key] ?? key }}
         </span>
-        <span v-if="preference.providers.length === 0 && !preference.enabled" class="text-xs text-muted-foreground/40 italic">Not fetched</span>
+        <span v-if="preference.providers.length === 0 && !preference.enabled" class="text-xs text-muted-foreground/60 italic">Not fetched</span>
         <span v-if="noProviders" class="flex items-center gap-1.5 text-xs text-amber-500 font-bold uppercase tracking-tight">
           <AlertTriangle :size="12" />
           Empty

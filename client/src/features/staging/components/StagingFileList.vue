@@ -276,7 +276,7 @@ function targetSummary(file: StagingFile): string {
           >
             {{ file.confidence }}%
           </span>
-          <span v-else class="text-xs text-muted-foreground/40">-</span>
+          <span v-else class="text-xs text-muted-foreground/60">-</span>
         </div>
 
         <div class="w-7 flex justify-center shrink-0">

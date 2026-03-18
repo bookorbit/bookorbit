@@ -45,7 +45,7 @@ function getIconComponent(name: string) {
   <div class="sticky top-0 z-20 mb-2 mt-2 flex h-10 shrink-0 items-center gap-2 p-2 transition-all duration-300 bg-background/80 backdrop-blur-md">
     <!-- Left: optional icon + title + count -->
     <div class="flex items-center gap-2 flex-1 min-w-0">
-      <component v-if="icon" :is="getIconComponent(icon)" :size="16" class="shrink-0 text-muted-foreground/90" />
+      <component v-if="icon" :is="getIconComponent(icon)" :size="16" class="shrink-0 text-muted-foreground" />
       <span class="font-bold text-[16px] text-foreground/90 tracking-tight truncate">{{ title }}</span>
       <span class="text-[12px] font-semibold text-primary/70 tabular-nums">({{ total.toLocaleString() }})</span>
     </div>
@@ -63,7 +63,7 @@ function getIconComponent(name: string) {
         :class="
           selectionMode
             ? 'text-primary bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/20'
-            : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/5'
+            : 'text-muted-foreground/80 hover:text-foreground hover:bg-primary/5'
         "
         @click="emit('toggle-selection')"
       >
@@ -80,7 +80,7 @@ function getIconComponent(name: string) {
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground/50 hover:text-foreground hover:bg-primary/5'"
+          :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'grid')"
         >
           <LayoutGrid :size="14" />
@@ -89,7 +89,7 @@ function getIconComponent(name: string) {
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground/50 hover:text-foreground hover:bg-primary/5'"
+          :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'list')"
         >
           <List :size="14" />
@@ -102,7 +102,7 @@ function getIconComponent(name: string) {
           <Button
             variant="ghost"
             size="icon"
-            class="hidden md:flex h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-primary/5"
+            class="hidden md:flex h-8 w-8 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-primary/5"
           >
             <SlidersHorizontal :size="14" />
           </Button>

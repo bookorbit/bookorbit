@@ -82,7 +82,7 @@ const lightboxSrc = ref<string | null>(null)
         :class="!field.hasDiff ? 'bg-muted/30 opacity-50' : field.isCopied ? 'bg-muted/30 opacity-40' : 'bg-background ring-1 ring-border'"
       >
         <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">Current</p>
-        <p class="wrap-break-word leading-snug text-sm w-full" :class="!field.currentDisplay ? 'text-muted-foreground/40 italic' : 'text-foreground'">
+        <p class="wrap-break-word leading-snug text-sm w-full" :class="!field.currentDisplay ? 'text-muted-foreground/60 italic' : 'text-foreground'">
           {{ field.currentDisplay || 'empty' }}
         </p>
       </div>

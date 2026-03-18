@@ -323,7 +323,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
               <button
                 v-if="!isDefaultSort"
                 @click="resetSort"
-                class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <X :size="13" />
               </button>
@@ -406,7 +406,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
                 <button
                   v-if="hasSavedFilter"
                   @click="forgetSavedFilter"
-                  class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <X :size="11" />
                 </button>
@@ -428,7 +428,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       <!-- Empty state: no books in library -->
       <div v-else-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <BookOpen :size="28" class="text-muted-foreground/50" />
+          <BookOpen :size="28" class="text-muted-foreground/70" />
         </div>
         <div class="flex flex-col gap-1">
           <p class="text-sm font-medium text-foreground">Your library is empty</p>

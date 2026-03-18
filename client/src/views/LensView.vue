@@ -280,7 +280,7 @@ watch(
       <!-- Empty state: no rules configured -->
       <div v-if="!loading && !lens?.filter && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <Settings2 :size="28" class="text-muted-foreground/50" />
+          <Settings2 :size="28" class="text-muted-foreground/70" />
         </div>
         <div class="flex flex-col gap-1">
           <p class="text-sm font-medium text-foreground">No rules configured</p>
@@ -299,7 +299,7 @@ watch(
       <!-- Empty state: rules set but no matches -->
       <div v-else-if="!loading && books.length === 0 && lens?.filter" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <Aperture :size="28" class="text-muted-foreground/50" />
+          <Aperture :size="28" class="text-muted-foreground/70" />
         </div>
         <p class="text-sm font-medium text-foreground">No books match this lens</p>
         <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>

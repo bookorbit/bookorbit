@@ -75,7 +75,7 @@ function onMinBookCountChange(event: Event) {
           :value="minBookCount ?? ''"
           min="1"
           placeholder="Any"
-          class="w-14 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+          class="w-14 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           @change="onMinBookCountChange"
         />
       </div>

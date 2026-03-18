@@ -114,7 +114,7 @@ function onPatternKeydown(e: KeyboardEvent) {
           @drop="metaDrag.onDrop()"
           @dragend="metaDrag.onDragEnd()"
         >
-          <GripVertical :size="14" class="text-muted-foreground/40 shrink-0" />
+          <GripVertical :size="14" class="text-muted-foreground/60 shrink-0" />
           <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
             {{ index + 1 }}
           </span>
@@ -140,7 +140,7 @@ function onPatternKeydown(e: KeyboardEvent) {
           @drop="fmtDrag.onDrop()"
           @dragend="fmtDrag.onDragEnd()"
         >
-          <GripVertical :size="14" class="text-muted-foreground/40 shrink-0" />
+          <GripVertical :size="14" class="text-muted-foreground/60 shrink-0" />
           <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
             {{ index + 1 }}
           </span>
@@ -187,7 +187,7 @@ function onPatternKeydown(e: KeyboardEvent) {
           v-model="newPattern"
           type="text"
           placeholder="**/node_modules/**"
-          class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
           @keydown="onPatternKeydown"
         />
         <button

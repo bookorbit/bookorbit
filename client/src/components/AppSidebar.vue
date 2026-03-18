@@ -182,7 +182,7 @@ onUnmounted(() => stopUploadCompletedListener())
           <span class="text-lg font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
             Project<span class="text-primary"> X</span>
           </span>
-          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/50">Library Control</span>
+          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">Library Control</span>
         </div>
       </div>
     </SidebarHeader>
@@ -234,7 +234,7 @@ onUnmounted(() => stopUploadCompletedListener())
         </SidebarGroupContent>
       </SidebarGroup>
 
-      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+      <SidebarSeparator />
 
       <!-- Libraries -->
       <SidebarGroup>
@@ -315,7 +315,7 @@ onUnmounted(() => stopUploadCompletedListener())
         </div>
       </SidebarGroup>
 
-      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+      <SidebarSeparator />
 
       <!-- Lenses -->
       <SidebarGroup>
@@ -374,7 +374,7 @@ onUnmounted(() => stopUploadCompletedListener())
         </div>
       </SidebarGroup>
 
-      <SidebarSeparator class="group-data-[collapsible=icon]:hidden" />
+      <SidebarSeparator />
 
       <!-- Collections -->
       <SidebarGroup>

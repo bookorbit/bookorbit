@@ -48,7 +48,7 @@ defineExpose({
       v-model="query"
       type="search"
       placeholder="Find in document..."
-      class="flex-1 min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
+      class="flex-1 min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
       style="max-width: 260px"
       @keydown.enter.exact="emit('next')"
       @keydown.enter.shift.exact.prevent="emit('prev')"

@@ -258,7 +258,7 @@ onMounted(async () => {
                       <code class="text-xs font-mono font-semibold text-primary">{{ '{' + t.token + '}' }}</code>
                       <p class="text-[11px] text-muted-foreground leading-tight mt-0.5">{{ t.description }}</p>
                     </div>
-                    <ClipboardCopy :size="13" class="shrink-0 text-muted-foreground/40 group-hover:text-primary/60 transition-colors" />
+                    <ClipboardCopy :size="13" class="shrink-0 text-muted-foreground/60 group-hover:text-primary/60 transition-colors" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Copy {{ '{' + t.token + '}' }}</TooltipContent>

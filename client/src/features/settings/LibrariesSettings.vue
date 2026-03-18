@@ -378,7 +378,7 @@ function coverRefreshLabel(libraryId: number): string {
     <!-- Empty state -->
     <div v-if="libraries.length === 0" class="rounded-xl border border-dashed border-border bg-card/50 px-8 py-16 text-center">
       <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mx-auto mb-4">
-        <FolderOpen :size="22" class="text-muted-foreground/60" />
+        <FolderOpen :size="22" class="text-muted-foreground/80" />
       </div>
       <p class="text-sm font-medium text-foreground mb-1">No libraries yet</p>
       <p class="text-sm text-muted-foreground mb-5">Add a library to start organizing your books.</p>

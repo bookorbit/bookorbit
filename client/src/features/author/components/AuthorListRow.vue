@@ -86,8 +86,8 @@ function handleClick(event: MouseEvent) {
         </span>
       </div>
 
-      <Loader2 v-if="!selectionMode && refreshing" :size="14" class="animate-spin text-muted-foreground/70" />
-      <ArrowRight v-else-if="!selectionMode" :size="14" class="text-muted-foreground/60" />
+      <Loader2 v-if="!selectionMode && refreshing" :size="14" class="animate-spin text-muted-foreground/85" />
+      <ArrowRight v-else-if="!selectionMode" :size="14" class="text-muted-foreground/80" />
     </div>
   </button>
 </template>

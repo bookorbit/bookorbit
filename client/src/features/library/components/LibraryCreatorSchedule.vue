@@ -107,7 +107,7 @@ function humanReadableCron(cron: string | null): string {
           type="text"
           :value="autoScanCronExpression ?? ''"
           placeholder="0 0 * * *"
-          class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
           @input="emit('update:autoScanCronExpression', ($event.target as HTMLInputElement).value || null)"
         />
         <p class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>

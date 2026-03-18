@@ -214,7 +214,7 @@ watch(
     <main class="flex-1 min-h-0">
       <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <FolderOpen :size="28" class="text-muted-foreground/50" />
+          <FolderOpen :size="28" class="text-muted-foreground/70" />
         </div>
         <p class="text-sm font-medium text-foreground">No books in this collection</p>
         <p class="text-xs text-muted-foreground">Select books from your library and add them here.</p>

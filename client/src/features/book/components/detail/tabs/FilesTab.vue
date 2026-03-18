@@ -178,7 +178,7 @@ async function toggleWriteLog() {
 
       <div class="min-w-0 flex-1">
         <p class="text-sm font-medium truncate">{{ file.filename ?? '-' }}</p>
-        <p class="text-[11px] font-mono text-muted-foreground/60 truncate mt-0.5" :title="file.absolutePath">{{ file.absolutePath }}</p>
+        <p class="text-[11px] font-mono text-muted-foreground/80 truncate mt-0.5" :title="file.absolutePath">{{ file.absolutePath }}</p>
         <p class="text-xs text-muted-foreground mt-1">
           {{ formatBytes(file.sizeBytes) }}
           <span class="mx-1 opacity-40">·</span>
@@ -212,7 +212,7 @@ async function toggleWriteLog() {
 
     <div v-if="book.files.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
       <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-muted mb-3">
-        <Files class="size-5 text-muted-foreground/50" />
+        <Files class="size-5 text-muted-foreground/70" />
       </div>
       <p class="text-sm font-medium">No files attached</p>
       <p class="text-xs text-muted-foreground mt-1">This book has no associated files.</p>

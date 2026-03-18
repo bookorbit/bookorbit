@@ -603,7 +603,7 @@ watch(
           <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
         </p>
         <template v-if="seriesLine">
-          <span class="text-muted-foreground/40 text-xs">·</span>
+          <span class="text-muted-foreground/60 text-xs">·</span>
           <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
         </template>
       </div>
@@ -613,7 +613,7 @@ watch(
           <Tooltip v-for="star in ratingStars" :key="star">
             <TooltipTrigger as-child>
               <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
-                <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'" />
+                <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
               </button>
             </TooltipTrigger>
             <TooltipContent>Rate {{ star }}</TooltipContent>
@@ -624,7 +624,7 @@ watch(
             v-for="star in ratingStars"
             :key="star"
             class="size-3.5"
-            :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
+            :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
           />
         </template>
       </div>

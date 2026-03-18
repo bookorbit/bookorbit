@@ -40,7 +40,7 @@ const kpis = computed(() => [
 <template>
   <div class="relative overflow-hidden rounded-xl border bg-card">
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent" />
-    <BarChart3 class="pointer-events-none absolute -right-4 -top-2 opacity-[0.04]" :size="160" aria-hidden="true" />
+    <BarChart3 class="pointer-events-none absolute -right-0 -top-2 opacity-[0.04]" :size="100" aria-hidden="true" />
 
     <div class="relative p-4">
       <div class="flex gap-3 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

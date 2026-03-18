@@ -115,7 +115,7 @@ const missingCount = computed(() => groups.value.flatMap((g) => g.fields).filter
         <div v-for="entry in group.fields" :key="entry.field" class="flex items-center justify-between gap-2 text-sm">
           <div class="flex items-center gap-1.5 min-w-0">
             <Check v-if="entry.filled" class="size-3.5 text-green-500 shrink-0" />
-            <Minus v-else class="size-3.5 text-muted-foreground/50 shrink-0" />
+            <Minus v-else class="size-3.5 text-muted-foreground/70 shrink-0" />
             <span :class="entry.filled ? 'text-foreground' : 'text-muted-foreground'">{{ entry.label }}</span>
           </div>
           <span class="text-xs text-muted-foreground shrink-0">{{ entry.weight }}</span>

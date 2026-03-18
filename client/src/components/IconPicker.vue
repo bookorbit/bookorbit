@@ -128,7 +128,7 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
     <component v-if="selectedIconComponent" :is="selectedIconComponent" :size="16" class="shrink-0 text-foreground" />
     <span v-else class="h-4 w-4 rounded bg-muted/60 shrink-0" />
     <span v-if="modelValue" class="flex-1 text-left text-foreground truncate">{{ modelValue }}</span>
-    <span v-else class="flex-1 text-left text-muted-foreground/40 truncate">{{ placeholder ?? 'Choose an icon...' }}</span>
+    <span v-else class="flex-1 text-left text-muted-foreground/60 truncate">{{ placeholder ?? 'Choose an icon...' }}</span>
     <button
       v-if="modelValue"
       type="button"
@@ -152,10 +152,10 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
             v-model="query"
             type="text"
             placeholder="Search icons..."
-            class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+            class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           />
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-[11px] text-muted-foreground/60">{{ filteredIcons.length.toLocaleString() }}</span>
+            <span class="text-[11px] text-muted-foreground/80">{{ filteredIcons.length.toLocaleString() }}</span>
             <button v-if="query" type="button" @click="query = ''" class="text-muted-foreground hover:text-foreground transition-colors">
               <X :size="13" />
             </button>

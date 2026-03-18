@@ -93,7 +93,7 @@ function onClear() {
               ><mark class="bg-yellow-300 text-yellow-900 rounded px-0.5">{{ result.excerpt.match }}</mark
               ><span class="text-muted-foreground">{{ result.excerpt.post }}</span>
             </p>
-            <p v-if="result.sectionTitle" class="text-xs text-muted-foreground/60 truncate">
+            <p v-if="result.sectionTitle" class="text-xs text-muted-foreground/80 truncate">
               {{ result.sectionTitle }}
             </p>
           </li>

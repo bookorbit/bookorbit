@@ -212,7 +212,7 @@ function availableRecipients(group: EmailGroup) {
               <UserPlus :size="12" />
               Add member
             </button>
-            <p v-else class="text-xs text-muted-foreground/60">All recipients are already in this group.</p>
+            <p v-else class="text-xs text-muted-foreground/80">All recipients are already in this group.</p>
           </div>
         </div>
       </div>

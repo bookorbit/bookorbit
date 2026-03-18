@@ -194,7 +194,7 @@ onMounted(() => {
       <div class="flex flex-col items-start gap-0.5 min-w-0">
         <span class="text-xs font-semibold text-foreground leading-none">Fetching metadata</span>
         <span class="text-xs text-muted-foreground leading-none">{{ bookRemainingLabel }}</span>
-        <span class="text-xs text-muted-foreground/60 leading-none truncate mt-0.5" :class="lastBookName ? '' : 'invisible'">{{
+        <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastBookName ? '' : 'invisible'">{{
           lastBookName ?? '\u00a0'
         }}</span>
       </div>
@@ -220,7 +220,7 @@ onMounted(() => {
       <div class="flex flex-col items-start gap-0.5 min-w-0">
         <span class="text-xs font-semibold text-foreground leading-none">Enriching authors</span>
         <span class="text-xs text-muted-foreground leading-none">{{ authorRemainingLabel }}</span>
-        <span class="text-xs text-muted-foreground/60 leading-none truncate mt-0.5" :class="lastAuthorName ? '' : 'invisible'">{{
+        <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastAuthorName ? '' : 'invisible'">{{
           lastAuthorName ?? '\u00a0'
         }}</span>
       </div>

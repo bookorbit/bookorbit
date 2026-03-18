@@ -242,7 +242,7 @@ function openDetails() {
                     v-for="star in ratingStars"
                     :key="star"
                     class="size-3"
-                    :class="detail.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'"
+                    :class="detail.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
                   />
                   <span class="text-[10px] text-muted-foreground ml-1">{{ detail.rating }}/5</span>
                 </div>

@@ -111,7 +111,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
         <TooltipTrigger as-child>
           <button
             @click="remove(index)"
-            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
           >
             <Trash2 :size="13" />
           </button>

@@ -39,7 +39,7 @@ defineProps<{
         </div>
         <div class="flex items-center gap-2">
           <slot name="controls" />
-          <GripVertical class="drag-handle text-muted-foreground/50 hover:text-muted-foreground size-4 cursor-grab active:cursor-grabbing" />
+          <GripVertical class="drag-handle text-muted-foreground/70 hover:text-muted-foreground size-4 cursor-grab active:cursor-grabbing" />
         </div>
       </div>
 

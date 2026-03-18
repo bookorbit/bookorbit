@@ -386,7 +386,7 @@ function showValueToInput(operator: RuleOperator): boolean {
 
         <button
           @click="removeNode(index)"
-          class="ml-auto h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+          class="ml-auto h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
         >
           <Trash2 :size="13" />
         </button>
@@ -402,7 +402,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         </div>
         <button
           @click="removeNode(index)"
-          class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0 mt-1"
+          class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0 mt-1"
         >
           <Trash2 :size="13" />
         </button>

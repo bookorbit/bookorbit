@@ -21,7 +21,7 @@ const hasMenu = () => props.canAdd || props.canReorder
   <div class="flex h-8.5 items-center px-2 group-data-[collapsible=icon]:hidden">
     <button class="group/hdr flex min-w-0 flex-1 items-center gap-1.5" @click="emit('toggle')">
       <span
-        class="text-[11px] font-medium uppercase tracking-[0.16em] text-sidebar-foreground/45 transition-colors group-hover/hdr:text-sidebar-foreground/80"
+        class="text-[11px] font-medium uppercase tracking-[0.16em] text-sidebar-foreground/65 transition-colors group-hover/hdr:text-sidebar-foreground/80"
       >
         {{ label }}
       </span>
