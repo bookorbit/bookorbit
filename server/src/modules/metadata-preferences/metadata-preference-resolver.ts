@@ -86,15 +86,21 @@ export class MetadataPreferenceResolver {
   withForwardCompatibility(preferences: MetadataFetchPreferences, registeredKeys: MetadataProviderKey[]): MetadataFetchPreferences {
     const defaults = this.getDefaultPreferences();
     const fields = {} as Record<MetadataField, FieldPreference>;
+    const registered = new Set(registeredKeys);
     for (const field of ALL_METADATA_FIELDS) {
-      const fp = this.normalizeFieldPreference(preferences?.fields?.[field], defaults.fields[field]);
+      const fallback = defaults.fields[field];
+      const fp = this.normalizeFieldPreference(preferences?.fields?.[field], fallback);
       if (!registeredKeys.length) {
         fields[field] = fp;
         continue;
       }
-      const existing = new Set(fp.providers);
-      const missing = registeredKeys.filter((k) => !existing.has(k));
-      fields[field] = missing.length ? { ...fp, providers: [...fp.providers, ...missing] } : fp;
+
+      const filtered = fp.providers.filter((k) => registered.has(k));
+      const fallbackFiltered = fallback.providers.filter((k) => registered.has(k));
+
+      // Preserve explicit provider selections; only drop unavailable providers.
+      // If filtering removes all providers, fall back to the field default set.
+      fields[field] = { ...fp, providers: filtered.length ? filtered : fallbackFiltered };
     }
     const options = this.normalizeOptions(preferences?.options, defaults.options!);
     return { fields, options };

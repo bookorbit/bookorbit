@@ -124,7 +124,7 @@ describe('MetadataPreferenceResolver', () => {
     expect(resolved.options).toEqual(defaults.options);
   });
 
-  it('adds newly registered provider keys without duplicating existing keys', () => {
+  it('preserves explicit provider selections when applying forward compatibility', () => {
     const defaults = resolver.getDefaultPreferences();
     const preferences: MetadataFetchPreferences = {
       fields: {
@@ -140,28 +140,29 @@ describe('MetadataPreferenceResolver', () => {
     const next = resolver.withForwardCompatibility(preferences, [
       MetadataProviderKey.GOOGLE,
       MetadataProviderKey.HARDCOVER,
+      MetadataProviderKey.AMAZON,
       MetadataProviderKey.OPEN_LIBRARY,
     ]);
 
-    expect(next.fields.title.providers).toEqual([MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOOGLE, MetadataProviderKey.HARDCOVER]);
+    expect(next.fields.title.providers).toEqual([MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOOGLE]);
     expect(next.options).toEqual(defaults.options);
   });
 
-  it('remains safe when stored preferences are missing fields and still appends new providers', () => {
+  it('drops unavailable providers and falls back to defaults when a field loses all providers', () => {
     const partial = {
       fields: {
         title: {
           enabled: true,
-          providers: [MetadataProviderKey.GOOGLE],
+          providers: [MetadataProviderKey.HARDCOVER],
           mergeStrategy: 'fillMissing',
         },
       },
     } as unknown as MetadataFetchPreferences;
 
-    const result = resolver.withForwardCompatibility(partial, [MetadataProviderKey.HARDCOVER]);
+    const result = resolver.withForwardCompatibility(partial, [MetadataProviderKey.GOOGLE]);
 
-    expect(result.fields.title.providers).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.HARDCOVER]);
-    expect(result.fields.subtitle.providers).toContain(MetadataProviderKey.HARDCOVER);
+    expect(result.fields.title.providers).toEqual([MetadataProviderKey.GOOGLE]);
+    expect(result.fields.subtitle.providers).toEqual([MetadataProviderKey.GOOGLE]);
   });
 
   it('resolves a single field from resolved preferences', () => {
