@@ -6,6 +6,7 @@ import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
+import { ProviderThrottleTracker } from '../metadata-fetch/provider-throttle.tracker';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchEligibilityService } from './book-metadata-fetch-eligibility.service';
@@ -32,6 +33,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     private readonly metadataService: MetadataService,
     private readonly scoreService: MetadataScoreService,
     private readonly session: BookMetadataFetchSessionService,
+    private readonly throttleTracker: ProviderThrottleTracker,
     @Optional() private readonly gateway?: BookMetadataFetchGateway,
   ) {}
 
@@ -310,7 +312,11 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   }
 
   private randomDelay(): Promise<void> {
-    const ms = 2_000 + Math.random() * 3_000;
+    const throttleActive = this.throttleTracker.hasAnyActive();
+    const ms = throttleActive ? 10_000 + Math.random() * 10_000 : 2_000 + Math.random() * 3_000;
+    if (throttleActive) {
+      this.logger.debug(`throttle active - extending inter-book delay to ${Math.round(ms)}ms`);
+    }
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 

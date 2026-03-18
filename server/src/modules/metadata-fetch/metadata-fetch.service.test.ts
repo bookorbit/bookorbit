@@ -4,6 +4,7 @@ import { firstValueFrom, toArray } from 'rxjs';
 
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { IdentifiableProvider, MetadataProvider } from './providers/metadata-provider';
 
 type DbMock = {
@@ -38,7 +39,8 @@ describe('MetadataFetchService', () => {
       },
     };
 
-    service = new MetadataFetchService(registry, db as never);
+    const throttleTracker = { clearOnSuccess: vi.fn(), record: vi.fn() } as unknown as ProviderThrottleTracker;
+    service = new MetadataFetchService(registry, throttleTracker, db as never);
   });
 
   afterEach(() => {

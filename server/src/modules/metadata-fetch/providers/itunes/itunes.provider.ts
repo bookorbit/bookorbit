@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapITunesResult } from './itunes.mapper';
@@ -33,7 +34,7 @@ export class ITunesProvider implements IdentifiableProvider {
     url.searchParams.set('limit', '10');
 
     try {
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url.toString(), { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(`iTunes Search API returned ${res.status} for search("${query}")`);
         return [];
@@ -54,7 +55,7 @@ export class ITunesProvider implements IdentifiableProvider {
     url.searchParams.set('id', providerId);
 
     try {
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url.toString(), { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(`iTunes Lookup API returned ${res.status} for lookupById(${providerId})`);
         return null;

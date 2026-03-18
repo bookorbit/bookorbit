@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
@@ -27,7 +28,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     query.set('limit', '10');
     query.set('fields', SEARCH_FIELDS);
 
-    const res = await fetch(`${BASE_URL}/search.json?${query}`, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetchWithThrottle(`${BASE_URL}/search.json?${query}`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return [];
 
     const body = (await res.json()) as OpenLibrarySearchResponse;
@@ -37,7 +38,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.openLibrary);
     if (!enabled) return null;
-    const res = await fetch(`${BASE_URL}/works/${providerId}.json`, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetchWithThrottle(`${BASE_URL}/works/${providerId}.json`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
 
     const work = (await res.json()) as OpenLibraryWork;
@@ -67,7 +68,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       limit: '20',
       fields: 'key,subject',
     });
-    const res = await fetch(`${BASE_URL}/search.json?${query}`, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetchWithThrottle(`${BASE_URL}/search.json?${query}`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return undefined;
 
     const body = (await res.json()) as Partial<OpenLibrarySearchResponse>;

@@ -7,6 +7,8 @@ import { from, merge, Observable, switchMap } from 'rxjs';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata } from '../../db/schema';
+import { ProviderThrottleError } from './provider-throttle.error';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { ProviderRegistry } from './provider-registry';
 import { isIdentifiable, MetadataProvider } from './providers/metadata-provider';
 import { MetadataSearchParams } from './providers/metadata-search-params';
@@ -20,12 +22,13 @@ export class MetadataFetchService {
 
   constructor(
     private readonly registry: ProviderRegistry,
+    private readonly throttleTracker: ProviderThrottleTracker,
     @Inject(DB) private readonly db: Db,
   ) {}
 
   search(params: MetadataSearchParams, keys?: MetadataProviderKey[]): Observable<MetadataCandidate> {
     const providers = this.registry.select(keys);
-    return merge(...providers.map((p) => from(this.withTimeout(this.fetchFromProvider(p, params))).pipe(switchMap((results) => from(results)))));
+    return merge(...providers.map((p) => from(this.fetchFromProviderWithThrottleHandling(p, params)).pipe(switchMap((results) => from(results)))));
   }
 
   async lookupById(key: MetadataProviderKey, providerId: string): Promise<MetadataCandidate | null> {
@@ -55,6 +58,21 @@ export class MetadataFetchService {
       [MetadataProviderKey.OPEN_LIBRARY]: row.openLibraryId ?? undefined,
       [MetadataProviderKey.ITUNES]: row.itunesId ?? undefined,
     };
+  }
+
+  private async fetchFromProviderWithThrottleHandling(p: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+    try {
+      const results = await this.withTimeout(this.fetchFromProvider(p, params));
+      this.throttleTracker.clearOnSuccess(p.key);
+      return results;
+    } catch (err) {
+      if (err instanceof ProviderThrottleError) {
+        const hint = err.retryAfterSeconds != null ? `${err.retryAfterSeconds}s (Retry-After header)` : 'scheduled backoff';
+        this.logger.warn(`[${p.key}] throttled by provider - ${hint}`);
+        this.throttleTracker.record(p.key, err.retryAfterSeconds);
+      }
+      return [];
+    }
   }
 
   private async fetchFromProvider(p: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
@@ -90,7 +108,13 @@ export class MetadataFetchService {
     const timeout = new Promise<MetadataCandidate[]>((resolve) => {
       timer = setTimeout(() => resolve([]), MetadataFetchService.PROVIDER_TIMEOUT_MS);
     });
-    return Promise.race([promise.catch(() => [] as MetadataCandidate[]), timeout]).finally(() => clearTimeout(timer!));
+    return Promise.race([
+      promise.catch((err: unknown) => {
+        if (err instanceof ProviderThrottleError) throw err;
+        return [] as MetadataCandidate[];
+      }),
+      timeout,
+    ]).finally(() => clearTimeout(timer!));
   }
 }
 

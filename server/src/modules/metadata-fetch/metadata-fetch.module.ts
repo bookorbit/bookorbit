@@ -7,6 +7,7 @@ import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataProvider } from './providers/metadata-provider';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { AmazonProvider } from './providers/amazon/amazon.provider';
 import { GoogleProvider } from './providers/google/google.provider';
 import { GoodreadsProvider } from './providers/goodreads/goodreads.provider';
@@ -25,10 +26,11 @@ const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, Ope
       inject: PROVIDER_CLASSES,
     },
     ProviderRegistry,
+    ProviderThrottleTracker,
     MetadataFetchService,
     MetadataFetchPipeline,
   ],
   controllers: [MetadataFetchController],
-  exports: [MetadataFetchService, MetadataFetchPipeline, ProviderRegistry],
+  exports: [MetadataFetchService, MetadataFetchPipeline, ProviderRegistry, ProviderThrottleTracker],
 })
 export class MetadataFetchModule {}

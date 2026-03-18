@@ -15,6 +15,7 @@ import { ProviderConfigService } from '../metadata-preferences/provider-config.s
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
 function createPreferences(mutate?: (fields: Record<MetadataField, FieldPreference>) => void): MetadataFetchPreferences {
   const fields = Object.fromEntries(
@@ -72,7 +73,8 @@ describe('MetadataFetchPipeline', () => {
       all: vi.fn(),
     } as unknown as Mocked<ProviderRegistry>;
 
-    pipeline = new MetadataFetchPipeline(fetchService, preferencesService, resolver, providerConfigService, registry);
+    const throttleTracker = { isThrottled: vi.fn().mockReturnValue(false) } as unknown as ProviderThrottleTracker;
+    pipeline = new MetadataFetchPipeline(fetchService, preferencesService, resolver, providerConfigService, registry, throttleTracker);
   });
 
   it('derives enabled provider keys from active fields, filters unknown providers, and de-duplicates keys', async () => {

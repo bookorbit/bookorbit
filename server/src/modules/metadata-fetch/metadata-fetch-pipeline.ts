@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { FieldPreference, MetadataCandidate, MetadataFetchPreferences, MetadataField, MetadataProviderKey } from '@projectx/types';
 import { firstValueFrom, toArray } from 'rxjs';
 
@@ -7,6 +7,7 @@ import { MetadataPreferencesService } from '../metadata-preferences/metadata-pre
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 
 export type ResolvedMetadataFields = Partial<Record<MetadataField, string | string[] | number | null>> & { coverUrl?: string };
@@ -14,12 +15,15 @@ type ResolvedProviderIds = Partial<Record<MetadataProviderKey, string>>;
 
 @Injectable()
 export class MetadataFetchPipeline {
+  private readonly logger = new Logger(MetadataFetchPipeline.name);
+
   constructor(
     private readonly fetchService: MetadataFetchService,
     private readonly preferencesService: MetadataPreferencesService,
     private readonly resolver: MetadataPreferenceResolver,
     private readonly providerConfigService: ProviderConfigService,
     private readonly registry: ProviderRegistry,
+    private readonly throttleTracker: ProviderThrottleTracker,
   ) {}
 
   async run(
@@ -79,7 +83,16 @@ export class MetadataFetchPipeline {
       if (field === 'genres' && mergeGenresFromAllConfigured) continue;
       fp.providers.filter((k) => registered.has(k)).forEach((k) => keys.add(k));
     }
-    return [...keys];
+
+    const active: MetadataProviderKey[] = [];
+    for (const key of keys) {
+      if (this.throttleTracker.isThrottled(key)) {
+        this.logger.debug(`[${key}] skipped - currently throttled`);
+      } else {
+        active.push(key);
+      }
+    }
+    return active;
   }
 
   private async getEnabledConfiguredProviders(registered: Set<MetadataProviderKey>): Promise<MetadataProviderKey[]> {
