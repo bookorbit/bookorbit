@@ -294,10 +294,9 @@ export class MetadataService {
     for (let i = 0; i < unique.length; i++) {
       const { name, sortName } = unique[i];
 
-      let [author] = await this.db.select().from(authors).where(eq(authors.name, name)).limit(1);
-
+      let [author] = await this.db.insert(authors).values({ name, sortName }).onConflictDoNothing().returning();
       if (!author) {
-        [author] = await this.db.insert(authors).values({ name, sortName }).returning();
+        [author] = await this.db.select().from(authors).where(eq(authors.name, name)).limit(1);
       }
 
       await this.db.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: i }).onConflictDoNothing();
@@ -320,9 +319,9 @@ export class MetadataService {
     if (unique.length === 0) return;
 
     for (const name of unique) {
-      let [genre] = await this.db.select().from(genres).where(eq(genres.name, name)).limit(1);
+      let [genre] = await this.db.insert(genres).values({ name }).onConflictDoNothing().returning();
       if (!genre) {
-        [genre] = await this.db.insert(genres).values({ name }).returning();
+        [genre] = await this.db.select().from(genres).where(eq(genres.name, name)).limit(1);
       }
       await this.db.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
     }
@@ -336,9 +335,9 @@ export class MetadataService {
     if (unique.length === 0) return;
 
     for (const name of unique) {
-      let [tag] = await this.db.select().from(tags).where(eq(tags.name, name)).limit(1);
+      let [tag] = await this.db.insert(tags).values({ name }).onConflictDoNothing().returning();
       if (!tag) {
-        [tag] = await this.db.insert(tags).values({ name }).returning();
+        [tag] = await this.db.select().from(tags).where(eq(tags.name, name)).limit(1);
       }
       await this.db.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
     }
