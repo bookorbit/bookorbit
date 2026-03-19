@@ -30,6 +30,31 @@ export class StatisticsController {
     return this.statisticsService.getStorageByFormat(user, query);
   }
 
+  @Get('metadata-score-distribution')
+  getMetadataScoreDistribution(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getMetadataScoreDistribution(user, query);
+  }
+
+  @Get('library-metadata-completeness')
+  getLibraryMetadataCompleteness(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getLibraryMetadataCompleteness(user, query);
+  }
+
+  @Get('format-share-over-time')
+  getFormatShareOverTime(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getFormatShareOverTime(user, query);
+  }
+
+  @Get('genre-rank-over-time')
+  getGenreRankOverTime(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getGenreRankOverTime(user, query);
+  }
+
+  @Get('page-count-distribution')
+  getPageCountDistribution(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getPageCountDistribution(user, query);
+  }
+
   @Get('publication-decade')
   getPublicationDecade(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getPublicationDecade(user, query);

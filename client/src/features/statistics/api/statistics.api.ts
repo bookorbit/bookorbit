@@ -1,11 +1,16 @@
 import { api } from '@/lib/api'
 import type {
   BooksAddedDataPoint,
+  FormatShareOverTimeItem,
   StatisticsSummary,
   FormatDistributionItem,
+  GenreRankOverTimeItem,
   GenreDistributionItem,
+  LibraryMetadataCompletenessItem,
   LanguageDistributionItem,
+  MetadataScoreDistribution,
   MetadataCompletenessItem,
+  PageCountDistributionItem,
   PublicationDecadeItem,
   StatisticsFilterConfig,
   StatisticsResult,
@@ -63,6 +68,28 @@ export async function fetchMetadataCompleteness(filters: StatisticsFilterConfig)
 
 export async function fetchGenreDistribution(filters: StatisticsFilterConfig): Promise<StatisticsResult<GenreDistributionItem>> {
   return parseResult(await api(`/api/v1/statistics/genre-distribution${buildParams(filters)}`))
+}
+
+export async function fetchMetadataScoreDistribution(filters: StatisticsFilterConfig): Promise<MetadataScoreDistribution> {
+  const res = await api(`/api/v1/statistics/metadata-score-distribution${buildParams(filters)}`)
+  if (!res.ok) throw new Error(`Metadata score distribution request failed: ${res.status}`)
+  return res.json() as Promise<MetadataScoreDistribution>
+}
+
+export async function fetchLibraryMetadataCompleteness(filters: StatisticsFilterConfig): Promise<StatisticsResult<LibraryMetadataCompletenessItem>> {
+  return parseResult(await api(`/api/v1/statistics/library-metadata-completeness${buildParams(filters)}`))
+}
+
+export async function fetchFormatShareOverTime(filters: StatisticsFilterConfig): Promise<StatisticsResult<FormatShareOverTimeItem>> {
+  return parseResult(await api(`/api/v1/statistics/format-share-over-time${buildParams(filters)}`))
+}
+
+export async function fetchGenreRankOverTime(filters: StatisticsFilterConfig): Promise<StatisticsResult<GenreRankOverTimeItem>> {
+  return parseResult(await api(`/api/v1/statistics/genre-rank-over-time${buildParams(filters)}`))
+}
+
+export async function fetchPageCountDistribution(filters: StatisticsFilterConfig): Promise<StatisticsResult<PageCountDistributionItem>> {
+  return parseResult(await api(`/api/v1/statistics/page-count-distribution${buildParams(filters)}`))
 }
 
 export async function fetchStatisticsSummary(filters: StatisticsFilterConfig): Promise<StatisticsSummary> {

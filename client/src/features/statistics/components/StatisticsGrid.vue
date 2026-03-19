@@ -53,6 +53,31 @@ const CHART_REGISTRY: Record<StatisticsChartId, ChartRegistryEntry> = {
     label: 'Genre Distribution',
     wide: true,
   },
+  'metadata-score-distribution': {
+    component: defineAsyncComponent(() => import('./MetadataScoreDistributionChart.vue')),
+    label: 'Metadata Score Distribution',
+    wide: false,
+  },
+  'library-metadata-completeness': {
+    component: defineAsyncComponent(() => import('./LibraryMetadataCompletenessHeatmapChart.vue')),
+    label: 'Library Metadata Completeness',
+    wide: true,
+  },
+  'format-share-over-time': {
+    component: defineAsyncComponent(() => import('./FormatShareOverTimeChart.vue')),
+    label: 'Format Share Over Time',
+    wide: true,
+  },
+  'genre-rank-over-time': {
+    component: defineAsyncComponent(() => import('./GenreRankOverTimeChart.vue')),
+    label: 'Genre Rank Over Time',
+    wide: true,
+  },
+  'page-count-distribution': {
+    component: defineAsyncComponent(() => import('./PageCountDistributionChart.vue')),
+    label: 'Page Count Distribution',
+    wide: false,
+  },
 }
 
 const { visibleCharts, reorder } = useStatisticsConfig()
@@ -65,7 +90,7 @@ function handleReorder(newList: ChartConfigEntry[]) {
 <template>
   <VueDraggable
     :model-value="visibleCharts"
-    class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+    class="grid grid-flow-row-dense grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
     handle=".drag-handle"
     :animation="200"
     @update:model-value="handleReorder"

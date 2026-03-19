@@ -6,7 +6,12 @@ export type StatisticsChartId =
   | 'publication-decade'
   | 'top-authors'
   | 'metadata-completeness'
-  | 'genre-distribution';
+  | 'genre-distribution'
+  | 'metadata-score-distribution'
+  | 'library-metadata-completeness'
+  | 'format-share-over-time'
+  | 'genre-rank-over-time'
+  | 'page-count-distribution';
 
 export type StatisticsGranularity = 'monthly' | 'yearly';
 export type StatisticsDateRange = 'last-year' | 'last-5-years' | 'all-time';
@@ -28,6 +33,39 @@ export interface StatisticsFilterConfig {
 export interface StatisticsSettings {
   charts: ChartConfigEntry[];
   filters: StatisticsFilterConfig;
+}
+
+export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [
+  'format-distribution',
+  'language-distribution',
+  'storage-by-format',
+  'publication-decade',
+  'books-added-over-time',
+  'format-share-over-time',
+  'metadata-completeness',
+  'metadata-score-distribution',
+  'page-count-distribution',
+  'top-authors',
+  'genre-distribution',
+  'genre-rank-over-time',
+  'library-metadata-completeness',
+];
+
+export const DEFAULT_STATISTICS_FILTERS: StatisticsFilterConfig = {
+  libraryIds: [],
+  booksOverTimeRange: 'all-time',
+  booksOverTimeGranularity: 'monthly',
+};
+
+export function createDefaultStatisticsSettings(): StatisticsSettings {
+  return {
+    charts: DEFAULT_STATISTICS_CHART_ORDER.map((id, order) => ({ id, order, visible: true })),
+    filters: {
+      libraryIds: [],
+      booksOverTimeRange: DEFAULT_STATISTICS_FILTERS.booksOverTimeRange,
+      booksOverTimeGranularity: DEFAULT_STATISTICS_FILTERS.booksOverTimeGranularity,
+    },
+  };
 }
 
 // Generic wrapper returned by all statistics endpoints.
@@ -78,6 +116,55 @@ export interface MetadataCompletenessItem {
 export interface GenreDistributionItem {
   genre: string;
   count: number;
+}
+
+export interface MetadataScoreDistributionBin {
+  minScore: number;
+  maxScore: number;
+  count: number;
+}
+
+export interface MetadataScoreDistribution {
+  bins: MetadataScoreDistributionBin[];
+  unknownCount: number;
+  totalCount: number;
+  percentile25: number | null;
+  percentile50: number | null;
+  percentile75: number | null;
+  percentile90: number | null;
+}
+
+export interface LibraryMetadataCompletenessItem {
+  libraryId: number;
+  libraryName: string;
+  field: string;
+  presentCount: number;
+  totalCount: number;
+  percent: number;
+}
+
+export interface FormatShareOverTimeItem {
+  year: number;
+  month: number;
+  format: string;
+  count: number;
+}
+
+export interface GenreRankOverTimeItem {
+  year: number;
+  genre: string;
+  rank: number;
+  count: number;
+}
+
+export interface PageCountDistributionItem {
+  format: string;
+  count: number;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
 }
 
 export interface StatisticsSummary {

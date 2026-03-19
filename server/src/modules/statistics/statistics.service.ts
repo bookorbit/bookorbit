@@ -2,11 +2,16 @@ import { Injectable } from '@nestjs/common';
 
 import type {
   BooksAddedDataPoint,
+  FormatShareOverTimeItem,
   StatisticsSummary,
+  GenreRankOverTimeItem,
   FormatDistributionItem,
   GenreDistributionItem,
+  LibraryMetadataCompletenessItem,
   LanguageDistributionItem,
+  MetadataScoreDistribution,
   MetadataCompletenessItem,
+  PageCountDistributionItem,
   PublicationDecadeItem,
   StatisticsResult,
   StorageByFormatItem,
@@ -19,6 +24,8 @@ import type { StatisticsFilterQueryDto } from './dto/statistics-filter-query.dto
 import { StatisticsRepository } from './statistics.repository';
 
 const STATISTICS_TOP_N = 10;
+const STREAM_TOP_FORMATS = 8;
+const BUMP_TOP_GENRES = 8;
 
 @Injectable()
 export class StatisticsService {
@@ -39,6 +46,149 @@ export class StatisticsService {
   async getBooksAddedOverTime(user: RequestUser, query: BooksOverTimeQueryDto): Promise<StatisticsResult<BooksAddedDataPoint>> {
     const items = await this.repo.booksAddedOverTime(user.id, user.isSuperuser, query.libraryIds, query.granularity, query.range);
     return { items, unknownCount: 0 };
+  }
+
+  async getMetadataScoreDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<MetadataScoreDistribution> {
+    const raw = await this.repo.metadataScoreDistribution(user.id, user.isSuperuser, query.libraryIds);
+    const byMin = new Map(raw.bins.map((b) => [b.minScore, b.count]));
+    const bins = Array.from({ length: 10 }, (_, i) => {
+      const minScore = i * 10;
+      const maxScore = i === 9 ? 100 : minScore + 9;
+      return {
+        minScore,
+        maxScore,
+        count: byMin.get(minScore) ?? 0,
+      };
+    });
+
+    return {
+      bins,
+      unknownCount: raw.unknownCount,
+      totalCount: raw.totalCount,
+      percentile25: raw.percentile25,
+      percentile50: raw.percentile50,
+      percentile75: raw.percentile75,
+      percentile90: raw.percentile90,
+    };
+  }
+
+  async getLibraryMetadataCompleteness(
+    user: RequestUser,
+    query: StatisticsFilterQueryDto,
+  ): Promise<StatisticsResult<LibraryMetadataCompletenessItem>> {
+    const rows = await this.repo.libraryMetadataCompleteness(user.id, user.isSuperuser, query.libraryIds);
+    const fieldDefs: Array<{ field: string; key: keyof (typeof rows)[number] }> = [
+      { field: 'Cover', key: 'hasCover' },
+      { field: 'Author', key: 'hasAuthor' },
+      { field: 'Description', key: 'hasDescription' },
+      { field: 'Publisher', key: 'hasPublisher' },
+      { field: 'Year', key: 'hasYear' },
+      { field: 'Language', key: 'hasLanguage' },
+      { field: 'Page Count', key: 'hasPageCount' },
+      { field: 'Rating', key: 'hasRating' },
+      { field: 'Series', key: 'hasSeries' },
+      { field: 'ISBN', key: 'hasIsbn' },
+    ];
+
+    const items: LibraryMetadataCompletenessItem[] = rows.flatMap((row) =>
+      fieldDefs.map((f) => {
+        const presentCount = Number(row[f.key] ?? 0);
+        const totalCount = row.total ?? 0;
+        return {
+          libraryId: row.libraryId,
+          libraryName: row.libraryName,
+          field: f.field,
+          presentCount,
+          totalCount,
+          percent: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0,
+        };
+      }),
+    );
+
+    return { items, unknownCount: 0 };
+  }
+
+  async getFormatShareOverTime(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<FormatShareOverTimeItem>> {
+    const raw = await this.repo.formatShareOverTime(user.id, user.isSuperuser, query.libraryIds);
+    const totals = new Map<string, number>();
+    for (const row of raw) {
+      const format = (row.format ?? 'unknown').toUpperCase();
+      totals.set(format, (totals.get(format) ?? 0) + row.count);
+    }
+
+    const topFormats = new Set(
+      [...totals.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, STREAM_TOP_FORMATS)
+        .map(([f]) => f),
+    );
+
+    const grouped = new Map<string, FormatShareOverTimeItem>();
+    for (const row of raw) {
+      const normalizedFormat = (row.format ?? 'unknown').toUpperCase();
+      const format = topFormats.has(normalizedFormat) ? normalizedFormat : 'OTHER';
+      const key = `${row.year}-${row.month}-${format}`;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.count += row.count;
+        continue;
+      }
+      grouped.set(key, { year: row.year, month: row.month, format, count: row.count });
+    }
+
+    const items = [...grouped.values()].sort((a, b) => a.year - b.year || a.month - b.month || a.format.localeCompare(b.format));
+    return { items, unknownCount: 0 };
+  }
+
+  async getGenreRankOverTime(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<GenreRankOverTimeItem>> {
+    const raw = await this.repo.genreCountsByYear(user.id, user.isSuperuser, query.libraryIds);
+    if (raw.length === 0) return { items: [], unknownCount: 0 };
+
+    const genreTotals = new Map<string, number>();
+    for (const row of raw) {
+      genreTotals.set(row.genre, (genreTotals.get(row.genre) ?? 0) + row.count);
+    }
+
+    const trackedGenres = [...genreTotals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, BUMP_TOP_GENRES)
+      .map(([genre]) => genre);
+
+    const trackedSet = new Set(trackedGenres);
+    const years = [...new Set(raw.map((r) => r.year))].sort((a, b) => a - b);
+    const countsByYearGenre = new Map<string, number>();
+    for (const row of raw) {
+      if (!trackedSet.has(row.genre)) continue;
+      countsByYearGenre.set(`${row.year}|${row.genre}`, row.count);
+    }
+
+    const items: GenreRankOverTimeItem[] = [];
+    for (const year of years) {
+      const entries = trackedGenres.map((genre) => ({
+        genre,
+        count: countsByYearGenre.get(`${year}|${genre}`) ?? 0,
+      }));
+      entries.sort((a, b) => b.count - a.count || a.genre.localeCompare(b.genre));
+      entries.forEach((entry, i) => {
+        items.push({ year, genre: entry.genre, rank: i + 1, count: entry.count });
+      });
+    }
+
+    return { items, unknownCount: 0 };
+  }
+
+  async getPageCountDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<PageCountDistributionItem>> {
+    const { items: raw, unknownCount } = await this.repo.pageCountDistributionByFormat(user.id, user.isSuperuser, query.libraryIds);
+    const items = raw.map((row) => ({
+      format: row.format!.toUpperCase(),
+      count: row.count,
+      min: row.min,
+      q1: Number(row.q1),
+      median: Number(row.median),
+      q3: Number(row.q3),
+      max: row.max,
+    }));
+    return { items, unknownCount };
   }
 
   async getStorageByFormat(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<StorageByFormatItem>> {

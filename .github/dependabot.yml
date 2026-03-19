@@ -1,10 +1,19 @@
 version: 2
 updates:
+  # Monorepo – pnpm (Root, Server, Client, Packages)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
-    versioning-strategy: "auto"
+      day: "friday"
+      time: "03:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       production-dependencies:
         dependency-type: "production"
@@ -13,15 +22,33 @@ updates:
         dependency-type: "development"
         update-types: ["minor", "patch"]
 
+  # Docker – Root (Dev & Production Base Images)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "friday"
+      time: "03:00"
+      timezone: "UTC"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps)"
 
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "friday"
+      time: "03:00"
+      timezone: "UTC"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       github-actions:
         patterns: ["*"]

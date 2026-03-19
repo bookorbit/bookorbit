@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
+  BarChart3,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
@@ -34,6 +36,11 @@ const CHART_LABELS: Record<StatisticsChartId, string> = {
   'top-authors': 'Top 25 Authors',
   'metadata-completeness': 'Metadata Completeness',
   'genre-distribution': 'Genre Distribution',
+  'metadata-score-distribution': 'Metadata Score Distribution',
+  'library-metadata-completeness': 'Library Metadata Completeness',
+  'format-share-over-time': 'Format Share Over Time',
+  'genre-rank-over-time': 'Genre Rank Over Time',
+  'page-count-distribution': 'Page Count Distribution',
 }
 
 const CHART_ICONS: Record<StatisticsChartId, unknown> = {
@@ -45,6 +52,11 @@ const CHART_ICONS: Record<StatisticsChartId, unknown> = {
   'top-authors': Users,
   'metadata-completeness': ListChecks,
   'genre-distribution': Tag,
+  'metadata-score-distribution': BarChart3,
+  'library-metadata-completeness': ListChecks,
+  'format-share-over-time': TrendingUp,
+  'genre-rank-over-time': Tag,
+  'page-count-distribution': BookOpen,
 }
 
 const { orderedCharts, filters, init, toggleVisibility, reorder, resetToDefaults, setLibraryFilter } = useStatisticsConfig()

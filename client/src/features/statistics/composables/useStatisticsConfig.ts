@@ -1,33 +1,26 @@
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
-import type {
-  ChartConfigEntry,
-  StatisticsChartId,
-  StatisticsDateRange,
-  StatisticsFilterConfig,
-  StatisticsGranularity,
-  StatisticsSettings,
+import {
+  DEFAULT_STATISTICS_CHART_ORDER,
+  DEFAULT_STATISTICS_FILTERS,
+  type ChartConfigEntry,
+  type StatisticsChartId,
+  type StatisticsDateRange,
+  type StatisticsFilterConfig,
+  type StatisticsGranularity,
+  type StatisticsSettings,
 } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 
 // Must stay in sync with CHART_REGISTRY in StatisticsGrid.vue.
-const KNOWN_CHART_IDS: StatisticsChartId[] = [
-  'format-distribution',
-  'language-distribution',
-  'books-added-over-time',
-  'storage-by-format',
-  'publication-decade',
-  'top-authors',
-  'metadata-completeness',
-  'genre-distribution',
-]
+const KNOWN_CHART_IDS: StatisticsChartId[] = [...DEFAULT_STATISTICS_CHART_ORDER]
 
 const DEFAULT_FILTERS: StatisticsFilterConfig = {
-  libraryIds: [],
-  booksOverTimeGranularity: 'monthly',
-  booksOverTimeRange: 'all-time',
+  libraryIds: [...DEFAULT_STATISTICS_FILTERS.libraryIds],
+  booksOverTimeGranularity: DEFAULT_STATISTICS_FILTERS.booksOverTimeGranularity,
+  booksOverTimeRange: DEFAULT_STATISTICS_FILTERS.booksOverTimeRange,
 }
 
 const config = ref<ChartConfigEntry[]>([])

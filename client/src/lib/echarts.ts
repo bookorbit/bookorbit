@@ -1,12 +1,37 @@
 import { use, registerTheme } from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
+import { BarChart, BoxplotChart, HeatmapChart, LineChart, PieChart, SunburstChart } from 'echarts/charts'
+import {
+  CalendarComponent,
+  GridComponent,
+  LegendComponent,
+  MarkAreaComponent,
+  MarkLineComponent,
+  TitleComponent,
+  TooltipComponent,
+  VisualMapComponent,
+} from 'echarts/components'
 
 // SVG renderer: events fire on real DOM elements, not via canvas hit-test.
 // This eliminates the cursor-flicker / hover-disappear bug that canvas
 // hit-test coordinate mismatches cause with this layout.
-use([SVGRenderer, PieChart, BarChart, LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
+use([
+  SVGRenderer,
+  PieChart,
+  BarChart,
+  LineChart,
+  HeatmapChart,
+  BoxplotChart,
+  SunburstChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  CalendarComponent,
+  VisualMapComponent,
+  MarkLineComponent,
+  MarkAreaComponent,
+])
 
 function readCssColor(varName: string): string {
   const el = document.createElement('span')
