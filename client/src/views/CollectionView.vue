@@ -20,6 +20,7 @@ import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { usePageTitle } from '@/composables/usePageTitle'
 import type { BookCard } from '@projectx/types'
 
 const route = useRoute()
@@ -29,6 +30,11 @@ const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const collectionId = computed(() => Number(route.params.id))
 const { collections, fetchCollections, removeBooksFromCollection } = useCollections()
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
+const pageTitle = computed(() => {
+  if (collection.value?.name) return `Collection · ${collection.value.name}`
+  return Number.isFinite(collectionId.value) ? `Collection #${collectionId.value}` : 'Collection'
+})
+usePageTitle(pageTitle)
 
 const { items: books, total, loading, hasMore, load } = useCollectionBooks(collectionId)
 const { setBookContext, registerLoadMore } = useBookNavigation()

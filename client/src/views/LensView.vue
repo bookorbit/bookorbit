@@ -20,6 +20,7 @@ import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { usePageTitle } from '@/composables/usePageTitle'
 import type { BookCard, GroupRule, SortField } from '@projectx/types'
 
 const route = useRoute()
@@ -52,6 +53,11 @@ onUnmounted(() => {
 const { lenses, fetchLenses, deleteLens } = useLenses()
 
 const lens = computed(() => lenses.value.find((l) => l.id === lensId.value))
+const pageTitle = computed(() => {
+  if (lens.value?.name) return `Lens · ${lens.value.name}`
+  return Number.isFinite(lensId.value) ? `Lens #${lensId.value}` : 'Lens'
+})
+usePageTitle(pageTitle)
 
 const sortChip = computed(() => {
   const specs = lens.value?.defaultSort

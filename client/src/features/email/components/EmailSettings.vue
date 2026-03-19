@@ -12,31 +12,16 @@ import { useEmailProviders } from '../composables/useEmailProviders'
 import { useEmailRecipients } from '../composables/useEmailRecipients'
 import { useEmailTemplates } from '../composables/useEmailTemplates'
 import { useEmailGroups } from '../composables/useEmailGroups'
+import { EMAIL_TAB_LABELS, EMAIL_TABS, normalizeEmailTab, type EmailTab as Tab } from '@/features/email/lib/email-tabs'
 
 const { fetchProviders } = useEmailProviders()
 const { fetchRecipients } = useEmailRecipients()
 const { fetchTemplates } = useEmailTemplates()
 const { fetchGroups } = useEmailGroups()
 
-type Tab = 'providers' | 'recipients' | 'groups' | 'templates' | 'preferences' | 'history'
-
 const route = useRoute()
 const router = useRouter()
-
-function normalizeTab(value: unknown): Tab {
-  if (
-    value === 'providers' ||
-    value === 'recipients' ||
-    value === 'groups' ||
-    value === 'templates' ||
-    value === 'preferences' ||
-    value === 'history'
-  )
-    return value
-  return 'providers'
-}
-
-const activeTab = ref<Tab>(normalizeTab(route.query.tab))
+const activeTab = ref<Tab>(normalizeEmailTab(route.query.tab))
 
 if (!route.query.tab) {
   router.replace({ name: 'settings-email', query: { ...route.query, tab: activeTab.value } })
@@ -45,7 +30,7 @@ if (!route.query.tab) {
 watch(
   () => route.query.tab,
   (value) => {
-    activeTab.value = normalizeTab(value)
+    activeTab.value = normalizeEmailTab(value)
   },
 )
 
@@ -57,14 +42,7 @@ function selectTab(tab: Tab) {
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'providers', label: 'Providers' },
-  { id: 'recipients', label: 'Recipients' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'templates', label: 'Templates' },
-  { id: 'preferences', label: 'Preferences' },
-  { id: 'history', label: 'History' },
-]
+const tabs: { id: Tab; label: string }[] = EMAIL_TABS.map((id) => ({ id, label: EMAIL_TAB_LABELS[id] }))
 
 onMounted(async () => {
   try {

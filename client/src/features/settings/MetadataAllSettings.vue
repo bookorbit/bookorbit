@@ -7,18 +7,12 @@ import BookMetadataFetchSettings from './metadata-auto-fetch/BookMetadataFetchSe
 import AuthorEnrichmentSettings from './AuthorEnrichmentSettings.vue'
 import MetadataFileSyncSettings from './MetadataFileSyncSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-
-type Tab = 'providers' | 'score' | 'auto-fetch' | 'authors' | 'file-sync'
+import { METADATA_TAB_INFO, METADATA_TABS, normalizeMetadataTab, type MetadataTab as Tab } from './lib/metadata-tabs'
 
 const route = useRoute()
 const router = useRouter()
 
-function normalizeTab(value: unknown): Tab {
-  if (value === 'providers' || value === 'score' || value === 'auto-fetch' || value === 'authors' || value === 'file-sync') return value
-  return 'providers'
-}
-
-const activeTab = ref<Tab>(normalizeTab(route.query.tab))
+const activeTab = ref<Tab>(normalizeMetadataTab(route.query.tab))
 
 if (!route.query.tab) {
   router.replace({ name: 'settings-admin-metadata', query: { ...route.query, tab: activeTab.value } })
@@ -27,31 +21,18 @@ if (!route.query.tab) {
 watch(
   () => route.query.tab,
   (value) => {
-    activeTab.value = normalizeTab(value)
+    activeTab.value = normalizeMetadataTab(value)
   },
 )
 
-const tabs: { id: Tab; label: string; subtitle: string }[] = [
-  {
-    id: 'providers',
-    label: 'Source & Priority',
-    subtitle: 'Define how book information is collected from external services and prioritized across your libraries.',
-  },
-  { id: 'score', label: 'Confidence Score', subtitle: 'Assign weights to metadata fields to calculate how much to trust fetched results.' },
-  {
-    id: 'auto-fetch',
-    label: 'Book Auto-Fetch',
-    subtitle: 'Automatically fetch covers, descriptions, and other details when new books are added to your library.',
-  },
-  {
-    id: 'authors',
-    label: 'Author Auto-Fetch',
-    subtitle: 'Automatically fetch biographies and profile photos when new authors appear in your library.',
-  },
-  { id: 'file-sync', label: 'File Write-Back', subtitle: 'Configure which metadata fields are saved directly into your book files on disk.' },
-]
+const tabs = METADATA_TABS.map((id) => ({
+  id,
+  navLabel: METADATA_TAB_INFO[id].navLabel,
+  titleLabel: METADATA_TAB_INFO[id].titleLabel,
+  subtitle: METADATA_TAB_INFO[id].subtitle,
+}))
 
-const activeTabInfo = computed(() => tabs.find((t) => t.id === activeTab.value)!)
+const activeTabInfo = computed(() => METADATA_TAB_INFO[activeTab.value])
 
 const tabWidths: Record<Tab, string> = {
   providers: 'max-w-5xl',
@@ -69,7 +50,7 @@ function selectTab(tab: Tab) {
 
 <template>
   <div>
-    <SettingsPageHeader :title="activeTabInfo.label" :subtitle="activeTabInfo.subtitle" />
+    <SettingsPageHeader :title="activeTabInfo.titleLabel" :subtitle="activeTabInfo.subtitle" />
 
     <div class="flex gap-1 mb-6 border-b border-border overflow-x-auto">
       <button
@@ -83,17 +64,7 @@ function selectTab(tab: Tab) {
         "
         @click="selectTab(tab.id)"
       >
-        {{
-          tab.id === 'providers'
-            ? 'Providers'
-            : tab.id === 'score'
-              ? 'Score'
-              : tab.id === 'auto-fetch'
-                ? 'Books'
-                : tab.id === 'authors'
-                  ? 'Authors'
-                  : 'File Sync'
-        }}
+        {{ tab.navLabel }}
       </button>
     </div>
 

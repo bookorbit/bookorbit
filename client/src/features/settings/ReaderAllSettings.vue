@@ -6,18 +6,12 @@ import ReaderSettings from './ReaderSettings.vue'
 import EbookSettings from './EbookSettings.vue'
 import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
-
-type Tab = 'general' | 'ebook' | 'pdf' | 'comics'
+import { READER_TAB_LABELS, READER_TABS, normalizeReaderTab, type ReaderTab as Tab } from './lib/reader-tabs'
 
 const route = useRoute()
 const router = useRouter()
 
-function normalizeTab(value: unknown): Tab {
-  if (value === 'general' || value === 'ebook' || value === 'pdf' || value === 'comics') return value
-  return 'ebook'
-}
-
-const activeTab = ref<Tab>(normalizeTab(route.query.tab))
+const activeTab = ref<Tab>(normalizeReaderTab(route.query.tab))
 
 if (!route.query.tab) {
   router.replace({ name: 'settings-reader-general', query: { ...route.query, tab: activeTab.value } })
@@ -26,16 +20,13 @@ if (!route.query.tab) {
 watch(
   () => route.query.tab,
   (value) => {
-    activeTab.value = normalizeTab(value)
+    activeTab.value = normalizeReaderTab(value)
   },
 )
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'ebook', label: 'eBook' },
-  { id: 'pdf', label: 'PDF' },
-  { id: 'comics', label: 'Comics' },
-  { id: 'general', label: 'General' },
-]
+const tabs: { id: Tab; label: string }[] = READER_TABS.slice()
+  .sort((a, b) => (a === 'general' ? 1 : b === 'general' ? -1 : 0))
+  .map((id) => ({ id, label: READER_TAB_LABELS[id] }))
 
 function selectTab(tab: Tab) {
   activeTab.value = tab

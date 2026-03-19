@@ -4,12 +4,19 @@ import { useRoute } from 'vue-router'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
+import { usePageTitle } from '@/composables/usePageTitle'
 
 const route = useRoute()
 
 const bookId = computed(() => Number(route.params.bookId))
 
 const { detail, loading, fetch } = useBookDetail()
+const pageTitle = computed(() => {
+  const title = detail.value?.title?.trim()
+  const base = title || (Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book')
+  return `Files · ${base}`
+})
+usePageTitle(pageTitle)
 
 watch(bookId, (id) => fetch(id), { immediate: true })
 </script>

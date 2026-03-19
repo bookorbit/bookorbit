@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { AuthorDetail } from '@projectx/types'
-import { MoreHorizontal, Pencil, RefreshCcw, UsersRound, X } from 'lucide-vue-next'
+import { MoreHorizontal, Pencil, RefreshCcw, Trash2, UsersRound, X } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const props = defineProps<{
@@ -12,6 +12,7 @@ const props = defineProps<{
   loadingPreview?: boolean
   canUpdate?: boolean
   canMerge?: boolean
+  canDelete?: boolean
   refreshing?: boolean
 }>()
 
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   edit: []
   merge: []
   refresh: []
+  delete: []
 }>()
 
 const initials = computed(() => {
@@ -49,7 +51,7 @@ const previewProviderLabel = computed(() => {
   return props.previewProvider
 })
 
-const showMenu = computed(() => props.canUpdate || props.canMerge)
+const showMenu = computed(() => props.canUpdate || props.canMerge || props.canDelete)
 
 const imageLightboxOpen = ref(false)
 const canOpenImageLightbox = computed(() => Boolean(props.imageUrl))
@@ -102,6 +104,11 @@ const canOpenImageLightbox = computed(() => Boolean(props.imageUrl))
                 <DropdownMenuItem v-if="canUpdate" :disabled="refreshing" @click="emit('refresh')">
                   <RefreshCcw class="mr-2 h-4 w-4" :class="refreshing ? 'animate-spin' : ''" />
                   {{ refreshing ? 'Refreshing...' : 'Refresh Metadata' }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator v-if="canDelete && (canUpdate || canMerge)" />
+                <DropdownMenuItem v-if="canDelete" class="text-destructive focus:text-destructive" @click="emit('delete')">
+                  <Trash2 class="mr-2 h-4 w-4" />
+                  Delete Author
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

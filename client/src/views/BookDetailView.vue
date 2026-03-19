@@ -6,12 +6,19 @@ import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
+import { usePageTitle } from '@/composables/usePageTitle'
 
 const route = useRoute()
 
 const bookId = computed(() => Number(route.params.bookId))
 
 const { detail, loading, fetch } = useBookDetail()
+const pageTitle = computed(() => {
+  const title = detail.value?.title?.trim()
+  if (title) return `Book · ${title}`
+  return Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book'
+})
+usePageTitle(pageTitle)
 
 const { subscribeLibrary } = useScanProgress()
 watch(

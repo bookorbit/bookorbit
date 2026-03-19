@@ -27,6 +27,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { usePageTitle } from '@/composables/usePageTitle'
 import type { GroupRule, SortSpec } from '@projectx/types'
 
 const route = useRoute()
@@ -39,6 +40,11 @@ const libraryId = shallowRef<number | null>(route.params.id ? Number(route.param
 const currentLibrary = computed(() => libraries.value.find((l) => l.id === libraryId.value))
 const title = computed(() => currentLibrary.value?.name ?? 'Library')
 const libraryIcon = computed(() => currentLibrary.value?.icon ?? 'BookOpen')
+const pageTitle = computed(() => {
+  if (currentLibrary.value?.name) return `Library · ${currentLibrary.value.name}`
+  return libraryId.value === null ? 'Library' : `Library #${libraryId.value}`
+})
+usePageTitle(pageTitle)
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()

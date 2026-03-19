@@ -10,9 +10,10 @@ import BookListRow from '@/features/book/components/BookListRow.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { usePageTitle } from '@/composables/usePageTitle'
 import AuthorHeader from '../components/AuthorHeader.vue'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
-import { fetchAuthors, mergeAuthors, refreshAuthorMetadata, updateAuthor } from '../api/author'
+import { deleteAuthors, fetchAuthors, mergeAuthors, refreshAuthorMetadata, updateAuthor } from '../api/author'
 import { useAuthorBooks } from '../composables/useAuthorBooks'
 import { useAuthorDetail } from '../composables/useAuthorDetail'
 import { useAuthorMetadataPreview } from '../composables/useAuthorMetadataPreview'
@@ -28,6 +29,11 @@ const authorId = computed(() => Number(route.params.id))
 const { author, loading: loadingAuthor, error: authorError, load: loadAuthor } = useAuthorDetail(authorId)
 const { items: books, total, loading: loadingBooks, error: booksError, hasMore, sort, order, libraryId, load: loadBooks } = useAuthorBooks(authorId)
 const authorName = computed(() => author.value?.name ?? '')
+const pageTitle = computed(() => {
+  if (author.value?.name) return `Author · ${author.value.name}`
+  return Number.isFinite(authorId.value) ? `Author #${authorId.value}` : 'Author'
+})
+usePageTitle(pageTitle)
 const {
   preview: metadataPreview,
   loading: loadingMetadataPreview,
@@ -38,12 +44,15 @@ const {
 
 const canUpdate = computed(() => hasPermission('library_edit_metadata'))
 const canMerge = computed(() => isSuperuser.value)
+const canDelete = computed(() => isSuperuser.value)
 
 const editOpen = ref(false)
 const mergeOpen = ref(false)
 const confirmMergeOpen = ref(false)
+const confirmDeleteOpen = ref(false)
 const savingEdit = ref(false)
 const merging = ref(false)
+const deleting = ref(false)
 const refreshingMetadata = ref(false)
 
 const draftName = ref('')
@@ -206,6 +215,22 @@ async function runMerge() {
   }
 }
 
+async function runDelete() {
+  if (!author.value || deleting.value) return
+
+  confirmDeleteOpen.value = false
+  deleting.value = true
+  try {
+    const result = await deleteAuthors({ authorIds: [author.value.id] })
+    toast.success(`Deleted author; affected ${result.affectedBookCount} books`)
+    await router.push({ name: 'authors' })
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Failed to delete author')
+  } finally {
+    deleting.value = false
+  }
+}
+
 function promptRunMerge() {
   if (!author.value || merging.value || selectedMergeIds.value.length === 0) return
   confirmMergeOpen.value = true
@@ -317,10 +342,12 @@ watch(authorName, () => {
       :loading-preview="loadingMetadataPreview"
       :can-update="canUpdate"
       :can-merge="canMerge"
+      :can-delete="canDelete"
       :refreshing="refreshingMetadata"
       @edit="toggleEdit"
       @merge="toggleMerge"
       @refresh="refreshMetadata"
+      @delete="confirmDeleteOpen = true"
     />
 
     <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -449,6 +476,17 @@ watch(authorName, () => {
       </div>
     </section>
   </main>
+
+  <AuthorConfirmDialog
+    :open="confirmDeleteOpen"
+    title="Delete author?"
+    description="This removes the author from the catalog and unlinks it from associated books. This action cannot be undone."
+    confirm-label="Delete"
+    :loading="deleting"
+    destructive
+    @confirm="runDelete"
+    @cancel="confirmDeleteOpen = false"
+  />
 
   <AuthorConfirmDialog
     :open="confirmMergeOpen"
