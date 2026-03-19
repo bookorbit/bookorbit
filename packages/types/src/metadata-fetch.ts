@@ -35,6 +35,19 @@ export interface MetadataProviderInfo {
   identifiable: boolean;
 }
 
+export interface ProviderThrottleRuntimeState {
+  key: MetadataProviderKey;
+  throttled: boolean;
+  throttledUntil: string | null;
+  remainingSeconds: number;
+  backoffLevel: number;
+}
+
+export interface ProviderThrottleRuntimeSnapshot {
+  observedAt: string;
+  providers: ProviderThrottleRuntimeState[];
+}
+
 export interface MetadataSource {
   title: string | null;
   subtitle: string | null;
@@ -50,4 +63,3 @@ export interface MetadataSource {
   authors: string[];
   genres: string[];
 }
-

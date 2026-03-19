@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { fetchWithThrottle } from '../../fetch-with-throttle';
+import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapGoodreadsApolloState } from './goodreads.mapper';
@@ -79,13 +81,14 @@ export class GoodreadsProvider implements IdentifiableProvider {
 
   private async fetchHtml(url: string): Promise<string | null> {
     try {
-      const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
+      const res = await fetchWithThrottle(url, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.warn(`Goodreads returned ${res.status} for ${url}`);
         return null;
       }
       return res.text();
     } catch (err) {
+      if (err instanceof ProviderThrottleError) throw err;
       this.logger.warn(`Goodreads fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }

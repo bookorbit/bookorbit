@@ -1,24 +1,31 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import type { FieldPreference, MetadataField, ProviderConfigurations } from '@projectx/types'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import ProviderConfigPanel from './components/ProviderConfigPanel.vue'
 import GlobalPreferencePanel from './components/GlobalPreferencePanel.vue'
 import LibraryPreferencePanel from './components/LibraryPreferencePanel.vue'
 import { useProviderConfig } from './composables/useProviderConfig'
+import { useProviderThrottleRuntime } from './composables/useProviderThrottleRuntime'
 import { useMetadataPreferences } from './composables/useMetadataPreferences'
 import { Info } from 'lucide-vue-next'
 
 const { config, statuses, saving: savingProviders, fetchConfig, saveConfig } = useProviderConfig()
+const { runtimeByKey, startPolling, stopPolling } = useProviderThrottleRuntime()
 const { globalPrefs, libraryPrefs, savingGlobal, savingField, fetchGlobal, saveGlobal, fetchLibrary, saveFieldOverride, resetLibrary } =
   useMetadataPreferences()
 const { libraries, fetchLibraries } = useLibraries()
 
-onMounted(async () => {
-  await Promise.all([fetchConfig(), fetchGlobal(), fetchLibraries()])
+onMounted(() => {
+  startPolling()
+  void Promise.all([fetchConfig(), fetchGlobal(), fetchLibraries()]).catch(() => undefined)
 })
 
 const fetchedLibraryIds = new Set<number>()
+
+onUnmounted(() => {
+  stopPolling()
+})
 
 watch(libraries, async (libs) => {
   const newLibs = libs.filter((lib) => !fetchedLibraryIds.has(lib.id))
@@ -43,6 +50,7 @@ async function onResetLibrary(libraryId: number) {
       <ProviderConfigPanel
         :config="config"
         :statuses="statuses"
+        :runtime-by-key="runtimeByKey"
         :saving="savingProviders"
         @save="saveConfig($event as Partial<ProviderConfigurations>)"
       />

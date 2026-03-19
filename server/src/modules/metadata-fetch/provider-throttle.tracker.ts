@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot, ProviderThrottleRuntimeState } from '@projectx/types';
 
 const DEFAULT_SCHEDULE = [120, 300, 600, 1800, 3600];
 
@@ -48,5 +48,26 @@ export class ProviderThrottleTracker {
       if (now < until) return true;
     }
     return false;
+  }
+
+  snapshot(keys: MetadataProviderKey[]): ProviderThrottleRuntimeSnapshot {
+    const now = Date.now();
+    const unique = [...new Set(keys)];
+    return {
+      observedAt: new Date(now).toISOString(),
+      providers: unique.map((key) => this.buildState(key, now)),
+    };
+  }
+
+  private buildState(key: MetadataProviderKey, now: number): ProviderThrottleRuntimeState {
+    const until = this.throttledUntil.get(key);
+    const throttled = until !== undefined && now < until;
+    return {
+      key,
+      throttled,
+      throttledUntil: throttled ? new Date(until).toISOString() : null,
+      remainingSeconds: throttled ? Math.ceil((until - now) / 1000) : 0,
+      backoffLevel: this.backoffLevel.get(key) ?? 0,
+    };
   }
 }

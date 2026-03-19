@@ -3,6 +3,7 @@ import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
+import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { mapITunesResult } from './itunes.mapper';
@@ -42,6 +43,7 @@ export class ITunesProvider implements IdentifiableProvider {
       const body = (await res.json()) as ITunesResponse;
       return body.results.map(mapITunesResult);
     } catch (err) {
+      if (err instanceof ProviderThrottleError) throw err;
       this.logger.error(`iTunes search failed: ${err instanceof Error ? err.message : String(err)}`);
       return [];
     }
@@ -63,6 +65,7 @@ export class ITunesProvider implements IdentifiableProvider {
       const body = (await res.json()) as ITunesResponse;
       return body.results.length > 0 ? mapITunesResult(body.results[0]) : null;
     } catch (err) {
+      if (err instanceof ProviderThrottleError) throw err;
       this.logger.error(`iTunes lookup failed: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }

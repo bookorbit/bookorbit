@@ -1,18 +1,33 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Loader2, Save } from 'lucide-vue-next'
-import type { ProviderConfigurations, ProviderStatus } from '@projectx/types'
+import type { MetadataProviderKey, ProviderConfigurations, ProviderStatus, ProviderThrottleRuntimeState } from '@projectx/types'
 import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
   config: ProviderConfigurations | null
   statuses: ProviderStatus[]
+  runtimeByKey?: Partial<Record<MetadataProviderKey, ProviderThrottleRuntimeState>>
   saving: boolean
 }>()
 
 const emit = defineEmits<{ save: [patch: Partial<ProviderConfigurations>] }>()
 
 const draft = ref<ProviderConfigurations | null>(null)
+const nowMs = ref(Date.now())
+let nowTicker: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  nowTicker = setInterval(() => {
+    nowMs.value = Date.now()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (!nowTicker) return
+  clearInterval(nowTicker)
+  nowTicker = null
+})
 
 watch(
   () => props.config,
@@ -77,6 +92,41 @@ function statusFor(key: string) {
   return props.statuses.find((s) => s.key === key)
 }
 
+function runtimeFor(key: string): ProviderThrottleRuntimeState | undefined {
+  return props.runtimeByKey?.[key as MetadataProviderKey]
+}
+
+function throttleSecondsLeft(key: string): number | null {
+  const state = runtimeFor(key)
+  if (!state?.throttled || !state.throttledUntil) return null
+  const remaining = Math.ceil((Date.parse(state.throttledUntil) - nowMs.value) / 1000)
+  return remaining > 0 ? remaining : null
+}
+
+function isThrottled(key: string): boolean {
+  return throttleSecondsLeft(key) !== null
+}
+
+function throttleMessage(key: string): string | null {
+  const seconds = throttleSecondsLeft(key)
+  if (seconds === null) return null
+  return `Retry in ${formatDuration(seconds)}`
+}
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds >= 3600) {
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+  if (totalSeconds >= 60) {
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes}m ${seconds}s`
+  }
+  return `${totalSeconds}s`
+}
+
 function save() {
   if (!draft.value) return
   emit('save', draft.value)
@@ -112,6 +162,13 @@ function save() {
                 Setup Required
               </Badge>
               <Badge
+                v-else-if="isThrottled(row.key)"
+                variant="outline"
+                class="h-4 px-1.5 text-[9px] font-bold uppercase tracking-wide text-amber-600 border-amber-500/30 bg-amber-500/5"
+              >
+                Throttled
+              </Badge>
+              <Badge
                 v-else
                 variant="outline"
                 class="h-4 px-1.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600 border-emerald-500/30 bg-emerald-500/5"
@@ -122,6 +179,9 @@ function save() {
           </div>
           <p v-if="row.hint" class="settings-hint max-w-sm">
             {{ row.hint }}
+          </p>
+          <p v-if="throttleMessage(row.key)" class="text-xs text-amber-600">
+            {{ throttleMessage(row.key) }}
           </p>
         </div>
 

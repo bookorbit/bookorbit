@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
 import type { Mocked } from 'vitest';
 import { firstValueFrom, of, toArray } from 'rxjs';
 
@@ -8,11 +8,13 @@ import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
 describe('MetadataFetchController', () => {
   let service: Mocked<MetadataFetchService>;
   let registry: Mocked<ProviderRegistry>;
   let providerConfig: Mocked<ProviderConfigService>;
+  let throttleTracker: Mocked<ProviderThrottleTracker>;
   let controller: MetadataFetchController;
 
   beforeEach(() => {
@@ -28,9 +30,14 @@ describe('MetadataFetchController', () => {
 
     providerConfig = {
       getConfig: vi.fn().mockResolvedValue({}),
+      getProviderStatuses: vi.fn(),
     } as unknown as Mocked<ProviderConfigService>;
 
-    controller = new MetadataFetchController(service, registry, providerConfig);
+    throttleTracker = {
+      snapshot: vi.fn(),
+    } as unknown as Mocked<ProviderThrottleTracker>;
+
+    controller = new MetadataFetchController(service, registry, providerConfig, throttleTracker);
   });
 
   it('returns provider metadata for UI configuration', async () => {
@@ -108,5 +115,41 @@ describe('MetadataFetchController', () => {
 
     expect(service.lookupById).toHaveBeenCalledWith(MetadataProviderKey.AMAZON, 'B123');
     expect(result).toEqual({ provider: MetadataProviderKey.AMAZON, providerId: 'B123', title: 'Amazon Title' });
+  });
+
+  it('returns runtime provider throttle state for admin metadata settings', async () => {
+    const config = { google: { enabled: true, apiKey: '' } };
+    providerConfig.getConfig.mockResolvedValue(config as never);
+    providerConfig.getProviderStatuses.mockResolvedValue([
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', enabled: true, configured: true },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'Open Library', enabled: true, configured: true },
+      { key: MetadataProviderKey.HARDCOVER, label: 'Hardcover', enabled: true, configured: true },
+    ] as never);
+    registry.all.mockReturnValue([
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'Open Library', identifiable: true },
+    ] as never);
+
+    const runtime: ProviderThrottleRuntimeSnapshot = {
+      observedAt: '2026-04-08T12:00:00.000Z',
+      providers: [
+        {
+          key: MetadataProviderKey.GOOGLE,
+          throttled: true,
+          throttledUntil: '2026-04-08T12:05:00.000Z',
+          remainingSeconds: 300,
+          backoffLevel: 2,
+        },
+      ],
+    };
+    throttleTracker.snapshot.mockReturnValue(runtime);
+
+    const result = await controller.listProviderRuntime();
+
+    expect(providerConfig.getConfig).toHaveBeenCalledTimes(1);
+    expect(providerConfig.getProviderStatuses).toHaveBeenCalledWith(config);
+    expect(registry.all).toHaveBeenCalledTimes(1);
+    expect(throttleTracker.snapshot).toHaveBeenCalledWith([MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+    expect(result).toEqual(runtime);
   });
 });

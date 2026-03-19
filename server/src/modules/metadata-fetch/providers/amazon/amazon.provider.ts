@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { fetchWithThrottle } from '../../fetch-with-throttle';
+import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { extractAsins, parseBookPage } from './amazon.scraper';
@@ -89,13 +91,14 @@ export class AmazonProvider implements IdentifiableProvider {
   private async fetchHtml(url: string, cookie = ''): Promise<string | null> {
     const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
     try {
-      const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+      const res = await fetchWithThrottle(url, { headers, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.warn(`Amazon returned ${res.status} for ${url}`);
         return null;
       }
       return res.text();
     } catch (err) {
+      if (err instanceof ProviderThrottleError) throw err;
       this.logger.warn(`Amazon fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }

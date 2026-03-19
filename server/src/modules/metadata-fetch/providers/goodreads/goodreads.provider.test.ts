@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProviderConfigurations } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { ProviderThrottleError } from '../../provider-throttle.error';
 import { GoodreadsProvider } from './goodreads.provider';
 
 describe('GoodreadsProvider', () => {
@@ -147,6 +148,15 @@ describe('GoodreadsProvider', () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const result = await provider.search({ title: 'Test' });
       expect(result).toEqual([]);
+    });
+
+    it('should rethrow provider throttle errors', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        status: 429,
+        headers: { get: vi.fn().mockReturnValue('120') },
+      });
+
+      await expect(provider.search({ title: 'Test' })).rejects.toBeInstanceOf(ProviderThrottleError);
     });
 
     it('should sort results by relevance score', async () => {

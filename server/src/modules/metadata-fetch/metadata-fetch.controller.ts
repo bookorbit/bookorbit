@@ -1,13 +1,15 @@
 import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderInfo } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderInfo, Permission, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
 import { map, Observable } from 'rxjs';
 
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { LookupMetadataDto } from './dto/lookup-metadata.dto';
 import { MetadataSearchDto } from './dto/metadata-search.dto';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
 @Controller('metadata-fetch')
 export class MetadataFetchController {
@@ -15,6 +17,7 @@ export class MetadataFetchController {
     private readonly metadataFetchService: MetadataFetchService,
     private readonly registry: ProviderRegistry,
     private readonly providerConfig: ProviderConfigService,
+    private readonly throttleTracker: ProviderThrottleTracker,
   ) {}
 
   @Get('providers')
@@ -28,6 +31,16 @@ export class MetadataFetchController {
         label: p.label,
         identifiable: p.identifiable,
       }));
+  }
+
+  @Get('providers/runtime')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  async listProviderRuntime(): Promise<ProviderThrottleRuntimeSnapshot> {
+    const config = await this.providerConfig.getConfig();
+    const statuses = await this.providerConfig.getProviderStatuses(config);
+    const registered = new Set(this.registry.all().map((p) => p.key));
+    const keys = statuses.map((s) => s.key).filter((key) => registered.has(key));
+    return this.throttleTracker.snapshot(keys);
   }
 
   @Sse('stream')
