@@ -1,0 +1,45 @@
+name: Feature Request
+description: Suggest a new feature or improvement for ProjectX
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What's your idea?
+      description: A clear description of the feature you'd like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve?
+      description: Help us understand the motivation behind this request.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else? (optional)
+      description: Mockups, examples from other apps, implementation ideas, alternatives you've considered.
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Want to help?
+      options:
+        - "Yes, I'd like to implement this"
+        - "I can help test and give feedback"
+        - "Just sharing the idea"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I've searched existing issues and this hasn't been requested yet.
+          required: true

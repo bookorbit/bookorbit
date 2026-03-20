@@ -82,5 +82,3 @@ On `main` and tag pushes it:
 
 - builds the Docker image
 - pushes immutable tags to GHCR (`sha-*`)
-- scans the image with Trivy (high/critical)
-- generates an SPDX SBOM artifact

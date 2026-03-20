@@ -4,7 +4,7 @@
   "description": "",
   "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0",
   "scripts": {
     "prebuild": "pnpm --filter @projectx/types build",
     "build": "nest build",
@@ -25,11 +25,8 @@
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "vitest run",
-    "test:vitest": "vitest run",
     "test:watch": "vitest",
-    "test:vitest:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:vitest:cov": "vitest run --coverage",
     "test:e2e": "vitest run test/app.e2e-spec.ts"
   },
   "dependencies": {
