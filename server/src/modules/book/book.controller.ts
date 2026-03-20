@@ -31,6 +31,7 @@ import { ExportBooksDto } from './dto/export-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
+import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import type { BookQuery } from '@projectx/types';
 
@@ -310,6 +311,12 @@ export class BookController {
   @RequirePermission(Permission.KoboSync)
   getKoboState(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getKoboState(id, user);
+  }
+
+  @Patch(':id/status')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  setReadStatus(@Param('id', ParseIntPipe) id: number, @Body() dto: SetStatusDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.setReadStatus(id, dto.status, user);
   }
 
   @Get(':id')

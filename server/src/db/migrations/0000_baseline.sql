@@ -335,6 +335,17 @@ CREATE TABLE "reading_sessions" (
 	"end_progress" real
 );
 --> statement-breakpoint
+CREATE TABLE "user_book_status" (
+	"user_id" integer NOT NULL,
+	"book_id" integer NOT NULL,
+	"status" varchar(20) DEFAULT 'unread' NOT NULL,
+	"source" varchar(10) DEFAULT 'auto' NOT NULL,
+	"started_at" timestamp,
+	"finished_at" timestamp,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "user_book_status_user_id_book_id_pk" PRIMARY KEY("user_id","book_id")
+);
+--> statement-breakpoint
 CREATE TABLE "user_reading_daily_stats" (
 	"user_id" integer NOT NULL,
 	"library_id" integer NOT NULL,
@@ -601,6 +612,8 @@ ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_book_file_id_boo
 ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reading_sessions" ADD CONSTRAINT "reading_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reading_sessions" ADD CONSTRAINT "reading_sessions_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_book_status" ADD CONSTRAINT "user_book_status_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_book_status" ADD CONSTRAINT "user_book_status_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_reading_daily_stats" ADD CONSTRAINT "user_reading_daily_stats_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_reading_daily_stats" ADD CONSTRAINT "user_reading_daily_stats_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oidc_sessions" ADD CONSTRAINT "oidc_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -662,6 +675,8 @@ CREATE UNIQUE INDEX "rs_session_id_uidx" ON "reading_sessions" USING btree ("ses
 CREATE INDEX "rs_user_started_at_idx" ON "reading_sessions" USING btree ("user_id","started_at");--> statement-breakpoint
 CREATE INDEX "rs_book_file_started_at_idx" ON "reading_sessions" USING btree ("book_file_id","started_at");--> statement-breakpoint
 CREATE INDEX "rs_user_book_file_idx" ON "reading_sessions" USING btree ("user_id","book_file_id");--> statement-breakpoint
+CREATE INDEX "ubs_user_id_idx" ON "user_book_status" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "ubs_user_status_idx" ON "user_book_status" USING btree ("user_id","status");--> statement-breakpoint
 CREATE INDEX "urds_user_day_idx" ON "user_reading_daily_stats" USING btree ("user_id","day");--> statement-breakpoint
 CREATE INDEX "urds_user_library_day_idx" ON "user_reading_daily_stats" USING btree ("user_id","library_id","day");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_user_id_idx" ON "oidc_sessions" USING btree ("user_id");--> statement-breakpoint

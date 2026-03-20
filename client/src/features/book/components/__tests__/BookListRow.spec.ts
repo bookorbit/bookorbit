@@ -41,6 +41,7 @@ const missingBook: BookCard = {
   tags: [],
   rating: null,
   readingProgress: null,
+  readStatus: null,
   metadataScore: null,
   addedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -59,6 +60,7 @@ const presentBook: BookCard = {
   tags: [],
   rating: null,
   readingProgress: null,
+  readStatus: null,
   metadataScore: null,
   addedAt: '2026-01-01T00:00:00.000Z',
 }

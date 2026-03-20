@@ -4,6 +4,32 @@ import { bookFiles, books } from './books';
 import { libraries } from './libraries';
 import { users } from './auth';
 
+export const userBookStatus = pgTable(
+  'user_book_status',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    // 'unread' | 'reading' | 'read' | 'abandoned'
+    status: varchar('status', { length: 20 }).notNull().default('unread'),
+    // 'auto' (derived from progress) | 'manual' (user-set; never auto-overridden)
+    source: varchar('source', { length: 10 }).notNull().default('auto'),
+    startedAt: timestamp('started_at'),
+    finishedAt: timestamp('finished_at'),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.bookId] }), index('ubs_user_id_idx').on(t.userId), index('ubs_user_status_idx').on(t.userId, t.status)],
+);
+
+export type UserBookStatusRow = typeof userBookStatus.$inferSelect;
+export type NewUserBookStatus = typeof userBookStatus.$inferInsert;
+
 export const readingProgress = pgTable(
   'reading_progress',
   {

@@ -3,6 +3,17 @@ import type { MetadataProviderKey } from "./metadata-fetch";
 export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2"] as const;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
+export type ReadStatus = "unread" | "reading" | "read" | "abandoned";
+export type ReadStatusSource = "auto" | "manual";
+
+export type UserBookStatus = {
+  status: ReadStatus;
+  source: ReadStatusSource;
+  startedAt: string | null;
+  finishedAt: string | null;
+  updatedAt: string;
+};
+
 export type BookFileRef = {
   id: number;
   format: string | null;
@@ -23,6 +34,7 @@ export type BookCard = {
   tags: string[];
   rating: number | null;
   readingProgress: number | null;
+  readStatus: UserBookStatus | null;
   metadataScore: number | null;
   addedAt: string;
 };
@@ -66,6 +78,7 @@ export type BookDetail = {
   files: BookDetailFile[];
   lastWrittenAt: string | null;
   metadataScore: number | null;
+  readStatus: UserBookStatus | null;
 };
 
 export type BookKoboReadingState = {

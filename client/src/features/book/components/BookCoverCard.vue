@@ -22,6 +22,8 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-vue-next'
+import { useBookStatus, STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS } from '../composables/useBookStatus'
+import type { ReadStatus } from '@projectx/types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,6 +151,29 @@ function handleDownloadFile(file: BookFileRef) {
 function handleExportAll() {
   void exportBooks([props.book.id], true)
 }
+
+const { setStatus } = useBookStatus()
+
+const localReadStatus = ref<ReadStatus | null>(props.book.readStatus?.status ?? null)
+watch(
+  () => props.book.readStatus?.status,
+  (val) => {
+    localReadStatus.value = val ?? null
+  },
+)
+const showReadBadge = computed(
+  () => cardOverlays.value.includes('read-status') && localReadStatus.value != null && localReadStatus.value !== 'unread' && !props.selectionMode,
+)
+
+async function handleSetStatus(status: ReadStatus) {
+  const prev = localReadStatus.value
+  localReadStatus.value = status
+  try {
+    await setStatus(props.book.id, status)
+  } catch {
+    localReadStatus.value = prev
+  }
+}
 </script>
 
 <template>
@@ -188,6 +213,18 @@ function handleExportAll() {
 
       <!-- "New" dot - top-right accent indicator -->
       <div v-if="showNewOverlay && !isMissing" class="absolute top-1.5 right-1.5 z-10 size-2 rounded-full bg-primary shadow-sm pointer-events-none" />
+
+      <!-- Read status icon - top-left -->
+      <div
+        v-if="showReadBadge && !isMissing"
+        class="absolute top-1.5 left-1.5 z-10 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
+      >
+        <component
+          :is="STATUS_ICONS[localReadStatus!]"
+          :size="14"
+          :class="[STATUS_COLORS[localReadStatus!], 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]']"
+        />
+      </div>
 
       <!-- Bottom-left overlays: rating dots + progress pill -->
       <div
@@ -384,6 +421,23 @@ function handleExportAll() {
                 <FolderPlus class="size-4 mr-2" />
                 Add to Collection
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <component
+                    :is="STATUS_ICONS[localReadStatus ?? 'unread']"
+                    class="size-4 mr-2"
+                    :class="STATUS_COLORS[localReadStatus ?? 'unread']"
+                  />
+                  Set Status
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
+                    <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+                    {{ opt.label }}
+                    <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
                 <Send class="size-4 mr-2" />
                 Send via Email

@@ -1,6 +1,6 @@
 import { basename } from 'path';
 
-import type { BookCard } from '@projectx/types';
+import type { BookCard, UserBookStatus } from '@projectx/types';
 
 type BookRow = {
   id: number;
@@ -19,6 +19,14 @@ type BookRow = {
 type NameRow = { bookId: number; name: string };
 type FileRow = { bookId: number; id: number; format: string | null; role: string };
 type ProgressRow = { bookFileId: number; percentage: number | null };
+type StatusRow = {
+  bookId: number;
+  status: string;
+  source: string;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  updatedAt: Date;
+};
 
 export function assembleBookCards(
   rows: BookRow[],
@@ -27,6 +35,7 @@ export function assembleBookCards(
   genreRows: NameRow[],
   tagRows: NameRow[],
   progressRows: ProgressRow[],
+  statusRows: StatusRow[] = [],
 ): BookCard[] {
   const authorsByBook = new Map<number, string[]>();
   for (const row of authorRows) {
@@ -61,6 +70,17 @@ export function assembleBookCards(
     progressByFileId.set(row.bookFileId, row.percentage);
   }
 
+  const statusByBookId = new Map<number, UserBookStatus>();
+  for (const row of statusRows) {
+    statusByBookId.set(row.bookId, {
+      status: row.status as UserBookStatus['status'],
+      source: row.source as UserBookStatus['source'],
+      startedAt: row.startedAt?.toISOString() ?? null,
+      finishedAt: row.finishedAt?.toISOString() ?? null,
+      updatedAt: row.updatedAt.toISOString(),
+    });
+  }
+
   return rows.map((row) => {
     const files = filesByBook.get(row.id) ?? [];
     const primaryFile = files.find((f) => f.role === 'primary') ?? files[0] ?? null;
@@ -81,6 +101,7 @@ export function assembleBookCards(
       rating: row.rating ?? null,
       metadataScore: row.metadataScore !== undefined ? (row.metadataScore ?? null) : null,
       readingProgress,
+      readStatus: statusByBookId.get(row.id) ?? null,
       addedAt: row.addedAt.toISOString(),
     };
   });

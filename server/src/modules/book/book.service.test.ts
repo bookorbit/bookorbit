@@ -92,6 +92,12 @@ function makeService() {
   const fileWriteService = {
     scheduleWrite: vi.fn(),
   };
+  const userBookStatusService = {
+    autoUpdate: vi.fn().mockResolvedValue(undefined),
+    setManual: vi.fn().mockResolvedValue(undefined),
+    findOne: vi.fn().mockResolvedValue(null),
+    findByBookIds: vi.fn().mockResolvedValue(new Map()),
+  };
 
   const service = new BookService(
     bookRepo as never,
@@ -102,11 +108,24 @@ function makeService() {
     pipeline as never,
     config as never,
     appSettings as never,
+    userBookStatusService as never,
     embedder as never,
     fileWriteService as never,
   );
 
-  return { service, bookRepo, libraryService, queryBuilder, metadataService, pipeline, config, appSettings, embedder, fileWriteService };
+  return {
+    service,
+    bookRepo,
+    libraryService,
+    queryBuilder,
+    metadataService,
+    pipeline,
+    config,
+    appSettings,
+    userBookStatusService,
+    embedder,
+    fileWriteService,
+  };
 }
 
 function metaRow(bookId: number, fields?: Partial<{ title: string | null; authors: string[] }>) {

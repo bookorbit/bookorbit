@@ -13,7 +13,7 @@ import type {
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, books, readingProgress, readingSessions, userLibraryAccess, userReadingDailyStats } from '../../db/schema';
+import { bookFiles, books, readingProgress, readingSessions, userBookStatus, userLibraryAccess, userReadingDailyStats } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 const RECENT_DAILY_AGGREGATION_DAYS = 2;
@@ -61,8 +61,22 @@ export class UserStatisticsRepository {
 
   async getSummary(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]): Promise<UserStatisticsSummary> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const libraryIds = this.intersectLibraryIds(accessible, filterLibraryIds);
+    const libraryFilter = this.libraryFilter(libraryIds);
 
+    // Status counts come from user_book_status (respects manual overrides)
+    const [statusRow] = await this.db
+      .select({
+        trackedBooks: sql<number>`count(*)::int`,
+        startedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} in ('reading', 'read', 'abandoned'))::int`,
+        inProgressBooks: sql<number>`count(*) filter (where ${userBookStatus.status} = 'reading')::int`,
+        completedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} = 'read')::int`,
+      })
+      .from(userBookStatus)
+      .innerJoin(books, eq(books.id, userBookStatus.bookId))
+      .where(and(eq(userBookStatus.userId, userId), libraryFilter));
+
+    // meanProgressPercent stays derived from actual reading position
     const perBookProgress = this.db
       .select({
         bookId: bookFiles.bookId,
@@ -71,26 +85,20 @@ export class UserStatisticsRepository {
       .from(readingProgress)
       .innerJoin(bookFiles, eq(bookFiles.id, readingProgress.bookFileId))
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(readingProgress.userId, userId), filter))
+      .where(and(eq(readingProgress.userId, userId), libraryFilter))
       .groupBy(bookFiles.bookId)
       .as('per_book_progress');
 
-    const [row] = await this.db
-      .select({
-        trackedBooks: sql<number>`count(*)::int`,
-        startedBooks: sql<number>`count(*) filter (where ${perBookProgress.maxPercentage} > 0)::int`,
-        inProgressBooks: sql<number>`count(*) filter (where ${perBookProgress.maxPercentage} > 0 and ${perBookProgress.maxPercentage} < 100)::int`,
-        completedBooks: sql<number>`count(*) filter (where ${perBookProgress.maxPercentage} >= 100)::int`,
-        meanProgressPercent: sql<number>`coalesce(avg(${perBookProgress.maxPercentage}), 0)::float`,
-      })
+    const [progressRow] = await this.db
+      .select({ meanProgressPercent: sql<number>`coalesce(avg(${perBookProgress.maxPercentage}), 0)::float` })
       .from(perBookProgress);
 
     return {
-      trackedBooks: row?.trackedBooks ?? 0,
-      startedBooks: row?.startedBooks ?? 0,
-      inProgressBooks: row?.inProgressBooks ?? 0,
-      completedBooks: row?.completedBooks ?? 0,
-      meanProgressPercent: row?.meanProgressPercent ?? 0,
+      trackedBooks: statusRow?.trackedBooks ?? 0,
+      startedBooks: statusRow?.startedBooks ?? 0,
+      inProgressBooks: statusRow?.inProgressBooks ?? 0,
+      completedBooks: statusRow?.completedBooks ?? 0,
+      meanProgressPercent: progressRow?.meanProgressPercent ?? 0,
     };
   }
 

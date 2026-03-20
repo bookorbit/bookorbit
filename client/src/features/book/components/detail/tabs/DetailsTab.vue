@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ChevronDown, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { Check, ChevronDown, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { FORMAT_TO_GROUP } from '@projectx/types'
-import type { BookDetail, BookKoboState } from '@projectx/types'
+import type { BookDetail, BookKoboState, ReadStatus } from '@projectx/types'
+import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
@@ -114,6 +116,26 @@ async function setRating(star: number) {
 }
 
 const ratingStars = [1, 2, 3, 4, 5]
+
+const { setStatus } = useBookStatus()
+
+const localReadStatus = ref<ReadStatus | null>(props.book.readStatus?.status ?? null)
+watch(
+  () => props.book.readStatus?.status,
+  (val) => {
+    localReadStatus.value = (val as ReadStatus) ?? null
+  },
+)
+
+async function handleSetReadStatus(status: ReadStatus) {
+  const prev = localReadStatus.value
+  localReadStatus.value = status
+  try {
+    await setStatus(props.book.id, status)
+  } catch {
+    localReadStatus.value = prev
+  }
+}
 
 const fileProgressById = ref<Record<number, FileProgress>>({})
 const collections = ref<CollectionMembership[]>([])
@@ -608,7 +630,7 @@ watch(
         </template>
       </div>
 
-      <div class="mt-2 flex items-center gap-1" @mouseleave="hoverRating = null">
+      <div class="mt-3 flex items-center gap-1" @mouseleave="hoverRating = null">
         <template v-if="canEditMetadata">
           <Tooltip v-for="star in ratingStars" :key="star">
             <TooltipTrigger as-child>
@@ -627,6 +649,25 @@ watch(
             :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
           />
         </template>
+
+        <div class="w-px h-3.5 bg-border mx-1.5" />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <button class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-3.5" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
+              {{ STATUS_OPTIONS.find((o) => o.value === (localReadStatus ?? 'unread'))?.label }}
+              <ChevronDown class="size-3 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
+              <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+              {{ opt.label }}
+              <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <!-- Format badges + provider links -->

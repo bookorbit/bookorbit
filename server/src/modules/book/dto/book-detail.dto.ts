@@ -1,4 +1,4 @@
-import type { ProviderIds } from '@projectx/types';
+import type { ProviderIds, UserBookStatus } from '@projectx/types';
 
 export class BookFileDto {
   id: number;
@@ -37,4 +37,5 @@ export class BookDetailDto {
   files: BookFileDto[];
   lastWrittenAt: Date | null;
   metadataScore: number | null;
+  readStatus: UserBookStatus | null;
 }

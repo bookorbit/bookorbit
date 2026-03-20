@@ -22,6 +22,7 @@ import {
   libraries,
   readingProgress,
   tags,
+  userBookStatus,
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -103,15 +104,29 @@ export class BookRepository {
     ]);
 
     const primaryFileIds = fileRows.filter((f) => f.role === 'primary').map((f) => f.id);
-    const progressRows =
+    const [progressRows, statusRows] = await Promise.all([
       primaryFileIds.length > 0
-        ? await this.db
+        ? this.db
             .select({ bookFileId: readingProgress.bookFileId, percentage: readingProgress.percentage })
             .from(readingProgress)
             .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
-        : [];
+        : Promise.resolve([]),
+      bookIds.length > 0
+        ? this.db
+            .select({
+              bookId: userBookStatus.bookId,
+              status: userBookStatus.status,
+              source: userBookStatus.source,
+              startedAt: userBookStatus.startedAt,
+              finishedAt: userBookStatus.finishedAt,
+              updatedAt: userBookStatus.updatedAt,
+            })
+            .from(userBookStatus)
+            .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds)))
+        : Promise.resolve([]),
+    ]);
 
-    return { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total: Number(total) };
+    return { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, total: Number(total) };
   }
 
   async findById(id: number) {

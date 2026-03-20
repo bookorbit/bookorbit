@@ -4,7 +4,7 @@ import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
 import { MetadataProviderKey, Permission, resolveUploadPath } from '@projectx/types';
-import type { BookKoboState, BookQuery, BooksPage, MetadataField } from '@projectx/types';
+import type { BookKoboState, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -15,6 +15,7 @@ import { LibraryService } from '../library/library.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { FileWriteService } from '../file-write/file-write.service';
+import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
@@ -36,6 +37,7 @@ export class BookService {
     private readonly pipeline: MetadataFetchPipeline,
     private readonly config: ConfigService,
     private readonly appSettings: AppSettingsService,
+    private readonly userBookStatusService: UserBookStatusService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {
@@ -97,7 +99,7 @@ export class BookService {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
@@ -105,7 +107,7 @@ export class BookService {
       userId: user.id,
     });
     return {
-      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows),
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows),
       total,
       page: query.pagination.page,
       size: query.pagination.size,
@@ -117,7 +119,7 @@ export class BookService {
     const accessibleLibraryIds = libs.map((l) => l.id);
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
@@ -125,7 +127,7 @@ export class BookService {
       userId: user.id,
     });
     return {
-      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows),
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows),
       total,
       page: query.pagination.page,
       size: query.pagination.size,
@@ -361,8 +363,17 @@ export class BookService {
   }
 
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
-    await this.verifyFileAccess(fileId, user);
+    const file = await this.verifyFileAccess(fileId, user);
     await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage);
+    this.libraryService
+      .findOne(file.libraryId)
+      .then((lib) => this.userBookStatusService.autoUpdate(userId, file.bookId, dto.percentage, lib?.markAsFinishedPercentComplete))
+      .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${file.bookId}: ${err.message}`));
+  }
+
+  async setReadStatus(bookId: number, status: ReadStatus, user: RequestUser): Promise<void> {
+    await this.verifyBookAccess(bookId, user);
+    await this.userBookStatusService.setManual(user.id, bookId, status);
   }
 
   async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {
@@ -579,7 +590,7 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const result = await this.bookRepo.findById(id);
+    const [result, readStatus] = await Promise.all([this.bookRepo.findById(id), this.userBookStatusService.findOne(user.id, id)]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
     const { book, authorRows, genreRows, tagRows, fileRows } = result;
@@ -627,6 +638,7 @@ export class BookService {
       })),
       lastWrittenAt: meta?.lastWrittenAt ?? null,
       metadataScore: meta?.metadataScore ?? null,
+      readStatus,
     };
   }
 }

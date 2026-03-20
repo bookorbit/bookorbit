@@ -48,6 +48,7 @@ import { MetadataScoreModule } from './modules/metadata-score/metadata-score.mod
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { UserStatisticsModule } from './modules/user-statistics/user-statistics.module';
 import { ReadingSessionModule } from './modules/reading-session/reading-session.module';
+import { UserBookStatusModule } from './modules/user-book-status/user-book-status.module';
 import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
@@ -96,6 +97,7 @@ import { AuditModule } from './modules/audit/audit.module';
     StatisticsModule,
     UserStatisticsModule,
     ReadingSessionModule,
+    UserBookStatusModule,
     AuditModule,
   ],
   providers: [

@@ -218,11 +218,7 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    transparent 50%,
-    color-mix(in oklch, var(--primary) 5%, transparent) 50%
-  );
+  background: linear-gradient(to bottom, transparent 50%, color-mix(in oklch, var(--primary) 5%, transparent) 50%);
   background-size: 100% 4px;
 }
 
