@@ -1,4 +1,4 @@
-import { boolean, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { bookFiles, books } from './books';
 import { libraries } from './libraries';
@@ -29,8 +29,8 @@ export const readingProgress = pgTable(
 export type ReadingProgress = typeof readingProgress.$inferSelect;
 export type NewReadingProgress = typeof readingProgress.$inferInsert;
 
-export const readingSessionEvents = pgTable(
-  'reading_session_events',
+export const readingSessions = pgTable(
+  'reading_sessions',
   {
     id: serial('id').primaryKey(),
     userId: integer('user_id')
@@ -39,27 +39,26 @@ export const readingSessionEvents = pgTable(
     bookFileId: integer('book_file_id')
       .notNull()
       .references(() => bookFiles.id, { onDelete: 'cascade' }),
-    // Idempotency key from the client save call; retries must reuse this value.
-    eventKey: varchar('event_key', { length: 120 }).notNull(),
-    recordedAt: timestamp('recorded_at').notNull().defaultNow(),
-    percentage: real('percentage').notNull(),
-    percentageDelta: real('percentage_delta').notNull().default(0),
-    pageNumber: integer('page_number'),
-    pageDelta: integer('page_delta').notNull().default(0),
-    deltaSeconds: integer('delta_seconds').notNull().default(0),
-    source: varchar('source', { length: 40 }).notNull().default('reader'),
-    synthetic: boolean('synthetic').notNull().default(false),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
+    // Client-generated UUID; used for idempotent retries.
+    sessionId: varchar('session_id', { length: 64 }).notNull(),
+    startedAt: timestamp('started_at').notNull(),
+    endedAt: timestamp('ended_at').notNull(),
+    // Server-computed from endedAt - startedAt; client-provided timestamps are untrusted for duration.
+    durationSeconds: integer('duration_seconds').notNull(),
+    // Nullable: CBX with no percentage tracking may omit these.
+    progressDelta: real('progress_delta'),
+    endProgress: real('end_progress'),
   },
   (t) => [
-    uniqueIndex('rse_event_key_uidx').on(t.eventKey),
-    index('rse_user_recorded_at_idx').on(t.userId, t.recordedAt),
-    index('rse_file_recorded_at_idx').on(t.bookFileId, t.recordedAt),
+    uniqueIndex('rs_session_id_uidx').on(t.sessionId),
+    index('rs_user_started_at_idx').on(t.userId, t.startedAt),
+    index('rs_book_file_started_at_idx').on(t.bookFileId, t.startedAt),
+    index('rs_user_book_file_idx').on(t.userId, t.bookFileId),
   ],
 );
 
-export type ReadingSessionEvent = typeof readingSessionEvents.$inferSelect;
-export type NewReadingSessionEvent = typeof readingSessionEvents.$inferInsert;
+export type ReadingSession = typeof readingSessions.$inferSelect;
+export type NewReadingSession = typeof readingSessions.$inferInsert;
 
 export const userReadingDailyStats = pgTable(
   'user_reading_daily_stats',
@@ -73,7 +72,7 @@ export const userReadingDailyStats = pgTable(
     day: date('day', { mode: 'string' }).notNull(),
     readingSeconds: integer('reading_seconds').notNull().default(0),
     progressDelta: real('progress_delta').notNull().default(0),
-    eventsCount: integer('events_count').notNull().default(0),
+    sessionsCount: integer('sessions_count').notNull().default(0),
     updatedAt: timestamp('updated_at')
       .notNull()
       .defaultNow()

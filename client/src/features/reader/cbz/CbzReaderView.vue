@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings } from 'lucide-vue-next'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
+import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useCbz } from './composables/useCbz'
 import { useCbzSettings } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
@@ -16,6 +17,11 @@ const router = useRouter()
 
 const progress = useReaderProgress(props.bookId, props.fileId)
 const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter } = useVisibility()
+
+const { onActivity } = useReadingSession(props.fileId, () => ({
+  percentage: progress.percentage.value,
+  pageNumber: progress.pageNumber.value,
+}))
 const { pageCount, bookTitle, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
 const { fitMode, viewMode, scrollMode, direction, bgColor, bgValue, isTwoPage, imgFitClass } = useCbzSettings()
 const bookSettings = useReaderSettings(props.fileId, 'cbz')
@@ -198,6 +204,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(currentPage, (page) => {
   schedulePreload(page)
+  onActivity()
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     progress.pageNumber.value = page + 1

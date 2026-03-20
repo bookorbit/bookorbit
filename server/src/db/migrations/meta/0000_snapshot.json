@@ -1,5 +1,5 @@
 {
-  "id": "bcba426a-a81b-4b4b-a3a1-e3f2e14c3819",
+  "id": "527f8ce7-3ed2-4f6d-aa0d-4fd227a23118",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2597,8 +2597,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.reading_session_events": {
-      "name": "reading_session_events",
+    "public.reading_sessions": {
+      "name": "reading_sessions",
       "schema": "",
       "columns": {
         "id": {
@@ -2619,80 +2619,49 @@
           "primaryKey": false,
           "notNull": true
         },
-        "event_key": {
-          "name": "event_key",
-          "type": "varchar(120)",
+        "session_id": {
+          "name": "session_id",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
-        "recorded_at": {
-          "name": "recorded_at",
+        "started_at": {
+          "name": "started_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": true
         },
-        "percentage": {
-          "name": "percentage",
-          "type": "real",
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": true
         },
-        "percentage_delta": {
-          "name": "percentage_delta",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "page_number": {
-          "name": "page_number",
+        "duration_seconds": {
+          "name": "duration_seconds",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "progress_delta": {
+          "name": "progress_delta",
+          "type": "real",
           "primaryKey": false,
           "notNull": false
         },
-        "page_delta": {
-          "name": "page_delta",
-          "type": "integer",
+        "end_progress": {
+          "name": "end_progress",
+          "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "delta_seconds": {
-          "name": "delta_seconds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "source": {
-          "name": "source",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'reader'"
-        },
-        "synthetic": {
-          "name": "synthetic",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": false
         }
       },
       "indexes": {
-        "rse_event_key_uidx": {
-          "name": "rse_event_key_uidx",
+        "rs_session_id_uidx": {
+          "name": "rs_session_id_uidx",
           "columns": [
             {
-              "expression": "event_key",
+              "expression": "session_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2703,8 +2672,8 @@
           "method": "btree",
           "with": {}
         },
-        "rse_user_recorded_at_idx": {
-          "name": "rse_user_recorded_at_idx",
+        "rs_user_started_at_idx": {
+          "name": "rs_user_started_at_idx",
           "columns": [
             {
               "expression": "user_id",
@@ -2713,7 +2682,7 @@
               "nulls": "last"
             },
             {
-              "expression": "recorded_at",
+              "expression": "started_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2724,8 +2693,8 @@
           "method": "btree",
           "with": {}
         },
-        "rse_file_recorded_at_idx": {
-          "name": "rse_file_recorded_at_idx",
+        "rs_book_file_started_at_idx": {
+          "name": "rs_book_file_started_at_idx",
           "columns": [
             {
               "expression": "book_file_id",
@@ -2734,7 +2703,28 @@
               "nulls": "last"
             },
             {
-              "expression": "recorded_at",
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rs_user_book_file_idx": {
+          "name": "rs_user_book_file_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_file_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2747,18 +2737,18 @@
         }
       },
       "foreignKeys": {
-        "reading_session_events_user_id_users_id_fk": {
-          "name": "reading_session_events_user_id_users_id_fk",
-          "tableFrom": "reading_session_events",
+        "reading_sessions_user_id_users_id_fk": {
+          "name": "reading_sessions_user_id_users_id_fk",
+          "tableFrom": "reading_sessions",
           "tableTo": "users",
           "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "reading_session_events_book_file_id_book_files_id_fk": {
-          "name": "reading_session_events_book_file_id_book_files_id_fk",
-          "tableFrom": "reading_session_events",
+        "reading_sessions_book_file_id_book_files_id_fk": {
+          "name": "reading_sessions_book_file_id_book_files_id_fk",
+          "tableFrom": "reading_sessions",
           "tableTo": "book_files",
           "columnsFrom": ["book_file_id"],
           "columnsTo": ["id"],
@@ -2808,8 +2798,8 @@
           "notNull": true,
           "default": 0
         },
-        "events_count": {
-          "name": "events_count",
+        "sessions_count": {
+          "name": "sessions_count",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

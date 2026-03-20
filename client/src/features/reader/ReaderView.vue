@@ -3,6 +3,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
 import { useReaderProgress } from './shared/composables/useReaderProgress'
+import { useReadingSession } from './shared/composables/useReadingSession'
 import { useReaderState } from './epub/composables/useReaderState'
 import { useReaderSettings } from './shared/composables/useReaderSettings'
 import { useVisibility } from './shared/composables/useVisibility'
@@ -66,6 +67,12 @@ const {
 const progress = useReaderProgress(bookId, fileId)
 const { cfi, chapterTitle, sectionIndex, totalSections, fraction, updateHeadsFeet } = progress
 
+const { onActivity } = useReadingSession(fileId, () => ({
+  percentage: progress.percentage.value,
+  cfi: progress.cfi.value,
+  pageNumber: progress.pageNumber.value,
+}))
+
 const visibility = useVisibility()
 const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter } = visibility
 
@@ -82,6 +89,7 @@ const selection = useReaderSelection()
 
 function onRelocateHandler(detail: RelocateDetail) {
   progress.onRelocate(detail)
+  onActivity()
   bookmarks.setCfi(detail?.cfi ?? null)
   toc.setActiveHref(detail?.tocItem?.href ?? '')
   const renderer = getRenderer()

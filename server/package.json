@@ -18,6 +18,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:runtime": "node dist/scripts/migrate.js",
     "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/scripts/db-seed.ts",
     "pretype-check": "pnpm --filter @projectx/types build",
     "type-check": "tsc --noEmit -p tsconfig.build.json",
     "lint": "pnpm run lint:check",

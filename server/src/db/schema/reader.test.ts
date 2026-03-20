@@ -6,7 +6,7 @@ import {
   readerDefaultPreferences,
   readerPreferences,
   readingProgress,
-  readingSessionEvents,
+  readingSessions,
   userReadingDailyStats,
 } from './reader';
 
@@ -35,19 +35,18 @@ describe('reader schema', () => {
     expect(readingProgress.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date);
   });
 
-  it('stores append-only reading session events with idempotency and time indexes', () => {
-    const config = getTableConfig(readingSessionEvents);
+  it('stores reading sessions with idempotency and time indexes', () => {
+    const config = getTableConfig(readingSessions);
     const uniqueIndexes = config.indexes.filter((idx) => idx.config.unique);
     const indexNames = config.indexes.map((idx) => idx.config.name);
-    const fkMap = fkByColumn(readingSessionEvents);
+    const fkMap = fkByColumn(readingSessions);
 
-    expect(uniqueIndexes.some((idx) => idx.config.name === 'rse_event_key_uidx')).toBe(true);
-    expect(indexNames).toContain('rse_user_recorded_at_idx');
-    expect(indexNames).toContain('rse_file_recorded_at_idx');
+    expect(uniqueIndexes.some((idx) => idx.config.name === 'rs_session_id_uidx')).toBe(true);
+    expect(indexNames).toContain('rs_user_started_at_idx');
+    expect(indexNames).toContain('rs_book_file_started_at_idx');
+    expect(indexNames).toContain('rs_user_book_file_idx');
     expect(fkMap.get('user_id')?.onDelete).toBe('cascade');
     expect(fkMap.get('book_file_id')?.onDelete).toBe('cascade');
-    expect(readingSessionEvents.source.default).toBe('reader');
-    expect(readingSessionEvents.synthetic.default).toBe(false);
   });
 
   it('stores user daily reading aggregates keyed by user, library, and day', () => {

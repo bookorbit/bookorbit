@@ -9,6 +9,7 @@ import { usePdfRenderer } from './composables/usePdfRenderer'
 import { usePdfFind } from './composables/usePdfFind'
 import { usePdfOutline } from './composables/usePdfOutline'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
+import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfFindBar from './components/FindBar.vue'
@@ -22,6 +23,11 @@ const router = useRouter()
 const { pdfDoc, totalPages, loading, error, load, getPageDim, startRenderPage, getTextContent } = usePdf()
 const progress = useReaderProgress(props.bookId, props.fileId)
 const bookSettings = useReaderSettings(props.fileId, 'pdf')
+
+const { onActivity } = useReadingSession(props.fileId, () => ({
+  percentage: progress.percentage.value,
+  pageNumber: progress.pageNumber.value,
+}))
 
 // ── Layout container ──────────────────────────────────────────────────────────
 const scrollRef = ref<HTMLElement | null>(null)
@@ -137,6 +143,7 @@ watch([spread, scrollMode], async () => {
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(currentPage, (page) => {
+  onActivity()
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     progress.pageNumber.value = page

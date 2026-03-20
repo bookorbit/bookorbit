@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -13,7 +13,7 @@ import type {
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, books, readingProgress, readingSessionEvents, userLibraryAccess, userReadingDailyStats } from '../../db/schema';
+import { bookFiles, books, readingProgress, readingSessions, userLibraryAccess, userReadingDailyStats } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 const RECENT_DAILY_AGGREGATION_DAYS = 2;
@@ -104,7 +104,7 @@ export class UserStatisticsRepository {
         day: userReadingDailyStats.day,
         readingSeconds: sql<number>`coalesce(sum(${userReadingDailyStats.readingSeconds}), 0)::int`,
         progressDelta: sql<number>`coalesce(sum(${userReadingDailyStats.progressDelta}), 0)::float`,
-        eventsCount: sql<number>`coalesce(sum(${userReadingDailyStats.eventsCount}), 0)::int`,
+        eventsCount: sql<number>`coalesce(sum(${userReadingDailyStats.sessionsCount}), 0)::int`,
       })
       .from(userReadingDailyStats)
       .where(and(eq(userReadingDailyStats.userId, userId), gte(userReadingDailyStats.day, sinceDay), libraryFilter))
@@ -116,18 +116,18 @@ export class UserStatisticsRepository {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
-    const hourExpr = sql<number>`extract(hour from ${readingSessionEvents.recordedAt})::int`;
+    const hourExpr = sql<number>`extract(hour from ${readingSessions.startedAt})::int`;
 
     return this.db
       .select({
         hour: hourExpr,
-        readingSeconds: sql<number>`coalesce(sum(case when ${readingSessionEvents.deltaSeconds} > 0 and ${readingSessionEvents.deltaSeconds} <= 1800 then ${readingSessionEvents.deltaSeconds} else 0 end), 0)::int`,
+        readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
         eventsCount: sql<number>`count(*)::int`,
       })
-      .from(readingSessionEvents)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessionEvents.bookFileId))
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(readingSessionEvents.userId, userId), gte(readingSessionEvents.recordedAt, since), libraryFilter))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
       .groupBy(hourExpr)
       .orderBy(hourExpr);
   }
@@ -136,18 +136,18 @@ export class UserStatisticsRepository {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
-    const dayOfWeekExpr = sql<number>`extract(dow from ${readingSessionEvents.recordedAt})::int`;
+    const dayOfWeekExpr = sql<number>`extract(dow from ${readingSessions.startedAt})::int`;
 
     return this.db
       .select({
         dayOfWeek: dayOfWeekExpr,
-        readingSeconds: sql<number>`coalesce(sum(case when ${readingSessionEvents.deltaSeconds} > 0 and ${readingSessionEvents.deltaSeconds} <= 1800 then ${readingSessionEvents.deltaSeconds} else 0 end), 0)::int`,
+        readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
         eventsCount: sql<number>`count(*)::int`,
       })
-      .from(readingSessionEvents)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessionEvents.bookFileId))
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(readingSessionEvents.userId, userId), gte(readingSessionEvents.recordedAt, since), libraryFilter))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
       .groupBy(dayOfWeekExpr)
       .orderBy(dayOfWeekExpr);
   }
@@ -165,12 +165,12 @@ export class UserStatisticsRepository {
     const firstCompletion = this.db
       .select({
         bookId: bookFiles.bookId,
-        firstCompletedAt: sql<Date>`min(${readingSessionEvents.recordedAt})`.as('first_completed_at'),
+        firstCompletedAt: sql<Date>`min(${readingSessions.endedAt})`.as('first_completed_at'),
       })
-      .from(readingSessionEvents)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessionEvents.bookFileId))
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(readingSessionEvents.userId, userId), gte(readingSessionEvents.percentage, 100), libraryFilter))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.endProgress, 100), libraryFilter))
       .groupBy(bookFiles.bookId)
       .as('first_completion');
 
@@ -208,18 +208,18 @@ export class UserStatisticsRepository {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const timeFilter = untilExclusive
-      ? and(gte(readingSessionEvents.recordedAt, since), lt(readingSessionEvents.recordedAt, untilExclusive))
-      : gte(readingSessionEvents.recordedAt, since);
+      ? and(gte(readingSessions.startedAt, since), lt(readingSessions.startedAt, untilExclusive))
+      : gte(readingSessions.startedAt, since);
 
     const perBookProgress = this.db
       .select({
         bookId: bookFiles.bookId,
-        maxPercentage: sql<number>`max(${readingSessionEvents.percentage})`.as('max_percentage'),
+        maxPercentage: sql<number>`max(${readingSessions.endProgress})`.as('max_percentage'),
       })
-      .from(readingSessionEvents)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessionEvents.bookFileId))
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(readingSessionEvents.userId, userId), timeFilter, libraryFilter))
+      .where(and(eq(readingSessions.userId, userId), timeFilter, libraryFilter, isNotNull(readingSessions.endProgress)))
       .groupBy(bookFiles.bookId)
       .as('per_book_progress');
 
@@ -250,33 +250,24 @@ export class UserStatisticsRepository {
     const completedInWindow = this.db
       .select({
         bookId: bookFiles.bookId,
-        completedAt: sql<Date>`min(${readingSessionEvents.recordedAt})`.as('completed_at'),
+        completedAt: sql<Date>`min(${readingSessions.endedAt})`.as('completed_at'),
       })
-      .from(readingSessionEvents)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessionEvents.bookFileId))
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(
-        and(
-          eq(readingSessionEvents.userId, userId),
-          gte(readingSessionEvents.recordedAt, since),
-          gte(readingSessionEvents.percentage, 100),
-          libraryFilter,
-        ),
-      )
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), gte(readingSessions.endProgress, 100), libraryFilter))
       .groupBy(bookFiles.bookId)
       .as('completed_in_window');
 
     const startedAndCompleted = this.db
       .select({
         completedAt: completedInWindow.completedAt,
-        startedAt: sql<Date | null>`min(case when ${readingSessionEvents.percentage} > 0 then ${readingSessionEvents.recordedAt} end)`.as(
-          'started_at',
-        ),
+        startedAt: sql<Date | null>`min(${readingSessions.startedAt})`.as('started_at'),
       })
-      .from(readingSessionEvents)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessionEvents.bookFileId))
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(completedInWindow, eq(completedInWindow.bookId, bookFiles.bookId))
-      .where(eq(readingSessionEvents.userId, userId))
+      .where(eq(readingSessions.userId, userId))
       .groupBy(completedInWindow.bookId, completedInWindow.completedAt)
       .as('started_and_completed');
 
@@ -298,30 +289,22 @@ export class UserStatisticsRepository {
 
     return this.db.transaction(async (tx) => {
       const deleteResult = await tx.execute(sql`delete from user_reading_daily_stats where day >= ${sinceDay}::date`);
+
       const insertResult = await tx.execute(sql`
-        insert into user_reading_daily_stats (user_id, library_id, day, reading_seconds, progress_delta, events_count, updated_at)
+        insert into user_reading_daily_stats (user_id, library_id, day, reading_seconds, progress_delta, sessions_count, updated_at)
         select
-          ${readingSessionEvents.userId} as user_id,
-          ${books.libraryId} as library_id,
-          date_trunc('day', ${readingSessionEvents.recordedAt})::date as day,
-          coalesce(
-            sum(
-              case
-                when ${readingSessionEvents.deltaSeconds} > 0 and ${readingSessionEvents.deltaSeconds} <= 1800
-                  then ${readingSessionEvents.deltaSeconds}
-                else 0
-              end
-            ),
-            0
-          )::int as reading_seconds,
-          coalesce(sum(${readingSessionEvents.percentageDelta}), 0)::real as progress_delta,
-          count(*)::int as events_count,
+          rs.user_id,
+          b.library_id,
+          date_trunc('day', rs.started_at)::date as day,
+          coalesce(sum(rs.duration_seconds), 0)::int as reading_seconds,
+          coalesce(sum(rs.progress_delta), 0)::real as progress_delta,
+          count(*)::int as sessions_count,
           now() as updated_at
-        from ${readingSessionEvents}
-        inner join ${bookFiles} on ${bookFiles.id} = ${readingSessionEvents.bookFileId}
-        inner join ${books} on ${books.id} = ${bookFiles.bookId}
-        where ${readingSessionEvents.recordedAt} >= ${since}
-        group by ${readingSessionEvents.userId}, ${books.libraryId}, date_trunc('day', ${readingSessionEvents.recordedAt})::date
+        from reading_sessions rs
+        inner join book_files bf on bf.id = rs.book_file_id
+        inner join books b on b.id = bf.book_id
+        where rs.started_at >= ${since}
+        group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
       `);
 
       const deleted = Number((deleteResult as { rowCount?: number }).rowCount ?? 0);

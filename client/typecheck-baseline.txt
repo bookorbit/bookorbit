@@ -24,9 +24,9 @@ src/features/reader/pdf/composables/usePdfRenderer.ts(97,17): error TS18048: 'e'
 src/features/reader/pdf/composables/usePdfRenderer.ts(98,34): error TS18048: 'f' is possibly 'undefined'.
 src/features/reader/pdf/composables/usePdfRenderer.ts(99,31): error TS18048: 'a' is possibly 'undefined'.
 src/features/reader/pdf/composables/usePdfRenderer.ts(99,50): error TS18048: 'b' is possibly 'undefined'.
-src/features/reader/ReaderView.vue(149,15): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'RawTocItem[]'.
-src/features/reader/ReaderView.vue(241,12): error TS2345: Argument of type '{}' is not assignable to parameter of type 'FoliateView'.
-src/features/reader/ReaderView.vue(253,15): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'FoliateView | null'.
+src/features/reader/ReaderView.vue(157,15): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'RawTocItem[]'.
+src/features/reader/ReaderView.vue(249,12): error TS2345: Argument of type '{}' is not assignable to parameter of type 'FoliateView'.
+src/features/reader/ReaderView.vue(261,15): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'FoliateView | null'.
 src/features/settings/metadata-preferences/components/FieldConfigSheet.vue(57,25): error TS2322: Type 'MetadataProviderKey | undefined' is not assignable to type 'MetadataProviderKey'.
 src/features/settings/metadata-preferences/components/FieldConfigSheet.vue(57,5): error TS2322: Type 'MetadataProviderKey | undefined' is not assignable to type 'MetadataProviderKey'.
 src/features/settings/metadata-preferences/components/FieldConfigSheet.vue(65,21): error TS2322: Type 'MetadataProviderKey | undefined' is not assignable to type 'MetadataProviderKey'.
