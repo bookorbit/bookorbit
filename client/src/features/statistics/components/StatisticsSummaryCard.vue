@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BarChart3, BookOpen, Building2, CalendarPlus, CalendarRange, Globe, Layers, Tags, Users } from 'lucide-vue-next'
+import { BarChart3, BookCheck, BookOpen, BookText, Building2, CalendarPlus, CalendarRange, Globe, Layers, Tags, Users } from 'lucide-vue-next'
 
 import { useStatisticsSummary } from '../composables/useStatisticsSummary'
+import { useUserStatisticsSummary } from '../composables/useUserStatisticsSummary'
 
-const { data, loading } = useStatisticsSummary()
+const { data, loading: libraryLoading } = useStatisticsSummary()
+const { data: userData, loading: userLoading } = useUserStatisticsSummary()
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
@@ -24,6 +26,13 @@ const publicationRange = computed(() => {
   return `${min} - ${max}`
 })
 
+const avgProgress = computed(() => {
+  if (!userData.value) return '-'
+  return `${userData.value.meanProgressPercent.toFixed(1)}%`
+})
+
+const loading = computed(() => libraryLoading.value || userLoading.value)
+
 const kpis = computed(() => [
   { icon: BookOpen, label: 'Books', value: data.value ? formatNumber(data.value.totalBooks) : '-', colorIndex: 1 },
   { icon: Users, label: 'Authors', value: data.value ? formatNumber(data.value.totalAuthors) : '-', colorIndex: 2 },
@@ -34,6 +43,10 @@ const kpis = computed(() => [
   { icon: Globe, label: 'Languages', value: data.value ? formatNumber(data.value.totalLanguages) : '-', colorIndex: 7 },
   { icon: CalendarRange, label: 'Published', value: publicationRange.value, colorIndex: 8 },
   { icon: CalendarPlus, label: 'This Year', value: data.value ? formatNumber(data.value.booksAddedThisYear) : '-', colorIndex: 9 },
+  { icon: BookText, label: 'Started', value: userData.value ? formatNumber(userData.value.startedBooks) : '-', colorIndex: 1 },
+  { icon: BookOpen, label: 'In Progress', value: userData.value ? formatNumber(userData.value.inProgressBooks) : '-', colorIndex: 2 },
+  { icon: BookCheck, label: 'Completed', value: userData.value ? formatNumber(userData.value.completedBooks) : '-', colorIndex: 3 },
+  { icon: BarChart3, label: 'Avg Progress', value: avgProgress.value, colorIndex: 4 },
 ])
 </script>
 

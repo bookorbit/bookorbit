@@ -11,16 +11,13 @@ defineProps<{
   empty: boolean
   unknownCount?: number
   error?: boolean
-  tall?: boolean
-  short?: boolean
 }>()
 </script>
 
 <template>
   <div
     :class="[
-      'bg-card text-card-foreground flex flex-col overflow-hidden rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-      tall ? 'h-[560px] md:h-[640px]' : short ? 'h-[240px] md:h-[280px]' : 'h-[320px] md:h-[360px]',
+      'bg-card text-card-foreground flex h-full min-h-[320px] flex-col overflow-hidden rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md md:min-h-0',
     ]"
   >
     <div class="flex min-h-0 flex-1 flex-col p-4">

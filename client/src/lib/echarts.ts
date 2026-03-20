@@ -1,6 +1,6 @@
 import { use, registerTheme } from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
-import { BarChart, BoxplotChart, HeatmapChart, LineChart, PieChart, SunburstChart } from 'echarts/charts'
+import { BarChart, BoxplotChart, FunnelChart, HeatmapChart, LineChart, PieChart, SunburstChart } from 'echarts/charts'
 import {
   CalendarComponent,
   GridComponent,
@@ -20,6 +20,7 @@ use([
   PieChart,
   BarChart,
   LineChart,
+  FunnelChart,
   HeatmapChart,
   BoxplotChart,
   SunburstChart,
@@ -33,7 +34,7 @@ use([
   MarkAreaComponent,
 ])
 
-function readCssColor(varName: string): string {
+export function readCssColor(varName: string): string {
   const el = document.createElement('span')
   el.style.color = `var(${varName})`
   document.body.appendChild(el)

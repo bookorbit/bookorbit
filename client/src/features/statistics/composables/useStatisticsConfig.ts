@@ -2,7 +2,6 @@ import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
 import {
-  DEFAULT_STATISTICS_CHART_ORDER,
   DEFAULT_STATISTICS_FILTERS,
   type ChartConfigEntry,
   type StatisticsChartId,
@@ -13,9 +12,9 @@ import {
 } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { STATISTICS_CHART_IDS } from '../statistics-chart-meta'
 
-// Must stay in sync with CHART_REGISTRY in StatisticsGrid.vue.
-const KNOWN_CHART_IDS: StatisticsChartId[] = [...DEFAULT_STATISTICS_CHART_ORDER]
+const KNOWN_CHART_IDS: StatisticsChartId[] = [...STATISTICS_CHART_IDS]
 
 const DEFAULT_FILTERS: StatisticsFilterConfig = {
   libraryIds: [...DEFAULT_STATISTICS_FILTERS.libraryIds],
@@ -85,7 +84,27 @@ export function useStatisticsConfig() {
   }
 
   function reorder(newOrder: ChartConfigEntry[]) {
-    config.value = newOrder.map((entry, i) => ({ ...entry, order: i }))
+    const visibleIds = new Set(newOrder.map((entry) => entry.id))
+    const previousById = new Map(config.value.map((entry) => [entry.id, entry]))
+
+    const reorderedVisible = newOrder.map((entry, index) => {
+      const existing = previousById.get(entry.id)
+      return {
+        id: entry.id,
+        visible: existing?.visible ?? true,
+        order: index,
+      }
+    })
+
+    const reorderedHidden = config.value
+      .filter((entry) => !visibleIds.has(entry.id))
+      .sort((a, b) => a.order - b.order)
+      .map((entry, index) => ({
+        ...entry,
+        order: reorderedVisible.length + index,
+      }))
+
+    config.value = [...reorderedVisible, ...reorderedHidden]
     scheduleSave()
   }
 

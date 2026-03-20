@@ -46,6 +46,7 @@ import { AuthorsModule } from './modules/authors/authors.module';
 import { BookMetadataFetchModule } from './modules/book-metadata-fetch/book-metadata-fetch.module';
 import { MetadataScoreModule } from './modules/metadata-score/metadata-score.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { UserStatisticsModule } from './modules/user-statistics/user-statistics.module';
 import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
@@ -92,6 +93,7 @@ import { AuditModule } from './modules/audit/audit.module';
     EmailModule,
     MetadataScoreModule,
     StatisticsModule,
+    UserStatisticsModule,
     AuditModule,
   ],
   providers: [

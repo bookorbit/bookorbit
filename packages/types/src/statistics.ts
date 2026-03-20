@@ -11,7 +11,14 @@ export type StatisticsChartId =
   | 'library-metadata-completeness'
   | 'format-share-over-time'
   | 'genre-rank-over-time'
-  | 'page-count-distribution';
+  | 'page-count-distribution'
+  | 'reading-heatmap'
+  | 'peak-reading-hours'
+  | 'favorite-reading-days'
+  | 'completion-timeline'
+  | 'goal-trajectory'
+  | 'progress-funnel'
+  | 'completion-latency';
 
 export type StatisticsGranularity = 'monthly' | 'yearly';
 export type StatisticsDateRange = 'last-year' | 'last-5-years' | 'all-time';
@@ -41,6 +48,13 @@ export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [
   'storage-by-format',
   'publication-decade',
   'books-added-over-time',
+  'reading-heatmap',
+  'peak-reading-hours',
+  'favorite-reading-days',
+  'completion-timeline',
+  'goal-trajectory',
+  'progress-funnel',
+  'completion-latency',
   'format-share-over-time',
   'metadata-completeness',
   'metadata-score-distribution',

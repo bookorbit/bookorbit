@@ -40,7 +40,7 @@ watchEffect(() => {
           return `${p.name}: <strong>${p.value}</strong> books`
         },
       },
-      grid: { left: '3%', right: '3%', bottom: '12%', top: '8%', containLabel: true },
+      grid: { left: '3%', right: '3%', bottom: '8%', top: '8%', containLabel: true },
       xAxis: {
         type: 'category',
         data: rows.map((r) => r.genre),
@@ -82,10 +82,11 @@ watchEffect(() => {
       },
     },
     legend: { type: 'scroll', top: 0 },
-    grid: { left: '3%', right: '3%', bottom: '10%', top: '16%', containLabel: true },
+    grid: { left: '3%', right: '15%', bottom: '6%', top: '16%', containLabel: true },
     xAxis: {
       type: 'category',
       data: years,
+      boundaryGap: false,
       axisTick: { show: false },
       axisLabel: { fontSize: 11 },
     },

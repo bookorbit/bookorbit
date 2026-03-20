@@ -1,6 +1,14 @@
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
-import { annotations, bookmarks, readerDefaultPreferences, readerPreferences, readingProgress } from './reader';
+import {
+  annotations,
+  bookmarks,
+  readerDefaultPreferences,
+  readerPreferences,
+  readingProgress,
+  readingSessionEvents,
+  userReadingDailyStats,
+} from './reader';
 
 const fkByColumn = (table: unknown) => {
   const config = getTableConfig(table as never);
@@ -25,6 +33,35 @@ describe('reader schema', () => {
     expect(indexNames).toContain('reading_progress_user_id_idx');
     expect(readingProgress.percentage.default).toBe(0);
     expect(readingProgress.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date);
+  });
+
+  it('stores append-only reading session events with idempotency and time indexes', () => {
+    const config = getTableConfig(readingSessionEvents);
+    const uniqueIndexes = config.indexes.filter((idx) => idx.config.unique);
+    const indexNames = config.indexes.map((idx) => idx.config.name);
+    const fkMap = fkByColumn(readingSessionEvents);
+
+    expect(uniqueIndexes.some((idx) => idx.config.name === 'rse_event_key_uidx')).toBe(true);
+    expect(indexNames).toContain('rse_user_recorded_at_idx');
+    expect(indexNames).toContain('rse_file_recorded_at_idx');
+    expect(fkMap.get('user_id')?.onDelete).toBe('cascade');
+    expect(fkMap.get('book_file_id')?.onDelete).toBe('cascade');
+    expect(readingSessionEvents.source.default).toBe('reader');
+    expect(readingSessionEvents.synthetic.default).toBe(false);
+  });
+
+  it('stores user daily reading aggregates keyed by user, library, and day', () => {
+    const config = getTableConfig(userReadingDailyStats);
+    const pkColumns = config.primaryKeys.map((pk) => pk.columns.map((col) => col.name));
+    const indexNames = config.indexes.map((idx) => idx.config.name);
+    const fkMap = fkByColumn(userReadingDailyStats);
+
+    expect(pkColumns).toContainEqual(['user_id', 'library_id', 'day']);
+    expect(indexNames).toContain('urds_user_day_idx');
+    expect(indexNames).toContain('urds_user_library_day_idx');
+    expect(fkMap.get('user_id')?.onDelete).toBe('cascade');
+    expect(fkMap.get('library_id')?.onDelete).toBe('cascade');
+    expect(userReadingDailyStats.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date);
   });
 
   it('enforces cascade deletes for bookmarks and annotations ownership', () => {

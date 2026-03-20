@@ -78,8 +78,11 @@ export class StatisticsService {
   ): Promise<StatisticsResult<LibraryMetadataCompletenessItem>> {
     const rows = await this.repo.libraryMetadataCompleteness(user.id, user.isSuperuser, query.libraryIds);
     const fieldDefs: Array<{ field: string; key: keyof (typeof rows)[number] }> = [
+      { field: 'Title', key: 'hasTitle' },
       { field: 'Cover', key: 'hasCover' },
       { field: 'Author', key: 'hasAuthor' },
+      { field: 'Genres', key: 'hasGenre' },
+      { field: 'Tags', key: 'hasTag' },
       { field: 'Description', key: 'hasDescription' },
       { field: 'Publisher', key: 'hasPublisher' },
       { field: 'Year', key: 'hasYear' },

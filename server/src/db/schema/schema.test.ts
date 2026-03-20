@@ -11,7 +11,7 @@ import { emailPreferences } from './email-preferences';
 import { lenses } from './lenses';
 import { koboSyncSettings, koboLibrarySnapshots, koboReadingStates } from './kobo';
 import { emailRecipients, emailRecipientGroups } from './email-recipients';
-import { readerDefaultPreferences, readerPreferences, readingProgress, annotations } from './reader';
+import { readerDefaultPreferences, readerPreferences, readingProgress, annotations, userReadingDailyStats } from './reader';
 
 describe('Database Schema Logic', () => {
   beforeAll(() => {
@@ -92,6 +92,7 @@ describe('Database Schema Logic', () => {
     testOnUpdate('emailRecipients.updatedAt', emailRecipients.updatedAt);
     testOnUpdate('emailRecipientGroups.updatedAt', emailRecipientGroups.updatedAt);
     testOnUpdate('readingProgress.updatedAt', readingProgress.updatedAt);
+    testOnUpdate('userReadingDailyStats.updatedAt', userReadingDailyStats.updatedAt);
     testOnUpdate('annotations.updatedAt', annotations.updatedAt);
     testOnUpdate('readerDefaultPreferences.updatedAt', readerDefaultPreferences.updatedAt);
     testOnUpdate('readerPreferences.updatedAt', readerPreferences.updatedAt);

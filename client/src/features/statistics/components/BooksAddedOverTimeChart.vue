@@ -38,7 +38,7 @@ watchEffect(() => {
         return `${p.name}: <strong>${p.value}</strong> books`
       },
     },
-    grid: { left: '3%', right: '4%', bottom: '12%', top: '8%', containLabel: true },
+    grid: { left: '3%', right: '4%', bottom: '8%', top: '8%', containLabel: true },
     xAxis: {
       type: 'category',
       data: labels,

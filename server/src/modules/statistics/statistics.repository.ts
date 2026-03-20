@@ -171,8 +171,11 @@ export class StatisticsRepository {
         libraryId: books.libraryId,
         libraryName: libraries.name,
         total: sql<number>`count(*)::int`,
+        hasTitle: sql<number>`count(${bookMetadata.title})::int`,
         hasCover: sql<number>`count(${bookMetadata.coverSource})::int`,
         hasAuthor: sql<number>`count(distinct ba.book_id)::int`,
+        hasGenre: sql<number>`count(distinct bg.book_id)::int`,
+        hasTag: sql<number>`count(distinct bt.book_id)::int`,
         hasDescription: sql<number>`count(${bookMetadata.description})::int`,
         hasPublisher: sql<number>`count(${bookMetadata.publisher})::int`,
         hasYear: sql<number>`count(${bookMetadata.publishedYear})::int`,
@@ -186,6 +189,8 @@ export class StatisticsRepository {
       .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(sql`(select distinct book_id from book_authors) ba`, sql`ba.book_id = ${books.id}`)
+      .leftJoin(sql`(select distinct book_id from book_genres) bg`, sql`bg.book_id = ${books.id}`)
+      .leftJoin(sql`(select distinct book_id from book_tags) bt`, sql`bt.book_id = ${books.id}`)
       .where(filter)
       .groupBy(books.libraryId, libraries.name)
       .orderBy(libraries.name);

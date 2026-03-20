@@ -1,8 +1,16 @@
 import { api } from '@/lib/api'
 import type {
   BooksAddedDataPoint,
+  UserCompletionLatencyDistribution,
   FormatShareOverTimeItem,
+  UserGoalTrajectory,
   StatisticsSummary,
+  UserCompletionTimelinePoint,
+  UserDailyReadingStat,
+  UserFavoriteDayStat,
+  UserProgressFunnelComparison,
+  UserPeakHourStat,
+  UserStatisticsSummary,
   FormatDistributionItem,
   GenreRankOverTimeItem,
   GenreDistributionItem,
@@ -29,6 +37,13 @@ function buildParams(filters: StatisticsFilterConfig, extra?: Record<string, str
   if (extra) Object.entries(extra).forEach(([k, v]) => params.set(k, v))
   const str = params.toString()
   return str ? `?${str}` : ''
+}
+
+function getUtcDaysSinceYearStartInclusive(): number {
+  const now = new Date()
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const yearStartUtc = Date.UTC(now.getUTCFullYear(), 0, 1)
+  return Math.floor((todayUtc - yearStartUtc) / 86_400_000) + 1
 }
 
 export async function fetchFormatDistribution(filters: StatisticsFilterConfig): Promise<StatisticsResult<FormatDistributionItem>> {
@@ -96,4 +111,53 @@ export async function fetchStatisticsSummary(filters: StatisticsFilterConfig): P
   const res = await api(`/api/v1/statistics/summary${buildParams(filters)}`)
   if (!res.ok) throw new Error(`Statistics summary request failed: ${res.status}`)
   return res.json() as Promise<StatisticsSummary>
+}
+
+export async function fetchUserStatisticsSummary(filters: StatisticsFilterConfig): Promise<UserStatisticsSummary> {
+  const res = await api(`/api/v1/user-statistics/summary${buildParams(filters)}`)
+  if (!res.ok) throw new Error(`User statistics summary request failed: ${res.status}`)
+  return res.json() as Promise<UserStatisticsSummary>
+}
+
+export async function fetchUserReadingHeatmap(filters: StatisticsFilterConfig): Promise<UserDailyReadingStat[]> {
+  const days = String(getUtcDaysSinceYearStartInclusive())
+  const res = await api(`/api/v1/user-statistics/reading-heatmap${buildParams(filters, { days })}`)
+  if (!res.ok) throw new Error(`User reading heatmap request failed: ${res.status}`)
+  return res.json() as Promise<UserDailyReadingStat[]>
+}
+
+export async function fetchUserPeakReadingHours(filters: StatisticsFilterConfig): Promise<UserPeakHourStat[]> {
+  const res = await api(`/api/v1/user-statistics/peak-hours${buildParams(filters, { days: '365' })}`)
+  if (!res.ok) throw new Error(`User peak hours request failed: ${res.status}`)
+  return res.json() as Promise<UserPeakHourStat[]>
+}
+
+export async function fetchUserFavoriteReadingDays(filters: StatisticsFilterConfig): Promise<UserFavoriteDayStat[]> {
+  const res = await api(`/api/v1/user-statistics/favorite-days${buildParams(filters, { days: '365' })}`)
+  if (!res.ok) throw new Error(`User favorite days request failed: ${res.status}`)
+  return res.json() as Promise<UserFavoriteDayStat[]>
+}
+
+export async function fetchUserCompletionTimeline(filters: StatisticsFilterConfig): Promise<UserCompletionTimelinePoint[]> {
+  const res = await api(`/api/v1/user-statistics/completion-timeline${buildParams(filters, { days: '1825' })}`)
+  if (!res.ok) throw new Error(`User completion timeline request failed: ${res.status}`)
+  return res.json() as Promise<UserCompletionTimelinePoint[]>
+}
+
+export async function fetchUserGoalTrajectory(filters: StatisticsFilterConfig): Promise<UserGoalTrajectory> {
+  const res = await api(`/api/v1/user-statistics/goal-trajectory${buildParams(filters, { days: '365', goalBooks: '12' })}`)
+  if (!res.ok) throw new Error(`User goal trajectory request failed: ${res.status}`)
+  return res.json() as Promise<UserGoalTrajectory>
+}
+
+export async function fetchUserProgressFunnel(filters: StatisticsFilterConfig): Promise<UserProgressFunnelComparison> {
+  const res = await api(`/api/v1/user-statistics/progress-funnel${buildParams(filters, { days: '365', comparePrevious: 'true' })}`)
+  if (!res.ok) throw new Error(`User progress funnel request failed: ${res.status}`)
+  return res.json() as Promise<UserProgressFunnelComparison>
+}
+
+export async function fetchUserCompletionLatency(filters: StatisticsFilterConfig): Promise<UserCompletionLatencyDistribution> {
+  const res = await api(`/api/v1/user-statistics/completion-latency${buildParams(filters, { days: '1825' })}`)
+  if (!res.ok) throw new Error(`User completion latency request failed: ${res.status}`)
+  return res.json() as Promise<UserCompletionLatencyDistribution>
 }

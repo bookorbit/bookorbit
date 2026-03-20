@@ -53,12 +53,12 @@ watchEffect(() => {
       },
     },
     legend: { type: 'scroll', top: 0 },
-    grid: { left: '3%', right: '3%', bottom: '12%', top: '16%', containLabel: true },
+    grid: { left: '3%', right: '3%', bottom: '6%', top: '16%', containLabel: true },
     xAxis: {
       type: 'category',
       data: labels,
       axisTick: { show: false },
-      axisLabel: { fontSize: 11, interval: Math.max(0, Math.floor(labels.length / 10) - 1) },
+      axisLabel: { fontSize: 11, rotate: 45, interval: Math.max(0, Math.floor(labels.length / 10) - 1) },
     },
     yAxis: {
       type: 'value',

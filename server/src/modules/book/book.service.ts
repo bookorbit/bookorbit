@@ -362,7 +362,15 @@ export class BookService {
 
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     await this.verifyFileAccess(fileId, user);
-    await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage);
+    await this.bookRepo.upsertProgress(
+      userId,
+      fileId,
+      dto.cfi ?? null,
+      dto.pageNumber ?? null,
+      dto.percentage,
+      dto.eventKey ?? null,
+      dto.source ?? null,
+    );
   }
 
   async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {

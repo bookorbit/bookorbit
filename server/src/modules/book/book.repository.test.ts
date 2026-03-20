@@ -195,32 +195,102 @@ describe('BookRepository', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
-  it('upserts reading progress with expected conflict target', async () => {
-    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
-    const insert = vi.fn().mockReturnValue({ values });
-    const db = { insert };
-    const repo = new BookRepository(db as never);
+  it('upserts reading progress and appends an idempotent session event', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:10.000Z'));
 
-    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', 7, 80);
+      const selectLimit = vi.fn().mockResolvedValue([{ percentage: 70, pageNumber: 6, updatedAt: new Date('2026-01-01T00:00:05.000Z') }]);
+      const selectWhere = vi.fn().mockReturnValue({ limit: selectLimit });
+      const selectFrom = vi.fn().mockReturnValue({ where: selectWhere });
+      const select = vi.fn().mockReturnValue({ from: selectFrom });
 
-    expect(insert).toHaveBeenCalledTimes(1);
-    expect(values).toHaveBeenCalledWith({
-      userId: 5,
-      bookFileId: 9,
-      cfi: 'epubcfi(/6/2)',
-      pageNumber: 7,
-      percentage: 80,
-    });
-    expect(onConflictDoUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target: expect.any(Array),
-        set: expect.objectContaining({
+      const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+      const valuesProgress = vi.fn().mockReturnValue({ onConflictDoUpdate });
+
+      const returningEvent = vi.fn().mockResolvedValue([{ id: 1 }]);
+      const onConflictDoNothing = vi.fn().mockReturnValue({ returning: returningEvent });
+      const valuesEvent = vi.fn().mockReturnValue({ onConflictDoNothing });
+
+      const insert = vi.fn().mockReturnValueOnce({ values: valuesEvent }).mockReturnValueOnce({ values: valuesProgress });
+      const execute = vi.fn().mockResolvedValue(undefined);
+
+      const tx = { execute, select, insert };
+      const transaction = vi.fn(async (fn: (trx: typeof tx) => Promise<void>) => fn(tx));
+      const db = { transaction };
+      const repo = new BookRepository(db as never);
+
+      await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', 7, 80, 'session-1:1', 'reader-web');
+
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(insert).toHaveBeenCalledTimes(2);
+      expect(valuesProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 5,
+          bookFileId: 9,
           cfi: 'epubcfi(/6/2)',
           pageNumber: 7,
           percentage: 80,
         }),
-      }),
-    );
+      );
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: expect.any(Array),
+          set: expect.objectContaining({
+            cfi: 'epubcfi(/6/2)',
+            pageNumber: 7,
+            percentage: 80,
+          }),
+        }),
+      );
+      expect(returningEvent).toHaveBeenCalledWith(expect.objectContaining({ id: expect.anything() }));
+      expect(valuesEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 5,
+          bookFileId: 9,
+          eventKey: 'session-1:1',
+          percentage: 80,
+          percentageDelta: 10,
+          pageNumber: 7,
+          pageDelta: 1,
+          deltaSeconds: 5,
+          source: 'reader-web',
+          synthetic: false,
+        }),
+      );
+      expect(onConflictDoNothing).toHaveBeenCalledWith(expect.objectContaining({ target: expect.any(Array) }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not mutate canonical progress when an event key already exists', async () => {
+    const selectLimit = vi.fn().mockResolvedValue([{ percentage: 70, pageNumber: 6, updatedAt: new Date('2026-01-01T00:00:05.000Z') }]);
+    const selectWhere = vi.fn().mockReturnValue({ limit: selectLimit });
+    const selectFrom = vi.fn().mockReturnValue({ where: selectWhere });
+    const select = vi.fn().mockReturnValue({ from: selectFrom });
+
+    const returningEvent = vi.fn().mockResolvedValue([]);
+    const onConflictDoNothing = vi.fn().mockReturnValue({ returning: returningEvent });
+    const valuesEvent = vi.fn().mockReturnValue({ onConflictDoNothing });
+
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+    const valuesProgress = vi.fn().mockReturnValue({ onConflictDoUpdate });
+
+    const insert = vi.fn().mockReturnValueOnce({ values: valuesEvent }).mockReturnValueOnce({ values: valuesProgress });
+    const execute = vi.fn().mockResolvedValue(undefined);
+
+    const tx = { execute, select, insert };
+    const transaction = vi.fn(async (fn: (trx: typeof tx) => Promise<void>) => fn(tx));
+    const db = { transaction };
+    const repo = new BookRepository(db as never);
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', 7, 80, 'session-1:1', 'reader-web');
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(valuesEvent).toHaveBeenCalledTimes(1);
+    expect(valuesProgress).not.toHaveBeenCalled();
+    expect(onConflictDoUpdate).not.toHaveBeenCalled();
   });
 });

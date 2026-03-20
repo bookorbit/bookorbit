@@ -10,8 +10,13 @@ export function useReaderProgress(bookId: number, fileId: number) {
   const sectionIndex = ref(0)
   const totalSections = ref(0)
   const fraction = ref(0)
+  const sessionId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let eventSequence = 0
 
   async function load() {
     const res = await api(`/api/v1/books/files/${fileId}/progress`)
@@ -35,10 +40,17 @@ export function useReaderProgress(bookId: number, fileId: number) {
   }
 
   async function save() {
+    eventSequence += 1
     await api(`/api/v1/books/files/${fileId}/progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cfi: cfi.value, pageNumber: pageNumber.value, percentage: percentage.value }),
+      body: JSON.stringify({
+        cfi: cfi.value,
+        pageNumber: pageNumber.value,
+        percentage: percentage.value,
+        eventKey: `${sessionId}:${eventSequence}`,
+        source: 'reader-web',
+      }),
     })
   }
 

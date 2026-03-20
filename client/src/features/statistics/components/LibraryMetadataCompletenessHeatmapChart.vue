@@ -1,15 +1,36 @@
 <script setup lang="ts">
-import { shallowRef, watchEffect } from 'vue'
+import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { ListChecks } from 'lucide-vue-next'
+import { useThemeStore } from '@/stores/theme'
 
+import { buildHeatmapPalette } from '../heatmap-palette'
 import { useLibraryMetadataCompleteness } from '../composables/useLibraryMetadataCompleteness'
 import ChartCard from './ChartCard.vue'
 
-const FIELD_ORDER = ['Cover', 'Author', 'Description', 'Publisher', 'Year', 'Language', 'Page Count', 'Rating', 'Series', 'ISBN']
+const FIELD_ORDER = [
+  'Title',
+  'Cover',
+  'Author',
+  'Genres',
+  'Tags',
+  'Description',
+  'Publisher',
+  'Year',
+  'Language',
+  'Page Count',
+  'Rating',
+  'Series',
+  'ISBN',
+]
 
+const themeStore = useThemeStore()
 const { data, loading, error } = useLibraryMetadataCompleteness()
 const option = shallowRef({})
+const heatmapPaletteState = computed(() => ({
+  accent: themeStore.accent,
+  palette: buildHeatmapPalette({ theme: themeStore.theme }),
+}))
 
 watchEffect(() => {
   if (!data.value.items.length) return
@@ -22,39 +43,48 @@ watchEffect(() => {
     const y = libraries.indexOf(item.libraryName)
     return [x, y, item.percent, item.presentCount, item.totalCount]
   })
+  const palette = heatmapPaletteState.value.palette
+  const labelColor = themeStore.theme === 'dark' ? '#f8fafc' : '#0f172a'
+  const pieces = [
+    { value: 0, color: palette.scale[0] },
+    { gt: 0, lte: 25, color: palette.scale[1] },
+    { gt: 25, lte: 50, color: palette.scale[2] },
+    { gt: 50, lte: 75, color: palette.scale[3] },
+    { gt: 75, color: palette.scale[4] },
+  ]
 
   option.value = {
     tooltip: {
       confine: true,
       enterable: false,
+      backgroundColor: palette.tooltipBackground,
+      borderColor: palette.tooltipBorder,
+      borderWidth: 1,
+      textStyle: { color: palette.tooltipText, fontSize: 12 },
       formatter: (params: { value: [number, number, number, number, number] }) => {
         const [x, y, pct, present, total] = params.value
         return `${libraries[y]}<br/>${fields[x]}: <strong>${pct}%</strong> (${present}/${total})`
       },
     },
-    grid: { left: '3%', right: '8%', bottom: '6%', top: '6%', containLabel: true },
+    grid: { left: '3%', right: '3%', bottom: '6%', top: '6%', containLabel: true },
     xAxis: {
       type: 'category',
       data: fields,
       axisTick: { show: false },
-      axisLabel: { fontSize: 11, rotate: 35, interval: 0 },
+      axisLabel: { fontSize: 11, rotate: 35, interval: 0, color: palette.axisColor },
     },
     yAxis: {
       type: 'category',
       data: libraries,
       axisTick: { show: false },
-      axisLabel: { fontSize: 11 },
+      axisLabel: { fontSize: 11, color: palette.axisColor },
     },
     visualMap: {
-      dimension: 2,
-      min: 0,
-      max: 100,
-      orient: 'vertical',
-      right: 0,
-      top: 'middle',
+      type: 'piecewise',
+      show: false,
       calculable: false,
-      inRange: { color: ['#334155', '#475569', '#64748b', '#93c5fd', '#2563eb'] },
-      text: ['100%', '0%'],
+      dimension: 2,
+      pieces,
     },
     series: [
       {
@@ -64,13 +94,13 @@ watchEffect(() => {
         label: {
           show: true,
           formatter: (params: { value: [number, number, number] }) => `${params.value[2]}%`,
-          color: '#f8fafc',
+          color: labelColor,
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: 500,
         },
         itemStyle: {
-          borderColor: 'rgba(15, 23, 42, 0.7)',
-          borderWidth: 1,
+          borderColor: palette.borderColor,
+          borderWidth: 0.8,
         },
         emphasis: { disabled: true },
       },
@@ -80,7 +110,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Library Metadata Completeness" :icon="ListChecks" :color-index="7" :loading :error :empty="!data.items.length" tall>
+  <ChartCard title="Library Metadata Completeness" :icon="ListChecks" :color-index="7" :loading :error :empty="!data.items.length">
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

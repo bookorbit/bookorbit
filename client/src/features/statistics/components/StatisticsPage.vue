@@ -1,21 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import {
-  BarChart3,
-  BookOpen,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  Globe,
-  GripVertical,
-  HardDrive,
-  ListChecks,
-  PieChart,
-  Settings2,
-  Tag,
-  TrendingUp,
-  Users,
-} from 'lucide-vue-next'
+import { Check, ChevronDown, GripVertical, Settings2 } from 'lucide-vue-next'
 import { VueDraggable } from 'vue-draggable-plus'
 
 import type { ChartConfigEntry, StatisticsChartId } from '@projectx/types'
@@ -23,41 +8,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { STATISTICS_CHART_META } from '../statistics-chart-meta'
 import { useStatisticsConfig } from '../composables/useStatisticsConfig'
 import StatisticsGrid from './StatisticsGrid.vue'
 import StatisticsSummaryCard from './StatisticsSummaryCard.vue'
-
-const CHART_LABELS: Record<StatisticsChartId, string> = {
-  'format-distribution': 'Format Distribution',
-  'language-distribution': 'Language Distribution',
-  'books-added-over-time': 'Books Added Over Time',
-  'storage-by-format': 'Storage by Format',
-  'publication-decade': 'Publication Decade',
-  'top-authors': 'Top 25 Authors',
-  'metadata-completeness': 'Metadata Completeness',
-  'genre-distribution': 'Genre Distribution',
-  'metadata-score-distribution': 'Metadata Score Distribution',
-  'library-metadata-completeness': 'Library Metadata Completeness',
-  'format-share-over-time': 'Format Share Over Time',
-  'genre-rank-over-time': 'Genre Rank Over Time',
-  'page-count-distribution': 'Page Count Distribution',
-}
-
-const CHART_ICONS: Record<StatisticsChartId, unknown> = {
-  'format-distribution': PieChart,
-  'language-distribution': Globe,
-  'books-added-over-time': TrendingUp,
-  'storage-by-format': HardDrive,
-  'publication-decade': CalendarDays,
-  'top-authors': Users,
-  'metadata-completeness': ListChecks,
-  'genre-distribution': Tag,
-  'metadata-score-distribution': BarChart3,
-  'library-metadata-completeness': ListChecks,
-  'format-share-over-time': TrendingUp,
-  'genre-rank-over-time': Tag,
-  'page-count-distribution': BookOpen,
-}
 
 const { orderedCharts, filters, init, toggleVisibility, reorder, resetToDefaults, setLibraryFilter } = useStatisticsConfig()
 const { libraries, fetchLibraries } = useLibraries()
@@ -113,6 +67,10 @@ function handleReset() {
 
 function openConfig() {
   configOpen.value = true
+}
+
+function chartMeta(id: StatisticsChartId) {
+  return STATISTICS_CHART_META[id]
 }
 </script>
 
@@ -207,9 +165,9 @@ function openConfig() {
               ]"
             >
               <GripVertical class="text-muted-foreground/80 drawer-drag-handle size-4 shrink-0 cursor-grab active:cursor-grabbing" />
-              <component :is="CHART_ICONS[chart.id]" :class="['size-4 shrink-0', chart.visible ? 'text-primary' : 'text-muted-foreground']" />
+              <component :is="chartMeta(chart.id).icon" :class="['size-4 shrink-0', chart.visible ? 'text-primary' : 'text-muted-foreground']" />
               <span :class="['flex-1 text-sm', chart.visible ? 'text-foreground' : 'text-muted-foreground']">
-                {{ CHART_LABELS[chart.id] }}
+                {{ chartMeta(chart.id).label }}
               </span>
               <ToggleSwitch :model-value="chart.visible" @update:model-value="handleToggleChart(chart.id)" />
             </div>

@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS pg_trgm;--> statement-breakpoint
 CREATE TYPE "public"."library_access_level" AS ENUM('viewer', 'editor', 'owner');--> statement-breakpoint
 CREATE TYPE "public"."opds_sort_order" AS ENUM('recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc');--> statement-breakpoint
 CREATE TABLE "audit_log" (
@@ -323,6 +325,33 @@ CREATE TABLE "reading_progress" (
 	CONSTRAINT "reading_progress_book_file_id_user_id_pk" PRIMARY KEY("book_file_id","user_id")
 );
 --> statement-breakpoint
+CREATE TABLE "reading_session_events" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"book_file_id" integer NOT NULL,
+	"event_key" varchar(120) NOT NULL,
+	"recorded_at" timestamp DEFAULT now() NOT NULL,
+	"percentage" real NOT NULL,
+	"percentage_delta" real DEFAULT 0 NOT NULL,
+	"page_number" integer,
+	"page_delta" integer DEFAULT 0 NOT NULL,
+	"delta_seconds" integer DEFAULT 0 NOT NULL,
+	"source" varchar(40) DEFAULT 'reader' NOT NULL,
+	"synthetic" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "user_reading_daily_stats" (
+	"user_id" integer NOT NULL,
+	"library_id" integer NOT NULL,
+	"day" date NOT NULL,
+	"reading_seconds" integer DEFAULT 0 NOT NULL,
+	"progress_delta" real DEFAULT 0 NOT NULL,
+	"events_count" integer DEFAULT 0 NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "user_reading_daily_stats_user_id_library_id_day_pk" PRIMARY KEY("user_id","library_id","day")
+);
+--> statement-breakpoint
 CREATE TABLE "oidc_group_mappings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"oidc_group_claim" text NOT NULL,
@@ -576,6 +605,10 @@ ALTER TABLE "reader_preferences" ADD CONSTRAINT "reader_preferences_user_id_user
 ALTER TABLE "reader_preferences" ADD CONSTRAINT "reader_preferences_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reading_session_events" ADD CONSTRAINT "reading_session_events_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reading_session_events" ADD CONSTRAINT "reading_session_events_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_reading_daily_stats" ADD CONSTRAINT "user_reading_daily_stats_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_reading_daily_stats" ADD CONSTRAINT "user_reading_daily_stats_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oidc_sessions" ADD CONSTRAINT "oidc_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "opds_users" ADD CONSTRAINT "opds_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_devices" ADD CONSTRAINT "kobo_devices_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -631,6 +664,11 @@ CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> 
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint
 CREATE UNIQUE INDEX "rp_user_file_idx" ON "reader_preferences" USING btree ("user_id","book_file_id");--> statement-breakpoint
 CREATE INDEX "reading_progress_user_id_idx" ON "reading_progress" USING btree ("user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "rse_event_key_uidx" ON "reading_session_events" USING btree ("event_key");--> statement-breakpoint
+CREATE INDEX "rse_user_recorded_at_idx" ON "reading_session_events" USING btree ("user_id","recorded_at");--> statement-breakpoint
+CREATE INDEX "rse_file_recorded_at_idx" ON "reading_session_events" USING btree ("book_file_id","recorded_at");--> statement-breakpoint
+CREATE INDEX "urds_user_day_idx" ON "user_reading_daily_stats" USING btree ("user_id","day");--> statement-breakpoint
+CREATE INDEX "urds_user_library_day_idx" ON "user_reading_daily_stats" USING btree ("user_id","library_id","day");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_user_id_idx" ON "oidc_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_subject_issuer_idx" ON "oidc_sessions" USING btree ("oidc_subject","oidc_issuer");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_session_id");--> statement-breakpoint

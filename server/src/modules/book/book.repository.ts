@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -20,11 +21,13 @@ import {
   koboReadingStates,
   koboSnapshotBooks,
   libraries,
+  readingSessionEvents,
   readingProgress,
   tags,
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+const MAX_ACTIVE_GAP_SECONDS = 30 * 60;
 type PatternMetadataRow = {
   bookId: number;
   title: string | null;
@@ -381,13 +384,70 @@ export class BookRepository {
     await this.db.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
   }
 
-  async upsertProgress(userId: number, fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {
-    await this.db
-      .insert(readingProgress)
-      .values({ userId, bookFileId: fileId, cfi, pageNumber, percentage })
-      .onConflictDoUpdate({
-        target: [readingProgress.bookFileId, readingProgress.userId],
-        set: { cfi, pageNumber, percentage, updatedAt: sql`now()` },
-      });
+  async upsertProgress(
+    userId: number,
+    fileId: number,
+    cfi: string | null,
+    pageNumber: number | null,
+    percentage: number,
+    eventKey: string | null = null,
+    source: string | null = null,
+  ) {
+    const now = new Date();
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${userId}, ${fileId})`);
+
+      const [previous] = await tx
+        .select({
+          percentage: readingProgress.percentage,
+          pageNumber: readingProgress.pageNumber,
+          updatedAt: readingProgress.updatedAt,
+        })
+        .from(readingProgress)
+        .where(and(eq(readingProgress.bookFileId, fileId), eq(readingProgress.userId, userId)))
+        .limit(1);
+
+      const previousUpdatedAt = previous?.updatedAt ?? null;
+      const rawGapSeconds = previousUpdatedAt ? Math.floor((now.getTime() - previousUpdatedAt.getTime()) / 1000) : 0;
+      const deltaSeconds = rawGapSeconds > 0 && rawGapSeconds <= MAX_ACTIVE_GAP_SECONDS ? rawGapSeconds : 0;
+
+      const percentageDelta = previous ? Number((percentage - previous.percentage).toFixed(4)) : 0;
+      const pageDelta = previous && pageNumber != null && previous.pageNumber != null ? pageNumber - previous.pageNumber : 0;
+      const effectiveSource = source?.trim() ? source.trim() : 'reader';
+      const normalizedEventKey = eventKey?.trim();
+      const effectiveEventKey = normalizedEventKey ? normalizedEventKey : `srv:${userId}:${fileId}:${now.getTime()}:${randomUUID()}`;
+
+      const insertedEvents = await tx
+        .insert(readingSessionEvents)
+        .values({
+          userId,
+          bookFileId: fileId,
+          eventKey: effectiveEventKey,
+          recordedAt: now,
+          percentage,
+          percentageDelta,
+          pageNumber,
+          pageDelta,
+          deltaSeconds,
+          source: effectiveSource,
+          synthetic: false,
+          createdAt: now,
+        })
+        .onConflictDoNothing({ target: [readingSessionEvents.eventKey] })
+        .returning({ id: readingSessionEvents.id });
+
+      // Client retries must be idempotent: if this event key already exists, do not
+      // mutate canonical progress timestamps or deltas.
+      if (insertedEvents.length === 0) return;
+
+      await tx
+        .insert(readingProgress)
+        .values({ userId, bookFileId: fileId, cfi, pageNumber, percentage, updatedAt: now })
+        .onConflictDoUpdate({
+          target: [readingProgress.bookFileId, readingProgress.userId],
+          set: { cfi, pageNumber, percentage, updatedAt: now },
+        });
+    });
   }
 }

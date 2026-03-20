@@ -30,7 +30,7 @@ watchEffect(() => {
         ].join('<br/>')
       },
     },
-    grid: { left: '3%', right: '3%', bottom: '18%', top: '8%', containLabel: true },
+    grid: { left: '3%', right: '3%', bottom: '4%', top: '6%', containLabel: true },
     xAxis: {
       type: 'category',
       data: data.value.items.map((item) => item.format),

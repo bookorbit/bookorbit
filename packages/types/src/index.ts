@@ -22,3 +22,4 @@ export * from "./author";
 export * from "./metadata-score";
 export * from "./book-metadata-fetch";
 export * from "./statistics";
+export * from "./user-statistics";

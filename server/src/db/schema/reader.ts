@@ -1,6 +1,7 @@
-import { index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { boolean, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { bookFiles, books } from './books';
+import { libraries } from './libraries';
 import { users } from './auth';
 
 export const readingProgress = pgTable(
@@ -27,6 +28,66 @@ export const readingProgress = pgTable(
 
 export type ReadingProgress = typeof readingProgress.$inferSelect;
 export type NewReadingProgress = typeof readingProgress.$inferInsert;
+
+export const readingSessionEvents = pgTable(
+  'reading_session_events',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    // Idempotency key from the client save call; retries must reuse this value.
+    eventKey: varchar('event_key', { length: 120 }).notNull(),
+    recordedAt: timestamp('recorded_at').notNull().defaultNow(),
+    percentage: real('percentage').notNull(),
+    percentageDelta: real('percentage_delta').notNull().default(0),
+    pageNumber: integer('page_number'),
+    pageDelta: integer('page_delta').notNull().default(0),
+    deltaSeconds: integer('delta_seconds').notNull().default(0),
+    source: varchar('source', { length: 40 }).notNull().default('reader'),
+    synthetic: boolean('synthetic').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('rse_event_key_uidx').on(t.eventKey),
+    index('rse_user_recorded_at_idx').on(t.userId, t.recordedAt),
+    index('rse_file_recorded_at_idx').on(t.bookFileId, t.recordedAt),
+  ],
+);
+
+export type ReadingSessionEvent = typeof readingSessionEvents.$inferSelect;
+export type NewReadingSessionEvent = typeof readingSessionEvents.$inferInsert;
+
+export const userReadingDailyStats = pgTable(
+  'user_reading_daily_stats',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    libraryId: integer('library_id')
+      .notNull()
+      .references(() => libraries.id, { onDelete: 'cascade' }),
+    day: date('day', { mode: 'string' }).notNull(),
+    readingSeconds: integer('reading_seconds').notNull().default(0),
+    progressDelta: real('progress_delta').notNull().default(0),
+    eventsCount: integer('events_count').notNull().default(0),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.libraryId, t.day] }),
+    index('urds_user_day_idx').on(t.userId, t.day),
+    index('urds_user_library_day_idx').on(t.userId, t.libraryId, t.day),
+  ],
+);
+
+export type UserReadingDailyStat = typeof userReadingDailyStats.$inferSelect;
+export type NewUserReadingDailyStat = typeof userReadingDailyStats.$inferInsert;
 
 export const bookmarks = pgTable(
   'bookmarks',

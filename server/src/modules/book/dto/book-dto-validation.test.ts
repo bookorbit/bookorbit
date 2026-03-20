@@ -46,11 +46,25 @@ describe('Book DTO validation', () => {
 
   it('validates SaveProgressDto percentage bounds and conditional field types', async () => {
     expect((await errorsFor(SaveProgressDto, { percentage: 0 })).length).toBe(0);
-    expect((await errorsFor(SaveProgressDto, { percentage: 100, cfi: 'epubcfi(/6/2)', pageNumber: 5 })).length).toBe(0);
+    expect(
+      (
+        await errorsFor(SaveProgressDto, {
+          percentage: 100,
+          cfi: 'epubcfi(/6/2)',
+          pageNumber: 5,
+          eventKey: 'session-1:9',
+          source: 'reader-web',
+        })
+      ).length,
+    ).toBe(0);
 
     expect((await errorsFor(SaveProgressDto, { percentage: -1 })).length).toBeGreaterThan(0);
     expect((await errorsFor(SaveProgressDto, { percentage: 50, cfi: 123 })).length).toBeGreaterThan(0);
     expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: 'five' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, eventKey: 123 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, eventKey: '' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, eventKey: '   ' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, source: 123 })).length).toBeGreaterThan(0);
   });
 
   it('requires non-empty search text and bounds search limit', async () => {

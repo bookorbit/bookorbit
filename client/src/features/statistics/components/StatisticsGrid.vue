@@ -3,81 +3,30 @@ import { type Component, defineAsyncComponent } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 
 import type { ChartConfigEntry, StatisticsChartId } from '@projectx/types'
+import { STATISTICS_CHART_META, type StatisticsChartSize } from '../statistics-chart-meta'
 import { useStatisticsConfig } from '../composables/useStatisticsConfig'
 
-interface ChartRegistryEntry {
-  component: Component
-  label: string
-  wide: boolean
-  fullWidth?: boolean
-}
-
-const CHART_REGISTRY: Record<StatisticsChartId, ChartRegistryEntry> = {
-  'format-distribution': {
-    component: defineAsyncComponent(() => import('./FormatDistributionChart.vue')),
-    label: 'Format Distribution',
-    wide: false,
-  },
-  'language-distribution': {
-    component: defineAsyncComponent(() => import('./LanguageDistributionChart.vue')),
-    label: 'Language Distribution',
-    wide: false,
-  },
-  'books-added-over-time': {
-    component: defineAsyncComponent(() => import('./BooksAddedOverTimeChart.vue')),
-    label: 'Books Added Over Time',
-    wide: true,
-  },
-  'storage-by-format': {
-    component: defineAsyncComponent(() => import('./StorageByFormatChart.vue')),
-    label: 'Storage by Format',
-    wide: false,
-  },
-  'publication-decade': {
-    component: defineAsyncComponent(() => import('./PublicationDecadeChart.vue')),
-    label: 'Publication Decade',
-    wide: false,
-  },
-  'top-authors': {
-    component: defineAsyncComponent(() => import('./TopAuthorsChart.vue')),
-    label: 'Top Authors',
-    wide: true,
-  },
-  'metadata-completeness': {
-    component: defineAsyncComponent(() => import('./MetadataCompletenessChart.vue')),
-    label: 'Metadata Completeness',
-    wide: false,
-  },
-  'genre-distribution': {
-    component: defineAsyncComponent(() => import('./GenreDistributionChart.vue')),
-    label: 'Genre Distribution',
-    wide: true,
-  },
-  'metadata-score-distribution': {
-    component: defineAsyncComponent(() => import('./MetadataScoreDistributionChart.vue')),
-    label: 'Metadata Score Distribution',
-    wide: false,
-  },
-  'library-metadata-completeness': {
-    component: defineAsyncComponent(() => import('./LibraryMetadataCompletenessHeatmapChart.vue')),
-    label: 'Library Metadata Completeness',
-    wide: true,
-  },
-  'format-share-over-time': {
-    component: defineAsyncComponent(() => import('./FormatShareOverTimeChart.vue')),
-    label: 'Format Share Over Time',
-    wide: true,
-  },
-  'genre-rank-over-time': {
-    component: defineAsyncComponent(() => import('./GenreRankOverTimeChart.vue')),
-    label: 'Genre Rank Over Time',
-    wide: true,
-  },
-  'page-count-distribution': {
-    component: defineAsyncComponent(() => import('./PageCountDistributionChart.vue')),
-    label: 'Page Count Distribution',
-    wide: false,
-  },
+const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
+  'format-distribution': defineAsyncComponent(() => import('./FormatDistributionChart.vue')),
+  'language-distribution': defineAsyncComponent(() => import('./LanguageDistributionChart.vue')),
+  'books-added-over-time': defineAsyncComponent(() => import('./BooksAddedOverTimeChart.vue')),
+  'storage-by-format': defineAsyncComponent(() => import('./StorageByFormatChart.vue')),
+  'publication-decade': defineAsyncComponent(() => import('./PublicationDecadeChart.vue')),
+  'top-authors': defineAsyncComponent(() => import('./TopAuthorsChart.vue')),
+  'metadata-completeness': defineAsyncComponent(() => import('./MetadataCompletenessChart.vue')),
+  'genre-distribution': defineAsyncComponent(() => import('./GenreDistributionChart.vue')),
+  'metadata-score-distribution': defineAsyncComponent(() => import('./MetadataScoreDistributionChart.vue')),
+  'library-metadata-completeness': defineAsyncComponent(() => import('./LibraryMetadataCompletenessHeatmapChart.vue')),
+  'format-share-over-time': defineAsyncComponent(() => import('./FormatShareOverTimeChart.vue')),
+  'genre-rank-over-time': defineAsyncComponent(() => import('./GenreRankOverTimeChart.vue')),
+  'page-count-distribution': defineAsyncComponent(() => import('./PageCountDistributionChart.vue')),
+  'reading-heatmap': defineAsyncComponent(() => import('./ReadingHeatmapChart.vue')),
+  'peak-reading-hours': defineAsyncComponent(() => import('./PeakReadingHoursChart.vue')),
+  'favorite-reading-days': defineAsyncComponent(() => import('./FavoriteReadingDaysChart.vue')),
+  'completion-timeline': defineAsyncComponent(() => import('./CompletionTimelineChart.vue')),
+  'goal-trajectory': defineAsyncComponent(() => import('./GoalTrajectoryChart.vue')),
+  'progress-funnel': defineAsyncComponent(() => import('./ProgressFunnelChart.vue')),
+  'completion-latency': defineAsyncComponent(() => import('./CompletionLatencyChart.vue')),
 }
 
 const { visibleCharts, reorder } = useStatisticsConfig()
@@ -85,24 +34,26 @@ const { visibleCharts, reorder } = useStatisticsConfig()
 function handleReorder(newList: ChartConfigEntry[]) {
   reorder(newList)
 }
+
+function tileClass(size: StatisticsChartSize): string {
+  if (size === '2x1') return 'md:col-span-2 md:row-span-1'
+  if (size === '2x2') return 'md:col-span-2 md:row-span-2'
+  if (size === '1x2') return 'md:col-span-1 md:row-span-2'
+  if (size === '3x1') return 'md:col-span-2 xl:col-span-3 md:row-span-1'
+  return 'md:col-span-1 md:row-span-1'
+}
 </script>
 
 <template>
   <VueDraggable
     :model-value="visibleCharts"
-    class="grid grid-flow-row-dense grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+    class="grid grid-flow-row-dense grid-cols-1 gap-4 md:grid-cols-2 md:auto-rows-[360px] xl:grid-cols-4"
     handle=".drag-handle"
     :animation="200"
     @update:model-value="handleReorder"
   >
-    <div
-      v-for="chart in visibleCharts"
-      :key="chart.id"
-      :class="
-        CHART_REGISTRY[chart.id].fullWidth ? 'md:col-span-2 xl:col-span-3 2xl:col-span-4' : CHART_REGISTRY[chart.id].wide ? 'md:col-span-2' : ''
-      "
-    >
-      <component :is="CHART_REGISTRY[chart.id].component" />
+    <div v-for="chart in visibleCharts" :key="chart.id" :class="tileClass(STATISTICS_CHART_META[chart.id].size)">
+      <component :is="CHART_COMPONENTS[chart.id]" />
     </div>
   </VueDraggable>
 </template>

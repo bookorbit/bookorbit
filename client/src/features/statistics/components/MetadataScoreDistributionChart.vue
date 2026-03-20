@@ -33,7 +33,7 @@ watchEffect(() => {
         return `${p.name}: <strong>${p.value}</strong> books`
       },
     },
-    grid: { left: '3%', right: '3%', bottom: '12%', top: '10%', containLabel: true },
+    grid: { left: '3%', right: '3%', bottom: '8%', top: '6%', containLabel: true },
     xAxis: {
       type: 'category',
       data: data.value.bins.map((b) => `${b.minScore}-${b.maxScore}`),
