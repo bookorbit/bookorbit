@@ -160,10 +160,7 @@ function handleExportAll() {
     <!-- Cover -->
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
-      :class="[
-        isMissing ? 'ring-2 ring-amber-500' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]',
-        selected ? 'ring-2 ring-primary' : '',
-      ]"
+      :class="[isMissing ? 'ring-2 ring-amber-500' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]']"
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
@@ -238,7 +235,11 @@ function handleExportAll() {
       />
 
       <!-- Selection checkbox overlay -->
-      <div v-if="selectionMode" class="absolute inset-0 z-30 pointer-events-none" :class="selected ? 'bg-primary/20' : ''">
+      <div
+        v-if="selectionMode"
+        class="absolute inset-0 z-30 pointer-events-none rounded-sm"
+        :class="selected ? 'bg-primary/20 ring-2 ring-inset ring-primary' : ''"
+      >
         <div
           class="absolute top-1.5 left-1.5 h-5 w-5 rounded flex items-center justify-center transition-colors"
           :class="selected ? 'bg-primary' : 'bg-black/40 border border-white/50'"

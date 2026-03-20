@@ -308,7 +308,7 @@ function coverRefreshLabel(libraryId: number): string {
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <button
-                  class="flex items-center justify-center w-9 h-9 rounded-lg border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  class="flex items-center justify-center px-2 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                 >
                   <MoreHorizontal :size="16" />
                 </button>

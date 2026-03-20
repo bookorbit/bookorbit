@@ -3,6 +3,7 @@ import { api } from '@/lib/api'
 import type { Library } from '@projectx/types'
 
 const libraries = ref<Library[]>([])
+const loading = ref(false)
 let loaded = false
 let fetchPromise: Promise<void> | null = null
 
@@ -14,6 +15,7 @@ export function useLibraries() {
 
   async function refreshLibraries(): Promise<void> {
     if (fetchPromise) return fetchPromise
+    loading.value = true
     fetchPromise = api('/api/v1/libraries')
       .then(async (res) => {
         if (!res.ok) return
@@ -22,6 +24,7 @@ export function useLibraries() {
       })
       .finally(() => {
         fetchPromise = null
+        loading.value = false
       })
     return fetchPromise
   }
@@ -35,5 +38,5 @@ export function useLibraries() {
     if (!res.ok) throw new Error('Failed to reorder libraries')
   }
 
-  return { libraries, fetchLibraries, refreshLibraries, reorderLibraries }
+  return { libraries, loading, fetchLibraries, refreshLibraries, reorderLibraries }
 }

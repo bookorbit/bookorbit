@@ -10,7 +10,6 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
@@ -21,7 +20,6 @@ import { useLenses } from '@/features/lens/composables/useLenses'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
-import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useDraggableOrder } from '@/composables/useDraggableOrder'
 import type { Library } from '@projectx/types'
@@ -50,7 +48,6 @@ const { lenses, fetchLenses, reorderLenses } = useLenses()
 const { collections, fetchCollections, reorderCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
-const { summary: stagingSummary, fetchSummary: fetchStagingSummary, subscribe: subscribeStagingSummary } = useStagingSummary()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const createLensOpen = ref(false)
@@ -85,8 +82,6 @@ const {
 } = useDraggableOrder({ source: collections, persist: reorderCollections })
 
 const isDashboardActive = computed(() => route.name === 'dashboard')
-const isStagingActive = computed(() => route.name === 'staging')
-const isStatisticsActive = computed(() => route.name === 'statistics')
 const isAuthorsActive = computed(() => route.name === 'authors' || route.name === 'author-detail')
 
 const activeLibraryId = computed(() => {
@@ -135,10 +130,6 @@ onMounted(async () => {
   }
   fetchLenses()
   fetchCollections()
-  if (hasPermission('staging_access')) {
-    fetchStagingSummary()
-    subscribeStagingSummary()
-  }
 })
 
 const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
@@ -200,35 +191,11 @@ onUnmounted(() => stopUploadCompletedListener())
               @click="router.push({ name: 'dashboard' })"
             />
             <SidebarNavItem
-              v-if="hasPermission('staging_access')"
-              :is-active="isStagingActive"
-              tooltip="Staging"
-              :icon="Icons.PackageOpen"
-              label="Staging"
-              @click="router.push({ name: 'staging' })"
-            >
-              <template #badge>
-                <span
-                  v-if="stagingSummary.total > 0"
-                  class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
-                >
-                  {{ stagingSummary.total }}
-                </span>
-              </template>
-            </SidebarNavItem>
-            <SidebarNavItem
               :is-active="isAuthorsActive"
               tooltip="Authors"
               :icon="Icons.Users"
               label="Authors"
               @click="router.push({ name: 'authors' })"
-            />
-            <SidebarNavItem
-              :is-active="isStatisticsActive"
-              tooltip="Statistics"
-              :icon="Icons.BarChart3"
-              label="Statistics"
-              @click="router.push({ name: 'statistics' })"
             />
           </SidebarMenu>
         </SidebarGroupContent>
@@ -367,9 +334,9 @@ onUnmounted(() => stopUploadCompletedListener())
                 </template>
               </SidebarNavItem>
             </VueDraggable>
-            <SidebarMenuItem v-if="localLenses.length === 0">
-              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No lenses yet</span>
-            </SidebarMenuItem>
+            <div v-if="localLenses.length === 0">
+              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No lenses yet</span>
+            </div>
           </SidebarGroupContent>
         </div>
       </SidebarGroup>
@@ -426,9 +393,9 @@ onUnmounted(() => stopUploadCompletedListener())
                 </template>
               </SidebarNavItem>
             </VueDraggable>
-            <SidebarMenuItem v-if="localCollections.length === 0">
-              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/35 group-data-[collapsible=icon]:hidden">No collections yet</span>
-            </SidebarMenuItem>
+            <div v-if="localCollections.length === 0">
+              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No collections yet</span>
+            </div>
           </SidebarGroupContent>
         </div>
       </SidebarGroup>

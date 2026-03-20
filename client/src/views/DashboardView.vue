@@ -1,25 +1,36 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Settings2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraries } from '@/features/library/composables/useLibraries'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
+import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
 
 const { user } = useAuth()
+const { hasPermission } = usePermissions()
+const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
 const { scrollers } = useDashboardConfig()
 
 const settingsOpen = ref(false)
 
 const enabledScrollers = computed(() => scrollers.value.filter((s) => s.enabled).sort((a, b) => a.order - b.order))
 
+const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
+
 const greeting = computed(() => {
   const hour = new Date().getHours()
   const base = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const firstName = user.value?.name?.split(' ')[0] || user.value?.username
   return firstName ? `${base}, ${firstName}` : base
+})
+
+onMounted(() => {
+  fetchLibraries()
 })
 </script>
 
@@ -44,20 +55,23 @@ const greeting = computed(() => {
       </Tooltip>
     </div>
 
-    <!-- Scrollers -->
+    <!-- Scrollers / Welcome -->
     <div class="space-y-5 pb-8 pt-2 sm:pr-2">
-      <DashboardScroller
-        v-for="scroller in enabledScrollers"
-        :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"
-        :type="scroller.type"
-        :title="scroller.label"
-        :limit="scroller.limit"
-        :lens-id="scroller.lensId"
-      />
-      <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
-        <p class="text-sm text-muted-foreground">All shelves are hidden.</p>
-        <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">Customize dashboard</button>
-      </div>
+      <DashboardWelcome v-if="hasNoLibraries" :can-create="hasPermission('manage_libraries')" />
+      <template v-else>
+        <DashboardScroller
+          v-for="scroller in enabledScrollers"
+          :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"
+          :type="scroller.type"
+          :title="scroller.label"
+          :limit="scroller.limit"
+          :lens-id="scroller.lensId"
+        />
+        <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
+          <p class="text-sm text-muted-foreground">All shelves are hidden.</p>
+          <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">Customize dashboard</button>
+        </div>
+      </template>
     </div>
   </main>
 

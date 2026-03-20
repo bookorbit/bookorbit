@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut } from 'lucide-vue-next'
-import { useRouter } from 'vue-router'
+import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut, PackageOpen, BarChart3 } from 'lucide-vue-next'
+import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -27,12 +27,26 @@ import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
+import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
 
 const router = useRouter()
+const route = useRoute()
 const { user, logout } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
+const { summary: stagingSummary, fetchSummary: fetchStagingSummary, subscribe: subscribeStagingSummary } = useStagingSummary()
+
+const isStagingActive = computed(() => route.name === 'staging')
+const isStatisticsActive = computed(() => route.name === 'statistics')
+
+function navigateToStaging() {
+  router.push({ name: 'staging' })
+}
+
+function navigateToStatistics() {
+  router.push({ name: 'statistics' })
+}
 
 const uploadOpen = ref(false)
 
@@ -115,7 +129,13 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+  if (hasPermission('staging_access')) {
+    fetchStagingSummary()
+    subscribeStagingSummary()
+  }
+})
 
 const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
   if (event.uploadedCount === 0 && event.failedCount === 0) return
@@ -258,7 +278,7 @@ function formatBadgeClass(fmt: string): string {
     <!-- Normal state -->
     <template v-else>
       <!-- Left: sidebar trigger -->
-      <SidebarTrigger class="-ml-1 text-muted-foreground hover:text-foreground" />
+      <SidebarTrigger class="-ml-1 text-foreground/70 hover:text-foreground" />
       <Separator orientation="vertical" class="mx-1 h-4" />
 
       <!-- Center: desktop global search -->
@@ -360,14 +380,14 @@ function formatBadgeClass(fmt: string): string {
       </div>
 
       <!-- Right -->
-      <div class="ml-auto flex items-center gap-0.5">
+      <div class="ml-auto flex items-center gap-3">
         <!-- Mobile: search icon -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
               variant="ghost"
               size="icon"
-              class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground"
+              class="md:hidden h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
               @click="mobileSearchOpen = true"
             >
               <Search :size="15" />
@@ -376,76 +396,132 @@ function formatBadgeClass(fmt: string): string {
           <TooltipContent>Search</TooltipContent>
         </Tooltip>
 
-        <!-- Upload button -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              v-if="hasPermission('library_upload')"
-              variant="ghost"
-              size="icon"
-              class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground"
-              @click="uploadOpen = true"
-            >
-              <Upload :size="15" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Upload books</TooltipContent>
-        </Tooltip>
-
-        <!-- Desktop: appearance settings popover -->
-        <Tooltip>
-          <Popover>
+        <!-- Group 1: Content (Staging, Statistics, Upload) -->
+        <div class="hidden md:flex items-center gap-2.5">
+          <!-- Staging button -->
+          <Tooltip v-if="hasPermission('staging_access')">
             <TooltipTrigger as-child>
-              <PopoverTrigger as-child>
-                <Button variant="ghost" size="icon" class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground">
-                  <Palette :size="15" />
-                </Button>
-              </PopoverTrigger>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="relative h-8 w-8 rounded-xl border transition-colors"
+                :class="
+                  isStagingActive
+                    ? 'border-primary/80 bg-primary/8 text-primary'
+                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground'
+                "
+                @click="navigateToStaging"
+              >
+                <PackageOpen :size="15" />
+                <span
+                  v-if="stagingSummary.total > 0"
+                  class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
+                >
+                  {{ stagingSummary.total }}
+                </span>
+              </Button>
             </TooltipTrigger>
-            <PopoverContent class="w-72 p-4" align="end">
-              <div class="space-y-4">
-                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
-                <div class="space-y-1.5">
-                  <span class="text-xs text-muted-foreground">Theme</span>
-                  <ThemePicker />
-                </div>
-                <div class="space-y-1.5">
-                  <span class="text-xs text-muted-foreground">Accent</span>
-                  <AccentPicker />
-                </div>
-                <div class="space-y-1.5">
-                  <span class="text-xs text-muted-foreground">Radius</span>
-                  <RadiusPicker />
-                </div>
-                <div class="space-y-1.5">
-                  <span class="text-xs text-muted-foreground">Background</span>
-                  <BackgroundPicker />
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <TooltipContent>Appearance</TooltipContent>
-        </Tooltip>
+            <TooltipContent>Staging</TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground"
-              @click="router.push({ name: 'settings-libraries' })"
-            >
-              <Settings :size="15" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Settings</TooltipContent>
-        </Tooltip>
+          <!-- Statistics button -->
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 rounded-xl border transition-colors"
+                :class="
+                  isStatisticsActive
+                    ? 'border-primary/80 bg-primary/8 text-primary'
+                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground'
+                "
+                @click="navigateToStatistics"
+              >
+                <BarChart3 :size="15" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Statistics</TooltipContent>
+          </Tooltip>
 
-        <!-- User avatar dropdown -->
+          <!-- Upload button -->
+          <Tooltip v-if="hasPermission('library_upload')">
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+                @click="uploadOpen = true"
+              >
+                <Upload :size="15" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Upload books</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <!-- Group 2: Preferences (Appearance, Settings) -->
+        <div class="hidden md:block h-4 w-px bg-foreground/20" />
+        <div class="hidden md:flex items-center gap-2.5">
+          <Tooltip>
+            <Popover>
+              <TooltipTrigger as-child>
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <Palette :size="15" />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <PopoverContent class="w-72 p-4" align="end">
+                <div class="space-y-4">
+                  <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Theme</span>
+                    <ThemePicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Accent</span>
+                    <AccentPicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Radius</span>
+                    <RadiusPicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Background</span>
+                    <BackgroundPicker />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <TooltipContent>Appearance</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+                @click="router.push({ name: 'settings-libraries' })"
+              >
+                <Settings :size="15" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <!-- Group 3: Identity (Avatar) -->
+        <div class="hidden md:block h-4 w-px bg-foreground/20" />
         <DropdownMenu v-if="user">
           <DropdownMenuTrigger as-child>
             <button
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-semibold hover:bg-primary/25 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 text-primary text-xs font-bold hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {{ user.name.charAt(0).toUpperCase() }}
             </button>
