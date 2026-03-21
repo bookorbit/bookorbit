@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile, chmod } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { findBookCandidates } from './walk';
+import { findBookCandidates, buildSingleBookCandidate } from './walk';
 
 let root: string;
 
@@ -130,66 +130,40 @@ describe('single-book folder', () => {
 // ── SERIES FOLDER (MULTIPLE STEMS) ───────────────────────────────────────────
 
 describe('series folder', () => {
-  it('creates one candidate per primary stem', async () => {
+  it('multiple primary files in one folder produce a single candidate', async () => {
     await file('Series/book1.epub');
     await file('Series/book2.epub');
     await file('Series/book3.pdf');
 
     const candidates = await findBookCandidates(root);
-    expect(candidates).toHaveLength(3);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'Series'));
   });
 
-  it('virtual folderPath is join(dir, origStem), preserving original casing', async () => {
-    await file('Series/Book1.epub');
-    await file('Series/Book2.epub');
-
-    const candidates = await findBookCandidates(root);
-    const paths = candidatePaths(candidates);
-    expect(paths).toContain(join(root, 'Series', 'Book1'));
-    expect(paths).toContain(join(root, 'Series', 'Book2'));
-  });
-
-  it('sidecar files are matched to their primary by stem', async () => {
+  it('all primary and sidecar files are bundled into the single candidate', async () => {
     await file('Series/book1.epub');
-    await file('Series/book1.jpg'); // not a cover basename — supplementary matched by stem
+    await file('Series/book1.jpg');
     await file('Series/book2.epub');
     await file('Series/book2.jpg');
 
     const candidates = await findBookCandidates(root);
-    const book1 = candidates.find((c) => c.folderPath.endsWith('book1'))!;
-    expect(book1).toBeDefined();
-    expect(filePaths(book1)).toContain(join(root, 'Series', 'book1.epub'));
-    expect(filePaths(book1)).toContain(join(root, 'Series', 'book1.jpg'));
-
-    const book2 = candidates.find((c) => c.folderPath.endsWith('book2'))!;
-    expect(filePaths(book2)).not.toContain(join(root, 'Series', 'book1.jpg'));
-  });
-
-  it('case-insensitive stem matching links cover.jpg to Book.epub in series folder', async () => {
-    await file('Series/Book1.epub');
-    await file('Series/book1.jpg'); // lowercase stem matches uppercase primary stem
-    await file('Series/Book2.epub');
-
-    const candidates = await findBookCandidates(root);
-    const book1 = candidates.find((c) => c.folderPath.endsWith('Book1'))!;
-    expect(book1).toBeDefined();
-    const paths = filePaths(book1);
+    expect(candidates).toHaveLength(1);
+    const paths = filePaths(candidates[0]);
+    expect(paths).toContain(join(root, 'Series', 'book1.epub'));
     expect(paths).toContain(join(root, 'Series', 'book1.jpg'));
+    expect(paths).toContain(join(root, 'Series', 'book2.epub'));
+    expect(paths).toContain(join(root, 'Series', 'book2.jpg'));
   });
 
-  it('original casing of folderPath is stable across scans (regression guard)', async () => {
-    // Ensures the lowercase-for-comparison change does not alter the DB key
+  it('folderPath is the real directory path, stable across scans', async () => {
     await file('Series/MyBook.epub');
     await file('Series/OtherBook.epub');
 
     const first = await findBookCandidates(root);
     const second = await findBookCandidates(root);
 
-    const firstPaths = candidatePaths(first);
-    const secondPaths = candidatePaths(second);
-    expect(firstPaths).toEqual(secondPaths);
-    expect(firstPaths).toContain(join(root, 'Series', 'MyBook'));
-    expect(firstPaths).toContain(join(root, 'Series', 'OtherBook'));
+    expect(candidatePaths(first)).toEqual(candidatePaths(second));
+    expect(candidatePaths(first)).toEqual([join(root, 'Series')]);
   });
 });
 
@@ -296,5 +270,273 @@ describe('mixed root structure', () => {
 
     const candidates = await findBookCandidates(root);
     expect(candidates).toHaveLength(2);
+  });
+});
+
+// ── AUDIO FOLDER GROUPING ─────────────────────────────────────────────────────
+
+describe('audio folder — single candidate', () => {
+  it('treats a folder with only MP3 files as one audiobook', async () => {
+    await file('Book/chapter-01.mp3');
+    await file('Book/chapter-02.mp3');
+    await file('Book/chapter-03.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'Book'));
+  });
+
+  it('includes all files (primary + non-primary) in the audio candidate', async () => {
+    await file('Book/chapter-01.mp3');
+    await file('Book/cover.jpg');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    const paths = filePaths(candidates[0]);
+    expect(paths).toContain(join(root, 'Book', 'chapter-01.mp3'));
+    expect(paths).toContain(join(root, 'Book', 'cover.jpg'));
+  });
+
+  it('natural-sorts audio files by basename', async () => {
+    await file('Book/track-10.mp3');
+    await file('Book/track-2.mp3');
+    await file('Book/track-1.mp3');
+
+    const candidates = await findBookCandidates(root);
+    const paths = candidates[0].files.map((f) => f.absolutePath);
+    expect(paths).toEqual([join(root, 'Book', 'track-1.mp3'), join(root, 'Book', 'track-2.mp3'), join(root, 'Book', 'track-10.mp3')]);
+  });
+
+  it('treats an m4b file as a single audio candidate', async () => {
+    await file('Book/book.m4b');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'Book'));
+  });
+});
+
+describe('mixed epub + audio folder', () => {
+  it('treats a folder with epub AND mp3 as one book (audio branch)', async () => {
+    await file('Book/book.epub');
+    await file('Book/chapter-01.mp3');
+    await file('Book/chapter-02.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'Book'));
+  });
+});
+
+// ── DISC FOLDER FLATTENING ────────────────────────────────────────────────────
+
+describe('disc folder flattening', () => {
+  it('flattens "CD 1" subdir files into parent and produces one candidate', async () => {
+    await file('Book/CD 1/chapter-01.mp3');
+    await file('Book/CD 1/chapter-02.mp3');
+    await file('Book/CD 2/chapter-03.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'Book'));
+    expect(candidates[0].files).toHaveLength(3);
+  });
+
+  it('flattens Disc, Disk, Part, Side patterns', async () => {
+    await file('MultiDisc/Disc 1/track-01.mp3');
+    await file('MultiDisc/Disk 2/track-02.mp3');
+    await file('MultiDisc/Part 3/track-03.mp3');
+    await file('MultiDisc/Side A/track-04.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].files).toHaveLength(4);
+  });
+
+  it('does NOT flatten directories that do not match the disc pattern', async () => {
+    await file('Library/BookA/chapter-01.mp3');
+    await file('Library/BookB/chapter-01.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(2);
+  });
+});
+
+// ── STEM-NAMED AUDIO SUBFOLDER FLATTENING ────────────────────────────────────
+
+describe('stem-named audio subfolder flattening', () => {
+  it('merges audio subfolder into parent when subfolder name matches sibling file stem', async () => {
+    await file('The Three-Body Problem/The Three-Body Problem (Liu Cixin).epub');
+    await file('The Three-Body Problem/The Three-Body Problem (Liu Cixin).mobi');
+    await file('The Three-Body Problem/The Three-Body Problem (Liu Cixin)/01-chapter.mp3');
+    await file('The Three-Body Problem/The Three-Body Problem (Liu Cixin)/02-chapter.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'The Three-Body Problem'));
+    const paths = candidates[0].files.map((f) => f.absolutePath);
+    expect(paths).toContain(join(root, 'The Three-Body Problem', 'The Three-Body Problem (Liu Cixin).epub'));
+    expect(paths).toContain(join(root, 'The Three-Body Problem', 'The Three-Body Problem (Liu Cixin)', '01-chapter.mp3'));
+  });
+
+  it('does not flatten a subfolder whose name does not match any sibling stem', async () => {
+    await file('Series/Book1.epub');
+    await file('Series/AudioStuff/track-01.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(2);
+  });
+
+  it('does not flatten a stem-named subfolder when the parent is the library root', async () => {
+    await file('BookTitle.epub');
+    await file('BookTitle/01.mp3');
+    await file('BookTitle/02.mp3');
+
+    const candidates = await findBookCandidates(root);
+    // BookTitle.epub is a root-level file (its own candidate); BookTitle/ is a separate audiobook
+    expect(candidates).toHaveLength(2);
+  });
+
+  it('still produces one candidate when the parent already only has same-stem ebooks', async () => {
+    await file('Book/book.epub');
+    await file('Book/book.mobi');
+    await file('Book/book/01.mp3');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].files).toHaveLength(3);
+  });
+});
+
+// ── EBOOK STEM GROUPING UNCHANGED BY AUDIO CHANGES ───────────────────────────
+
+describe('ebook stem grouping — unaffected by audio support', () => {
+  it('still groups epub + mobi with same stem as one book', async () => {
+    await file('Book/book.epub');
+    await file('Book/book.mobi');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+  });
+
+  it('different stems in one folder still produce a single candidate', async () => {
+    await file('Series/BookOne.epub');
+    await file('Series/BookTwo.epub');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'Series'));
+  });
+});
+
+// ── buildSingleBookCandidate ───────────────────────────────────────────────────
+
+describe('buildSingleBookCandidate', () => {
+  it('returns null for a folder with no primary-format files', async () => {
+    await file('Book/cover.jpg');
+    await file('Book/book.opf');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when the folder does not exist', async () => {
+    const result = await buildSingleBookCandidate(join(root, 'nonexistent'), root);
+    expect(result).toBeNull();
+  });
+
+  it('returns one candidate with folderPath equal to the book folder', async () => {
+    await file('Book/book.epub');
+    await file('Book/book.mobi');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    expect(result).not.toBeNull();
+    expect(result!.folderPath).toBe(join(root, 'Book'));
+  });
+
+  it('bundles all files (primary + sidecar) into the single candidate', async () => {
+    await file('Book/book.epub');
+    await file('Book/book.mobi');
+    await file('Book/cover.jpg');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    const paths = result!.files.map((f) => f.absolutePath).sort();
+    expect(paths).toContain(join(root, 'Book', 'book.epub'));
+    expect(paths).toContain(join(root, 'Book', 'book.mobi'));
+    expect(paths).toContain(join(root, 'Book', 'cover.jpg'));
+    expect(result!.files).toHaveLength(3);
+  });
+
+  it('bundles all files even when stems differ (no stem-split)', async () => {
+    await file('Book/TitleOne.epub');
+    await file('Book/TitleTwo.epub');
+    await file('Book/TitleThree.mobi');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    expect(result!.folderPath).toBe(join(root, 'Book'));
+    expect(result!.files).toHaveLength(3);
+  });
+
+  it('relPath is relative to libraryFolderPath, not to bookFolderPath', async () => {
+    await file('Author/Book/book.epub');
+
+    const result = await buildSingleBookCandidate(join(root, 'Author', 'Book'), root);
+    expect(result!.files[0].relPath).toBe(join('Author', 'Book', 'book.epub'));
+  });
+
+  it('flattens disc subdirectories into the candidate', async () => {
+    await file('Book/CD 1/chapter-01.mp3');
+    await file('Book/CD 2/chapter-02.mp3');
+    await file('Book/cover.jpg');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    const paths = result!.files.map((f) => f.absolutePath);
+    expect(paths).toContain(join(root, 'Book', 'CD 1', 'chapter-01.mp3'));
+    expect(paths).toContain(join(root, 'Book', 'CD 2', 'chapter-02.mp3'));
+    expect(paths).toContain(join(root, 'Book', 'cover.jpg'));
+  });
+
+  it('does not recurse into non-disc, non-stem subdirectories', async () => {
+    await file('Book/book.epub');
+    await file('Book/Extras/bonus.epub');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    const paths = result!.files.map((f) => f.absolutePath);
+    expect(paths).toContain(join(root, 'Book', 'book.epub'));
+    expect(paths).not.toContain(join(root, 'Book', 'Extras', 'bonus.epub'));
+  });
+
+  it('includes files from a stem-named audio subfolder (parent has ebooks + same-named audio subdir)', async () => {
+    await file('Book/The Three-Body Problem.epub');
+    await file('Book/The Three-Body Problem.mobi');
+    await file('Book/The Three-Body Problem/01-chapter.mp3');
+    await file('Book/The Three-Body Problem/02-chapter.mp3');
+    await file('Book/The Three-Body Problem/cover.jpg');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    expect(result).not.toBeNull();
+    expect(result!.folderPath).toBe(join(root, 'Book'));
+    const paths = result!.files.map((f) => f.absolutePath);
+    expect(paths).toContain(join(root, 'Book', 'The Three-Body Problem.epub'));
+    expect(paths).toContain(join(root, 'Book', 'The Three-Body Problem', '01-chapter.mp3'));
+    expect(paths).toContain(join(root, 'Book', 'The Three-Body Problem', 'cover.jpg'));
+    expect(result!.files).toHaveLength(5);
+  });
+
+  it('returns null when folder is empty', async () => {
+    await dir('EmptyBook');
+
+    const result = await buildSingleBookCandidate(join(root, 'EmptyBook'), root);
+    expect(result).toBeNull();
+  });
+
+  it('excludes dotfiles', async () => {
+    await file('Book/book.epub');
+    await file('Book/.DS_Store');
+
+    const result = await buildSingleBookCandidate(join(root, 'Book'), root);
+    const paths = result!.files.map((f) => f.absolutePath);
+    expect(paths).not.toContain(join(root, 'Book', '.DS_Store'));
+    expect(paths).toContain(join(root, 'Book', 'book.epub'));
   });
 });

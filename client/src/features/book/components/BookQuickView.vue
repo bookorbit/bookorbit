@@ -157,7 +157,7 @@ function openBook() {
 
 function editMetadata() {
   if (!detail.value) return
-  router.push({ name: 'book-edit', params: { bookId: detail.value.id } })
+  router.push({ name: 'book-detail', params: { bookId: detail.value.id }, query: { tab: 'edit' } })
   emit('update:open', false)
 }
 

@@ -14,10 +14,12 @@ function makeService() {
   const gateway = {
     emitBookMissing: vi.fn(),
     emitBookRestored: vi.fn(),
+    emitBookMoved: vi.fn(),
   } as unknown as ScanGateway;
 
   const scannerService = {
     startScanAsync: vi.fn(),
+    scanBookFolderAsync: vi.fn(),
   } as unknown as ScannerService;
 
   const db = {} as any;
@@ -66,14 +68,26 @@ describe('process()', () => {
     expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
 
-  it('schedules a scan when handleCreate returns noop (genuinely new file)', async () => {
+  it('schedules a folder scan when handleCreate returns noop (genuinely new file)', async () => {
     const { service, scannerService } = makeService();
-    const scheduleScanSpy = vi.spyOn(service as any, 'scheduleScan');
+    const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
 
     await (service as any).process('create', '/books/new.epub', 5);
 
-    expect(scheduleScanSpy).toHaveBeenCalledWith(5);
-    expect(scannerService.startScanAsync).not.toHaveBeenCalled(); // called after debounce, not immediately
+    expect(scheduleFolderScanSpy).toHaveBeenCalledWith('/books/new.epub', 5);
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+  });
+
+  it('schedules a folder scan and emits book-moved when handleCreate returns book-moved', async () => {
+    const { service, processor, gateway, scannerService } = makeService();
+    const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
+    processor.handleCreate = vi.fn().mockResolvedValue({ type: 'book-moved', libraryId: 1, bookIds: [5] });
+
+    await (service as any).process('create', '/books/moved.epub', 1);
+
+    expect((gateway as any).emitBookMoved).toHaveBeenCalledWith({ libraryId: 1, bookIds: [5] });
+    expect(scheduleFolderScanSpy).toHaveBeenCalledWith('/books/moved.epub', 1);
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
   });
 
   it('emits nothing when both handlers return noop', async () => {
@@ -165,5 +179,46 @@ describe('reconcile()', () => {
 
     expect(processor.reconcileMissingBooks).not.toHaveBeenCalled();
     expect(gateway.emitBookRestored).not.toHaveBeenCalled();
+  });
+});
+
+// ── scheduleFolderScan() debounce ─────────────────────────────────────────────
+
+describe('scheduleFolderScan() debounce', () => {
+  it('debounces multiple events for files in the same folder — scan triggered once', async () => {
+    const { service, scannerService } = makeService();
+
+    (service as any).scheduleFolderScan('/books/Author/Book/file1.epub', 1);
+    (service as any).scheduleFolderScan('/books/Author/Book/file2.epub', 1);
+    (service as any).scheduleFolderScan('/books/Author/Book/file3.epub', 1);
+
+    vi.runAllTimers();
+    await Promise.resolve();
+
+    expect(scannerService.scanBookFolderAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires separate scans for files in different folders', async () => {
+    const { service, scannerService } = makeService();
+
+    (service as any).scheduleFolderScan('/books/Author/BookA/file.epub', 1);
+    (service as any).scheduleFolderScan('/books/Author/BookB/file.epub', 1);
+
+    vi.runAllTimers();
+    await Promise.resolve();
+
+    expect(scannerService.scanBookFolderAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the last filePath when the same folder has multiple rapid events', async () => {
+    const { service, scannerService } = makeService();
+
+    (service as any).scheduleFolderScan('/books/Author/Book/first.epub', 1);
+    (service as any).scheduleFolderScan('/books/Author/Book/last.epub', 1);
+
+    vi.runAllTimers();
+    await Promise.resolve();
+
+    expect(scannerService.scanBookFolderAsync).toHaveBeenCalledWith('/books/Author/Book/last.epub', 1);
   });
 });

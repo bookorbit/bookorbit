@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookMetadata, collections, genres, tags } from '../../db/schema';
+import { authors, bookMetadata, collections, genres, narrators, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -22,6 +22,16 @@ export class CatalogService {
 
   searchTags(q: string): Promise<{ name: string }[]> {
     return this.searchByName(q, tags);
+  }
+
+  searchNarrators(q: string): Promise<{ name: string }[]> {
+    if (!q.trim()) return Promise.resolve([]);
+    return this.db
+      .select({ name: narrators.name })
+      .from(narrators)
+      .where(ilike(narrators.name, `%${q}%`))
+      .orderBy(narrators.name)
+      .limit(15);
   }
 
   searchPublishers(q: string): Promise<{ name: string }[]> {

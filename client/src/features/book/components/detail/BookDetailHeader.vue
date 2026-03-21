@@ -26,7 +26,7 @@ watch(
 )
 
 async function navigateToBook(id: number) {
-  await router.push({ name: route.name!, params: { ...route.params, bookId: id } })
+  await router.push({ name: 'book-detail', params: { bookId: id }, query: route.query })
 }
 </script>
 

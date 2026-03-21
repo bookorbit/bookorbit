@@ -12,7 +12,7 @@ const themeStore = useThemeStore()
 
 const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
 
-const BOOK_ROUTE_NAMES = new Set(['book-detail', 'book-edit', 'book-files'])
+const BOOK_ROUTE_NAMES = new Set(['book-detail'])
 const viewKey = computed(() => {
   const name = String(route.name)
   if (BOOK_ROUTE_NAMES.has(name)) return name

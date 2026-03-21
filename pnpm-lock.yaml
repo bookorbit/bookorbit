@@ -34,6 +34,9 @@ importers:
       "@tailwindcss/vite":
         specifier: ^4.2.2
         version: 4.2.2(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      "@types/howler":
+        specifier: ^2.2.12
+        version: 2.2.12
       "@vueuse/core":
         specifier: ^14.2.1
         version: 14.2.1(vue@3.5.31(typescript@5.9.3))
@@ -46,6 +49,9 @@ importers:
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
+      howler:
+        specifier: ^2.2.4
+        version: 2.2.4
       lucide-vue-next:
         specifier: ^1.0.0
         version: 1.0.0(vue@3.5.31(typescript@5.9.3))
@@ -263,6 +269,9 @@ importers:
       ms:
         specifier: ^2.1.3
         version: 2.1.3
+      music-metadata:
+        specifier: ^7.14.0
+        version: 7.14.0
       nestjs-pino:
         specifier: ^4.6.1
         version: 4.6.1(@nestjs/common@11.1.17(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
@@ -3822,6 +3831,12 @@ packages:
         integrity: sha512-2uVfn+C6bX/H356H6mjxsWUA5u8LO8dJgSBIRO/NFlpMe4DESzacutD/rKYrTDKm1Ugv78b4Wz1KvpHrlv3jSw==,
       }
 
+  "@types/howler@2.2.12":
+    resolution:
+      {
+        integrity: sha512-hy769UICzOSdK0Kn1FBk4gN+lswcj1EKRkmiDtMkUGvFfYJzgaDXmVXkSShS2m89ERAatGIPnTUlp2HhfkVo5g==,
+      }
+
   "@types/http-cache-semantics@4.2.0":
     resolution:
       {
@@ -5403,6 +5418,13 @@ packages:
       }
     engines: { node: ">=18" }
 
+  content-type@1.0.5:
+    resolution:
+      {
+        integrity: sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==,
+      }
+    engines: { node: ">= 0.6" }
+
   convert-hrtime@5.0.0:
     resolution:
       {
@@ -6427,6 +6449,13 @@ packages:
       }
     engines: { node: ">=16.0.0" }
 
+  file-type@16.5.4:
+    resolution:
+      {
+        integrity: sha512-/yFHK0aGjFEgDJjEKP0pWCplsPFPhwyfwevf/pVxiN0tmE4L9LmwWxWukdJSHdoCli4VgQLehjJtwQBnqmsKcw==,
+      }
+    engines: { node: ">=10" }
+
   file-type@21.3.2:
     resolution:
       {
@@ -6751,6 +6780,12 @@ packages:
     resolution:
       {
         integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==,
+      }
+
+  howler@2.2.4:
+    resolution:
+      {
+        integrity: sha512-iARIBPgcQrwtEr+tALF+rapJ8qSc+Set2GJQl7xT1MQzWaVkFebdJhR3alVlSiUf5U7nAANKuj3aWpwerocD5w==,
       }
 
   html-encoding-sniffer@6.0.0:
@@ -7634,6 +7669,13 @@ packages:
         integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==,
       }
 
+  media-typer@1.1.0:
+    resolution:
+      {
+        integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==,
+      }
+    engines: { node: ">= 0.8" }
+
   memfs@3.5.3:
     resolution:
       {
@@ -7816,6 +7858,13 @@ packages:
       {
         integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==,
       }
+
+  music-metadata@7.14.0:
+    resolution:
+      {
+        integrity: sha512-xrm3w7SV0Wk+OythZcSbaI8mcr/KHd0knJieu8bVpaPfMv/Agz5EooCAPz3OR5hbYMiUG6dgAPKZKnMzV+3amA==,
+      }
+    engines: { node: ">=10" }
 
   mute-stream@2.0.0:
     resolution:
@@ -8269,6 +8318,13 @@ packages:
       }
     engines: { node: ">=20.19.0 || >=22.13.0 || >=24" }
 
+  peek-readable@4.1.0:
+    resolution:
+      {
+        integrity: sha512-ZI3LnwUv5nOGbQzD9c2iDG6toheuXSZP5esSHBjopsXH4dg19soufvpUGA3uohi5anFtGb2lhAVdHzH6R/Evvg==,
+      }
+    engines: { node: ">=8" }
+
   peek-stream@1.1.3:
     resolution:
       {
@@ -8634,6 +8690,13 @@ packages:
         integrity: sha512-oIGGmcpTLwPga8Bn6/Z75SVaH1z5dUut2ibSyAMVhmUggWpmDn2dapB0n7f8nwaSiRtepAsfJyfXIO5DCVAODg==,
       }
     engines: { node: ^12.22.0 || ^14.17.0 || >=16.0.0 }
+
+  readable-web-to-node-stream@3.0.4:
+    resolution:
+      {
+        integrity: sha512-9nX56alTf5bwXQ3ZDipHJhusu9NTQJ/CVPtb/XHAJCXihZeitfJvIRS4GqQ/mfIoOE3IelHMrpayVrosdHBuLw==,
+      }
+    engines: { node: ">=8" }
 
   readdir-glob@1.1.3:
     resolution:
@@ -9253,6 +9316,13 @@ packages:
       }
     engines: { node: ">=18" }
 
+  strtok3@6.3.0:
+    resolution:
+      {
+        integrity: sha512-fZtbhtvI9I48xDSywd/somNqgUHl2L2cstmXCCif0itOf96jeW18MBSyrLuNicYQVkvpOxkZtkzujiTJ9LW5Jw==,
+      }
+    engines: { node: ">=10" }
+
   super-regex@1.1.0:
     resolution:
       {
@@ -9471,6 +9541,13 @@ packages:
         integrity: sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==,
       }
     engines: { node: ">=0.6" }
+
+  token-types@4.2.1:
+    resolution:
+      {
+        integrity: sha512-6udB24Q737UD/SDsKAHI9FCRP7Bqc9D/MQUV02ORQg5iskjtLJlZJNdN4kKtcdtwCeWIwIHDGaUsTsCCAa8sFQ==,
+      }
+    engines: { node: ">=10" }
 
   token-types@6.1.2:
     resolution:
@@ -12086,6 +12163,8 @@ snapshots:
 
   "@types/geoip-lite@1.4.4": {}
 
+  "@types/howler@2.2.12": {}
+
   "@types/http-cache-semantics@4.2.0": {}
 
   "@types/http-errors@2.0.5": {}
@@ -13174,6 +13253,8 @@ snapshots:
 
   content-disposition@1.0.1: {}
 
+  content-type@1.0.5: {}
+
   convert-hrtime@5.0.0: {}
 
   convert-source-map@2.0.0: {}
@@ -13829,6 +13910,12 @@ snapshots:
     dependencies:
       flat-cache: 4.0.1
 
+  file-type@16.5.4:
+    dependencies:
+      readable-web-to-node-stream: 3.0.4
+      strtok3: 6.3.0
+      token-types: 4.2.1
+
   file-type@21.3.2:
     dependencies:
       "@tokenizer/inflate": 0.4.1
@@ -14047,6 +14134,8 @@ snapshots:
   help-me@5.0.0: {}
 
   hookable@5.5.3: {}
+
+  howler@2.2.4: {}
 
   html-encoding-sniffer@6.0.0(@noble/hashes@1.8.0):
     dependencies:
@@ -14499,6 +14588,8 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
+  media-typer@1.1.0: {}
+
   memfs@3.5.3:
     dependencies:
       fs-monkey: 1.1.0
@@ -14572,6 +14663,18 @@ snapshots:
   ms@2.1.3: {}
 
   muggle-string@0.4.1: {}
+
+  music-metadata@7.14.0:
+    dependencies:
+      "@tokenizer/token": 0.3.0
+      content-type: 1.0.5
+      debug: 4.4.3
+      file-type: 16.5.4
+      media-typer: 1.1.0
+      strtok3: 6.3.0
+      token-types: 4.2.1
+    transitivePeerDependencies:
+      - supports-color
 
   mute-stream@2.0.0: {}
 
@@ -14824,6 +14927,8 @@ snapshots:
       "@napi-rs/canvas": 0.1.97
       node-readable-to-web-readable-stream: 0.4.2
 
+  peek-readable@4.1.0: {}
+
   peek-stream@1.1.3:
     dependencies:
       buffer-from: 1.1.2
@@ -15045,6 +15150,10 @@ snapshots:
       events: 3.3.0
       process: 0.11.10
       string_decoder: 1.3.0
+
+  readable-web-to-node-stream@3.0.4:
+    dependencies:
+      readable-stream: 4.7.0
 
   readdir-glob@1.1.3:
     dependencies:
@@ -15437,6 +15546,11 @@ snapshots:
     dependencies:
       "@tokenizer/token": 0.3.0
 
+  strtok3@6.3.0:
+    dependencies:
+      "@tokenizer/token": 0.3.0
+      peek-readable: 4.1.0
+
   super-regex@1.1.0:
     dependencies:
       function-timeout: 1.0.2
@@ -15581,6 +15695,11 @@ snapshots:
   toad-cache@3.7.0: {}
 
   toidentifier@1.0.1: {}
+
+  token-types@4.2.1:
+    dependencies:
+      "@tokenizer/token": 0.3.0
+      ieee754: 1.2.1
 
   token-types@6.1.2:
     dependencies:

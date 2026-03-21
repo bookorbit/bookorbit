@@ -419,7 +419,7 @@ export class KoboSyncService {
         updatedAt: schema.books.updatedAt,
       })
       .from(schema.books)
-      .innerJoin(schema.bookFiles, and(eq(schema.bookFiles.bookId, schema.books.id), eq(schema.bookFiles.role, 'primary')))
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
       .leftJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
       .innerJoin(schema.collectionBooks, eq(schema.collectionBooks.bookId, schema.books.id))
       .innerJoin(

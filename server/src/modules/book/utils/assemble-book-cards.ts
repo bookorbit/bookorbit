@@ -5,6 +5,7 @@ import type { BookCard, UserBookStatus } from '@projectx/types';
 type BookRow = {
   id: number;
   status: string;
+  primaryFileId?: number | null;
   folderPath: string;
   addedAt: Date;
   title: string | null;
@@ -14,6 +15,7 @@ type BookRow = {
   language: string | null;
   rating: number | null;
   metadataScore?: number | null;
+  durationSeconds?: number | null;
 };
 
 type NameRow = { bookId: number; name: string };
@@ -82,8 +84,14 @@ export function assembleBookCards(
   }
 
   return rows.map((row) => {
-    const files = filesByBook.get(row.id) ?? [];
-    const primaryFile = files.find((f) => f.role === 'primary') ?? files[0] ?? null;
+    const rawFiles = filesByBook.get(row.id) ?? [];
+    const primaryFile =
+      (row.primaryFileId != null ? rawFiles.find((f) => f.id === row.primaryFileId) : undefined) ??
+      rawFiles.find((f) => f.role === 'primary') ??
+      rawFiles.find((f) => f.role === 'content') ??
+      rawFiles[0] ??
+      null;
+    const files = rawFiles.map((f) => ({ ...f, role: primaryFile && f.id === primaryFile.id ? 'primary' : f.role }));
     const readingProgress = primaryFile != null ? (progressByFileId.get(primaryFile.id) ?? null) : null;
 
     return {
@@ -103,6 +111,7 @@ export function assembleBookCards(
       readingProgress,
       readStatus: statusByBookId.get(row.id) ?? null,
       addedAt: row.addedAt.toISOString(),
+      durationSeconds: row.durationSeconds ?? null,
     };
   });
 }

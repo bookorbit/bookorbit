@@ -1,5 +1,11 @@
+-- ------------------------------------------------------------
+-- ENUMS
+-- ------------------------------------------------------------
 CREATE TYPE "public"."library_access_level" AS ENUM('viewer', 'editor', 'owner');--> statement-breakpoint
 CREATE TYPE "public"."opds_sort_order" AS ENUM('recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc');--> statement-breakpoint
+-- ------------------------------------------------------------
+-- USERS & AUTH
+-- ------------------------------------------------------------
 CREATE TABLE "audit_log" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"user_id" integer,
@@ -76,6 +82,9 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- LIBRARIES
+-- ------------------------------------------------------------
 CREATE TABLE "libraries" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -84,7 +93,7 @@ CREATE TABLE "libraries" (
 	"watch" boolean DEFAULT false NOT NULL,
 	"auto_scan_cron_expression" text,
 	"metadata_precedence" jsonb DEFAULT '["folderStructure","embedded","nfoFile","opfFile","sidecar"]'::jsonb NOT NULL,
-	"format_priority" jsonb DEFAULT '["epub","pdf","cbz","cbr","mobi","azw3","fb2"]'::jsonb NOT NULL,
+	"format_priority" jsonb DEFAULT '["epub","pdf","cbz","cbr","cb7","mobi","azw3","azw","fb2","m4b","mp3","m4a","opus","ogg","flac"]'::jsonb NOT NULL,
 	"allowed_formats" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"organization_mode" varchar(20) DEFAULT 'auto' NOT NULL,
 	"exclude_patterns" jsonb DEFAULT '[]'::jsonb NOT NULL,
@@ -119,15 +128,21 @@ CREATE TABLE "book_files" (
 	"mtime" timestamp,
 	"hash" varchar(64),
 	"format" varchar(20),
-	"role" varchar(20) DEFAULT 'primary' NOT NULL,
+	"role" varchar(20) DEFAULT 'content' NOT NULL,
+	"sort_order" integer,
+	"duration_seconds" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- BOOKS & METADATA
+-- ------------------------------------------------------------
 CREATE TABLE "books" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"library_id" integer NOT NULL,
 	"library_folder_id" integer NOT NULL,
+	"primary_file_id" integer,
 	"folder_path" varchar(4096) NOT NULL,
 	"status" varchar(20) DEFAULT 'present' NOT NULL,
 	"added_at" timestamp DEFAULT now() NOT NULL,
@@ -228,6 +243,10 @@ CREATE TABLE "book_metadata" (
 	"last_metadata_fetch_at" timestamp,
 	"embedding" vector(256),
 	"last_written_at" timestamp,
+	"duration_seconds" integer,
+	"abridged" boolean DEFAULT false NOT NULL,
+	"audible_id" varchar(20),
+	"chapters" jsonb,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -261,6 +280,24 @@ CREATE TABLE "tags" (
 	CONSTRAINT "tags_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
+CREATE TABLE "book_narrators" (
+	"book_id" integer NOT NULL,
+	"narrator_id" integer NOT NULL,
+	"display_order" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "book_narrators_book_id_narrator_id_pk" PRIMARY KEY("book_id","narrator_id")
+);
+--> statement-breakpoint
+CREATE TABLE "narrators" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" varchar(500) NOT NULL,
+	"sort_name" varchar(500),
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "narrators_name_unique" UNIQUE("name")
+);
+--> statement-breakpoint
+-- ------------------------------------------------------------
+-- SCANNER
+-- ------------------------------------------------------------
 CREATE TABLE "scan_jobs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"library_id" integer NOT NULL,
@@ -274,6 +311,9 @@ CREATE TABLE "scan_jobs" (
 	"completed_at" timestamp
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- READER
+-- ------------------------------------------------------------
 CREATE TABLE "annotations" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
@@ -319,6 +359,7 @@ CREATE TABLE "reading_progress" (
 	"percentage" real DEFAULT 0 NOT NULL,
 	"cfi" varchar(2000),
 	"page_number" integer,
+	"position_seconds" real,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "reading_progress_book_file_id_user_id_pk" PRIMARY KEY("book_file_id","user_id")
 );
@@ -357,6 +398,9 @@ CREATE TABLE "user_reading_daily_stats" (
 	CONSTRAINT "user_reading_daily_stats_user_id_library_id_day_pk" PRIMARY KEY("user_id","library_id","day")
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- OIDC & OPDS
+-- ------------------------------------------------------------
 CREATE TABLE "oidc_group_mappings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"oidc_group_claim" text NOT NULL,
@@ -387,6 +431,9 @@ CREATE TABLE "opds_users" (
 	CONSTRAINT "opds_users_username_unique" UNIQUE("username")
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- KOBO
+-- ------------------------------------------------------------
 CREATE TABLE "kobo_devices" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
@@ -447,6 +494,9 @@ CREATE TABLE "kobo_sync_settings" (
 	CONSTRAINT "kobo_sync_settings_user_id_unique" UNIQUE("user_id")
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- FILE OPS
+-- ------------------------------------------------------------
 CREATE TABLE "staging_files" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"file_name" varchar(500) NOT NULL,
@@ -483,6 +533,9 @@ CREATE TABLE "file_write_log" (
 	"written_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- EMAIL
+-- ------------------------------------------------------------
 CREATE TABLE "email_templates" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer,
@@ -577,6 +630,9 @@ CREATE TABLE "email_send_log" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+-- ------------------------------------------------------------
+-- FOREIGN KEY CONSTRAINTS
+-- ------------------------------------------------------------
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -588,6 +644,31 @@ ALTER TABLE "book_files" ADD CONSTRAINT "book_files_book_id_books_id_fk" FOREIGN
 ALTER TABLE "book_files" ADD CONSTRAINT "book_files_library_folder_id_library_folders_id_fk" FOREIGN KEY ("library_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "books" ADD CONSTRAINT "books_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "books" ADD CONSTRAINT "books_library_folder_id_library_folders_id_fk" FOREIGN KEY ("library_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "books" ADD CONSTRAINT "books_primary_file_id_book_files_id_fk" FOREIGN KEY ("primary_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE FUNCTION "enforce_books_primary_file_match"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	IF NEW.primary_file_id IS NULL THEN
+		RETURN NEW;
+	END IF;
+
+	IF NOT EXISTS (
+		SELECT 1
+		FROM "book_files"
+		WHERE "book_files"."id" = NEW.primary_file_id
+			AND "book_files"."book_id" = NEW.id
+	) THEN
+		RAISE EXCEPTION 'books.primary_file_id % does not belong to book %', NEW.primary_file_id, NEW.id
+			USING ERRCODE = '23514';
+	END IF;
+
+	RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER "books_primary_file_match_trg"
+BEFORE INSERT OR UPDATE OF "primary_file_id" ON "books"
+FOR EACH ROW EXECUTE FUNCTION "enforce_books_primary_file_match"();--> statement-breakpoint
 ALTER TABLE "collection_books" ADD CONSTRAINT "collection_books_collection_id_collections_id_fk" FOREIGN KEY ("collection_id") REFERENCES "public"."collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collection_books" ADD CONSTRAINT "collection_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collections" ADD CONSTRAINT "collections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -601,6 +682,8 @@ ALTER TABLE "book_metadata" ADD CONSTRAINT "book_metadata_book_id_books_id_fk" F
 ALTER TABLE "book_metadata_fetch_queue" ADD CONSTRAINT "book_metadata_fetch_queue_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_tags" ADD CONSTRAINT "book_tags_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_tags" ADD CONSTRAINT "book_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_narrators" ADD CONSTRAINT "book_narrators_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_narrators" ADD CONSTRAINT "book_narrators_narrator_id_narrators_id_fk" FOREIGN KEY ("narrator_id") REFERENCES "public"."narrators"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scan_jobs" ADD CONSTRAINT "scan_jobs_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "annotations" ADD CONSTRAINT "annotations_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "annotations" ADD CONSTRAINT "annotations_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -648,6 +731,9 @@ ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_id_books_id_fk"
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_provider_id_email_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."email_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+-- ------------------------------------------------------------
+-- INDEXES
+-- ------------------------------------------------------------
 CREATE INDEX "idx_audit_user_id" ON "audit_log" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_resource" ON "audit_log" USING btree ("resource","resource_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_action" ON "audit_log" USING btree ("action");--> statement-breakpoint
@@ -656,6 +742,7 @@ CREATE INDEX "idx_audit_created_at" ON "audit_log" USING btree ("created_at");--
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "books_library_id_folder_path_idx" ON "books" USING btree ("library_id","folder_path");--> statement-breakpoint
+CREATE INDEX "books_primary_file_id_idx" ON "books" USING btree ("primary_file_id");--> statement-breakpoint
 CREATE INDEX "author_enrichment_queue_status_next_attempt_idx" ON "author_enrichment_queue" USING btree ("status","next_attempt_at");--> statement-breakpoint
 CREATE INDEX "author_enrichment_queue_next_attempt_idx" ON "author_enrichment_queue" USING btree ("next_attempt_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "author_enrichment_queue_single_processing_idx" ON "author_enrichment_queue" USING btree ("status") WHERE "author_enrichment_queue"."status" = 'processing';--> statement-breakpoint
@@ -667,6 +754,8 @@ CREATE INDEX "bm_publisher_trgm_idx" ON "book_metadata" USING gin ("publisher" g
 CREATE INDEX "bm_language_idx" ON "book_metadata" USING btree ("language");--> statement-breakpoint
 CREATE INDEX "bmfq_status_idx" ON "book_metadata_fetch_queue" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "bmfq_created_at_idx" ON "book_metadata_fetch_queue" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "book_narrators_narrator_id_idx" ON "book_narrators" USING btree ("narrator_id");--> statement-breakpoint
+CREATE INDEX "narrators_name_trgm_idx" ON "narrators" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint

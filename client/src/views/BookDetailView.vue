@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import type { BookDetail } from '@projectx/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
+import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'
+import EditMetadataTab from '@/features/book/components/detail/tabs/EditMetadataTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { usePageTitle } from '@/composables/usePageTitle'
+import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
 
 const route = useRoute()
 
 const bookId = computed(() => Number(route.params.bookId))
+const tab = computed(() => normalizeBookDetailTab(route.query.tab))
 
 const { detail, loading, fetch } = useBookDetail()
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
-  if (title) return `Book · ${title}`
-  return Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book'
+  const base = title || (Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book')
+  if (tab.value === 'edit') return `Edit Metadata · ${base}`
+  if (tab.value === 'files') return `Files · ${base}`
+  return `Book · ${base}`
 })
 usePageTitle(pageTitle)
 
@@ -42,14 +49,26 @@ onBookMoved((bookIds) => {
 })
 
 watch(bookId, (id) => fetch(id), { immediate: true })
+
+function onMetadataSaved(updated: BookDetail) {
+  detail.value = updated
+}
+
+function onCoverChanged(source: 'extracted' | 'custom' | null) {
+  if (detail.value) detail.value = { ...detail.value, coverSource: source }
+}
 </script>
 
 <template>
   <BookDetailLayout :book-id="bookId">
-    <DetailsTab v-if="detail" :book="detail" />
+    <template v-if="detail">
+      <DetailsTab v-if="tab === 'details'" :book="detail" />
+      <EditMetadataTab v-else-if="tab === 'edit'" :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" />
+      <FilesTab v-else-if="tab === 'files'" :book="detail" />
+    </template>
 
     <template v-else-if="loading">
-      <div class="flex flex-col md:flex-row gap-8">
+      <div v-if="tab === 'details'" class="flex flex-col md:flex-row gap-8">
         <div class="md:w-56 shrink-0">
           <div class="w-full rounded-sm bg-muted animate-pulse" style="aspect-ratio: 2/3" />
           <div class="mt-4 space-y-2">
@@ -68,6 +87,14 @@ watch(bookId, (id) => fetch(id), { immediate: true })
           </div>
           <div class="h-32 w-full rounded bg-muted animate-pulse mt-4" />
         </div>
+      </div>
+      <div v-else-if="tab === 'edit'" class="max-w-2xl space-y-4">
+        <div class="h-9 rounded-md bg-muted animate-pulse" />
+        <div class="h-9 rounded-md bg-muted animate-pulse" />
+        <div class="h-9 rounded-md bg-muted animate-pulse" />
+      </div>
+      <div v-else-if="tab === 'files'" class="space-y-3">
+        <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-pulse" />
       </div>
     </template>
   </BookDetailLayout>

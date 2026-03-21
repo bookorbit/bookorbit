@@ -63,6 +63,19 @@ function encodeFilenameStar(value: string): string | null {
   }
 }
 
+const AUDIO_MIME_TYPES: Record<string, string> = {
+  m4b: 'audio/mp4',
+  m4a: 'audio/mp4',
+  mp3: 'audio/mpeg',
+  opus: 'audio/ogg; codecs=opus',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+};
+
+function resolveAudioMimeType(format: string | null): string | null {
+  return format ? (AUDIO_MIME_TYPES[format.toLowerCase()] ?? null) : null;
+}
+
 @Controller('books')
 export class BookController {
   constructor(
@@ -229,7 +242,8 @@ export class BookController {
     @Res() reply: FastifyReply,
   ) {
     const { path, size, format, bookId, originalFilename } = await this.bookService.getFileInfo(fileId, user);
-    const mimeType = format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip';
+    const mimeType =
+      resolveAudioMimeType(format) ?? (format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip');
     const isDownload = download === '1' || download === 'true';
     const filename = isDownload
       ? await this.bookService.resolveDownloadFilename({ bookId, absolutePath: path, format: format === 'unknown' ? null : format })
@@ -275,6 +289,11 @@ export class BookController {
     await this.bookService.saveProgress(user.id, fileId, dto, user);
   }
 
+  @Get(':id/audio-progress')
+  async getAudioProgress(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return (await this.bookService.getAudioProgress(user.id, id, user)) ?? null;
+  }
+
   @Patch(':id/metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
   @Auditable({
@@ -311,6 +330,11 @@ export class BookController {
   @RequirePermission(Permission.KoboSync)
   getKoboState(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getKoboState(id, user);
+  }
+
+  @Get(':id/progress')
+  async getBookProgress(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.getBookProgress(user.id, id, user);
   }
 
   @Patch(':id/status')

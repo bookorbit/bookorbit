@@ -17,7 +17,10 @@ describe('UploadProcessorService', () => {
   const insertBooksReturning = vi.fn();
   const insertBooksValues = vi.fn();
   const insertBookMetadataValues = vi.fn();
+  const insertBookFilesReturning = vi.fn();
   const insertBookFilesValues = vi.fn();
+  const updateBooksSet = vi.fn();
+  const updateBooksWhere = vi.fn();
 
   const db = {
     insert: vi.fn((table: unknown) => {
@@ -30,6 +33,10 @@ describe('UploadProcessorService', () => {
       if (table === bookFiles) {
         return { values: insertBookFilesValues };
       }
+      throw new Error('unexpected table');
+    }),
+    update: vi.fn((table: unknown) => {
+      if (table === books) return { set: updateBooksSet };
       throw new Error('unexpected table');
     }),
   };
@@ -55,7 +62,10 @@ describe('UploadProcessorService', () => {
     insertBooksValues.mockReturnValue({ returning: insertBooksReturning });
     insertBooksReturning.mockResolvedValue([{ id: 42 }]);
     insertBookMetadataValues.mockResolvedValue(undefined);
-    insertBookFilesValues.mockResolvedValue(undefined);
+    insertBookFilesValues.mockReturnValue({ returning: insertBookFilesReturning });
+    insertBookFilesReturning.mockResolvedValue([{ id: 420 }]);
+    updateBooksSet.mockReturnValue({ where: updateBooksWhere });
+    updateBooksWhere.mockResolvedValue(undefined);
 
     mockStat.mockResolvedValue({ ino: 111, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
     mockFingerprintFile.mockResolvedValue('hash-abc');
@@ -63,7 +73,7 @@ describe('UploadProcessorService', () => {
     service = new UploadProcessorService(db as any, metadataService as any);
   });
 
-  it('creates book, metadata, and primary file rows with fingerprint/stat data', async () => {
+  it('creates book, metadata, and content file rows with fingerprint/stat data', async () => {
     const result = await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
 
     expect(result).toEqual({ bookId: 42 });
@@ -79,9 +89,10 @@ describe('UploadProcessorService', () => {
         sizeBytes: 12345,
         hash: 'hash-abc',
         format: 'epub',
-        role: 'primary',
+        role: 'content',
       }),
     );
+    expect(updateBooksSet).toHaveBeenCalledWith({ primaryFileId: 420 });
   });
 
   it('extractMetadataAsync ignores unsupported formats', () => {

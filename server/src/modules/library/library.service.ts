@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
+import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { FileWatcherService } from '../scanner/file-watcher.service';
@@ -67,7 +68,7 @@ export class LibraryService {
       watch: dto.watch ?? false,
       autoScanCronExpression: dto.autoScanCronExpression ?? null,
       metadataPrecedence: dto.metadataPrecedence ?? ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
-      formatPriority: dto.formatPriority ?? ['epub', 'pdf', 'cbz', 'cbr', 'mobi', 'azw3', 'fb2'],
+      formatPriority: dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY],
       allowedFormats: dto.allowedFormats ?? [],
       organizationMode: dto.organizationMode ?? 'auto',
       excludePatterns: dto.excludePatterns ?? [],
@@ -133,6 +134,10 @@ export class LibraryService {
         folders.map((f) => f.path),
       );
     }
+
+    const shouldRescan =
+      dto.formatPriority !== undefined || dto.allowedFormats !== undefined || dto.excludePatterns !== undefined || folderPaths !== undefined;
+    if (shouldRescan) this.scannerService.startScanAsync(id);
 
     return { ...updated, folders };
   }

@@ -15,6 +15,9 @@ export type DiffFieldKey =
   | 'isbn13'
   | 'isbn10'
   | 'genres'
+  | 'narrators'
+  | 'durationSeconds'
+  | 'abridged'
   | 'coverUrl'
   | 'providerId'
   | 'sourceUrl'
@@ -45,12 +48,16 @@ export interface MetadataPatch {
   isbn13?: string | null
   authors?: string[]
   genres?: string[]
+  narrators?: string[]
+  durationSeconds?: number | null
+  abridged?: boolean
   googleBooksId?: string | null
   goodreadsId?: string | null
   amazonId?: string | null
   hardcoverId?: string | null
   openLibraryId?: string | null
   itunesId?: string | null
+  audibleId?: string | null
 }
 
 const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
@@ -68,9 +75,12 @@ const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'isbn13', label: 'ISBN-13' },
   { key: 'isbn10', label: 'ISBN-10' },
   { key: 'genres', label: 'Genres' },
+  { key: 'narrators', label: 'Narrators' },
+  { key: 'durationSeconds', label: 'Duration (seconds)' },
+  { key: 'abridged', label: 'Abridged' },
 ]
 
-type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId'
+type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId'
 
 const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
@@ -79,6 +89,8 @@ const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | unde
   hardcover: 'hardcoverId',
   openLibrary: 'openLibraryId',
   itunes: 'itunesId',
+  audible: 'audibleId',
+  audnexus: undefined,
 }
 
 const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
@@ -88,6 +100,8 @@ const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
   hardcover: 'Hardcover ID',
   openLibrary: 'Open Library ID',
   itunes: 'iTunes ID',
+  audible: 'Audible ID',
+  audnexus: 'AudNexus ID',
 }
 
 export function useMetadataDiff(current: MetadataSource, candidate: MetadataCandidate, currentCoverUrl?: string, currentProviderId?: string | null) {
@@ -96,6 +110,7 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
   function getBookValue(key: DiffFieldKey): string {
     if (key === 'authors') return current.authors.join(', ')
     if (key === 'genres') return current.genres.join(', ')
+    if (key === 'narrators') return current.narrators?.join(', ') ?? ''
     if (key === 'coverUrl') return currentCoverUrl ?? ''
     const val = current[key as keyof MetadataSource]
     return val != null ? String(val) : ''
@@ -105,6 +120,7 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
     if (key === 'coverUrl') return candidate.coverUrl ?? ''
     if (key === 'authors') return (candidate.authors ?? []).join(', ')
     if (key === 'genres') return (candidate.genres ?? []).join(', ')
+    if (key === 'narrators') return (candidate.narrators ?? []).join(', ')
     const val = candidate[key as keyof MetadataCandidate]
     return val != null ? String(val) : ''
   }
@@ -207,6 +223,18 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
         formPatch.genres = candidate.genres ?? []
         continue
       }
+      if (key === 'narrators') {
+        formPatch.narrators = candidate.narrators ?? []
+        continue
+      }
+      if (key === 'durationSeconds') {
+        formPatch.durationSeconds = candidate.durationSeconds ?? null
+        continue
+      }
+      if (key === 'abridged') {
+        formPatch.abridged = candidate.abridged ?? false
+        continue
+      }
       if (key === 'publishedYear') {
         formPatch.publishedYear = candidate.publishedYear ?? null
         continue
@@ -227,11 +255,6 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
       if (key === 'sourceUrl') continue
       const val = candidate[key as keyof MetadataCandidate]
       ;(formPatch as Record<string, unknown>)[key] = val != null ? String(val) : null
-    }
-
-    if (copiedFields.size > 0) {
-      const idField = PROVIDER_ID_FIELD[candidate.provider]
-      if (idField) formPatch[idField] = candidate.providerId
     }
 
     return { formPatch, coverUrl }

@@ -1,12 +1,12 @@
 export type WriteResult = {
-  status: 'success' | 'skipped' | 'failed';
+  status: "success" | "skipped" | "failed";
   fieldsWritten: string[];
   durationMs: number;
   reason?: string;
 };
 
 export type LibraryFileSyncProgressEvent =
-  | { bookId: number; status: 'success' | 'failed' | 'skipped'; reason?: string }
+  | { bookId: number; status: "success" | "failed" | "skipped"; reason?: string }
   | { done: true; processed: number; succeeded: number; failed: number; skipped: number };
 
 export type WriteLogEntry = {
@@ -28,7 +28,7 @@ export interface FormatWriteSettings {
 export interface CbxFormatWriteSettings {
   enabled: boolean;
   maxFileSizeBytes: number;
-  formats: ('cbz' | 'cb7')[];
+  formats: ("cbz" | "cb7")[];
 }
 
 export interface GlobalFileWriteSettings {
@@ -44,6 +44,5 @@ export const DEFAULT_FILE_WRITE_SETTINGS: GlobalFileWriteSettings = {
   writeCover: true,
   epub: { enabled: true, maxFileSizeBytes: 104_857_600 },
   pdf: { enabled: true, maxFileSizeBytes: 104_857_600 },
-  cbx: { enabled: false, formats: ['cbz', 'cb7'], maxFileSizeBytes: 524_288_000 },
+  cbx: { enabled: false, formats: ["cbz", "cb7"], maxFileSizeBytes: 524_288_000 },
 };
-

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -11,6 +11,7 @@ import {
   bookFiles,
   bookGenres,
   bookMetadata,
+  bookNarrators,
   books,
   bookTags,
   collectionBooks,
@@ -20,6 +21,7 @@ import {
   koboReadingStates,
   koboSnapshotBooks,
   libraries,
+  narrators,
   readingProgress,
   tags,
   userBookStatus,
@@ -51,6 +53,7 @@ export class BookRepository {
         .select({
           id: books.id,
           status: books.status,
+          primaryFileId: books.primaryFileId,
           folderPath: books.folderPath,
           addedAt: books.addedAt,
           title: bookMetadata.title,
@@ -103,7 +106,7 @@ export class BookRepository {
         : [],
     ]);
 
-    const primaryFileIds = fileRows.filter((f) => f.role === 'primary').map((f) => f.id);
+    const primaryFileIds = rows.map((r) => r.primaryFileId).filter((id): id is number => id != null);
     const [progressRows, statusRows] = await Promise.all([
       primaryFileIds.length > 0
         ? this.db
@@ -140,7 +143,7 @@ export class BookRepository {
 
     if (!book) return null;
 
-    const [authorRows, genreRows, tagRows, fileRows] = await Promise.all([
+    const [authorRows, genreRows, tagRows, fileRows, narratorRows] = await Promise.all([
       this.db
         .select({ id: authors.id, name: authors.name, sortName: authors.sortName })
         .from(bookAuthors)
@@ -157,12 +160,20 @@ export class BookRepository {
           sizeBytes: bookFiles.sizeBytes,
           absolutePath: bookFiles.absolutePath,
           createdAt: bookFiles.createdAt,
+          durationSeconds: bookFiles.durationSeconds,
         })
         .from(bookFiles)
-        .where(eq(bookFiles.bookId, id)),
+        .where(eq(bookFiles.bookId, id))
+        .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id)),
+      this.db
+        .select({ id: narrators.id, name: narrators.name, sortName: narrators.sortName, displayOrder: bookNarrators.displayOrder })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+        .where(eq(bookNarrators.bookId, id))
+        .orderBy(bookNarrators.displayOrder),
     ]);
 
-    return { book, authorRows, genreRows, tagRows, fileRows };
+    return { book, authorRows, genreRows, tagRows, fileRows, narratorRows };
   }
 
   async findLibraryIdByBookId(bookId: number): Promise<number | null> {
@@ -193,6 +204,21 @@ export class BookRepository {
       .where(and(eq(readingProgress.bookFileId, fileId), eq(readingProgress.userId, userId)))
       .limit(1);
     return row ?? null;
+  }
+
+  async findProgressByBook(userId: number, bookId: number) {
+    return this.db
+      .select({
+        fileId: bookFiles.id,
+        cfi: readingProgress.cfi,
+        pageNumber: readingProgress.pageNumber,
+        percentage: readingProgress.percentage,
+        updatedAt: readingProgress.updatedAt,
+      })
+      .from(bookFiles)
+      .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
+      .where(eq(bookFiles.bookId, bookId))
+      .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
   }
 
   async findKoboReadingState(userId: number, bookId: number) {
@@ -375,9 +401,10 @@ export class BookRepository {
   async findPrimaryFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
     if (bookIds.length === 0) return [];
     return this.db
-      .select({ bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
-      .from(bookFiles)
-      .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'primary')));
+      .select({ bookId: books.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(inArray(books.id, bookIds));
   }
 
   async findAllFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
@@ -396,14 +423,41 @@ export class BookRepository {
     await this.db.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
   }
 
-  async upsertProgress(userId: number, fileId: number, cfi: string | null, pageNumber: number | null, percentage: number) {
+  async upsertProgress(
+    userId: number,
+    fileId: number,
+    cfi: string | null,
+    pageNumber: number | null,
+    percentage: number,
+    positionSeconds?: number | null,
+  ) {
     const now = new Date();
     await this.db
       .insert(readingProgress)
-      .values({ userId, bookFileId: fileId, cfi, pageNumber, percentage, updatedAt: now })
+      .values({ userId, bookFileId: fileId, cfi, pageNumber, percentage, positionSeconds: positionSeconds ?? null, updatedAt: now })
       .onConflictDoUpdate({
         target: [readingProgress.bookFileId, readingProgress.userId],
-        set: { cfi, pageNumber, percentage, updatedAt: now },
+        set: { cfi, pageNumber, percentage, positionSeconds: positionSeconds ?? null, updatedAt: now },
       });
+  }
+
+  async findLatestAudioProgress(userId: number, bookId: number) {
+    const AUDIO_FORMATS = ['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'];
+    const [row] = await this.db
+      .select({
+        fileId: readingProgress.bookFileId,
+        percentage: readingProgress.percentage,
+        positionSeconds: readingProgress.positionSeconds,
+        updatedAt: readingProgress.updatedAt,
+        format: bookFiles.format,
+        absolutePath: bookFiles.absolutePath,
+      })
+      .from(readingProgress)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingProgress.bookFileId))
+      .where(and(eq(readingProgress.userId, userId), eq(bookFiles.bookId, bookId), inArray(bookFiles.format, AUDIO_FORMATS)))
+      .orderBy(desc(readingProgress.updatedAt))
+      .limit(1);
+
+    return row ?? null;
   }
 }

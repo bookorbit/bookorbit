@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles } from '../../db/schema';
+import { bookFiles, books } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -35,7 +35,8 @@ export class EmailFileSelector {
       if (match) return match;
     }
 
-    const primary = allFiles.find((f) => f.role === 'primary');
+    const [book] = await this.db.select({ primaryFileId: books.primaryFileId }).from(books).where(eq(books.id, bookId)).limit(1);
+    const primary = allFiles.find((f) => f.id === book?.primaryFileId);
     return primary ?? allFiles[0];
   }
 }

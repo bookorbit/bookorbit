@@ -21,6 +21,11 @@ export class HardcoverProviderConfigDto {
   @IsOptional() @IsString() apiKey?: string;
 }
 
+export class AudibleProviderConfigDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsString() domain?: string;
+}
+
 export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => GoogleProviderConfigDto) google?: GoogleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => AmazonProviderConfigDto) amazon?: AmazonProviderConfigDto;
@@ -28,4 +33,6 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => HardcoverProviderConfigDto) hardcover?: HardcoverProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) openLibrary?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) itunes?: SimpleProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => AudibleProviderConfigDto) audible?: AudibleProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) audnexus?: SimpleProviderConfigDto;
 }

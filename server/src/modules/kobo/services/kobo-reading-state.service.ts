@@ -116,15 +116,13 @@ export class KoboReadingStateService {
   async getAndMarkStatesNeedingPush(userId: number, readingThreshold: number, finishedThreshold: number): Promise<unknown[]> {
     const rows = await this.db
       .select({
-        bookId: schema.bookFiles.bookId,
+        bookId: schema.books.id,
         percentage: schema.readingProgress.percentage,
       })
       .from(schema.readingProgress)
-      .innerJoin(schema.bookFiles, and(eq(schema.bookFiles.id, schema.readingProgress.bookFileId), eq(schema.bookFiles.role, 'primary')))
-      .leftJoin(
-        schema.koboReadingStates,
-        and(eq(schema.koboReadingStates.bookId, schema.bookFiles.bookId), eq(schema.koboReadingStates.userId, userId)),
-      )
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.readingProgress.bookFileId))
+      .innerJoin(schema.books, eq(schema.books.primaryFileId, schema.bookFiles.id))
+      .leftJoin(schema.koboReadingStates, and(eq(schema.koboReadingStates.bookId, schema.books.id), eq(schema.koboReadingStates.userId, userId)))
       .where(
         and(
           eq(schema.readingProgress.userId, userId),
@@ -190,8 +188,14 @@ export class KoboReadingStateService {
   private async syncToReadingProgress(userId: number, bookId: number, percent: number, readingThreshold: number, finishedThreshold: number) {
     if (percent < readingThreshold) return;
 
+    const book = await this.db.query.books.findFirst({
+      where: eq(schema.books.id, bookId),
+      columns: { primaryFileId: true },
+    });
+    if (!book?.primaryFileId) return;
+
     const file = await this.db.query.bookFiles.findFirst({
-      where: and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.role, 'primary')),
+      where: and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.id, book.primaryFileId)),
     });
 
     if (!file) return;

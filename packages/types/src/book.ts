@@ -1,7 +1,13 @@
 import type { MetadataProviderKey } from "./metadata-fetch";
+import type { AudiobookChapter, NarratorRef } from "./audiobook";
 
-export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2"] as const;
+export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2", "m4b", "mp3", "m4a", "opus", "ogg", "flac"] as const;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
+
+const AUDIO_FORMATS = new Set<string>(["m4b", "mp3", "m4a", "opus", "ogg", "flac"]);
+export function isAudioFormat(format: string): boolean {
+  return AUDIO_FORMATS.has(format.toLowerCase());
+}
 
 export type ReadStatus = "unread" | "reading" | "read" | "abandoned";
 export type ReadStatusSource = "auto" | "manual";
@@ -37,6 +43,7 @@ export type BookCard = {
   readStatus: UserBookStatus | null;
   metadataScore: number | null;
   addedAt: string;
+  durationSeconds: number | null;
 };
 
 export type BookDetailFile = {
@@ -47,6 +54,7 @@ export type BookDetailFile = {
   absolutePath: string;
   createdAt: string;
   filename: string | null;
+  durationSeconds: number | null;
 };
 
 export type ProviderIds = Partial<Record<MetadataProviderKey, string | null>>;
@@ -73,12 +81,17 @@ export type BookDetail = {
   coverSource: "extracted" | "custom" | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
+  narrators: NarratorRef[];
   genres: string[];
   tags: string[];
   files: BookDetailFile[];
   lastWrittenAt: string | null;
   metadataScore: number | null;
   readStatus: UserBookStatus | null;
+  durationSeconds: number | null;
+  abridged: boolean;
+  chapters: AudiobookChapter[] | null;
+  formatPriority: string[];
 };
 
 export type BookKoboReadingState = {

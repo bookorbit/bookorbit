@@ -209,9 +209,9 @@ export class StatisticsRepository {
         format: bookFiles.format,
         count: sql<number>`count(distinct ${bookFiles.bookId})::int`,
       })
-      .from(bookFiles)
-      .innerJoin(books, eq(bookFiles.bookId, books.id))
-      .where(and(eq(bookFiles.role, 'primary'), isNotNull(bookFiles.format), filter))
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(and(isNotNull(bookFiles.format), filter))
       .groupBy(yearExpr, monthExpr, bookFiles.format)
       .orderBy(yearExpr, monthExpr, bookFiles.format);
   }
@@ -252,7 +252,7 @@ export class StatisticsRepository {
         })
         .from(books)
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .innerJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
         .where(and(isNotNull(bookMetadata.pageCount), isNotNull(bookFiles.format), filter))
         .groupBy(bookFiles.format)
         .orderBy(desc(sql<number>`count(*)`)),

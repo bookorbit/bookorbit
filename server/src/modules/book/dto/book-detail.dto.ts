@@ -1,4 +1,4 @@
-import type { ProviderIds, UserBookStatus } from '@projectx/types';
+import type { AudiobookChapter, NarratorRef, ProviderIds, UserBookStatus } from '@projectx/types';
 
 export class BookFileDto {
   id: number;
@@ -8,6 +8,7 @@ export class BookFileDto {
   absolutePath: string;
   createdAt: Date;
   filename: string | null;
+  durationSeconds: number | null;
 }
 
 export class BookDetailDto {
@@ -32,10 +33,15 @@ export class BookDetailDto {
   coverSource: 'extracted' | 'custom' | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
+  narrators: NarratorRef[];
   genres: string[];
   tags: string[];
   files: BookFileDto[];
   lastWrittenAt: Date | null;
   metadataScore: number | null;
   readStatus: UserBookStatus | null;
+  durationSeconds: number | null;
+  abridged: boolean;
+  chapters: AudiobookChapter[] | null;
+  formatPriority: string[];
 }

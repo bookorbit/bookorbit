@@ -1,18 +1,69 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, Files, History } from 'lucide-vue-next'
+import { BookOpen, Download, Files, Headphones, History, FolderOpen, ArrowUpDown } from 'lucide-vue-next'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@projectx/types'
+import { READER_OPENABLE_FORMATS } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
+import { getFormatColor } from '@/features/book/lib/format-colors'
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
 
 const { downloadFile: downloadBookFile } = useBookDownload()
 
-const READABLE_FORMATS = new Set(['epub', 'pdf', 'cbz'])
+const AUDIO_FORMATS = new Set(['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'])
+
+function isAudioFile(file: BookDetailFile): boolean {
+  return !!file.format && AUDIO_FORMATS.has(file.format.toLowerCase())
+}
+
+const audioTrackIndex = computed(() => {
+  const map = new Map<number, number>()
+  let track = 1
+  for (const file of props.book.files) {
+    if (isAudioFile(file)) {
+      map.set(file.id, track++)
+    }
+  }
+  return map
+})
+
+const audioTrackCount = computed(() => audioTrackIndex.value.size)
+
+type SortKey = 'name' | 'format' | 'size' | 'date'
+type SortDir = 'asc' | 'desc'
+
+const sortKey = ref<SortKey>('name')
+const sortDir = ref<SortDir>('asc')
+
+function toggleSort(key: SortKey) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedFiles = computed(() => {
+  const files = [...props.book.files]
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return files.sort((a, b) => {
+    switch (sortKey.value) {
+      case 'name':
+        return dir * (a.filename ?? '').localeCompare(b.filename ?? '')
+      case 'format':
+        return dir * (a.format ?? '').localeCompare(b.format ?? '')
+      case 'size':
+        return dir * ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0))
+      case 'date':
+        return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    }
+  })
+})
 
 function formatBytes(bytes: number | null): string {
   if (bytes == null) return '-'
@@ -20,6 +71,16 @@ function formatBytes(bytes: number | null): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function formatDuration(seconds: number | null | undefined): string | null {
+  if (seconds == null) return null
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
 }
 
 function formatDate(iso: string): string {
@@ -50,44 +111,15 @@ function downloadFile(file: BookDetailFile) {
   void downloadBookFile(file.id)
 }
 
-function fileIconBg(format: string | null): string {
-  switch (format?.toLowerCase()) {
-    case 'epub':
-      return 'bg-blue-500/15'
-    case 'pdf':
-      return 'bg-red-500/15'
-    case 'cbz':
-    case 'cbr':
-    case 'cb7':
-      return 'bg-violet-500/15'
-    case 'mobi':
-    case 'azw':
-    case 'azw3':
-      return 'bg-orange-500/15'
-    default:
-      return 'bg-muted'
+function fileIconStyle(format: string | null): Record<string, string> {
+  const color = getFormatColor(format)
+  return {
+    backgroundColor: `${color}26`,
+    color,
   }
 }
 
-function fileIconText(format: string | null): string {
-  switch (format?.toLowerCase()) {
-    case 'epub':
-      return 'text-blue-600 dark:text-blue-400'
-    case 'pdf':
-      return 'text-red-600 dark:text-red-400'
-    case 'cbz':
-    case 'cbr':
-    case 'cb7':
-      return 'text-violet-600 dark:text-violet-400'
-    case 'mobi':
-    case 'azw':
-    case 'azw3':
-      return 'text-orange-600 dark:text-orange-400'
-    default:
-      return 'text-muted-foreground'
-  }
-}
-
+const showPaths = ref(false)
 const writeLogOpen = ref(false)
 const writeLog = ref<WriteLogEntry[]>([])
 const writeLogLoading = ref(false)
@@ -121,14 +153,43 @@ async function toggleWriteLog() {
 </script>
 
 <template>
-  <div class="max-w-8xl space-y-2">
-    <!-- lastWrittenAt info strip -->
-    <div v-if="book.lastWrittenAt" class="flex items-center justify-between px-1 py-1">
-      <span class="text-xs text-muted-foreground"> Last synced to file: {{ formatRelative(book.lastWrittenAt) }} </span>
-      <button class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors" @click="toggleWriteLog">
-        <History class="size-3" />
-        {{ writeLogOpen ? 'Hide log' : 'View sync log' }}
-      </button>
+  <div class="max-w-8xl space-y-3">
+    <!-- header strip -->
+    <div class="flex items-center justify-between px-1 py-1">
+      <span v-if="book.lastWrittenAt" class="text-xs text-muted-foreground">Last synced to file: {{ formatRelative(book.lastWrittenAt) }}</span>
+      <span v-else />
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1">
+          <ArrowUpDown class="size-3 text-muted-foreground" />
+          <span class="text-xs text-muted-foreground">Sort:</span>
+          <button
+            v-for="opt in [
+              ['name', 'Name'],
+              ['format', 'Format'],
+              ['size', 'Size'],
+              ['date', 'Date'],
+            ] as [SortKey, string][]"
+            :key="opt[0]"
+            class="text-xs px-1.5 py-0.5 rounded transition-colors"
+            :class="sortKey === opt[0] ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'"
+            @click="toggleSort(opt[0])"
+          >
+            {{ opt[1] }}{{ sortKey === opt[0] ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '' }}
+          </button>
+        </div>
+        <button class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors" @click="showPaths = !showPaths">
+          <FolderOpen class="size-3" />
+          {{ showPaths ? 'Hide paths' : 'Show paths' }}
+        </button>
+        <button
+          v-if="book.lastWrittenAt"
+          class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          @click="toggleWriteLog"
+        >
+          <History class="size-3" />
+          {{ writeLogOpen ? 'Hide log' : 'View sync log' }}
+        </button>
+      </div>
     </div>
 
     <!-- Inline sync log -->
@@ -154,13 +215,13 @@ async function toggleWriteLog() {
 
     <!-- File list -->
     <div
-      v-for="file in book.files"
+      v-for="file in sortedFiles"
       :key="file.id"
-      class="flex items-center gap-4 px-4 py-3.5 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
+      class="flex items-center gap-4 px-4 py-2.5 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
     >
       <div
         class="relative shrink-0 w-10 h-12 flex items-end justify-center pb-1.5"
-        :class="[fileIconBg(file.format), fileIconText(file.format)]"
+        :style="fileIconStyle(file.format)"
         style="clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); border-radius: 3px 0 3px 3px"
       >
         <!-- corner fold — clipped to a triangle by the parent clip-path -->
@@ -177,24 +238,39 @@ async function toggleWriteLog() {
       </div>
 
       <div class="min-w-0 flex-1">
-        <p class="text-sm font-medium truncate">{{ file.filename ?? '-' }}</p>
-        <p class="text-[11px] font-mono text-muted-foreground/80 truncate mt-0.5" :title="file.absolutePath">{{ file.absolutePath }}</p>
+        <p class="text-sm font-medium truncate text-foreground/80">{{ file.filename ?? '-' }}</p>
+        <p v-if="showPaths" class="text-[11px] font-mono text-muted-foreground/80 truncate mt-0.5">{{ file.absolutePath }}</p>
         <p class="text-xs text-muted-foreground mt-1">
           {{ formatBytes(file.sizeBytes) }}
           <span class="mx-1 opacity-40">·</span>
           {{ formatDate(file.createdAt) }}
+          <template v-if="formatDuration(file.durationSeconds)">
+            <span class="mx-1 opacity-40">·</span>
+            {{ formatDuration(file.durationSeconds) }}
+          </template>
         </p>
       </div>
 
       <div class="flex items-center gap-2 shrink-0">
-        <span v-if="file.role === 'primary'" class="text-[11px] font-medium px-2 py-0.5 rounded bg-primary/10 text-primary">Primary</span>
+        <span v-if="isAudioFile(file) && audioTrackCount > 1" class="text-[11px] font-medium px-2 py-0.5 rounded bg-muted text-muted-foreground"
+          >Track {{ audioTrackIndex.get(file.id) }}</span
+        >
+        <span v-else-if="file.role === 'primary'" class="text-[11px] font-medium px-2 py-0.5 rounded bg-primary/10 text-primary">Primary</span>
         <button
-          v-if="READABLE_FORMATS.has(file.format ?? '')"
+          v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)"
           class="flex items-center gap-1.5 h-7 px-2.5 rounded border border-input bg-background text-xs font-medium hover:bg-muted transition-colors"
           @click="openFile(file)"
         >
           <BookOpen class="size-3.5" />
           Read
+        </button>
+        <button
+          v-if="isAudioFile(file)"
+          class="flex items-center gap-1.5 h-7 px-2.5 rounded border border-input bg-background text-xs font-medium hover:bg-muted transition-colors"
+          @click="openFile(file)"
+        >
+          <Headphones class="size-3.5" />
+          Play
         </button>
         <Tooltip>
           <TooltipTrigger as-child>

@@ -43,14 +43,14 @@ describe('EmailFileSelector', () => {
   });
 
   it('should select preferred format if available', async () => {
-    db.where.mockResolvedValue([mockFile, mockFile2]);
+    db.where.mockResolvedValueOnce([mockFile, mockFile2]);
 
     const result = await selector.select(1, null, 'pdf');
     expect(result).toEqual(mockFile2);
   });
 
   it('should fallback to primary if preferred format not found', async () => {
-    db.where.mockResolvedValue([mockFile, mockFile2]);
+    db.where.mockResolvedValueOnce([mockFile, mockFile2]).mockReturnValueOnce({ limit: vi.fn().mockResolvedValue([{ primaryFileId: 100 }]) });
 
     const result = await selector.select(1, null, 'mobi');
     expect(result).toEqual(mockFile);

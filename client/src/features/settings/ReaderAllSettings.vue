@@ -6,6 +6,7 @@ import ReaderSettings from './ReaderSettings.vue'
 import EbookSettings from './EbookSettings.vue'
 import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
+import AudioSettings from './AudioSettings.vue'
 import { READER_TAB_LABELS, READER_TABS, normalizeReaderTab, type ReaderTab as Tab } from './lib/reader-tabs'
 
 const route = useRoute()
@@ -55,4 +56,5 @@ function selectTab(tab: Tab) {
   <EbookSettings v-else-if="activeTab === 'ebook'" embedded />
   <PdfSettings v-else-if="activeTab === 'pdf'" embedded />
   <ComicsSettings v-else-if="activeTab === 'comics'" embedded />
+  <AudioSettings v-else-if="activeTab === 'audio'" embedded />
 </template>

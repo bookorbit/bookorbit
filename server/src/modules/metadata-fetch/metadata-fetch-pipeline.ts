@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { FieldPreference, MetadataCandidate, MetadataFetchPreferences, MetadataField, MetadataProviderKey } from '@projectx/types';
+import { AudiobookChapter, FieldPreference, MetadataCandidate, MetadataFetchPreferences, MetadataField, MetadataProviderKey } from '@projectx/types';
 import { firstValueFrom, toArray } from 'rxjs';
 
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
@@ -10,7 +10,10 @@ import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 
-export type ResolvedMetadataFields = Partial<Record<MetadataField, string | string[] | number | null>> & { coverUrl?: string };
+export type ResolvedMetadataFields = Partial<Record<MetadataField, string | string[] | number | null>> & {
+  coverUrl?: string;
+  chapters?: AudiobookChapter[];
+};
 type ResolvedProviderIds = Partial<Record<MetadataProviderKey, string>>;
 
 @Injectable()
@@ -178,6 +181,18 @@ export class MetadataFetchPipeline {
       }
     }
 
+    // Pass through chapters from the first candidate that has them, using the
+    // narrators field's provider preference order as the authority for audiobook data.
+    const narratorProviders = preferences.fields['narrators']?.providers ?? [];
+    const chapterProviders = [...narratorProviders, ...byProvider.keys()];
+    for (const providerKey of chapterProviders) {
+      const candidate = byProvider.get(providerKey);
+      if (candidate?.chapters?.length) {
+        result.chapters = candidate.chapters;
+        break;
+      }
+    }
+
     return { resolved: result, sources, providerIds };
   }
 
@@ -195,6 +210,9 @@ export class MetadataFetchPipeline {
       seriesIndex: 'seriesIndex',
       genres: 'genres',
       cover: 'coverUrl',
+      narrators: 'narrators',
+      duration: 'durationSeconds',
+      abridged: 'abridged',
     };
     const key = map[field];
     return key ? candidate[key] : undefined;

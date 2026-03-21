@@ -79,6 +79,7 @@ describe('MetadataFetchController', () => {
         author: 'Frank Herbert',
         isbn: '9780441172719',
         existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'vol-1' },
+        isAudiobook: false,
       },
       [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
     );
@@ -102,7 +103,47 @@ describe('MetadataFetchController', () => {
         author: undefined,
         isbn: undefined,
         existingProviderIds: {},
+        isAudiobook: false,
       },
+      undefined,
+    );
+  });
+
+  it('infers audiobook search when audiobook providers are requested', async () => {
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.AUDIBLE, providerId: 'B001', title: 'Audio Result' }));
+
+    const dto: MetadataSearchDto = {
+      title: 'All Systems Red',
+      providers: [MetadataProviderKey.AUDIBLE, MetadataProviderKey.AUDNEXUS],
+    };
+    const stream = await controller.stream(dto);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(service.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'All Systems Red',
+        isAudiobook: true,
+      }),
+      [MetadataProviderKey.AUDIBLE, MetadataProviderKey.AUDNEXUS],
+    );
+  });
+
+  it('infers audiobook search from stored audible ids when providers are not specified', async () => {
+    service.getStoredProviderIds.mockResolvedValue({ [MetadataProviderKey.AUDIBLE]: 'B0ABC12345' });
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.AUDNEXUS, providerId: 'B0ABC12345', title: 'Audio Result' }));
+
+    const dto: MetadataSearchDto = {
+      bookId: 44,
+      title: 'Artificial Condition',
+    };
+    const stream = await controller.stream(dto);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(service.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        existingProviderIds: { [MetadataProviderKey.AUDIBLE]: 'B0ABC12345' },
+        isAudiobook: true,
+      }),
       undefined,
     );
   });

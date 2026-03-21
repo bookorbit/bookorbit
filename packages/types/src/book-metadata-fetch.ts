@@ -1,4 +1,4 @@
-import type { MetadataField } from './metadata-preferences';
+import type { MetadataField } from "./metadata-preferences";
 
 export interface BookMetadataFetchScoreCondition {
   enabled: boolean;
@@ -31,9 +31,9 @@ export interface BookMetadataFetchConfig {
 export type BookMetadataFetchConfigOverride = Partial<BookMetadataFetchConfig> | null;
 
 // 'done' is not a queue status — rows are deleted on success to prevent unbounded growth.
-export type BookMetadataFetchQueueStatus = 'queued' | 'processing' | 'failed';
+export type BookMetadataFetchQueueStatus = "queued" | "processing" | "failed";
 
-export type BookMetadataFetchReason = 'event_import' | 'manual_trigger' | 'manual_retry';
+export type BookMetadataFetchReason = "event_import" | "manual_trigger" | "manual_retry";
 
 export interface BookMetadataFetchStatus {
   queued: number;

@@ -1,4 +1,28 @@
 export type OrganizationMode = "auto" | "book_per_file" | "book_per_folder";
+
+export const DEFAULT_FORMAT_PRIORITY = [
+  "epub", "pdf", "cbz", "cbr", "cb7",
+  "mobi", "azw3", "azw", "fb2",
+  "m4b", "mp3", "m4a", "opus", "ogg", "flac",
+] as const;
+
+export const FORMAT_LABELS: Record<string, string> = {
+  epub: "EPUB e-book",
+  pdf: "PDF document",
+  cbz: "CBZ comic",
+  cbr: "CBR comic",
+  cb7: "CB7 comic",
+  mobi: "MOBI e-book",
+  azw3: "AZW3 e-book",
+  azw: "AZW e-book",
+  fb2: "FictionBook",
+  m4b: "M4B audiobook",
+  mp3: "MP3 audio",
+  m4a: "M4A audio",
+  opus: "Opus audio",
+  ogg: "OGG audio",
+  flac: "FLAC audio",
+};
 export type AccessLevel = "viewer" | "editor" | "owner";
 
 export interface LibraryFolder {

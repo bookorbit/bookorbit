@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { ReaderPreferencesRepository } from './reader-preferences.repository';
 
-const VALID_FORMAT_GROUPS = ['epub', 'pdf', 'cbx'] as const;
+const VALID_FORMAT_GROUPS = ['epub', 'pdf', 'cbx', 'audio'] as const;
 type FormatGroup = (typeof VALID_FORMAT_GROUPS)[number];
 
 function assertValidFormatGroup(formatGroup: string): asserts formatGroup is FormatGroup {

@@ -1,5 +1,20 @@
 import { sql } from 'drizzle-orm';
-import { boolean, customType, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  customType,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  serial,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
@@ -44,6 +59,10 @@ export const bookMetadata = pgTable(
     lastMetadataFetchAt: timestamp('last_metadata_fetch_at'),
     embedding: embedding256('embedding'),
     lastWrittenAt: timestamp('last_written_at'),
+    durationSeconds: integer('duration_seconds'),
+    abridged: boolean('abridged').notNull().default(false),
+    audibleId: varchar('audible_id', { length: 20 }),
+    chapters: jsonb('chapters'),
     updatedAt: timestamp('updated_at')
       .defaultNow()
       .notNull()
@@ -67,7 +86,7 @@ export const authors = pgTable(
     hasPhoto: boolean('has_photo').notNull().default(false),
     lastEnrichedAt: timestamp('last_enriched_at'),
   },
-  (t) => [index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
+  (t) => [unique('authors_name_unique').on(t.name), index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
 );
 
 export const bookAuthors = pgTable(

@@ -16,6 +16,8 @@ const mockRepo: Mocked<
   Pick<
     ScannerRepository,
     | 'findBookFileByAbsolutePath'
+    | 'findBookFilesByBookId'
+    | 'deleteBookFile'
     | 'markBooksAsMissing'
     | 'findBooksByFolderPath'
     | 'findMissingBookByFolderPath'
@@ -28,9 +30,13 @@ const mockRepo: Mocked<
     | 'findBookFileWithContextByIno'
     | 'updateBookFolderPath'
     | 'findLibraryFolderPath'
+    | 'findLibrarySettings'
+    | 'updateBookPrimaryFile'
   >
 > = {
   findBookFileByAbsolutePath: vi.fn(),
+  findBookFilesByBookId: vi.fn(),
+  deleteBookFile: vi.fn(),
   markBooksAsMissing: vi.fn(),
   findBooksByFolderPath: vi.fn(),
   findMissingBookByFolderPath: vi.fn(),
@@ -43,6 +49,8 @@ const mockRepo: Mocked<
   findBookFileWithContextByIno: vi.fn(),
   updateBookFolderPath: vi.fn(),
   findLibraryFolderPath: vi.fn(),
+  findLibrarySettings: vi.fn(),
+  updateBookPrimaryFile: vi.fn(),
 };
 
 function makeService() {
@@ -65,10 +73,14 @@ beforeEach(() => {
   mockRepo.markBooksAsPresent.mockResolvedValue(undefined);
   mockRepo.createBookFile.mockResolvedValue({} as any);
   mockRepo.updateBookFile.mockResolvedValue({} as any);
+  mockRepo.deleteBookFile.mockResolvedValue(undefined);
+  mockRepo.findBookFilesByBookId.mockResolvedValue([]);
+  mockRepo.findLibrarySettings.mockResolvedValue(null);
   mockRepo.findBookFileWithContextByIno.mockResolvedValue(null);
   mockRepo.updateBookFolderPath.mockResolvedValue(undefined);
   mockRepo.findLibraryFolderPath.mockResolvedValue('/books');
   mockReaddir.mockResolvedValue([]);
+  mockRepo.updateBookPrimaryFile.mockResolvedValue(undefined);
 });
 
 // ── handleUnlink ──────────────────────────────────────────────────────────────
@@ -81,16 +93,146 @@ describe('handleUnlink', () => {
 
     expect(result).toEqual({ type: 'noop' });
     expect(mockRepo.markBooksAsMissing).not.toHaveBeenCalled();
+    expect(mockRepo.deleteBookFile).not.toHaveBeenCalled();
   });
 
-  it('marks book missing and preserves file row', async () => {
+  it('deletes non-selected file record and returns noop without marking book missing', async () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
-      file: { id: 99, bookId: 12 },
+      file: { id: 55, bookId: 12, role: 'supplementary' },
       libraryId: 5,
+      primaryFileId: 99,
     } as any);
+
+    const result = await makeService().handleUnlink('/books/Solo/solo.pdf');
+
+    expect(mockRepo.deleteBookFile).toHaveBeenCalledWith(55);
+    expect(mockRepo.markBooksAsMissing).not.toHaveBeenCalled();
+    expect(mockRepo.findBookFilesByBookId).not.toHaveBeenCalled();
+    expect(result).toEqual({ type: 'noop' });
+  });
+
+  it('marks book missing when primary file is deleted and no other files remain', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([{ id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 }] as any);
 
     const result = await makeService().handleUnlink('/books/Solo/solo.epub');
 
+    // File record is intentionally kept so inode-based rename detection still works.
+    expect(mockRepo.deleteBookFile).not.toHaveBeenCalled();
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, null);
+    expect(mockRepo.markBooksAsMissing).toHaveBeenCalledWith([12]);
+    expect(result).toEqual({ type: 'book-missing', libraryId: 5, bookIds: [12] });
+  });
+
+  it('promotes highest-priority remaining file when primary is deleted', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 },
+      { id: 100, bookId: 12, role: 'content', format: 'pdf', sizeBytes: 2000 },
+      { id: 101, bookId: 12, role: 'content', format: 'mobi', sizeBytes: 1500 },
+    ] as any);
+    mockRepo.findLibrarySettings.mockResolvedValue({ formatPriority: ['epub', 'pdf', 'mobi'] } as any);
+
+    const result = await makeService().handleUnlink('/books/Solo/solo.epub');
+
+    expect(mockRepo.deleteBookFile).toHaveBeenCalledWith(99);
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 100);
+    expect(mockRepo.markBooksAsMissing).not.toHaveBeenCalled();
+    expect(result).toEqual({ type: 'book-restored', libraryId: 5, bookIds: [12] });
+  });
+
+  it('falls back to DEFAULT_FORMAT_PRIORITY when library settings are null', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 },
+      { id: 100, bookId: 12, role: 'content', format: 'pdf', sizeBytes: 2000 },
+    ] as any);
+    mockRepo.findLibrarySettings.mockResolvedValue(null);
+
+    await makeService().handleUnlink('/books/Solo/solo.epub');
+
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 100);
+  });
+
+  it('skips zero-byte files in format election, falls back to them only if all remaining are zero-byte', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 },
+      { id: 100, bookId: 12, role: 'content', format: 'pdf', sizeBytes: 0 },
+      { id: 101, bookId: 12, role: 'content', format: 'mobi', sizeBytes: 1500 },
+    ] as any);
+    mockRepo.findLibrarySettings.mockResolvedValue({ formatPriority: ['epub', 'pdf', 'mobi'] } as any);
+
+    await makeService().handleUnlink('/books/Solo/solo.epub');
+
+    // pdf is zero-byte so mobi wins despite pdf being higher in priority
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 101);
+  });
+
+  it('falls back to first remaining file when no format matches priority list', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 },
+      { id: 100, bookId: 12, role: 'content', format: 'unknown', sizeBytes: 500 },
+    ] as any);
+    mockRepo.findLibrarySettings.mockResolvedValue({ formatPriority: ['epub', 'pdf'] } as any);
+
+    await makeService().handleUnlink('/books/Solo/solo.epub');
+
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 100);
+  });
+
+  it('falls back to zero-byte files when all remaining are zero-byte', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 },
+      { id: 100, bookId: 12, role: 'content', format: 'pdf', sizeBytes: 0 },
+    ] as any);
+    mockRepo.findLibrarySettings.mockResolvedValue({ formatPriority: ['epub', 'pdf'] } as any);
+
+    const result = await makeService().handleUnlink('/books/Solo/solo.epub');
+
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 100);
+    expect(result).toEqual({ type: 'book-restored', libraryId: 5, bookIds: [12] });
+  });
+
+  it('re-elects and marks missing when primary_file_id is null and last content file is deleted', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: null,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([{ id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000 }] as any);
+
+    const result = await makeService().handleUnlink('/books/Solo/solo.epub');
+
+    // File record is intentionally kept so inode-based rename detection still works.
+    expect(mockRepo.deleteBookFile).not.toHaveBeenCalled();
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, null);
     expect(mockRepo.markBooksAsMissing).toHaveBeenCalledWith([12]);
     expect(result).toEqual({ type: 'book-missing', libraryId: 5, bookIds: [12] });
   });
@@ -132,7 +274,7 @@ describe('handleCreate — file', () => {
     expect(result).toEqual({ type: 'noop' });
   });
 
-  it('returns noop for non-primary file formats', async () => {
+  it('returns noop for non-content file formats', async () => {
     mockStat.mockResolvedValue(makeFileStat());
     const result = await makeService().handleCreate('/books/Author/cover.jpg');
     expect(result).toEqual({ type: 'noop' });
@@ -164,6 +306,7 @@ describe('handleCreate — file', () => {
     const result = await makeService().handleCreate('/books/Author/book.epub');
 
     expect(mockRepo.updateBookFile).toHaveBeenCalledWith(42, expect.objectContaining({ ino: 2000, sizeBytes: 50000 }));
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalled();
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([10]);
     expect(mockRepo.createBookFile).not.toHaveBeenCalled();
     expect(result).toEqual({ type: 'book-restored', libraryId: 3, bookIds: [10] });
@@ -193,8 +336,9 @@ describe('handleCreate — file', () => {
     const result = await makeService().handleCreate('/books/Author/book.epub');
 
     expect(mockRepo.createBookFile).toHaveBeenCalledWith(
-      expect.objectContaining({ bookId: 55, absolutePath: '/books/Author/book.epub', format: 'epub', role: 'primary' }),
+      expect.objectContaining({ bookId: 55, absolutePath: '/books/Author/book.epub', format: 'epub', role: 'content' }),
     );
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalled();
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([55]);
     expect(result).toEqual({ type: 'book-restored', libraryId: 4, bookIds: [55] });
   });
@@ -210,8 +354,9 @@ describe('handleCreate — file', () => {
     expect(mockRepo.findMissingBookByFolderPath).toHaveBeenCalledWith('/books/Audiobooks');
     expect(mockRepo.findMissingBookByFolderPath).toHaveBeenCalledWith('/books/Audiobooks/book.pdf');
     expect(mockRepo.createBookFile).toHaveBeenCalledWith(
-      expect.objectContaining({ bookId: 60, absolutePath: '/books/Audiobooks/book.pdf', format: 'pdf', role: 'primary' }),
+      expect.objectContaining({ bookId: 60, absolutePath: '/books/Audiobooks/book.pdf', format: 'pdf', role: 'content' }),
     );
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalled();
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([60]);
     expect(result).toEqual({ type: 'book-restored', libraryId: 5, bookIds: [60] });
   });
@@ -237,7 +382,9 @@ describe('handleCreate — directory (folder restoration)', () => {
     mockRepo.findMissingBooksByFolderPath.mockResolvedValue([
       { id: 70, libraryId: 6, libraryFolderId: 20, folderPath: '/books/Author/Title' } as any,
     ]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 100, absolutePath: '/books/Author/Title/book.epub', bookId: 70 } as any]);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 100, absolutePath: '/books/Author/Title/book.epub', bookId: 70, role: 'content', format: 'epub', sizeBytes: 80000 } as any,
+    ]);
 
     const result = await makeService().handleCreate('/books/Author/Title');
 
@@ -250,7 +397,9 @@ describe('handleCreate — directory (folder restoration)', () => {
     mockStat.mockResolvedValueOnce(makeFileStat({ isDirectory: true, isFile: false })).mockRejectedValueOnce(new Error('ENOENT'));
 
     mockRepo.findMissingBooksByFolderPath.mockResolvedValue([{ id: 80, libraryId: 7, libraryFolderId: 30, folderPath: '/books/gone' } as any]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 200, absolutePath: '/books/gone/book.epub', bookId: 80 } as any]);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 200, absolutePath: '/books/gone/book.epub', bookId: 80, role: 'content', format: 'epub', sizeBytes: 1000 } as any,
+    ]);
 
     const result = await makeService().handleCreate('/books/gone');
 
@@ -393,19 +542,24 @@ describe('reconcileMissingBooks', () => {
 
   it('restores books whose files reappear on disk', async () => {
     mockRepo.findMissingBooksForLibraries.mockResolvedValue([{ id: 50, libraryId: 2, libraryFolderId: 10, folderPath: '/books/restored' } as any]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 300, absolutePath: '/books/restored/book.epub', bookId: 50 } as any]);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 300, absolutePath: '/books/restored/book.epub', bookId: 50, role: 'content', format: 'epub', sizeBytes: 99000 } as any,
+    ]);
     mockStat.mockResolvedValue(makeFileStat({ ino: 5000, size: 99000 }));
 
     const results = await makeService().reconcileMissingBooks([2]);
 
     expect(mockRepo.updateBookFile).toHaveBeenCalledWith(300, expect.objectContaining({ ino: 5000 }));
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(50, 300);
     expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([50]);
     expect(results).toEqual([{ type: 'book-restored', libraryId: 2, bookIds: [50] }]);
   });
 
   it('skips books whose files are still gone', async () => {
     mockRepo.findMissingBooksForLibraries.mockResolvedValue([{ id: 51, libraryId: 2, libraryFolderId: 10, folderPath: '/books/still-gone' } as any]);
-    mockRepo.findPrimaryBookFilesByBookId.mockResolvedValue([{ id: 301, absolutePath: '/books/still-gone/book.epub', bookId: 51 } as any]);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 301, absolutePath: '/books/still-gone/book.epub', bookId: 51, role: 'content', format: 'epub', sizeBytes: 1000 } as any,
+    ]);
     mockStat.mockRejectedValue(new Error('ENOENT'));
 
     const results = await makeService().reconcileMissingBooks([2]);

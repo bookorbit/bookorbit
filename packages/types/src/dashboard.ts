@@ -1,4 +1,4 @@
-export type ScrollerType = 'recently-added' | 'continue-reading' | 'random' | 'lens';
+export type ScrollerType = "recently-added" | "continue-reading" | "random" | "lens";
 
 export interface ScrollerConfig {
   id: string;
@@ -9,4 +9,3 @@ export interface ScrollerConfig {
   limit: number;
   lensId?: number;
 }
-

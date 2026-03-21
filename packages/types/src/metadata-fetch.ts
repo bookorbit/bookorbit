@@ -1,10 +1,14 @@
+import type { AudiobookChapter, NarratorRef } from "./audiobook";
+
 export const MetadataProviderKey = {
-  GOOGLE: 'google',
-  GOODREADS: 'goodreads',
-  AMAZON: 'amazon',
-  HARDCOVER: 'hardcover',
-  OPEN_LIBRARY: 'openLibrary',
-  ITUNES: 'itunes',
+  GOOGLE: "google",
+  GOODREADS: "goodreads",
+  AMAZON: "amazon",
+  HARDCOVER: "hardcover",
+  OPEN_LIBRARY: "openLibrary",
+  ITUNES: "itunes",
+  AUDIBLE: "audible",
+  AUDNEXUS: "audnexus",
 } as const;
 
 export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof MetadataProviderKey];
@@ -27,6 +31,11 @@ export interface MetadataCandidate {
   genres?: string[];
   coverUrl?: string;
   sourceUrl?: string;
+  narrators?: string[];
+  durationSeconds?: number;
+  abridged?: boolean;
+  audibleId?: string;
+  chapters?: AudiobookChapter[];
 }
 
 export interface MetadataProviderInfo {
@@ -62,4 +71,7 @@ export interface MetadataSource {
   isbn13: string | null;
   authors: string[];
   genres: string[];
+  narrators: string[];
+  durationSeconds: number | null;
+  abridged: boolean | null;
 }

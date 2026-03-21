@@ -5,13 +5,16 @@ import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/boo
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
-import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole } from './lib/classify';
+import { basename, dirname, sep } from 'path';
+import { readdir } from 'fs/promises';
+
+import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole, isAudioFormat } from './lib/classify';
 import { fingerprintFile } from './lib/hash';
 import { waitForStability } from './lib/stability';
-import { BookCandidate, FileStat, findBookCandidates } from './lib/walk';
+import { BookCandidate, FileStat, findBookCandidates, buildSingleBookCandidate } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 
-const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf']);
+const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
 const BATCH_SIZE = 5;
 
 interface ScanCounts {
@@ -94,6 +97,92 @@ export class ScannerService implements OnApplicationBootstrap {
     );
   }
 
+  scanBookFolderAsync(filePath: string, libraryId: number): void {
+    this.scanBookFolder(filePath, libraryId).catch((err) =>
+      this.logger.error(`Targeted folder scan failed for ${filePath}: ${(err as Error).message}`),
+    );
+  }
+
+  private async scanBookFolder(filePath: string, libraryId: number): Promise<void> {
+    const allFolders = await this.scannerRepo.findLibraryFolders(libraryId);
+    const libraryFolder = allFolders.find((f) => filePath.startsWith(f.path + sep));
+    if (!libraryFolder) return;
+
+    const bookFolder = dirname(filePath);
+
+    // If the file sits directly inside the library root, a targeted scan would
+    // walk the entire root — treat it as a full scan instead.
+    if (bookFolder === libraryFolder.path) {
+      this.startScanAsync(libraryId);
+      return;
+    }
+
+    // Walk up one level if this folder is a stem-named audio subfolder of its parent
+    // (e.g. mp3 files in "BookTitle/" alongside "BookTitle.epub" in the parent).
+    // In that case the parent is the real book folder.
+    let resolvedBookFolder = bookFolder;
+    const parentFolder = dirname(bookFolder);
+    if (parentFolder !== bookFolder && parentFolder !== libraryFolder.path) {
+      try {
+        const parentEntries = await readdir(parentFolder, { withFileTypes: true });
+        const folderStem = basename(bookFolder);
+        const hasStemSibling = parentEntries.some((e) => {
+          if (!e.isFile() || e.name.startsWith('.')) return false;
+          const i = e.name.lastIndexOf('.');
+          return (i > 0 ? e.name.slice(0, i) : e.name) === folderStem;
+        });
+        if (hasStemSibling) resolvedBookFolder = parentFolder;
+      } catch {
+        /* ignore unreadable parent */
+      }
+    }
+
+    const settings = await this.scannerRepo.findLibrarySettings(libraryId);
+    const allowedFormats = settings?.allowedFormats ?? [];
+    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
+    const excludePatterns = settings?.excludePatterns ?? [];
+
+    let candidate: BookCandidate | null;
+    try {
+      candidate = await buildSingleBookCandidate(resolvedBookFolder, libraryFolder.path, excludePatterns, (msg) => this.logger.warn(msg));
+    } catch (err) {
+      this.logger.warn(`Cannot walk ${resolvedBookFolder}: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+
+    if (!candidate) return;
+
+    const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
+    if (allowed) {
+      const filtered = candidate.files.filter((f) => {
+        const { role, format } = classifyFile(f.absolutePath);
+        return role !== 'content' || (format !== null && allowed.has(format));
+      });
+      if (!filtered.some((f) => classifyFile(f.absolutePath).role === 'content')) return;
+      candidate = { ...candidate, files: filtered };
+    }
+
+    // Load only books/files relevant to this specific folder (including any
+    // virtual stem-split children so the merge logic in upsertBook can run).
+    const knownBooks = await this.scannerRepo.findBooksByFolderPath(resolvedBookFolder);
+    const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((b) => b.id));
+
+    const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
+      knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
+    );
+    const fileByPath = new Map<
+      string,
+      { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
+    >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
+    const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
+      knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
+    );
+
+    const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, bookByFolderPath, fileByPath, fileByIno, formatPriority);
+
+    this.logger.log(`Targeted scan of ${basename(resolvedBookFolder)}: added=${result.added}, updated=${result.updated}`);
+  }
+
   private async runScan(
     libraryId: number,
     jobId: number,
@@ -132,10 +221,10 @@ export class ScannerService implements OnApplicationBootstrap {
             ...c,
             files: c.files.filter((f) => {
               const { role, format } = classifyFile(f.absolutePath);
-              return role !== 'primary' || (format !== null && allowed.has(format));
+              return role !== 'content' || (format !== null && allowed.has(format));
             }),
           }))
-          .filter((c) => c.files.some((f) => classifyFile(f.absolutePath).role === 'primary'));
+          .filter((c) => c.files.some((f) => classifyFile(f.absolutePath).role === 'content'));
       }
 
       const [knownBooks, knownFiles] = await Promise.all([
@@ -187,9 +276,16 @@ export class ScannerService implements OnApplicationBootstrap {
   ): Promise<ScanCounts> {
     const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
-    const bookByFolderPath = new Map(knownBooks.map((b) => [b.folderPath, b]));
-    const fileByPath = new Map(knownFiles.map((f) => [f.absolutePath, f]));
-    const fileByIno = new Map(knownFiles.map((f) => [f.ino, f]));
+    const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
+      knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
+    );
+    const fileByPath = new Map<
+      string,
+      { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
+    >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
+    const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
+      knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
+    );
     const seenBookIds = new Set<number>();
 
     for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
@@ -228,39 +324,48 @@ export class ScannerService implements OnApplicationBootstrap {
     libraryId: number,
     libraryFolderId: number,
     bookByFolderPath: Map<string, { id: number; status: string; folderPath: string }>,
-    fileByPath: Map<string, { id: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
-    fileByIno: Map<number, { id: number; absolutePath: string }>,
+    fileByPath: Map<string, { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
+    fileByIno: Map<number, { id: number; bookId: number; absolutePath: string }>,
     formatPriority: string[],
   ): Promise<{ bookId: number; added: number; updated: number }> {
     const counts = { added: 0, updated: 0 };
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
+    this.logger.log(`Processing: ${basename(candidate.folderPath)} (${candidate.files.length} file${candidate.files.length !== 1 ? 's' : ''})`);
+
     const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, fileCounts);
     counts.added += fileCounts.addedCount;
     counts.updated += fileCounts.updatedCount;
 
-    // Determine which format gets the 'primary' role when multiple primary-format files exist.
+    // Determine which format wins primary selection when multiple content-format files exist.
     // Exclude zero-byte files from the election so a corrupt/empty file doesn't shadow a valid one.
-    const primaryFiles = candidate.files.filter((f) => classifyFile(f.absolutePath).role === 'primary' && f.sizeBytes > 0);
+    const contentFiles = candidate.files.filter((f) => classifyFile(f.absolutePath).role === 'content' && f.sizeBytes > 0);
     const chosenFormat =
-      primaryFiles.length > 1 ? (formatPriority.find((fmt) => primaryFiles.some((f) => classifyFile(f.absolutePath).format === fmt)) ?? null) : null;
+      contentFiles.length > 1 ? (formatPriority.find((fmt) => contentFiles.some((f) => classifyFile(f.absolutePath).format === fmt)) ?? null) : null;
 
-    for (const fileStat of candidate.files) {
+    const contentCandidates: { fileId: number; format: string | null }[] = [];
+    // New audio content files collected for batch metadata processing after the file loop.
+    const newAudioContentFiles: { absolutePath: string; format: string }[] = [];
+    // Track whether a non-audio format already extracted book metadata in this scan.
+    // If so, the audio block should only extract duration, not overwrite metadata.
+    let nonAudioMetadataExtracted = false;
+
+    for (let sortOrder = 0; sortOrder < candidate.files.length; sortOrder++) {
+      const fileStat = candidate.files[sortOrder];
       const { format, role: classifiedRole } = classifyFile(fileStat.absolutePath);
 
-      if (classifiedRole === 'primary' && fileStat.sizeBytes === 0) {
-        this.logger.warn(`Zero-byte primary file skipped: ${fileStat.absolutePath}`);
+      if (classifiedRole === 'content' && fileStat.sizeBytes === 0) {
+        this.logger.warn(`Zero-byte content file skipped: ${fileStat.absolutePath}`);
         continue;
       }
 
-      const role: FileRole =
-        chosenFormat !== null && classifiedRole === 'primary' ? (format === chosenFormat ? 'primary' : 'supplementary') : classifiedRole;
+      const role: FileRole = classifiedRole;
 
       const fileCount: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
-      let isNew: boolean;
+      let processResult: { isNew: boolean; reassigned: boolean; fileId: number | null };
 
       try {
-        isNew = await this.processFile(fileStat, format, role, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
+        processResult = await this.processFile(fileStat, format, role, sortOrder, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
       } catch (err) {
         this.logger.warn(`Failed to process file ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
         continue;
@@ -269,12 +374,68 @@ export class ScannerService implements OnApplicationBootstrap {
       counts.added += fileCount.addedCount;
       counts.updated += fileCount.updatedCount;
 
-      if (isNew && format && METADATA_FORMATS.has(format)) {
-        try {
-          await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
-        } catch (err) {
-          this.logger.warn(`Metadata extraction failed for ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+      if (classifiedRole === 'content' && processResult.fileId !== null) {
+        contentCandidates.push({ fileId: processResult.fileId, format });
+      }
+
+      if ((processResult.isNew || processResult.reassigned) && format && METADATA_FORMATS.has(format)) {
+        if (role === 'content' && isAudioFormat(format)) {
+          newAudioContentFiles.push({ absolutePath: fileStat.absolutePath, format });
+        } else if (!isAudioFormat(format)) {
+          try {
+            await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
+            nonAudioMetadataExtracted = true;
+          } catch (err) {
+            this.logger.warn(`Metadata extraction failed for ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
+      }
+    }
+
+    const winner =
+      formatPriority.reduce<{ fileId: number; format: string | null } | null>(
+        (found, fmt) => found ?? contentCandidates.find((f) => f.format === fmt) ?? null,
+        null,
+      ) ??
+      (chosenFormat ? (contentCandidates.find((f) => f.format === chosenFormat) ?? null) : null) ??
+      contentCandidates[0] ??
+      null;
+
+    await this.scannerRepo.updateBookPrimaryFile(book.id, winner?.fileId ?? null);
+
+    // For audiobooks: extract full metadata from the first (natural-sorted) content file,
+    // duration-only from the rest, then aggregate total duration into bookMetadata.
+    // If a non-audio format (epub, mobi, etc.) already extracted metadata in this scan,
+    // skip extractAndSave for audio and only collect durations — the ebook metadata wins.
+    if (newAudioContentFiles.length > 0) {
+      newAudioContentFiles.sort((a, b) => basename(a.absolutePath).localeCompare(basename(b.absolutePath), undefined, { numeric: true }));
+
+      const [first, ...rest] = newAudioContentFiles;
+
+      if (!nonAudioMetadataExtracted) {
+        try {
+          await this.metadataService.extractAndSave(book.id, first.absolutePath, first.format);
+        } catch (err) {
+          this.logger.warn(`Audio metadata extraction failed for ${first.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // When ebook metadata already won, all audio files only contribute duration.
+      const durationOnlyFiles = nonAudioMetadataExtracted ? newAudioContentFiles : rest;
+      await Promise.all(
+        durationOnlyFiles.map(async (audioFile) => {
+          try {
+            await this.metadataService.extractAudioFileDuration(book.id, audioFile.absolutePath);
+          } catch (err) {
+            this.logger.warn(`Audio duration extraction failed for ${audioFile.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }),
+      );
+
+      try {
+        await this.metadataService.aggregateAudioDuration(book.id);
+      } catch (err) {
+        this.logger.warn(`Audio duration aggregation failed for book ${book.id}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -291,6 +452,25 @@ export class ScannerService implements OnApplicationBootstrap {
     const existing = bookByFolderPath.get(candidate.folderPath);
 
     if (!existing) {
+      // Detect series-to-single-book merge: files were renamed so all stems match,
+      // turning what was a virtual multi-book folder into one real-directory book.
+      // Find any known books whose folderPaths are virtual children of this directory
+      // and pick the lowest-ID one as the survivor to preserve its reading progress.
+      const dirPrefix = candidate.folderPath + sep;
+      const virtualChildren = [...bookByFolderPath.values()].filter((b) => b.folderPath.startsWith(dirPrefix));
+
+      if (virtualChildren.length > 0) {
+        const survivor = virtualChildren.reduce((a, b) => (a.id < b.id ? a : b));
+        await this.scannerRepo.updateBookFolderPath(survivor.id, candidate.folderPath);
+        if (survivor.status === 'missing') {
+          await this.scannerRepo.updateBookStatus(survivor.id, 'present');
+          counts.updatedCount++;
+        }
+        bookByFolderPath.set(candidate.folderPath, { ...survivor, folderPath: candidate.folderPath });
+        this.logger.log(`Merged ${virtualChildren.length} stem-split book(s) into book ${survivor.id}: ${basename(candidate.folderPath)}`);
+        return { ...survivor, folderPath: candidate.folderPath };
+      }
+
       const book = await this.scannerRepo.createBook({
         libraryId,
         libraryFolderId,
@@ -309,6 +489,19 @@ export class ScannerService implements OnApplicationBootstrap {
       counts.updatedCount++;
     }
 
+    // Drain any virtual siblings that share this real folder (created by old stem-split
+    // logic or by detectMovedFile updating a book's folderPath to the real directory).
+    // Marking them missing here ensures processFile will reassign their files to
+    // `existing`, and reconcile cannot restore them once their files are gone.
+    const dirPrefix = candidate.folderPath + sep;
+    const virtualSiblings = [...bookByFolderPath.values()].filter((b) => b.id !== existing.id && b.folderPath.startsWith(dirPrefix));
+    if (virtualSiblings.length > 0) {
+      const siblingIds = virtualSiblings.map((b) => b.id);
+      await this.scannerRepo.markBooksAsMissing(siblingIds);
+      this.scanGateway.emitBookMissing({ libraryId, bookIds: siblingIds });
+      this.logger.log(`Drained ${virtualSiblings.length} virtual sibling(s) into book ${existing.id}: ${basename(candidate.folderPath)}`);
+    }
+
     return existing;
   }
 
@@ -316,44 +509,53 @@ export class ScannerService implements OnApplicationBootstrap {
     fileStat: FileStat,
     format: string | null,
     role: FileRole,
+    sortOrder: number,
     bookId: number,
     libraryFolderId: number,
-    fileByPath: Map<string, { id: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
-    fileByIno: Map<number, { id: number; absolutePath: string }>,
+    fileByPath: Map<string, { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
+    fileByIno: Map<number, { id: number; bookId: number; absolutePath: string }>,
     counts: ScanCounts,
-  ): Promise<boolean> {
+  ): Promise<{ isNew: boolean; reassigned: boolean; fileId: number | null }> {
     await waitForStability(fileStat.absolutePath);
 
     // 1. Path match — file didn't move.
     const byPath = fileByPath.get(fileStat.absolutePath);
     if (byPath) {
       const changed = fileStat.sizeBytes !== byPath.sizeBytes || fileStat.mtime.getTime() !== byPath.mtime?.getTime();
-      if (changed) {
+      const reassigned = byPath.bookId !== bookId;
+      if (changed || reassigned) {
         await this.scannerRepo.updateBookFile(byPath.id, {
+          ...(reassigned && { bookId }),
           ino: fileStat.ino,
           sizeBytes: fileStat.sizeBytes,
           mtime: fileStat.mtime,
           format,
           role,
+          sortOrder,
         });
         counts.updatedCount++;
+      } else {
+        // Always keep sort order current even when content is unchanged.
+        await this.scannerRepo.updateBookFile(byPath.id, { sortOrder });
       }
-      return false;
+      return { isNew: false, reassigned: reassigned, fileId: byPath.id };
     }
 
     // 2. Inode match — renamed/moved within the same filesystem.
     const byIno = fileByIno.get(fileStat.ino);
     if (byIno) {
       await this.scannerRepo.updateBookFile(byIno.id, {
+        bookId,
         absolutePath: fileStat.absolutePath,
         relPath: fileStat.relPath,
         sizeBytes: fileStat.sizeBytes,
         mtime: fileStat.mtime,
         format,
         role,
+        sortOrder,
       });
       counts.updatedCount++;
-      return false;
+      return { isNew: false, reassigned: byIno.bookId !== bookId, fileId: byIno.id };
     }
 
     // 3. Hash match — cross-filesystem copy (expensive, last resort).
@@ -364,13 +566,14 @@ export class ScannerService implements OnApplicationBootstrap {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'ENOENT' || code === 'EACCES') {
         this.logger.debug(`File no longer accessible, skipping: ${fileStat.absolutePath}`);
-        return false;
+        return { isNew: false, reassigned: false, fileId: null };
       }
       throw err;
     }
     const byHash = await this.scannerRepo.findBookFileByHash(hash, libraryFolderId);
     if (byHash) {
       await this.scannerRepo.updateBookFile(byHash.id, {
+        bookId,
         absolutePath: fileStat.absolutePath,
         relPath: fileStat.relPath,
         ino: fileStat.ino,
@@ -378,13 +581,14 @@ export class ScannerService implements OnApplicationBootstrap {
         mtime: fileStat.mtime,
         format,
         role,
+        sortOrder,
       });
       counts.updatedCount++;
-      return false;
+      return { isNew: false, reassigned: byHash.bookId !== bookId, fileId: byHash.id };
     }
 
     // 4. Genuinely new file.
-    await this.scannerRepo.createBookFile({
+    const created = await this.scannerRepo.createBookFile({
       bookId,
       libraryFolderId,
       absolutePath: fileStat.absolutePath,
@@ -395,9 +599,10 @@ export class ScannerService implements OnApplicationBootstrap {
       hash,
       format,
       role,
+      sortOrder,
     });
     counts.addedCount++;
-    return true;
+    return { isNew: true, reassigned: false, fileId: created.id };
   }
 
   private emitFromStore(libraryId: number, jobId: number, status: 'running' | 'completed' | 'failed', errorMessage?: string): void {

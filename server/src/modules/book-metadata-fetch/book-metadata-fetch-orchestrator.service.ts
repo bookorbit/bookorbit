@@ -168,7 +168,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         return;
       }
 
-      const { book, authorRows, genreRows } = found;
+      const { book, authorRows, genreRows, narratorRows } = found;
       const meta = book.book_metadata;
       const libraryId = book.books.libraryId;
 
@@ -177,6 +177,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
         existingProviderIds: this.collectProviderIds(meta ?? {}),
+        isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
       };
 
       const existingFields: Partial<Record<MetadataField, unknown>> = {
@@ -192,11 +193,14 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
         cover: meta?.coverSource,
+        duration: meta?.durationSeconds ?? undefined,
+        abridged: meta?.abridged ?? undefined,
+        narrators: narratorRows.map((n) => n.name),
       };
 
       const { resolved, providerIds } = await this.pipeline.runWithSources(searchParams, existingFields, libraryId);
 
-      await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows);
+      await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
 
       this.scoreService
         .calculateAndSave(bookId)
@@ -223,6 +227,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     providerIds: Partial<Record<MetadataProviderKey, string>>,
     existingAuthorRows: { name: string }[],
     existingGenreRows: { name: string }[],
+    existingNarratorRows: { name: string }[],
   ): Promise<void> {
     const r = resolved as Record<string, unknown>;
     const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
@@ -243,6 +248,13 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (providerIds[MetadataProviderKey.HARDCOVER]) scalarFields.hardcoverId = providerIds[MetadataProviderKey.HARDCOVER];
     if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) scalarFields.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
     if (providerIds[MetadataProviderKey.ITUNES]) scalarFields.itunesId = providerIds[MetadataProviderKey.ITUNES];
+    if (providerIds[MetadataProviderKey.AUDIBLE]) scalarFields.audibleId = providerIds[MetadataProviderKey.AUDIBLE];
+
+    if (r.duration !== undefined) scalarFields.durationSeconds = (r.duration as number | null) ?? null;
+    // Only overwrite abridged when the provider gives a definitive boolean — never let null
+    // overwrite an existing true value.
+    if (r.abridged != null) scalarFields.abridged = r.abridged as boolean;
+    if (resolved.chapters !== undefined) scalarFields.chapters = resolved.chapters as unknown;
 
     scalarFields.lastMetadataFetchAt = new Date();
     scalarFields.updatedAt = new Date();
@@ -265,6 +277,16 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       }
     }
 
+    if (r.narrators !== undefined) {
+      const names = r.narrators as string[];
+      if (names.length > 0 || existingNarratorRows.length > 0) {
+        await this.metadataService.replaceNarrators(
+          bookId,
+          names.map((name) => ({ name, sortName: null })),
+        );
+      }
+    }
+
     if (resolved.coverUrl) {
       await this.metadataService.downloadAndSaveCover(resolved.coverUrl, bookId);
     }
@@ -273,7 +295,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   private async loadEligibilityData(bookId: number) {
     const found = await this.bookRepo.findById(bookId);
     if (!found) return null;
-    const { book, authorRows, genreRows } = found;
+    const { book, authorRows, genreRows, narratorRows } = found;
     const meta = book.book_metadata;
     return {
       metadataScore: meta?.metadataScore ?? null,
@@ -290,6 +312,9 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       coverSource: meta?.coverSource ?? null,
       hasAuthors: authorRows.length > 0,
       hasGenres: genreRows.length > 0,
+      hasNarrators: narratorRows.length > 0,
+      durationSeconds: meta?.durationSeconds ?? null,
+      abridged: meta?.abridged ?? null,
     };
   }
 
@@ -300,6 +325,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     hardcoverId?: string | null;
     openLibraryId?: string | null;
     itunesId?: string | null;
+    audibleId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const ids: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) ids[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -308,6 +334,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (meta.hardcoverId) ids[MetadataProviderKey.HARDCOVER] = meta.hardcoverId;
     if (meta.openLibraryId) ids[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
     if (meta.itunesId) ids[MetadataProviderKey.ITUNES] = meta.itunesId;
+    if (meta.audibleId) ids[MetadataProviderKey.AUDIBLE] = meta.audibleId;
     return ids;
   }
 

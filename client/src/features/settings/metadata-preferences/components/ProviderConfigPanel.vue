@@ -59,6 +59,19 @@ const AMAZON_DOMAINS = [
   'amazon.tr',
 ]
 
+const AUDIBLE_DOMAINS = [
+  'audible.com',
+  'audible.co.uk',
+  'audible.de',
+  'audible.fr',
+  'audible.it',
+  'audible.es',
+  'audible.ca',
+  'audible.com.au',
+  'audible.co.jp',
+  'audible.in',
+]
+
 type FieldDef = { key: string; label: string; type: 'text' | 'password' | 'select'; options?: string[] }
 
 const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; fields: FieldDef[] }[] = [
@@ -86,6 +99,16 @@ const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; f
   },
   { key: 'openLibrary', label: 'Open Library', hint: "The Internet Archive's free book catalog. No setup required.", fields: [] },
   { key: 'itunes', label: 'iTunes', hint: "Apple's digital book catalog. No setup required.", fields: [] },
+  {
+    key: 'audible',
+    label: 'Audible',
+    hint: 'Pulls audiobook metadata from Audible product pages. A session cookie is highly recommended.',
+    fields: [
+      { key: 'domain', label: 'Region', type: 'select', options: AUDIBLE_DOMAINS },
+      { key: 'cookie', label: 'Cookie', type: 'password' },
+    ],
+  },
+  { key: 'audnexus', label: 'AudNexus', hint: 'Community-driven audiobook metadata. No setup required.', fields: [] },
 ]
 
 function statusFor(key: string) {

@@ -4,6 +4,7 @@ export * from "./permissions";
 export * from "./metadata-preferences";
 export * from "./dashboard";
 export * from "./book";
+export * from "./audiobook";
 export * from "./upload";
 export * from "./collection";
 export * from "./lens";

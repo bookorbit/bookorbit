@@ -95,7 +95,7 @@ describe('LibraryService', () => {
         displayOrder: 0,
         watch: false,
         metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
-        formatPriority: ['epub', 'pdf', 'cbz', 'cbr', 'mobi', 'azw3', 'fb2'],
+        formatPriority: ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'],
       }),
     );
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(5);
@@ -182,6 +182,16 @@ describe('LibraryService', () => {
     await service.update(9, { folders: ['/keep', '/add'] } as any);
 
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(9, ['/keep', '/add']);
+  });
+
+  it('update triggers a background scan when format selection settings change', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', watch: false }]);
+    libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', watch: false }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    await service.update(10, { formatPriority: ['epub', 'pdf'], allowedFormats: ['epub'] } as any);
+
+    expect(scannerService.startScanAsync).toHaveBeenCalledWith(10);
   });
 
   it('remove deletes library and cleans related cover directories', async () => {

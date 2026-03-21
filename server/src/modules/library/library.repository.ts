@@ -124,9 +124,9 @@ export class LibraryRepository {
         count: sql<number>`count(*)::int`,
         totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint`,
       })
-      .from(bookFiles)
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(books.libraryId, libraryId), eq(books.status, 'present'), eq(bookFiles.role, 'primary')))
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(and(eq(books.libraryId, libraryId), eq(books.status, 'present')))
       .groupBy(bookFiles.format);
 
     const formatCounts: Record<string, number> = {};

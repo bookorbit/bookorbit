@@ -66,6 +66,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     coverSource: null,
     providerIds: {},
     authors: [],
+    narrators: [],
     genres: [],
     tags: [],
     files: [],
@@ -73,6 +74,9 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     lastWrittenAt: null,
     metadataScore: null,
     readStatus: null,
+    durationSeconds: null,
+    abridged: false,
+    chapters: null,
     ...overrides,
   }
 }

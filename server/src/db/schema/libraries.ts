@@ -16,7 +16,10 @@ export const libraries = pgTable('libraries', {
     .$type<string[]>()
     .notNull()
     .default(['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar']),
-  formatPriority: jsonb('format_priority').$type<string[]>().notNull().default(['epub', 'pdf', 'cbz', 'cbr', 'mobi', 'azw3', 'fb2']),
+  formatPriority: jsonb('format_priority')
+    .$type<string[]>()
+    .notNull()
+    .default(['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']),
   allowedFormats: jsonb('allowed_formats').$type<string[]>().notNull().default([]),
   organizationMode: varchar('organization_mode', { length: 20 }).notNull().default('auto'),
   excludePatterns: jsonb('exclude_patterns').$type<string[]>().notNull().default([]),

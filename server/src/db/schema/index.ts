@@ -5,6 +5,7 @@ export * from './books';
 export * from './collections';
 export * from './lenses';
 export * from './metadata';
+export * from './narrators';
 export * from './scanner';
 export * from './reader';
 export * from './oidc';

@@ -1,37 +1,43 @@
-import { MetadataProviderKey } from './metadata-fetch';
+import { MetadataProviderKey } from "./metadata-fetch";
 
 export type MetadataField =
-  | 'title'
-  | 'subtitle'
-  | 'description'
-  | 'cover'
-  | 'authors'
-  | 'publisher'
-  | 'publishedYear'
-  | 'language'
-  | 'pageCount'
-  | 'seriesName'
-  | 'seriesIndex'
-  | 'genres';
+  | "title"
+  | "subtitle"
+  | "description"
+  | "cover"
+  | "authors"
+  | "publisher"
+  | "publishedYear"
+  | "language"
+  | "pageCount"
+  | "seriesName"
+  | "seriesIndex"
+  | "genres"
+  | "narrators"
+  | "duration"
+  | "abridged";
 
 export const ALL_METADATA_FIELDS: MetadataField[] = [
-  'title',
-  'subtitle',
-  'description',
-  'cover',
-  'authors',
-  'publisher',
-  'publishedYear',
-  'language',
-  'pageCount',
-  'seriesName',
-  'seriesIndex',
-  'genres',
+  "title",
+  "subtitle",
+  "description",
+  "cover",
+  "authors",
+  "publisher",
+  "publishedYear",
+  "language",
+  "pageCount",
+  "seriesName",
+  "seriesIndex",
+  "genres",
+  "narrators",
+  "duration",
+  "abridged",
 ];
 
-export type MergeStrategy = 'fillMissing' | 'overwrite' | 'overwriteIfProvided';
-export type GenreMergeMode = 'firstProvider' | 'merge';
-export type GenreProviderScope = 'selectedProviders' | 'allConfiguredProviders';
+export type MergeStrategy = "fillMissing" | "overwrite" | "overwriteIfProvided";
+export type GenreMergeMode = "firstProvider" | "merge";
+export type GenreProviderScope = "selectedProviders" | "allConfiguredProviders";
 
 export interface FieldPreference {
   enabled: boolean;
@@ -80,6 +86,15 @@ export interface SimpleProviderConfig {
   enabled: boolean;
 }
 
+export interface AudibleProviderConfig {
+  enabled: boolean;
+  domain: string;
+}
+
+export interface AudnexusProviderConfig {
+  enabled: boolean;
+}
+
 export interface ProviderConfigurations {
   google: GoogleProviderConfig;
   amazon: AmazonProviderConfig;
@@ -87,6 +102,8 @@ export interface ProviderConfigurations {
   hardcover: HardcoverProviderConfig;
   openLibrary: SimpleProviderConfig;
   itunes: SimpleProviderConfig;
+  audible: AudibleProviderConfig;
+  audnexus: AudnexusProviderConfig;
 }
 
 export interface ProviderStatus {

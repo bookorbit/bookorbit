@@ -13,8 +13,10 @@ import { GoogleProvider } from './providers/google/google.provider';
 import { GoodreadsProvider } from './providers/goodreads/goodreads.provider';
 import { OpenLibraryProvider } from './providers/open-library/open-library.provider';
 import { ITunesProvider } from './providers/itunes/itunes.provider';
+import { AudibleProvider } from './providers/audible/audible.provider';
+import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
 
-const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider, ITunesProvider];
+const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider, ITunesProvider, AudibleProvider, AudnexusProvider];
 
 @Module({
   imports: [MetadataPreferencesModule],

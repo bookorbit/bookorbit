@@ -4,7 +4,7 @@ import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
 import { MetadataProviderKey, Permission, resolveUploadPath } from '@projectx/types';
-import type { BookKoboState, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
+import type { AudiobookChapter, BookKoboState, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -15,6 +15,7 @@ import { LibraryService } from '../library/library.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { FileWriteService } from '../file-write/file-write.service';
+import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
@@ -38,6 +39,7 @@ export class BookService {
     private readonly config: ConfigService,
     private readonly appSettings: AppSettingsService,
     private readonly userBookStatusService: UserBookStatusService,
+    private readonly narratorService: NarratorService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {
@@ -59,6 +61,7 @@ export class BookService {
     hardcoverId?: string | null;
     openLibraryId?: string | null;
     itunesId?: string | null;
+    audibleId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -67,11 +70,12 @@ export class BookService {
     if (meta.hardcoverId) providerIds[MetadataProviderKey.HARDCOVER] = meta.hardcoverId;
     if (meta.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
     if (meta.itunesId) providerIds[MetadataProviderKey.ITUNES] = meta.itunesId;
+    if (meta.audibleId) providerIds[MetadataProviderKey.AUDIBLE] = meta.audibleId;
     return providerIds;
   }
 
   private applyResolvedProviderIds(
-    dto: Pick<UpdateBookMetadataDto, 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId'>,
+    dto: Pick<UpdateBookMetadataDto, 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId'>,
     providerIds: Partial<Record<MetadataProviderKey, string>>,
   ): void {
     if (providerIds[MetadataProviderKey.GOOGLE]) dto.googleBooksId = providerIds[MetadataProviderKey.GOOGLE];
@@ -80,6 +84,7 @@ export class BookService {
     if (providerIds[MetadataProviderKey.HARDCOVER]) dto.hardcoverId = providerIds[MetadataProviderKey.HARDCOVER];
     if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) dto.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
     if (providerIds[MetadataProviderKey.ITUNES]) dto.itunesId = providerIds[MetadataProviderKey.ITUNES];
+    if (providerIds[MetadataProviderKey.AUDIBLE]) dto.audibleId = providerIds[MetadataProviderKey.AUDIBLE];
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -314,6 +319,9 @@ export class BookService {
     if ('hardcoverId' in dto) scalarFields.hardcoverId = dto.hardcoverId ?? null;
     if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
     if ('itunesId' in dto) scalarFields.itunesId = dto.itunesId ?? null;
+    if ('audibleId' in dto) scalarFields.audibleId = dto.audibleId ?? null;
+    if ('durationSeconds' in dto) scalarFields.durationSeconds = dto.durationSeconds ?? null;
+    if ('abridged' in dto) scalarFields.abridged = dto.abridged ?? false;
 
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();
@@ -325,6 +333,9 @@ export class BookService {
         id,
         dto.authors.map((name) => ({ name, sortName: null })),
       );
+    }
+    if (dto.narrators !== undefined) {
+      await this.narratorService.replaceForBook(id, dto.narrators);
     }
     if (dto.genres !== undefined) {
       await this.metadataService.replaceGenres(id, dto.genres);
@@ -362,9 +373,26 @@ export class BookService {
     return this.bookRepo.findProgress(userId, fileId);
   }
 
+  async getBookProgress(userId: number, bookId: number, user: RequestUser) {
+    await this.verifyBookAccess(bookId, user);
+    const rows = await this.bookRepo.findProgressByBook(userId, bookId);
+    return rows.map((row) => ({
+      fileId: row.fileId,
+      cfi: row.cfi ?? null,
+      pageNumber: row.pageNumber ?? null,
+      percentage: row.percentage ?? 0,
+      updatedAt: row.updatedAt ?? null,
+    }));
+  }
+
+  async getAudioProgress(userId: number, bookId: number, user: RequestUser) {
+    await this.verifyBookAccess(bookId, user);
+    return this.bookRepo.findLatestAudioProgress(userId, bookId);
+  }
+
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     const file = await this.verifyFileAccess(fileId, user);
-    await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage);
+    await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage, dto.positionSeconds ?? null);
     this.libraryService
       .findOne(file.libraryId)
       .then((lib) => this.userBookStatusService.autoUpdate(userId, file.bookId, dto.percentage, lib?.markAsFinishedPercentComplete))
@@ -446,6 +474,7 @@ export class BookService {
       author: authorRows[0]?.name ?? undefined,
       isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
       existingProviderIds: providerIds,
+      isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
     };
 
     const existingFields: Partial<Record<MetadataField, unknown>> = {
@@ -461,6 +490,8 @@ export class BookService {
       seriesIndex: meta?.seriesIndex,
       genres: genreRows.map((g) => g.name),
       cover: meta?.coverSource,
+      duration: meta?.durationSeconds ?? undefined,
+      abridged: meta?.abridged ?? undefined,
     };
 
     const { resolved, providerIds: resolvedProviderIds } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId);
@@ -473,6 +504,7 @@ export class BookService {
         hardcoverId?: string;
         openLibraryId?: string;
         itunesId?: string;
+        audibleId?: string;
       } = { ...resolved };
       this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
       return previewResult;
@@ -491,6 +523,8 @@ export class BookService {
     if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
     if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
     if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
+    if (r.duration !== undefined) dto.durationSeconds = r.duration as number | null;
+    if (r.abridged !== undefined) dto.abridged = r.abridged as boolean | null;
     this.applyResolvedProviderIds(dto, resolvedProviderIds);
 
     let detail: BookDetailDto | undefined;
@@ -593,7 +627,7 @@ export class BookService {
     const [result, readStatus] = await Promise.all([this.bookRepo.findById(id), this.userBookStatusService.findOne(user.id, id)]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
-    const { book, authorRows, genreRows, tagRows, fileRows } = result;
+    const { book, authorRows, genreRows, tagRows, fileRows, narratorRows } = result;
     const meta = book.book_metadata;
 
     return {
@@ -623,22 +657,29 @@ export class BookService {
         [MetadataProviderKey.HARDCOVER]: meta?.hardcoverId ?? null,
         [MetadataProviderKey.OPEN_LIBRARY]: meta?.openLibraryId ?? null,
         [MetadataProviderKey.ITUNES]: meta?.itunesId ?? null,
+        [MetadataProviderKey.AUDIBLE]: meta?.audibleId ?? null,
       },
       authors: authorRows,
+      narrators: narratorRows.map((n, i) => ({ id: n.id, name: n.name, sortName: n.sortName, displayOrder: i })),
       genres: genreRows.map((g) => g.name),
       tags: tagRows.map((t) => t.name),
       files: fileRows.map((f) => ({
         id: f.id,
         format: f.format,
-        role: f.role,
+        role: f.id === book.books.primaryFileId ? 'primary' : f.role,
         sizeBytes: f.sizeBytes,
         absolutePath: f.absolutePath,
         createdAt: f.createdAt,
         filename: basename(f.absolutePath),
+        durationSeconds: f.durationSeconds,
       })),
       lastWrittenAt: meta?.lastWrittenAt ?? null,
       metadataScore: meta?.metadataScore ?? null,
       readStatus,
+      durationSeconds: meta?.durationSeconds ?? null,
+      abridged: meta?.abridged ?? false,
+      chapters: (meta?.chapters as AudiobookChapter[] | null) ?? null,
+      formatPriority: (book.libraries?.formatPriority as string[] | null) ?? [],
     };
   }
 }

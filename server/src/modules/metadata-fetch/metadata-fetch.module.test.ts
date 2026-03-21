@@ -12,6 +12,8 @@ import { GoodreadsProvider } from './providers/goodreads/goodreads.provider';
 import { GoogleProvider } from './providers/google/google.provider';
 import { OpenLibraryProvider } from './providers/open-library/open-library.provider';
 import { ITunesProvider } from './providers/itunes/itunes.provider';
+import { AudibleProvider } from './providers/audible/audible.provider';
+import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
 
 describe('MetadataFetchModule', () => {
   it('registers provider classes and factory wiring for METADATA_PROVIDERS', () => {
@@ -24,6 +26,8 @@ describe('MetadataFetchModule', () => {
         AmazonProvider,
         OpenLibraryProvider,
         ITunesProvider,
+        AudibleProvider,
+        AudnexusProvider,
         ProviderRegistry,
         MetadataFetchService,
         MetadataFetchPipeline,
@@ -36,7 +40,15 @@ describe('MetadataFetchModule', () => {
     );
 
     expect(providerFactory).toBeDefined();
-    expect(providerFactory?.inject).toEqual([GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider, ITunesProvider]);
+    expect(providerFactory?.inject).toEqual([
+      GoogleProvider,
+      GoodreadsProvider,
+      AmazonProvider,
+      OpenLibraryProvider,
+      ITunesProvider,
+      AudibleProvider,
+      AudnexusProvider,
+    ]);
 
     const google = { key: 'google' };
     const amazon = { key: 'amazon' };

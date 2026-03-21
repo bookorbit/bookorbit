@@ -16,6 +16,9 @@ export interface BookEligibilityData {
   coverSource: string | null;
   hasAuthors: boolean;
   hasGenres: boolean;
+  hasNarrators: boolean;
+  durationSeconds: number | null;
+  abridged: boolean | null;
 }
 
 @Injectable()
@@ -49,6 +52,12 @@ export class BookMetadataFetchEligibilityService {
         return !book.hasAuthors;
       case 'genres':
         return !book.hasGenres;
+      case 'narrators':
+        return !book.hasNarrators;
+      case 'duration':
+        return book.durationSeconds === null;
+      case 'abridged':
+        return book.abridged === null;
       case 'cover':
         return book.coverSource === null;
       case 'title':

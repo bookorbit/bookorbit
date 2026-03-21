@@ -1,27 +1,27 @@
 export type StatisticsChartId =
-  | 'format-distribution'
-  | 'language-distribution'
-  | 'books-added-over-time'
-  | 'storage-by-format'
-  | 'publication-decade'
-  | 'top-authors'
-  | 'metadata-completeness'
-  | 'genre-distribution'
-  | 'metadata-score-distribution'
-  | 'library-metadata-completeness'
-  | 'format-share-over-time'
-  | 'genre-rank-over-time'
-  | 'page-count-distribution'
-  | 'reading-heatmap'
-  | 'peak-reading-hours'
-  | 'favorite-reading-days'
-  | 'completion-timeline'
-  | 'goal-trajectory'
-  | 'progress-funnel'
-  | 'completion-latency';
+  | "format-distribution"
+  | "language-distribution"
+  | "books-added-over-time"
+  | "storage-by-format"
+  | "publication-decade"
+  | "top-authors"
+  | "metadata-completeness"
+  | "genre-distribution"
+  | "metadata-score-distribution"
+  | "library-metadata-completeness"
+  | "format-share-over-time"
+  | "genre-rank-over-time"
+  | "page-count-distribution"
+  | "reading-heatmap"
+  | "peak-reading-hours"
+  | "favorite-reading-days"
+  | "completion-timeline"
+  | "goal-trajectory"
+  | "progress-funnel"
+  | "completion-latency";
 
-export type StatisticsGranularity = 'monthly' | 'yearly';
-export type StatisticsDateRange = 'last-year' | 'last-5-years' | 'all-time';
+export type StatisticsGranularity = "monthly" | "yearly";
+export type StatisticsDateRange = "last-year" | "last-5-years" | "all-time";
 
 // Stored in users.settings JSONB under key 'statisticsConfig'.
 // Does NOT include 'wide' — that is fixed per chart type in CHART_REGISTRY.
@@ -43,32 +43,32 @@ export interface StatisticsSettings {
 }
 
 export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [
-  'format-distribution',
-  'language-distribution',
-  'storage-by-format',
-  'publication-decade',
-  'books-added-over-time',
-  'reading-heatmap',
-  'peak-reading-hours',
-  'favorite-reading-days',
-  'completion-timeline',
-  'goal-trajectory',
-  'progress-funnel',
-  'completion-latency',
-  'format-share-over-time',
-  'metadata-completeness',
-  'metadata-score-distribution',
-  'page-count-distribution',
-  'top-authors',
-  'genre-distribution',
-  'genre-rank-over-time',
-  'library-metadata-completeness',
+  "format-distribution",
+  "language-distribution",
+  "storage-by-format",
+  "publication-decade",
+  "books-added-over-time",
+  "reading-heatmap",
+  "peak-reading-hours",
+  "favorite-reading-days",
+  "completion-timeline",
+  "goal-trajectory",
+  "progress-funnel",
+  "completion-latency",
+  "format-share-over-time",
+  "metadata-completeness",
+  "metadata-score-distribution",
+  "page-count-distribution",
+  "top-authors",
+  "genre-distribution",
+  "genre-rank-over-time",
+  "library-metadata-completeness",
 ];
 
 export const DEFAULT_STATISTICS_FILTERS: StatisticsFilterConfig = {
   libraryIds: [],
-  booksOverTimeRange: 'all-time',
-  booksOverTimeGranularity: 'monthly',
+  booksOverTimeRange: "all-time",
+  booksOverTimeGranularity: "monthly",
 };
 
 export function createDefaultStatisticsSettings(): StatisticsSettings {

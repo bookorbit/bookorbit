@@ -2,6 +2,7 @@
 import { computed, ref, onUnmounted } from 'vue'
 import { Image, ImagePlus, Link, Loader2, RotateCcw, Search, Upload, X } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
+import { FORMAT_TO_GROUP } from '@projectx/types'
 import { hideOnError } from '../../../lib/metadata-fetch'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
@@ -39,7 +40,15 @@ let debounceTimer: ReturnType<typeof setTimeout>
 
 const activeSrc = computed(() => previewSrc.value ?? coverUrl(props.book.id, 'cover'))
 const hasPending = computed(() => !!pendingFile.value || !!pendingUrl.value)
-const isAudiobook = computed(() => props.book.files.some((f) => f.format === 'audiobook' || f.role === 'audiobook'))
+const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const coverNaturalWidth = ref(0)
+const coverNaturalHeight = ref(0)
+const coverAspectRatio = computed(() => {
+  if (!isPrimaryAudio.value) return '2/3'
+  if (coverNaturalWidth.value > 0 && coverNaturalHeight.value > coverNaturalWidth.value) return '2/3'
+  return '1/1'
+})
 
 function cancelPending() {
   clearPending()
@@ -80,6 +89,12 @@ async function handleRevert() {
 
 const lightboxOpen = ref(false)
 
+function handleCoverLoad(e: Event) {
+  const img = e.target as HTMLImageElement
+  coverNaturalWidth.value = img.naturalWidth
+  coverNaturalHeight.value = img.naturalHeight
+}
+
 defineExpose({ setUrl, hasPending, confirm })
 
 onUnmounted(() => clearTimeout(debounceTimer))
@@ -88,14 +103,12 @@ onUnmounted(() => clearTimeout(debounceTimer))
 <template>
   <div class="flex flex-col gap-3">
     <!-- Cover image -->
-    <div class="relative w-full overflow-hidden rounded-xl bg-muted shadow-md cursor-zoom-in" style="aspect-ratio: 2/3" @click="lightboxOpen = true">
-      <img
-        :src="activeSrc"
-        :alt="book.title ?? ''"
-        class="w-full h-full object-contain"
-        @error="hideOnError"
-        @load="(e) => ((e.target as HTMLImageElement).style.visibility = 'visible')"
-      />
+    <div
+      class="relative w-full overflow-hidden rounded-xl bg-muted shadow-md cursor-zoom-in"
+      :style="{ aspectRatio: coverAspectRatio }"
+      @click="lightboxOpen = true"
+    >
+      <img :src="activeSrc" :alt="book.title ?? ''" class="w-full h-full object-contain" @error="hideOnError" @load="handleCoverLoad" />
     </div>
 
     <!-- Lightbox -->

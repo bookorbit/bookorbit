@@ -31,7 +31,7 @@ export class ITunesProvider implements IdentifiableProvider {
 
     const url = new URL(SEARCH_URL);
     url.searchParams.set('term', query);
-    url.searchParams.set('entity', 'ebook'); // Default to ebook
+    url.searchParams.set('entity', params.isAudiobook ? 'audiobook' : 'ebook');
     url.searchParams.set('limit', '10');
 
     try {

@@ -109,7 +109,7 @@ function handleEditSelected() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
   setBookContext(ids, ids.length)
-  router.push({ name: 'book-edit', params: { bookId: ids[0] } })
+  router.push({ name: 'book-detail', params: { bookId: ids[0] }, query: { tab: 'edit' } })
   exitSelectionMode()
 }
 

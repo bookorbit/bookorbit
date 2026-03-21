@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
+import { FORMAT_TO_GROUP } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
@@ -9,14 +10,19 @@ import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
+import { useNarratorSearch } from '../../../composables/useNarratorSearch'
 import { useGenreSearch, useTagSearch } from '../../../composables/useTagSearch'
 import { useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ saved: [BookDetail]; coverChanged: ['extracted' | 'custom' | null] }>()
 
+const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+
 const { form, saving, error, isDirty, load, reset, save } = useMetadataEditor()
 const { search: searchAuthors } = useAuthorSearch()
+const { search: searchNarrators } = useNarratorSearch()
 const { search: searchGenres } = useGenreSearch()
 const { search: searchTags } = useTagSearch()
 
@@ -30,9 +36,10 @@ const providerIdFields = [
   { field: 'hardcoverId' as const, label: 'Hardcover' },
   { field: 'openLibraryId' as const, label: 'OpenLibrary' },
   { field: 'itunesId' as const, label: 'iTunes' },
+  { field: 'audibleId' as const, label: 'Audible' },
 ]
 
-function setIntField(field: 'publishedYear' | 'pageCount', e: Event) {
+function setIntField(field: 'publishedYear' | 'pageCount' | 'durationSeconds', e: Event) {
   const val = (e.target as HTMLInputElement).value
   if (val === '') {
     form[field] = null
@@ -101,6 +108,7 @@ async function autoFill() {
   if (preview.hardcoverId != null) form.hardcoverId = preview.hardcoverId
   if (preview.openLibraryId != null) form.openLibraryId = preview.openLibraryId
   if (preview.itunesId != null) form.itunesId = preview.itunesId
+  if (preview.audibleId != null) form.audibleId = preview.audibleId
   if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
 }
 </script>
@@ -158,8 +166,8 @@ async function autoFill() {
       </div>
 
       <!-- Title + Subtitle -->
-      <div class="grid grid-cols-4 gap-3">
-        <div class="col-span-3 space-y-1">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div class="sm:col-span-3 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
           <input
             v-model="form.title"
@@ -177,10 +185,16 @@ async function autoFill() {
         </div>
       </div>
 
-      <!-- Authors -->
-      <div class="space-y-1">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Authors</label>
-        <ChipInput v-model="form.authors" placeholder="Add author..." :search-fn="searchAuthors" />
+      <!-- Authors | Narrators (audio only) -->
+      <div class="grid gap-3" :class="isPrimaryAudio ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'">
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Authors</label>
+          <ChipInput v-model="form.authors" placeholder="Add author..." :search-fn="searchAuthors" />
+        </div>
+        <div v-if="isPrimaryAudio" class="space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Narrators</label>
+          <ChipInput v-model="form.narrators" placeholder="Add narrator..." :search-fn="searchNarrators" />
+        </div>
       </div>
 
       <!-- Genres -->
@@ -189,35 +203,13 @@ async function autoFill() {
         <ChipInput v-model="form.genres" placeholder="Add genre..." :search-fn="searchGenres" />
       </div>
 
-      <!-- Tags -->
-      <div class="space-y-1">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</label>
-        <ChipInput v-model="form.tags" placeholder="Add tag..." :search-fn="searchTags" />
-      </div>
-
-      <!-- Series + Index + Rating -->
-      <div class="grid grid-cols-6 gap-3">
-        <div class="col-span-4 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Series</label>
-          <input
-            v-model="form.seriesName"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="Series name"
-          />
+      <!-- Tags | Rating -->
+      <div class="flex items-start gap-3">
+        <div class="flex-1 space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</label>
+          <ChipInput v-model="form.tags" placeholder="Add tag..." :search-fn="searchTags" />
         </div>
-        <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Index</label>
-          <input
-            :value="form.seriesIndex ?? ''"
-            type="number"
-            step="0.1"
-            min="0"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="1"
-            @input="setFloatField('seriesIndex', $event)"
-          />
-        </div>
-        <div class="space-y-1">
+        <div class="space-y-1 shrink-0">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rating</label>
           <div class="flex items-center gap-0.5 h-8" @mouseleave="hoverRating = null">
             <Tooltip v-for="star in 5" :key="star">
@@ -240,9 +232,29 @@ async function autoFill() {
         </div>
       </div>
 
-      <!-- Publisher + Year + Language -->
-      <div class="grid grid-cols-3 gap-3">
-        <div class="space-y-1">
+      <!-- Series | Index | Publisher -->
+      <div class="flex flex-wrap gap-3">
+        <div class="flex-1 min-w-[140px] space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Series</label>
+          <input
+            v-model="form.seriesName"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            placeholder="Series name"
+          />
+        </div>
+        <div class="w-16 shrink-0 space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Index</label>
+          <input
+            :value="form.seriesIndex ?? ''"
+            type="number"
+            step="0.1"
+            min="0"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            placeholder="1"
+            @input="setFloatField('seriesIndex', $event)"
+          />
+        </div>
+        <div class="flex-1 min-w-[120px] space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Publisher</label>
           <input
             v-model="form.publisher"
@@ -250,8 +262,12 @@ async function autoFill() {
             placeholder="Publisher"
           />
         </div>
-        <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Published Year</label>
+      </div>
+
+      <!-- Year | Language | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
+      <div class="flex flex-wrap gap-3">
+        <div class="w-20 shrink-0 space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Year</label>
           <input
             :value="form.publishedYear ?? ''"
             type="number"
@@ -262,7 +278,7 @@ async function autoFill() {
             @input="setIntField('publishedYear', $event)"
           />
         </div>
-        <div class="space-y-1">
+        <div class="w-32 shrink-0 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Language</label>
           <input
             v-model="form.language"
@@ -271,11 +287,7 @@ async function autoFill() {
             maxlength="10"
           />
         </div>
-      </div>
-
-      <!-- Page count + ISBNs -->
-      <div class="grid grid-cols-3 gap-3">
-        <div class="space-y-1">
+        <div class="w-24 shrink-0 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Page Count</label>
           <input
             :value="form.pageCount ?? ''"
@@ -286,7 +298,7 @@ async function autoFill() {
             @input="setIntField('pageCount', $event)"
           />
         </div>
-        <div class="space-y-1">
+        <div class="flex-1 min-w-[90px] space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ISBN-13</label>
           <input
             v-model="form.isbn13"
@@ -295,7 +307,7 @@ async function autoFill() {
             maxlength="13"
           />
         </div>
-        <div class="space-y-1">
+        <div class="flex-1 min-w-[85px] space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ISBN-10</label>
           <input
             v-model="form.isbn10"
@@ -304,13 +316,31 @@ async function autoFill() {
             maxlength="10"
           />
         </div>
+        <div v-if="isPrimaryAudio" class="w-24 shrink-0 space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Duration (s)</label>
+          <input
+            :value="form.durationSeconds ?? ''"
+            type="number"
+            min="1"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            placeholder="36000"
+            @input="setIntField('durationSeconds', $event)"
+          />
+        </div>
+        <div v-if="isPrimaryAudio" class="w-20 shrink-0 space-y-1">
+          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Abridged</label>
+          <div class="flex items-center h-8">
+            <input id="abridged-check" v-model="form.abridged" type="checkbox" class="h-4 w-4 rounded border-input accent-primary" />
+            <label for="abridged-check" class="ml-2 text-sm text-foreground select-none">Abridged</label>
+          </div>
+        </div>
       </div>
 
       <!-- Provider IDs -->
       <div class="space-y-1">
         <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Provider IDs</label>
-        <div class="rounded-lg border border-border bg-muted/30 p-3 grid grid-cols-6 gap-3">
-          <div v-for="{ field, label } in providerIdFields" :key="field" class="space-y-1">
+        <div class="rounded-lg border border-border bg-muted/30 p-3 flex gap-3 overflow-x-auto">
+          <div v-for="{ field, label } in providerIdFields" :key="field" class="space-y-1 min-w-[120px] flex-1">
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ label }}</label>
             <input
               v-model="form[field]"

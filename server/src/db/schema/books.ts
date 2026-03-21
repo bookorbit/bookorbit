@@ -1,4 +1,4 @@
-import { bigint, integer, pgTable, serial, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgTable, serial, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { libraryFolders, libraries } from './libraries';
 
@@ -12,6 +12,7 @@ export const books = pgTable(
     libraryFolderId: integer('library_folder_id')
       .notNull()
       .references(() => libraryFolders.id, { onDelete: 'cascade' }),
+    primaryFileId: integer('primary_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
     folderPath: varchar('folder_path', { length: 4096 }).notNull(),
     status: varchar('status', { length: 20 }).notNull().default('present'),
     addedAt: timestamp('added_at').defaultNow().notNull(),
@@ -20,7 +21,7 @@ export const books = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [uniqueIndex('books_library_id_folder_path_idx').on(t.libraryId, t.folderPath)],
+  (t) => [uniqueIndex('books_library_id_folder_path_idx').on(t.libraryId, t.folderPath), index('books_primary_file_id_idx').on(t.primaryFileId)],
 );
 
 export const bookFiles = pgTable('book_files', {
@@ -38,7 +39,9 @@ export const bookFiles = pgTable('book_files', {
   mtime: timestamp('mtime'),
   hash: varchar('hash', { length: 64 }),
   format: varchar('format', { length: 20 }),
-  role: varchar('role', { length: 20 }).notNull().default('primary'),
+  role: varchar('role', { length: 20 }).notNull().default('content'),
+  sortOrder: integer('sort_order'),
+  durationSeconds: integer('duration_seconds'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
     .defaultNow()

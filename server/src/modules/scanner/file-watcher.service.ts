@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { dirname } from 'path';
 import type { AsyncSubscription } from '@parcel/watcher';
 
 import { DB } from '../../db';
@@ -9,20 +10,21 @@ import { libraries, libraryFolders } from '../../db/schema';
 import { ScanGateway } from './scan.gateway';
 import { ScannerService } from './scanner.service';
 import { FileEventProcessorService, type FileEventResult } from './file-event-processor.service';
+import { classifyFile } from './lib/classify';
 
 type Db = NodePgDatabase<typeof schema>;
 type EventType = 'delete' | 'create';
 
 const DEBOUNCE_MS = 500;
 const SCAN_DEBOUNCE_MS = 3_000;
-const RECONCILE_MS = 30_000;
+const RECONCILE_MS = 30 * 60 * 1_000;
 
 @Injectable()
 export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(FileWatcherService.name);
   private readonly subscriptions = new Map<number, AsyncSubscription[]>();
   private readonly pendingTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; type: EventType; libraryId: number }>();
-  private readonly pendingScanTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly pendingFolderScanTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private reconcileTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -51,8 +53,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     if (this.reconcileTimer) clearInterval(this.reconcileTimer);
     for (const entry of this.pendingTimers.values()) clearTimeout(entry.timer);
     this.pendingTimers.clear();
-    for (const timer of this.pendingScanTimers.values()) clearTimeout(timer);
-    this.pendingScanTimers.clear();
+    for (const timer of this.pendingFolderScanTimers.values()) clearTimeout(timer);
+    this.pendingFolderScanTimers.clear();
     for (const subs of this.subscriptions.values()) {
       for (const sub of subs) await sub.unsubscribe();
     }
@@ -104,14 +106,15 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     this.subscriptions.delete(libraryId);
   }
 
-  private scheduleScan(libraryId: number): void {
-    const existing = this.pendingScanTimers.get(libraryId);
+  private scheduleFolderScan(filePath: string, libraryId: number): void {
+    const bookFolder = dirname(filePath);
+    const existing = this.pendingFolderScanTimers.get(bookFolder);
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
-      this.pendingScanTimers.delete(libraryId);
-      this.scannerService.startScanAsync(libraryId);
+      this.pendingFolderScanTimers.delete(bookFolder);
+      this.scannerService.scanBookFolderAsync(filePath, libraryId);
     }, SCAN_DEBOUNCE_MS);
-    this.pendingScanTimers.set(libraryId, timer);
+    this.pendingFolderScanTimers.set(bookFolder, timer);
   }
 
   private schedule(type: EventType, path: string, libraryId: number): void {
@@ -129,7 +132,10 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     if (type === 'create') {
       result = await this.processor.handleCreate(path);
       if (result.type === 'noop') {
-        this.scheduleScan(libraryId);
+        // Only schedule a scan for unrecognised content-format files. Supplementary
+        // files (covers, metadata, .lit, etc.) don't need a full scan on creation.
+        const { role } = classifyFile(path);
+        if (role === 'content') this.scheduleFolderScan(path, libraryId);
         return;
       }
     } else {
@@ -145,6 +151,9 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
     } else if (result.type === 'book-moved') {
       this.gateway.emitBookMoved({ libraryId: result.libraryId, bookIds: result.bookIds });
+      // A move updates the file's path and may consolidate virtual-sibling books.
+      // Schedule a folder scan so upsertBook can drain any remaining siblings.
+      if (type === 'create') this.scheduleFolderScan(path, libraryId);
     }
   }
 }

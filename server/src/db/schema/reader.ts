@@ -44,6 +44,8 @@ export const readingProgress = pgTable(
     cfi: varchar('cfi', { length: 2000 }),
     // PDF / CBX / CBR: zero-based page index
     pageNumber: integer('page_number'),
+    // Audio: playback position in seconds
+    positionSeconds: real('position_seconds'),
     updatedAt: timestamp('updated_at')
       .notNull()
       .defaultNow()

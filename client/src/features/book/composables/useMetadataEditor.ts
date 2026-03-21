@@ -22,12 +22,16 @@ export function useMetadataEditor() {
     authors: [] as string[],
     genres: [] as string[],
     tags: [] as string[],
+    narrators: [] as string[],
+    durationSeconds: null as number | null,
+    abridged: false as boolean,
     googleBooksId: null as string | null,
     goodreadsId: null as string | null,
     amazonId: null as string | null,
     hardcoverId: null as string | null,
     openLibraryId: null as string | null,
     itunesId: null as string | null,
+    audibleId: null as string | null,
   })
 
   const snapshot = ref(JSON.stringify(form))
@@ -50,12 +54,16 @@ export function useMetadataEditor() {
     form.authors = book.authors.map((a) => a.name)
     form.genres = [...book.genres]
     form.tags = [...book.tags]
+    form.narrators = book.narrators?.map((n) => n.name) ?? []
+    form.durationSeconds = book.durationSeconds ?? null
+    form.abridged = book.abridged ?? false
     form.googleBooksId = book.providerIds.google ?? null
     form.goodreadsId = book.providerIds.goodreads ?? null
     form.amazonId = book.providerIds.amazon ?? null
     form.hardcoverId = book.providerIds.hardcover ?? null
     form.openLibraryId = book.providerIds.openLibrary ?? null
     form.itunesId = book.providerIds.itunes ?? null
+    form.audibleId = book.providerIds.audible ?? null
     snapshot.value = JSON.stringify(form)
     error.value = null
   }

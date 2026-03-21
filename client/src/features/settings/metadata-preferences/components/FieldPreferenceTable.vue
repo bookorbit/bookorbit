@@ -23,6 +23,7 @@ const GROUPS: { label: string; fields: MetadataField[] }[] = [
   { label: 'Publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount'] },
   { label: 'Series', fields: ['seriesName', 'seriesIndex'] },
   { label: 'Classification', fields: ['genres'] },
+  { label: 'Audiobook', fields: ['narrators', 'duration', 'abridged'] },
 ]
 </script>
 

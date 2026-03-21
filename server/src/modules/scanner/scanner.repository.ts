@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, like, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, like, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -63,19 +63,36 @@ export class ScannerRepository {
     return this.db
       .select({ bookId: books.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
       .from(books)
-      .innerJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(and(eq(books.libraryId, libraryId), ne(books.status, 'missing')));
   }
 
   async findPrimaryBookFilesByBookId(bookId: number) {
     return this.db
-      .select()
-      .from(bookFiles)
-      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')));
+      .select({
+        id: bookFiles.id,
+        bookId: bookFiles.bookId,
+        libraryFolderId: bookFiles.libraryFolderId,
+        absolutePath: bookFiles.absolutePath,
+        relPath: bookFiles.relPath,
+        ino: bookFiles.ino,
+        sizeBytes: bookFiles.sizeBytes,
+        mtime: bookFiles.mtime,
+        hash: bookFiles.hash,
+        format: bookFiles.format,
+        role: bookFiles.role,
+        sortOrder: bookFiles.sortOrder,
+        durationSeconds: bookFiles.durationSeconds,
+        createdAt: bookFiles.createdAt,
+        updatedAt: bookFiles.updatedAt,
+      })
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(eq(books.id, bookId));
   }
 
   async createBook(data: typeof books.$inferInsert) {
-    const [book] = await this.db
+    const rows = await this.db
       .insert(books)
       .values(data)
       .onConflictDoUpdate({
@@ -83,6 +100,7 @@ export class ScannerRepository {
         set: { status: 'present', updatedAt: new Date() },
       })
       .returning();
+    const book = rows[0]!;
     // Always create an empty metadata row so joins never return null.
     await this.db.insert(bookMetadata).values({ bookId: book.id }).onConflictDoNothing();
     return book;
@@ -90,6 +108,18 @@ export class ScannerRepository {
 
   async updateBookStatus(id: number, status: 'present' | 'missing') {
     await this.db.update(books).set({ status, updatedAt: new Date() }).where(eq(books.id, id));
+  }
+
+  async updateBookPrimaryFile(bookId: number, primaryFileId: number | null) {
+    const primaryScope =
+      primaryFileId == null
+        ? sql`TRUE`
+        : sql`EXISTS (SELECT 1 FROM ${bookFiles} WHERE ${bookFiles.id} = ${primaryFileId} AND ${bookFiles.bookId} = ${bookId})`;
+
+    await this.db
+      .update(books)
+      .set({ primaryFileId, updatedAt: new Date() })
+      .where(and(eq(books.id, bookId), sql`${books.primaryFileId} IS DISTINCT FROM ${primaryFileId}`, primaryScope));
   }
 
   async markBooksAsMissing(ids: number[]) {
@@ -113,7 +143,8 @@ export class ScannerRepository {
   }
 
   async createBookFile(data: typeof bookFiles.$inferInsert) {
-    const [file] = await this.db.insert(bookFiles).values(data).returning();
+    const rows = await this.db.insert(bookFiles).values(data).returning();
+    const file = rows[0]!;
     return file;
   }
 
@@ -128,7 +159,7 @@ export class ScannerRepository {
 
   async findBookFileByAbsolutePath(absolutePath: string) {
     const [row] = await this.db
-      .select({ file: bookFiles, libraryId: books.libraryId })
+      .select({ file: bookFiles, libraryId: books.libraryId, primaryFileId: books.primaryFileId })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .where(eq(bookFiles.absolutePath, absolutePath))
@@ -170,6 +201,19 @@ export class ScannerRepository {
   async markBooksAsPresent(bookIds: number[]) {
     if (bookIds.length === 0) return;
     await this.db.update(books).set({ status: 'present', updatedAt: new Date() }).where(inArray(books.id, bookIds));
+  }
+
+  async findBookFilesByBookId(bookId: number) {
+    return this.db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId));
+  }
+
+  async findBookFilesByBookIds(bookIds: number[]) {
+    if (bookIds.length === 0) return [];
+    return this.db.select().from(bookFiles).where(inArray(bookFiles.bookId, bookIds));
+  }
+
+  async deleteBookFile(id: number) {
+    await this.db.delete(bookFiles).where(eq(bookFiles.id, id));
   }
 
   async findBookFileWithContextByIno(ino: number) {

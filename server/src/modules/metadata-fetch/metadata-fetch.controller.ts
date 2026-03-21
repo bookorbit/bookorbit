@@ -1,5 +1,5 @@
 import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderInfo, Permission, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, Permission, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
 import { map, Observable } from 'rxjs';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -46,12 +46,17 @@ export class MetadataFetchController {
   @Sse('stream')
   async stream(@Query() dto: MetadataSearchDto): Promise<Observable<MessageEvent>> {
     const existingProviderIds = dto.bookId ? await this.metadataFetchService.getStoredProviderIds(dto.bookId) : {};
+    const requestedAudiobookProvider = (dto.providers ?? []).some(
+      (provider) => provider === MetadataProviderKey.AUDIBLE || provider === MetadataProviderKey.AUDNEXUS,
+    );
+    const isAudiobook = dto.isAudiobook ?? (requestedAudiobookProvider || Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE]));
 
     const params: MetadataSearchParams = {
       title: dto.title,
       author: dto.author,
       isbn: dto.isbn,
       existingProviderIds,
+      isAudiobook,
     };
 
     return this.metadataFetchService.search(params, dto.providers).pipe(map((candidate: MetadataCandidate) => ({ data: candidate })));

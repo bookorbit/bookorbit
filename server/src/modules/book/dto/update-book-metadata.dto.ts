@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(1000) title?: string | null;
@@ -14,6 +14,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) narrators?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
@@ -22,4 +23,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(50) hardcoverId?: string | null;
   @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
   @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
+  @IsOptional() @IsInt() @Min(0) durationSeconds?: number | null;
+  @IsOptional() @IsBoolean() abridged?: boolean | null;
 }

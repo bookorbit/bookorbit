@@ -67,11 +67,12 @@ const presentBook: BookCard = {
 }
 
 describe('BookCoverCard — missing state', () => {
-  it('applies amber ring to the cover container when missing', () => {
+  it('renders an amber inset ring overlay when missing', () => {
     const wrapper = mount(BookCoverCard, { props: { book: missingBook }, global: globalStubs })
-    const coverDiv = wrapper.find('[style*="aspect-ratio"]')
-    expect(coverDiv.classes()).toContain('ring-2')
-    expect(coverDiv.classes()).toContain('ring-amber-500')
+    const ringOverlay = wrapper.find('.ring-amber-500')
+    expect(ringOverlay.exists()).toBe(true)
+    expect(ringOverlay.classes()).toContain('ring-2')
+    expect(ringOverlay.classes()).toContain('ring-inset')
   })
 
   it('does not apply hover-scale to the cover container', () => {

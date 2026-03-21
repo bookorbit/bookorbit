@@ -47,6 +47,7 @@ export class MetadataFetchService {
         hardcoverId: true,
         openLibraryId: true,
         itunesId: true,
+        audibleId: true,
       },
     });
     if (!row) return {};
@@ -57,6 +58,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.HARDCOVER]: row.hardcoverId ?? undefined,
       [MetadataProviderKey.OPEN_LIBRARY]: row.openLibraryId ?? undefined,
       [MetadataProviderKey.ITUNES]: row.itunesId ?? undefined,
+      [MetadataProviderKey.AUDIBLE]: row.audibleId ?? undefined,
     };
   }
 

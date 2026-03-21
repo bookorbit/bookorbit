@@ -207,18 +207,21 @@ export const routes: RouteRecordRaw[] = [
         name: 'book-detail',
         component: () => import('@/views/BookDetailView.vue'),
         meta: { title: (to) => fallbackById('Book', numericParam(to, 'bookId')) },
+        beforeEnter: (to, _from, next) => {
+          if (!to.query.tab) {
+            next({ ...to, query: { ...to.query, tab: 'details' } })
+          } else {
+            next()
+          }
+        },
       },
       {
         path: '/book/:bookId/files',
-        name: 'book-files',
-        component: () => import('@/views/BookFilesView.vue'),
-        meta: { title: (to) => `Files · ${fallbackById('Book', numericParam(to, 'bookId'))}` },
+        redirect: (to) => ({ name: 'book-detail', params: to.params, query: { tab: 'files' } }),
       },
       {
         path: '/book/:bookId/edit',
-        name: 'book-edit',
-        component: () => import('@/views/BookEditMetadataView.vue'),
-        meta: { title: (to) => `Edit Metadata · ${fallbackById('Book', numericParam(to, 'bookId'))}` },
+        redirect: (to) => ({ name: 'book-detail', params: to.params, query: { tab: 'edit' } }),
       },
     ],
   },

@@ -203,6 +203,9 @@ const currentSource = computed<MetadataSource>(() => ({
         .map((g) => g.trim())
         .filter(Boolean)
     : [],
+  narrators: [],
+  durationSeconds: null,
+  abridged: null,
 }))
 
 function openSearch() {

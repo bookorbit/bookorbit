@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@projectx/types'
-import { FORMAT_TO_GROUP } from '@projectx/types'
+import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { getFormatColor } from '../lib/format-colors'
 import { computed, ref, watch } from 'vue'
@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   FolderPlus,
+  Headphones,
   Image,
   Loader2,
   MoreHorizontal,
@@ -65,8 +66,23 @@ const seriesLine = computed(() => {
   return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
 })
 
-const readableFiles = computed(() => props.book.files.filter((f) => f.format && f.format in FORMAT_TO_GROUP))
+const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
+
+// For multi-file audiobooks, collapse all tracks into one representative entry.
+// The audio reader loads the full track queue from the book, so opening any track is equivalent.
+const isMultiTrackAudio = computed(() => {
+  const audioFiles = readableFiles.value.filter((f) => FORMAT_TO_GROUP[f.format!] === 'audio')
+  return audioFiles.length > 1
+})
+const openableFiles = computed(() => {
+  if (isMultiTrackAudio.value) {
+    const first = readableFiles.value.find((f) => FORMAT_TO_GROUP[f.format!] === 'audio')
+    const nonAudio = readableFiles.value.filter((f) => FORMAT_TO_GROUP[f.format!] !== 'audio')
+    return first ? [first, ...nonAudio] : nonAudio
+  }
+  return readableFiles.value
+})
 
 const { coverUrl, bumpVersion } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
@@ -185,10 +201,13 @@ async function handleSetStatus(status: ReadStatus) {
     <!-- Cover -->
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
-      :class="[isMissing ? 'ring-2 ring-amber-500' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]']"
+      :class="[isMissing ? '' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]']"
       style="aspect-ratio: 2/3"
       :style="coverLoaded ? {} : coverStyle"
     >
+      <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
+      <div v-if="isMissing" class="absolute inset-0 z-30 pointer-events-none rounded-sm ring-2 ring-inset ring-amber-500" />
+
       <img
         v-if="!coverFailed"
         :src="coverSrc"
@@ -260,6 +279,16 @@ async function handleSetStatus(status: ReadStatus) {
           :style="{ backgroundColor: getFormatColor(primaryFile!.format!) + 'cc' }"
         >
           {{ primaryFile!.format!.toUpperCase() }}
+        </span>
+      </div>
+
+      <!-- Audiobook badge - bottom-left, distinct from series/read-status badges at top-left -->
+      <div
+        v-if="book.durationSeconds != null && !selectionMode"
+        class="absolute bottom-5 left-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
+      >
+        <span class="flex items-center gap-0.5 bg-black/60 text-white rounded px-1.5 py-0.5">
+          <Headphones class="size-2.5" />
         </span>
       </div>
 
@@ -352,38 +381,40 @@ async function handleSetStatus(status: ReadStatus) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <!-- Open submenu (only when multiple readable files; single file = direct item) -->
-              <DropdownMenuItem v-if="readableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
+              <!-- Open submenu (only when multiple openable files; single file = direct item) -->
+              <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
                 <BookOpen class="size-4 mr-2" />
                 Open
               </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="readableFiles.length > 1 && !isMissing">
+              <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
                 <DropdownMenuSubTrigger>
                   <BookOpen class="size-4 mr-2" />
                   Open
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="file in readableFiles" :key="file.id" @click="openFile(file)">
-                    {{ file.format?.toUpperCase() ?? '?' }}
-                    <span v-if="file.role === 'primary'" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
+                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
 
               <!-- Download submenu -->
-              <DropdownMenuItem v-if="readableFiles.length === 1 && primaryFile" @click="handleDownloadFile(primaryFile)">
+              <DropdownMenuItem v-if="openableFiles.length === 1 && primaryFile" @click="handleDownloadFile(primaryFile)">
                 <Download class="size-4 mr-2" />
                 Download
               </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="readableFiles.length > 1">
+              <DropdownMenuSub v-else-if="openableFiles.length > 1">
                 <DropdownMenuSubTrigger>
                   <Download class="size-4 mr-2" />
                   Download
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="file in readableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                    {{ file.format?.toUpperCase() ?? '?' }}
-                    <span v-if="file.role === 'primary'" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
@@ -401,7 +432,7 @@ async function handleSetStatus(status: ReadStatus) {
                   Metadata
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
+                  <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
                     <Pencil class="size-4 mr-2" />
                     Edit Metadata
                   </DropdownMenuItem>

@@ -1,7 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { extname } from 'path';
 
-export const SUPPORTED_BOOK_FORMATS = new Set(['epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2']);
+export const SUPPORTED_BOOK_FORMATS = new Set([
+  'epub',
+  'pdf',
+  'mobi',
+  'azw3',
+  'cbz',
+  'cbr',
+  'cb7',
+  'fb2',
+  'm4b',
+  'm4a',
+  'mp3',
+  'opus',
+  'ogg',
+  'flac',
+]);
 
 @Injectable()
 export class UploadValidatorService {

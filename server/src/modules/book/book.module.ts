@@ -7,6 +7,7 @@ import { LibraryModule } from '../library/library.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
+import { NarratorModule } from '../narrator/narrator.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookController } from './book.controller';
@@ -22,6 +23,7 @@ import { BookService } from './book.service';
     FileWriteModule,
     AppSettingsModule,
     MetadataScoreModule,
+    NarratorModule,
     UserBookStatusModule,
   ],
   controllers: [BookController],

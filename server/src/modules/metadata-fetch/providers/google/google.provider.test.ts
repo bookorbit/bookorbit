@@ -14,6 +14,9 @@ describe('GoogleProvider', () => {
     goodreads: { enabled: true },
     hardcover: { enabled: false, apiKey: '' },
     openLibrary: { enabled: true },
+    itunes: { enabled: true },
+    audible: { enabled: false, domain: 'com' },
+    audnexus: { enabled: false },
   };
 
   beforeEach(async () => {

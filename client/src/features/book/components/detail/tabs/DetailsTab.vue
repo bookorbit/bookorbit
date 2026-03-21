@@ -7,7 +7,7 @@ import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
-import { FORMAT_TO_GROUP } from '@projectx/types'
+import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
 import type { BookDetail, BookKoboState, ReadStatus } from '@projectx/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
@@ -29,6 +29,10 @@ type FileProgress = {
   cfi: string | null
   pageNumber: number | null
   updatedAt: string | null
+}
+
+type FileProgressRow = FileProgress & {
+  fileId: number
 }
 
 type CollectionMembership = {
@@ -72,6 +76,8 @@ const coverLoaded = ref(false)
 const coverFailed = ref(false)
 const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
+const coverNaturalWidth = ref(0)
+const coverNaturalHeight = ref(0)
 
 const { hasPermission } = usePermissions()
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
@@ -82,10 +88,52 @@ const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
-const readableFiles = computed(() => props.book.files.filter((f) => f.format && f.format in FORMAT_TO_GROUP))
-const hasMultipleFiles = computed(() => readableFiles.value.length > 1)
+const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const coverAspectRatio = computed(() => {
+  if (!isPrimaryAudio.value) return '2/3'
+  if (coverNaturalWidth.value > 0 && coverNaturalHeight.value > coverNaturalWidth.value) return '2/3'
+  return '1/1'
+})
+const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
+
+// For multi-file audiobooks, collapse all tracks into one representative entry.
+const isMultiTrackAudio = computed(() => {
+  const audioFiles = readableFiles.value.filter((f) => FORMAT_TO_GROUP[f.format!] === 'audio')
+  return audioFiles.length > 1
+})
+const openableFiles = computed(() => {
+  if (isMultiTrackAudio.value) {
+    const first = readableFiles.value.find((f) => FORMAT_TO_GROUP[f.format!] === 'audio')
+    const nonAudio = readableFiles.value.filter((f) => FORMAT_TO_GROUP[f.format!] !== 'audio')
+    return first ? [first, ...nonAudio] : nonAudio
+  }
+  return readableFiles.value
+})
+const hasMultipleFiles = computed(() => openableFiles.value.length > 1)
 const authorLine = computed(() => props.book.authors.map((a) => a.name).join(', ') || null)
-const formats = computed(() => [...new Set(props.book.files.map((f) => f.format ?? '?'))])
+const narratorLine = computed(() => props.book.narrators?.map((n) => n.name).join(', ') || null)
+const formats = computed(() => {
+  const all = [...new Set(props.book.files.map((f) => f.format ?? '?'))]
+  const priority = props.book.formatPriority
+  const sorted = priority.length
+    ? all.sort((a, b) => {
+        const ai = priority.indexOf(a)
+        const bi = priority.indexOf(b)
+        return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
+      })
+    : all
+  const primary = primaryFile.value?.format
+  if (!primary) return sorted
+  return [primary, ...sorted.filter((f) => f !== primary)]
+})
+
+function formatDuration(seconds: number | null | undefined): string {
+  if (seconds == null) return '-'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
 
 const localRating = ref<number | null>(null)
 const hoverRating = ref<number | null>(null)
@@ -201,6 +249,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       fallback: '',
     })
   }
+  if (ids.audible) {
+    out.push({
+      key: 'audible',
+      label: 'Audible',
+      url: `https://www.audible.com/pd/${ids.audible}`,
+      iconUrl: 'https://www.audible.com/favicon.ico',
+      fallback: 'Au',
+    })
+  }
   return out
 })
 
@@ -312,12 +369,23 @@ function providerLinkStyle(provider: string) {
 
 function handleEditMetadataFromScore() {
   scoreBreakdownOpen.value = false
-  router.push({ name: 'book-edit', params: { bookId: props.book.id } })
+  router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
 }
 
 function handleDeleteFromMenu() {
   moreMenuOpen.value = false
   promptDelete(props.book.id)
+}
+
+function handleCoverLoad(e: Event) {
+  const img = e.target as HTMLImageElement
+  coverNaturalWidth.value = img.naturalWidth
+  coverNaturalHeight.value = img.naturalHeight
+  coverLoaded.value = true
+}
+
+function openEditCover() {
+  router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
 }
 
 function openBook() {
@@ -344,36 +412,20 @@ async function loadSupplemental() {
   const requestId = ++supplementalRequestId
   supplementalLoading.value = true
   try {
-    const progressPromises = props.book.files.map(async (file) => {
-      try {
-        const res = await api(`/api/v1/books/files/${file.id}/progress`)
-        if (!res.ok) {
-          return { fileId: file.id, percentage: 0, cfi: null, pageNumber: null, updatedAt: null }
-        }
-        const data = (await res.json()) as Partial<FileProgress>
-        return {
-          fileId: file.id,
-          percentage: typeof data.percentage === 'number' ? data.percentage : 0,
-          cfi: data.cfi ?? null,
-          pageNumber: data.pageNumber ?? null,
-          updatedAt: data.updatedAt ?? null,
-        }
-      } catch {
-        return { fileId: file.id, percentage: 0, cfi: null, pageNumber: null, updatedAt: null }
-      }
-    })
-
+    const progressPromise = api(`/api/v1/books/${props.book.id}/progress`).catch(() => null)
     const collectionsPromise = api(`/api/v1/collections?bookIds=${props.book.id}`)
     const koboPromise = canViewKobo.value ? api(`/api/v1/books/${props.book.id}/kobo-state`) : Promise.resolve(null)
 
-    const [progressRows, collectionsRes, koboRes] = await Promise.all([Promise.all(progressPromises), collectionsPromise, koboPromise])
+    const [progressRes, collectionsRes, koboRes] = await Promise.all([progressPromise, collectionsPromise, koboPromise])
 
     if (requestId !== supplementalRequestId) return
 
+    const progressRows: FileProgressRow[] = progressRes && progressRes.ok ? ((await progressRes.json()) as FileProgressRow[]) : []
     const progressMap: Record<number, FileProgress> = {}
     for (const row of progressRows) {
+      if (!Number.isFinite(row.fileId)) continue
       progressMap[row.fileId] = {
-        percentage: row.percentage,
+        percentage: typeof row.percentage === 'number' ? row.percentage : 0,
         cfi: row.cfi,
         pageNumber: row.pageNumber,
         updatedAt: row.updatedAt,
@@ -446,15 +498,14 @@ watch(
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
           class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in bg-muted/50"
-          style="aspect-ratio: 2/3"
-          :style="coverLoaded ? {} : coverStyle"
+          :style="[{ aspectRatio: coverAspectRatio }, coverLoaded ? {} : coverStyle]"
           @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
         >
           <Tooltip>
             <TooltipTrigger as-child>
               <button
                 class="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                @click.stop="router.push({ name: 'book-edit', params: { bookId: book.id } })"
+                @click.stop="openEditCover"
               >
                 <Pencil class="size-3" />
               </button>
@@ -467,7 +518,7 @@ watch(
             class="w-full h-full object-contain transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             :alt="book.title ?? ''"
-            @load="coverLoaded = true"
+            @load="handleCoverLoad"
             @error="coverFailed = true"
           />
         </div>
@@ -495,7 +546,7 @@ watch(
               </PopoverTrigger>
               <PopoverContent class="w-52 p-1" align="end">
                 <button
-                  v-for="file in readableFiles"
+                  v-for="file in openableFiles"
                   :key="file.id"
                   class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
                   @click="openBookFile(file)"
@@ -505,8 +556,11 @@ watch(
                     :style="formatBadgeStyle(file.format ?? '?')"
                     >{{ file.format ?? '?' }}</span
                   >
-                  <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ formatFileSize(file.sizeBytes) }}</span>
-                  <span v-if="file.role === 'primary'" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
+                  <span class="flex-1 text-left text-muted-foreground text-xs truncate">
+                    <template v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</template>
+                    <template v-else>{{ formatFileSize(file.sizeBytes) }}</template>
+                  </span>
+                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
                 </button>
               </PopoverContent>
             </Popover>
@@ -624,6 +678,10 @@ watch(
           <span class="text-muted-foreground">by</span>
           <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
         </p>
+        <p v-if="narratorLine" class="text-sm">
+          <span class="text-muted-foreground">narrated by</span>
+          <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
+        </p>
         <template v-if="seriesLine">
           <span class="text-muted-foreground/60 text-xs">·</span>
           <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
@@ -675,9 +733,15 @@ watch(
         <span
           v-for="fmt in formats"
           :key="fmt"
-          class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+          class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
           :style="formatBadgeStyle(fmt)"
         >
+          <Tooltip v-if="fmt === primaryFile?.format">
+            <TooltipTrigger as-child>
+              <span class="size-1.5 rounded-full shrink-0" :style="{ backgroundColor: 'currentColor' }" />
+            </TooltipTrigger>
+            <TooltipContent>Primary format</TooltipContent>
+          </Tooltip>
           {{ fmt }}
         </span>
         <div v-if="providerLinks.length" class="flex items-center gap-2 shrink-0">
@@ -744,6 +808,14 @@ watch(
         <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Pages</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ book.pageCount || '-' }}</dd>
+        </div>
+        <div v-if="book.durationSeconds != null">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Duration</dt>
+          <dd class="text-sm text-foreground mt-0.5">{{ formatDuration(book.durationSeconds) }}</dd>
+        </div>
+        <div v-if="book.durationSeconds != null">
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Edition</dt>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.abridged ? 'Abridged' : 'Unabridged' }}</dd>
         </div>
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN</dt>

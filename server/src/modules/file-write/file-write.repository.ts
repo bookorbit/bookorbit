@@ -22,9 +22,9 @@ export class FileWriteRepository {
         sizeBytes: bookFiles.sizeBytes,
         libraryId: books.libraryId,
       })
-      .from(bookFiles)
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')))
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(eq(books.id, bookId))
       .limit(1);
     return row ?? null;
   }
@@ -39,7 +39,7 @@ export class FileWriteRepository {
         sizeBytes: bookFiles.sizeBytes,
       })
       .from(books)
-      .innerJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(and(eq(books.libraryId, libraryId), ne(books.status, 'missing')));
   }
 

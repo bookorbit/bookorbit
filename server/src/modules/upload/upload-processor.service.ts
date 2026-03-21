@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
+import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -34,23 +35,34 @@ export class UploadProcessorService {
   ): Promise<{ bookId: number }> {
     const [fileStat, hash] = await Promise.all([stat(absolutePath), fingerprintFile(absolutePath)]);
 
-    const [book] = await this.db.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning();
+    const insertedBooks = (await this.db.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning()) as Array<{
+      id: number;
+    }>;
+    const book = insertedBooks[0];
+    if (!book) throw new Error('Failed to create book record');
 
     // Always create an empty metadata row so joins never return null (mirrors scanner behaviour).
     await this.db.insert(bookMetadata).values({ bookId: book.id });
 
-    await this.db.insert(bookFiles).values({
-      bookId: book.id,
-      libraryFolderId,
-      absolutePath,
-      relPath,
-      ino: fileStat.ino,
-      sizeBytes,
-      mtime: fileStat.mtime,
-      hash,
-      format,
-      role: 'primary',
-    });
+    const insertedFiles = (await this.db
+      .insert(bookFiles)
+      .values({
+        bookId: book.id,
+        libraryFolderId,
+        absolutePath,
+        relPath,
+        ino: fileStat.ino,
+        sizeBytes,
+        mtime: fileStat.mtime,
+        hash,
+        format,
+        role: 'content',
+      })
+      .returning()) as Array<{ id: number }>;
+    const file = insertedFiles[0];
+    if (!file) throw new Error('Failed to create book file');
+
+    await this.db.update(books).set({ primaryFileId: file.id }).where(eq(books.id, book.id));
 
     this.autoFetchOrchestrator
       ?.scheduleIfEligible(book.id, libraryId, 'event_import')

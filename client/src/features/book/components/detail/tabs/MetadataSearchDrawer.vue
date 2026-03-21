@@ -36,6 +36,9 @@ const currentSource = computed<MetadataSource>(() => ({
   isbn13: props.book.isbn13,
   authors: props.book.authors.map((a) => a.name),
   genres: props.book.genres,
+  narrators: props.book.narrators.map((n) => n.name),
+  durationSeconds: props.book.durationSeconds,
+  abridged: props.book.abridged,
 }))
 const {
   filteredResults,
@@ -59,7 +62,8 @@ onMounted(() => {
 })
 
 function handleSearch(params: { title: string; author: string; isbn: string }) {
-  search({ ...params, bookId: props.book.id })
+  const isAudiobook = props.book.durationSeconds != null || !!props.book.providerIds.audible
+  search({ ...params, bookId: props.book.id, isAudiobook })
 }
 
 function selectCandidate(candidate: MetadataCandidate) {

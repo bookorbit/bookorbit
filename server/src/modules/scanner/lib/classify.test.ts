@@ -1,17 +1,17 @@
-import { classifyFile, isPrimaryFormat, DEFAULT_FORMAT_PRIORITY } from './classify';
+import { classifyFile, isPrimaryFormat, isAudioFormat, AUDIO_FORMATS, DEFAULT_FORMAT_PRIORITY } from './classify';
 
 // ── PRIMARY FORMATS ───────────────────────────────────────────────────────────
 
 describe('classifyFile — primary formats', () => {
   it.each(['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2'])('classifies .%s as primary', (ext) => {
     const result = classifyFile(`/books/Author/Book/book.${ext}`);
-    expect(result).toEqual({ format: ext, role: 'primary' });
+    expect(result).toEqual({ format: ext, role: 'content' });
   });
 
   it('classifies extensions case-insensitively', () => {
-    expect(classifyFile('/books/Book.EPUB')).toEqual({ format: 'epub', role: 'primary' });
-    expect(classifyFile('/books/Book.PDF')).toEqual({ format: 'pdf', role: 'primary' });
-    expect(classifyFile('/books/Book.CBZ')).toEqual({ format: 'cbz', role: 'primary' });
+    expect(classifyFile('/books/Book.EPUB')).toEqual({ format: 'epub', role: 'content' });
+    expect(classifyFile('/books/Book.PDF')).toEqual({ format: 'pdf', role: 'content' });
+    expect(classifyFile('/books/Book.CBZ')).toEqual({ format: 'cbz', role: 'content' });
   });
 
   it('format matches the lowercased extension, not the original', () => {
@@ -112,6 +112,55 @@ describe('DEFAULT_FORMAT_PRIORITY', () => {
   it('every format in DEFAULT_FORMAT_PRIORITY is a primary format', () => {
     for (const fmt of DEFAULT_FORMAT_PRIORITY) {
       expect(isPrimaryFormat(`/path/file.${fmt}`)).toBe(true);
+    }
+  });
+});
+
+// ── AUDIO FORMATS ─────────────────────────────────────────────────────────────
+
+describe('classifyFile — audio formats', () => {
+  it.each([...AUDIO_FORMATS])('classifies .%s as primary', (ext) => {
+    const result = classifyFile(`/books/Author/Book/book.${ext}`);
+    expect(result).toEqual({ format: ext, role: 'content' });
+  });
+
+  it('audio formats are case-insensitive', () => {
+    expect(classifyFile('/books/Book/book.M4B')).toEqual({ format: 'm4b', role: 'content' });
+    expect(classifyFile('/books/Book/book.MP3')).toEqual({ format: 'mp3', role: 'content' });
+  });
+});
+
+describe('isAudioFormat', () => {
+  it('returns true for all audio formats', () => {
+    for (const fmt of AUDIO_FORMATS) {
+      expect(isAudioFormat(fmt)).toBe(true);
+    }
+  });
+
+  it('returns false for non-audio formats', () => {
+    expect(isAudioFormat('epub')).toBe(false);
+    expect(isAudioFormat('pdf')).toBe(false);
+    expect(isAudioFormat('jpg')).toBe(false);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isAudioFormat('M4B')).toBe(true);
+    expect(isAudioFormat('MP3')).toBe(true);
+  });
+});
+
+describe('DEFAULT_FORMAT_PRIORITY — audio ordering', () => {
+  it('epub appears before all audio formats (epub wins in mixed book)', () => {
+    const epubIdx = DEFAULT_FORMAT_PRIORITY.indexOf('epub');
+    for (const fmt of AUDIO_FORMATS) {
+      const audioIdx = DEFAULT_FORMAT_PRIORITY.indexOf(fmt);
+      expect(epubIdx).toBeLessThan(audioIdx);
+    }
+  });
+
+  it('all audio formats are present in DEFAULT_FORMAT_PRIORITY', () => {
+    for (const fmt of AUDIO_FORMATS) {
+      expect(DEFAULT_FORMAT_PRIORITY).toContain(fmt);
     }
   });
 });

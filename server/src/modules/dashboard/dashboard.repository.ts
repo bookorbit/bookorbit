@@ -13,6 +13,7 @@ type Db = NodePgDatabase<typeof schema>;
 const BOOK_CARD_FIELDS = {
   id: books.id,
   status: books.status,
+  primaryFileId: books.primaryFileId,
   folderPath: books.folderPath,
   addedAt: books.addedAt,
   title: bookMetadata.title,
@@ -32,7 +33,7 @@ export class DashboardRepository {
       return { authorRows: [], fileRows: [], genreRows: [], tagRows: [], progressRows: [] };
     }
 
-    const [authorRows, fileRows, genreRows, tagRows] = await Promise.all([
+    const [authorRows, fileRows, genreRows, tagRows, primaryRows] = await Promise.all([
       this.db
         .select({ bookId: bookAuthors.bookId, name: authors.name })
         .from(bookAuthors)
@@ -53,9 +54,10 @@ export class DashboardRepository {
         .from(bookTags)
         .innerJoin(tags, eq(tags.id, bookTags.tagId))
         .where(inArray(bookTags.bookId, bookIds)),
+      this.db.select({ id: books.id, primaryFileId: books.primaryFileId }).from(books).where(inArray(books.id, bookIds)),
     ]);
 
-    const primaryFileIds = fileRows.filter((f) => f.role === 'primary').map((f) => f.id);
+    const primaryFileIds = primaryRows.map((r) => r.primaryFileId).filter((id): id is number => id != null);
     const progressRows =
       primaryFileIds.length > 0
         ? await this.db
@@ -86,7 +88,7 @@ export class DashboardRepository {
       .select(BOOK_CARD_FIELDS)
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .innerJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .innerJoin(
         readingProgress,
         and(
@@ -113,7 +115,7 @@ export class DashboardRepository {
       .select(BOOK_CARD_FIELDS)
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .leftJoin(bookFiles, and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'primary')))
+      .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
       .where(and(inArray(books.libraryId, accessibleLibraryIds), or(isNull(readingProgress.bookFileId), eq(readingProgress.percentage, 0))))
       .orderBy(sql.raw('RANDOM()'))

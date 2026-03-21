@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   Min,
@@ -58,6 +59,18 @@ export class MetadataSearchDto {
   @IsOptional()
   @IsString()
   isbn?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') return true;
+      if (normalized === 'false' || normalized === '0') return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  isAudiobook?: boolean;
 
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => {

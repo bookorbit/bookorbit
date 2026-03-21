@@ -21,6 +21,9 @@ const FIELD_LABELS: Record<MetadataField, string> = {
   seriesName: 'Series name',
   seriesIndex: 'Series index',
   genres: 'Genres',
+  narrators: 'Narrators',
+  duration: 'Duration',
+  abridged: 'Abridged',
 }
 
 function toggle(field: MetadataField) {

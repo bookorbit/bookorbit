@@ -115,6 +115,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
 
@@ -138,6 +139,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
 
@@ -161,6 +163,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     mockExtractAndSaveCover.mockResolvedValue('');
@@ -175,6 +178,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const metadataSpy = vi.spyOn(service as never, 'extractMetadata').mockRejectedValue(new Error('bad metadata'));
@@ -191,6 +195,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
@@ -239,6 +244,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
@@ -266,6 +272,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
@@ -321,6 +328,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
@@ -370,6 +378,7 @@ describe('MetadataService', () => {
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
       metadataEvents as never,
     );
@@ -404,5 +413,59 @@ describe('MetadataService', () => {
     await service.replaceAuthors(7, [{ name: 'New Author', sortName: null }]);
 
     expect(metadataEvents.emit).toHaveBeenCalledWith(METADATA_AUTHORS_REPLACED, { bookId: 7, authorIds: [81] });
+  });
+
+  it('aggregateAudioDuration sums only files that match the selected primary audio format', async () => {
+    const primaryWhere = vi.fn().mockResolvedValue([{ format: 'm4b' }]);
+    const primaryInnerJoin = vi.fn().mockReturnValue({ where: primaryWhere });
+    const primaryFrom = vi.fn().mockReturnValue({ innerJoin: primaryInnerJoin });
+
+    const aggregateWhere = vi.fn().mockResolvedValue([{ total: 3600 }]);
+    const aggregateFrom = vi.fn().mockReturnValue({ where: aggregateWhere });
+
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      select: vi.fn().mockReturnValueOnce({ from: primaryFrom }).mockReturnValueOnce({ from: aggregateFrom }),
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+    };
+
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
+
+    await service.aggregateAudioDuration(42);
+
+    expect(primaryWhere).toHaveBeenCalledTimes(1);
+    expect(aggregateWhere).toHaveBeenCalledTimes(1);
+    expect(updateSet).toHaveBeenCalledWith({ durationSeconds: 3600 });
+  });
+
+  it('aggregateAudioDuration no-ops when selected primary file is not an audio format', async () => {
+    const primaryWhere = vi.fn().mockResolvedValue([]);
+    const primaryInnerJoin = vi.fn().mockReturnValue({ where: primaryWhere });
+    const primaryFrom = vi.fn().mockReturnValue({ innerJoin: primaryInnerJoin });
+
+    const db = {
+      select: vi.fn().mockReturnValueOnce({ from: primaryFrom }),
+      update: vi.fn(),
+    };
+
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
+
+    await service.aggregateAudioDuration(99);
+
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

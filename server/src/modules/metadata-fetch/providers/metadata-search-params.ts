@@ -5,4 +5,5 @@ export interface MetadataSearchParams {
   author?: string;
   isbn?: string;
   existingProviderIds?: Partial<Record<MetadataProviderKey, string>>;
+  isAudiobook?: boolean;
 }

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -9,7 +9,10 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
+import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
+import { isAudioFormat } from '@projectx/types';
+import { extractAudioMetadata, parseAudioDuration } from './extractors/audio.extractor';
 import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from './lib/cbz-metadata';
 import { extractAndSaveCover, generateThumbnail, imageExt } from './lib/cover';
 import { extractEpubMetadata } from './lib/epub';
@@ -30,6 +33,7 @@ export class MetadataService {
     @Inject(DB) private readonly db: Db,
     private readonly config: ConfigService,
     private readonly scoreService: MetadataScoreService,
+    private readonly narratorService: NarratorService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {
@@ -202,6 +206,34 @@ export class MetadataService {
           await this.savePdfCover(bookId, pdf.coverBuffer);
         }
       }
+    } else if (isAudioFormat(format)) {
+      const audio = await extractAudioMetadata(absolutePath);
+      await this.db
+        .update(bookMetadata)
+        .set({
+          title: audio.title,
+          description: audio.description,
+          publisher: audio.publisher,
+          publishedYear: audio.publishedYear,
+          language: audio.language,
+          durationSeconds: audio.durationSeconds,
+          chapters: audio.chapters.length > 0 ? audio.chapters : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookMetadata.bookId, bookId));
+
+      await this.replaceAuthors(bookId, audio.authors);
+      if (audio.narrators.length > 0) {
+        await this.narratorService.replaceForBook(bookId, audio.narrators);
+      }
+
+      if (audio.coverBytes && audio.coverBytes.length > 0) {
+        await this.saveExtractedCoverBytes(bookId, audio.coverBytes);
+      }
+
+      this.logger.debug(`Audio metadata saved for book ${bookId}: "${audio.title}"`);
+      this.embedder?.embedBook(bookId).catch((err: Error) => this.logger.warn(`Embedding failed for book ${bookId}: ${err.message}`));
+      return;
     }
 
     if (!parsed) return;
@@ -267,6 +299,37 @@ export class MetadataService {
       .where(and(eq(bookMetadata.bookId, bookId), isNull(bookMetadata.coverSource)));
   }
 
+  // ── Audio helpers ────────────────────────────────────────────────────────────
+
+  async extractAudioFileDuration(bookId: number, absolutePath: string): Promise<void> {
+    const durationSeconds = await parseAudioDuration(absolutePath);
+    if (durationSeconds === null) return;
+    await this.db
+      .update(schema.bookFiles)
+      .set({ durationSeconds })
+      .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.absolutePath, absolutePath)));
+  }
+
+  async aggregateAudioDuration(bookId: number): Promise<void> {
+    const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'];
+    const [primary] = await this.db
+      .select({ format: schema.bookFiles.format })
+      .from(schema.books)
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, AUDIO_FORMATS)));
+    if (!primary?.format) return;
+
+    const rows = await this.db
+      .select({ total: sql<number>`COALESCE(SUM(${schema.bookFiles.durationSeconds}), 0)` })
+      .from(schema.bookFiles)
+      .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.role, 'content'), eq(schema.bookFiles.format, primary.format)));
+
+    const total = Number(rows[0]?.total ?? 0);
+    if (total > 0) {
+      await this.db.update(bookMetadata).set({ durationSeconds: total }).where(eq(bookMetadata.bookId, bookId));
+    }
+  }
+
   // ── Authors ──────────────────────────────────────────────────────────────────
 
   async replaceAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
@@ -312,6 +375,10 @@ export class MetadataService {
   }
 
   // ── Genres ───────────────────────────────────────────────────────────────────
+
+  async replaceNarrators(bookId: number, narratorNames: { name: string; sortName: string | null }[]) {
+    await this.narratorService.replaceForBook(bookId, narratorNames);
+  }
 
   async replaceGenres(bookId: number, parsedGenres: string[]) {
     await this.db.delete(bookGenres).where(eq(bookGenres.bookId, bookId));

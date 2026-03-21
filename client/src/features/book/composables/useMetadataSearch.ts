@@ -7,6 +7,7 @@ export interface SearchParams {
   author?: string
   isbn?: string
   bookId?: number
+  isAudiobook?: boolean
 }
 
 export function useMetadataSearch() {
@@ -45,6 +46,7 @@ export function useMetadataSearch() {
     if (params.author) query.set('author', params.author)
     if (params.isbn) query.set('isbn', params.isbn)
     if (params.bookId != null) query.set('bookId', String(params.bookId))
+    if (params.isAudiobook != null) query.set('isAudiobook', String(params.isAudiobook))
     if (selectedProviders.value.length) query.set('providers', selectedProviders.value.join(','))
 
     try {
@@ -83,7 +85,7 @@ export function useMetadataSearch() {
     }
   }
 
-  const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'goodreads', 'hardcover', 'google', 'itunes', 'openLibrary']
+  const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'audible', 'audnexus', 'goodreads', 'hardcover', 'google', 'itunes', 'openLibrary']
 
   function sortResults(list: MetadataCandidate[]): MetadataCandidate[] {
     const byProvider = new Map<string, MetadataCandidate[]>()

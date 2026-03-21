@@ -53,7 +53,9 @@ function makeService() {
     findFileById: vi.fn(),
     findLibraryIdByBookId: vi.fn(),
     findProgress: vi.fn(),
+    findProgressByBook: vi.fn(),
     upsertProgress: vi.fn(),
+    findLatestAudioProgress: vi.fn(),
     updateMetadataFields: vi.fn(),
     deleteByIds: vi.fn(),
     findAllIds: vi.fn(),
@@ -109,6 +111,7 @@ function makeService() {
     config as never,
     appSettings as never,
     userBookStatusService as never,
+    { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
     embedder as never,
     fileWriteService as never,
   );
@@ -356,6 +359,7 @@ describe('BookService', () => {
             [MetadataProviderKey.GOOGLE]: 'g-id',
             [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
           },
+          isAudiobook: false,
         },
         {
           title: 'Old Title',
@@ -370,6 +374,8 @@ describe('BookService', () => {
           seriesIndex: null,
           genres: [],
           cover: 'extracted',
+          duration: undefined,
+          abridged: undefined,
         },
         7,
       );
@@ -604,6 +610,105 @@ describe('BookService', () => {
       expect(mockRm).toHaveBeenCalledWith('/tmp/library/book3.epub', { force: true });
       expect(mockRm).toHaveBeenCalledWith('/tmp/library/book4.pdf', { force: true });
       expect(warnSpy).toHaveBeenCalled();
+    });
+  });
+
+  // ── AUDIO PROGRESS ─────────────────────────────────────────────────────────
+
+  describe('getAudioProgress', () => {
+    it('returns latest audio progress from repo', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const progressRow = { fileId: 5, positionSeconds: 1234, updatedAt: new Date().toISOString() };
+
+      bookRepo.findLibraryIdByBookId = vi.fn().mockResolvedValue(1);
+      bookRepo.findLatestAudioProgress = vi.fn().mockResolvedValue(progressRow);
+
+      const result = await service.getAudioProgress(user.id, 10, user);
+      expect(result).toBe(progressRow);
+      expect(bookRepo.findLatestAudioProgress).toHaveBeenCalledWith(user.id, 10);
+    });
+
+    it('throws NotFoundException when book does not exist', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      bookRepo.findLibraryIdByBookId = vi.fn().mockResolvedValue(null);
+
+      await expect(service.getAudioProgress(user.id, 99, user)).rejects.toThrow();
+    });
+  });
+
+  describe('getBookProgress', () => {
+    it('returns one row per file with defaults for missing progress', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookRepo.findProgressByBook.mockResolvedValue([
+        {
+          fileId: 10,
+          cfi: null,
+          pageNumber: null,
+          percentage: null,
+          updatedAt: null,
+        },
+        {
+          fileId: 11,
+          cfi: 'epubcfi(/6/4)',
+          pageNumber: 12,
+          percentage: 45,
+          updatedAt: new Date('2026-01-04T00:00:00.000Z'),
+        },
+      ]);
+
+      const result = await service.getBookProgress(user.id, 99, user);
+
+      expect(bookRepo.findProgressByBook).toHaveBeenCalledWith(user.id, 99);
+      expect(result).toEqual([
+        {
+          fileId: 10,
+          cfi: null,
+          pageNumber: null,
+          percentage: 0,
+          updatedAt: null,
+        },
+        {
+          fileId: 11,
+          cfi: 'epubcfi(/6/4)',
+          pageNumber: 12,
+          percentage: 45,
+          updatedAt: new Date('2026-01-04T00:00:00.000Z'),
+        },
+      ]);
+    });
+  });
+
+  describe('saveProgress — positionSeconds', () => {
+    it('passes positionSeconds from DTO to repo', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser();
+
+      bookRepo.findFileById.mockResolvedValue({ id: 7, bookId: 10, libraryId: 1, absolutePath: '/books/a.m4b', format: 'm4b' });
+      bookRepo.upsertProgress.mockResolvedValue(undefined);
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue(null);
+
+      await service.saveProgress(user.id, 7, { percentage: 25, positionSeconds: 900 } as never, user);
+
+      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 7, null, null, 25, 900);
+    });
+
+    it('passes null positionSeconds when not provided in DTO', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser();
+
+      bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
+      bookRepo.upsertProgress.mockResolvedValue(undefined);
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue(null);
+
+      await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
+
+      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null);
     });
   });
 });

@@ -17,6 +17,8 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   hardcover: { enabled: false, apiKey: '' },
   openLibrary: { enabled: true },
   itunes: { enabled: true },
+  audible: { enabled: false, domain: 'com' },
+  audnexus: { enabled: false },
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -30,6 +32,8 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.HARDCOVER]: 'Hardcover',
   [MetadataProviderKey.OPEN_LIBRARY]: 'Open Library',
   [MetadataProviderKey.ITUNES]: 'iTunes',
+  [MetadataProviderKey.AUDIBLE]: 'Audible',
+  [MetadataProviderKey.AUDNEXUS]: 'AudNexus',
 };
 
 @Injectable()
@@ -44,6 +48,8 @@ export class ProviderConfigService {
       hardcover: { ...DEFAULT_CONFIG.hardcover },
       openLibrary: { ...DEFAULT_CONFIG.openLibrary },
       itunes: { ...DEFAULT_CONFIG.itunes },
+      audible: { ...DEFAULT_CONFIG.audible },
+      audnexus: { ...DEFAULT_CONFIG.audnexus },
     };
   }
 
@@ -62,6 +68,8 @@ export class ProviderConfigService {
         hardcover: { ...defaults.hardcover, ...asObject(stored.hardcover) },
         openLibrary: { ...defaults.openLibrary, ...asObject(stored.openLibrary) },
         itunes: { ...defaults.itunes, ...asObject(stored.itunes) },
+        audible: { ...defaults.audible, ...asObject(stored.audible) },
+        audnexus: { ...defaults.audnexus, ...asObject(stored.audnexus) },
       };
     } catch {
       return defaults;
@@ -77,6 +85,8 @@ export class ProviderConfigService {
       hardcover: { ...current.hardcover, ...asObject(patch.hardcover) },
       openLibrary: { ...current.openLibrary, ...asObject(patch.openLibrary) },
       itunes: { ...current.itunes, ...asObject(patch.itunes) },
+      audible: { ...current.audible, ...asObject(patch.audible) },
+      audnexus: { ...current.audnexus, ...asObject(patch.audnexus) },
     };
     const value = JSON.stringify(next);
     await this.db
@@ -125,6 +135,18 @@ export class ProviderConfigService {
         key: MetadataProviderKey.ITUNES,
         label: PROVIDER_LABELS[MetadataProviderKey.ITUNES],
         enabled: cfg.itunes.enabled,
+        configured: true,
+      },
+      {
+        key: MetadataProviderKey.AUDIBLE,
+        label: PROVIDER_LABELS[MetadataProviderKey.AUDIBLE],
+        enabled: cfg.audible.enabled,
+        configured: true,
+      },
+      {
+        key: MetadataProviderKey.AUDNEXUS,
+        label: PROVIDER_LABELS[MetadataProviderKey.AUDNEXUS],
+        enabled: cfg.audnexus.enabled,
         configured: true,
       },
     ];

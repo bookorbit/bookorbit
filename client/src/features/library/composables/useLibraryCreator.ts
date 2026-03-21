@@ -1,25 +1,15 @@
 import { reactive, ref } from 'vue'
 import { api } from '@/lib/api'
+import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS } from '@projectx/types'
 import type { Library, OrganizationMode, PrescanResult } from '@projectx/types'
 
+export { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS }
+
 export const DEFAULT_METADATA_PRECEDENCE = ['embedded', 'opfFile']
-export const DEFAULT_FORMAT_PRIORITY = ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2']
 
 export const METADATA_LABELS: Record<string, string> = {
   embedded: 'Embedded metadata',
   opfFile: 'OPF files',
-}
-
-export const FORMAT_LABELS: Record<string, string> = {
-  epub: 'EPUB',
-  pdf: 'PDF',
-  cbz: 'CBZ',
-  cbr: 'CBR',
-  cb7: 'CB7',
-  mobi: 'MOBI',
-  azw3: 'AZW3',
-  azw: 'AZW',
-  fb2: 'FB2',
 }
 
 function blankForm() {
@@ -65,7 +55,8 @@ export function useLibraryCreator() {
     form.watch = library.watch
     form.autoScanCronExpression = library.autoScanCronExpression ?? null
     form.metadataPrecedence = [...library.metadataPrecedence]
-    form.formatPriority = [...library.formatPriority]
+    const missing = DEFAULT_FORMAT_PRIORITY.filter((f) => !library.formatPriority.includes(f))
+    form.formatPriority = [...library.formatPriority, ...missing]
     form.allowedFormats = [...library.allowedFormats]
     form.organizationMode = library.organizationMode
     form.excludePatterns = [...library.excludePatterns]

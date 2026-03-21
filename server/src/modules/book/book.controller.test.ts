@@ -96,6 +96,7 @@ function makeController() {
     getFileInfo: vi.fn(),
     resolveDownloadFilename: vi.fn(),
     getProgress: vi.fn(),
+    getBookProgress: vi.fn(),
     saveProgress: vi.fn(),
     updateMetadata: vi.fn(),
     refreshMetadata: vi.fn(),
@@ -256,6 +257,18 @@ describe('BookController', () => {
     expect(archive.file).toHaveBeenCalledWith('/books/a.epub', { name: 'A.epub' });
     expect(archive.file).toHaveBeenCalledWith('/books/b.epub', { name: 'B.epub' });
     expect(archive.finalize).toHaveBeenCalled();
+  });
+
+  it('delegates book-level progress endpoint to service with current user id', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    const payload = [{ fileId: 1, cfi: null, pageNumber: null, percentage: 0, updatedAt: null }];
+    bookService.getBookProgress.mockResolvedValue(payload);
+
+    const result = await controller.getBookProgress(9, user);
+
+    expect(bookService.getBookProgress).toHaveBeenCalledWith(user.id, 9, user);
+    expect(result).toEqual(payload);
   });
 
   it('verifies access before returning file write log entries', async () => {

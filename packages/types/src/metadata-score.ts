@@ -1,28 +1,28 @@
 export type MetadataScoreField =
-  | 'title'
-  | 'subtitle'
-  | 'description'
-  | 'coverSource'
-  | 'genres'
-  | 'isbn13'
-  | 'publisher'
-  | 'publishedYear'
-  | 'language'
-  | 'isbn10'
-  | 'pageCount'
-  | 'rating'
-  | 'seriesName'
-  | 'seriesIndex'
-  | 'tags'
-  | 'authors'
-  | 'googleBooksId'
-  | 'goodreadsId'
-  | 'amazonId'
-  | 'hardcoverId'
-  | 'openLibraryId'
-  | 'itunesId';
+  | "title"
+  | "subtitle"
+  | "description"
+  | "coverSource"
+  | "genres"
+  | "isbn13"
+  | "publisher"
+  | "publishedYear"
+  | "language"
+  | "isbn10"
+  | "pageCount"
+  | "rating"
+  | "seriesName"
+  | "seriesIndex"
+  | "tags"
+  | "authors"
+  | "googleBooksId"
+  | "goodreadsId"
+  | "amazonId"
+  | "hardcoverId"
+  | "openLibraryId"
+  | "itunesId";
 
-export type MetadataScoreGroup = 'core' | 'publishing' | 'classification' | 'enrichment' | 'providers';
+export type MetadataScoreGroup = "core" | "publishing" | "classification" | "enrichment" | "providers";
 
 export interface MetadataScoreFieldMeta {
   group: MetadataScoreGroup;
@@ -31,36 +31,36 @@ export interface MetadataScoreFieldMeta {
 }
 
 export const METADATA_SCORE_FIELDS: Record<MetadataScoreField, MetadataScoreFieldMeta> = {
-  title:         { group: 'core',           label: 'Title',           defaultWeight: 10 },
-  authors:       { group: 'core',           label: 'Authors',         defaultWeight: 10 },
-  coverSource:   { group: 'core',           label: 'Cover',           defaultWeight: 10 },
-  description:   { group: 'core',           label: 'Description',     defaultWeight: 8 },
-  genres:        { group: 'core',           label: 'Genres',          defaultWeight: 6  },
-  subtitle:      { group: 'core',           label: 'Subtitle',        defaultWeight: 0  },
-  isbn13:        { group: 'classification', label: 'ISBN-13',         defaultWeight: 7  },
-  publisher:     { group: 'publishing',     label: 'Publisher',       defaultWeight: 4  },
-  publishedYear: { group: 'publishing',     label: 'Published Year',  defaultWeight: 4  },
-  language:      { group: 'publishing',     label: 'Language',        defaultWeight: 4  },
-  isbn10:        { group: 'classification', label: 'ISBN-10',         defaultWeight: 2  },
-  pageCount:     { group: 'publishing',     label: 'Page Count',      defaultWeight: 2  },
-  rating:        { group: 'enrichment',     label: 'Rating',          defaultWeight: 1  },
-  seriesName:    { group: 'classification', label: 'Series',          defaultWeight: 0  },
-  seriesIndex:   { group: 'classification', label: 'Series Index',    defaultWeight: 0  },
-  tags:          { group: 'enrichment',     label: 'Tags',            defaultWeight: 2  },
-  googleBooksId: { group: 'providers',      label: 'Google Books ID', defaultWeight: 1  },
-  goodreadsId:   { group: 'providers',      label: 'Goodreads ID',    defaultWeight: 1  },
-  amazonId:      { group: 'providers',      label: 'Amazon ID',       defaultWeight: 1  },
-  hardcoverId:   { group: 'providers',      label: 'Hardcover ID',    defaultWeight: 1  },
-  openLibraryId: { group: 'providers',      label: 'Open Library ID', defaultWeight: 1  },
-  itunesId:      { group: 'providers',      label: 'iTunes ID',       defaultWeight: 1  },
+  title: { group: "core", label: "Title", defaultWeight: 10 },
+  authors: { group: "core", label: "Authors", defaultWeight: 10 },
+  coverSource: { group: "core", label: "Cover", defaultWeight: 10 },
+  description: { group: "core", label: "Description", defaultWeight: 8 },
+  genres: { group: "core", label: "Genres", defaultWeight: 6 },
+  subtitle: { group: "core", label: "Subtitle", defaultWeight: 0 },
+  isbn13: { group: "classification", label: "ISBN-13", defaultWeight: 7 },
+  publisher: { group: "publishing", label: "Publisher", defaultWeight: 4 },
+  publishedYear: { group: "publishing", label: "Published Year", defaultWeight: 4 },
+  language: { group: "publishing", label: "Language", defaultWeight: 4 },
+  isbn10: { group: "classification", label: "ISBN-10", defaultWeight: 2 },
+  pageCount: { group: "publishing", label: "Page Count", defaultWeight: 2 },
+  rating: { group: "enrichment", label: "Rating", defaultWeight: 1 },
+  seriesName: { group: "classification", label: "Series", defaultWeight: 0 },
+  seriesIndex: { group: "classification", label: "Series Index", defaultWeight: 0 },
+  tags: { group: "enrichment", label: "Tags", defaultWeight: 2 },
+  googleBooksId: { group: "providers", label: "Google Books ID", defaultWeight: 1 },
+  goodreadsId: { group: "providers", label: "Goodreads ID", defaultWeight: 1 },
+  amazonId: { group: "providers", label: "Amazon ID", defaultWeight: 1 },
+  hardcoverId: { group: "providers", label: "Hardcover ID", defaultWeight: 1 },
+  openLibraryId: { group: "providers", label: "Open Library ID", defaultWeight: 1 },
+  itunesId: { group: "providers", label: "iTunes ID", defaultWeight: 1 },
 };
 
 export const METADATA_SCORE_GROUP_LABELS: Record<MetadataScoreGroup, string> = {
-  core:           'Core',
-  publishing:     'Publishing',
-  classification: 'Classification',
-  enrichment:     'Enrichment',
-  providers:      'Provider IDs',
+  core: "Core",
+  publishing: "Publishing",
+  classification: "Classification",
+  enrichment: "Enrichment",
+  providers: "Provider IDs",
 };
 
 export type MetadataScoreWeights = Record<MetadataScoreField, number>;

@@ -22,6 +22,11 @@ export class CatalogController {
     return this.catalogService.searchTags(q);
   }
 
+  @Get('narrators')
+  searchNarrators(@Query('q') q = '') {
+    return this.catalogService.searchNarrators(q);
+  }
+
   @Get('publishers')
   searchPublishers(@Query('q') q = '') {
     return this.catalogService.searchPublishers(q);

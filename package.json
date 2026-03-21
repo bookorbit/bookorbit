@@ -6,7 +6,7 @@
     "guide": "node ./scripts/help.mjs",
     "setup": "bash ./scripts/setup.sh",
     "doctor": "bash ./scripts/doctor.sh",
-    "dev": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @projectx/types dev\" \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cd client && npm run dev -- --host",
     "dev:server": "cd server && npm run start:dev",
     "quick": "pnpm run verify:fast",
@@ -51,7 +51,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.3.3",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.1"
   },
   "lint-staged": {

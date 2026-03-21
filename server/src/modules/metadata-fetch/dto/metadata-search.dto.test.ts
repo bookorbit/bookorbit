@@ -93,6 +93,17 @@ describe('MetadataSearchDto', () => {
     expect(dto.providers).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOODREADS]);
   });
 
+  it('normalizes isAudiobook query values to booleans', async () => {
+    const trueValue = await validateInput({ title: 'Dune', isAudiobook: 'true' });
+    const falseValue = await validateInput({ title: 'Dune', isAudiobook: '0' });
+
+    expect(trueValue.errors).toHaveLength(0);
+    expect(trueValue.dto.isAudiobook).toBe(true);
+
+    expect(falseValue.errors).toHaveLength(0);
+    expect(falseValue.dto.isAudiobook).toBe(false);
+  });
+
   it('rejects unknown provider keys after normalization', async () => {
     const { errors } = await validateInput({
       title: 'Dune',

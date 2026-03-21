@@ -249,6 +249,8 @@ describe('MetadataFetchService', () => {
       amazonId: 'a-1',
       hardcoverId: null,
       openLibraryId: 'ol-1',
+      itunesId: null,
+      audibleId: 'B0ABC12345',
     });
 
     const result = await service.getStoredProviderIds(42);
@@ -259,6 +261,8 @@ describe('MetadataFetchService', () => {
       [MetadataProviderKey.AMAZON]: 'a-1',
       [MetadataProviderKey.HARDCOVER]: undefined,
       [MetadataProviderKey.OPEN_LIBRARY]: 'ol-1',
+      [MetadataProviderKey.ITUNES]: undefined,
+      [MetadataProviderKey.AUDIBLE]: 'B0ABC12345',
     });
     expect(db.query.bookMetadata.findFirst).toHaveBeenCalledTimes(1);
   });

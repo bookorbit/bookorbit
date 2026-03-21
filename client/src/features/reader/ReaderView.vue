@@ -21,15 +21,18 @@ import ReaderSearchPanel from './epub/components/ReaderSearchPanel.vue'
 import NoteDialog from './epub/components/NoteDialog.vue'
 import PdfReaderView from './pdf/PdfReaderView.vue'
 import CbzReaderView from './cbz/CbzReaderView.vue'
+import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateRenderer } from './epub/composables/useFoliate'
 import type { EpubReaderSettings } from '@projectx/types'
+import { getFormatGroup } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
 const bookId = Number(route.params.bookId)
 const fileId = Number(route.params.fileId)
 const fileFormat = (route.query.format as string) || 'epub'
+const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
 
 const containerRef = ref<HTMLElement | null>(null)
 const showSidebar = ref(false)
@@ -135,6 +138,9 @@ onMounted(async () => {
   onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
   await progress.load()
+
+  // Audio formats are handled entirely by AudiobookReaderView
+  if (isAudioFormat) return
 
   // Only epub-group formats use the epub reader; PDF/CBZ are rendered by child components
   const isEpubFormat = !['pdf', 'cbz', 'cbr', 'cb7'].includes(fileFormat)
@@ -275,6 +281,7 @@ function closeSearch() {
 <template>
   <PdfReaderView v-if="fileFormat === 'pdf'" :bookId="bookId" :fileId="fileId" />
   <CbzReaderView v-else-if="fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'" :bookId="bookId" :fileId="fileId" />
+  <AudiobookReaderView v-else-if="isAudioFormat" :bookId="bookId" :fileId="fileId" />
   <div
     v-else
     class="fixed inset-0 overflow-hidden"

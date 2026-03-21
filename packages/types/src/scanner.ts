@@ -1,7 +1,7 @@
 export interface ScanProgressEvent {
   jobId: number;
   libraryId: number;
-  status: 'running' | 'completed' | 'failed';
+  status: "running" | "completed" | "failed";
   processed: number;
   total: number;
   added: number;
@@ -14,7 +14,7 @@ export interface CoverRefreshProgressEvent {
   libraryId: number;
   processed: number;
   total: number;
-  status: 'running' | 'completed';
+  status: "running" | "completed";
 }
 
 export interface CoverRefreshedEvent {

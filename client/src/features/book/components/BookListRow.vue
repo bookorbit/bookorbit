@@ -233,7 +233,7 @@ function openAuthorBrowse() {
             Book Details
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem @click="router.push({ name: 'book-edit', params: { bookId: book.id } })">
+          <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
             <Pencil class="size-4 mr-2" />
             Edit Metadata
           </DropdownMenuItem>

@@ -1,4 +1,4 @@
-import type { BooksPage } from './book';
+import type { BooksPage } from "./book";
 
 export type AuthorSummary = {
   id: number;
@@ -54,7 +54,7 @@ export type AuthorInsights = {
 };
 
 export const AuthorMetadataProviderKey = {
-  AUDNEXUS: 'audnexus',
+  AUDNEXUS: "audnexus",
 } as const;
 
 export type AuthorMetadataProviderKey = (typeof AuthorMetadataProviderKey)[keyof typeof AuthorMetadataProviderKey];
@@ -106,12 +106,11 @@ export type AuthorEnrichmentFailedPage = {
 };
 
 export const AuthorAutoEnrichmentWriteMode = {
-  MISSING_ONLY: 'missing_only',
-  ALWAYS_REFETCH: 'always_refetch',
+  MISSING_ONLY: "missing_only",
+  ALWAYS_REFETCH: "always_refetch",
 } as const;
 
-export type AuthorAutoEnrichmentWriteMode =
-  (typeof AuthorAutoEnrichmentWriteMode)[keyof typeof AuthorAutoEnrichmentWriteMode];
+export type AuthorAutoEnrichmentWriteMode = (typeof AuthorAutoEnrichmentWriteMode)[keyof typeof AuthorAutoEnrichmentWriteMode];
 
 export type AuthorEnrichmentConditions = {
   neverEnriched: boolean;

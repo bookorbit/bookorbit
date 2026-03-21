@@ -48,7 +48,7 @@ export class KoboDownloadService {
     if (!accessible) throw new ForbiddenException('No access to this book');
 
     const file = await this.db.query.bookFiles.findFirst({
-      where: and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.role, 'primary')),
+      where: and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.id, book.primaryFileId ?? -1)),
     });
 
     if (!file) throw new NotFoundException('No file found for this book');

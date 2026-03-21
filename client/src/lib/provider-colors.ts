@@ -7,6 +7,8 @@ const PROVIDER_HEX: Record<string, string> = {
   hardcover: '#4F47E5',
   openLibrary: '#E83B2A',
   itunes: '#E252E9',
+  audible: '#FF8A00',
+  audnexus: '#A78BFA',
   auto: '#8B5CF6',
 }
 
@@ -19,6 +21,8 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   hardcover: 'Hardcover',
   openLibrary: 'Open Lib',
   itunes: 'iTunes',
+  audible: 'Audible',
+  audnexus: 'AudNexus',
   auto: 'Fetched',
 }
 

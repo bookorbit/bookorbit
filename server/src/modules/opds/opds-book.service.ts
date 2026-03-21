@@ -236,7 +236,7 @@ export class OpdsBookService {
       .from(bookFiles)
       .leftJoin(books, eq(books.id, bookFiles.bookId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
-      .where(fileId ? eq(bookFiles.id, fileId) : and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'primary')))
+      .where(fileId ? eq(bookFiles.id, fileId) : and(eq(books.id, bookId), eq(bookFiles.id, books.primaryFileId)))
       .limit(1);
 
     const [file] = await fileQuery;
@@ -351,9 +351,10 @@ export class OpdsBookService {
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
       this.db
-        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
-        .from(bookFiles)
-        .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'primary'))),
+        .select({ bookId: books.id, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+        .from(books)
+        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+        .where(inArray(books.id, bookIds)),
     ]);
 
     const authorsByBook = new Map<number, string[]>();
