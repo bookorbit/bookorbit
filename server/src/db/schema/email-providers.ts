@@ -19,6 +19,7 @@ export const emailProviders = pgTable(
     startTls: boolean('start_tls').notNull().default(true),
     isDefault: boolean('is_default').notNull().default(false),
     isShared: boolean('is_shared').notNull().default(false),
+    isSystemProvider: boolean('is_system_provider').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()

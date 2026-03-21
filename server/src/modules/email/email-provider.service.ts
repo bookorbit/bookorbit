@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailEncryptionService } from './email-encryption.service';
@@ -59,7 +59,10 @@ export class EmailProviderService {
   }
 
   async remove(id: number, user: RequestUser) {
-    await this.getOwned(id, user);
+    const provider = await this.getOwned(id, user);
+    if (provider.isSystemProvider) {
+      throw new BadRequestException('Cannot delete the system mail provider. Remove the system designation first.');
+    }
     await this.repo.delete(id, user.id);
   }
 
@@ -72,11 +75,24 @@ export class EmailProviderService {
   }
 
   async toggleShared(id: number, user: RequestUser) {
-    if (!this.isSuperuser(user)) throw new ForbiddenException('Only superusers can share providers');
+    if (!user.isSuperuser) throw new ForbiddenException('Only superusers can share providers');
     const provider = await this.getOwned(id, user);
     const [updated] = await this.repo.setSharedByOwner(id, user.id, !provider.isShared);
     if (!updated) throw new NotFoundException('Provider not found');
     return this.sanitize(updated);
+  }
+
+  async setSystemProvider(id: number, user: RequestUser) {
+    if (!user.isSuperuser) throw new ForbiddenException('Only superusers can configure the system mail provider');
+    await this.getOwnedOrShared(id, user);
+    const updated = await this.repo.setSystemProvider(id);
+    if (!updated) throw new NotFoundException('Provider not found');
+    return this.sanitize(updated);
+  }
+
+  async clearSystemProvider(user: RequestUser) {
+    if (!user.isSuperuser) throw new ForbiddenException('Only superusers can configure the system mail provider');
+    await this.repo.clearSystemProvider();
   }
 
   async testConnection(id: number, user: RequestUser): Promise<{ success: boolean; error?: string }> {
@@ -127,9 +143,5 @@ export class EmailProviderService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordEnc, ...rest } = provider;
     return { ...rest, hasPassword: !!provider.passwordEnc };
-  }
-
-  private isSuperuser(user: RequestUser): boolean {
-    return user.isSuperuser;
   }
 }

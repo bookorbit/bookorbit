@@ -1,5 +1,5 @@
 {
-  "id": "34de1491-9bf5-4cfe-b899-32360bc9b18a",
+  "id": "a5647da5-6734-4203-8698-c4192405229a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -4156,6 +4156,13 @@
         },
         "is_shared": {
           "name": "is_shared",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_system_provider": {
+          "name": "is_system_provider",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

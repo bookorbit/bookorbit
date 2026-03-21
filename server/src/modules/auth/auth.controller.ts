@@ -88,15 +88,15 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: FastifyRequest) {
+    return this.authService.forgotPassword(dto, req.ip);
   }
 
   @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: FastifyRequest) {
+    return this.authService.resetPassword(dto, req.ip);
   }
 
   @Post('change-password')

@@ -7,6 +7,7 @@ import type { StringValue } from 'ms';
 import { CommonModule } from '../../common/common.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AuditModule } from '../audit/audit.module';
+import { EmailModule } from '../email/email.module';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -35,6 +36,7 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
     CommonModule,
     AppSettingsModule,
     AuditModule,
+    EmailModule,
   ],
   controllers: [AuthController],
   providers: [

@@ -15,6 +15,7 @@ export interface EmailProvider {
   startTls: boolean
   isDefault: boolean
   isShared: boolean
+  isSystemProvider: boolean
   hasPassword: boolean
   createdAt: string
 }
@@ -108,5 +109,35 @@ export function useEmailProviders() {
     return res.json()
   }
 
-  return { providers, fetchProviders, createProvider, updateProvider, deleteProvider, setDefaultProvider, toggleSharedProvider, testProvider }
+  async function setSystemProvider(id: number): Promise<void> {
+    const res = await api(`/api/v1/email/providers/${id}/system`, { method: 'PATCH' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as { message?: string }).message ?? 'Failed to set system provider')
+    }
+    const updated: EmailProvider = await res.json()
+    providers.value = providers.value.map((p) => ({ ...p, isSystemProvider: p.id === updated.id }))
+  }
+
+  async function clearSystemProvider(): Promise<void> {
+    const res = await api('/api/v1/email/providers/system', { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as { message?: string }).message ?? 'Failed to clear system provider')
+    }
+    providers.value = providers.value.map((p) => ({ ...p, isSystemProvider: false }))
+  }
+
+  return {
+    providers,
+    fetchProviders,
+    createProvider,
+    updateProvider,
+    deleteProvider,
+    setDefaultProvider,
+    toggleSharedProvider,
+    testProvider,
+    setSystemProvider,
+    clearSystemProvider,
+  }
 }

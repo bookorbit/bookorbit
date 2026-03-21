@@ -4,6 +4,7 @@ export const appConfig = registerAs('app', () => ({
   port: parseInt(process.env.PORT ?? '3000', 10),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   logLevel: process.env.LOG_LEVEL,
+  appUrl: process.env.APP_URL ?? 'http://localhost:5173',
 }));
 
 export const dbConfig = registerAs('db', () => ({
@@ -28,14 +29,4 @@ export const externalApiConfig = registerAs('externalApi', () => ({
 
 export const emailConfig = registerAs('email', () => ({
   encryptionKey: process.env.EMAIL_ENCRYPTION_KEY ?? '',
-}));
-
-export const mailerConfig = registerAs('mailer', () => ({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT ?? '587', 10),
-  secure: process.env.SMTP_SECURE === 'true',
-  user: process.env.SMTP_USER,
-  pass: process.env.SMTP_PASS,
-  from: process.env.SMTP_FROM ?? 'noreply@projectx.local',
-  appUrl: process.env.APP_URL ?? 'http://localhost:5173',
 }));

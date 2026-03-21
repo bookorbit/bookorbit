@@ -4,6 +4,8 @@ export enum AuditAction {
   AuthLoginFailed = 'auth.login.failed',
   AuthLogout = 'auth.logout',
   AuthPasswordChange = 'auth.password.change',
+  AuthPasswordResetRequest = 'auth.password.reset_request',
+  AuthPasswordReset = 'auth.password.reset',
   AuthPasswordAdminReset = 'auth.password.admin_reset',
   AuthSessionRevoke = 'auth.session.revoke',
 
@@ -62,6 +64,8 @@ export enum AuditAction {
   EmailProviderUpdate = 'email.provider.update',
   EmailProviderDelete = 'email.provider.delete',
   EmailProviderSetDefault = 'email.provider.set_default',
+  EmailProviderSetSystem = 'email.provider.set_system',
+  EmailProviderClearSystem = 'email.provider.clear_system',
 
   EmailTemplateCreate = 'email.template.create',
   EmailTemplateUpdate = 'email.template.update',

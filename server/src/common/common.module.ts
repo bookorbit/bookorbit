@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import { MailerService } from './services/mailer.service';
 import { PermissionService } from './services/permission.service';
 
 @Module({
-  providers: [PermissionService, MailerService],
-  exports: [PermissionService, MailerService],
+  providers: [PermissionService],
+  exports: [PermissionService],
 })
 export class CommonModule {}

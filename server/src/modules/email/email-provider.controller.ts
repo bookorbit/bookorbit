@@ -70,6 +70,12 @@ export class EmailProviderController {
   }
 
   @Patch(':id/share')
+  @Auditable({
+    action: AuditAction.EmailProviderUpdate,
+    resource: AuditResource.EmailProvider,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Toggled sharing for email provider #${req.params['id']}`,
+  })
   toggleShared(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.toggleShared(id, user);
   }
@@ -78,5 +84,27 @@ export class EmailProviderController {
   @HttpCode(HttpStatus.OK)
   testConnection(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.testConnection(id, user);
+  }
+
+  @Patch(':id/system')
+  @Auditable({
+    action: AuditAction.EmailProviderSetSystem,
+    resource: AuditResource.EmailProvider,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Set email provider #${req.params['id']} as system mail provider`,
+  })
+  setSystemProvider(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.service.setSystemProvider(id, user);
+  }
+
+  @Delete('system')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.EmailProviderClearSystem,
+    resource: AuditResource.EmailProvider,
+    description: () => 'Cleared system mail provider',
+  })
+  clearSystemProvider(@CurrentUser() user: RequestUser) {
+    return this.service.clearSystemProvider(user);
   }
 }

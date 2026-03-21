@@ -76,8 +76,8 @@ function makeService(dbOverrides?: Record<string, unknown>) {
       return undefined;
     }),
   };
-  const mailerService = {
-    isConfigured: vi.fn().mockReturnValue(true),
+  const systemMailService = {
+    isConfigured: vi.fn().mockResolvedValue(true),
     sendPasswordReset: vi.fn().mockResolvedValue(undefined),
   };
   const appSettings = {
@@ -95,7 +95,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     userService as never,
     jwtService as never,
     config as never,
-    mailerService as never,
+    systemMailService as never,
     appSettings as never,
     oidcSessionRepo as never,
     oidcDiscovery as never,
@@ -103,7 +103,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     db,
   );
 
-  return { service, db, userService, jwtService, config, mailerService, appSettings, oidcSessionRepo, oidcDiscovery };
+  return { service, db, userService, jwtService, config, systemMailService, appSettings, oidcSessionRepo, oidcDiscovery };
 }
 
 describe('AuthService', () => {
@@ -382,9 +382,9 @@ describe('AuthService', () => {
   });
 
   describe('forgotPassword', () => {
-    it('throws ServiceUnavailableException when mailer is not configured', async () => {
-      const { service, mailerService } = makeService();
-      mailerService.isConfigured.mockReturnValue(false);
+    it('throws ServiceUnavailableException when system mail is not configured', async () => {
+      const { service, systemMailService } = makeService();
+      systemMailService.isConfigured.mockResolvedValue(false);
 
       await expect(service.forgotPassword({ email: 'u@example.com' })).rejects.toThrow(ServiceUnavailableException);
     });
@@ -397,11 +397,52 @@ describe('AuthService', () => {
     });
 
     it('sends reset email when user exists', async () => {
-      const { service, userService, mailerService } = makeService();
-      userService.findByEmail.mockResolvedValue({ id: 1, email: 'u@example.com', name: 'User' });
+      const { service, userService, systemMailService } = makeService();
+      userService.findByEmail.mockResolvedValue({
+        id: 1,
+        email: 'u@example.com',
+        name: 'User',
+        active: true,
+        provisioningMethod: 'local',
+        username: 'user',
+      });
 
       await service.forgotPassword({ email: 'u@example.com' });
-      expect(mailerService.sendPasswordReset).toHaveBeenCalledWith('u@example.com', 'User', 'raw-reset-token');
+      // fire-and-forget — flush microtasks
+      await new Promise((r) => setImmediate(r));
+      expect(systemMailService.sendPasswordReset).toHaveBeenCalledWith('u@example.com', 'User', 'raw-reset-token');
+    });
+
+    it('silently returns without sending email for inactive user', async () => {
+      const { service, userService, systemMailService } = makeService();
+      userService.findByEmail.mockResolvedValue({
+        id: 1,
+        email: 'u@example.com',
+        name: 'User',
+        active: false,
+        provisioningMethod: 'local',
+        username: 'user',
+      });
+
+      await service.forgotPassword({ email: 'u@example.com' });
+      await new Promise((r) => setImmediate(r));
+      expect(systemMailService.sendPasswordReset).not.toHaveBeenCalled();
+    });
+
+    it('silently returns without sending email for OIDC user', async () => {
+      const { service, userService, systemMailService } = makeService();
+      userService.findByEmail.mockResolvedValue({
+        id: 1,
+        email: 'u@example.com',
+        name: 'User',
+        active: true,
+        provisioningMethod: 'oidc',
+        username: 'user',
+      });
+
+      await service.forgotPassword({ email: 'u@example.com' });
+      await new Promise((r) => setImmediate(r));
+      expect(systemMailService.sendPasswordReset).not.toHaveBeenCalled();
     });
   });
 
@@ -489,6 +530,61 @@ describe('AuthService', () => {
       });
 
       await expect(service.resetPassword({ token: 'used', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException for inactive user', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 1,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 10_000),
+        usedAt: null,
+      });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: false,
+        provisioningMethod: 'local',
+      });
+
+      await expect(service.resetPassword({ token: 'valid', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException for OIDC user', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 1,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 10_000),
+        usedAt: null,
+      });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        provisioningMethod: 'oidc',
+      });
+
+      await expect(service.resetPassword({ token: 'valid', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('resets password, marks token used, and revokes sessions on success', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 5,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 10_000),
+        usedAt: null,
+      });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        provisioningMethod: 'local',
+      });
+
+      await expect(service.resetPassword({ token: 'valid', newPassword: 'NewPassword1!' })).resolves.toBeUndefined();
+      expect(db.transaction).toHaveBeenCalled();
     });
   });
 

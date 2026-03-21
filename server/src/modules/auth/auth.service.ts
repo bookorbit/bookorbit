@@ -23,7 +23,7 @@ import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
 import type { RequestUser } from '../../common/types/request-user';
-import { MailerService } from '../../common/services/mailer.service';
+import { SystemMailService } from '../email/system-mail.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserService } from '../user/user.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -57,7 +57,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
-    private readonly mailerService: MailerService,
+    private readonly systemMailService: SystemMailService,
     private readonly appSettings: AppSettingsService,
     private readonly oidcSessionRepo: OidcSessionRepository,
     private readonly oidcDiscovery: OidcDiscoveryService,
@@ -337,20 +337,43 @@ export class AuthService {
     await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, sessionId));
   }
 
-  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
-    if (!this.mailerService.isConfigured()) {
+  async forgotPassword(dto: ForgotPasswordDto, ip?: string): Promise<void> {
+    if (!(await this.systemMailService.isConfigured())) {
       throw new ServiceUnavailableException('Self-service password reset is not configured. Contact your administrator.');
     }
-
-    // Always return without revealing whether email exists
-    const user = await this.userService.findByEmail(dto.email);
-    if (!user || !user.email) return;
-
-    const rawToken = await this.userService.generatePasswordResetToken(user.id);
-    await this.mailerService.sendPasswordReset(user.email, user.name, rawToken);
+    void this.processPasswordResetAsync(dto.email, ip).catch((err) => this.logger.error('Unhandled error during password reset processing', err));
   }
 
-  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+  private async processPasswordResetAsync(email: string, ip?: string): Promise<void> {
+    const user = await this.userService.findByEmail(email);
+    if (!user || !user.email) {
+      this.logger.log(`Password reset requested for unknown email: ${email}`);
+      return;
+    }
+
+    if (!user.active) {
+      this.logger.log(`Password reset requested for inactive account: ${email}`);
+      return;
+    }
+
+    if (user.provisioningMethod === 'oidc') {
+      this.logger.log(`Password reset requested for OIDC account: ${email}`);
+      return;
+    }
+
+    const rawToken = await this.userService.generatePasswordResetToken(user.id);
+    await this.systemMailService.sendPasswordReset(user.email, user.name, rawToken);
+
+    this.auditEvents.emit(AUDIT_EVENT, {
+      userId: user.id,
+      actorUsername: user.username,
+      action: AuditAction.AuthPasswordResetRequest,
+      description: `Password reset email sent to ${user.email}`,
+      ip,
+    });
+  }
+
+  async resetPassword(dto: ResetPasswordDto, ip?: string): Promise<void> {
     const tokenHash = sha256(dto.token);
 
     const row = await this.db.query.passwordResetTokens.findFirst({
@@ -358,6 +381,11 @@ export class AuthService {
     });
 
     if (!row || row.expiresAt < new Date() || row.usedAt) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const user = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
+    if (!user || !user.active || user.provisioningMethod === 'oidc') {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
@@ -375,6 +403,14 @@ export class AuthService {
         .update(schema.refreshTokens)
         .set({ revokedAt: new Date() })
         .where(and(eq(schema.refreshTokens.userId, row.userId), isNull(schema.refreshTokens.revokedAt)));
+    });
+
+    this.auditEvents.emit(AUDIT_EVENT, {
+      userId: user.id,
+      actorUsername: user.username,
+      action: AuditAction.AuthPasswordReset,
+      description: `Password reset completed for user '${user.username}'`,
+      ip,
     });
   }
 

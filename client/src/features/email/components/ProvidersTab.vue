@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { toast } from 'vue-sonner'
-import { Plus, Pencil, Trash2, Star, Share2, Wifi } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Star, Share2, Wifi, Server } from 'lucide-vue-next'
 import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-const { providers, createProvider, updateProvider, deleteProvider, setDefaultProvider, toggleSharedProvider, testProvider } = useEmailProviders()
+const {
+  providers,
+  createProvider,
+  updateProvider,
+  deleteProvider,
+  setDefaultProvider,
+  toggleSharedProvider,
+  testProvider,
+  setSystemProvider,
+  clearSystemProvider,
+} = useEmailProviders()
+const { isSuperuser } = usePermissions()
 
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
@@ -109,6 +121,20 @@ async function toggleShare(p: EmailProvider) {
     toast.success(p.isShared ? 'Provider unshared' : 'Provider shared with all users')
   } catch (e) {
     toast.error(e instanceof Error ? e.message : 'Failed to update sharing')
+  }
+}
+
+async function setSystem(p: EmailProvider) {
+  try {
+    if (p.isSystemProvider) {
+      await clearSystemProvider()
+      toast.success(`"${p.name}" removed as system mail provider`)
+    } else {
+      await setSystemProvider(p.id)
+      toast.success(`"${p.name}" set as system mail provider`)
+    }
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Failed to update system provider')
   }
 }
 
@@ -260,11 +286,26 @@ async function test(p: EmailProvider) {
             <span class="text-sm font-medium text-foreground">{{ p.name }}</span>
             <span v-if="p.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">Default</span>
             <span v-if="p.isShared" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Shared</span>
+            <span v-if="p.isSystemProvider" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              >System</span
+            >
           </div>
           <p class="text-xs text-muted-foreground mt-0.5">{{ p.host }}:{{ p.port }} · {{ p.fromAddress || p.username || 'no from address' }}</p>
         </div>
 
         <div class="flex items-center gap-1 shrink-0">
+          <Tooltip v-if="isSuperuser">
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+                :class="p.isSystemProvider ? 'text-amber-500' : 'text-muted-foreground hover:text-amber-500 hover:bg-muted'"
+                @click="setSystem(p)"
+              >
+                <Server :size="13" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ p.isSystemProvider ? 'Remove as system mail provider' : 'Set as system mail provider' }}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
               <button
@@ -329,7 +370,8 @@ async function test(p: EmailProvider) {
 
     <div class="border border-border rounded-lg p-4 bg-card/50">
       <p class="text-xs text-muted-foreground">
-        Providers with "Shared" enabled are available to all users. The "Default" provider is used when no provider is specified at send time.
+        The <strong>System</strong> provider (superuser only) is used for password reset emails. The <strong>Default</strong> provider is used when
+        sending books with no explicit provider selected. Providers marked <strong>Shared</strong> are available to all users.
       </p>
     </div>
   </div>

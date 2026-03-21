@@ -4,7 +4,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 
-import { appConfig, authConfig, dbConfig, emailConfig, externalApiConfig, mailerConfig, storageConfig } from './config/config';
+import { appConfig, authConfig, dbConfig, emailConfig, externalApiConfig, storageConfig } from './config/config';
 import { validateEnv } from './config/env.validation';
 import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
@@ -57,7 +57,7 @@ import { AuditModule } from './modules/audit/audit.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
-      load: [appConfig, dbConfig, authConfig, storageConfig, mailerConfig, externalApiConfig, emailConfig],
+      load: [appConfig, dbConfig, authConfig, storageConfig, externalApiConfig, emailConfig],
     }),
     ScheduleModule.forRoot(),
     DbModule,

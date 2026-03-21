@@ -511,6 +511,7 @@ CREATE TABLE "email_providers" (
 	"start_tls" boolean DEFAULT true NOT NULL,
 	"is_default" boolean DEFAULT false NOT NULL,
 	"is_shared" boolean DEFAULT false NOT NULL,
+	"is_system_provider" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "email_providers_user_id_name_unique" UNIQUE("user_id","name")

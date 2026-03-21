@@ -38,7 +38,7 @@ export class EmailTemplateContextService {
     const [meta] = metaResult;
     const file: typeof bookFiles.$inferSelect | undefined = fileResult[0];
 
-    const appUrl = this.config.get<string>('mailer.appUrl') ?? '';
+    const appUrl = this.config.get<string>('app.appUrl') ?? '';
     const coverUrl = meta ? `${appUrl}/api/books/${bookId}/cover` : '';
 
     return {

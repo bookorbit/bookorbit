@@ -91,7 +91,7 @@ export class UserService {
       }
     }
 
-    const appUrl = this.config.get<string>('mailer.appUrl') ?? 'http://localhost:5173';
+    const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
     const rawToken = await this.userRepo.generateResetToken(user.id);
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
@@ -180,7 +180,7 @@ export class UserService {
     if (target.isSuperuser && !requestingUser.isSuperuser) {
       throw new ForbiddenException('Only administrators can reset administrator passwords');
     }
-    const appUrl = this.config.get<string>('mailer.appUrl') ?? 'http://localhost:5173';
+    const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
     const rawToken = await this.userRepo.generateResetToken(targetUserId);
     return { resetUrl: `${appUrl}/reset-password?token=${rawToken}` };
   }

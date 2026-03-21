@@ -26,6 +26,7 @@ import { EmailTemplateController } from './email-template.controller';
 import { EmailTemplateRepository } from './email-template.repository';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTransportService } from './email-transport.service';
+import { SystemMailService } from './system-mail.service';
 
 @Module({
   imports: [],
@@ -58,7 +59,8 @@ import { EmailTransportService } from './email-transport.service';
     EmailSendLogRepository,
     EmailSendLogService,
     EmailSendOrchestrator,
+    SystemMailService,
   ],
-  exports: [EmailSendOrchestrator, EmailTransportService, EmailEncryptionService],
+  exports: [EmailSendOrchestrator, EmailTransportService, EmailEncryptionService, SystemMailService],
 })
 export class EmailModule {}

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -72,5 +72,28 @@ export class EmailProviderRepository {
       .delete(emailProviders)
       .where(and(eq(emailProviders.id, id), eq(emailProviders.userId, userId)))
       .returning();
+  }
+
+  findSystemProvider() {
+    return this.db.select().from(emailProviders).where(eq(emailProviders.isSystemProvider, true)).limit(1);
+  }
+
+  clearSystemProvider() {
+    return this.db.update(emailProviders).set({ isSystemProvider: false }).where(eq(emailProviders.isSystemProvider, true));
+  }
+
+  setSystemProvider(id: number) {
+    return this.db.transaction(async (tx) => {
+      await tx
+        .update(emailProviders)
+        .set({ isSystemProvider: false })
+        .where(and(eq(emailProviders.isSystemProvider, true), ne(emailProviders.id, id)));
+      const [updated] = await tx
+        .update(emailProviders)
+        .set({ isSystemProvider: true, updatedAt: sql`now()` })
+        .where(eq(emailProviders.id, id))
+        .returning();
+      return updated;
+    });
   }
 }
