@@ -25,7 +25,13 @@ export class UserController {
     return this.userService.findAll(page, pageSize);
   }
 
-  // Must be before :id routes to avoid "me" being parsed as an int
+  // Must be before :id routes to avoid named segments being parsed as ints
+  @Get('assignable')
+  @RequirePermission(Permission.ManageLibraries)
+  findAssignable() {
+    return this.userService.findAssignable();
+  }
+
   @Patch('me')
   @Auditable({
     action: AuditAction.UserSelfUpdate,

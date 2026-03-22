@@ -22,9 +22,16 @@ const PRESETS = [
   { label: 'Custom', value: '__custom__' },
 ]
 
+const CRON_REGEX = /^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/
+
 const isCustom = computed(() => {
   if (props.autoScanCronExpression === null) return false
   return !PRESETS.some((p) => p.value === props.autoScanCronExpression)
+})
+
+const isCronValid = computed(() => {
+  if (!isCustom.value || !props.autoScanCronExpression) return true
+  return CRON_REGEX.test(props.autoScanCronExpression)
 })
 
 const selectedPreset = computed(() => {
@@ -35,7 +42,7 @@ const selectedPreset = computed(() => {
 
 function selectPreset(value: string | null) {
   if (value === '__custom__') {
-    emit('update:autoScanCronExpression', '0 0 * * *')
+    emit('update:autoScanCronExpression', '*/30 * * * *')
   } else {
     emit('update:autoScanCronExpression', value)
   }
@@ -107,10 +114,12 @@ function humanReadableCron(cron: string | null): string {
           type="text"
           :value="autoScanCronExpression ?? ''"
           placeholder="0 0 * * *"
-          class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2"
+          :class="isCronValid ? 'border-border focus:ring-ring' : 'border-destructive focus:ring-destructive'"
           @input="emit('update:autoScanCronExpression', ($event.target as HTMLInputElement).value || null)"
         />
-        <p class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>
+        <p v-if="!isCronValid" class="mt-1 text-xs text-destructive">Invalid cron expression.</p>
+        <p v-else class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>
       </div>
 
       <!-- Human readable preview -->

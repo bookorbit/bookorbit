@@ -1,4 +1,18 @@
-import { ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateLibraryDto {
   @IsString()
@@ -28,6 +42,10 @@ export class CreateLibraryDto {
 
   @IsOptional()
   @IsString()
+  @ValidateIf((o: { autoScanCronExpression?: unknown }) => o.autoScanCronExpression !== null)
+  @Matches(/^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/, {
+    message: 'autoScanCronExpression must be a valid 5-field cron expression',
+  })
   autoScanCronExpression?: string | null;
 
   @IsOptional()

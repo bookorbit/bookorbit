@@ -62,6 +62,10 @@ export class UserService {
     return this.userRepo.findAll(page, pageSize);
   }
 
+  findAssignable() {
+    return this.userRepo.findAssignable();
+  }
+
   async findById(id: number) {
     const user = await this.userRepo.findByIdWithPermissions(id);
     if (!user) throw new NotFoundException('User not found');

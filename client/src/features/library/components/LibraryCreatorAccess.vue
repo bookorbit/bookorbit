@@ -19,12 +19,14 @@ const availableUsers = ref<UserOption[]>([])
 const grantUserId = ref<number | null>(null)
 const grantLevel = ref<'viewer' | 'editor' | 'owner'>('viewer')
 const loading = ref(false)
+const error = ref<string | null>(null)
 
 async function loadAccess() {
   if (!props.libraryId) return
   loading.value = true
+  error.value = null
   try {
-    const [accessRes, usersRes] = await Promise.all([api(`/api/v1/libraries/${props.libraryId}/access`), api('/api/v1/users')])
+    const [accessRes, usersRes] = await Promise.all([api(`/api/v1/libraries/${props.libraryId}/access`), api('/api/v1/users/assignable')])
     if (accessRes.ok) accessList.value = await accessRes.json()
     if (usersRes.ok) {
       const all: UserOption[] = await usersRes.json()
@@ -38,28 +40,46 @@ async function loadAccess() {
 
 async function grant() {
   if (!props.libraryId || !grantUserId.value) return
-  await api(`/api/v1/libraries/${props.libraryId}/access`, {
+  error.value = null
+  const res = await api(`/api/v1/libraries/${props.libraryId}/access`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: grantUserId.value, accessLevel: grantLevel.value }),
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    error.value = body?.message ?? 'Failed to grant access'
+    return
+  }
   grantUserId.value = null
   await loadAccess()
 }
 
 async function changeLevel(userId: number, accessLevel: 'viewer' | 'editor' | 'owner') {
   if (!props.libraryId) return
-  await api(`/api/v1/libraries/${props.libraryId}/access/${userId}`, {
+  error.value = null
+  const res = await api(`/api/v1/libraries/${props.libraryId}/access/${userId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ accessLevel }),
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    error.value = body?.message ?? 'Failed to update access level'
+    return
+  }
   await loadAccess()
 }
 
 async function revoke(userId: number) {
   if (!props.libraryId) return
-  await api(`/api/v1/libraries/${props.libraryId}/access/${userId}`, { method: 'DELETE' })
+  error.value = null
+  const res = await api(`/api/v1/libraries/${props.libraryId}/access/${userId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    error.value = body?.message ?? 'Failed to revoke access'
+    return
+  }
   await loadAccess()
 }
 
@@ -77,6 +97,8 @@ onMounted(loadAccess)
       <div>
         <h3 class="text-sm font-semibold text-foreground mb-1">Access control</h3>
         <p class="text-xs text-muted-foreground mb-4">Superusers always have access. Non-superusers must be granted access explicitly.</p>
+
+        <p v-if="error" class="text-xs text-destructive mb-3">{{ error }}</p>
 
         <!-- Grant access row -->
         <div class="flex gap-2 mb-4">

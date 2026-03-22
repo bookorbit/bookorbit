@@ -70,6 +70,10 @@ function toggleAllowedFormat(fmt: string) {
   emit('update:allowedFormats', current)
 }
 
+function selectAllFormats() {
+  emit('update:allowedFormats', [])
+}
+
 // ── Exclude patterns ─────────────────────────────────────────────────────────
 
 const newPattern = ref('')
@@ -96,119 +100,139 @@ function onPatternKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="px-6 py-6 space-y-8">
-    <!-- Metadata precedence -->
+  <div class="px-6 py-5 space-y-6">
+    <!-- Metadata group -->
     <div>
-      <h3 class="text-sm font-semibold text-foreground mb-1">Metadata precedence</h3>
-      <p class="text-xs text-muted-foreground mb-3">Drag to reorder. The source higher in the list is preferred when both are present.</p>
-      <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
-        <div
-          v-for="(key, index) in metadataPrecedence"
-          :key="key"
-          draggable="true"
-          class="flex items-center gap-3 px-4 py-3 bg-card cursor-grab active:cursor-grabbing select-none transition-colors"
-          :class="metaDrag.dragOver.value === index ? 'bg-primary/5' : ''"
-          @dragstart="metaDrag.onDragStart(index)"
-          @dragenter.prevent="metaDrag.onDragEnter(index)"
-          @dragover.prevent
-          @drop="metaDrag.onDrop()"
-          @dragend="metaDrag.onDragEnd()"
-        >
-          <GripVertical :size="14" class="text-muted-foreground/60 shrink-0" />
-          <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
-            {{ index + 1 }}
-          </span>
-          <span class="flex-1 text-sm text-foreground">{{ METADATA_LABELS[key] ?? key }}</span>
+      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Metadata</p>
+
+      <!-- Metadata precedence -->
+      <div>
+        <h3 class="text-sm font-semibold text-foreground mb-1">Metadata precedence</h3>
+        <p class="text-xs text-muted-foreground mb-2">Drag to reorder. Higher source is preferred when both are present.</p>
+        <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
+          <div
+            v-for="(key, index) in metadataPrecedence"
+            :key="key"
+            draggable="true"
+            class="flex items-center gap-3 px-3 py-2.5 bg-card cursor-grab active:cursor-grabbing select-none transition-colors relative"
+            :class="metaDrag.dragOver.value === index ? 'bg-primary/10 border-l-2 border-l-primary' : ''"
+            @dragstart="metaDrag.onDragStart(index)"
+            @dragenter.prevent="metaDrag.onDragEnter(index)"
+            @dragover.prevent
+            @drop="metaDrag.onDrop()"
+            @dragend="metaDrag.onDragEnd()"
+          >
+            <GripVertical :size="13" class="text-muted-foreground/50 shrink-0" />
+            <span class="flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 text-primary text-[9px] font-bold shrink-0">
+              {{ index + 1 }}
+            </span>
+            <span class="flex-1 text-sm text-foreground truncate">{{ METADATA_LABELS[key] ?? key }}</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Format priority -->
+    <!-- Filtering group -->
     <div>
-      <h3 class="text-sm font-semibold text-foreground mb-1">Format priority</h3>
-      <p class="text-xs text-muted-foreground mb-3">When a book has multiple formats, prefer the format highest in the list.</p>
-      <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
-        <div
-          v-for="(fmt, index) in formatPriority"
-          :key="fmt"
-          draggable="true"
-          class="flex items-center gap-3 px-4 py-2.5 bg-card cursor-grab active:cursor-grabbing select-none transition-colors"
-          :class="fmtDrag.dragOver.value === index ? 'bg-primary/5' : ''"
-          @dragstart="fmtDrag.onDragStart(index)"
-          @dragenter.prevent="fmtDrag.onDragEnter(index)"
-          @dragover.prevent
-          @drop="fmtDrag.onDrop()"
-          @dragend="fmtDrag.onDragEnd()"
-        >
-          <GripVertical :size="14" class="text-muted-foreground/60 shrink-0" />
-          <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
-            {{ index + 1 }}
-          </span>
-          <span class="flex-1 text-sm font-mono text-foreground uppercase">{{ fmt }}</span>
-          <span class="text-xs text-muted-foreground">{{ FORMAT_LABELS[fmt] ?? fmt }}</span>
-        </div>
-      </div>
-    </div>
+      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Filtering</p>
 
-    <!-- Allowed formats -->
-    <div>
-      <h3 class="text-sm font-semibold text-foreground mb-1">Allowed formats</h3>
-      <p class="text-xs text-muted-foreground mb-3">
-        {{ allowedFormats.length === 0 ? 'All formats are allowed.' : 'Only the selected formats will be imported.' }}
-      </p>
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="fmt in ALL_FORMATS"
-          :key="fmt"
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
-          :class="
-            allowedFormats.length === 0 || allowedFormats.includes(fmt)
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
-          "
-          @click="toggleAllowedFormat(fmt)"
-        >
-          {{ fmt.toUpperCase() }}
-        </button>
-      </div>
-      <p v-if="allowedFormats.length > 0" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-        Books in other formats already in the library will be marked as missing on the next scan.
-      </p>
-    </div>
-
-    <!-- Exclude patterns -->
-    <div>
-      <h3 class="text-sm font-semibold text-foreground mb-1">Exclude patterns</h3>
-      <p class="text-xs text-muted-foreground mb-3">
-        Glob patterns to skip during scanning (e.g. <code class="font-mono bg-muted px-1 rounded">**/samples/**</code>).
-      </p>
-      <div class="flex gap-2 mb-3">
-        <input
-          v-model="newPattern"
-          type="text"
-          placeholder="**/node_modules/**"
-          class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
-          @keydown="onPatternKeydown"
-        />
-        <button
-          class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-          @click="addPattern"
-        >
-          <Plus :size="14" />
-          Add
-        </button>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <span
-          v-for="(pattern, i) in excludePatterns"
-          :key="pattern"
-          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-mono text-foreground"
-        >
-          {{ pattern }}
-          <button class="text-muted-foreground hover:text-destructive transition-colors" @click="removePattern(i)">
-            <X :size="11" />
+      <!-- Allowed formats -->
+      <div class="mb-5">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-sm font-semibold text-foreground">Allowed formats</h3>
+          <button
+            v-if="allowedFormats.length > 0"
+            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            @click="selectAllFormats"
+          >
+            Allow all
           </button>
-        </span>
+        </div>
+        <p class="text-xs text-muted-foreground mb-2">
+          {{ allowedFormats.length === 0 ? 'All formats are allowed.' : 'Only the selected formats will be imported.' }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="fmt in ALL_FORMATS"
+            :key="fmt"
+            class="px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors"
+            :class="
+              allowedFormats.length === 0 || allowedFormats.includes(fmt)
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+            "
+            @click="toggleAllowedFormat(fmt)"
+          >
+            {{ fmt.toUpperCase() }}
+          </button>
+        </div>
+        <p v-if="allowedFormats.length > 0" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+          Books in other formats already in the library will be marked as missing on the next scan.
+        </p>
+      </div>
+
+      <!-- Format priority -->
+      <div class="mb-5">
+        <h3 class="text-sm font-semibold text-foreground mb-1">Format priority</h3>
+        <p class="text-xs text-muted-foreground mb-2">When a book has multiple formats, prefer the format highest in the list.</p>
+        <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
+          <div
+            v-for="(fmt, index) in formatPriority"
+            :key="fmt"
+            draggable="true"
+            class="flex items-center gap-3 px-3 py-2.5 bg-card cursor-grab active:cursor-grabbing select-none transition-colors"
+            :class="fmtDrag.dragOver.value === index ? 'bg-primary/10 border-l-2 border-l-primary' : ''"
+            @dragstart="fmtDrag.onDragStart(index)"
+            @dragenter.prevent="fmtDrag.onDragEnter(index)"
+            @dragover.prevent
+            @drop="fmtDrag.onDrop()"
+            @dragend="fmtDrag.onDragEnd()"
+          >
+            <GripVertical :size="13" class="text-muted-foreground/50 shrink-0" />
+            <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10.5px] font-bold shrink-0">
+              {{ index + 1 }}
+            </span>
+            <span class="flex-1 text-sm font-mono text-foreground uppercase">{{ fmt }}</span>
+            <span class="text-xs text-muted-foreground">{{ FORMAT_LABELS[fmt] ?? fmt }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exclude patterns -->
+      <div>
+        <h3 class="text-sm font-semibold text-foreground mb-1">Exclude patterns</h3>
+        <p class="text-xs text-muted-foreground mb-2">
+          Glob patterns to skip during scanning (e.g. <code class="font-mono bg-muted px-1 rounded">**/samples/**</code>).
+        </p>
+        <div class="flex gap-2 mb-2">
+          <input
+            v-model="newPattern"
+            type="text"
+            placeholder="**/node_modules/**"
+            class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
+            @keydown="onPatternKeydown"
+          />
+          <button
+            class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            @click="addPattern"
+          >
+            <Plus :size="13" />
+            Add
+          </button>
+        </div>
+        <div class="min-h-[40px] rounded-md border border-border bg-muted/30 p-2 flex flex-wrap gap-1.5 overflow-y-auto" style="max-height: 80px">
+          <span v-if="excludePatterns.length === 0" class="text-xs text-muted-foreground/50 self-center px-1"> No patterns added. </span>
+          <span
+            v-for="(pattern, i) in excludePatterns"
+            :key="pattern"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background border border-border text-xs font-mono text-foreground"
+          >
+            {{ pattern }}
+            <button class="text-muted-foreground hover:text-destructive transition-colors" @click="removePattern(i)">
+              <X :size="11" />
+            </button>
+          </span>
+        </div>
       </div>
     </div>
   </div>

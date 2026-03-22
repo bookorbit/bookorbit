@@ -80,6 +80,14 @@ export class UserRepository {
     return { users, total: normalizedTotal };
   }
 
+  async findAssignable() {
+    return this.db
+      .select({ id: schema.users.id, username: schema.users.username, name: schema.users.name })
+      .from(schema.users)
+      .where(and(eq(schema.users.active, true), eq(schema.users.isSuperuser, false)))
+      .orderBy(schema.users.name);
+  }
+
   async findByUsername(username: string) {
     return this.db.query.users.findFirst({ where: eq(schema.users.username, username) });
   }

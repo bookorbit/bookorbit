@@ -90,7 +90,7 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
       <div class="flex flex-col rounded-lg border border-border bg-card overflow-hidden flex-1 min-h-0">
         <!-- Search -->
         <div class="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
-          <Search :size="13" class="text-foreground/60 shrink-0" />
+          <Search :size="13" class="text-foreground/70 shrink-0" />
           <input
             v-model="search"
             type="text"
@@ -111,7 +111,7 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
                   <button
                     class="flex items-center justify-center rounded-md transition-colors"
                     style="width: calc(100% / 10); aspect-ratio: 1"
-                    :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-foreground/60 hover:bg-muted hover:text-foreground'"
+                    :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-foreground/70 hover:bg-muted hover:text-foreground'"
                     @click="emit('update:icon', icon === iconName ? null : iconName)"
                   >
                     <component :is="getIconComponent(iconName)" :size="17" />
