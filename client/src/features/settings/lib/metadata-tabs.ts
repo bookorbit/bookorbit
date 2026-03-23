@@ -1,4 +1,4 @@
-export const METADATA_TABS = ['providers', 'score', 'auto-fetch', 'authors', 'file-sync'] as const
+export const METADATA_TABS = ['providers', 'field-rules', 'score', 'auto-fetch', 'authors', 'file-sync'] as const
 
 export type MetadataTab = (typeof METADATA_TABS)[number]
 
@@ -11,8 +11,13 @@ type MetadataTabInfo = {
 export const METADATA_TAB_INFO: Record<MetadataTab, MetadataTabInfo> = {
   providers: {
     navLabel: 'Providers',
-    titleLabel: 'Source & Priority',
-    subtitle: 'Define how book information is collected from external services and prioritized across your libraries.',
+    titleLabel: 'Providers',
+    subtitle: 'Enable external metadata sources and configure their credentials.',
+  },
+  'field-rules': {
+    navLabel: 'Field Rules',
+    titleLabel: 'Field-Level Rules',
+    subtitle: 'Control which provider supplies each metadata field and how values are merged across your libraries.',
   },
   score: {
     navLabel: 'Score',

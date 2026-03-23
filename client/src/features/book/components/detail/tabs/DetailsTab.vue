@@ -226,7 +226,7 @@ const providerLinks = computed<ProviderLink[]>(() => {
       key: 'hardcover',
       label: 'Hardcover',
       url: `https://hardcover.app/books/${ids.hardcover}`,
-      iconUrl: 'https://hardcover.app/favicon.ico',
+      iconUrl: 'https://assets.hardcover.app/static/favicon.ico',
       fallback: 'H',
     })
   }
@@ -425,7 +425,7 @@ async function loadSupplemental() {
     for (const row of progressRows) {
       if (!Number.isFinite(row.fileId)) continue
       progressMap[row.fileId] = {
-        percentage: typeof row.percentage === 'number' ? row.percentage : 0,
+        percentage: row.percentage,
         cfi: row.cfi,
         pageNumber: row.pageNumber,
         updatedAt: row.updatedAt,

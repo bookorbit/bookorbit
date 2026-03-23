@@ -2,13 +2,13 @@ import type { MetadataProviderKey } from '@projectx/types'
 
 const PROVIDER_HEX: Record<string, string> = {
   google: '#34A853',
-  goodreads: '#06B6D4',
+  goodreads: '#00d8d1',
   amazon: '#FF9900',
-  hardcover: '#4F47E5',
-  openLibrary: '#E83B2A',
-  itunes: '#E252E9',
+  hardcover: '#7772ff',
+  openLibrary: '#49a4ff',
+  itunes: '#ff4f5d',
   audible: '#FF8A00',
-  audnexus: '#A78BFA',
+  audnexus: '#FF5ADD',
   auto: '#8B5CF6',
 }
 

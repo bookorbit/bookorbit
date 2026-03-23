@@ -15,8 +15,19 @@ import { OpenLibraryProvider } from './providers/open-library/open-library.provi
 import { ITunesProvider } from './providers/itunes/itunes.provider';
 import { AudibleProvider } from './providers/audible/audible.provider';
 import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
+import { HardcoverClient } from './providers/hardcover/hardcover.client';
+import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
 
-const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, OpenLibraryProvider, ITunesProvider, AudibleProvider, AudnexusProvider];
+const PROVIDER_CLASSES = [
+  GoogleProvider,
+  GoodreadsProvider,
+  AmazonProvider,
+  OpenLibraryProvider,
+  ITunesProvider,
+  AudibleProvider,
+  AudnexusProvider,
+  HardcoverProvider,
+];
 
 @Module({
   imports: [MetadataPreferencesModule],
@@ -27,6 +38,7 @@ const PROVIDER_CLASSES = [GoogleProvider, GoodreadsProvider, AmazonProvider, Ope
       useFactory: (...providers: MetadataProvider[]) => providers,
       inject: PROVIDER_CLASSES,
     },
+    HardcoverClient,
     ProviderRegistry,
     ProviderThrottleTracker,
     MetadataFetchService,
