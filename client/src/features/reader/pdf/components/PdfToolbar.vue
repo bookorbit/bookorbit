@@ -38,6 +38,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ScrollMode } from '../composables/usePdfLayout'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+
+const { hasPermission } = usePermissions()
 
 const props = defineProps<{
   currentPage: number
@@ -234,7 +237,7 @@ function currentZoomValue(): string {
       <TooltipContent>{{ isFullscreen ? 'Exit Fullscreen' : 'Fullscreen' }}</TooltipContent>
     </Tooltip>
 
-    <Tooltip>
+    <Tooltip v-if="hasPermission('library_download')">
       <TooltipTrigger as-child>
         <a :href="`/api/v1/books/files/${fileId}/serve?download=1`" class="viewer-btn flex items-center justify-center">
           <Download :size="14" />

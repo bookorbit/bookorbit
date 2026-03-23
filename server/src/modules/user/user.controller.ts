@@ -7,6 +7,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -118,6 +119,25 @@ export class UserController {
     @CurrentUser() requestingUser: RequestUser,
   ) {
     return this.userService.setSuperuser(id, isSuperuser, requestingUser);
+  }
+
+  @Get(':id/libraries')
+  @RequirePermission(Permission.ManageUsers)
+  getLibraries(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.getLibraryIds(id);
+  }
+
+  @Put(':id/libraries')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({
+    action: AuditAction.UserUpdate,
+    resource: AuditResource.User,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated library access for user #${req.params['id']}`,
+  })
+  setLibraries(@Param('id', ParseIntPipe) id: number, @Body() dto: SetLibrariesDto, @CurrentUser() requestingUser: RequestUser) {
+    return this.userService.setLibraries(id, dto.libraryIds, requestingUser);
   }
 
   @Post(':id/reset-password')

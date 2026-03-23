@@ -401,11 +401,14 @@ async function handleSetStatus(status: ReadStatus) {
               </DropdownMenuSub>
 
               <!-- Download submenu -->
-              <DropdownMenuItem v-if="openableFiles.length === 1 && primaryFile" @click="handleDownloadFile(primaryFile)">
+              <DropdownMenuItem
+                v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
+                @click="handleDownloadFile(primaryFile)"
+              >
                 <Download class="size-4 mr-2" />
                 Download
               </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="openableFiles.length > 1">
+              <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
                 <DropdownMenuSubTrigger>
                   <Download class="size-4 mr-2" />
                   Download
@@ -425,8 +428,8 @@ async function handleSetStatus(status: ReadStatus) {
                 <ExternalLink class="size-4 mr-2" />
                 Book Details
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuSub>
+              <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
+              <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
                 <DropdownMenuSubTrigger>
                   <Pencil class="size-4 mr-2" />
                   Metadata
@@ -441,7 +444,7 @@ async function handleSetStatus(status: ReadStatus) {
                     <RefreshCw v-else class="size-4 mr-2" />
                     Refresh Metadata
                   </DropdownMenuItem>
-                  <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="reExtractingCover" @click="reExtractCover()">
+                  <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
                     <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
                     <Image v-else class="size-4 mr-2" />
                     Regenerate Cover
@@ -474,7 +477,11 @@ async function handleSetStatus(status: ReadStatus) {
                 Send via Email
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem class="text-destructive focus:text-destructive" @click="emit('action', 'delete')">
+              <DropdownMenuItem
+                v-if="hasPermission('library_delete_books')"
+                class="text-destructive focus:text-destructive"
+                @click="emit('action', 'delete')"
+              >
                 <Trash2 class="size-4 mr-2" />
                 Delete
               </DropdownMenuItem>

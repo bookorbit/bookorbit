@@ -23,13 +23,7 @@ const emit = defineEmits<{
 const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   {
     label: 'Content',
-    permissions: [
-      Permission.LibraryView,
-      Permission.LibraryDownload,
-      Permission.LibraryUpload,
-      Permission.LibraryEditMetadata,
-      Permission.LibraryDeleteBooks,
-    ],
+    permissions: [Permission.LibraryDownload, Permission.LibraryUpload, Permission.LibraryEditMetadata, Permission.LibraryDeleteBooks],
   },
   {
     label: 'Devices & Access',
@@ -37,7 +31,7 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   },
   {
     label: 'Email',
-    permissions: [Permission.EmailSend],
+    permissions: [Permission.EmailSend, Permission.ManageEmail],
   },
   {
     label: 'Administration',
@@ -58,7 +52,7 @@ const isEdit = computed(() => !!props.user?.id)
 
 watch(
   () => props.user,
-  (u) => {
+  async (u) => {
     name.value = u?.name ?? ''
     username.value = u?.username ?? ''
     email.value = u?.email ?? ''
@@ -66,6 +60,14 @@ watch(
     selectedPermissionNames.value = new Set(u?.permissions?.filter((p) => p !== '*') ?? [])
     selectedLibraryIds.value = new Set()
     error.value = null
+
+    if (u?.id) {
+      const res = await api(`/api/v1/users/${u.id}/libraries`)
+      if (res.ok) {
+        const ids: number[] = await res.json()
+        selectedLibraryIds.value = new Set(ids)
+      }
+    }
   },
   { immediate: true },
 )
@@ -110,6 +112,17 @@ async function handleSubmit() {
       if (!permRes.ok) {
         const err = await permRes.json().catch(() => ({}))
         error.value = err.message ?? 'Failed to update permissions'
+        return
+      }
+
+      const libRes = await api(`/api/v1/users/${props.user!.id}/libraries`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ libraryIds: [...selectedLibraryIds.value] }),
+      })
+      if (!libRes.ok) {
+        const err = await libRes.json().catch(() => ({}))
+        error.value = err.message ?? 'Failed to update library access'
         return
       }
     } else {
@@ -188,8 +201,8 @@ async function handleSubmit() {
           <label for="active" class="settings-label">Active</label>
         </div>
 
-        <!-- Library access (create only) -->
-        <div v-if="!isEdit && libraries.length > 0" class="space-y-2">
+        <!-- Library access -->
+        <div v-if="libraries.length > 0" class="space-y-2">
           <p class="settings-label">Library access</p>
           <div class="space-y-1.5">
             <label v-for="lib in libraries" :key="lib.id" class="flex cursor-pointer items-center gap-2">

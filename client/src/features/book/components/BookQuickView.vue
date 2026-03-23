@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, Pencil, Star, Trash2, X } from 'lucide-vue-next'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from 'reka-ui'
@@ -14,6 +15,7 @@ import { getFormatColor } from '../lib/format-colors'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
+const { hasPermission } = usePermissions()
 const emit = defineEmits<{
   'update:open': [value: boolean]
   action: [type: 'edit-metadata' | 'add-to-collection' | 'delete']
@@ -364,7 +366,7 @@ function openDetails() {
               <ExternalLink class="size-4" />
               Details
             </button>
-            <Tooltip>
+            <Tooltip v-if="hasPermission('library_edit_metadata')">
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
@@ -386,7 +388,7 @@ function openDetails() {
               </TooltipTrigger>
               <TooltipContent>Add to collection</TooltipContent>
             </Tooltip>
-            <Tooltip>
+            <Tooltip v-if="hasPermission('library_delete_books')">
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center h-9 px-3 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"

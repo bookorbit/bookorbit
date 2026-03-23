@@ -11,8 +11,10 @@ import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
+const { hasPermission } = usePermissions()
 
 const bookId = computed(() => Number(route.params.bookId))
 const tab = computed(() => normalizeBookDetailTab(route.query.tab))
@@ -63,7 +65,12 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
   <BookDetailLayout :book-id="bookId">
     <template v-if="detail">
       <DetailsTab v-if="tab === 'details'" :book="detail" />
-      <EditMetadataTab v-else-if="tab === 'edit'" :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" />
+      <EditMetadataTab
+        v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
+        :book="detail"
+        @saved="onMetadataSaved"
+        @cover-changed="onCoverChanged"
+      />
       <FilesTab v-else-if="tab === 'files'" :book="detail" />
     </template>
 

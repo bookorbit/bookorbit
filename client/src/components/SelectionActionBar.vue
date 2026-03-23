@@ -2,6 +2,7 @@
 import { computed, ref, useSlots, watch } from 'vue'
 import { Download, FolderMinus, FolderPlus, ImageDown, Mail, Pencil, RefreshCw, Trash2, X } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const ICON_SIZE = 17
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   exit: []
 }>()
 
+const { hasPermission } = usePermissions()
 const confirmingDelete = ref(false)
 const exportMenuOpen = ref(false)
 const slots = useSlots()
@@ -92,7 +94,7 @@ watch(
             <TooltipContent side="top">Send via email</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
+          <Tooltip v-if="hasPermission('library_download')">
             <TooltipTrigger as-child>
               <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="exportMenuOpen = true">
                 <Download :size="ICON_SIZE" />
@@ -119,7 +121,7 @@ watch(
             <TooltipContent side="top">Remove from collection</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
+          <Tooltip v-if="hasPermission('library_edit_metadata')">
             <TooltipTrigger as-child>
               <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('edit')">
                 <Pencil :size="ICON_SIZE" />
@@ -128,9 +130,9 @@ watch(
             <TooltipContent side="top">Edit metadata</TooltipContent>
           </Tooltip>
 
-          <div :class="DIVIDER" />
+          <div v-if="hasPermission('library_edit_metadata')" :class="DIVIDER" />
 
-          <Tooltip>
+          <Tooltip v-if="hasPermission('library_edit_metadata')">
             <TooltipTrigger as-child>
               <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('refresh-metadata')">
                 <RefreshCw :size="ICON_SIZE" />
@@ -139,7 +141,7 @@ watch(
             <TooltipContent side="top">Refresh metadata</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
+          <Tooltip v-if="hasPermission('library_edit_metadata')">
             <TooltipTrigger as-child>
               <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('re-extract-cover')">
                 <ImageDown :size="ICON_SIZE" />

@@ -8,11 +8,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { api } from '@/lib/api'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { getFormatColor } from '@/features/book/lib/format-colors'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const props = defineProps<{ book: BookDetail }>()
 const router = useRouter()
 
 const { downloadFile: downloadBookFile } = useBookDownload()
+const { hasPermission } = usePermissions()
 
 const AUDIO_FORMATS = new Set(['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'])
 
@@ -272,7 +274,7 @@ async function toggleWriteLog() {
           <Headphones class="size-3.5" />
           Play
         </button>
-        <Tooltip>
+        <Tooltip v-if="hasPermission('library_download')">
           <TooltipTrigger as-child>
             <button
               class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"

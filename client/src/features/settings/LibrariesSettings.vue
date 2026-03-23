@@ -12,9 +12,16 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
 const router = useRouter()
+const { hasPermission } = usePermissions()
+
+if (!hasPermission('manage_libraries')) {
+  router.replace({ name: 'settings-appearance' })
+}
+
 const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
 const { subscribeLibrary, getProgress, isScanning, progressMap, getCoverRefreshProgress, isRefreshingCovers } = useScanProgress()
 

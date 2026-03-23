@@ -10,21 +10,23 @@ import { UpdateEmailProviderDto } from './dto/update-email-provider.dto';
 import { EmailProviderService } from './email-provider.service';
 
 @Controller('email/providers')
-@RequirePermission(Permission.EmailSend)
 export class EmailProviderController {
   constructor(private readonly service: EmailProviderService) {}
 
   @Get()
+  @RequirePermission(Permission.EmailSend)
   findAll(@CurrentUser() user: RequestUser) {
     return this.service.findAll(user);
   }
 
   @Get(':id')
+  @RequirePermission(Permission.EmailSend)
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.findOne(id, user);
   }
 
   @Post()
+  @RequirePermission(Permission.ManageEmail)
   @Auditable({
     action: AuditAction.EmailProviderCreate,
     resource: AuditResource.EmailProvider,
@@ -36,6 +38,7 @@ export class EmailProviderController {
   }
 
   @Put(':id')
+  @RequirePermission(Permission.ManageEmail)
   @Auditable({
     action: AuditAction.EmailProviderUpdate,
     resource: AuditResource.EmailProvider,
@@ -48,6 +51,7 @@ export class EmailProviderController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.ManageEmail)
   @Auditable({
     action: AuditAction.EmailProviderDelete,
     resource: AuditResource.EmailProvider,
@@ -59,6 +63,7 @@ export class EmailProviderController {
   }
 
   @Patch(':id/default')
+  @RequirePermission(Permission.EmailSend)
   @Auditable({
     action: AuditAction.EmailProviderSetDefault,
     resource: AuditResource.EmailProvider,
@@ -70,6 +75,7 @@ export class EmailProviderController {
   }
 
   @Patch(':id/share')
+  @RequirePermission(Permission.ManageEmail)
   @Auditable({
     action: AuditAction.EmailProviderUpdate,
     resource: AuditResource.EmailProvider,
@@ -82,11 +88,13 @@ export class EmailProviderController {
 
   @Post(':id/test')
   @HttpCode(HttpStatus.OK)
+  @RequirePermission(Permission.ManageEmail)
   testConnection(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.testConnection(id, user);
   }
 
   @Patch(':id/system')
+  @RequirePermission(Permission.ManageEmail)
   @Auditable({
     action: AuditAction.EmailProviderSetSystem,
     resource: AuditResource.EmailProvider,
@@ -99,6 +107,7 @@ export class EmailProviderController {
 
   @Delete('system')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.ManageEmail)
   @Auditable({
     action: AuditAction.EmailProviderClearSystem,
     resource: AuditResource.EmailProvider,

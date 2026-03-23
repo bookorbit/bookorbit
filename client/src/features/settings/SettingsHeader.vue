@@ -17,10 +17,12 @@ const sections = computed<Section[]>(() => {
   const su = isSuperuser.value
 
   const result: Section[] = [
-    { label: 'Libraries', routeName: 'settings-libraries' },
     { label: 'Appearance', routeName: 'settings-appearance' },
     { label: 'Reader', routeName: 'settings-reader-general' },
   ]
+  if (su || perms.includes('manage_libraries')) {
+    result.unshift({ label: 'Libraries', routeName: 'settings-libraries' })
+  }
   if (su || perms.includes('manage_metadata_config')) {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
   }
@@ -30,8 +32,10 @@ const sections = computed<Section[]>(() => {
   if (su) {
     result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
   }
-  if (su || perms.includes('manage_app_settings')) {
+  if (su || perms.includes('staging_access')) {
     result.push({ label: 'Staging', routeName: 'settings-admin-staging' })
+  }
+  if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'File Naming', routeName: 'settings-admin-file-naming' })
   }
   if (su || perms.includes('manage_users')) {
@@ -40,7 +44,7 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'OIDC / SSO', routeName: 'settings-admin-oidc' })
   }
-  if (su || perms.includes('email_send')) {
+  if (su || perms.includes('email_send') || perms.includes('manage_email')) {
     result.push({ label: 'Email', routeName: 'settings-email' })
   }
   if (su || perms.includes('opds_access')) {

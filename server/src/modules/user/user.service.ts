@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundExce
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Permission } from '@projectx/types';
 
@@ -176,6 +177,31 @@ export class UserService {
       }
     }
     await this.userRepo.setSuperuser(targetUserId, isSuperuser);
+  }
+
+  async getLibraryIds(userId: number): Promise<number[]> {
+    const rows = await this.db
+      .select({ libraryId: schema.userLibraryAccess.libraryId })
+      .from(schema.userLibraryAccess)
+      .where(eq(schema.userLibraryAccess.userId, userId));
+    return rows.map((r) => r.libraryId);
+  }
+
+  async setLibraries(targetUserId: number, libraryIds: number[], requestingUser: RequestUser): Promise<void> {
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
+    if (target.isSuperuser && !requestingUser.isSuperuser) {
+      throw new ForbiddenException('Only administrators can edit administrator accounts');
+    }
+
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.userLibraryAccess).where(eq(schema.userLibraryAccess.userId, targetUserId));
+      if (libraryIds.length) {
+        await tx
+          .insert(schema.userLibraryAccess)
+          .values(libraryIds.map((libraryId) => ({ userId: targetUserId, libraryId, accessLevel: 'viewer' as const })));
+      }
+    });
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {

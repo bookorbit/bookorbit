@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { Plus, Pencil, Trash2, Star, Share2, Wifi, Server } from 'lucide-vue-next'
+import { Permission } from '@projectx/types'
 import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const {
@@ -17,7 +19,9 @@ const {
   setSystemProvider,
   clearSystemProvider,
 } = useEmailProviders()
-const { isSuperuser } = usePermissions()
+const { isSuperuser, hasPermission } = usePermissions()
+const { user } = useAuth()
+const canManageEmail = computed(() => hasPermission(Permission.ManageEmail))
 
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
@@ -160,7 +164,7 @@ async function test(p: EmailProvider) {
     <div class="flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SMTP Providers</p>
       <button
-        v-if="!showForm"
+        v-if="canManageEmail && !showForm"
         class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         @click="openCreate()"
       >
@@ -170,7 +174,7 @@ async function test(p: EmailProvider) {
     </div>
 
     <!-- Add/Edit form -->
-    <div v-if="showForm" class="border border-border rounded-lg p-5 bg-card space-y-4">
+    <div v-if="canManageEmail && showForm" class="border border-border rounded-lg p-5 bg-card space-y-4">
       <p class="text-sm font-semibold text-foreground">{{ editingId ? 'Edit Provider' : 'New Provider' }}</p>
       <div class="grid grid-cols-2 gap-3">
         <div class="col-span-2">
@@ -275,7 +279,13 @@ async function test(p: EmailProvider) {
 
     <!-- Empty state -->
     <div v-if="providers.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
-      <p class="text-sm text-muted-foreground">No providers yet. Add an SMTP provider to start sending emails.</p>
+      <p class="text-sm text-muted-foreground">
+        {{
+          canManageEmail
+            ? 'No providers yet. Add an SMTP provider to start sending emails.'
+            : 'No providers available. Ask an administrator to add one.'
+        }}
+      </p>
     </div>
 
     <!-- List -->
@@ -306,7 +316,7 @@ async function test(p: EmailProvider) {
             </TooltipTrigger>
             <TooltipContent>{{ p.isSystemProvider ? 'Remove as system mail provider' : 'Set as system mail provider' }}</TooltipContent>
           </Tooltip>
-          <Tooltip>
+          <Tooltip v-if="canManageEmail">
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -318,7 +328,7 @@ async function test(p: EmailProvider) {
             </TooltipTrigger>
             <TooltipContent>Test connection</TooltipContent>
           </Tooltip>
-          <Tooltip>
+          <Tooltip v-if="p.userId === user?.id">
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded transition-colors"
@@ -330,7 +340,7 @@ async function test(p: EmailProvider) {
             </TooltipTrigger>
             <TooltipContent>Set as default</TooltipContent>
           </Tooltip>
-          <Tooltip v-if="!p.isShared || p.userId !== null">
+          <Tooltip v-if="canManageEmail && (!p.isShared || p.userId !== null)">
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded transition-colors"
@@ -342,7 +352,7 @@ async function test(p: EmailProvider) {
             </TooltipTrigger>
             <TooltipContent>Toggle sharing</TooltipContent>
           </Tooltip>
-          <Tooltip>
+          <Tooltip v-if="canManageEmail">
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -353,7 +363,7 @@ async function test(p: EmailProvider) {
             </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
           </Tooltip>
-          <Tooltip v-if="p.userId !== null">
+          <Tooltip v-if="canManageEmail && p.userId !== null">
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

@@ -1,6 +1,5 @@
 export enum Permission {
   // Content
-  LibraryView = "library_view",
   LibraryDownload = "library_download",
   LibraryUpload = "library_upload",
   LibraryEditMetadata = "library_edit_metadata",
@@ -13,6 +12,7 @@ export enum Permission {
 
   // Email
   EmailSend = "email_send",
+  ManageEmail = "manage_email",
 
   // Administration
   ManageLibraries = "manage_libraries",
@@ -22,7 +22,6 @@ export enum Permission {
 }
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
-  [Permission.LibraryView]: "Browse libraries",
   [Permission.LibraryDownload]: "Download books",
   [Permission.LibraryUpload]: "Upload books",
   [Permission.LibraryEditMetadata]: "Edit metadata",
@@ -31,6 +30,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.OpdsAccess]: "OPDS access",
   [Permission.StagingAccess]: "Staging / bookdrop",
   [Permission.EmailSend]: "Send by email",
+  [Permission.ManageEmail]: "Manage email",
   [Permission.ManageLibraries]: "Manage libraries",
   [Permission.ManageMetadataConfig]: "Metadata config",
   [Permission.ManageAppSettings]: "App settings",

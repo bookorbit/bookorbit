@@ -25,7 +25,7 @@ export class CoverController {
   }
 
   @Get('cover/proxy')
-  @RequirePermission(Permission.LibraryView)
+  @RequirePermission(Permission.LibraryEditMetadata)
   async proxyImage(@Query('url') url: string, @Res() res: FastifyReply) {
     const { buffer, contentType } = await this.coverService.proxyImage(url);
     res.type(contentType).send(buffer);

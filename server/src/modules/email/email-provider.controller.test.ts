@@ -1,4 +1,7 @@
+import 'reflect-metadata';
 import type { RequestUser } from '../../common/types/request-user';
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
+import { Permission } from '@projectx/types';
 import { EmailProviderController } from './email-provider.controller';
 import type { CreateEmailProviderDto } from './dto/create-email-provider.dto';
 import type { UpdateEmailProviderDto } from './dto/update-email-provider.dto';
@@ -29,6 +32,8 @@ describe('EmailProviderController', () => {
     setDefault: vi.fn(),
     toggleShared: vi.fn(),
     testConnection: vi.fn(),
+    setSystemProvider: vi.fn(),
+    clearSystemProvider: vi.fn(),
   } as unknown as EmailProviderService;
 
   const controller = new EmailProviderController(service);
@@ -37,53 +42,108 @@ describe('EmailProviderController', () => {
     vi.clearAllMocks();
   });
 
-  it('delegates findAll', async () => {
-    await controller.findAll(user);
-    expect(service.findAll).toHaveBeenCalledWith(user);
+  describe('delegation', () => {
+    it('delegates findAll', async () => {
+      await controller.findAll(user);
+      expect(service.findAll).toHaveBeenCalledWith(user);
+    });
+
+    it('delegates findOne with parsed id', async () => {
+      await controller.findOne(55, user);
+      expect(service.findOne).toHaveBeenCalledWith(55, user);
+    });
+
+    it('delegates create', async () => {
+      const dto: CreateEmailProviderDto = {
+        name: 'SMTP',
+        host: 'smtp.example.com',
+        port: 587,
+        auth: true,
+        ssl: false,
+        startTls: true,
+      };
+
+      await controller.create(dto, user);
+      expect(service.create).toHaveBeenCalledWith(dto, user);
+    });
+
+    it('delegates update', async () => {
+      const dto: UpdateEmailProviderDto = { port: 2525 };
+      await controller.update(12, dto, user);
+      expect(service.update).toHaveBeenCalledWith(12, dto, user);
+    });
+
+    it('delegates remove', async () => {
+      await controller.remove(9, user);
+      expect(service.remove).toHaveBeenCalledWith(9, user);
+    });
+
+    it('delegates setDefault', async () => {
+      await controller.setDefault(3, user);
+      expect(service.setDefault).toHaveBeenCalledWith(3, user);
+    });
+
+    it('delegates toggleShared', async () => {
+      await controller.toggleShared(3, user);
+      expect(service.toggleShared).toHaveBeenCalledWith(3, user);
+    });
+
+    it('delegates testConnection', async () => {
+      await controller.testConnection(3, user);
+      expect(service.testConnection).toHaveBeenCalledWith(3, user);
+    });
+
+    it('delegates setSystemProvider', async () => {
+      await controller.setSystemProvider(7, user);
+      expect(service.setSystemProvider).toHaveBeenCalledWith(7, user);
+    });
+
+    it('delegates clearSystemProvider', async () => {
+      await controller.clearSystemProvider(user);
+      expect(service.clearSystemProvider).toHaveBeenCalledWith(user);
+    });
   });
 
-  it('delegates findOne with parsed id', async () => {
-    await controller.findOne(55, user);
-    expect(service.findOne).toHaveBeenCalledWith(55, user);
-  });
+  describe('permissions', () => {
+    function getPermission(method: keyof EmailProviderController): Permission | undefined {
+      return Reflect.getMetadata(PERMISSION_KEY, EmailProviderController.prototype[method as string]);
+    }
 
-  it('delegates create', async () => {
-    const dto: CreateEmailProviderDto = {
-      name: 'SMTP',
-      host: 'smtp.example.com',
-      port: 587,
-      auth: true,
-      ssl: false,
-      startTls: true,
-    };
+    it('requires EmailSend to read providers', () => {
+      expect(getPermission('findAll')).toBe(Permission.EmailSend);
+      expect(getPermission('findOne')).toBe(Permission.EmailSend);
+    });
 
-    await controller.create(dto, user);
-    expect(service.create).toHaveBeenCalledWith(dto, user);
-  });
+    it('requires EmailSend to set default provider', () => {
+      expect(getPermission('setDefault')).toBe(Permission.EmailSend);
+    });
 
-  it('delegates update', async () => {
-    const dto: UpdateEmailProviderDto = { port: 2525 };
-    await controller.update(12, dto, user);
-    expect(service.update).toHaveBeenCalledWith(12, dto, user);
-  });
+    it('requires ManageEmail to create a provider', () => {
+      expect(getPermission('create')).toBe(Permission.ManageEmail);
+    });
 
-  it('delegates remove', async () => {
-    await controller.remove(9, user);
-    expect(service.remove).toHaveBeenCalledWith(9, user);
-  });
+    it('requires ManageEmail to update a provider', () => {
+      expect(getPermission('update')).toBe(Permission.ManageEmail);
+    });
 
-  it('delegates setDefault', async () => {
-    await controller.setDefault(3, user);
-    expect(service.setDefault).toHaveBeenCalledWith(3, user);
-  });
+    it('requires ManageEmail to delete a provider', () => {
+      expect(getPermission('remove')).toBe(Permission.ManageEmail);
+    });
 
-  it('delegates toggleShared', async () => {
-    await controller.toggleShared(3, user);
-    expect(service.toggleShared).toHaveBeenCalledWith(3, user);
-  });
+    it('requires ManageEmail to toggle sharing', () => {
+      expect(getPermission('toggleShared')).toBe(Permission.ManageEmail);
+    });
 
-  it('delegates testConnection', async () => {
-    await controller.testConnection(3, user);
-    expect(service.testConnection).toHaveBeenCalledWith(3, user);
+    it('requires ManageEmail to test a connection', () => {
+      expect(getPermission('testConnection')).toBe(Permission.ManageEmail);
+    });
+
+    it('requires ManageEmail to set the system provider', () => {
+      expect(getPermission('setSystemProvider')).toBe(Permission.ManageEmail);
+    });
+
+    it('requires ManageEmail to clear the system provider', () => {
+      expect(getPermission('clearSystemProvider')).toBe(Permission.ManageEmail);
+    });
   });
 });

@@ -53,7 +53,7 @@ export const routes: RouteRecordRaw[] = [
         path: '/settings',
         component: () => import('@/views/SettingsView.vue'),
         children: [
-          { path: '', redirect: { name: 'settings-libraries' } },
+          { path: '', redirect: { name: 'settings-appearance' } },
           {
             path: 'libraries',
             name: 'settings-libraries',

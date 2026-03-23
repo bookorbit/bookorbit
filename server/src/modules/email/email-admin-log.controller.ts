@@ -8,7 +8,7 @@ import { QuerySendLogDto } from './dto/query-send-log.dto';
 import { EmailSendLogService } from './email-send-log.service';
 
 @Controller('email/admin/log')
-@RequirePermission(Permission.ManageAppSettings)
+@RequirePermission(Permission.ManageEmail)
 export class EmailAdminLogController {
   constructor(private readonly logService: EmailSendLogService) {}
 

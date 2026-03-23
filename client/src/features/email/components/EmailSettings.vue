@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Permission } from '@projectx/types'
 import ProvidersTab from './ProvidersTab.vue'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import RecipientsTab from './RecipientsTab.vue'
@@ -12,16 +13,43 @@ import { useEmailProviders } from '../composables/useEmailProviders'
 import { useEmailRecipients } from '../composables/useEmailRecipients'
 import { useEmailTemplates } from '../composables/useEmailTemplates'
 import { useEmailGroups } from '../composables/useEmailGroups'
-import { EMAIL_TAB_LABELS, EMAIL_TABS, normalizeEmailTab, type EmailTab as Tab } from '@/features/email/lib/email-tabs'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { EMAIL_TAB_LABELS, normalizeEmailTab, type EmailTab as Tab } from '@/features/email/lib/email-tabs'
 
 const { fetchProviders } = useEmailProviders()
 const { fetchRecipients } = useEmailRecipients()
 const { fetchTemplates } = useEmailTemplates()
 const { fetchGroups } = useEmailGroups()
+const { hasPermission } = usePermissions()
+
+const canManageEmail = computed(() => hasPermission(Permission.ManageEmail))
+const canSendEmail = computed(() => hasPermission(Permission.EmailSend))
+
+const tabs = computed<{ id: Tab; label: string }[]>(() => {
+  const result: { id: Tab; label: string }[] = []
+  if (canManageEmail.value || canSendEmail.value) result.push({ id: 'providers', label: EMAIL_TAB_LABELS['providers'] })
+  if (canSendEmail.value) {
+    result.push(
+      { id: 'recipients', label: EMAIL_TAB_LABELS['recipients'] },
+      { id: 'groups', label: EMAIL_TAB_LABELS['groups'] },
+      { id: 'templates', label: EMAIL_TAB_LABELS['templates'] },
+      { id: 'preferences', label: EMAIL_TAB_LABELS['preferences'] },
+      { id: 'history', label: EMAIL_TAB_LABELS['history'] },
+    )
+  }
+  return result
+})
 
 const route = useRoute()
 const router = useRouter()
-const activeTab = ref<Tab>(normalizeEmailTab(route.query.tab))
+
+function resolveTab(value: unknown): Tab {
+  const normalized = normalizeEmailTab(value)
+  if (tabs.value.some((t) => t.id === normalized)) return normalized
+  return tabs.value[0]?.id ?? 'recipients'
+}
+
+const activeTab = ref<Tab>(resolveTab(route.query.tab))
 
 if (!route.query.tab) {
   router.replace({ name: 'settings-email', query: { ...route.query, tab: activeTab.value } })
@@ -30,7 +58,7 @@ if (!route.query.tab) {
 watch(
   () => route.query.tab,
   (value) => {
-    activeTab.value = normalizeEmailTab(value)
+    activeTab.value = resolveTab(value)
   },
 )
 
@@ -42,11 +70,12 @@ function selectTab(tab: Tab) {
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const tabs: { id: Tab; label: string }[] = EMAIL_TABS.map((id) => ({ id, label: EMAIL_TAB_LABELS[id] }))
-
 onMounted(async () => {
   try {
-    await Promise.all([fetchProviders(), fetchRecipients(), fetchTemplates(), fetchGroups()])
+    const fetches: Promise<unknown>[] = []
+    if (canManageEmail.value || canSendEmail.value) fetches.push(fetchProviders())
+    if (canSendEmail.value) fetches.push(fetchRecipients(), fetchTemplates(), fetchGroups())
+    await Promise.all(fetches)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load'
   } finally {

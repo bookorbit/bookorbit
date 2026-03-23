@@ -233,11 +233,14 @@ function openAuthorBrowse() {
             Book Details
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
+          <DropdownMenuItem
+            v-if="hasPermission('library_edit_metadata')"
+            @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
+          >
             <Pencil class="size-4 mr-2" />
             Edit Metadata
           </DropdownMenuItem>
-          <DropdownMenuItem :disabled="refreshing" @click="refreshWithFeedback(book.id)">
+          <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
             <RefreshCw v-else class="size-4 mr-2" />
             Refresh Metadata
@@ -250,8 +253,12 @@ function openAuthorBrowse() {
             <Send class="size-4 mr-2" />
             Send via Email
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem class="text-destructive focus:text-destructive" @click="emit('action', 'delete')">
+          <DropdownMenuSeparator v-if="hasPermission('library_delete_books')" />
+          <DropdownMenuItem
+            v-if="hasPermission('library_delete_books')"
+            class="text-destructive focus:text-destructive"
+            @click="emit('action', 'delete')"
+          >
             <Trash2 class="size-4 mr-2" />
             Delete
           </DropdownMenuItem>

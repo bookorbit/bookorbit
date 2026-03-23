@@ -576,7 +576,7 @@ watch(
           </button>
 
           <div class="flex gap-2">
-            <div class="flex-1">
+            <div v-if="hasPermission('library_download')" class="flex-1">
               <BookDownloadButton :files="book.files" :book-id="book.id" />
             </div>
             <Tooltip>
@@ -590,7 +590,7 @@ watch(
               </TooltipTrigger>
               <TooltipContent>Add to collection</TooltipContent>
             </Tooltip>
-            <Popover :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
+            <Popover v-if="hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
               <PopoverTrigger as-child>
                 <button
                   class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
