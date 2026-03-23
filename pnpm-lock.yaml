@@ -189,8 +189,8 @@ importers:
         specifier: ^13.0.2
         version: 13.0.2
       "@fastify/multipart":
-        specifier: ^9.4.0
-        version: 9.4.0
+        specifier: ^10.0.0
+        version: 10.0.0
       "@fastify/rate-limit":
         specifier: ^10.3.0
         version: 10.3.0
@@ -270,8 +270,8 @@ importers:
         specifier: ^2.1.3
         version: 2.1.3
       music-metadata:
-        specifier: ^7.14.0
-        version: 7.14.0
+        specifier: ^11.12.3
+        version: 11.12.3
       nestjs-pino:
         specifier: ^4.6.1
         version: 4.6.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
@@ -339,9 +339,6 @@ importers:
       "@types/bcrypt":
         specifier: ^6.0.0
         version: 6.0.0
-      "@types/bcryptjs":
-        specifier: ^3.0.0
-        version: 3.0.0
       "@types/express":
         specifier: ^5.0.6
         version: 5.0.6
@@ -352,8 +349,8 @@ importers:
         specifier: ^25.6.0
         version: 25.6.0
       "@types/nodemailer":
-        specifier: ^7.0.11
-        version: 7.0.11
+        specifier: ^8.0.0
+        version: 8.0.0
       "@types/passport-jwt":
         specifier: ^4.0.1
         version: 4.0.1
@@ -1700,10 +1697,10 @@ packages:
         integrity: sha512-OA3KGBCy6KtIvLf8DINC5880o5iBlDX4SxzLQS8HorJAbqluzLRn80UXU0bxZn7UOFhFgpRJDasfwn9nG4FG4A==,
       }
 
-  "@fastify/multipart@9.4.0":
+  "@fastify/multipart@10.0.0":
     resolution:
       {
-        integrity: sha512-Z404bzZeLSXTBmp/trCBuoVFX28pM7rhv849Q5TsbTFZHuk1lc4QjQITTPK92DKVpXmNtJXeHSSc7GYvqFpxAQ==,
+        integrity: sha512-pUx3Z1QStY7E7kwvDTIvB6P+rF5lzP+iqPgZyJyG3yBJVPvQaZxzDHYbQD89rbY0ciXrMOyGi8ezHDVexLvJDA==,
       }
 
   "@fastify/proxy-addr@5.1.0":
@@ -3746,13 +3743,6 @@ packages:
         integrity: sha512-/oJGukuH3D2+D+3H4JWLaAsJ/ji86dhRidzZ/Od7H/i8g+aCmvkeCc6Ni/f9uxGLSQVCRZkX2/lqEFG2BvWtlQ==,
       }
 
-  "@types/bcryptjs@3.0.0":
-    resolution:
-      {
-        integrity: sha512-WRZOuCuaz8UcZZE4R5HXTco2goQSI2XxjGY3hbM/xDvwmqFWd4ivooImsMx65OKM6CtNKbnZ5YL+YwAwK7c1dg==,
-      }
-    deprecated: This is a stub types definition. bcryptjs provides its own type definitions, so you do not need this installed.
-
   "@types/body-parser@1.19.6":
     resolution:
       {
@@ -3891,10 +3881,10 @@ packages:
         integrity: sha512-+qIYRKdNYJwY3vRCZMdJbPLJAtGjQBudzZzdzwQYkEPQd+PJGixUL5QfvCLDaULoLv+RhT3LDkwEfKaAkgSmNQ==,
       }
 
-  "@types/nodemailer@7.0.11":
+  "@types/nodemailer@8.0.0":
     resolution:
       {
-        integrity: sha512-E+U4RzR2dKrx+u3N4DlsmLaDC6mMZOM/TPROxA0UAPiTgI0y4CEFBmZE+coGWTjakDriRsXG368lNk1u9Q0a2g==,
+        integrity: sha512-fyf8jWULsCo0d0BuoQ75i6IeoHs47qcqxWc7yUdUcV0pOZGjUTTOvwdG1PRXUDqN/8A64yQdQdnA2pZgcdi+cA==,
       }
 
   "@types/passport-jwt@4.0.1":
@@ -6443,13 +6433,6 @@ packages:
       }
     engines: { node: ">=16.0.0" }
 
-  file-type@16.5.4:
-    resolution:
-      {
-        integrity: sha512-/yFHK0aGjFEgDJjEKP0pWCplsPFPhwyfwevf/pVxiN0tmE4L9LmwWxWukdJSHdoCli4VgQLehjJtwQBnqmsKcw==,
-      }
-    engines: { node: ">=10" }
-
   file-type@21.3.4:
     resolution:
       {
@@ -7846,12 +7829,12 @@ packages:
         integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==,
       }
 
-  music-metadata@7.14.0:
+  music-metadata@11.12.3:
     resolution:
       {
-        integrity: sha512-xrm3w7SV0Wk+OythZcSbaI8mcr/KHd0knJieu8bVpaPfMv/Agz5EooCAPz3OR5hbYMiUG6dgAPKZKnMzV+3amA==,
+        integrity: sha512-n6hSTZkuD59qWgHh6IP5dtDlDZQXoxk/bcA85Jywg8Z1iFrlNgl2+GTFgjZyn52W5UgQpV42V4XqrQZZAMbZTQ==,
       }
-    engines: { node: ">=10" }
+    engines: { node: ">=18" }
 
   mute-stream@2.0.0:
     resolution:
@@ -8305,13 +8288,6 @@ packages:
       }
     engines: { node: ">=20.19.0 || >=22.13.0 || >=24" }
 
-  peek-readable@4.1.0:
-    resolution:
-      {
-        integrity: sha512-ZI3LnwUv5nOGbQzD9c2iDG6toheuXSZP5esSHBjopsXH4dg19soufvpUGA3uohi5anFtGb2lhAVdHzH6R/Evvg==,
-      }
-    engines: { node: ">=8" }
-
   peek-stream@1.1.3:
     resolution:
       {
@@ -8678,13 +8654,6 @@ packages:
         integrity: sha512-oIGGmcpTLwPga8Bn6/Z75SVaH1z5dUut2ibSyAMVhmUggWpmDn2dapB0n7f8nwaSiRtepAsfJyfXIO5DCVAODg==,
       }
     engines: { node: ^12.22.0 || ^14.17.0 || >=16.0.0 }
-
-  readable-web-to-node-stream@3.0.4:
-    resolution:
-      {
-        integrity: sha512-9nX56alTf5bwXQ3ZDipHJhusu9NTQJ/CVPtb/XHAJCXihZeitfJvIRS4GqQ/mfIoOE3IelHMrpayVrosdHBuLw==,
-      }
-    engines: { node: ">=8" }
 
   readdir-glob@1.1.3:
     resolution:
@@ -9304,13 +9273,6 @@ packages:
       }
     engines: { node: ">=18" }
 
-  strtok3@6.3.0:
-    resolution:
-      {
-        integrity: sha512-fZtbhtvI9I48xDSywd/somNqgUHl2L2cstmXCCif0itOf96jeW18MBSyrLuNicYQVkvpOxkZtkzujiTJ9LW5Jw==,
-      }
-    engines: { node: ">=10" }
-
   super-regex@1.1.0:
     resolution:
       {
@@ -9529,13 +9491,6 @@ packages:
         integrity: sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==,
       }
     engines: { node: ">=0.6" }
-
-  token-types@4.2.1:
-    resolution:
-      {
-        integrity: sha512-6udB24Q737UD/SDsKAHI9FCRP7Bqc9D/MQUV02ORQg5iskjtLJlZJNdN4kKtcdtwCeWIwIHDGaUsTsCCAa8sFQ==,
-      }
-    engines: { node: ">=10" }
 
   token-types@6.1.2:
     resolution:
@@ -10200,6 +10155,12 @@ packages:
         integrity: sha512-NsmoXalsWVDMGupxZ5R08ka9flZjjiLvHVAWYOKtiKM8ujtZWr9cRffak+uSE48+Ob8ObalXpwyeUiyDD6QFgg==,
       }
     engines: { node: ">=8" }
+
+  win-guid@0.2.1:
+    resolution:
+      {
+        integrity: sha512-gEIQU4mkgl2OPeoNrWflcJFJ3Ae2BPd4eCsHHA/XikslkIVms/nHhvnvzIZV7VLmBvtFlDOzLt9rrZT+n6D67A==,
+      }
 
   word-wrap@1.2.5:
     resolution:
@@ -11049,7 +11010,7 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  "@fastify/multipart@9.4.0":
+  "@fastify/multipart@10.0.0":
     dependencies:
       "@fastify/busboy": 3.2.0
       "@fastify/deepmerge": 3.2.1
@@ -12099,10 +12060,6 @@ snapshots:
     dependencies:
       "@types/node": 25.6.0
 
-  "@types/bcryptjs@3.0.0":
-    dependencies:
-      bcryptjs: 3.0.3
-
   "@types/body-parser@1.19.6":
     dependencies:
       "@types/connect": 3.4.38
@@ -12184,7 +12141,7 @@ snapshots:
     dependencies:
       undici-types: 7.19.2
 
-  "@types/nodemailer@7.0.11":
+  "@types/nodemailer@8.0.0":
     dependencies:
       "@types/node": 25.6.0
 
@@ -13883,12 +13840,6 @@ snapshots:
     dependencies:
       flat-cache: 4.0.1
 
-  file-type@16.5.4:
-    dependencies:
-      readable-web-to-node-stream: 3.0.4
-      strtok3: 6.3.0
-      token-types: 4.2.1
-
   file-type@21.3.4:
     dependencies:
       "@tokenizer/inflate": 0.4.1
@@ -14628,15 +14579,18 @@ snapshots:
 
   muggle-string@0.4.1: {}
 
-  music-metadata@7.14.0:
+  music-metadata@11.12.3:
     dependencies:
+      "@borewit/text-codec": 0.2.2
       "@tokenizer/token": 0.3.0
       content-type: 1.0.5
       debug: 4.4.3
-      file-type: 16.5.4
+      file-type: 21.3.4
       media-typer: 1.1.0
-      strtok3: 6.3.0
-      token-types: 4.2.1
+      strtok3: 10.3.5
+      token-types: 6.1.2
+      uint8array-extras: 1.5.0
+      win-guid: 0.2.1
     transitivePeerDependencies:
       - supports-color
 
@@ -14891,8 +14845,6 @@ snapshots:
       "@napi-rs/canvas": 0.1.97
       node-readable-to-web-readable-stream: 0.4.2
 
-  peek-readable@4.1.0: {}
-
   peek-stream@1.1.3:
     dependencies:
       buffer-from: 1.1.2
@@ -15114,10 +15066,6 @@ snapshots:
       events: 3.3.0
       process: 0.11.10
       string_decoder: 1.3.0
-
-  readable-web-to-node-stream@3.0.4:
-    dependencies:
-      readable-stream: 4.7.0
 
   readdir-glob@1.1.3:
     dependencies:
@@ -15507,11 +15455,6 @@ snapshots:
     dependencies:
       "@tokenizer/token": 0.3.0
 
-  strtok3@6.3.0:
-    dependencies:
-      "@tokenizer/token": 0.3.0
-      peek-readable: 4.1.0
-
   super-regex@1.1.0:
     dependencies:
       function-timeout: 1.0.2
@@ -15656,11 +15599,6 @@ snapshots:
   toad-cache@3.7.0: {}
 
   toidentifier@1.0.1: {}
-
-  token-types@4.2.1:
-    dependencies:
-      "@tokenizer/token": 0.3.0
-      ieee754: 1.2.1
 
   token-types@6.1.2:
     dependencies:
@@ -16087,6 +16025,8 @@ snapshots:
   widest-line@3.1.0:
     dependencies:
       string-width: 4.2.3
+
+  win-guid@0.2.1: {}
 
   word-wrap@1.2.5: {}
 

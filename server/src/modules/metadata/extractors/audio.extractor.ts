@@ -38,7 +38,7 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
 
     const publisher = common.label?.[0] ?? null;
     const publishedYear = common.year ?? null;
-    const description = common.comment?.[0] ?? null;
+    const description = extractCommentText(common.comment as unknown);
     const language = common.language ?? null;
 
     const durationSeconds = format.duration !== undefined ? Math.round(format.duration) : null;
@@ -100,4 +100,20 @@ function splitArtists(raw: string): string[] {
     .split(/[;/]/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function extractCommentText(rawComments: unknown): string | null {
+  if (!Array.isArray(rawComments)) return null;
+
+  for (const comment of rawComments) {
+    if (typeof comment === 'string' && comment.trim().length > 0) {
+      return comment;
+    }
+
+    if (typeof comment === 'object' && comment !== null && 'text' in comment && typeof comment.text === 'string' && comment.text.trim().length > 0) {
+      return comment.text;
+    }
+  }
+
+  return null;
 }
