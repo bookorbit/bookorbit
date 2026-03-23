@@ -19,6 +19,7 @@ import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
+import { ComicMetadataService } from './comic-metadata.service';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
@@ -40,6 +41,7 @@ export class BookService {
     private readonly appSettings: AppSettingsService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly narratorService: NarratorService,
+    private readonly comicMetadataService: ComicMetadataService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {
@@ -62,6 +64,7 @@ export class BookService {
     openLibraryId?: string | null;
     itunesId?: string | null;
     audibleId?: string | null;
+    comicvineId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -71,11 +74,15 @@ export class BookService {
     if (meta.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
     if (meta.itunesId) providerIds[MetadataProviderKey.ITUNES] = meta.itunesId;
     if (meta.audibleId) providerIds[MetadataProviderKey.AUDIBLE] = meta.audibleId;
+    if (meta.comicvineId) providerIds[MetadataProviderKey.COMICVINE] = meta.comicvineId;
     return providerIds;
   }
 
   private applyResolvedProviderIds(
-    dto: Pick<UpdateBookMetadataDto, 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId'>,
+    dto: Pick<
+      UpdateBookMetadataDto,
+      'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId' | 'comicvineId'
+    >,
     providerIds: Partial<Record<MetadataProviderKey, string>>,
   ): void {
     if (providerIds[MetadataProviderKey.GOOGLE]) dto.googleBooksId = providerIds[MetadataProviderKey.GOOGLE];
@@ -85,6 +92,7 @@ export class BookService {
     if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) dto.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
     if (providerIds[MetadataProviderKey.ITUNES]) dto.itunesId = providerIds[MetadataProviderKey.ITUNES];
     if (providerIds[MetadataProviderKey.AUDIBLE]) dto.audibleId = providerIds[MetadataProviderKey.AUDIBLE];
+    if (providerIds[MetadataProviderKey.COMICVINE]) dto.comicvineId = providerIds[MetadataProviderKey.COMICVINE];
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -322,10 +330,15 @@ export class BookService {
     if ('audibleId' in dto) scalarFields.audibleId = dto.audibleId ?? null;
     if ('durationSeconds' in dto) scalarFields.durationSeconds = dto.durationSeconds ?? null;
     if ('abridged' in dto) scalarFields.abridged = dto.abridged ?? false;
+    if ('comicvineId' in dto) scalarFields.comicvineId = dto.comicvineId ?? null;
 
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();
       await this.bookRepo.updateMetadataFields(id, scalarFields);
+    }
+
+    if (dto.comicMetadata) {
+      await this.comicMetadataService.upsert(id, dto.comicMetadata);
     }
 
     if (dto.authors !== undefined) {
@@ -624,7 +637,11 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, readStatus] = await Promise.all([this.bookRepo.findById(id), this.userBookStatusService.findOne(user.id, id)]);
+    const [result, readStatus, comicMeta] = await Promise.all([
+      this.bookRepo.findById(id),
+      this.userBookStatusService.findOne(user.id, id),
+      this.comicMetadataService.findByBookId(id),
+    ]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
     const { book, authorRows, genreRows, tagRows, fileRows, narratorRows } = result;
@@ -658,6 +675,7 @@ export class BookService {
         [MetadataProviderKey.OPEN_LIBRARY]: meta?.openLibraryId ?? null,
         [MetadataProviderKey.ITUNES]: meta?.itunesId ?? null,
         [MetadataProviderKey.AUDIBLE]: meta?.audibleId ?? null,
+        [MetadataProviderKey.COMICVINE]: meta?.comicvineId ?? null,
       },
       authors: authorRows,
       narrators: narratorRows.map((n, i) => ({ id: n.id, name: n.name, sortName: n.sortName, displayOrder: i })),
@@ -680,6 +698,21 @@ export class BookService {
       abridged: meta?.abridged ?? false,
       chapters: (meta?.chapters as AudiobookChapter[] | null) ?? null,
       formatPriority: (book.libraries?.formatPriority as string[] | null) ?? [],
+      comicMetadata: comicMeta
+        ? {
+            issueNumber: comicMeta.issueNumber ?? undefined,
+            volumeName: comicMeta.volumeName ?? undefined,
+            pencillers: comicMeta.pencillers ?? undefined,
+            inkers: comicMeta.inkers ?? undefined,
+            colorists: comicMeta.colorists ?? undefined,
+            letterers: comicMeta.letterers ?? undefined,
+            coverArtists: comicMeta.coverArtists ?? undefined,
+            characters: comicMeta.characters ?? undefined,
+            teams: comicMeta.teams ?? undefined,
+            locations: comicMeta.locations ?? undefined,
+            storyArcs: comicMeta.storyArcs ?? undefined,
+          }
+        : null,
     };
   }
 }

@@ -17,6 +17,8 @@ import { AudibleProvider } from './providers/audible/audible.provider';
 import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
 import { HardcoverClient } from './providers/hardcover/hardcover.client';
 import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
+import { ComicVineClient } from './providers/comicvine/comicvine.client';
+import { ComicVineProvider } from './providers/comicvine/comicvine.provider';
 
 const PROVIDER_CLASSES = [
   GoogleProvider,
@@ -27,6 +29,7 @@ const PROVIDER_CLASSES = [
   AudibleProvider,
   AudnexusProvider,
   HardcoverProvider,
+  ComicVineProvider,
 ];
 
 @Module({
@@ -39,6 +42,7 @@ const PROVIDER_CLASSES = [
       inject: PROVIDER_CLASSES,
     },
     HardcoverClient,
+    ComicVineClient,
     ProviderRegistry,
     ProviderThrottleTracker,
     MetadataFetchService,

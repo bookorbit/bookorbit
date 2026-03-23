@@ -1,4 +1,19 @@
-import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ComicMetadataDto {
+  @IsOptional() @IsString() @MaxLength(50) issueNumber?: string;
+  @IsOptional() @IsString() @MaxLength(500) volumeName?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) pencillers?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) inkers?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) colorists?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) letterers?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) coverArtists?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) characters?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) teams?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) locations?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) storyArcs?: string[];
+}
 
 export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(1000) title?: string | null;
@@ -26,4 +41,6 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
   @IsOptional() @IsInt() @Min(0) durationSeconds?: number | null;
   @IsOptional() @IsBoolean() abridged?: boolean | null;
+  @IsOptional() @IsString() @MaxLength(50) comicvineId?: string | null;
+  @IsOptional() @ValidateNested() @Type(() => ComicMetadataDto) comicMetadata?: ComicMetadataDto;
 }

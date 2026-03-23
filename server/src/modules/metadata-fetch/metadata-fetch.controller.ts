@@ -11,6 +11,11 @@ import { MetadataSearchParams } from './providers/metadata-search-params';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
+function normalizeSearchTitle(title: string | undefined): string | undefined {
+  if (!title) return title;
+  return title.trim().replace(/#0*(\d+)/g, '#$1');
+}
+
 @Controller('metadata-fetch')
 export class MetadataFetchController {
   constructor(
@@ -52,7 +57,7 @@ export class MetadataFetchController {
     const isAudiobook = dto.isAudiobook ?? (requestedAudiobookProvider || Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE]));
 
     const params: MetadataSearchParams = {
-      title: dto.title,
+      title: normalizeSearchTitle(dto.title),
       author: dto.author,
       isbn: dto.isbn,
       existingProviderIds,

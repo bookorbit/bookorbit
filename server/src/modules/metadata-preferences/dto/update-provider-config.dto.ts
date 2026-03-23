@@ -26,6 +26,11 @@ export class AudibleProviderConfigDto {
   @IsOptional() @IsString() domain?: string;
 }
 
+export class ComicVineProviderConfigDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsString() apiKey?: string;
+}
+
 export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => GoogleProviderConfigDto) google?: GoogleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => AmazonProviderConfigDto) amazon?: AmazonProviderConfigDto;
@@ -35,4 +40,5 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) itunes?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => AudibleProviderConfigDto) audible?: AudibleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) audnexus?: SimpleProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => ComicVineProviderConfigDto) comicvine?: ComicVineProviderConfigDto;
 }

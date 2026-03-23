@@ -32,6 +32,18 @@ export function useMetadataEditor() {
     openLibraryId: null as string | null,
     itunesId: null as string | null,
     audibleId: null as string | null,
+    comicvineId: null as string | null,
+    comicIssueNumber: null as string | null,
+    comicVolumeName: null as string | null,
+    comicStoryArcs: [] as string[],
+    comicPencillers: [] as string[],
+    comicInkers: [] as string[],
+    comicColorists: [] as string[],
+    comicLetterers: [] as string[],
+    comicCoverArtists: [] as string[],
+    comicCharacters: [] as string[],
+    comicTeams: [] as string[],
+    comicLocations: [] as string[],
   })
 
   const snapshot = ref(JSON.stringify(form))
@@ -64,6 +76,19 @@ export function useMetadataEditor() {
     form.openLibraryId = book.providerIds.openLibrary ?? null
     form.itunesId = book.providerIds.itunes ?? null
     form.audibleId = book.providerIds.audible ?? null
+    form.comicvineId = book.providerIds.comicvine ?? null
+    const cm = book.comicMetadata
+    form.comicIssueNumber = cm?.issueNumber ?? null
+    form.comicVolumeName = cm?.volumeName ?? null
+    form.comicStoryArcs = cm?.storyArcs ?? []
+    form.comicPencillers = cm?.pencillers ?? []
+    form.comicInkers = cm?.inkers ?? []
+    form.comicColorists = cm?.colorists ?? []
+    form.comicLetterers = cm?.letterers ?? []
+    form.comicCoverArtists = cm?.coverArtists ?? []
+    form.comicCharacters = cm?.characters ?? []
+    form.comicTeams = cm?.teams ?? []
+    form.comicLocations = cm?.locations ?? []
     snapshot.value = JSON.stringify(form)
     error.value = null
   }
@@ -74,6 +99,39 @@ export function useMetadataEditor() {
     error.value = null
   }
 
+  function buildPayload() {
+    const {
+      comicIssueNumber,
+      comicVolumeName,
+      comicStoryArcs,
+      comicPencillers,
+      comicInkers,
+      comicColorists,
+      comicLetterers,
+      comicCoverArtists,
+      comicCharacters,
+      comicTeams,
+      comicLocations,
+      ...rest
+    } = form
+    return {
+      ...rest,
+      comicMetadata: {
+        issueNumber: comicIssueNumber ?? undefined,
+        volumeName: comicVolumeName ?? undefined,
+        storyArcs: comicStoryArcs,
+        pencillers: comicPencillers,
+        inkers: comicInkers,
+        colorists: comicColorists,
+        letterers: comicLetterers,
+        coverArtists: comicCoverArtists,
+        characters: comicCharacters,
+        teams: comicTeams,
+        locations: comicLocations,
+      },
+    }
+  }
+
   async function save(bookId: number): Promise<BookDetail | null> {
     saving.value = true
     error.value = null
@@ -81,7 +139,7 @@ export function useMetadataEditor() {
       const res = await api(`/api/v1/books/${bookId}/metadata`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(buildPayload()),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const updated: BookDetail = await res.json()

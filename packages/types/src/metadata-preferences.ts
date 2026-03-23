@@ -95,6 +95,11 @@ export interface AudnexusProviderConfig {
   enabled: boolean;
 }
 
+export interface ComicVineProviderConfig {
+  enabled: boolean;
+  apiKey: string;
+}
+
 export interface ProviderConfigurations {
   google: GoogleProviderConfig;
   amazon: AmazonProviderConfig;
@@ -104,6 +109,7 @@ export interface ProviderConfigurations {
   itunes: SimpleProviderConfig;
   audible: AudibleProviderConfig;
   audnexus: AudnexusProviderConfig;
+  comicvine: ComicVineProviderConfig;
 }
 
 export interface ProviderStatus {

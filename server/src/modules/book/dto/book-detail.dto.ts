@@ -1,4 +1,4 @@
-import type { AudiobookChapter, NarratorRef, ProviderIds, UserBookStatus } from '@projectx/types';
+import type { AudiobookChapter, ComicMetadataFields, NarratorRef, ProviderIds, UserBookStatus } from '@projectx/types';
 
 export class BookFileDto {
   id: number;
@@ -44,4 +44,5 @@ export class BookDetailDto {
   abridged: boolean;
   chapters: AudiobookChapter[] | null;
   formatPriority: string[];
+  comicMetadata: ComicMetadataFields | null;
 }

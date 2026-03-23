@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, ChevronDown, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
@@ -78,6 +78,145 @@ const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
 const coverNaturalWidth = ref(0)
 const coverNaturalHeight = ref(0)
+const genresExpanded = ref(false)
+const genreMeasureContainer = ref<HTMLElement | null>(null)
+const genreHiddenCount = ref(0)
+const visibleGenreCount = ref(0)
+const displayedGenres = computed(() => {
+  if (genresExpanded.value || genreHiddenCount.value === 0) return props.book.genres
+  const count = visibleGenreCount.value > 0 ? visibleGenreCount.value : props.book.genres.length
+  return props.book.genres.slice(0, count)
+})
+const MORE_BUTTON_RESERVED_WIDTH = 72
+
+function getUniqueRowTops(values: number[]): number[] {
+  const rows: number[] = []
+  for (const value of values) {
+    if (!rows.some((rowTop) => Math.abs(rowTop - value) <= 1)) rows.push(value)
+  }
+  return rows.sort((a, b) => a - b)
+}
+
+function getRowTop(metrics: Array<{ top: number; right: number }>): number | null {
+  const tops = getUniqueRowTops(metrics.map((metric) => metric.top))
+  return tops.length > 0 ? tops[0]! : null
+}
+
+function getRowRight(metrics: Array<{ top: number; right: number }>, rowTop: number): number {
+  const rowItems = metrics.filter((metric) => Math.abs(metric.top - rowTop) <= 1)
+  return rowItems.length ? Math.max(...rowItems.map((metric) => metric.right)) : 0
+}
+
+function ensureMoreButtonFitsSecondRow(
+  metrics: Array<{ top: number; right: number }>,
+  secondRowTop: number,
+  containerWidth: number,
+  initialVisibleCount: number,
+) {
+  let visibleCount = initialVisibleCount
+  let hiddenCount = metrics.length - visibleCount
+
+  while (hiddenCount > 0 && visibleCount > 0) {
+    const visibleMetrics = metrics.slice(0, visibleCount)
+    const currentSecondRowTop = getRowTop(visibleMetrics.filter((metric) => metric.top >= secondRowTop - 1))
+    const rowTop = currentSecondRowTop ?? secondRowTop
+    const remainingWidth = containerWidth - getRowRight(visibleMetrics, rowTop)
+    if (remainingWidth >= MORE_BUTTON_RESERVED_WIDTH) break
+    visibleCount -= 1
+    hiddenCount += 1
+  }
+
+  return { visibleCount, hiddenCount }
+}
+
+function resetGenreFoldState() {
+  visibleGenreCount.value = props.book.genres.length
+  genreHiddenCount.value = 0
+}
+
+function measureGenreOverflow() {
+  const container = genreMeasureContainer.value
+  if (!container) {
+    resetGenreFoldState()
+    return
+  }
+
+  const pills = Array.from(container.querySelectorAll<HTMLElement>('[data-genre-pill="true"]'))
+  if (pills.length === 0) {
+    resetGenreFoldState()
+    return
+  }
+
+  const containerRect = container.getBoundingClientRect()
+  const containerWidth = container.clientWidth
+  const pillMetrics = pills.map((pill) => {
+    const rect = pill.getBoundingClientRect()
+    return {
+      top: rect.top - containerRect.top,
+      right: rect.right - containerRect.left,
+    }
+  })
+
+  const rowTops = getUniqueRowTops(pillMetrics.map((metric) => metric.top))
+  if (rowTops.length <= 2) {
+    resetGenreFoldState()
+    return
+  }
+
+  const secondRowTop = rowTops[1]!
+  let visibleCount = pillMetrics.findIndex((metric) => metric.top > secondRowTop + 1)
+  if (visibleCount === -1) visibleCount = pillMetrics.length
+
+  const fitted = ensureMoreButtonFitsSecondRow(pillMetrics, secondRowTop, containerWidth, visibleCount)
+  visibleGenreCount.value = fitted.visibleCount
+  genreHiddenCount.value = fitted.hiddenCount
+}
+
+let genreResizeObserver: ResizeObserver | null = null
+let genreMeasureFrame: number | null = null
+
+function scheduleGenreOverflowMeasure() {
+  void nextTick(() => {
+    if (genreMeasureFrame != null) cancelAnimationFrame(genreMeasureFrame)
+    genreMeasureFrame = requestAnimationFrame(() => {
+      genreMeasureFrame = null
+      measureGenreOverflow()
+    })
+  })
+}
+
+watch(
+  () => `${props.book.id}:${props.book.genres.join('|')}`,
+  () => {
+    genresExpanded.value = false
+    resetGenreFoldState()
+    scheduleGenreOverflowMeasure()
+  },
+  { immediate: true },
+)
+
+watch(genreMeasureContainer, (current, previous) => {
+  if (genreResizeObserver && previous) genreResizeObserver.unobserve(previous)
+  if (genreResizeObserver && current) genreResizeObserver.observe(current)
+  scheduleGenreOverflowMeasure()
+})
+
+onMounted(() => {
+  genreResizeObserver = new ResizeObserver(() => {
+    scheduleGenreOverflowMeasure()
+  })
+  if (genreMeasureContainer.value) genreResizeObserver.observe(genreMeasureContainer.value)
+  window.addEventListener('resize', scheduleGenreOverflowMeasure)
+})
+
+onBeforeUnmount(() => {
+  if (genreMeasureFrame != null) cancelAnimationFrame(genreMeasureFrame)
+  if (genreResizeObserver) {
+    genreResizeObserver.disconnect()
+    genreResizeObserver = null
+  }
+  window.removeEventListener('resize', scheduleGenreOverflowMeasure)
+})
 
 const { hasPermission } = usePermissions()
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
@@ -770,17 +909,50 @@ watch(
       </div>
 
       <!-- Genres + Tags -->
-      <div v-if="book.genres.length || book.tags.length" class="flex flex-wrap gap-1.5 mt-4">
-        <span v-for="genre in book.genres" :key="genre" class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80">
-          {{ genre }}
-        </span>
-        <span
-          v-for="tag in book.tags"
-          :key="tag"
-          class="text-xs px-2.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        >
-          #{{ tag }}
-        </span>
+      <div v-if="book.genres.length || book.tags.length" class="mt-4 space-y-1.5">
+        <div v-if="book.genres.length" class="relative">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span
+              v-for="(genre, index) in displayedGenres"
+              :key="`${genre}-${index}`"
+              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80"
+            >
+              {{ genre }}
+            </span>
+            <button
+              v-if="genreHiddenCount > 0"
+              type="button"
+              class="text-xs font-medium text-foreground/75 hover:text-foreground transition-colors whitespace-nowrap"
+              @click="genresExpanded = !genresExpanded"
+            >
+              {{ genresExpanded ? 'Show less' : `+${genreHiddenCount} more` }}
+            </button>
+          </div>
+          <div
+            ref="genreMeasureContainer"
+            aria-hidden="true"
+            class="pointer-events-none absolute left-0 top-0 -z-10 invisible flex w-full flex-wrap gap-1.5"
+          >
+            <span
+              v-for="(genre, index) in book.genres"
+              :key="`measure-${genre}-${index}`"
+              data-genre-pill="true"
+              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80"
+            >
+              {{ genre }}
+            </span>
+          </div>
+        </div>
+
+        <div v-if="book.tags.length" class="flex flex-wrap gap-1.5">
+          <span
+            v-for="tag in book.tags"
+            :key="tag"
+            class="text-xs px-2.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          >
+            #{{ tag }}
+          </span>
+        </div>
       </div>
 
       <!-- Metadata grid -->

@@ -26,6 +26,7 @@ describe('AudnexusProvider', () => {
     itunes: { enabled: true },
     audible: { enabled: false, domain: 'audible.com' },
     audnexus: { enabled: true },
+    comicvine: { enabled: false, apiKey: '' },
   };
 
   beforeEach(async () => {

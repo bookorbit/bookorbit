@@ -1,5 +1,6 @@
 import type { MetadataProviderKey } from "./metadata-fetch";
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
+import type { ComicMetadataFields } from "./metadata-fetch";
 
 export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2", "m4b", "mp3", "m4a", "opus", "ogg", "flac"] as const;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
@@ -92,6 +93,7 @@ export type BookDetail = {
   abridged: boolean;
   chapters: AudiobookChapter[] | null;
   formatPriority: string[];
+  comicMetadata: ComicMetadataFields | null;
 };
 
 export type BookKoboReadingState = {

@@ -62,6 +62,7 @@ export const bookMetadata = pgTable(
     durationSeconds: integer('duration_seconds'),
     abridged: boolean('abridged').notNull().default(false),
     audibleId: varchar('audible_id', { length: 20 }),
+    comicvineId: varchar('comicvine_id', { length: 50 }),
     chapters: jsonb('chapters'),
     updatedAt: timestamp('updated_at')
       .defaultNow()

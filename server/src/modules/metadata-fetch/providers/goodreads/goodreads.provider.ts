@@ -56,12 +56,12 @@ export class GoodreadsProvider implements IdentifiableProvider {
   private async searchIds(params: MetadataSearchParams): Promise<string[]> {
     const query = [params.title, params.author].filter(Boolean).join(' ');
     const url = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}&search_type=books`;
-    const html = await this.fetchHtml(url);
+    const html = await this.fetchHtml(url, 'search', query);
     return html ? extractBookIds(html, params.title, MAX_RESULTS) : [];
   }
 
   private async findIdByIsbn(isbn: string): Promise<string | null> {
-    const html = await this.fetchHtml(`https://www.goodreads.com/book/isbn/${isbn}`);
+    const html = await this.fetchHtml(`https://www.goodreads.com/book/isbn/${isbn}`, 'search-by-isbn', isbn);
     if (!html) return null;
     return (
       html.match(/property="og:url"\s+content="[^"]*\/book\/show\/(\d+)/)?.[1] ??
@@ -71,7 +71,8 @@ export class GoodreadsProvider implements IdentifiableProvider {
   }
 
   private async fetchBook(bookId: string): Promise<MetadataCandidate | null> {
-    const html = await this.fetchHtml(`https://www.goodreads.com/book/show/${bookId}`);
+    const url = `https://www.goodreads.com/book/show/${bookId}`;
+    const html = await this.fetchHtml(url, 'lookup', undefined, bookId);
     if (!html) return null;
     const nextData = extractNextData(html);
     const state = nextData?.props?.pageProps?.apolloState;
@@ -79,17 +80,32 @@ export class GoodreadsProvider implements IdentifiableProvider {
     return mapGoodreadsApolloState(state, bookId);
   }
 
-  private async fetchHtml(url: string): Promise<string | null> {
+  private async fetchHtml(url: string, op: 'search' | 'search-by-isbn' | 'lookup', query?: string, providerId?: string): Promise<string | null> {
+    const startedAt = Date.now();
+    this.logger.log(`[goodreads] fetch.start op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
     try {
       const res = await fetchWithThrottle(url, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
-        this.logger.warn(`Goodreads returned ${res.status} for ${url}`);
+        this.logger.warn(
+          `[goodreads] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+        );
         return null;
       }
-      return res.text();
+      const html = await res.text();
+      this.logger.log(
+        `[goodreads] fetch.end op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
+      );
+      return html;
     } catch (err) {
-      if (err instanceof ProviderThrottleError) throw err;
-      this.logger.warn(`Goodreads fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(
+          `[goodreads] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
+        );
+        throw err;
+      }
+      this.logger.warn(
+        `[goodreads] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+      );
       return null;
     }
   }

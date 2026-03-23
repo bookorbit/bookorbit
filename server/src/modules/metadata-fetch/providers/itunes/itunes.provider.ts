@@ -33,18 +33,32 @@ export class ITunesProvider implements IdentifiableProvider {
     url.searchParams.set('term', query);
     url.searchParams.set('entity', params.isAudiobook ? 'audiobook' : 'ebook');
     url.searchParams.set('limit', '10');
+    const requestUrl = url.toString();
+    const startedAt = Date.now();
+    this.logger.log(`[itunes] fetch.start op=search query="${query}"`);
 
     try {
-      const res = await fetchWithThrottle(url.toString(), { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
-        this.logger.warn(`iTunes Search API returned ${res.status} for search("${query}")`);
+        this.logger.warn(
+          `[itunes] fetch.fail op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+        );
         return [];
       }
       const body = (await res.json()) as ITunesResponse;
-      return body.results.map(mapITunesResult);
+      const results = body.results.map(mapITunesResult);
+      this.logger.log(
+        `[itunes] fetch.end op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
+      );
+      return results;
     } catch (err) {
-      if (err instanceof ProviderThrottleError) throw err;
-      this.logger.error(`iTunes search failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(`[itunes] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        throw err;
+      }
+      this.logger.error(
+        `[itunes] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+      );
       return [];
     }
   }
@@ -55,18 +69,32 @@ export class ITunesProvider implements IdentifiableProvider {
 
     const url = new URL(LOOKUP_URL);
     url.searchParams.set('id', providerId);
+    const requestUrl = url.toString();
+    const startedAt = Date.now();
+    this.logger.log(`[itunes] fetch.start op=lookup providerId="${providerId}"`);
 
     try {
-      const res = await fetchWithThrottle(url.toString(), { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
-        this.logger.warn(`iTunes Lookup API returned ${res.status} for lookupById(${providerId})`);
+        this.logger.warn(
+          `[itunes] fetch.fail op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+        );
         return null;
       }
       const body = (await res.json()) as ITunesResponse;
-      return body.results.length > 0 ? mapITunesResult(body.results[0]) : null;
+      const result = body.results.length > 0 ? mapITunesResult(body.results[0]) : null;
+      this.logger.log(
+        `[itunes] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
+      );
+      return result;
     } catch (err) {
-      if (err instanceof ProviderThrottleError) throw err;
-      this.logger.error(`iTunes lookup failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(`[itunes] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        throw err;
+      }
+      this.logger.error(
+        `[itunes] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+      );
       return null;
     }
   }

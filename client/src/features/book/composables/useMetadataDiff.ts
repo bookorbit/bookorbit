@@ -1,5 +1,18 @@
 import { computed, reactive } from 'vue'
-import type { MetadataCandidate, MetadataProviderKey, MetadataSource } from '@projectx/types'
+import type { ComicMetadataFields, MetadataCandidate, MetadataProviderKey, MetadataSource } from '@projectx/types'
+
+type ComicDiffFieldKey =
+  | 'comicIssueNumber'
+  | 'comicVolumeName'
+  | 'comicPencillers'
+  | 'comicInkers'
+  | 'comicColorists'
+  | 'comicLetterers'
+  | 'comicCoverArtists'
+  | 'comicCharacters'
+  | 'comicTeams'
+  | 'comicLocations'
+  | 'comicStoryArcs'
 
 export type DiffFieldKey =
   | 'title'
@@ -21,6 +34,7 @@ export type DiffFieldKey =
   | 'coverUrl'
   | 'providerId'
   | 'sourceUrl'
+  | ComicDiffFieldKey
 
 export interface DiffField {
   key: DiffFieldKey
@@ -58,6 +72,8 @@ export interface MetadataPatch {
   openLibraryId?: string | null
   itunesId?: string | null
   audibleId?: string | null
+  comicvineId?: string | null
+  comicMetadata?: ComicMetadataFields
 }
 
 const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
@@ -80,7 +96,35 @@ const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'abridged', label: 'Abridged' },
 ]
 
-type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId'
+interface ComicFieldDef {
+  key: ComicDiffFieldKey
+  label: string
+  comicKey: keyof ComicMetadataFields
+}
+
+const COMIC_FIELD_DEFS: ComicFieldDef[] = [
+  { key: 'comicIssueNumber', label: 'Issue Number', comicKey: 'issueNumber' },
+  { key: 'comicVolumeName', label: 'Volume', comicKey: 'volumeName' },
+  { key: 'comicPencillers', label: 'Pencillers', comicKey: 'pencillers' },
+  { key: 'comicInkers', label: 'Inkers', comicKey: 'inkers' },
+  { key: 'comicColorists', label: 'Colorists', comicKey: 'colorists' },
+  { key: 'comicLetterers', label: 'Letterers', comicKey: 'letterers' },
+  { key: 'comicCoverArtists', label: 'Cover Artists', comicKey: 'coverArtists' },
+  { key: 'comicCharacters', label: 'Characters', comicKey: 'characters' },
+  { key: 'comicTeams', label: 'Teams', comicKey: 'teams' },
+  { key: 'comicLocations', label: 'Locations', comicKey: 'locations' },
+  { key: 'comicStoryArcs', label: 'Story Arcs', comicKey: 'storyArcs' },
+]
+
+const COMIC_KEY_MAP: Record<ComicDiffFieldKey, keyof ComicMetadataFields> = Object.fromEntries(
+  COMIC_FIELD_DEFS.map((d) => [d.key, d.comicKey]),
+) as Record<ComicDiffFieldKey, keyof ComicMetadataFields>
+
+function isComicDiffFieldKey(key: DiffFieldKey): key is ComicDiffFieldKey {
+  return key in COMIC_KEY_MAP
+}
+
+type ProviderIdPatchField = 'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId' | 'comicvineId'
 
 const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
@@ -91,6 +135,7 @@ const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | unde
   itunes: 'itunesId',
   audible: 'audibleId',
   audnexus: undefined,
+  comicvine: 'comicvineId',
 }
 
 const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
@@ -102,12 +147,14 @@ const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
   itunes: 'iTunes ID',
   audible: 'Audible ID',
   audnexus: 'AudNexus ID',
+  comicvine: 'ComicVine ID',
 }
 
 export function useMetadataDiff(current: MetadataSource, candidate: MetadataCandidate, currentCoverUrl?: string, currentProviderId?: string | null) {
   const copiedFields = reactive(new Set<DiffFieldKey>())
 
   function getBookValue(key: DiffFieldKey): string {
+    if (isComicDiffFieldKey(key)) return ''
     if (key === 'authors') return current.authors.join(', ')
     if (key === 'genres') return current.genres.join(', ')
     if (key === 'narrators') return current.narrators?.join(', ') ?? ''
@@ -117,6 +164,12 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
   }
 
   function getCandidateValue(key: DiffFieldKey): string {
+    if (isComicDiffFieldKey(key)) {
+      const comicKey = COMIC_KEY_MAP[key]
+      const val = candidate.comicMetadata?.[comicKey]
+      if (Array.isArray(val)) return val.join(', ')
+      return val ?? ''
+    }
     if (key === 'coverUrl') return candidate.coverUrl ?? ''
     if (key === 'authors') return (candidate.authors ?? []).join(', ')
     if (key === 'genres') return (candidate.genres ?? []).join(', ')
@@ -125,69 +178,76 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
     return val != null ? String(val) : ''
   }
 
-  const fields = computed<DiffField[]>(
-    () =>
-      [
-        ...FIELD_DEFS.flatMap((def) => {
-          const candidateVal = getCandidateValue(def.key)
-          const bookVal = getBookValue(def.key)
-          if (def.key === 'coverUrl') {
-            if (!candidateVal && !bookVal) return []
-          } else {
-            if (!candidateVal) return []
-          }
-          const isCopied = copiedFields.has(def.key)
-          return [
-            {
-              key: def.key,
-              label: def.label,
-              bookValue: bookVal,
-              currentDisplay: isCopied ? candidateVal : bookVal,
-              candidateDisplay: candidateVal,
-              hasDiff: bookVal !== candidateVal,
-              isCopied,
-              isCover: def.key === 'coverUrl',
-              isCopyable: true,
-            },
-          ]
-        }),
-        ...(candidate.providerId || currentProviderId
-          ? [
-              (() => {
-                const providerIsCopied = copiedFields.has('providerId')
-                const candidateProviderId = candidate.providerId ?? ''
-                const existingProviderId = currentProviderId ?? ''
-                return {
-                  key: 'providerId' as const,
-                  label: PROVIDER_ID_LABEL[candidate.provider] ?? 'Provider ID',
-                  bookValue: existingProviderId,
-                  currentDisplay: providerIsCopied ? candidateProviderId : existingProviderId,
-                  candidateDisplay: candidateProviderId,
-                  hasDiff: existingProviderId !== candidateProviderId,
-                  isCopied: providerIsCopied,
-                  isCover: false,
-                  isCopyable: true,
-                }
-              })(),
-            ]
-          : []),
-        ...(candidate.sourceUrl
-          ? [
-              {
-                key: 'sourceUrl' as const,
-                label: 'Source URL',
-                bookValue: '',
-                currentDisplay: '',
-                candidateDisplay: candidate.sourceUrl,
-                hasDiff: true,
-                isCopied: false,
-                isCover: false,
-                isCopyable: false,
-              },
-            ]
-          : []),
-      ] as DiffField[],
-  )
+  function makeRow(key: DiffFieldKey, label: string): DiffField | null {
+    const candidateVal = getCandidateValue(key)
+    const bookVal = getBookValue(key)
+    if (key === 'coverUrl') {
+      if (!candidateVal && !bookVal) return null
+    } else {
+      if (!candidateVal) return null
+    }
+    const isCopied = copiedFields.has(key)
+    return {
+      key,
+      label,
+      bookValue: bookVal,
+      currentDisplay: isCopied ? candidateVal : bookVal,
+      candidateDisplay: candidateVal,
+      hasDiff: bookVal !== candidateVal,
+      isCopied,
+      isCover: key === 'coverUrl',
+      isCopyable: true,
+    }
+  }
+
+  const fields = computed<DiffField[]>(() => {
+    const rows: DiffField[] = []
+
+    for (const def of FIELD_DEFS) {
+      const row = makeRow(def.key, def.label)
+      if (row) rows.push(row)
+    }
+
+    if (candidate.comicMetadata) {
+      for (const def of COMIC_FIELD_DEFS) {
+        const row = makeRow(def.key, def.label)
+        if (row) rows.push(row)
+      }
+    }
+
+    if (candidate.providerId || currentProviderId) {
+      const providerIsCopied = copiedFields.has('providerId')
+      const candidateProviderId = candidate.providerId ?? ''
+      const existingProviderId = currentProviderId ?? ''
+      rows.push({
+        key: 'providerId',
+        label: PROVIDER_ID_LABEL[candidate.provider] ?? 'Provider ID',
+        bookValue: existingProviderId,
+        currentDisplay: providerIsCopied ? candidateProviderId : existingProviderId,
+        candidateDisplay: candidateProviderId,
+        hasDiff: existingProviderId !== candidateProviderId,
+        isCopied: providerIsCopied,
+        isCover: false,
+        isCopyable: true,
+      })
+    }
+
+    if (candidate.sourceUrl) {
+      rows.push({
+        key: 'sourceUrl',
+        label: 'Source URL',
+        bookValue: '',
+        currentDisplay: '',
+        candidateDisplay: candidate.sourceUrl,
+        hasDiff: true,
+        isCopied: false,
+        isCover: false,
+        isCopyable: false,
+      })
+    }
+
+    return rows
+  })
 
   function toggleField(key: DiffFieldKey) {
     if (copiedFields.has(key)) copiedFields.delete(key)
@@ -209,8 +269,14 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
   function buildPatch(): { formPatch: MetadataPatch; coverUrl?: string } {
     const formPatch: MetadataPatch = {}
     let coverUrl: string | undefined
+    const comicPatch: Partial<ComicMetadataFields> = {}
 
     for (const key of copiedFields) {
+      if (isComicDiffFieldKey(key)) {
+        const comicKey = COMIC_KEY_MAP[key]
+        ;(comicPatch as Record<string, unknown>)[comicKey] = candidate.comicMetadata?.[comicKey]
+        continue
+      }
       if (key === 'coverUrl') {
         coverUrl = candidate.coverUrl
         continue
@@ -255,6 +321,10 @@ export function useMetadataDiff(current: MetadataSource, candidate: MetadataCand
       if (key === 'sourceUrl') continue
       const val = candidate[key as keyof MetadataCandidate]
       ;(formPatch as Record<string, unknown>)[key] = val != null ? String(val) : null
+    }
+
+    if (Object.keys(comicPatch).length > 0) {
+      formPatch.comicMetadata = comicPatch as ComicMetadataFields
     }
 
     return { formPatch, coverUrl }

@@ -65,11 +65,13 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
   }
 
   private async fetchJson<T>(url: string): Promise<T | null> {
+    const startedAt = Date.now();
+    this.logger.log(`[audnexus] fetch.start method=GET`);
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
       if (!res.ok) {
         const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
-        const message = `Audnexus request failed: ${res.status} (${url})`;
+        const message = `[audnexus] fetch.fail method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`;
         this.logger.warn(message);
         throw new AuthorMetadataProviderError(message, {
           httpStatus: res.status,
@@ -77,14 +79,16 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
           transient: res.status === 429 || res.status >= 500,
         });
       }
-      return (await res.json()) as T;
+      const body = (await res.json()) as T;
+      this.logger.log(`[audnexus] fetch.end method=GET status=${res.status} durationMs=${Date.now() - startedAt}`);
+      return body;
     } catch (error) {
       if (error instanceof AuthorMetadataProviderError) {
         throw error;
       }
       const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.warn(`Audnexus request error (${url}): ${message}`);
-      throw new AuthorMetadataProviderError(`Audnexus request error (${url}): ${message}`, {
+      this.logger.warn(`[audnexus] fetch.fail method=GET durationMs=${Date.now() - startedAt} message="${message}"`);
+      throw new AuthorMetadataProviderError(`[audnexus] fetch.fail method=GET durationMs=${Date.now() - startedAt} message="${message}"`, {
         transient: true,
       });
     }

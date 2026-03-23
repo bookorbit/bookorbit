@@ -85,7 +85,17 @@ export function useMetadataSearch() {
     }
   }
 
-  const PROVIDER_ORDER: MetadataProviderKey[] = ['amazon', 'audible', 'audnexus', 'goodreads', 'hardcover', 'google', 'itunes', 'openLibrary']
+  const PROVIDER_ORDER: MetadataProviderKey[] = [
+    'comicvine',
+    'amazon',
+    'audible',
+    'audnexus',
+    'goodreads',
+    'hardcover',
+    'google',
+    'itunes',
+    'openLibrary',
+  ]
 
   function sortResults(list: MetadataCandidate[]): MetadataCandidate[] {
     const byProvider = new Map<string, MetadataCandidate[]>()

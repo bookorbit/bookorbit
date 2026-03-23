@@ -8,6 +8,20 @@ import { getSevenZip } from '../../../common/sevenzip';
 
 const EOCD_SIG = 0x06054b50; // end of central directory
 
+export interface ParsedCbzComicMetadata {
+  issueNumber: string | null;
+  volumeName: string | null;
+  pencillers: string[];
+  inkers: string[];
+  colorists: string[];
+  letterers: string[];
+  coverArtists: string[];
+  characters: string[];
+  teams: string[];
+  locations: string[];
+  storyArcs: string[];
+}
+
 export interface ParsedCbzMetadata {
   title: string | null;
   seriesName: string | null;
@@ -18,6 +32,7 @@ export interface ParsedCbzMetadata {
   language: string | null;
   authors: { name: string; sortName: string | null }[];
   tags: string[];
+  comicMetadata: ParsedCbzComicMetadata | null;
 }
 
 // ── ZIP helpers ───────────────────────────────────────────────────────────────
@@ -93,12 +108,34 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       return isNaN(v) ? null : v;
     };
 
-    // Writers are the "authors" for a book-like view
     const writers = splitDelimited(str('Writer'));
     const year = num('Year');
 
     const tags = [...splitDelimited(str('Genre')), ...splitDelimited(str('Tags'))];
     const uniqueTags = [...new Set(tags)];
+
+    const pencillers = splitDelimited(str('Penciller'));
+    const inkers = splitDelimited(str('Inker'));
+    const colorists = splitDelimited(str('Colorist'));
+    const letterers = splitDelimited(str('Letterer'));
+    const coverArtists = splitDelimited(str('CoverArtist'));
+    const characters = splitDelimited(str('Characters'));
+    const teams = splitDelimited(str('Teams'));
+    const locations = splitDelimited(str('Locations'));
+    const storyArcs = splitDelimited(str('StoryArc'));
+
+    const hasComicFields =
+      str('Number') !== null ||
+      str('Series') !== null ||
+      pencillers.length > 0 ||
+      inkers.length > 0 ||
+      colorists.length > 0 ||
+      letterers.length > 0 ||
+      coverArtists.length > 0 ||
+      characters.length > 0 ||
+      teams.length > 0 ||
+      locations.length > 0 ||
+      storyArcs.length > 0;
 
     return {
       title: str('Title'),
@@ -110,6 +147,21 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       language: str('LanguageISO'),
       authors: writers.map((name) => ({ name, sortName: null })),
       tags: uniqueTags,
+      comicMetadata: hasComicFields
+        ? {
+            issueNumber: str('Number'),
+            volumeName: str('Volume'),
+            pencillers,
+            inkers,
+            colorists,
+            letterers,
+            coverArtists,
+            characters,
+            teams,
+            locations,
+            storyArcs,
+          }
+        : null,
     };
   } catch {
     return null;
@@ -138,6 +190,7 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
       language: null,
       authors: writers,
       tags,
+      comicMetadata: null,
     };
   } catch {
     return null;

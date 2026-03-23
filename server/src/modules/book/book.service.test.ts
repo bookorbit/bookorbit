@@ -112,6 +112,7 @@ function makeService() {
     appSettings as never,
     userBookStatusService as never,
     { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+    { upsert: vi.fn().mockResolvedValue(undefined), findByBookId: vi.fn().mockResolvedValue(null) } as never,
     embedder as never,
     fileWriteService as never,
   );

@@ -19,6 +19,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   itunes: { enabled: true },
   audible: { enabled: false, domain: 'com' },
   audnexus: { enabled: false },
+  comicvine: { enabled: false, apiKey: '' },
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -34,6 +35,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.ITUNES]: 'iTunes',
   [MetadataProviderKey.AUDIBLE]: 'Audible',
   [MetadataProviderKey.AUDNEXUS]: 'AudNexus',
+  [MetadataProviderKey.COMICVINE]: 'ComicVine',
 };
 
 @Injectable()
@@ -50,6 +52,7 @@ export class ProviderConfigService {
       itunes: { ...DEFAULT_CONFIG.itunes },
       audible: { ...DEFAULT_CONFIG.audible },
       audnexus: { ...DEFAULT_CONFIG.audnexus },
+      comicvine: { ...DEFAULT_CONFIG.comicvine },
     };
   }
 
@@ -70,6 +73,7 @@ export class ProviderConfigService {
         itunes: { ...defaults.itunes, ...asObject(stored.itunes) },
         audible: { ...defaults.audible, ...asObject(stored.audible) },
         audnexus: { ...defaults.audnexus, ...asObject(stored.audnexus) },
+        comicvine: { ...defaults.comicvine, ...asObject(stored.comicvine) },
       };
     } catch {
       return defaults;
@@ -87,6 +91,7 @@ export class ProviderConfigService {
       itunes: { ...current.itunes, ...asObject(patch.itunes) },
       audible: { ...current.audible, ...asObject(patch.audible) },
       audnexus: { ...current.audnexus, ...asObject(patch.audnexus) },
+      comicvine: { ...current.comicvine, ...asObject(patch.comicvine) },
     };
     const value = JSON.stringify(next);
     await this.db
@@ -148,6 +153,12 @@ export class ProviderConfigService {
         label: PROVIDER_LABELS[MetadataProviderKey.AUDNEXUS],
         enabled: cfg.audnexus.enabled,
         configured: true,
+      },
+      {
+        key: MetadataProviderKey.COMICVINE,
+        label: PROVIDER_LABELS[MetadataProviderKey.COMICVINE],
+        enabled: cfg.comicvine.enabled,
+        configured: !!cfg.comicvine.apiKey,
       },
     ];
   }

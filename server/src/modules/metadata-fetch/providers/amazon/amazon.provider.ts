@@ -58,12 +58,13 @@ export class AmazonProvider implements IdentifiableProvider {
     const query = params.isbn?.trim() || [params.title, params.author].filter(Boolean).join(' ');
     if (!query) return [];
     const url = `https://www.${domain}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
-    const html = await this.fetchHtml(url, cookie);
+    const html = await this.fetchHtml(url, cookie, 'search', query);
     return html ? extractAsins(html, MAX_RESULTS) : [];
   }
 
   private async fetchByAsin(asin: string, domain: string, cookie: string): Promise<MetadataCandidate | null> {
-    const html = await this.fetchHtml(`https://www.${domain}/dp/${asin}`, cookie);
+    const url = `https://www.${domain}/dp/${asin}`;
+    const html = await this.fetchHtml(url, cookie, 'lookup', undefined, asin);
     if (!html) return null;
     const data = parseBookPage(html);
     if (!data.title) return null;
@@ -88,18 +89,33 @@ export class AmazonProvider implements IdentifiableProvider {
     };
   }
 
-  private async fetchHtml(url: string, cookie = ''): Promise<string | null> {
+  private async fetchHtml(url: string, cookie = '', op: 'search' | 'lookup' = 'search', query?: string, providerId?: string): Promise<string | null> {
     const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
+    const startedAt = Date.now();
+    this.logger.log(`[amazon] fetch.start op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
     try {
       const res = await fetchWithThrottle(url, { headers, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
-        this.logger.warn(`Amazon returned ${res.status} for ${url}`);
+        this.logger.warn(
+          `[amazon] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+        );
         return null;
       }
-      return res.text();
+      const html = await res.text();
+      this.logger.log(
+        `[amazon] fetch.end op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
+      );
+      return html;
     } catch (err) {
-      if (err instanceof ProviderThrottleError) throw err;
-      this.logger.warn(`Amazon fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(
+          `[amazon] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
+        );
+        throw err;
+      }
+      this.logger.warn(
+        `[amazon] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+      );
       return null;
     }
   }

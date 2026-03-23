@@ -42,6 +42,7 @@ describe('ProviderConfigService', () => {
       itunes: { enabled: true },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
+      comicvine: { enabled: false, apiKey: '' },
     });
   });
 
@@ -134,6 +135,7 @@ describe('ProviderConfigService', () => {
       itunes: { enabled: true },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
+      comicvine: { enabled: false, apiKey: '' },
     });
 
     expect(statuses.map((s) => s.key)).toEqual([
@@ -145,6 +147,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.ITUNES,
       MetadataProviderKey.AUDIBLE,
       MetadataProviderKey.AUDNEXUS,
+      MetadataProviderKey.COMICVINE,
     ]);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('Recommended for higher rate limits');
     expect(statuses.find((s) => s.key === MetadataProviderKey.AMAZON)?.hint).toContain('Cookie recommended');
@@ -162,6 +165,7 @@ describe('ProviderConfigService', () => {
       itunes: { enabled: true },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
+      comicvine: { enabled: false, apiKey: '' },
     });
 
     expect(statuses.find((s) => s.key === MetadataProviderKey.HARDCOVER)?.configured).toBe(true);

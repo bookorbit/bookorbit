@@ -15,6 +15,7 @@ const mockConfig: ProviderConfigurations = {
   itunes: { enabled: true },
   audible: { enabled: false, domain: 'com' },
   audnexus: { enabled: false },
+  comicvine: { enabled: false, apiKey: '' },
 };
 
 const mockDocument: HardcoverSearchDocument = {

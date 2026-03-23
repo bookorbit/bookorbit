@@ -15,6 +15,7 @@ import { ITunesProvider } from './providers/itunes/itunes.provider';
 import { AudibleProvider } from './providers/audible/audible.provider';
 import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
 import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
+import { ComicVineProvider } from './providers/comicvine/comicvine.provider';
 
 describe('MetadataFetchModule', () => {
   it('registers provider classes and factory wiring for METADATA_PROVIDERS', () => {
@@ -30,6 +31,7 @@ describe('MetadataFetchModule', () => {
         AudibleProvider,
         AudnexusProvider,
         HardcoverProvider,
+        ComicVineProvider,
         ProviderRegistry,
         MetadataFetchService,
         MetadataFetchPipeline,
@@ -51,6 +53,7 @@ describe('MetadataFetchModule', () => {
       AudibleProvider,
       AudnexusProvider,
       HardcoverProvider,
+      ComicVineProvider,
     ]);
 
     const google = { key: 'google' };

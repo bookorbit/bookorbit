@@ -109,6 +109,12 @@ const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; f
     ],
   },
   { key: 'audnexus', label: 'AudNexus', hint: 'Community-driven audiobook metadata. No setup required.', fields: [] },
+  {
+    key: 'comicvine',
+    label: 'ComicVine',
+    hint: 'Comic book metadata from ComicVine. A free API key is required from comicvine.gamespot.com.',
+    fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
+  },
 ]
 
 function statusFor(key: string) {

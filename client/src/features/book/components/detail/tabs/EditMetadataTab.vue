@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
+import { ChevronDown, Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -19,6 +19,8 @@ const emit = defineEmits<{ saved: [BookDetail]; coverChanged: ['extracted' | 'cu
 
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const comicSectionOpen = ref(true)
 
 const { form, saving, error, isDirty, load, reset, save } = useMetadataEditor()
 const { search: searchAuthors } = useAuthorSearch()
@@ -37,6 +39,7 @@ const providerIdFields = [
   { field: 'openLibraryId' as const, label: 'OpenLibrary' },
   { field: 'itunesId' as const, label: 'iTunes' },
   { field: 'audibleId' as const, label: 'Audible' },
+  { field: 'comicvineId' as const, label: 'ComicVine' },
 ]
 
 function setIntField(field: 'publishedYear' | 'pageCount' | 'durationSeconds', e: Event) {
@@ -81,8 +84,26 @@ function setRating(star: number) {
   form.rating = form.rating === star ? null : star
 }
 
+function toggleComicSection() {
+  comicSectionOpen.value = !comicSectionOpen.value
+}
+
 function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverUrl?: string }) {
-  Object.assign(form, formPatch)
+  const { comicMetadata, ...rest } = formPatch
+  Object.assign(form, rest)
+  if (comicMetadata) {
+    if (comicMetadata.issueNumber !== undefined) form.comicIssueNumber = comicMetadata.issueNumber
+    if (comicMetadata.volumeName !== undefined) form.comicVolumeName = comicMetadata.volumeName
+    if (comicMetadata.storyArcs !== undefined) form.comicStoryArcs = comicMetadata.storyArcs
+    if (comicMetadata.pencillers !== undefined) form.comicPencillers = comicMetadata.pencillers
+    if (comicMetadata.inkers !== undefined) form.comicInkers = comicMetadata.inkers
+    if (comicMetadata.colorists !== undefined) form.comicColorists = comicMetadata.colorists
+    if (comicMetadata.letterers !== undefined) form.comicLetterers = comicMetadata.letterers
+    if (comicMetadata.coverArtists !== undefined) form.comicCoverArtists = comicMetadata.coverArtists
+    if (comicMetadata.characters !== undefined) form.comicCharacters = comicMetadata.characters
+    if (comicMetadata.teams !== undefined) form.comicTeams = comicMetadata.teams
+    if (comicMetadata.locations !== undefined) form.comicLocations = comicMetadata.locations
+  }
   if (coverUrl) coverPanel.value?.setUrl(coverUrl)
 }
 
@@ -335,6 +356,85 @@ async function autoFill() {
               v-model="form[field]"
               class="w-full h-8 rounded-md border border-input bg-background px-2.5 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
             />
+          </div>
+        </div>
+      </div>
+
+      <!-- Comic Details (CBX books only) -->
+      <div v-if="isPrimaryComic" class="rounded-lg border border-border overflow-hidden">
+        <button
+          type="button"
+          class="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/70 transition-colors"
+          @click="toggleComicSection"
+        >
+          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comic Details</span>
+          <ChevronDown class="size-3.5 text-muted-foreground transition-transform" :class="comicSectionOpen ? 'rotate-180' : ''" />
+        </button>
+        <div v-if="comicSectionOpen" class="p-3 space-y-3">
+          <!-- Issue Number | Volume -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Issue Number</label>
+              <input
+                v-model="form.comicIssueNumber"
+                class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+              />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Volume</label>
+              <input
+                v-model="form.comicVolumeName"
+                class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+              />
+            </div>
+          </div>
+          <!-- Story Arcs -->
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Story Arcs</label>
+            <ChipInput v-model="form.comicStoryArcs" />
+          </div>
+          <!-- Pencillers | Inkers -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pencillers</label>
+              <ChipInput v-model="form.comicPencillers" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Inkers</label>
+              <ChipInput v-model="form.comicInkers" />
+            </div>
+          </div>
+          <!-- Colorists | Letterers -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Colorists</label>
+              <ChipInput v-model="form.comicColorists" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Letterers</label>
+              <ChipInput v-model="form.comicLetterers" />
+            </div>
+          </div>
+          <!-- Cover Artists -->
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cover Artists</label>
+            <ChipInput v-model="form.comicCoverArtists" />
+          </div>
+          <!-- Characters | Teams -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Characters</label>
+              <ChipInput v-model="form.comicCharacters" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Teams</label>
+              <ChipInput v-model="form.comicTeams" />
+            </div>
+          </div>
+          <!-- Locations -->
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Locations</label>
+            <ChipInput v-model="form.comicLocations" />
           </div>
         </div>
       </div>

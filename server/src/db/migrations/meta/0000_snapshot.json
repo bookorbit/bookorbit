@@ -1,5 +1,5 @@
 {
-  "id": "5360be98-7613-464e-bc18-3b0954a49c73",
+  "id": "044c15cb-ab99-4b1f-b88f-3c025644dec7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -618,6 +618,127 @@
           "name": "users_email_unique",
           "nullsNotDistinct": false,
           "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.comic_metadata": {
+      "name": "comic_metadata",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issue_number": {
+          "name": "issue_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "volume_name": {
+          "name": "volume_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pencillers": {
+          "name": "pencillers",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inkers": {
+          "name": "inkers",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "colorists": {
+          "name": "colorists",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "letterers": {
+          "name": "letterers",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_artists": {
+          "name": "cover_artists",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "characters": {
+          "name": "characters",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "teams": {
+          "name": "teams",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "locations": {
+          "name": "locations",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "story_arcs": {
+          "name": "story_arcs",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "comic_metadata_book_id_books_id_fk": {
+          "name": "comic_metadata_book_id_books_id_fk",
+          "tableFrom": "comic_metadata",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "comic_metadata_book_id_unique": {
+          "name": "comic_metadata_book_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["book_id"]
         }
       },
       "policies": {},
@@ -1819,6 +1940,12 @@
         "audible_id": {
           "name": "audible_id",
           "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comicvine_id": {
+          "name": "comicvine_id",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },

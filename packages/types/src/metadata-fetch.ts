@@ -9,7 +9,22 @@ export const MetadataProviderKey = {
   ITUNES: "itunes",
   AUDIBLE: "audible",
   AUDNEXUS: "audnexus",
+  COMICVINE: "comicvine",
 } as const;
+
+export interface ComicMetadataFields {
+  issueNumber?: string;
+  volumeName?: string;
+  pencillers?: string[];
+  inkers?: string[];
+  colorists?: string[];
+  letterers?: string[];
+  coverArtists?: string[];
+  characters?: string[];
+  teams?: string[];
+  locations?: string[];
+  storyArcs?: string[];
+}
 
 export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof MetadataProviderKey];
 
@@ -36,6 +51,7 @@ export interface MetadataCandidate {
   abridged?: boolean;
   audibleId?: string;
   chapters?: AudiobookChapter[];
+  comicMetadata?: ComicMetadataFields;
 }
 
 export interface MetadataProviderInfo {

@@ -32,18 +32,32 @@ export class AudibleProvider implements IdentifiableProvider {
     url.searchParams.set('num_results', '10');
     url.searchParams.set('keywords', query);
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
+    const requestUrl = url.toString();
+    const startedAt = Date.now();
+    this.logger.log(`[audible] fetch.start op=search query="${query}"`);
 
     try {
-      const res = await fetchWithThrottle(url.toString(), { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
-        this.logger.warn(`Audible Search API returned ${res.status} for search("${query}")`);
+        this.logger.warn(
+          `[audible] fetch.fail op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+        );
         return [];
       }
       const body = (await res.json()) as AudibleSearchResponse;
-      return (body.products ?? []).map(mapAudibleProduct);
+      const results = (body.products ?? []).map(mapAudibleProduct);
+      this.logger.log(
+        `[audible] fetch.end op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
+      );
+      return results;
     } catch (err) {
-      if (err instanceof ProviderThrottleError) throw err;
-      this.logger.error(`Audible search failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(`[audible] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        throw err;
+      }
+      this.logger.error(
+        `[audible] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+      );
       return [];
     }
   }
@@ -55,18 +69,32 @@ export class AudibleProvider implements IdentifiableProvider {
 
     const url = new URL(`https://api.audible.${normalizedDomain}/1.0/catalog/products/${providerId}`);
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
+    const requestUrl = url.toString();
+    const startedAt = Date.now();
+    this.logger.log(`[audible] fetch.start op=lookup providerId="${providerId}"`);
 
     try {
-      const res = await fetchWithThrottle(url.toString(), { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
-        this.logger.warn(`Audible Lookup API returned ${res.status} for lookupById(${providerId})`);
+        this.logger.warn(
+          `[audible] fetch.fail op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+        );
         return null;
       }
       const body = (await res.json()) as { product: AudibleSearchResponse['products'][0] };
-      return body.product ? mapAudibleProduct(body.product) : null;
+      const result = body.product ? mapAudibleProduct(body.product) : null;
+      this.logger.log(
+        `[audible] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
+      );
+      return result;
     } catch (err) {
-      if (err instanceof ProviderThrottleError) throw err;
-      this.logger.error(`Audible lookup failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(`[audible] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        throw err;
+      }
+      this.logger.error(
+        `[audible] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+      );
       return null;
     }
   }

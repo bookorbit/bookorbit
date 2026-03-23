@@ -13,6 +13,7 @@ import { BookQueryBuilder } from './book-query-builder.service';
 import { BookController } from './book.controller';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
+import { ComicMetadataService } from './comic-metadata.service';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { BookService } from './book.service';
     UserBookStatusModule,
   ],
   controllers: [BookController],
-  providers: [BookService, BookRepository, BookQueryBuilder],
+  providers: [BookService, BookRepository, BookQueryBuilder, ComicMetadataService],
   exports: [BookService, BookRepository, BookQueryBuilder],
 })
 export class BookModule {}

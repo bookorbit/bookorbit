@@ -116,7 +116,7 @@ function downloadFile(file: BookDetailFile) {
 function fileIconStyle(format: string | null): Record<string, string> {
   const color = getFormatColor(format)
   return {
-    backgroundColor: `${color}26`,
+    backgroundColor: `${color}35`,
     color,
   }
 }

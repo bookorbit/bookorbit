@@ -8,6 +8,7 @@ import { join } from 'path';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
+import { ComicMetadataService } from '../book/comic-metadata.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
@@ -34,6 +35,7 @@ export class MetadataService {
     private readonly config: ConfigService,
     private readonly scoreService: MetadataScoreService,
     private readonly narratorService: NarratorService,
+    private readonly comicMetadataService: ComicMetadataService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {
@@ -126,6 +128,9 @@ export class MetadataService {
         authors: cbz?.authors ?? [],
         tags: cbz?.tags ?? [],
       };
+      if (cbz?.comicMetadata) {
+        await this.comicMetadataService.upsert(bookId, cbz.comicMetadata);
+      }
     } else if (format === 'cbr' || format === 'cb7') {
       const cbx = format === 'cbr' ? await extractCbrMetadata(absolutePath) : await extractCb7Metadata(absolutePath);
       const fb = parseBookFilename(absolutePath);
@@ -143,6 +148,9 @@ export class MetadataService {
         authors: cbx?.authors ?? [],
         tags: cbx?.tags ?? [],
       };
+      if (cbx?.comicMetadata) {
+        await this.comicMetadataService.upsert(bookId, cbx.comicMetadata);
+      }
     } else if (format === 'mobi' || format === 'azw3' || format === 'azw') {
       const mobi = await parseMobiFile(absolutePath);
       if (mobi) {

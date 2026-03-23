@@ -9,6 +9,7 @@ const PROVIDER_HEX: Record<string, string> = {
   itunes: '#ff4f5d',
   audible: '#FF8A00',
   audnexus: '#FF5ADD',
+  comicvine: '#ffdb0f',
   auto: '#8B5CF6',
 }
 
@@ -23,6 +24,7 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   itunes: 'iTunes',
   audible: 'Audible',
   audnexus: 'AudNexus',
+  comicvine: 'ComicVine',
   auto: 'Fetched',
 }
 

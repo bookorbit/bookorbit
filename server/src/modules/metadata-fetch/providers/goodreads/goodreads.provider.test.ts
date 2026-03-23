@@ -18,6 +18,7 @@ describe('GoodreadsProvider', () => {
     itunes: { enabled: true },
     audible: { enabled: false, domain: 'com' },
     audnexus: { enabled: false },
+    comicvine: { enabled: false, apiKey: '' },
   };
 
   beforeEach(async () => {

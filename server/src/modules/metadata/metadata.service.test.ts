@@ -116,6 +116,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
 
@@ -140,6 +141,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
 
@@ -164,6 +166,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     mockExtractAndSaveCover.mockResolvedValue('');
@@ -179,6 +182,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const metadataSpy = vi.spyOn(service as never, 'extractMetadata').mockRejectedValue(new Error('bad metadata'));
@@ -196,6 +200,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
@@ -245,6 +250,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
@@ -273,6 +279,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
@@ -329,6 +336,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
@@ -379,6 +387,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
       metadataEvents as never,
     );
@@ -436,6 +445,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
 
@@ -461,6 +471,7 @@ describe('MetadataService', () => {
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
 
