@@ -1,6 +1,28 @@
 import { Permission } from '@projectx/types';
 import { AuditAction, AuditResource } from '@projectx/types';
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseBoolPipe, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  BadRequestException,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseBoolPipe,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { MultipartFile } from '@fastify/multipart';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import { createReadStream } from 'fs';
+import { stat } from 'fs/promises';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -11,11 +33,17 @@ import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserAvatarService } from './user-avatar.service';
 import { UserService } from './user.service';
+
+type MultipartRequest = FastifyRequest & { file: () => Promise<MultipartFile | undefined> };
 
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly userAvatarService: UserAvatarService,
+  ) {}
 
   @Get()
   @RequirePermission(Permission.ManageUsers)
@@ -44,10 +72,61 @@ export class UserController {
     return this.userService.updateMe(user.id, dto);
   }
 
+  @Post('me/avatar')
+  @Auditable({
+    action: AuditAction.UserSelfUpdate,
+    resource: AuditResource.User,
+    getResourceId: (req) => (req as unknown as { user?: { id: number } }).user?.id,
+    description: () => 'User uploaded a profile picture',
+  })
+  async uploadMyAvatar(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
+    const data = await req.file();
+    if (!data) throw new BadRequestException('No file provided');
+    const buffer = await data.toBuffer();
+    return this.userAvatarService.uploadOwnAvatar(user, buffer, data.mimetype);
+  }
+
+  @Delete('me/avatar')
+  @Auditable({
+    action: AuditAction.UserSelfUpdate,
+    resource: AuditResource.User,
+    getResourceId: (req) => (req as unknown as { user?: { id: number } }).user?.id,
+    description: () => 'User removed their profile picture',
+  })
+  deleteMyAvatar(@CurrentUser() user: RequestUser) {
+    return this.userAvatarService.removeOwnAvatar(user);
+  }
+
   @Get(':id')
   @RequirePermission(Permission.ManageUsers)
   findById(@Param('id', ParseIntPipe) id: number) {
     return this.userService.findById(id);
+  }
+
+  @Get(':id/avatar')
+  async getAvatar(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() reply: FastifyReply,
+    @Headers('if-none-match') ifNoneMatch?: string,
+  ) {
+    const avatarPath = await this.userAvatarService.getAvatarPath(user, id);
+    if (!avatarPath) {
+      reply.status(404).send({ message: `No avatar for user ${id}` });
+      return;
+    }
+
+    const { mtimeMs } = await stat(avatarPath);
+    const etag = `"${Math.floor(mtimeMs)}"`;
+    if (ifNoneMatch === etag) {
+      reply.status(304).send();
+      return;
+    }
+
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('ETag', etag);
+    reply.type('image/jpeg');
+    reply.send(createReadStream(avatarPath));
   }
 
   @Post()

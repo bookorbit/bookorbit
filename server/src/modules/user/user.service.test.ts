@@ -56,13 +56,25 @@ describe('UserService', () => {
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
     config.get.mockReturnValue('https://app.example.com');
     userRepo.create.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User' });
+    userRepo.findByEmail.mockResolvedValue(null);
     userRepo.generateResetToken.mockResolvedValue('reset-token');
   });
 
   it('createUser rejects duplicate usernames', async () => {
     userRepo.findByUsername.mockResolvedValue({ id: 2 });
 
-    await expect(service.createUser({ username: 'taken', name: 'Name' } as any)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.createUser({ username: 'taken', name: 'Name', email: 'taken@example.com' } as any)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('createUser rejects duplicate emails', async () => {
+    userRepo.findByUsername.mockResolvedValue(null);
+    userRepo.findByEmail.mockResolvedValue({ id: 3 });
+
+    await expect(service.createUser({ username: 'newuser', name: 'Name', email: 'taken@example.com' } as any)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('createUser creates user, assigns requested permissions, and returns reset URL', async () => {

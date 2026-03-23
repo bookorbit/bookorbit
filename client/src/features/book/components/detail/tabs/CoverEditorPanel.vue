@@ -160,7 +160,6 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <input
         v-model="urlInput"
         class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
-        placeholder="https://..."
         @input="onUrlInput"
       />
     </div>

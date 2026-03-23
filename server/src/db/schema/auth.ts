@@ -2,6 +2,8 @@ import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, te
 
 import { libraries } from './libraries';
 
+export const userAvatarSourceEnum = pgEnum('user_avatar_source', ['none', 'external', 'uploaded']);
+
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   username: varchar('username', { length: 100 }).notNull().unique(),
@@ -16,6 +18,8 @@ export const users = pgTable('users', {
   oidcSubject: text('oidc_subject'),
   oidcIssuer: text('oidc_issuer'),
   avatarUrl: text('avatar_url'),
+  avatarSource: userAvatarSourceEnum('avatar_source').notNull().default('none'),
+  avatarVersion: integer('avatar_version').notNull().default(0),
   provisioningMethod: varchar('provisioning_method', { length: 20 }).notNull().default('local'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at')

@@ -92,11 +92,13 @@ async function handleSubmit() {
   error.value = null
   loading.value = true
   try {
+    const trimmedEmail = email.value.trim()
+
     if (isEdit.value) {
       const res = await api(`/api/v1/users/${props.user!.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.value, email: email.value || undefined, active: active.value }),
+        body: JSON.stringify({ name: name.value, email: trimmedEmail || undefined, active: active.value }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -126,13 +128,18 @@ async function handleSubmit() {
         return
       }
     } else {
+      if (!trimmedEmail) {
+        error.value = 'Email is required'
+        return
+      }
+
       const res = await api('/api/v1/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.value,
           username: username.value,
-          email: email.value || undefined,
+          email: trimmedEmail,
           permissionNames: [...selectedPermissionNames.value],
           libraryIds: [...selectedLibraryIds.value],
         }),
@@ -188,10 +195,11 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label class="settings-label">Email <span class="text-muted-foreground">(optional)</span></label>
+          <label class="settings-label">Email</label>
           <input
             v-model="email"
             type="email"
+            :required="!isEdit"
             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>

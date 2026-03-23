@@ -13,7 +13,7 @@ async function hasErrors(dto: object): Promise<boolean> {
 }
 
 describe('User DTO validation', () => {
-  it('CreateUserDto enforces username minimum length and string permission names', async () => {
+  it('CreateUserDto requires email and enforces username minimum length and string permission names', async () => {
     const bad = plainToInstance(CreateUserDto, { username: 'ab', name: 'n', permissionNames: [1, 2] });
     expect(await hasErrors(bad)).toBe(true);
 

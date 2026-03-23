@@ -11,6 +11,8 @@ export interface RequestUser {
   tokenVersion: number;
   settings: Record<string, unknown>;
   avatarUrl: string | null;
+  avatarSource?: 'none' | 'external' | 'uploaded' | null;
+  avatarVersion?: number | null;
   provisioningMethod: string;
   permissions: Permission[];
 }

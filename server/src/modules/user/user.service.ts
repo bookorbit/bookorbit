@@ -76,6 +76,8 @@ export class UserService {
   async createUser(dto: CreateUserDto) {
     const existing = await this.userRepo.findByUsername(dto.username);
     if (existing) throw new ConflictException('Username already taken');
+    const existingEmail = await this.userRepo.findByEmail(dto.email);
+    if (existingEmail) throw new ConflictException('Email already in use');
 
     const passwordHash = await hash(randomBytes(16).toString('hex'), 12);
     const user = await this.userRepo.create({

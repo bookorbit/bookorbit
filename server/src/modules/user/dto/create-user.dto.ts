@@ -10,8 +10,7 @@ export class CreateUserDto {
   name: string;
 
   @IsEmail()
-  @IsOptional()
-  email?: string;
+  email: string;
 
   @IsArray()
   @IsString({ each: true })

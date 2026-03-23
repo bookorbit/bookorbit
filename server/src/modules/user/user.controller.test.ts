@@ -14,8 +14,13 @@ describe('UserController', () => {
     setSuperuser: vi.fn(),
     adminResetPassword: vi.fn(),
   };
+  const userAvatarService = {
+    uploadOwnAvatar: vi.fn(),
+    removeOwnAvatar: vi.fn(),
+    getAvatarPath: vi.fn(),
+  };
 
-  const controller = new UserController(userService as any);
+  const controller = new UserController(userService as any, userAvatarService as any);
 
   beforeEach(() => {
     vi.resetAllMocks();

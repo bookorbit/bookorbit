@@ -186,7 +186,7 @@ describe('AuthService', () => {
       const { service, db } = makeService();
       (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'false' });
 
-      await expect(service.register({ username: 'u', name: 'U', password: 'P@ssw0rd!', email: undefined } as never)).rejects.toThrow(
+      await expect(service.register({ username: 'u', name: 'U', password: 'P@ssw0rd!', email: 'u@example.com' } as never)).rejects.toThrow(
         ForbiddenException,
       );
     });
@@ -196,9 +196,9 @@ describe('AuthService', () => {
       (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce({ id: 99, username: 'existing' });
 
-      await expect(service.register({ username: 'existing', name: 'E', password: 'P@ssw0rd!', email: undefined } as never)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.register({ username: 'existing', name: 'E', password: 'P@ssw0rd!', email: 'existing@example.com' } as never),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('throws ConflictException when email already in use', async () => {
@@ -219,7 +219,7 @@ describe('AuthService', () => {
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce(null);
       ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);
 
-      const result = await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: undefined } as never);
+      const result = await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never);
       expect(result).toEqual({ id: 1, username: 'jdoe', name: 'John Doe' });
     });
   });

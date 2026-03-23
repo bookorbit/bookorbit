@@ -2,6 +2,7 @@
 -- ENUMS
 -- ------------------------------------------------------------
 CREATE TYPE "public"."library_access_level" AS ENUM('viewer', 'editor', 'owner');--> statement-breakpoint
+CREATE TYPE "public"."user_avatar_source" AS ENUM('none', 'external', 'uploaded');--> statement-breakpoint
 CREATE TYPE "public"."opds_sort_order" AS ENUM('recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc');--> statement-breakpoint
 -- ------------------------------------------------------------
 -- USERS & AUTH
@@ -75,6 +76,8 @@ CREATE TABLE "users" (
 	"oidc_subject" text,
 	"oidc_issuer" text,
 	"avatar_url" text,
+	"avatar_source" "user_avatar_source" DEFAULT 'none' NOT NULL,
+	"avatar_version" integer DEFAULT 0 NOT NULL,
 	"provisioning_method" varchar(20) DEFAULT 'local' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
@@ -202,7 +205,8 @@ CREATE TABLE "authors" (
 	"sort_name" varchar(500),
 	"description" text,
 	"has_photo" boolean DEFAULT false NOT NULL,
-	"last_enriched_at" timestamp
+	"last_enriched_at" timestamp,
+	CONSTRAINT "authors_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
 CREATE TABLE "book_authors" (

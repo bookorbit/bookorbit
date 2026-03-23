@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut, PackageOpen, BarChart3 } from 'lucide-vue-next'
+import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut, PackageOpen, BarChart3, User } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -28,6 +28,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -46,6 +47,10 @@ function navigateToStaging() {
 
 function navigateToStatistics() {
   router.push({ name: 'statistics' })
+}
+
+function navigateToAccount() {
+  router.push({ name: 'settings-account' })
 }
 
 const uploadOpen = ref(false)
@@ -507,7 +512,7 @@ function formatBadgeClass(fmt: string): string {
                 variant="ghost"
                 size="icon"
                 class="h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
-                @click="router.push({ name: 'settings-libraries' })"
+                @click="router.push({ name: 'settings-account' })"
               >
                 <Settings :size="15" />
               </Button>
@@ -521,9 +526,9 @@ function formatBadgeClass(fmt: string): string {
         <DropdownMenu v-if="user">
           <DropdownMenuTrigger as-child>
             <button
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 text-primary text-xs font-bold hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-primary/50 bg-primary/10 hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              {{ user.name.charAt(0).toUpperCase() }}
+              <UserAvatar :name="user.name" :avatar-url="user.avatarUrl ?? null" size-class="h-full w-full" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-48">
@@ -533,6 +538,11 @@ function formatBadgeClass(fmt: string): string {
                 <span class="text-[10px] text-muted-foreground">{{ user.username }}</span>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="navigateToAccount">
+              <User :size="13" class="mr-2 text-muted-foreground" />
+              Account
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem @click="openChangePassword()">
               <KeyRound :size="13" class="mr-2 text-muted-foreground" />

@@ -55,6 +55,12 @@ export const routes: RouteRecordRaw[] = [
         children: [
           { path: '', redirect: { name: 'settings-appearance' } },
           {
+            path: 'account',
+            name: 'settings-account',
+            component: () => import('@/features/settings/AccountSettings.vue'),
+            meta: { title: 'Account' },
+          },
+          {
             path: 'libraries',
             name: 'settings-libraries',
             component: () => import('@/features/settings/LibrariesSettings.vue'),

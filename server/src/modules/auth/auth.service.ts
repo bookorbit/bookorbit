@@ -23,6 +23,7 @@ import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { resolveUserAvatarUrl } from '../../common/utils/user-avatar-url';
 import { SystemMailService } from '../email/system-mail.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserService } from '../user/user.service';
@@ -200,7 +201,7 @@ export class AuthService {
       isSuperuser: user.isSuperuser,
       isDefaultPassword: user.isDefaultPassword,
       settings: user.settings,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: resolveUserAvatarUrl(user),
       provisioningMethod: user.provisioningMethod,
       permissions: user.isSuperuser ? ['*'] : user.permissions,
     };

@@ -105,6 +105,8 @@ export class UserRepository {
         tokenVersion: schema.users.tokenVersion,
         settings: schema.users.settings,
         avatarUrl: schema.users.avatarUrl,
+        avatarSource: schema.users.avatarSource,
+        avatarVersion: schema.users.avatarVersion,
         provisioningMethod: schema.users.provisioningMethod,
         permissionName: schema.userPermissions.permissionName,
       })
@@ -134,6 +136,8 @@ export class UserRepository {
       tokenVersion: first.tokenVersion,
       settings: first.settings as Record<string, unknown>,
       avatarUrl: first.avatarUrl,
+      avatarSource: first.avatarSource,
+      avatarVersion: first.avatarVersion,
       provisioningMethod: first.provisioningMethod,
       permissions,
     };
@@ -242,9 +246,32 @@ export class UserRepository {
         oidcSubject: data.oidcSubject,
         oidcIssuer: data.oidcIssuer,
         avatarUrl: data.avatarUrl,
+        avatarSource: data.avatarUrl ? 'external' : 'none',
         provisioningMethod: 'oidc',
       })
       .returning();
     return user;
+  }
+
+  async findAvatarStateById(id: number) {
+    return this.db.query.users.findFirst({
+      where: eq(schema.users.id, id),
+      columns: {
+        id: true,
+        avatarUrl: true,
+        avatarSource: true,
+        avatarVersion: true,
+      },
+    });
+  }
+
+  async setAvatarSourceAndBumpVersion(userId: number, avatarSource: 'none' | 'external' | 'uploaded') {
+    await this.db
+      .update(schema.users)
+      .set({
+        avatarSource,
+        avatarVersion: sql`${schema.users.avatarVersion} + 1`,
+      })
+      .where(eq(schema.users.id, userId));
   }
 }

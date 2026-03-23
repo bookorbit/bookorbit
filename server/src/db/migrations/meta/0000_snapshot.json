@@ -1,5 +1,5 @@
 {
-  "id": "6fa8d785-5441-45c5-b80d-1fdee77f90bd",
+  "id": "5360be98-7613-464e-bc18-3b0954a49c73",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -567,6 +567,21 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "avatar_source": {
+          "name": "avatar_source",
+          "type": "user_avatar_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "avatar_version": {
+          "name": "avatar_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "provisioning_method": {
           "name": "provisioning_method",
@@ -1508,7 +1523,13 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "authors_name_unique": {
+          "name": "authors_name_unique",
+          "nullsNotDistinct": false,
+          "columns": ["name"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -4905,6 +4926,11 @@
       "name": "library_access_level",
       "schema": "public",
       "values": ["viewer", "editor", "owner"]
+    },
+    "public.user_avatar_source": {
+      "name": "user_avatar_source",
+      "schema": "public",
+      "values": ["none", "external", "uploaded"]
     },
     "public.opds_sort_order": {
       "name": "opds_sort_order",

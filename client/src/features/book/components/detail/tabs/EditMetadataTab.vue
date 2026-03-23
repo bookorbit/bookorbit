@@ -172,7 +172,6 @@ async function autoFill() {
           <input
             v-model="form.title"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="Book title"
           />
         </div>
         <div class="space-y-1">
@@ -180,7 +179,6 @@ async function autoFill() {
           <input
             v-model="form.subtitle"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="Subtitle"
           />
         </div>
       </div>
@@ -189,25 +187,25 @@ async function autoFill() {
       <div class="grid gap-3" :class="isPrimaryAudio ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'">
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Authors</label>
-          <ChipInput v-model="form.authors" placeholder="Add author..." :search-fn="searchAuthors" />
+          <ChipInput v-model="form.authors" :search-fn="searchAuthors" />
         </div>
         <div v-if="isPrimaryAudio" class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Narrators</label>
-          <ChipInput v-model="form.narrators" placeholder="Add narrator..." :search-fn="searchNarrators" />
+          <ChipInput v-model="form.narrators" :search-fn="searchNarrators" />
         </div>
       </div>
 
       <!-- Genres -->
       <div class="space-y-1">
         <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Genres</label>
-        <ChipInput v-model="form.genres" placeholder="Add genre..." :search-fn="searchGenres" />
+        <ChipInput v-model="form.genres" :search-fn="searchGenres" />
       </div>
 
       <!-- Tags | Rating -->
       <div class="flex items-start gap-3">
         <div class="flex-1 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</label>
-          <ChipInput v-model="form.tags" placeholder="Add tag..." :search-fn="searchTags" />
+          <ChipInput v-model="form.tags" :search-fn="searchTags" />
         </div>
         <div class="space-y-1 shrink-0">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rating</label>
@@ -239,7 +237,6 @@ async function autoFill() {
           <input
             v-model="form.seriesName"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="Series name"
           />
         </div>
         <div class="w-16 shrink-0 space-y-1">
@@ -250,7 +247,6 @@ async function autoFill() {
             step="0.1"
             min="0"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="1"
             @input="setFloatField('seriesIndex', $event)"
           />
         </div>
@@ -259,7 +255,6 @@ async function autoFill() {
           <input
             v-model="form.publisher"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="Publisher"
           />
         </div>
       </div>
@@ -274,7 +269,6 @@ async function autoFill() {
             min="1"
             max="2100"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="2024"
             @input="setIntField('publishedYear', $event)"
           />
         </div>
@@ -283,7 +277,6 @@ async function autoFill() {
           <input
             v-model="form.language"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="en"
             maxlength="10"
           />
         </div>
@@ -294,7 +287,6 @@ async function autoFill() {
             type="number"
             min="1"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="300"
             @input="setIntField('pageCount', $event)"
           />
         </div>
@@ -303,7 +295,6 @@ async function autoFill() {
           <input
             v-model="form.isbn13"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="9780000000000"
             maxlength="13"
           />
         </div>
@@ -312,7 +303,6 @@ async function autoFill() {
           <input
             v-model="form.isbn10"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="0000000000"
             maxlength="10"
           />
         </div>
@@ -323,7 +313,6 @@ async function autoFill() {
             type="number"
             min="1"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            placeholder="36000"
             @input="setIntField('durationSeconds', $event)"
           />
         </div>
@@ -345,7 +334,6 @@ async function autoFill() {
             <input
               v-model="form[field]"
               class="w-full h-8 rounded-md border border-input bg-background px-2.5 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
-              :placeholder="label + ' ID'"
             />
           </div>
         </div>
@@ -358,7 +346,6 @@ async function autoFill() {
           v-model="form.description"
           rows="6"
           class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow resize-y"
-          placeholder="Book description..."
         />
       </div>
     </div>

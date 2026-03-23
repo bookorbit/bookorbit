@@ -16,21 +16,17 @@ const sections = computed<Section[]>(() => {
   const perms = userPermissions.value
   const su = isSuperuser.value
 
-  const result: Section[] = [
-    { label: 'Appearance', routeName: 'settings-appearance' },
-    { label: 'Reader', routeName: 'settings-reader-general' },
-  ]
+  const result: Section[] = []
+
   if (su || perms.includes('manage_libraries')) {
-    result.unshift({ label: 'Libraries', routeName: 'settings-libraries' })
+    result.push({ label: 'Libraries', routeName: 'settings-libraries' })
   }
+
+  result.push({ label: 'Appearance', routeName: 'settings-appearance' })
+  result.push({ label: 'Reader', routeName: 'settings-reader-general' })
+
   if (su || perms.includes('manage_metadata_config')) {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
-  }
-  if (su || perms.includes('manage_app_settings')) {
-    result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
-  }
-  if (su) {
-    result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
   }
   if (su || perms.includes('staging_access')) {
     result.push({ label: 'Staging', routeName: 'settings-admin-staging' })
@@ -53,6 +49,16 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('kobo_sync')) {
     result.push({ label: 'Kobo', routeName: 'settings-kobo' })
   }
+  if (su || perms.includes('manage_app_settings')) {
+    result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
+  }
+
+  result.push({ label: 'Account', routeName: 'settings-account' })
+
+  if (su) {
+    result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
+  }
+
   result.push({ label: 'About', routeName: 'settings-about' })
 
   return result
