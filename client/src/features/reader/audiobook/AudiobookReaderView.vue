@@ -186,7 +186,7 @@ function seekToChapter(chapter: AudiobookChapter) {
   // Chapters reference absolute time across the book. Find which file contains it.
   let offset = 0
   for (let i = 0; i < audioFiles.value.length; i++) {
-    const fileDur = audioFiles.value[i].durationSeconds ?? 0
+    const fileDur = audioFiles.value[i]!.durationSeconds ?? 0
     const startMs = chapter.startMs / 1000
     if (i === audioFiles.value.length - 1 || offset + fileDur > startMs) {
       queue.activateIndex(i, startMs - offset)
@@ -235,7 +235,7 @@ function formatTime(seconds: number): string {
 const absolutePositionMs = computed(() => {
   let offset = 0
   for (let i = 0; i < currentFileIndex.value; i++) {
-    offset += (audioFiles.value[i].durationSeconds ?? 0) * 1000
+    offset += (audioFiles.value[i]!.durationSeconds ?? 0) * 1000
   }
   return offset + currentPosition.value * 1000
 })
@@ -292,7 +292,7 @@ onMounted(async () => {
   } else {
     // Fall back to the first audio file if the provided fileId is not audio
     const isAudio = audioFiles.value.some((f) => f.id === startFileId)
-    if (!isAudio) startFileId = audioFiles.value[0].id
+    if (!isAudio) startFileId = audioFiles.value[0]!.id
   }
 
   initQueue(startFileId, startPosition)

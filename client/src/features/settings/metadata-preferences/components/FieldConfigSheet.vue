@@ -18,6 +18,9 @@ const FIELD_LABELS: Record<MetadataField, string> = {
   seriesName: 'Series name',
   seriesIndex: 'Series index',
   genres: 'Genres',
+  narrators: 'Narrators',
+  duration: 'Duration',
+  abridged: 'Abridged',
 }
 
 const props = defineProps<{
@@ -54,7 +57,7 @@ function moveUp(key: MetadataProviderKey) {
   const providers = [...props.preference.providers]
   const idx = providers.indexOf(key)
   if (idx <= 0) return
-  ;[providers[idx - 1], providers[idx]] = [providers[idx], providers[idx - 1]]
+  ;[providers[idx - 1], providers[idx]] = [providers[idx]!, providers[idx - 1]!]
   emit('change', { ...props.preference, providers })
 }
 
@@ -62,7 +65,7 @@ function moveDown(key: MetadataProviderKey) {
   const providers = [...props.preference.providers]
   const idx = providers.indexOf(key)
   if (idx < 0 || idx >= providers.length - 1) return
-  ;[providers[idx], providers[idx + 1]] = [providers[idx + 1], providers[idx]]
+  ;[providers[idx], providers[idx + 1]] = [providers[idx + 1]!, providers[idx]!]
   emit('change', { ...props.preference, providers })
 }
 

@@ -77,6 +77,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     durationSeconds: null,
     abridged: false,
     chapters: null,
+    formatPriority: [],
     ...overrides,
   }
 }

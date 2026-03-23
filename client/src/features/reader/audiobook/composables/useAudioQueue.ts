@@ -26,7 +26,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   let pendingSeek: number | null = null
 
   function buildHowl(index: number): Howl {
-    const file = files[index]
+    const file = files[index]!
     const fmt = file.format?.toLowerCase() ?? 'm4b'
     const howl = new Howl({
       src: [serveUrl(file.id)],
@@ -60,7 +60,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   }
 
   function getOrCreate(index: number): Howl {
-    const file = files[index]
+    const file = files[index]!
     if (!howls.has(file.id)) {
       howls.set(file.id, buildHowl(index))
     }
@@ -81,7 +81,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   function activateIndex(index: number, positionSeconds = 0) {
     const clamped = Math.max(0, Math.min(index, files.length - 1))
     if (clamped !== currentIndex.value) {
-      const prev = howls.get(files[currentIndex.value]?.id)
+      const prev = howls.get(files[currentIndex.value]!.id)
       prev?.stop()
       currentIndex.value = clamped
       pendingSeek = null
@@ -93,7 +93,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
     evictDistant(clamped)
 
     loadError.value = null
-    duration.value = files[clamped].durationSeconds ?? 0
+    duration.value = files[clamped]!.durationSeconds ?? 0
 
     if (howl.state() === 'loaded') {
       duration.value = howl.duration()
@@ -113,7 +113,8 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   }
 
   function currentHowl(): Howl | undefined {
-    return howls.get(files[currentIndex.value]?.id)
+    const id = files[currentIndex.value]?.id
+    return id !== undefined ? howls.get(id) : undefined
   }
 
   function play() {

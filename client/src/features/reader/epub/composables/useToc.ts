@@ -27,8 +27,8 @@ export function useToc() {
   const expandedHrefs = ref<Set<string>>(new Set())
   const activeHref = ref<string>('')
 
-  function setChapters(toc: RawTocItem[]) {
-    chapters.value = mapTocItems(toc ?? [])
+  function setChapters(toc: unknown[]) {
+    chapters.value = mapTocItems((toc ?? []) as RawTocItem[])
   }
 
   function setActiveHref(href: string) {

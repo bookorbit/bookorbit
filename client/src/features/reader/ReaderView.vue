@@ -10,7 +10,7 @@ import { useVisibility } from './shared/composables/useVisibility'
 import { useBookmarks } from './epub/composables/useBookmarks'
 import { useAnnotations } from './epub/composables/useAnnotations'
 import { useToc } from './epub/composables/useToc'
-import { useSearch } from './epub/composables/useSearch'
+import { useSearch, type FoliateView } from './epub/composables/useSearch'
 import { useReaderSelection } from './epub/composables/useReaderSelection'
 import ReaderHeader from './epub/components/ReaderHeader.vue'
 import ReaderFooter from './epub/components/ReaderFooter.vue'
@@ -252,7 +252,7 @@ function handleSidebarDeleteAnnotation(id: number) {
 
 function onSearchQuery(q: string) {
   if (!foliateView.value) return
-  doSearch(foliateView.value, q)
+  doSearch(foliateView.value as FoliateView, q)
 }
 
 async function openSearchWithText(text: string) {
@@ -264,7 +264,7 @@ async function openSearchWithText(text: string) {
 }
 
 function onSearchClear() {
-  clearSearch(foliateView.value)
+  clearSearch(foliateView.value as FoliateView | null)
 }
 
 function navigateSearch(cfiTarget: string) {

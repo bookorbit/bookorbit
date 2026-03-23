@@ -21,7 +21,7 @@ function blankForm() {
     watch: false,
     autoScanCronExpression: null as string | null,
     metadataPrecedence: [...DEFAULT_METADATA_PRECEDENCE],
-    formatPriority: [...DEFAULT_FORMAT_PRIORITY],
+    formatPriority: [...DEFAULT_FORMAT_PRIORITY] as string[],
     allowedFormats: [] as string[],
     organizationMode: 'auto' as OrganizationMode,
     excludePatterns: [] as string[],

@@ -45,6 +45,7 @@ const missingBook: BookCard = {
   readStatus: null,
   metadataScore: null,
   addedAt: '2026-01-01T00:00:00.000Z',
+  durationSeconds: null,
 }
 
 const presentBook: BookCard = {
@@ -64,6 +65,7 @@ const presentBook: BookCard = {
   readStatus: null,
   metadataScore: null,
   addedAt: '2026-01-01T00:00:00.000Z',
+  durationSeconds: null,
 }
 
 describe('BookCoverCard — missing state', () => {

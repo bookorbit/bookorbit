@@ -180,7 +180,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         v-if="isSearchOpen"
         :initial-title="book.title ?? ''"
         :initial-author="book.authors?.[0]?.name ?? ''"
-        :is-audiobook="isAudiobook"
+        :is-audiobook="isPrimaryAudio"
         @close="isSearchOpen = false"
         @select="handleSearchSelect"
       />

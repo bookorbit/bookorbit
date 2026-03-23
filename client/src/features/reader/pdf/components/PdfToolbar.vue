@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ScrollMode } from '../composables/usePdfLayout'
+import type { AcceptableValue } from 'reka-ui'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const { hasPermission } = usePermissions()
@@ -114,6 +115,10 @@ function currentZoomValue(): string {
   if (props.zoomMode === 'fit-page') return 'fit-page'
   if (props.zoomMode === 'fit-width') return 'fit-width'
   return String(props.customScale)
+}
+
+function handleApplyZoomPreset(value: AcceptableValue) {
+  emit('applyZoomPreset', String(value))
 }
 </script>
 
@@ -205,7 +210,7 @@ function currentZoomValue(): string {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" class="min-w-[9rem]">
-        <DropdownMenuRadioGroup :model-value="currentZoomValue()" @update:model-value="emit('applyZoomPreset', $event)">
+        <DropdownMenuRadioGroup :model-value="currentZoomValue()" @update:model-value="handleApplyZoomPreset">
           <DropdownMenuRadioItem value="fit-page" class="text-xs">Page Fit</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="fit-width" class="text-xs">Page Width</DropdownMenuRadioItem>
           <DropdownMenuSeparator />

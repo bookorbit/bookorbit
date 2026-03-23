@@ -17,7 +17,7 @@ interface FoliateSearchSection {
   subitems?: { cfi?: string; excerpt?: SearchExcerpt }[]
 }
 
-interface FoliateView {
+export interface FoliateView {
   search(opts: { query: string }): AsyncIterable<FoliateSearchSection>
   clearSearch?(): void
 }
