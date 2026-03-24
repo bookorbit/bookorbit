@@ -114,7 +114,7 @@ function runSearch() {
       </button>
     </div>
 
-    <!-- Results -->
+    <!-- Results (scrollable) -->
     <div class="flex-1 overflow-y-auto px-4 pb-4">
       <!-- Skeleton grid while loading with no results yet -->
       <div v-if="isStreaming && !filteredResults.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -137,6 +137,11 @@ function runSearch() {
           <p class="text-sm font-medium text-foreground">No results found</p>
           <p class="text-xs text-muted-foreground mt-0.5">Try adjusting the title or author</p>
         </div>
+      </div>
+
+      <!-- Instructions when no search yet -->
+      <div v-else-if="!hasSearched" class="py-12 flex flex-col items-center gap-2 text-muted-foreground">
+        <p class="text-sm">Search above, then click a result to start comparing metadata.</p>
       </div>
 
       <!-- Results grid -->

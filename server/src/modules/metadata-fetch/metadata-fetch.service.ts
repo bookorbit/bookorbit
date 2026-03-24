@@ -7,6 +7,7 @@ import { from, merge, Observable, switchMap } from 'rxjs';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata } from '../../db/schema';
+import { filterAndRank } from './candidate-relevance';
 import { ProviderThrottleError } from './provider-throttle.error';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { ProviderRegistry } from './provider-registry';
@@ -85,7 +86,7 @@ export class MetadataFetchService {
       return p.lookupById(existingId).then((r) => (r ? [r] : []));
     }
 
-    const primary = await p.search(params);
+    const primary = filterAndRank(await p.search(params), params);
     const hasIsbn = hasText(params.isbn);
     if (!hasIsbn) return primary;
 
@@ -102,7 +103,7 @@ export class MetadataFetchService {
 
     this.logger.log(`[${p.key}] ISBN search returned no results; falling back to non-ISBN search`);
     const fallbackParams: MetadataSearchParams = { ...params, isbn: undefined };
-    const fallback = await p.search(fallbackParams);
+    const fallback = filterAndRank(await p.search(fallbackParams), fallbackParams);
     this.logger.log(`[${p.key}] Non-ISBN fallback ${fallback.length > 0 ? `returned ${fallback.length} result(s)` : 'returned no results'}`);
     return fallback;
   }

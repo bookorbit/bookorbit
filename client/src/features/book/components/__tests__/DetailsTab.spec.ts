@@ -1,5 +1,16 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
 import DetailsTab from '../detail/tabs/DetailsTab.vue'
 import type { BookDetail } from '@projectx/types'
 
@@ -78,6 +89,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     abridged: false,
     chapters: null,
     formatPriority: [],
+    comicMetadata: null,
     ...overrides,
   }
 }

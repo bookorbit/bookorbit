@@ -40,6 +40,7 @@ const currentSource = computed<MetadataSource>(() => ({
   durationSeconds: props.book.durationSeconds,
   abridged: props.book.abridged,
 }))
+
 const {
   filteredResults,
   providerCounts,
@@ -55,7 +56,6 @@ const {
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
-const currentProviderId = computed(() => (selectedCandidate.value ? (props.book.providerIds[selectedCandidate.value.provider] ?? null) : null))
 
 onMounted(() => {
   loadProviders()
@@ -63,17 +63,18 @@ onMounted(() => {
 
 function handleSearch(params: { title: string; author: string; isbn: string }) {
   const isAudiobook = props.book.durationSeconds != null || !!props.book.providerIds.audible
+  selectedCandidate.value = null
+  view.value = 'search'
   search({ ...params, bookId: props.book.id, isAudiobook })
 }
 
-function selectCandidate(candidate: MetadataCandidate) {
+function handleSelect(candidate: MetadataCandidate) {
   selectedCandidate.value = candidate
   view.value = 'diff'
 }
 
 function backToSearch() {
   view.value = 'search'
-  selectedCandidate.value = null
 }
 
 function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
@@ -85,15 +86,15 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-50 flex">
-      <!-- Backdrop: hidden on mobile since the panel is full-screen there -->
+      <!-- Backdrop -->
       <div class="hidden sm:block flex-1 bg-black/50 backdrop-blur-sm" @click="$emit('close')" />
 
-      <!-- Drawer panel: full-screen on mobile, right-side panel on sm+ -->
+      <!-- Drawer panel -->
       <div class="relative flex flex-col w-full sm:w-3/4 sm:max-w-4xl h-full bg-background sm:border-l border-border shadow-2xl overflow-hidden">
         <!-- Gradient accent strip -->
         <div class="h-px w-full bg-linear-to-r from-transparent via-primary to-transparent shrink-0 opacity-60" />
 
-        <!-- Ambient glow behind title -->
+        <!-- Ambient glow -->
         <div class="absolute top-0 right-0 w-64 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
         <!-- Close button -->
@@ -121,7 +122,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
         </div>
 
         <!-- Content -->
-        <div class="flex-1 min-h-0">
+        <div class="flex-1 min-h-0 relative">
           <MetadataSearchPanel
             v-if="view === 'search'"
             :search-defaults="searchDefaults"
@@ -134,16 +135,19 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             @search="handleSearch"
             @toggle-provider="toggleProvider"
             @clear-filter="clearProviderFilter"
-            @select="selectCandidate"
+            @select="handleSelect"
           />
 
           <MetadataDiffPanel
             v-else-if="view === 'diff' && selectedCandidate"
             :current="currentSource"
-            :candidate="selectedCandidate"
+            :candidates="filteredResults"
+            :initial-candidate="selectedCandidate"
             :providers="providers"
             :current-cover-url="bookCoverUrl"
-            :current-provider-id="currentProviderId"
+            :provider-ids="book.providerIds"
+            :filtered-results="filteredResults"
+            back-label="Results"
             @back="backToSearch"
             @apply="handleApply"
           />

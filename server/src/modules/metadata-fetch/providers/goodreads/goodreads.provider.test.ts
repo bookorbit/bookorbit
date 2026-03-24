@@ -163,47 +163,6 @@ describe('GoodreadsProvider', () => {
       await expect(provider.search({ title: 'Test' })).rejects.toBeInstanceOf(ProviderThrottleError);
     });
 
-    it('should sort results by relevance score', async () => {
-      const searchHtml = `
-        <a href="/book/show/1?from_srp=true">Exact Title</a>
-        <a href="/book/show/2?from_srp=true">Partial</a>
-      `;
-      const mockState1 = { 'Book:kca:1': { title: 'Exact Title' } };
-      const mockState2 = { 'Book:kca:2': { title: 'Partial Title' } };
-      const bookHtml1 = `<script id="__NEXT_DATA__">{"props":{"pageProps":{"apolloState":${JSON.stringify(mockState1)}}}}</script>`;
-      const bookHtml2 = `<script id="__NEXT_DATA__">{"props":{"pageProps":{"apolloState":${JSON.stringify(mockState2)}}}}</script>`;
-
-      global.fetch = vi
-        .fn()
-        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(searchHtml) })
-        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(bookHtml1) })
-        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(bookHtml2) });
-
-      const result = await provider.search({ title: 'Exact Title' });
-      expect(result).toHaveLength(2);
-      expect(result[0].title).toBe('Exact Title');
-    });
-
-    it('should score relevance by author', async () => {
-      const searchHtml = `<a href="/book/show/1?from_srp=true">Book</a>`;
-      const mockState = {
-        'Book:kca:1': {
-          title: 'Book',
-          primaryContributorEdge: { node: { __ref: 'Contributor:1' } },
-        },
-        'Contributor:1': { name: 'F. Scott Fitzgerald' },
-      };
-      const bookHtml = `<script id="__NEXT_DATA__">{"props":{"pageProps":{"apolloState":${JSON.stringify(mockState)}}}}</script>`;
-
-      global.fetch = vi
-        .fn()
-        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(searchHtml) })
-        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(bookHtml) });
-
-      const result = await provider.search({ title: 'Book', author: 'Fitzgerald' });
-      expect(result).toHaveLength(1);
-    });
-
     it('should use slug-based scoring in extractBookIds', async () => {
       const searchHtml = `
         <a href="/book/show/1.The_Great_Gatsby?from_srp=true">B1</a>

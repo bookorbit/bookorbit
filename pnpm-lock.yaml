@@ -257,6 +257,9 @@ importers:
       fast-xml-parser:
         specifier: ^5.5.11
         version: 5.5.11
+      fastest-levenshtein:
+        specifier: ^1.0.16
+        version: 1.0.16
       fastify:
         specifier: ^5.8.4
         version: 5.8.4
@@ -6388,6 +6391,13 @@ packages:
         integrity: sha512-QL0eb0YbSTVWF6tTf1+LEMSgtCEjBYPpnAjoLC8SscESlAjXEIRJ7cHtLG0pLeDFaZLa4VKZLArtA/60ZS7vyA==,
       }
     hasBin: true
+
+  fastest-levenshtein@1.0.16:
+    resolution:
+      {
+        integrity: sha512-eRnCtTTtGZFpQCwhJiUOuxPQWRXVKYDn0b2PeHfXL6/Zi53SLAzAHfVhVWK2AryC/WH05kGfxhFIPvTF0SXQzg==,
+      }
+    engines: { node: ">= 4.9.1" }
 
   fastify-plugin@5.1.0:
     resolution:
@@ -13803,6 +13813,8 @@ snapshots:
       fast-xml-builder: 1.1.4
       path-expression-matcher: 1.5.0
       strnum: 2.2.3
+
+  fastest-levenshtein@1.0.16: {}
 
   fastify-plugin@5.1.0: {}
 

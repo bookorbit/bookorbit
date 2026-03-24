@@ -2,8 +2,8 @@ import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLeng
 import { Type } from 'class-transformer';
 
 export class ComicMetadataDto {
-  @IsOptional() @IsString() @MaxLength(50) issueNumber?: string;
-  @IsOptional() @IsString() @MaxLength(500) volumeName?: string;
+  @IsOptional() @IsString() @MaxLength(50) issueNumber?: string | null;
+  @IsOptional() @IsString() @MaxLength(500) volumeName?: string | null;
   @IsOptional() @IsArray() @IsString({ each: true }) pencillers?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) inkers?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) colorists?: string[];

@@ -40,10 +40,6 @@ export class GoodreadsProvider implements IdentifiableProvider {
       if (candidate) results.push(candidate);
     }
 
-    if (results.length > 1 && (params.title || params.author)) {
-      results.sort((a, b) => scoreRelevance(b, params) - scoreRelevance(a, params));
-    }
-
     return results;
   }
 
@@ -155,48 +151,6 @@ function extractBookIds(html: string, titleHint: string | undefined, limit: numb
   }));
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((s) => s.id);
-}
-
-function normalizeStr(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function scoreRelevance(candidate: MetadataCandidate, params: MetadataSearchParams): number {
-  let score = 0;
-
-  if (params.title && candidate.title) {
-    const qt = normalizeStr(params.title);
-    const ct = normalizeStr(candidate.title);
-    if (ct === qt) score += 10;
-    else if (ct.startsWith(qt)) score += 6;
-    else {
-      const queryWords = qt.split(' ').filter((w) => w.length > 1);
-      const candidateWords = new Set(ct.split(' '));
-      score += queryWords.filter((w) => candidateWords.has(w)).length * 2;
-    }
-  }
-
-  if (params.author && candidate.authors?.length) {
-    const qa = normalizeStr(params.author);
-    const qaWords = new Set(qa.split(' ').filter((w) => w.length > 2));
-    for (const author of candidate.authors) {
-      const ca = normalizeStr(author);
-      if (ca.includes(qa) || qa.includes(ca)) {
-        score += 5;
-        break;
-      }
-      if (ca.split(' ').some((w) => qaWords.has(w))) {
-        score += 2;
-        break;
-      }
-    }
-  }
-
-  return score;
 }
 
 function sleep(ms: number): Promise<void> {

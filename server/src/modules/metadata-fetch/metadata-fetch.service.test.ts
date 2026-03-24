@@ -52,13 +52,15 @@ describe('MetadataFetchService', () => {
       key: MetadataProviderKey.GOOGLE,
       label: 'Google',
       identifiable: false,
-      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'g1')]),
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'g1', 'Dune')]),
     };
     const openLibrary: MetadataProvider = {
       key: MetadataProviderKey.OPEN_LIBRARY,
       label: 'OpenLibrary',
       identifiable: false,
-      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1'), candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol2')]),
+      search: vi
+        .fn()
+        .mockResolvedValue([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune'), candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol2', 'Dune')]),
     };
     registry.select.mockReturnValue([google, openLibrary]);
 
@@ -67,9 +69,9 @@ describe('MetadataFetchService', () => {
     expect(results).toHaveLength(3);
     expect(results).toEqual(
       expect.arrayContaining([
-        candidate(MetadataProviderKey.GOOGLE, 'g1'),
-        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1'),
-        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol2'),
+        candidate(MetadataProviderKey.GOOGLE, 'g1', 'Dune'),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune'),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol2', 'Dune'),
       ]),
     );
     expect(google.search).toHaveBeenCalledWith({ title: 'Dune' });
@@ -84,13 +86,13 @@ describe('MetadataFetchService', () => {
       search: vi
         .fn()
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([candidate(MetadataProviderKey.GOOGLE, 'g-fallback')]),
+        .mockResolvedValueOnce([candidate(MetadataProviderKey.GOOGLE, 'g-fallback', 'Dune')]),
     };
     registry.select.mockReturnValue([google]);
 
     const results = await firstValueFrom(service.search({ title: 'Dune', author: 'Frank Herbert', isbn: '9780441013593' }).pipe(toArray()));
 
-    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-fallback')]);
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-fallback', 'Dune')]);
     expect(google.search).toHaveBeenCalledTimes(2);
     expect(google.search).toHaveBeenNthCalledWith(1, {
       title: 'Dune',
@@ -109,13 +111,13 @@ describe('MetadataFetchService', () => {
       key: MetadataProviderKey.GOOGLE,
       label: 'Google',
       identifiable: false,
-      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'g-isbn')]),
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'g-isbn', 'Dune')]),
     };
     registry.select.mockReturnValue([google]);
 
     const results = await firstValueFrom(service.search({ title: 'Dune', isbn: '9780441013593' }).pipe(toArray()));
 
-    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-isbn')]);
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-isbn', 'Dune')]);
     expect(google.search).toHaveBeenCalledTimes(1);
     expect(google.search).toHaveBeenCalledWith({ title: 'Dune', isbn: '9780441013593' });
   });
@@ -141,8 +143,8 @@ describe('MetadataFetchService', () => {
       key: MetadataProviderKey.GOOGLE,
       label: 'Google',
       identifiable: true,
-      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'search-id')]),
-      lookupById: vi.fn().mockResolvedValue(candidate(MetadataProviderKey.GOOGLE, 'stored-id')),
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]),
+      lookupById: vi.fn().mockResolvedValue(candidate(MetadataProviderKey.GOOGLE, 'stored-id', 'Dune')),
     };
     registry.select.mockReturnValue([google]);
 
@@ -150,7 +152,7 @@ describe('MetadataFetchService', () => {
       service.search({ title: 'Dune', existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' } }).pipe(toArray()),
     );
 
-    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'stored-id')]);
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'stored-id', 'Dune')]);
     expect(google.lookupById).toHaveBeenCalledWith('stored-id');
     expect(google.search).not.toHaveBeenCalled();
   });
@@ -160,7 +162,7 @@ describe('MetadataFetchService', () => {
       key: MetadataProviderKey.GOOGLE,
       label: 'Google',
       identifiable: true,
-      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'search-id')]),
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]),
       lookupById: vi.fn().mockResolvedValue(null),
     };
     registry.select.mockReturnValue([google]);
@@ -185,13 +187,13 @@ describe('MetadataFetchService', () => {
       key: MetadataProviderKey.OPEN_LIBRARY,
       label: 'OpenLibrary',
       identifiable: false,
-      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1')]),
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune')]),
     };
     registry.select.mockReturnValue([failing, healthy]);
 
     const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
 
-    expect(results).toEqual([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1')]);
+    expect(results).toEqual([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune')]);
   });
 
   it('times out a stalled provider instead of hanging indefinitely', async () => {
