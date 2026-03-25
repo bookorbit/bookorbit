@@ -78,29 +78,29 @@ export class GoodreadsProvider implements IdentifiableProvider {
 
   private async fetchHtml(url: string, op: 'search' | 'search-by-isbn' | 'lookup', query?: string, providerId?: string): Promise<string | null> {
     const startedAt = Date.now();
-    this.logger.log(`[goodreads] fetch.start op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
+    this.logger.log(`[goodreads] [start] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
     try {
       const res = await fetchWithThrottle(url, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[goodreads] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
       const html = await res.text();
       this.logger.log(
-        `[goodreads] fetch.end op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
+        `[goodreads] [end] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
       );
       return html;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.logger.warn(
-          `[goodreads] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
+          `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
         );
         throw err;
       }
       this.logger.warn(
-        `[goodreads] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return null;
     }

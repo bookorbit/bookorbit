@@ -73,7 +73,7 @@ export class MetadataFetchService {
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         const hint = err.retryAfterSeconds != null ? `${err.retryAfterSeconds}s (Retry-After header)` : 'scheduled backoff';
-        this.logger.warn(`[${p.key}] throttled by provider - ${hint}`);
+        this.logger.warn(`[${p.key}] [throttle] hint="${hint}" - provider throttled`);
         this.throttleTracker.record(p.key, err.retryAfterSeconds);
       }
       return [];

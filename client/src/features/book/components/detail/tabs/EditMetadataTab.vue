@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ChevronDown, Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import type { BookDetail } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -113,6 +114,12 @@ const { refreshing: autoFilling, previewRefresh } = useRefreshMetadata()
 async function autoFill() {
   const preview = await previewRefresh(props.book.id)
   if (!preview) return
+
+  if (Object.keys(preview).length === 0) {
+    toast.info('No new metadata found')
+    return
+  }
+
   if (preview.title != null) form.title = preview.title
   if (preview.subtitle != null) form.subtitle = preview.subtitle
   if (preview.description != null) form.description = preview.description
@@ -159,7 +166,7 @@ async function autoFill() {
     <!-- Right: Form -->
     <div class="flex-1 min-w-0 space-y-3">
       <!-- Action bar -->
-      <div class="flex items-center justify-between min-h-[2rem]">
+      <div class="flex items-center justify-between min-h-8">
         <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
         <span v-else />
         <div class="flex gap-2">
@@ -268,7 +275,7 @@ async function autoFill() {
 
       <!-- Series | Index | Publisher -->
       <div class="flex flex-wrap gap-3">
-        <div class="flex-1 min-w-[140px] space-y-1">
+        <div class="flex-1 min-w-35 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Series</label>
           <input
             v-model="form.seriesName"
@@ -286,7 +293,7 @@ async function autoFill() {
             @input="setFloatField('seriesIndex', $event)"
           />
         </div>
-        <div class="flex-1 min-w-[120px] space-y-1">
+        <div class="flex-1 min-w-30 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Publisher</label>
           <input
             v-model="form.publisher"
@@ -326,7 +333,7 @@ async function autoFill() {
             @input="setIntField('pageCount', $event)"
           />
         </div>
-        <div class="flex-1 min-w-[90px] space-y-1">
+        <div class="flex-1 min-w-22.5 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ISBN-13</label>
           <input
             v-model="form.isbn13"
@@ -334,7 +341,7 @@ async function autoFill() {
             maxlength="13"
           />
         </div>
-        <div class="flex-1 min-w-[85px] space-y-1">
+        <div class="flex-1 min-w-21.25 space-y-1">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ISBN-10</label>
           <input
             v-model="form.isbn10"
@@ -365,7 +372,7 @@ async function autoFill() {
       <div class="space-y-1">
         <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Provider IDs</label>
         <div class="rounded-lg border border-border bg-muted/30 p-3 flex gap-3 overflow-x-auto">
-          <div v-for="{ field, label } in providerIdFields" :key="field" class="space-y-1 min-w-[120px] flex-1">
+          <div v-for="{ field, label } in providerIdFields" :key="field" class="space-y-1 min-w-30 flex-1">
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ label }}</label>
             <input
               v-model="form[field]"

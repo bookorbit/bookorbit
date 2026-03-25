@@ -25,7 +25,7 @@ export class ProviderThrottleTracker {
     const until = Date.now() + seconds * 1000;
     this.throttledUntil.set(key, until);
     this.backoffLevel.set(key, level + 1);
-    this.logger.log(`[${key}] cooldown set until ${new Date(until).toISOString()} (${seconds}s, level ${level + 1})`);
+    this.logger.log(`[${key}] [cooldown] until=${new Date(until).toISOString()} seconds=${seconds} level=${level + 1} - cooldown set`);
   }
 
   isThrottled(key: MetadataProviderKey): boolean {
@@ -38,7 +38,7 @@ export class ProviderThrottleTracker {
     this.throttledUntil.delete(key);
     this.backoffLevel.delete(key);
     if (wasThrottled) {
-      this.logger.log(`[${key}] throttle cleared after successful fetch`);
+      this.logger.log(`[${key}] [cooldown] - throttle cleared`);
     }
   }
 

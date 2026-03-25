@@ -40,73 +40,132 @@ export class ScannerService implements OnApplicationBootstrap {
   }
 
   async startScan(libraryId: number, triggeredBy: 'manual' | 'watcher' | 'schedule'): Promise<{ jobId: number }> {
-    if (this.scanJobStore.isRunning(libraryId)) {
-      throw new ConflictException(`A scan is already running for library ${libraryId}`);
+    const event = 'scanner.start_scan';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} triggeredBy=${triggeredBy} - scan start requested`);
+    try {
+      if (this.scanJobStore.isRunning(libraryId)) {
+        throw new ConflictException(`A scan is already running for library ${libraryId}`);
+      }
+
+      const [folders, settings] = await Promise.all([
+        this.scannerRepo.findLibraryFolders(libraryId),
+        this.scannerRepo.findLibrarySettings(libraryId),
+      ]);
+      if (folders.length === 0) throw new NotFoundException(`Library ${libraryId} has no folders`);
+
+      const allowedFormats = settings?.allowedFormats ?? [];
+      const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
+      const excludePatterns = settings?.excludePatterns ?? [];
+
+      const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
+
+      this.scanJobStore.create(job.id, libraryId, 0);
+      this.emitFromStore(libraryId, job.id, 'running');
+
+      this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns).catch((err) => {
+        const errorClass = err instanceof Error ? err.name : 'Error';
+        const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+        this.logger.error(
+          `[scanner.run_scan] [fail] libraryId=${libraryId} jobId=${job.id} errorClass=${errorClass} error="${errorMessage}" - scan job crashed unexpectedly`,
+        );
+      });
+
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} triggeredBy=${triggeredBy} durationMs=${Date.now() - startedAt} jobId=${job.id} - scan start accepted`,
+      );
+      return { jobId: job.id };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} triggeredBy=${triggeredBy} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - scan start failed`,
+      );
+      throw err;
     }
-
-    const [folders, settings] = await Promise.all([this.scannerRepo.findLibraryFolders(libraryId), this.scannerRepo.findLibrarySettings(libraryId)]);
-    if (folders.length === 0) throw new NotFoundException(`Library ${libraryId} has no folders`);
-
-    const allowedFormats = settings?.allowedFormats ?? [];
-    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
-    const excludePatterns = settings?.excludePatterns ?? [];
-
-    const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
-
-    this.scanJobStore.create(job.id, libraryId, 0);
-    this.emitFromStore(libraryId, job.id, 'running');
-
-    this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns).catch((err) =>
-      this.logger.error(`Scan job ${job.id} crashed unexpectedly: ${(err as Error).message}`),
-    );
-
-    return { jobId: job.id };
   }
 
   async refreshCovers(libraryId: number): Promise<{ queued: number }> {
-    const rows = await this.scannerRepo.findPrimaryBookFilesByLibrary(libraryId);
-    const candidates = rows.filter((r) => r.format && METADATA_FORMATS.has(r.format));
-    const total = candidates.length;
+    const event = 'scanner.refresh_covers';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} - cover refresh started`);
+    try {
+      const rows = await this.scannerRepo.findPrimaryBookFilesByLibrary(libraryId);
+      const candidates = rows.filter((r) => r.format && METADATA_FORMATS.has(r.format));
+      const total = candidates.length;
+      const backgroundStartedAt = Date.now();
 
-    this.scanGateway.emitCoverRefreshProgress({ libraryId, processed: 0, total, status: 'running' });
+      this.scanGateway.emitCoverRefreshProgress({ libraryId, processed: 0, total, status: 'running' });
 
-    (async () => {
-      let processed = 0;
-      for (const row of candidates) {
-        const refreshed = await this.metadataService.refreshCoverForBook(row.bookId, row.absolutePath, row.format!);
-        processed++;
-        if (refreshed) {
-          this.scanGateway.emitCoverRefreshed({ bookId: row.bookId, libraryId } satisfies CoverRefreshedEvent);
+      (async () => {
+        let processed = 0;
+        let refreshedCount = 0;
+        for (const row of candidates) {
+          const refreshed = await this.metadataService.refreshCoverForBook(row.bookId, row.absolutePath, row.format!);
+          processed++;
+          if (refreshed) {
+            refreshedCount++;
+            this.scanGateway.emitCoverRefreshed({ bookId: row.bookId, libraryId } satisfies CoverRefreshedEvent);
+          }
+          this.scanGateway.emitCoverRefreshProgress({
+            libraryId,
+            processed,
+            total,
+            status: processed < total ? 'running' : 'completed',
+          } satisfies CoverRefreshProgressEvent);
         }
-        this.scanGateway.emitCoverRefreshProgress({
-          libraryId,
-          processed,
-          total,
-          status: processed < total ? 'running' : 'completed',
-        } satisfies CoverRefreshProgressEvent);
-      }
-    })().catch((err) => this.logger.warn(`Cover refresh crashed for library ${libraryId}: ${(err as Error).message}`));
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - backgroundStartedAt} queued=${total} processed=${processed} refreshed=${refreshedCount} - cover refresh completed`,
+        );
+      })().catch((err) => {
+        const errorClass = err instanceof Error ? err.name : 'Error';
+        const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+        this.logger.warn(
+          `[${event}] [fail] libraryId=${libraryId} durationMs=${Date.now() - backgroundStartedAt} errorClass=${errorClass} error="${errorMessage}" - cover refresh crashed`,
+        );
+      });
 
-    return { queued: total };
+      this.logger.log(`[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} queued=${total} - cover refresh queued`);
+      return { queued: total };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover refresh failed`,
+      );
+      throw err;
+    }
   }
 
   startScanAsync(libraryId: number): void {
     if (this.scanJobStore.isRunning(libraryId)) return;
     this.startScan(libraryId, 'manual').catch((err) =>
-      this.logger.error(`Auto-scan failed to start for library ${libraryId}: ${(err as Error).message}`),
+      this.logger.error(
+        `[scanner.start_scan] [fail] libraryId=${libraryId} triggeredBy=manual errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - auto-scan failed to start`,
+      ),
     );
   }
 
   scanBookFolderAsync(filePath: string, libraryId: number): void {
     this.scanBookFolder(filePath, libraryId).catch((err) =>
-      this.logger.error(`Targeted folder scan failed for ${filePath}: ${(err as Error).message}`),
+      this.logger.error(
+        `[scanner.scan_book_folder] [fail] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - targeted folder scan failed`,
+      ),
     );
   }
 
   private async scanBookFolder(filePath: string, libraryId: number): Promise<void> {
+    const event = 'scanner.scan_book_folder';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" - targeted folder scan started`);
     const allFolders = await this.scannerRepo.findLibraryFolders(libraryId);
     const libraryFolder = allFolders.find((f) => filePath.startsWith(f.path + sep));
-    if (!libraryFolder) return;
+    if (!libraryFolder) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} matchedLibraryFolder=false - targeted folder scan completed`,
+      );
+      return;
+    }
 
     const bookFolder = dirname(filePath);
 
@@ -114,6 +173,9 @@ export class ScannerService implements OnApplicationBootstrap {
     // walk the entire root — treat it as a full scan instead.
     if (bookFolder === libraryFolder.path) {
       this.startScanAsync(libraryId);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} promotedToFullScan=true - targeted folder scan completed`,
+      );
       return;
     }
 
@@ -144,13 +206,24 @@ export class ScannerService implements OnApplicationBootstrap {
 
     let candidate: BookCandidate | null;
     try {
-      candidate = await buildSingleBookCandidate(resolvedBookFolder, libraryFolder.path, excludePatterns, (msg) => this.logger.warn(msg));
+      candidate = await buildSingleBookCandidate(resolvedBookFolder, libraryFolder.path, excludePatterns, (msg) =>
+        this.logger.warn(
+          `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${resolvedBookFolder.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+        ),
+      );
     } catch (err) {
-      this.logger.warn(`Cannot walk ${resolvedBookFolder}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk target folder`,
+      );
       return;
     }
 
-    if (!candidate) return;
+    if (!candidate) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateFound=false - targeted folder scan completed`,
+      );
+      return;
+    }
 
     const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
     if (allowed) {
@@ -158,7 +231,12 @@ export class ScannerService implements OnApplicationBootstrap {
         const { role, format } = classifyFile(f.absolutePath);
         return role !== 'content' || (format !== null && allowed.has(format));
       });
-      if (!filtered.some((f) => classifyFile(f.absolutePath).role === 'content')) return;
+      if (!filtered.some((f) => classifyFile(f.absolutePath).role === 'content')) {
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateFound=true skippedByAllowedFormats=true - targeted folder scan completed`,
+        );
+        return;
+      }
       candidate = { ...candidate, files: filtered };
     }
 
@@ -180,7 +258,9 @@ export class ScannerService implements OnApplicationBootstrap {
 
     const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, bookByFolderPath, fileByPath, fileByIno, formatPriority);
 
-    this.logger.log(`Targeted scan of ${basename(resolvedBookFolder)}: added=${result.added}, updated=${result.updated}`);
+    this.logger.log(
+      `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} folder="${basename(resolvedBookFolder).replace(/"/g, '\\"')}" added=${result.added} updated=${result.updated} - targeted folder scan completed`,
+    );
   }
 
   private async runScan(
@@ -191,7 +271,9 @@ export class ScannerService implements OnApplicationBootstrap {
     formatPriority: string[],
     excludePatterns: string[],
   ): Promise<void> {
-    this.logger.log(`Scan job ${jobId} started for library ${libraryId}`);
+    const event = 'scanner.run_scan';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} jobId=${jobId} folderCount=${folders.length} - scan job started`);
 
     type FolderWork = {
       id: number;
@@ -210,9 +292,15 @@ export class ScannerService implements OnApplicationBootstrap {
     for (const folder of folders) {
       let candidates: BookCandidate[] = [];
       try {
-        candidates = await findBookCandidates(folder.path, excludePatterns, (msg) => this.logger.warn(msg));
+        candidates = await findBookCandidates(folder.path, excludePatterns, (msg) =>
+          this.logger.warn(
+            `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+          ),
+        );
       } catch (err) {
-        this.logger.warn(`Cannot walk ${folder.path}: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(
+          `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} path="${folder.path.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk folder`,
+        );
       }
 
       if (allowed) {
@@ -250,7 +338,9 @@ export class ScannerService implements OnApplicationBootstrap {
       }
 
       await this.scannerRepo.completeScanJob(jobId, totals);
-      this.logger.log(`Scan job ${jobId} completed — ${JSON.stringify(totals)}`);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} jobId=${jobId} durationMs=${Date.now() - startedAt} addedCount=${totals.addedCount} updatedCount=${totals.updatedCount} missingCount=${totals.missingCount} - scan job completed`,
+      );
       this.scanJobStore.increment(libraryId, { added: totals.addedCount, updated: totals.updatedCount });
       this.emitFromStore(libraryId, jobId, 'completed');
     } catch (err) {
@@ -258,7 +348,9 @@ export class ScannerService implements OnApplicationBootstrap {
       await this.scannerRepo.failScanJob(jobId, message).catch(() => {
         // Job row may have been cascade-deleted if library was deleted.
       });
-      this.logger.error(`Scan job ${jobId} failed: ${message}`);
+      this.logger.error(
+        `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${message.replace(/"/g, '\\"')}" - scan job failed`,
+      );
       this.emitFromStore(libraryId, jobId, 'failed', message);
     } finally {
       this.scanJobStore.delete(libraryId);
@@ -274,49 +366,66 @@ export class ScannerService implements OnApplicationBootstrap {
     jobId: number,
     formatPriority: string[],
   ): Promise<ScanCounts> {
-    const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
-
-    const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
-      knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
+    const event = 'scanner.scan_folder_candidates';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} candidateCount=${candidates.length} - folder candidate scan started`,
     );
-    const fileByPath = new Map<
-      string,
-      { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
-    >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
-    const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
-      knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
-    );
-    const seenBookIds = new Set<number>();
+    try {
+      const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
-    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-      const batch = candidates.slice(i, i + BATCH_SIZE);
-
-      const results = await Promise.all(
-        batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, bookByFolderPath, fileByPath, fileByIno, formatPriority)),
+      const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
+        knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
       );
+      const fileByPath = new Map<
+        string,
+        { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
+      >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
+      const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
+        knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
+      );
+      const seenBookIds = new Set<number>();
 
-      for (const r of results) {
-        seenBookIds.add(r.bookId);
-        counts.addedCount += r.added;
-        counts.updatedCount += r.updated;
+      for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+        const batch = candidates.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.all(
+          batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, bookByFolderPath, fileByPath, fileByIno, formatPriority)),
+        );
+
+        for (const r of results) {
+          seenBookIds.add(r.bookId);
+          counts.addedCount += r.added;
+          counts.updatedCount += r.updated;
+        }
+
+        const entry = this.scanJobStore.increment(libraryId, { processed: batch.length });
+        if (entry && this.scanJobStore.shouldEmit(entry)) {
+          this.emitFromStore(libraryId, jobId, 'running');
+          this.scanJobStore.markEmitted(entry);
+        }
       }
 
-      const entry = this.scanJobStore.increment(libraryId, { processed: batch.length });
-      if (entry && this.scanJobStore.shouldEmit(entry)) {
-        this.emitFromStore(libraryId, jobId, 'running');
-        this.scanJobStore.markEmitted(entry);
+      const missingIds = knownBooks.filter((b) => !seenBookIds.has(b.id)).map((b) => b.id);
+      if (missingIds.length > 0) {
+        await this.scannerRepo.markBooksAsMissing(missingIds);
+        counts.missingCount += missingIds.length;
+        this.scanJobStore.increment(libraryId, { missing: missingIds.length });
+        this.scanGateway.emitBookMissing({ libraryId, bookIds: missingIds } satisfies BookMissingEvent);
       }
-    }
 
-    const missingIds = knownBooks.filter((b) => !seenBookIds.has(b.id)).map((b) => b.id);
-    if (missingIds.length > 0) {
-      await this.scannerRepo.markBooksAsMissing(missingIds);
-      counts.missingCount += missingIds.length;
-      this.scanJobStore.increment(libraryId, { missing: missingIds.length });
-      this.scanGateway.emitBookMissing({ libraryId, bookIds: missingIds } satisfies BookMissingEvent);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} durationMs=${Date.now() - startedAt} addedCount=${counts.addedCount} updatedCount=${counts.updatedCount} missingCount=${counts.missingCount} - folder candidate scan completed`,
+      );
+      return counts;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - folder candidate scan failed`,
+      );
+      throw err;
     }
-
-    return counts;
   }
 
   private async processCandidate(
@@ -330,8 +439,6 @@ export class ScannerService implements OnApplicationBootstrap {
   ): Promise<{ bookId: number; added: number; updated: number }> {
     const counts = { added: 0, updated: 0 };
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
-
-    this.logger.log(`Processing: ${basename(candidate.folderPath)} (${candidate.files.length} file${candidate.files.length !== 1 ? 's' : ''})`);
 
     const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, fileCounts);
     counts.added += fileCounts.addedCount;
@@ -355,7 +462,9 @@ export class ScannerService implements OnApplicationBootstrap {
       const { format, role: classifiedRole } = classifyFile(fileStat.absolutePath);
 
       if (classifiedRole === 'content' && fileStat.sizeBytes === 0) {
-        this.logger.warn(`Zero-byte content file skipped: ${fileStat.absolutePath}`);
+        this.logger.warn(
+          `[scanner.process_file] [fail] bookId=${book.id} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" reason=zero_byte_content - content file skipped`,
+        );
         continue;
       }
 
@@ -367,7 +476,9 @@ export class ScannerService implements OnApplicationBootstrap {
       try {
         processResult = await this.processFile(fileStat, format, role, sortOrder, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
       } catch (err) {
-        this.logger.warn(`Failed to process file ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(
+          `[scanner.process_file] [fail] bookId=${book.id} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - file processing failed`,
+        );
         continue;
       }
 
@@ -386,7 +497,9 @@ export class ScannerService implements OnApplicationBootstrap {
             await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
             nonAudioMetadataExtracted = true;
           } catch (err) {
-            this.logger.warn(`Metadata extraction failed for ${fileStat.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+            this.logger.warn(
+              `[scanner.extract_metadata] [fail] bookId=${book.id} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" format=${format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - metadata extraction failed`,
+            );
           }
         }
       }
@@ -416,7 +529,9 @@ export class ScannerService implements OnApplicationBootstrap {
         try {
           await this.metadataService.extractAndSave(book.id, first.absolutePath, first.format);
         } catch (err) {
-          this.logger.warn(`Audio metadata extraction failed for ${first.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+          this.logger.warn(
+            `[scanner.extract_audio_metadata] [fail] bookId=${book.id} path="${first.absolutePath.replace(/"/g, '\\"')}" format=${first.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - audio metadata extraction failed`,
+          );
         }
       }
 
@@ -427,7 +542,9 @@ export class ScannerService implements OnApplicationBootstrap {
           try {
             await this.metadataService.extractAudioFileDuration(book.id, audioFile.absolutePath);
           } catch (err) {
-            this.logger.warn(`Audio duration extraction failed for ${audioFile.absolutePath}: ${err instanceof Error ? err.message : String(err)}`);
+            this.logger.warn(
+              `[scanner.extract_audio_duration] [fail] bookId=${book.id} path="${audioFile.absolutePath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - audio duration extraction failed`,
+            );
           }
         }),
       );
@@ -435,10 +552,11 @@ export class ScannerService implements OnApplicationBootstrap {
       try {
         await this.metadataService.aggregateAudioDuration(book.id);
       } catch (err) {
-        this.logger.warn(`Audio duration aggregation failed for book ${book.id}: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(
+          `[scanner.aggregate_audio_duration] [fail] bookId=${book.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - audio duration aggregation failed`,
+        );
       }
     }
-
     return { bookId: book.id, ...counts };
   }
 
@@ -467,7 +585,9 @@ export class ScannerService implements OnApplicationBootstrap {
           counts.updatedCount++;
         }
         bookByFolderPath.set(candidate.folderPath, { ...survivor, folderPath: candidate.folderPath });
-        this.logger.log(`Merged ${virtualChildren.length} stem-split book(s) into book ${survivor.id}: ${basename(candidate.folderPath)}`);
+        this.logger.log(
+          `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${survivor.id} folder="${candidate.folderPath.replace(/"/g, '\\"')}" mergedCount=${virtualChildren.length} action=merge_stem_split - stem-split books merged`,
+        );
         return { ...survivor, folderPath: candidate.folderPath };
       }
 
@@ -480,7 +600,11 @@ export class ScannerService implements OnApplicationBootstrap {
       counts.addedCount++;
       this.autoFetchOrchestrator
         ?.scheduleIfEligible(book.id, libraryId, 'event_import')
-        .catch((err: Error) => this.logger.warn(`book-metadata-fetch schedule failed for book ${book.id}: ${err.message}`));
+        .catch((err: Error) =>
+          this.logger.warn(
+            `[scanner.upsert_book] [fail] libraryId=${libraryId} bookId=${book.id} action=schedule_metadata_fetch errorClass=${err.name} error="${err.message.replace(/"/g, '\\"')}" - metadata fetch schedule failed`,
+          ),
+        );
       return book;
     }
 
@@ -499,7 +623,9 @@ export class ScannerService implements OnApplicationBootstrap {
       const siblingIds = virtualSiblings.map((b) => b.id);
       await this.scannerRepo.markBooksAsMissing(siblingIds);
       this.scanGateway.emitBookMissing({ libraryId, bookIds: siblingIds });
-      this.logger.log(`Drained ${virtualSiblings.length} virtual sibling(s) into book ${existing.id}: ${basename(candidate.folderPath)}`);
+      this.logger.log(
+        `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${existing.id} folder="${candidate.folderPath.replace(/"/g, '\\"')}" drainedCount=${virtualSiblings.length} action=drain_virtual_siblings - virtual siblings drained`,
+      );
     }
 
     return existing;
@@ -565,7 +691,9 @@ export class ScannerService implements OnApplicationBootstrap {
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'ENOENT' || code === 'EACCES') {
-        this.logger.debug(`File no longer accessible, skipping: ${fileStat.absolutePath}`);
+        this.logger.debug(
+          `[scanner.process_file] [end] bookId=${bookId} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" action=skip_inaccessible - file no longer accessible`,
+        );
         return { isNew: false, reassigned: false, fileId: null };
       }
       throw err;

@@ -35,75 +35,157 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    const watchedLibraries = await this.db.select().from(libraries).where(eq(libraries.watch, true));
-    for (const lib of watchedLibraries) {
-      const folders = await this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, lib.id));
-      await this.startWatcher(
-        lib.id,
-        folders.map((f) => f.path),
-      );
-    }
+    const event = 'scanner.watcher.bootstrap';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] - watcher bootstrap started`);
+    try {
+      const watchedLibraries = await this.db.select().from(libraries).where(eq(libraries.watch, true));
+      for (const lib of watchedLibraries) {
+        const folders = await this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, lib.id));
+        await this.startWatcher(
+          lib.id,
+          folders.map((f) => f.path),
+        );
+      }
 
-    this.reconcileTimer = setInterval(() => {
-      this.reconcile().catch((err) => this.logger.error(`Reconcile error: ${(err as Error).message}`));
-    }, RECONCILE_MS);
+      this.reconcileTimer = setInterval(() => {
+        this.reconcile().catch((err) => {
+          const errorClass = err instanceof Error ? err.name : 'Error';
+          const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+          this.logger.error(`[scanner.watcher.reconcile] [fail] errorClass=${errorClass} error="${errorMessage}" - reconcile failed`);
+        });
+      }, RECONCILE_MS);
+      this.logger.log(
+        `[${event}] [end] durationMs=${Date.now() - startedAt} watchedLibraryCount=${watchedLibraries.length} - watcher bootstrap completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - watcher bootstrap failed`,
+      );
+      throw err;
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.reconcileTimer) clearInterval(this.reconcileTimer);
-    for (const entry of this.pendingTimers.values()) clearTimeout(entry.timer);
-    this.pendingTimers.clear();
-    for (const timer of this.pendingFolderScanTimers.values()) clearTimeout(timer);
-    this.pendingFolderScanTimers.clear();
-    for (const subs of this.subscriptions.values()) {
-      for (const sub of subs) await sub.unsubscribe();
+    const event = 'scanner.watcher.destroy';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] activeWatchers=${this.subscriptions.size} - watcher destroy started`);
+    try {
+      if (this.reconcileTimer) clearInterval(this.reconcileTimer);
+      for (const entry of this.pendingTimers.values()) clearTimeout(entry.timer);
+      this.pendingTimers.clear();
+      for (const timer of this.pendingFolderScanTimers.values()) clearTimeout(timer);
+      this.pendingFolderScanTimers.clear();
+      for (const subs of this.subscriptions.values()) {
+        for (const sub of subs) await sub.unsubscribe();
+      }
+      this.subscriptions.clear();
+      this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} - watcher destroy completed`);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - watcher destroy failed`,
+      );
+      throw err;
     }
-    this.subscriptions.clear();
   }
 
   private async reconcile(): Promise<void> {
+    const event = 'scanner.watcher.reconcile';
+    const startedAt = Date.now();
     const libraryIds = [...this.subscriptions.keys()];
     if (libraryIds.length === 0) return;
 
-    const results = await this.processor.reconcileMissingBooks(libraryIds);
-    for (const result of results) {
-      if (result.type === 'book-restored') {
-        this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
+    this.logger.log(`[${event}] [start] libraryCount=${libraryIds.length} - reconcile started`);
+    try {
+      const results = await this.processor.reconcileMissingBooks(libraryIds);
+      for (const result of results) {
+        if (result.type === 'book-restored') {
+          this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
+        }
       }
+      this.logger.log(
+        `[${event}] [end] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} resultCount=${results.length} - reconcile completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - reconcile failed`,
+      );
+      throw err;
     }
   }
 
   async startWatcher(libraryId: number, paths: string[]): Promise<void> {
-    await this.stopWatcher(libraryId);
-    if (paths.length === 0) return;
+    const event = 'scanner.watcher.start';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} pathCount=${paths.length} - watcher start requested`);
+    try {
+      await this.stopWatcher(libraryId);
+      if (paths.length === 0) {
+        this.logger.log(`[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} pathCount=0 - watcher start completed`);
+        return;
+      }
 
-    const { subscribe } = await import('@parcel/watcher');
-    const subs: AsyncSubscription[] = [];
+      const { subscribe } = await import('@parcel/watcher');
+      const subs: AsyncSubscription[] = [];
 
-    for (const path of paths) {
-      const sub = await subscribe(path, (err, events) => {
-        if (err) {
-          this.logger.warn(`Watcher error for library ${libraryId}: ${err.message}`);
-          return;
-        }
-        for (const event of events) {
-          if (event.type === 'delete' || event.type === 'create') {
-            this.schedule(event.type, event.path, libraryId);
+      for (const path of paths) {
+        const sub = await subscribe(path, (err, events) => {
+          if (err) {
+            this.logger.warn(
+              `[${event}] [fail] libraryId=${libraryId} path="${path.replace(/"/g, '\\"')}" errorClass=${err.name ?? 'Error'} error="${err.message.replace(/"/g, '\\"')}" - watcher callback error`,
+            );
+            return;
           }
-        }
-      });
-      subs.push(sub);
-    }
+          for (const event of events) {
+            if (event.type === 'delete' || event.type === 'create') {
+              this.schedule(event.type, event.path, libraryId);
+            }
+          }
+        });
+        subs.push(sub);
+      }
 
-    this.subscriptions.set(libraryId, subs);
-    this.logger.log(`Watching ${paths.length} folder(s) for library ${libraryId}`);
+      this.subscriptions.set(libraryId, subs);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} pathCount=${paths.length} - watcher start completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} pathCount=${paths.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - watcher start failed`,
+      );
+      throw err;
+    }
   }
 
   async stopWatcher(libraryId: number): Promise<void> {
-    const existing = this.subscriptions.get(libraryId);
-    if (!existing) return;
-    for (const sub of existing) await sub.unsubscribe();
-    this.subscriptions.delete(libraryId);
+    const event = 'scanner.watcher.stop';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} - watcher stop requested`);
+    try {
+      const existing = this.subscriptions.get(libraryId);
+      if (!existing) {
+        this.logger.log(`[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} hadWatcher=false - watcher stop completed`);
+        return;
+      }
+      for (const sub of existing) await sub.unsubscribe();
+      this.subscriptions.delete(libraryId);
+      this.logger.log(`[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} hadWatcher=true - watcher stop completed`);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - watcher stop failed`,
+      );
+      throw err;
+    }
   }
 
   private scheduleFolderScan(filePath: string, libraryId: number): void {
@@ -122,7 +204,11 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     if (existing) clearTimeout(existing.timer);
     const timer = setTimeout(() => {
       this.pendingTimers.delete(path);
-      this.process(type, path, libraryId).catch((err) => this.logger.error(`Failed to process ${type} for ${path}: ${(err as Error).message}`));
+      this.process(type, path, libraryId).catch((err) =>
+        this.logger.error(
+          `[scanner.watcher.process_event] [fail] libraryId=${libraryId} type=${type} path="${path.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - file event processing failed`,
+        ),
+      );
     }, DEBOUNCE_MS);
     this.pendingTimers.set(path, { timer, type, libraryId });
   }

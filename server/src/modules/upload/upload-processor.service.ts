@@ -78,8 +78,14 @@ export class UploadProcessorService {
   extractMetadataAsync(bookId: number, absolutePath: string, format: string): void {
     if (!METADATA_FORMATS.has(format)) return;
 
+    this.logger.debug(`[upload.metadata] [start] book=${bookId} format=${format}`);
     this.metadataService
       .extractAndSave(bookId, absolutePath, format)
-      .catch((err: Error) => this.logger.warn(`Metadata extraction failed for uploaded book ${bookId}: ${err.message}`));
+      .then(() => {
+        this.logger.debug(`[upload.metadata] [success] book=${bookId}`);
+      })
+      .catch((err: Error) => {
+        this.logger.warn(`[upload.metadata] [fail] book=${bookId} error="${err.message}"`);
+      });
   }
 }

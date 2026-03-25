@@ -95,7 +95,7 @@ export class ComicVineClient {
   private async get<T>(url: URL): Promise<T | null> {
     await this.rateLimiter.throttle();
     const startedAt = Date.now();
-    this.logger.log(`[comicvine] fetch.start method=GET`);
+    this.logger.log(`[comicvine] [start] method=GET`);
 
     try {
       const res = await fetchWithThrottle(url, {
@@ -104,27 +104,27 @@ export class ComicVineClient {
       });
 
       if (res.status === 420) {
-        this.logger.warn(`[comicvine] fetch.fail method=GET status=420 durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[comicvine] [fail] method=GET status=420 durationMs=${Date.now() - startedAt} message="throttled"`);
         throw new ProviderThrottleError();
       }
 
       if (!res.ok) {
-        this.logger.warn(`[comicvine] fetch.fail method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`);
+        this.logger.warn(`[comicvine] [fail] method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`);
         return null;
       }
 
       const body = (await res.json()) as ComicVineApiResponse<T>;
       if (body.status_code !== 1) {
-        this.logger.warn(`[comicvine] fetch.fail method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="${body.error}"`);
+        this.logger.warn(`[comicvine] [fail] method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="${body.error}"`);
         return null;
       }
 
       const resultCount = Array.isArray(body.results) ? body.results.length : body.results ? 1 : 0;
-      this.logger.log(`[comicvine] fetch.end method=GET status=${res.status} resultCount=${resultCount} durationMs=${Date.now() - startedAt}`);
+      this.logger.log(`[comicvine] [end] method=GET status=${res.status} resultCount=${resultCount} durationMs=${Date.now() - startedAt}`);
       return body.results;
     } catch (err) {
       if (err instanceof ProviderThrottleError) throw err;
-      this.logger.warn(`[comicvine] fetch.fail method=GET durationMs=${Date.now() - startedAt} message="${(err as Error).message}"`);
+      this.logger.warn(`[comicvine] [fail] method=GET durationMs=${Date.now() - startedAt} message="${(err as Error).message}"`);
       return null;
     }
   }

@@ -112,7 +112,7 @@ export class HardcoverClient {
   ): Promise<T | null> {
     await this.rateLimiter.throttle();
     const startedAt = Date.now();
-    this.logger.log(`[hardcover] fetch.start op=${op} method=POST`);
+    this.logger.log(`[hardcover] [start] op=${op} method=POST`);
 
     try {
       const res = await fetchWithThrottle(GRAPHQL_ENDPOINT, {
@@ -127,20 +127,20 @@ export class HardcoverClient {
 
       if (!res.ok) {
         this.logger.warn(
-          `[hardcover] fetch.fail op=${op} method=POST status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[hardcover] [fail] op=${op} method=POST status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
 
       const body = (await res.json()) as T;
-      this.logger.log(`[hardcover] fetch.end op=${op} method=POST status=${res.status} durationMs=${Date.now() - startedAt}`);
+      this.logger.log(`[hardcover] [end] op=${op} method=POST status=${res.status} durationMs=${Date.now() - startedAt}`);
       return body;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[hardcover] fetch.fail op=${op} method=POST durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
-      this.logger.warn(`[hardcover] fetch.fail op=${op} method=POST durationMs=${Date.now() - startedAt} message="${(err as Error).message}"`);
+      this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="${(err as Error).message}"`);
       return null;
     }
   }

@@ -42,6 +42,9 @@ export class EmailSendOrchestrator {
   ) {}
 
   async send(dto: SendBookDto, user: RequestUser): Promise<{ queued: number }> {
+    this.logger.log(
+      `[email.send] [start] user=${user.id} books=${dto.bookIds.length} recipients=${(dto.recipientIds?.length ?? 0) + (dto.groupIds?.length ?? 0)}`,
+    );
     const tasks = await this.buildTasks(dto, user);
     if (tasks.length === 0) throw new BadRequestException('No recipients specified');
 
@@ -55,10 +58,12 @@ export class EmailSendOrchestrator {
       }
     }
 
+    this.logger.log(`[email.send] [queued] user=${user.id} total=${queued}`);
     return { queued };
   }
 
   async resend(logEntryId: number, user: RequestUser): Promise<{ queued: number }> {
+    this.logger.log(`[email.resend] [start] user=${user.id} logEntry=${logEntryId}`);
     const logEntry = await this.sendLogService.getForResend(logEntryId, user);
     if (!logEntry.bookId || !logEntry.toEmail) {
       throw new BadRequestException('Cannot resend: original book or recipient is missing');
@@ -98,6 +103,7 @@ export class EmailSendOrchestrator {
   }
 
   async quickSend(bookId: number, user: RequestUser): Promise<{ queued: number }> {
+    this.logger.log(`[email.quick-send] [start] user=${user.id} book=${bookId}`);
     const prefs = await this.preferencesService.getForUser(user.id);
     if (!prefs?.defaultRecipientId) {
       throw new BadRequestException('No default recipient configured. Set one in email settings.');
@@ -204,10 +210,10 @@ export class EmailSendOrchestrator {
       });
 
       await this.sendLogService.markSent(logId);
-      this.logger.log(`Email sent: log#${logId} to ${task.recipientEmail}`);
+      this.logger.log(`[email.dispatch] [success] log=${logId} to=${task.recipientEmail}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Send failed for log#${logId} (attempt ${attemptCount + 1}): ${errorMessage}`);
+      this.logger.warn(`[email.dispatch] [retry] log=${logId} attempt=${attemptCount + 1} error="${errorMessage}"`);
 
       const { isFinal } = await this.sendLogService.markFailed(logId, errorMessage, attemptCount);
 
@@ -215,7 +221,7 @@ export class EmailSendOrchestrator {
         const delayMs = SEND_RETRY_DELAYS_MS[attemptCount] ?? 0;
         setTimeout(() => void this.dispatchSend(logId, smtpConfig, task, file, subject, bodyText, attemptCount + 1), delayMs);
       } else {
-        this.logger.error(`Send permanently failed for log#${logId} to ${task.recipientEmail}`);
+        this.logger.error(`[email.dispatch] [fail] log=${logId} to=${task.recipientEmail} error="${errorMessage}"`);
       }
     }
   }

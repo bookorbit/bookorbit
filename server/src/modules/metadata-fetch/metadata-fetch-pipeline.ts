@@ -87,7 +87,7 @@ export class MetadataFetchPipeline {
     const active: MetadataProviderKey[] = [];
     for (const key of keys) {
       if (this.throttleTracker.isThrottled(key)) {
-        this.logger.warn(`[${key}] throttled - skipping metadata fetch for this run`);
+        this.logger.warn(`[${key}] [throttle] - skipping metadata fetch for this run`);
       } else {
         active.push(key);
       }

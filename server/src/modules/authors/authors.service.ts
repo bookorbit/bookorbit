@@ -158,18 +158,54 @@ export class AuthorsService {
   }
 
   async searchMetadata(dto: ListAuthorMetadataDto): Promise<AuthorMetadataCandidate[]> {
-    return this.authorMetadataFetchService.search(
-      {
-        name: dto.q,
-        region: dto.region,
-        limit: dto.limit,
-      },
-      { keys: dto.providers },
+    const event = 'author.search_metadata';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] query=${JSON.stringify(dto.q)} region=${dto.region ?? 'default'} limit=${dto.limit ?? 0} providerCount=${dto.providers?.length ?? 0} - author metadata search started`,
     );
+    try {
+      const result = await this.authorMetadataFetchService.search(
+        {
+          name: dto.q,
+          region: dto.region,
+          limit: dto.limit,
+        },
+        { keys: dto.providers },
+      );
+      this.logger.log(
+        `[${event}] [end] query=${JSON.stringify(dto.q)} durationMs=${Date.now() - startedAt} resultCount=${result.length} - author metadata search completed`,
+      );
+      return result;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] query=${JSON.stringify(dto.q)} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author metadata search failed`,
+      );
+      throw err;
+    }
   }
 
   async lookupMetadata(dto: LookupAuthorMetadataDto): Promise<AuthorMetadataCandidate | null> {
-    return this.authorMetadataFetchService.lookupById(dto.provider, dto.id, dto.region);
+    const event = 'author.lookup_metadata';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] provider=${dto.provider} providerId=${JSON.stringify(dto.id)} region=${dto.region ?? 'default'} - author metadata lookup started`,
+    );
+    try {
+      const result = await this.authorMetadataFetchService.lookupById(dto.provider, dto.id, dto.region);
+      this.logger.log(
+        `[${event}] [end] provider=${dto.provider} providerId=${JSON.stringify(dto.id)} durationMs=${Date.now() - startedAt} found=${result != null} - author metadata lookup completed`,
+      );
+      return result;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] provider=${dto.provider} providerId=${JSON.stringify(dto.id)} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author metadata lookup failed`,
+      );
+      throw err;
+    }
   }
 
   streamMetadata(dto: ListAuthorMetadataDto): Observable<AuthorMetadataCandidate> {
@@ -258,93 +294,152 @@ export class AuthorsService {
   }
 
   async update(user: RequestUser, authorId: number, dto: UpdateAuthorDto): Promise<AuthorDetail> {
-    await this.assertMutationAccess(user, [authorId]);
+    const event = 'author.update';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} authorId=${authorId} - author update started`);
+    try {
+      await this.assertMutationAccess(user, [authorId]);
 
-    const values: Parameters<AuthorsRepository['updateAuthorById']>[1] = {};
+      const values: Parameters<AuthorsRepository['updateAuthorById']>[1] = {};
 
-    if ('name' in dto) {
-      const name = dto.name?.trim();
-      if (!name) throw new BadRequestException('name cannot be empty');
-      values.name = name;
+      if ('name' in dto) {
+        const name = dto.name?.trim();
+        if (!name) throw new BadRequestException('name cannot be empty');
+        values.name = name;
+      }
+
+      if ('sortName' in dto) {
+        values.sortName = dto.sortName?.trim() || null;
+      }
+
+      if ('description' in dto) {
+        values.description = dto.description?.trim() || null;
+      }
+
+      const fieldNames = Object.keys(values);
+      if (fieldNames.length === 0) {
+        const detail = await this.findOne(user, authorId);
+        this.logger.log(
+          `[${event}] [end] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} fields=none noChange=true - author update completed`,
+        );
+        return detail;
+      }
+
+      const updated = await this.authorsRepo.updateAuthorById(authorId, values);
+      if (!updated) throw new NotFoundException('Author not found');
+      if (values.name !== undefined) {
+        await this.enrichmentOrchestrator.schedule(authorId, 'author_rename');
+      }
+      const detail = await this.findOne(user, authorId);
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} fields=${fieldNames.join(',')} noChange=false - author update completed`,
+      );
+      return detail;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author update failed`,
+      );
+      throw err;
     }
-
-    if ('sortName' in dto) {
-      values.sortName = dto.sortName?.trim() || null;
-    }
-
-    if ('description' in dto) {
-      values.description = dto.description?.trim() || null;
-    }
-
-    if (Object.keys(values).length === 0) {
-      return this.findOne(user, authorId);
-    }
-
-    const updated = await this.authorsRepo.updateAuthorById(authorId, values);
-    if (!updated) throw new NotFoundException('Author not found');
-    if (values.name !== undefined) {
-      await this.enrichmentOrchestrator.schedule(authorId, 'author_rename');
-    }
-    this.logger.log(`author.update userId=${user.id} authorId=${authorId} fields=${Object.keys(values).join(',')}`);
-
-    return this.findOne(user, authorId);
   }
 
   async merge(user: RequestUser, dto: MergeAuthorsDto): Promise<MergeAuthorsResult> {
-    if (!this.isSuperuser(user)) {
-      throw new ForbiddenException('Only superusers can merge authors');
-    }
-
-    const uniqueSourceIds = [...new Set(dto.sourceAuthorIds)].filter((id) => id !== dto.targetAuthorId);
-    if (uniqueSourceIds.length === 0) {
-      throw new BadRequestException('sourceAuthorIds must include at least one author different from targetAuthorId');
-    }
-
-    const allAuthorIds = [dto.targetAuthorId, ...uniqueSourceIds];
-    await this.assertMutationAccess(user, allAuthorIds);
-
-    const affectedBookCount = await this.authorsRepo.countDistinctBooks(uniqueSourceIds);
-    await this.authorsRepo.mergeAuthors(dto.targetAuthorId, uniqueSourceIds);
-    await this.enrichmentOrchestrator.schedule(dto.targetAuthorId, 'author_merge_target');
+    const event = 'author.merge';
+    const startedAt = Date.now();
     this.logger.log(
-      `author.merge userId=${user.id} targetAuthorId=${dto.targetAuthorId} sourceAuthorIds=${uniqueSourceIds.join(',')} affectedBookCount=${affectedBookCount}`,
+      `[${event}] [start] userId=${user.id} targetAuthorId=${dto.targetAuthorId} sourceCount=${dto.sourceAuthorIds.length} - author merge started`,
     );
-    const target = await this.findOne(user, dto.targetAuthorId);
+    try {
+      if (!this.isSuperuser(user)) {
+        throw new ForbiddenException('Only superusers can merge authors');
+      }
 
-    return {
-      target,
-      mergedAuthorIds: uniqueSourceIds,
-      affectedBookCount,
-    };
+      const uniqueSourceIds = [...new Set(dto.sourceAuthorIds)].filter((id) => id !== dto.targetAuthorId);
+      if (uniqueSourceIds.length === 0) {
+        throw new BadRequestException('sourceAuthorIds must include at least one author different from targetAuthorId');
+      }
+
+      const allAuthorIds = [dto.targetAuthorId, ...uniqueSourceIds];
+      await this.assertMutationAccess(user, allAuthorIds);
+
+      const affectedBookCount = await this.authorsRepo.countDistinctBooks(uniqueSourceIds);
+      await this.authorsRepo.mergeAuthors(dto.targetAuthorId, uniqueSourceIds);
+      await this.enrichmentOrchestrator.schedule(dto.targetAuthorId, 'author_merge_target');
+      const target = await this.findOne(user, dto.targetAuthorId);
+
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} targetAuthorId=${dto.targetAuthorId} durationMs=${Date.now() - startedAt} mergedCount=${uniqueSourceIds.length} affectedBookCount=${affectedBookCount} - author merge completed`,
+      );
+      return {
+        target,
+        mergedAuthorIds: uniqueSourceIds,
+        affectedBookCount,
+      };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} targetAuthorId=${dto.targetAuthorId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author merge failed`,
+      );
+      throw err;
+    }
   }
 
   async delete(user: RequestUser, dto: DeleteAuthorsDto): Promise<{ deletedAuthorIds: number[]; affectedBookCount: number }> {
-    if (!this.isSuperuser(user)) {
-      throw new ForbiddenException('Only superusers can delete authors');
+    const event = 'author.delete';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${dto.authorIds.length} - author delete started`);
+    try {
+      if (!this.isSuperuser(user)) {
+        throw new ForbiddenException('Only superusers can delete authors');
+      }
+
+      const authorIds = [...new Set(dto.authorIds)];
+      await this.assertMutationAccess(user, authorIds);
+
+      const affectedBookCount = await this.authorsRepo.countDistinctBooks(authorIds);
+      await this.authorsRepo.deleteAuthors(authorIds);
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} durationMs=${Date.now() - startedAt} deletedCount=${authorIds.length} affectedBookCount=${affectedBookCount} - author delete completed`,
+      );
+
+      return {
+        deletedAuthorIds: authorIds,
+        affectedBookCount,
+      };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} count=${dto.authorIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author delete failed`,
+      );
+      throw err;
     }
-
-    const authorIds = [...new Set(dto.authorIds)];
-    await this.assertMutationAccess(user, authorIds);
-
-    const affectedBookCount = await this.authorsRepo.countDistinctBooks(authorIds);
-    await this.authorsRepo.deleteAuthors(authorIds);
-    this.logger.log(`author.delete userId=${user.id} authorIds=${authorIds.join(',')} affectedBookCount=${affectedBookCount}`);
-
-    return {
-      deletedAuthorIds: authorIds,
-      affectedBookCount,
-    };
   }
 
   async refreshEnrichment(user: RequestUser, authorId: number): Promise<AuthorDetail> {
-    await this.assertMutationAccess(user, [authorId]);
+    const event = 'author.refresh_enrichment';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} authorId=${authorId} - author enrichment refresh started`);
+    try {
+      await this.assertMutationAccess(user, [authorId]);
 
-    const result = await this.refreshEnrichmentInternal(authorId);
-
-    this.logger.log(
-      `author.enrichment.refresh userId=${user.id} authorId=${authorId} provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated}`,
-    );
-    return this.findOne(user, authorId);
+      const result = await this.refreshEnrichmentInternal(authorId);
+      const detail = await this.findOne(user, authorId);
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated} - author enrichment refresh completed`,
+      );
+      return detail;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author enrichment refresh failed`,
+      );
+      throw err;
+    }
   }
 
   async getThumbnailPath(user: RequestUser, authorId: number): Promise<string | null> {
@@ -362,55 +457,78 @@ export class AuthorsService {
     user: RequestUser,
     onProgress?: (event: { authorId: number; updated: boolean; imageUpdated?: boolean; imageUrl?: string | null; error?: string }) => void,
   ): Promise<{ processed: number; failed: number; updated: number }> {
-    const uniqueAuthorIds = [...new Set(authorIds)];
-    if (uniqueAuthorIds.length === 0) {
-      return { processed: 0, failed: 0, updated: 0 };
-    }
+    const event = 'author.bulk_refresh_metadata';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${authorIds.length} - bulk author metadata refresh started`);
+    try {
+      const uniqueAuthorIds = [...new Set(authorIds)];
+      if (uniqueAuthorIds.length === 0) {
+        this.logger.log(
+          `[${event}] [end] userId=${user.id} count=0 durationMs=${Date.now() - startedAt} processed=0 updated=0 failed=0 - bulk author metadata refresh completed`,
+        );
+        return { processed: 0, failed: 0, updated: 0 };
+      }
 
-    await this.assertMutationAccess(user, uniqueAuthorIds);
+      await this.assertMutationAccess(user, uniqueAuthorIds);
 
-    let processed = 0;
-    let failed = 0;
-    let updated = 0;
+      let processed = 0;
+      let failed = 0;
+      let updated = 0;
+      let callbackInterrupted = false;
 
-    for (let index = 0; index < uniqueAuthorIds.length; index += 1) {
-      const authorId = uniqueAuthorIds[index]!;
-      let didUpdate = false;
-      let imageUpdated = false;
-      let imageUrl: string | null | undefined;
-      let errorMessage: string | undefined;
+      for (let index = 0; index < uniqueAuthorIds.length; index += 1) {
+        const authorId = uniqueAuthorIds[index]!;
+        let didUpdate = false;
+        let imageUpdated = false;
+        let imageUrl: string | null | undefined;
+        let errorMessage: string | undefined;
 
-      try {
-        const result = await this.refreshEnrichmentInternal(authorId);
-        didUpdate = result.descriptionUpdated || result.imageUpdated;
-        imageUpdated = result.imageUpdated;
-        if (imageUpdated) {
-          imageUrl = await this.authorImageStorage.getThumbnailUrlIfExists(authorId);
+        try {
+          const result = await this.refreshEnrichmentInternal(authorId);
+          didUpdate = result.descriptionUpdated || result.imageUpdated;
+          imageUpdated = result.imageUpdated;
+          if (imageUpdated) {
+            imageUrl = await this.authorImageStorage.getThumbnailUrlIfExists(authorId);
+          }
+          if (didUpdate) {
+            updated += 1;
+          }
+        } catch (error) {
+          failed += 1;
+          const itemErrorClass = error instanceof Error ? error.name : 'Error';
+          errorMessage = error instanceof Error ? error.message : 'Failed to refresh metadata';
+          const itemError = errorMessage.replace(/"/g, '\\"');
+          this.logger.warn(
+            `[${event}] [fail] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} errorClass=${itemErrorClass} error="${itemError}" - author metadata refresh item failed`,
+          );
         }
-        if (didUpdate) {
-          updated += 1;
+
+        processed += 1;
+        try {
+          onProgress?.({ authorId, updated: didUpdate, imageUpdated, imageUrl, error: errorMessage });
+        } catch {
+          // callback threw (e.g. client disconnected) — stop the loop
+          callbackInterrupted = true;
+          break;
         }
-      } catch (error) {
-        failed += 1;
-        errorMessage = error instanceof Error ? error.message : 'Failed to refresh metadata';
-        this.logger.warn(`author.enrichment.bulk authorId=${authorId} error=${JSON.stringify(errorMessage)}`);
+
+        if (index < uniqueAuthorIds.length - 1) {
+          await this.sleep(this.getBulkAudnexusDelayMs());
+        }
       }
 
-      processed += 1;
-      try {
-        onProgress?.({ authorId, updated: didUpdate, imageUpdated, imageUrl, error: errorMessage });
-      } catch {
-        // callback threw (e.g. client disconnected) — stop the loop
-        break;
-      }
-
-      if (index < uniqueAuthorIds.length - 1) {
-        await this.sleep(this.getBulkAudnexusDelayMs());
-      }
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} count=${uniqueAuthorIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} failed=${failed} callbackInterrupted=${callbackInterrupted} - bulk author metadata refresh completed`,
+      );
+      return { processed, failed, updated };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} count=${authorIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - bulk author metadata refresh failed`,
+      );
+      throw err;
     }
-
-    this.logger.log(`author.enrichment.bulk userId=${user.id} processed=${processed} updated=${updated} failed=${failed}`);
-    return { processed, failed, updated };
   }
 
   private async resolveLibraryIds(user: RequestUser, scopedLibraryId?: number): Promise<number[]> {

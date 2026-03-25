@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { EmailProvider } from '../../db/schema';
@@ -13,6 +13,8 @@ export interface ResolvedSmtp {
 
 @Injectable()
 export class EmailProviderResolver {
+  private readonly logger = new Logger(EmailProviderResolver.name);
+
   constructor(
     private readonly providerService: EmailProviderService,
     private readonly preferencesService: EmailPreferencesService,
@@ -20,12 +22,16 @@ export class EmailProviderResolver {
 
   async resolve(user: RequestUser, requestedProviderId?: number | null): Promise<ResolvedSmtp> {
     if (requestedProviderId !== null && requestedProviderId !== undefined) {
-      return this.fromProvider(await this.providerService.getProviderWithDecryptedPassword(requestedProviderId, user));
+      const provider = await this.providerService.getProviderWithDecryptedPassword(requestedProviderId, user);
+      this.logger.debug(`[email.provider] [resolved] id=${provider.id} host=${provider.host} (requested)`);
+      return this.fromProvider(provider);
     }
 
     const prefs = await this.preferencesService.getForUser(user.id);
     if (prefs?.defaultProviderId !== null && prefs?.defaultProviderId !== undefined) {
-      return this.fromProvider(await this.providerService.getProviderWithDecryptedPassword(prefs.defaultProviderId, user));
+      const provider = await this.providerService.getProviderWithDecryptedPassword(prefs.defaultProviderId, user);
+      this.logger.debug(`[email.provider] [resolved] id=${provider.id} host=${provider.host} (default)`);
+      return this.fromProvider(provider);
     }
 
     throw new BadRequestException('No email provider configured. Add a provider in email settings.');

@@ -33,15 +33,17 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const user = await this.authService.validateUser(payload.sub, payload.ver);
       if (!user) throw new Error('User not found or token revoked');
       (client.data as Record<string, unknown>).user = user;
-      this.logger.debug(`WS connected: user=${user.id} socket=${client.id}`);
+      this.logger.debug(`[scanner.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
     } catch (err) {
-      this.logger.warn(`WS rejected: ${(err as Error).message} socket=${client.id}`);
+      this.logger.warn(
+        `[scanner.ws_connection] [fail] socketId=${client.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - websocket rejected`,
+      );
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket): void {
-    this.logger.debug(`WS disconnected: socket=${client.id}`);
+    this.logger.debug(`[scanner.ws_connection] [end] socketId=${client.id} - websocket disconnected`);
   }
 
   @SubscribeMessage('subscribe:library')

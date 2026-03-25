@@ -287,98 +287,157 @@ export class BookService {
   }
 
   async deleteBooks(bookIds: number[], user: RequestUser): Promise<void> {
-    if (bookIds.length === 0) return;
-    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-    const isSuperuser = this.isSuperuser(user);
-    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
-    const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
-    await this.bookRepo.deleteByIds(bookIds);
-    for (const { id: bookId } of rows) {
-      const coverDir = join(this.booksPath, 'covers', String(bookId));
-      rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
-        this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
+    const event = 'book.delete_books';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - delete books started`);
+    try {
+      if (bookIds.length === 0) {
+        this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} deletedBooks=0 deletedFiles=0 - delete books completed`);
+        return;
+      }
+      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+      const isSuperuser = this.isSuperuser(user);
+      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+      const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
+      await this.bookRepo.deleteByIds(bookIds);
+      for (const { id: bookId } of rows) {
+        const coverDir = join(this.booksPath, 'covers', String(bookId));
+        rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
+          this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
+        );
+      }
+      for (const { absolutePath } of files) {
+        rm(absolutePath, { force: true }).catch((err: Error) => this.logger.warn(`Failed to delete book file ${absolutePath}: ${err.message}`));
+      }
+      this.logger.log(
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${files.length} - delete books completed`,
       );
-    }
-    for (const { absolutePath } of files) {
-      rm(absolutePath, { force: true }).catch((err: Error) => this.logger.warn(`Failed to delete book file ${absolutePath}: ${err.message}`));
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books failed`,
+      );
+      throw err;
     }
   }
 
   async updateMetadata(id: number, dto: UpdateBookMetadataDto, user: RequestUser): Promise<BookDetailDto> {
-    await this.verifyBookAccess(id, user);
+    const event = 'book.update_metadata';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} - metadata update started`);
+    try {
+      await this.verifyBookAccess(id, user);
 
-    const scalarFields: Parameters<BookRepository['updateMetadataFields']>[1] = {};
-    if ('title' in dto) scalarFields.title = dto.title ?? null;
-    if ('subtitle' in dto) scalarFields.subtitle = dto.subtitle ?? null;
-    if ('description' in dto) scalarFields.description = dto.description ?? null;
-    if ('publisher' in dto) scalarFields.publisher = dto.publisher ?? null;
-    if ('publishedYear' in dto) scalarFields.publishedYear = dto.publishedYear ?? null;
-    if ('language' in dto) scalarFields.language = dto.language ?? null;
-    if ('pageCount' in dto) scalarFields.pageCount = dto.pageCount ?? null;
-    if ('seriesName' in dto) scalarFields.seriesName = dto.seriesName ?? null;
-    if ('seriesIndex' in dto) scalarFields.seriesIndex = dto.seriesIndex ?? null;
-    if ('isbn10' in dto) scalarFields.isbn10 = dto.isbn10 ?? null;
-    if ('isbn13' in dto) scalarFields.isbn13 = dto.isbn13 ?? null;
-    if ('rating' in dto) scalarFields.rating = dto.rating ?? null;
-    if ('googleBooksId' in dto) scalarFields.googleBooksId = dto.googleBooksId ?? null;
-    if ('goodreadsId' in dto) scalarFields.goodreadsId = dto.goodreadsId ?? null;
-    if ('amazonId' in dto) scalarFields.amazonId = dto.amazonId ?? null;
-    if ('hardcoverId' in dto) scalarFields.hardcoverId = dto.hardcoverId ?? null;
-    if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
-    if ('itunesId' in dto) scalarFields.itunesId = dto.itunesId ?? null;
-    if ('audibleId' in dto) scalarFields.audibleId = dto.audibleId ?? null;
-    if ('durationSeconds' in dto) scalarFields.durationSeconds = dto.durationSeconds ?? null;
-    if ('abridged' in dto) scalarFields.abridged = dto.abridged ?? false;
-    if ('comicvineId' in dto) scalarFields.comicvineId = dto.comicvineId ?? null;
+      const scalarFields: Parameters<BookRepository['updateMetadataFields']>[1] = {};
+      if ('title' in dto) scalarFields.title = dto.title ?? null;
+      if ('subtitle' in dto) scalarFields.subtitle = dto.subtitle ?? null;
+      if ('description' in dto) scalarFields.description = dto.description ?? null;
+      if ('publisher' in dto) scalarFields.publisher = dto.publisher ?? null;
+      if ('publishedYear' in dto) scalarFields.publishedYear = dto.publishedYear ?? null;
+      if ('language' in dto) scalarFields.language = dto.language ?? null;
+      if ('pageCount' in dto) scalarFields.pageCount = dto.pageCount ?? null;
+      if ('seriesName' in dto) scalarFields.seriesName = dto.seriesName ?? null;
+      if ('seriesIndex' in dto) scalarFields.seriesIndex = dto.seriesIndex ?? null;
+      if ('isbn10' in dto) scalarFields.isbn10 = dto.isbn10 ?? null;
+      if ('isbn13' in dto) scalarFields.isbn13 = dto.isbn13 ?? null;
+      if ('rating' in dto) scalarFields.rating = dto.rating ?? null;
+      if ('googleBooksId' in dto) scalarFields.googleBooksId = dto.googleBooksId ?? null;
+      if ('goodreadsId' in dto) scalarFields.goodreadsId = dto.goodreadsId ?? null;
+      if ('amazonId' in dto) scalarFields.amazonId = dto.amazonId ?? null;
+      if ('hardcoverId' in dto) scalarFields.hardcoverId = dto.hardcoverId ?? null;
+      if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
+      if ('itunesId' in dto) scalarFields.itunesId = dto.itunesId ?? null;
+      if ('audibleId' in dto) scalarFields.audibleId = dto.audibleId ?? null;
+      if ('durationSeconds' in dto) scalarFields.durationSeconds = dto.durationSeconds ?? null;
+      if ('abridged' in dto) scalarFields.abridged = dto.abridged ?? false;
+      if ('comicvineId' in dto) scalarFields.comicvineId = dto.comicvineId ?? null;
 
-    if (Object.keys(scalarFields).length > 0) {
-      scalarFields.updatedAt = new Date();
-      await this.bookRepo.updateMetadataFields(id, scalarFields);
-    }
+      const scalarFieldCount = Object.keys(scalarFields).length;
+      if (scalarFieldCount > 0) {
+        scalarFields.updatedAt = new Date();
+        await this.bookRepo.updateMetadataFields(id, scalarFields);
+      }
 
-    if (dto.comicMetadata) {
-      await this.comicMetadataService.upsert(id, dto.comicMetadata);
-    }
+      if (dto.comicMetadata) {
+        await this.comicMetadataService.upsert(id, dto.comicMetadata);
+      }
 
-    if (dto.authors !== undefined) {
-      await this.metadataService.replaceAuthors(
-        id,
-        dto.authors.map((name) => ({ name, sortName: null })),
+      if (dto.authors !== undefined) {
+        await this.metadataService.replaceAuthors(
+          id,
+          dto.authors.map((name) => ({ name, sortName: null })),
+        );
+      }
+      if (dto.narrators !== undefined) {
+        await this.narratorService.replaceForBook(id, dto.narrators);
+      }
+      if (dto.genres !== undefined) {
+        await this.metadataService.replaceGenres(id, dto.genres);
+      }
+      if (dto.tags !== undefined) {
+        await this.metadataService.replaceTags(id, dto.tags);
+      }
+
+      this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
+      this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
+      this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
+      const detail = await this.getDetail(id, user);
+      this.logger.log(
+        `[${event}] [end] bookId=${id} durationMs=${Date.now() - startedAt} scalarFields=${scalarFieldCount} authorsUpdated=${dto.authors !== undefined} narratorsUpdated=${dto.narrators !== undefined} genresUpdated=${dto.genres !== undefined} tagsUpdated=${dto.tags !== undefined} comicMetadataUpdated=${dto.comicMetadata !== undefined} - metadata update completed`,
       );
+      return detail;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata update failed`,
+      );
+      throw err;
     }
-    if (dto.narrators !== undefined) {
-      await this.narratorService.replaceForBook(id, dto.narrators);
-    }
-    if (dto.genres !== undefined) {
-      await this.metadataService.replaceGenres(id, dto.genres);
-    }
-    if (dto.tags !== undefined) {
-      await this.metadataService.replaceTags(id, dto.tags);
-    }
-
-    this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
-    this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
-    this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
-    return this.getDetail(id, user);
   }
 
   async embedAll(): Promise<{ queued: number }> {
-    const bookIds = await this.bookRepo.findAllIds();
-    this.runEmbeddings(bookIds).catch((err: Error) => this.logger.error(`Embed-all failed: ${err.message}`));
-    return { queued: bookIds.length };
+    const event = 'book.embed_all';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] - embed all started`);
+    try {
+      const bookIds = await this.bookRepo.findAllIds();
+      void this.runEmbeddings(bookIds);
+      this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} queued=${bookIds.length} - embed all completed`);
+      return { queued: bookIds.length };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(`[${event}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - embed all failed`);
+      throw err;
+    }
   }
 
   private async runEmbeddings(bookIds: number[]): Promise<void> {
-    const BATCH = 10;
-    for (let i = 0; i < bookIds.length; i += BATCH) {
-      await Promise.all(
-        bookIds
-          .slice(i, i + BATCH)
-          .map((id) => this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Failed to embed book ${id}: ${err.message}`))),
+    const event = 'book.run_embeddings';
+    const startedAt = Date.now();
+    const batch = 10;
+    this.logger.log(`[${event}] [start] totalBooks=${bookIds.length} batchSize=${batch} - embeddings run started`);
+    try {
+      for (let i = 0; i < bookIds.length; i += batch) {
+        await Promise.all(
+          bookIds
+            .slice(i, i + batch)
+            .map((id) => this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Failed to embed book ${id}: ${err.message}`))),
+        );
+      }
+      this.logger.log(
+        `[${event}] [end] totalBooks=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${bookIds.length} - embeddings run completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] totalBooks=${bookIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - embeddings run failed`,
       );
     }
-    this.logger.log(`Embeddings complete: ${bookIds.length} books processed`);
   }
 
   async getProgress(userId: number, fileId: number, user: RequestUser) {
@@ -473,87 +532,109 @@ export class BookService {
   }
 
   async refreshMetadata(id: number, preview: boolean, user: RequestUser): Promise<BookDetailDto | ResolvedMetadataFields> {
-    const found = await this.bookRepo.findById(id);
-    if (!found) throw new NotFoundException(`Book ${id} not found`);
+    const event = 'book.refresh_metadata';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} preview=${preview} - refresh metadata started`);
+    try {
+      const found = await this.bookRepo.findById(id);
+      if (!found) throw new NotFoundException(`Book ${id} not found`);
 
-    const { book, authorRows, genreRows } = found;
-    await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
-    const meta = book.book_metadata;
+      const { book, authorRows, genreRows } = found;
+      await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
+      const meta = book.book_metadata;
 
-    const providerIds = this.collectExistingProviderIds(meta ?? {});
+      const providerIds = this.collectExistingProviderIds(meta ?? {});
 
-    const searchParams: MetadataSearchParams = {
-      title: meta?.title ?? undefined,
-      author: authorRows[0]?.name ?? undefined,
-      isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
-      existingProviderIds: providerIds,
-      isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
-      maxCandidatesPerProvider: 1,
-    };
+      const searchParams: MetadataSearchParams = {
+        title: meta?.title ?? undefined,
+        author: authorRows[0]?.name ?? undefined,
+        isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+        existingProviderIds: providerIds,
+        isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
+        maxCandidatesPerProvider: 1,
+      };
 
-    const existingFields: Partial<Record<MetadataField, unknown>> = {
-      title: meta?.title,
-      subtitle: meta?.subtitle,
-      description: meta?.description,
-      authors: authorRows.map((a) => a.name),
-      publisher: meta?.publisher,
-      publishedYear: meta?.publishedYear,
-      language: meta?.language,
-      pageCount: meta?.pageCount,
-      seriesName: meta?.seriesName,
-      seriesIndex: meta?.seriesIndex,
-      genres: genreRows.map((g) => g.name),
-      cover: meta?.coverSource,
-      duration: meta?.durationSeconds ?? undefined,
-      abridged: meta?.abridged ?? undefined,
-    };
+      const existingFields: Partial<Record<MetadataField, unknown>> = {
+        title: meta?.title,
+        subtitle: meta?.subtitle,
+        description: meta?.description,
+        authors: authorRows.map((a) => a.name),
+        publisher: meta?.publisher,
+        publishedYear: meta?.publishedYear,
+        language: meta?.language,
+        pageCount: meta?.pageCount,
+        seriesName: meta?.seriesName,
+        seriesIndex: meta?.seriesIndex,
+        genres: genreRows.map((g) => g.name),
+        cover: meta?.coverSource,
+        duration: meta?.durationSeconds ?? undefined,
+        abridged: meta?.abridged ?? undefined,
+      };
 
-    const { resolved, providerIds: resolvedProviderIds } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId);
+      const { resolved, providerIds: resolvedProviderIds } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId);
 
-    if (preview) {
-      const previewResult: ResolvedMetadataFields & {
-        googleBooksId?: string;
-        goodreadsId?: string;
-        amazonId?: string;
-        hardcoverId?: string;
-        openLibraryId?: string;
-        itunesId?: string;
-        audibleId?: string;
-        comicvineId?: string;
-      } = { ...resolved };
-      this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
-      return previewResult;
+      if (preview) {
+        const previewResult: ResolvedMetadataFields & {
+          googleBooksId?: string;
+          goodreadsId?: string;
+          amazonId?: string;
+          hardcoverId?: string;
+          openLibraryId?: string;
+          itunesId?: string;
+          audibleId?: string;
+          comicvineId?: string;
+        } = { ...resolved };
+        this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
+        this.logger.log(
+          `[${event}] [end] bookId=${id} preview=true durationMs=${Date.now() - startedAt} resolvedFields=${Object.keys(previewResult).length} - refresh metadata completed`,
+        );
+        return previewResult;
+      }
+
+      const r = resolved as Record<string, unknown>;
+      const dto: UpdateBookMetadataDto = {};
+      if (r.title !== undefined) dto.title = r.title as string | null;
+      if (r.subtitle !== undefined) dto.subtitle = r.subtitle as string | null;
+      if (r.description !== undefined) dto.description = r.description as string | null;
+      if (r.authors !== undefined) dto.authors = r.authors as string[];
+      if (r.genres !== undefined) dto.genres = r.genres as string[];
+      if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
+      if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
+      if (r.language !== undefined) dto.language = r.language as string | null;
+      if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
+      if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
+      if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
+      if (r.duration !== undefined) dto.durationSeconds = r.duration as number | null;
+      if (r.abridged !== undefined) dto.abridged = r.abridged as boolean | null;
+      if (r.comicMetadata !== undefined) dto.comicMetadata = r.comicMetadata as UpdateBookMetadataDto['comicMetadata'];
+      this.applyResolvedProviderIds(dto, resolvedProviderIds);
+
+      const updatedFields = Object.keys(dto).length;
+      let detail: BookDetailDto | undefined;
+      if (updatedFields > 0) {
+        detail = await this.updateMetadata(id, dto, user);
+      }
+
+      let coverDownloaded = false;
+      if (resolved.coverUrl) {
+        await this.metadataService.downloadAndSaveCover(resolved.coverUrl, id);
+        detail = await this.getDetail(id, user);
+        coverDownloaded = true;
+      }
+
+      const result = detail ?? (await this.getDetail(id, user));
+      this.logger.log(
+        `[${event}] [end] bookId=${id} preview=false durationMs=${Date.now() - startedAt} updatedFields=${updatedFields} coverDownloaded=${coverDownloaded} - refresh metadata completed`,
+      );
+      return result;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${id} userId=${user.id} preview=${preview} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - refresh metadata failed`,
+      );
+      throw err;
     }
-
-    const r = resolved as Record<string, unknown>;
-    const dto: UpdateBookMetadataDto = {};
-    if (r.title !== undefined) dto.title = r.title as string | null;
-    if (r.subtitle !== undefined) dto.subtitle = r.subtitle as string | null;
-    if (r.description !== undefined) dto.description = r.description as string | null;
-    if (r.authors !== undefined) dto.authors = r.authors as string[];
-    if (r.genres !== undefined) dto.genres = r.genres as string[];
-    if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
-    if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
-    if (r.language !== undefined) dto.language = r.language as string | null;
-    if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
-    if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
-    if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
-    if (r.duration !== undefined) dto.durationSeconds = r.duration as number | null;
-    if (r.abridged !== undefined) dto.abridged = r.abridged as boolean | null;
-    if (r.comicMetadata !== undefined) dto.comicMetadata = r.comicMetadata as UpdateBookMetadataDto['comicMetadata'];
-    this.applyResolvedProviderIds(dto, resolvedProviderIds);
-
-    let detail: BookDetailDto | undefined;
-    if (Object.keys(dto).length > 0) {
-      detail = await this.updateMetadata(id, dto, user);
-    }
-
-    if (resolved.coverUrl) {
-      await this.metadataService.downloadAndSaveCover(resolved.coverUrl, id);
-      detail = await this.getDetail(id, user);
-    }
-
-    return detail ?? this.getDetail(id, user);
   }
 
   async bulkRefreshMetadata(
@@ -561,26 +642,44 @@ export class BookService {
     user: RequestUser,
     onProgress?: (bookId: number) => void,
   ): Promise<{ processed: number; failed: number }> {
-    if (bookIds.length === 0) return { processed: 0, failed: 0 };
-    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-    const isSuperuser = this.isSuperuser(user);
-    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
-
-    let processed = 0;
-    let failed = 0;
-    for (const id of bookIds) {
-      try {
-        await this.refreshMetadata(id, false, user);
-        processed++;
-        onProgress?.(id);
-      } catch (err) {
-        this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err instanceof Error ? err.message : String(err)}`);
-        failed++;
-        onProgress?.(id);
+    const event = 'book.bulk_refresh_metadata';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - bulk refresh metadata started`);
+    try {
+      if (bookIds.length === 0) {
+        this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 failed=0 - bulk refresh metadata completed`);
+        return { processed: 0, failed: 0 };
       }
+      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+      const isSuperuser = this.isSuperuser(user);
+      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+
+      let processed = 0;
+      let failed = 0;
+      for (const id of bookIds) {
+        try {
+          await this.refreshMetadata(id, false, user);
+          processed++;
+          onProgress?.(id);
+        } catch (err) {
+          this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err instanceof Error ? err.message : String(err)}`);
+          failed++;
+          onProgress?.(id);
+        }
+      }
+      this.logger.log(
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} failed=${failed} - bulk refresh metadata completed`,
+      );
+      return { processed, failed };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - bulk refresh metadata failed`,
+      );
+      throw err;
     }
-    return { processed, failed };
   }
 
   async bulkReExtractCover(
@@ -588,54 +687,88 @@ export class BookService {
     user: RequestUser,
     onProgress?: (bookId: number) => void,
   ): Promise<{ processed: number; updated: number }> {
-    if (bookIds.length === 0) return { processed: 0, updated: 0 };
-    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-    const isSuperuser = this.isSuperuser(user);
-    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
-
-    const files = await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
-    const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
-
-    let processed = 0;
-    let updated = 0;
-    for (const id of bookIds) {
-      const file = filesByBookId.get(id);
-      if (!file) continue;
-      processed++;
-      const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
-      if (saved) {
-        updated++;
+    const event = 'book.bulk_reextract_cover';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - bulk re-extract cover started`);
+    try {
+      if (bookIds.length === 0) {
+        this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 updated=0 - bulk re-extract cover completed`);
+        return { processed: 0, updated: 0 };
       }
-      onProgress?.(id);
+      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+      const isSuperuser = this.isSuperuser(user);
+      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+
+      const files = await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
+      const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
+
+      let processed = 0;
+      let updated = 0;
+      for (const id of bookIds) {
+        const file = filesByBookId.get(id);
+        if (!file) continue;
+        processed++;
+        const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
+        if (saved) {
+          updated++;
+        }
+        onProgress?.(id);
+      }
+      this.logger.log(
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} - bulk re-extract cover completed`,
+      );
+      return { processed, updated };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - bulk re-extract cover failed`,
+      );
+      throw err;
     }
-    return { processed, updated };
   }
 
   async getExportFiles(bookIds: number[], user: RequestUser, allFormats: boolean): Promise<{ absolutePath: string; zipPath: string }[]> {
-    if (bookIds.length === 0) throw new BadRequestException('No books selected');
-    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-    const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-    const isSuperuser = this.isSuperuser(user);
-    await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+    const event = 'book.get_export_files';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} allFormats=${allFormats} - get export files started`);
+    try {
+      if (bookIds.length === 0) throw new BadRequestException('No books selected');
+      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
+      const isSuperuser = this.isSuperuser(user);
+      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
 
-    const files = allFormats ? await this.bookRepo.findAllFilesByBookIds(bookIds) : await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
-    const [pattern, metadataRows] = await Promise.all([
-      this.appSettings.getDownloadPattern(),
-      this.bookRepo.findPatternMetadataByBookIds([...new Set(files.map((f) => f.bookId))]),
-    ]);
-    const metadataByBookId = new Map(metadataRows.map((row) => [row.bookId, row]));
-    const usedPaths = new Set<string>();
+      const files = allFormats ? await this.bookRepo.findAllFilesByBookIds(bookIds) : await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
+      const [pattern, metadataRows] = await Promise.all([
+        this.appSettings.getDownloadPattern(),
+        this.bookRepo.findPatternMetadataByBookIds([...new Set(files.map((f) => f.bookId))]),
+      ]);
+      const metadataByBookId = new Map(metadataRows.map((row) => [row.bookId, row]));
+      const usedPaths = new Set<string>();
 
-    return files.map((file) => {
-      const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metadataByBookId.get(file.bookId));
-      const resolvedPath = resolveUploadPath(pattern || BookService.DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
-      const fallbackFilename = basename(file.absolutePath);
-      const rawZipPath = resolvedPath ?? fallbackFilename;
-      const safeZipPath = this.sanitizeZipPath(rawZipPath, fallbackFilename);
-      const zipPath = this.makeUniqueZipPath(safeZipPath, usedPaths);
-      return { absolutePath: file.absolutePath, zipPath };
-    });
+      const result = files.map((file) => {
+        const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metadataByBookId.get(file.bookId));
+        const resolvedPath = resolveUploadPath(pattern || BookService.DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
+        const fallbackFilename = basename(file.absolutePath);
+        const rawZipPath = resolvedPath ?? fallbackFilename;
+        const safeZipPath = this.sanitizeZipPath(rawZipPath, fallbackFilename);
+        const zipPath = this.makeUniqueZipPath(safeZipPath, usedPaths);
+        return { absolutePath: file.absolutePath, zipPath };
+      });
+      this.logger.log(
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} files=${result.length} allFormats=${allFormats} - get export files completed`,
+      );
+      return result;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} allFormats=${allFormats} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - get export files failed`,
+      );
+      throw err;
+    }
   }
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {

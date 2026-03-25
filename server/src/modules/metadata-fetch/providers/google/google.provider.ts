@@ -34,29 +34,29 @@ export class GoogleProvider implements IdentifiableProvider {
     if (!enabled) return null;
     const url = this.buildUrl(`/volumes/${providerId}`, {}, apiKey);
     const startedAt = Date.now();
-    this.logger.log(`[google] fetch.start op=lookup providerId="${providerId}"`);
+    this.logger.log(`[google] [start] op=lookup providerId="${providerId}"`);
 
     try {
       const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[google] fetch.fail op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[google] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
       const item = (await res.json()) as GoogleVolumeItem;
       const mapped = mapGoogleVolume(item);
       this.logger.log(
-        `[google] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${mapped != null} durationMs=${Date.now() - startedAt}`,
+        `[google] [end] op=lookup providerId="${providerId}" status=${res.status} found=${mapped != null} durationMs=${Date.now() - startedAt}`,
       );
       return mapped;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[google] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[google] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.warn(
-        `[google] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[google] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       throw err;
     }
@@ -73,29 +73,29 @@ export class GoogleProvider implements IdentifiableProvider {
   private async fetchVolumes(query: string, apiKey: string): Promise<MetadataCandidate[]> {
     const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' }, apiKey);
     const startedAt = Date.now();
-    this.logger.log(`[google] fetch.start op=search query="${query}"`);
+    this.logger.log(`[google] [start] op=search query="${query}"`);
 
     try {
       const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[google] fetch.fail op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[google] [fail] op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return [];
       }
       const body = (await res.json()) as GoogleBooksResponse;
       const items = (body.items ?? []).map(mapGoogleVolume);
       this.logger.log(
-        `[google] fetch.end op=search query="${query}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
+        `[google] [end] op=search query="${query}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
       );
       return items;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[google] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[google] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.warn(
-        `[google] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[google] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       throw err;
     }
