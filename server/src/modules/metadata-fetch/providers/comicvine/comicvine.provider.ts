@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { ProviderThrottleTracker } from '../../provider-throttle.tracker';
+import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { ComicVineClient } from './comicvine.client';
@@ -46,6 +48,7 @@ export class ComicVineProvider implements IdentifiableProvider {
   constructor(
     private readonly client: ComicVineClient,
     private readonly providerConfig: ProviderConfigService,
+    private readonly throttleTracker: ProviderThrottleTracker,
   ) {}
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
@@ -56,23 +59,41 @@ export class ComicVineProvider implements IdentifiableProvider {
     }
     if (!params.title) return [];
 
-    const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider);
-    const parsed = parseIssueTitle(params.title);
-    if (parsed) {
-      return this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates);
+    try {
+      const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider);
+      const parsed = parseIssueTitle(params.title);
+      return parsed
+        ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates)
+        : await this.generalSearch(params.title, apiKey, maxCandidates);
+    } catch (err) {
+      if (err instanceof ProviderThrottleError) {
+        this.recordThrottle();
+        return [];
+      }
+      throw err;
     }
-
-    return this.generalSearch(params.title, apiKey, maxCandidates);
   }
 
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.comicvine);
     if (!enabled || !apiKey) return null;
 
-    const issue = await this.client.getIssueById(providerId, apiKey);
-    if (!issue) return null;
+    try {
+      const issue = await this.client.getIssueById(providerId, apiKey);
+      return issue ? mapIssueToCandidate(issue) : null;
+    } catch (err) {
+      if (err instanceof ProviderThrottleError) {
+        this.recordThrottle();
+        return null;
+      }
+      throw err;
+    }
+  }
 
-    return mapIssueToCandidate(issue);
+  private recordThrottle(): void {
+    const waitMs = this.client.windowResetMs();
+    const retryAfterSeconds = waitMs > 0 ? Math.ceil(waitMs / 1000) : undefined;
+    this.throttleTracker.record(MetadataProviderKey.COMICVINE, retryAfterSeconds);
   }
 
   private async structuredSearch(seriesName: string, issueNumber: string, apiKey: string, maxCandidates: number): Promise<MetadataCandidate[]> {

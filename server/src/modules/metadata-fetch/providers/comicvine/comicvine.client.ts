@@ -6,7 +6,8 @@ import { ComicVineApiResponse, ComicVineIssue, ComicVineVolume } from './comicvi
 
 const BASE_URL = 'https://comicvine.gamespot.com/api';
 const REQUEST_TIMEOUT_MS = 15_000;
-const RATE_LIMIT_DELAY_MS = 1_000;
+const VELOCITY_GUARD_MS = 1_000;
+const HOURLY_WINDOW_MS = 3_600_000;
 const VOLUME_CACHE_TTL_MS = 10 * 60 * 1_000;
 const VOLUME_CACHE_MAX_SIZE = 50;
 
@@ -25,15 +26,27 @@ interface CachedVolumes {
 
 class RateLimiter {
   private nextAllowedTime = 0;
+  private readonly timestamps: number[] = [];
 
   async throttle(): Promise<void> {
     const now = Date.now();
     const scheduled = Math.max(now, this.nextAllowedTime);
-    this.nextAllowedTime = scheduled + RATE_LIMIT_DELAY_MS;
+    this.nextAllowedTime = scheduled + VELOCITY_GUARD_MS;
+    this.timestamps.push(scheduled);
     const wait = scheduled - now;
     if (wait > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, wait));
     }
+  }
+
+  timeUntilWindowResetMs(): number {
+    const now = Date.now();
+    const windowStart = now - HOURLY_WINDOW_MS;
+    while (this.timestamps.length > 0 && this.timestamps[0] < windowStart) {
+      this.timestamps.shift();
+    }
+    if (this.timestamps.length === 0) return 0;
+    return Math.max(0, this.timestamps[0] + HOURLY_WINDOW_MS - now);
   }
 }
 
@@ -42,6 +55,10 @@ export class ComicVineClient {
   private readonly logger = new Logger(ComicVineClient.name);
   private readonly rateLimiter = new RateLimiter();
   private readonly volumeCache = new Map<string, CachedVolumes>();
+
+  windowResetMs(): number {
+    return this.rateLimiter.timeUntilWindowResetMs();
+  }
 
   async searchVolumes(seriesName: string, apiKey: string): Promise<ComicVineVolume[]> {
     const cacheKey = seriesName.toLowerCase().trim();
