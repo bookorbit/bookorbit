@@ -27,7 +27,7 @@ export function useFoliateInput(
 
   function handleTouchStart(e: TouchEvent) {
     if (e.touches.length !== 1) return
-    const touch = e.touches[0]
+    const touch = e.touches[0]!
     touchStartX = touch.clientX
     touchStartY = touch.clientY
     touchStartTime = Date.now()
@@ -39,7 +39,7 @@ export function useFoliateInput(
 
   function handleTouchMove(e: TouchEvent, doc: Document) {
     if (e.touches.length !== 1) return
-    const touch = e.touches[0]
+    const touch = e.touches[0]!
     const deltaX = Math.abs(touch.clientX - touchStartX)
     const deltaY = Math.abs(touch.clientY - touchStartY)
     const selection = doc.defaultView?.getSelection()
@@ -67,7 +67,7 @@ export function useFoliateInput(
     }
 
     if (!isTextSelectionInProgress && e.changedTouches.length === 1) {
-      const touch = e.changedTouches[0]
+      const touch = e.changedTouches[0]!
       const deltaX = touch.clientX - touchStartX
       const deltaY = Math.abs(touch.clientY - touchStartY)
 

@@ -108,7 +108,6 @@ export interface AuditLogEntry {
   resourceId: number | null;
   description: string;
   ip: string | null;
-  countryCode: string | null;
   meta: Record<string, unknown> | null;
   createdAt: string;
 }

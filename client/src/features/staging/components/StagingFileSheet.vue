@@ -580,11 +580,13 @@ onMounted(() => {
         <div class="flex-1 min-h-0">
           <MetadataDiffPanel
             :current="currentSource"
-            :candidate="selectedCandidate"
+            :candidates="diffSource === 'fetched' ? [selectedCandidate] : filteredResults"
+            :initial-candidate="selectedCandidate"
+            :filtered-results="diffSource === 'fetched' ? [selectedCandidate] : filteredResults"
             :providers="providers"
             :back-label="diffSource === 'fetched' ? 'Back' : 'Results'"
             :current-cover-url="currentStagingCoverUrl"
-            :field-sources="diffSource === 'fetched' ? (file.fetchedMetadataSources ?? undefined) : undefined"
+            :provider-ids="(file.fetchedMetadataSources as any) ?? undefined"
             @back="backFromDiff"
             @apply="handleApply"
           />

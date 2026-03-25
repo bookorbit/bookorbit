@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { themes } from '../constants/themes'
-import type { ThemeMode } from '../constants/themes'
+import type { Theme, ThemeMode } from '../constants/themes'
 import type { FoliateRenderer } from './useFoliate'
 
 export interface ReaderState {
@@ -62,7 +62,7 @@ export function useReaderState() {
     flow: flow.value,
   }))
 
-  const currentTheme = computed(() => themes.find((t) => t.name === themeName.value) ?? themes[0])
+  const currentTheme = computed<Theme>(() => themes.find((t) => t.name === themeName.value) ?? themes[0]!)
 
   const activeMode = computed<ThemeMode>(() => {
     const theme = currentTheme.value
@@ -209,7 +209,7 @@ export function useReaderState() {
   function applyToRenderer(renderer: FoliateRenderer): void {
     if (!renderer) return
     const s = state.value
-    renderer.setAttribute('max-column-count', s.maxColumnCount)
+    renderer.setAttribute('max-column-count', String(s.maxColumnCount))
     renderer.setAttribute('gap', `${s.gap * 100}%`)
     renderer.setAttribute('max-inline-size', `${s.maxInlineSize}px`)
     renderer.setAttribute('max-block-size', `${s.maxBlockSize}px`)

@@ -62,7 +62,7 @@ jobs:
       - name: Compute changed scopes
         id: changes
         if: github.event_name != 'workflow_dispatch'
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
         with:
           filters: |
             server:
@@ -152,7 +152,7 @@ jobs:
             pnpm --filter server type-check
           else
             pnpm --filter @projectx/types build
-            pnpm run typecheck:client:baseline
+            pnpm --filter client type-check
           fi
 
       - name: Prepare test report directory

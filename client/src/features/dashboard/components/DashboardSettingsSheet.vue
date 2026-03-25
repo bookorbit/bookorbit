@@ -42,8 +42,10 @@ function onDrop(index: number) {
   if (draggedIndex.value === null || draggedIndex.value === index) return
   const items = [...draft.value]
   const [moved] = items.splice(draggedIndex.value, 1)
-  items.splice(index, 0, moved)
-  draft.value = items
+  if (moved) {
+    items.splice(index, 0, moved)
+    draft.value = items
+  }
   draggedIndex.value = null
   dragOverIndex.value = null
 }

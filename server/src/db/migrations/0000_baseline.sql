@@ -10,7 +10,6 @@ CREATE TABLE "audit_log" (
 	"resource_id" integer,
 	"description" text NOT NULL,
 	"ip" varchar(45),
-	"country_code" char(2),
 	"meta" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );

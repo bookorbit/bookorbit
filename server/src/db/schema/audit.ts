@@ -1,4 +1,4 @@
-import { bigserial, char, index, integer, jsonb, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { bigserial, index, integer, jsonb, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 import { users } from './auth';
 
@@ -13,7 +13,6 @@ export const auditLog = pgTable(
     resourceId: integer('resource_id'),
     description: text('description').notNull(),
     ip: varchar('ip', { length: 45 }),
-    countryCode: char('country_code', { length: 2 }),
     meta: jsonb('meta'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

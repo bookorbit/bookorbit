@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import * as geoip from 'geoip-lite';
 
 import { AUDIT_EVENT, AuditEventPayload, AuditEventsService } from './audit-events.service';
 import { AuditRepository, AuditLogQuery } from './audit.repository';
@@ -30,8 +29,6 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
   }
 
   private handleAuditEvent(payload: AuditEventPayload): void {
-    const countryCode = payload.ip ? (geoip.lookup(payload.ip)?.country ?? null) : null;
-
     this.auditRepository
       .insert({
         userId: payload.userId,
@@ -41,7 +38,6 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
         resourceId: payload.resourceId ?? null,
         description: payload.description,
         ip: payload.ip ?? null,
-        countryCode,
         meta: payload.meta ?? null,
       })
       .catch((err: unknown) => {

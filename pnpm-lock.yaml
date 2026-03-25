@@ -263,9 +263,6 @@ importers:
       fastify:
         specifier: ^5.8.4
         version: 5.8.4
-      geoip-lite:
-        specifier: ^2.0.1
-        version: 2.0.1
       jose:
         specifier: ^6.2.2
         version: 6.2.2
@@ -345,9 +342,6 @@ importers:
       "@types/express":
         specifier: ^5.0.6
         version: 5.0.6
-      "@types/geoip-lite":
-        specifier: ^1.4.4
-        version: 1.4.4
       "@types/node":
         specifier: ^25.6.0
         version: 25.6.0
@@ -3818,12 +3812,6 @@ packages:
         integrity: sha512-sKYVuV7Sv9fbPIt/442koC7+IIwK5olP1KWeD88e/idgoJqDm3JV/YUiPwkoKK92ylff2MGxSz1CSjsXelx0YA==,
       }
 
-  "@types/geoip-lite@1.4.4":
-    resolution:
-      {
-        integrity: sha512-2uVfn+C6bX/H356H6mjxsWUA5u8LO8dJgSBIRO/NFlpMe4DESzacutD/rKYrTDKm1Ugv78b4Wz1KvpHrlv3jSw==,
-      }
-
   "@types/howler@2.2.12":
     resolution:
       {
@@ -6591,13 +6579,6 @@ packages:
       }
     engines: { node: ">=6.9.0" }
 
-  geoip-lite@2.0.1:
-    resolution:
-      {
-        integrity: sha512-cR9E28nu1a6dsvzB1tANhdmCyXWV1L4AiSCT9alHLIUl06599EGu33mqY99ieU0twQob0kfcDQ/sAUBvHb7swA==,
-      }
-    engines: { node: ">=24.0.0" }
-
   get-caller-file@2.0.5:
     resolution:
       {
@@ -6895,13 +6876,6 @@ packages:
         integrity: sha512-MAQUJuIo7Xqk8EVNP+6d3CKq9c80hi4tjIbIAT6lmGW9W6WzlHiu9PS8uSuUYU+Do+j1baiFp3H25XEVxDIG2g==,
       }
 
-  ip-address@5.9.4:
-    resolution:
-      {
-        integrity: sha512-dHkI3/YNJq4b/qQaz+c8LuarD3pY24JqZWfjB8aZx1gtpc2MDILu9L9jpZe1sHpzo/yWFweQVn+U//FhazUxmw==,
-      }
-    engines: { node: ">= 0.10" }
-
   ipaddr.js@2.3.0:
     resolution:
       {
@@ -7163,12 +7137,6 @@ packages:
       }
     hasBin: true
 
-  jsbn@1.1.0:
-    resolution:
-      {
-        integrity: sha512-4bYVV3aAMtDTTu4+xsDYa6sy9GyJ69/amsu9sYF2zqjiEoZA5xJi3BrfX3uY+/IekIu7MwdObdbDWpoZdBv3/A==,
-      }
-
   jsdom@29.0.2:
     resolution:
       {
@@ -7295,13 +7263,6 @@ packages:
       {
         integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==,
       }
-
-  lazy@1.0.11:
-    resolution:
-      {
-        integrity: sha512-Y+CjUfLmIpoUCCRl0ub4smrYtGGr5AOa2AKOaWelGHOGz33X/Y/KizefGqbkwfz44+cnq/+9habclf8vOmu2LA==,
-      }
-    engines: { node: ">=0.2.0" }
 
   lazystream@1.0.1:
     resolution:
@@ -9130,12 +9091,6 @@ packages:
         integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==,
       }
     engines: { node: ">= 10.x" }
-
-  sprintf-js@1.1.2:
-    resolution:
-      {
-        integrity: sha512-VE0SOVEHCk7Qc8ulkWw3ntAzXuqf7S2lvwQaDLRnUeIEaKNQJzV6BwmLKhOqT61aGhfUMrXeaBk+oDGCzvhcug==,
-      }
 
   stackback@0.0.2:
     resolution:
@@ -12119,8 +12074,6 @@ snapshots:
       "@types/express-serve-static-core": 5.1.1
       "@types/serve-static": 2.2.0
 
-  "@types/geoip-lite@1.4.4": {}
-
   "@types/howler@2.2.12": {}
 
   "@types/http-cache-semantics@4.2.0": {}
@@ -13955,14 +13908,6 @@ snapshots:
 
   gensync@1.0.0-beta.2: {}
 
-  geoip-lite@2.0.1:
-    dependencies:
-      chalk: 4.1.2
-      iconv-lite: 0.6.3
-      ip-address: 5.9.4
-      lazy: 1.0.11
-      yauzl: 3.3.0
-
   get-caller-file@2.0.5: {}
 
   get-east-asian-width@1.5.0: {}
@@ -14129,12 +14074,6 @@ snapshots:
     dependencies:
       kind-of: 6.0.3
 
-  ip-address@5.9.4:
-    dependencies:
-      jsbn: 1.1.0
-      lodash: 4.18.1
-      sprintf-js: 1.1.2
-
   ipaddr.js@2.3.0: {}
 
   is-arrayish@0.2.1: {}
@@ -14242,8 +14181,6 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  jsbn@1.1.0: {}
-
   jsdom@29.0.2(@noble/hashes@1.8.0):
     dependencies:
       "@asamuzakjp/css-color": 5.1.9
@@ -14333,8 +14270,6 @@ snapshots:
   kind-of@6.0.3: {}
 
   kolorist@1.8.0: {}
-
-  lazy@1.0.11: {}
 
   lazystream@1.0.1:
     dependencies:
@@ -15385,8 +15320,6 @@ snapshots:
   speakingurl@14.0.1: {}
 
   split2@4.2.0: {}
-
-  sprintf-js@1.1.2: {}
 
   stackback@0.0.2: {}
 

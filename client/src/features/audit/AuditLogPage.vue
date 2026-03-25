@@ -101,15 +101,14 @@ onMounted(fetchPage)
             <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">Action</th>
             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
             <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">IP</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Country</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-border">
           <tr v-if="loading">
-            <td colspan="6" class="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</td>
+            <td colspan="5" class="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</td>
           </tr>
           <tr v-else-if="entries.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-sm text-muted-foreground">No audit logs found</td>
+            <td colspan="5" class="px-4 py-8 text-center text-sm text-muted-foreground">No audit logs found</td>
           </tr>
           <tr
             v-else
@@ -130,7 +129,6 @@ onMounted(fetchPage)
             </td>
             <td class="px-4 py-2.5 text-muted-foreground max-w-xs truncate">{{ entry.description }}</td>
             <td class="px-4 py-2.5 text-muted-foreground font-mono text-xs hidden md:table-cell">{{ entry.ip ?? '-' }}</td>
-            <td class="px-4 py-2.5 text-muted-foreground text-xs hidden md:table-cell">{{ entry.countryCode ?? '-' }}</td>
           </tr>
         </tbody>
       </table>

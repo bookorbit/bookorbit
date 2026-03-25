@@ -89,7 +89,7 @@ export function usePdfRenderer(
       if (typeof item !== 'object' || item === null || !('str' in item)) continue
       const { str, transform, height } = item as PdfTextItem
       if (!str.trim()) continue
-      const [a, b, , , e, f] = transform
+      const [a, b, , , e, f] = transform as [number, number, number, number, number, number]
       const span = document.createElement('span')
       span.textContent = str
       span.style.cssText =

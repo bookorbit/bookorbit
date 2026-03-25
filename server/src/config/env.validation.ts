@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
-  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
+  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL').optional(),
   JWT_SECRET: z
     .string()
     .min(16, 'JWT_SECRET must be at least 16 characters')
@@ -14,10 +13,9 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   SETUP_BOOTSTRAP_TOKEN: z.string().optional(),
-  BOOKS_PATH: z.string().default('/data/books'),
+  BOOKS_PATH: z.string().default('/data'),
   STAGING_PATH: z.string().optional(),
   CLIENT_URL: z.string().url().optional(),
-  GOOGLE_BOOKS_API_KEY: z.string().default(''),
   APP_URL: z.string().url().default('http://localhost:5173'),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),

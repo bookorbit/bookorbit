@@ -1,25 +1,61 @@
-name: projectx-dev
+name: projectx
 
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-projectx}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-projectx}
-      POSTGRES_DB: ${POSTGRES_DB:-projectx}
-      POSTGRES_HOST_AUTH_METHOD: trust
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?required}
+      POSTGRES_DB: ${POSTGRES_DB?required}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U projectx"]
-      interval: 5s
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER?required} -d ${POSTGRES_DB?required}",
+        ]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
 
-
-volumes:
-  postgres_data:
+  app:
+    image: ${APP_IMAGE?required}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?required}
+      POSTGRES_DB: ${POSTGRES_DB?required}
+      JWT_SECRET: ${JWT_SECRET?required}
+      SETUP_BOOTSTRAP_TOKEN: ${SETUP_BOOTSTRAP_TOKEN?required}
+      APP_URL: ${APP_URL?required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./books:/books
+      - ./staging:/staging
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:''+(process.env.PORT||3000)+''/api/v1/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

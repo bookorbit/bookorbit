@@ -2,10 +2,10 @@ node_modules/
 dist/
 .env
 .env.local
-.env.prod
 client/.env
 server/.env
 *.local
+data
 
 # OS
 .DS_Store

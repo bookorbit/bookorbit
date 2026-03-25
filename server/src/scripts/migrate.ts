@@ -33,6 +33,12 @@ async function runMigrations() {
   });
 
   try {
+    await pool.query(`
+      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+      CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+      CREATE EXTENSION IF NOT EXISTS "vector";
+    `);
+
     const migrationsFolder = resolveMigrationsFolder();
     await migrate(drizzle(pool), { migrationsFolder });
 

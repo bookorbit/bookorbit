@@ -13,12 +13,10 @@ echo "Installing dependencies..."
 pnpm install
 
 echo "Starting PostgreSQL..."
-docker compose up -d --wait
+docker compose -f docker-compose.dev.yml up -d --wait
 
 echo "Applying migrations..."
 pnpm run db:migrate
 
 echo "Seeding baseline data..."
 pnpm run db:seed
-
-pnpm run doctor

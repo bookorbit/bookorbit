@@ -1,1 +1,1 @@
-pnpm run quick
+pnpm run verify:fast

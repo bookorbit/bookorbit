@@ -1,9 +1,7 @@
 import { registerAs } from '@nestjs/config';
 
 export const appConfig = registerAs('app', () => ({
-  port: parseInt(process.env.PORT ?? '3000', 10),
   nodeEnv: process.env.NODE_ENV ?? 'development',
-  logLevel: process.env.LOG_LEVEL,
   appUrl: process.env.APP_URL ?? 'http://localhost:5173',
 }));
 
@@ -19,12 +17,8 @@ export const authConfig = registerAs('auth', () => ({
 }));
 
 export const storageConfig = registerAs('storage', () => ({
-  booksPath: process.env.BOOKS_PATH ?? '/data/books',
+  booksPath: process.env.BOOKS_PATH ?? '/data',
   stagingPath: process.env.STAGING_PATH,
-}));
-
-export const externalApiConfig = registerAs('externalApi', () => ({
-  googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? '',
 }));
 
 export const emailConfig = registerAs('email', () => ({

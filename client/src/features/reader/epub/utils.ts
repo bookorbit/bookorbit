@@ -1,5 +1,5 @@
 export function stripFragment(href: string): string {
-  return href.split('#')[0]
+  return href.split('#')[0]!
 }
 
 export function formatDate(dateStr: string): string {

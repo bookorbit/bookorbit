@@ -6,6 +6,7 @@ import { useMetadataDiff } from '../useMetadataDiff'
 describe('useMetadataDiff', () => {
   const mockCurrent: MetadataSource = {
     title: 'Original Title',
+    subtitle: 'Original Subtitle',
     authors: ['Original Author'],
     genres: ['Genre 1'],
     description: 'Original Description',
@@ -17,6 +18,9 @@ describe('useMetadataDiff', () => {
     seriesIndex: 1,
     isbn10: '1234567890',
     isbn13: '1234567890123',
+    narrators: [],
+    durationSeconds: null,
+    abridged: null,
   }
 
   const mockCandidate1: MetadataCandidate = {
@@ -37,8 +41,8 @@ describe('useMetadataDiff', () => {
   }
 
   const providers = [
-    { key: 'google' as MetadataProviderKey, label: 'Google Books' },
-    { key: 'goodreads' as MetadataProviderKey, label: 'Goodreads' },
+    { key: 'google' as MetadataProviderKey, label: 'Google Books', identifiable: true },
+    { key: 'goodreads' as MetadataProviderKey, label: 'Goodreads', identifiable: true },
   ]
 
   it('initializes with fields from active provider', () => {

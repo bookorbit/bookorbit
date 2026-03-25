@@ -28,8 +28,8 @@ export function usePdfFind(textLayerMap: Ref<Map<number, HTMLElement>>) {
   }
 
   function isWordBoundary(text: string, start: number, len: number): boolean {
-    const before = start === 0 ? ' ' : text[start - 1]
-    const after = start + len >= text.length ? ' ' : text[start + len]
+    const before = start === 0 ? ' ' : (text[start - 1] ?? ' ')
+    const after = start + len >= text.length ? ' ' : (text[start + len] ?? ' ')
     return /\W/.test(before) && /\W/.test(after)
   }
 

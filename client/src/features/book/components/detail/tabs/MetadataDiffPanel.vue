@@ -59,7 +59,8 @@ watch(representativeCandidates, (list) => {
 })
 
 const activeCandidate = computed(
-  () => representativeCandidates.value.find((c) => c.provider === activeProvider.value) ?? representativeCandidates.value[0],
+  () =>
+    representativeCandidates.value.find((c) => c.provider === activeProvider.value) ?? representativeCandidates.value[0] ?? props.initialCandidate,
 )
 
 const { fields, picksPerProvider, toggleField, pickFieldFromProvider, clearPicksForProvider, copyAll, copyMissing, buildPatch, hasCopied } =

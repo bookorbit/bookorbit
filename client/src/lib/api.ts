@@ -30,11 +30,13 @@ async function attemptRefresh(): Promise<void> {
 }
 
 export async function api(input: RequestInfo | URL, init?: RequestInit & { _isRetry?: boolean }): Promise<Response> {
-  const res = await rawFetch(input, init)
+  const isRetry = init?._isRetry
+  const { _isRetry: _, ...rest } = init ?? {}
+  const res = await rawFetch(input, rest)
 
   if (res.status !== 401) return res
 
-  if (init?._isRetry) {
+  if (isRetry) {
     _onAuthFailure?.()
     throw new Error('Session expired')
   }
@@ -52,5 +54,5 @@ export async function api(input: RequestInfo | URL, init?: RequestInit & { _isRe
     throw new Error('Session expired')
   }
 
-  return rawFetch(input, { ...init, _isRetry: true })
+  return api(input, { ...rest, _isRetry: true })
 }

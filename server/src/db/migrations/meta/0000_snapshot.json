@@ -1,5 +1,5 @@
 {
-  "id": "044c15cb-ab99-4b1f-b88f-3c025644dec7",
+  "id": "2e38901e-f8a5-4f93-8564-e0f8f44e1883",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -53,12 +53,6 @@
         "ip": {
           "name": "ip",
           "type": "varchar(45)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "country_code": {
-          "name": "country_code",
-          "type": "char(2)",
           "primaryKey": false,
           "notNull": false
         },
