@@ -1,14 +1,15 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import type { FieldPreference, LibraryMetadataPreferences, MetadataFetchPreferences, MetadataField } from '@projectx/types'
+import type { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@projectx/types'
+import { ALL_METADATA_FIELDS } from '@projectx/types'
 
 export function useMetadataPreferences() {
   const globalPrefs = ref<MetadataFetchPreferences | null>(null)
   const libraryPrefs = ref<Map<number, LibraryMetadataPreferences>>(new Map())
   const loadingGlobal = ref(false)
   const savingGlobal = ref(false)
-  const savingField = ref<string | null>(null)
+  const savingLibrary = ref<number | null>(null)
 
   async function fetchGlobal() {
     loadingGlobal.value = true
@@ -47,24 +48,45 @@ export function useMetadataPreferences() {
     }
   }
 
-  async function saveFieldOverride(libraryId: number, field: MetadataField, pref: FieldPreference | null) {
-    const key = `${libraryId}:${field}`
-    savingField.value = key
+  async function saveLibraryDraft(libraryId: number, overrides: FieldPreferenceOverrides) {
+    savingLibrary.value = libraryId
     try {
-      const url = `/api/v1/metadata-preferences/libraries/${libraryId}/fields/${field}`
-      const res = await api(url, {
-        method: pref === null ? 'DELETE' : 'PUT',
-        headers: pref !== null ? { 'Content-Type': 'application/json' } : undefined,
-        body: pref !== null ? JSON.stringify(pref) : undefined,
+      const res = await api(`/api/v1/metadata-preferences/libraries/${libraryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides }),
       })
-      if (res.ok || res.status === 204) {
+      if (res.ok) {
         await fetchLibrary(libraryId)
+        toast.success('Library preferences saved')
       } else {
-        toast.error('Failed to save field override')
+        toast.error('Failed to save library preferences')
       }
     } finally {
-      savingField.value = null
+      savingLibrary.value = null
     }
+  }
+
+  async function resetGlobal() {
+    const res = await api('/api/v1/metadata-preferences/global', { method: 'DELETE' })
+    if (res.ok || res.status === 204) {
+      await fetchGlobal()
+      toast.success('Global preferences reset to system defaults')
+    } else {
+      toast.error('Failed to reset global preferences')
+    }
+  }
+
+  async function clearAllProviders(prefs: MetadataFetchPreferences) {
+    const fields: MetadataFetchPreferences['fields'] = { ...prefs.fields }
+    for (const field of ALL_METADATA_FIELDS) {
+      fields[field] = { ...prefs.fields[field], providers: [] }
+    }
+    const cleared: MetadataFetchPreferences = {
+      ...prefs,
+      fields,
+    }
+    await saveGlobal(cleared)
   }
 
   async function resetLibrary(libraryId: number) {
@@ -82,11 +104,13 @@ export function useMetadataPreferences() {
     libraryPrefs,
     loadingGlobal,
     savingGlobal,
-    savingField,
+    savingLibrary,
     fetchGlobal,
     saveGlobal,
+    resetGlobal,
+    clearAllProviders,
     fetchLibrary,
-    saveFieldOverride,
+    saveLibraryDraft,
     resetLibrary,
   }
 }

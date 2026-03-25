@@ -4,7 +4,6 @@ import {
   FieldPreference,
   FieldPreferenceOverrides,
   GenreMergeMode,
-  GenreProviderScope,
   MetadataFetchPreferences,
   MetadataFetchOptions,
   MetadataField,
@@ -22,7 +21,6 @@ const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
 const DEFAULT_MERGE_STRATEGY: MergeStrategy = 'overwriteIfProvided';
 const MERGE_STRATEGIES: Set<MergeStrategy> = new Set(['fillMissing', 'overwrite', 'overwriteIfProvided']);
 const GENRE_MERGE_MODES: Set<GenreMergeMode> = new Set(['firstProvider', 'merge']);
-const GENRE_PROVIDER_SCOPES: Set<GenreProviderScope> = new Set(['selectedProviders', 'allConfiguredProviders']);
 
 const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
   MetadataProviderKey.GOODREADS,
@@ -65,7 +63,6 @@ export class MetadataPreferenceResolver {
     const options: MetadataFetchOptions = {
       genres: {
         mode: 'merge',
-        providerScope: 'allConfiguredProviders',
       },
       saveProviderIds: true,
     };
@@ -138,13 +135,10 @@ export class MetadataPreferenceResolver {
       candidate.genres && typeof candidate.genres === 'object' && !Array.isArray(candidate.genres) ? candidate.genres : {};
 
     const mode = GENRE_MERGE_MODES.has(genresCandidate.mode as GenreMergeMode) ? (genresCandidate.mode as GenreMergeMode) : fallback.genres.mode;
-    const providerScope = GENRE_PROVIDER_SCOPES.has(genresCandidate.providerScope as GenreProviderScope)
-      ? (genresCandidate.providerScope as GenreProviderScope)
-      : fallback.genres.providerScope;
     const saveProviderIds = typeof candidate.saveProviderIds === 'boolean' ? candidate.saveProviderIds : fallback.saveProviderIds;
 
     return {
-      genres: { mode, providerScope },
+      genres: { mode },
       saveProviderIds,
     };
   }

@@ -6,7 +6,7 @@ import type { AudNexusBook, AudNexusChaptersResponse } from './audnexus.types';
 function makeBook(overrides: Partial<AudNexusBook> = {}): AudNexusBook {
   return {
     asin: 'B09ABCDEF1',
-    name: 'Project Hail Mary',
+    title: 'Project Hail Mary',
     ...overrides,
   };
 }
@@ -24,9 +24,19 @@ describe('mapAudNexusBook — basic fields', () => {
     expect(result.audibleId).toBe('B09XYZ1234');
   });
 
-  it('maps name to title', () => {
-    const result = mapAudNexusBook(makeBook({ name: 'The Martian' }));
+  it('maps title to title', () => {
+    const result = mapAudNexusBook(makeBook({ title: 'The Martian' }));
     expect(result.title).toBe('The Martian');
+  });
+
+  it('falls back to legacy name when title is missing', () => {
+    const result = mapAudNexusBook(makeBook({ title: undefined, name: 'The Martian (Legacy)' }));
+    expect(result.title).toBe('The Martian (Legacy)');
+  });
+
+  it('maps subtitle', () => {
+    const result = mapAudNexusBook(makeBook({ subtitle: 'A Novel' }));
+    expect(result.subtitle).toBe('A Novel');
   });
 
   it('maps authors array', () => {
@@ -47,9 +57,14 @@ describe('mapAudNexusBook — basic fields', () => {
     expect(mapAudNexusBook(makeBook()).narrators).toEqual([]);
   });
 
-  it('maps summary to description', () => {
-    const result = mapAudNexusBook(makeBook({ summary: 'A lone astronaut.' }));
-    expect(result.description).toBe('A lone astronaut.');
+  it('prefers description over summary', () => {
+    const result = mapAudNexusBook(makeBook({ description: 'Plain text description', summary: '<p>HTML summary</p>' }));
+    expect(result.description).toBe('Plain text description');
+  });
+
+  it('strips HTML from summary when description is absent', () => {
+    const result = mapAudNexusBook(makeBook({ summary: '<p>A lone <b>astronaut</b>.</p>' }));
+    expect(result.description).toBe('A lone astronaut .');
   });
 
   it('maps publisherName', () => {
@@ -119,6 +134,16 @@ describe('mapAudNexusBook — abridged', () => {
 // ── SERIES ───────────────────────────────────────────────────────────────────
 
 describe('mapAudNexusBook — series', () => {
+  it('maps seriesPrimary and numeric position from current payload', () => {
+    const result = mapAudNexusBook(
+      makeBook({
+        seriesPrimary: { asin: 'B0SERIES', name: 'The Expanse', position: '3' },
+      }),
+    );
+    expect(result.seriesName).toBe('The Expanse');
+    expect(result.seriesIndex).toBe(3);
+  });
+
   it('maps seriesName and numeric seriesPart', () => {
     const result = mapAudNexusBook(makeBook({ seriesName: 'The Expanse', seriesPart: '3' }));
     expect(result.seriesName).toBe('The Expanse');

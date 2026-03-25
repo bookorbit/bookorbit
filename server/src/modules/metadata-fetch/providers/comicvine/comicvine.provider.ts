@@ -9,6 +9,7 @@ import { mapIssueToCandidate } from './comicvine.mapper';
 import { ComicVineIssue } from './comicvine.types';
 
 const ISSUE_PATTERN = /^(.*?)\s*#(\d[\d.]*)(.*)$/;
+const MAX_RESULTS = 10;
 
 interface ParsedIssueTitle {
   seriesName: string;
@@ -55,12 +56,13 @@ export class ComicVineProvider implements IdentifiableProvider {
     }
     if (!params.title) return [];
 
+    const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider);
     const parsed = parseIssueTitle(params.title);
     if (parsed) {
-      return this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey);
+      return this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates);
     }
 
-    return this.generalSearch(params.title, apiKey);
+    return this.generalSearch(params.title, apiKey, maxCandidates);
   }
 
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
@@ -73,7 +75,7 @@ export class ComicVineProvider implements IdentifiableProvider {
     return mapIssueToCandidate(issue);
   }
 
-  private async structuredSearch(seriesName: string, issueNumber: string, apiKey: string): Promise<MetadataCandidate[]> {
+  private async structuredSearch(seriesName: string, issueNumber: string, apiKey: string, maxCandidates: number): Promise<MetadataCandidate[]> {
     const volumes = await this.client.searchVolumes(seriesName, apiKey);
     if (volumes.length === 0) {
       this.logger.debug(`ComicVine: no volumes found for "${seriesName}"`);
@@ -89,7 +91,7 @@ export class ComicVineProvider implements IdentifiableProvider {
     for (const volume of sorted.slice(0, 8)) {
       const issues = await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey);
       if (issues.length > 0) {
-        const enriched = await Promise.all(issues.map((issue) => this.enrichWithDetails(issue, apiKey)));
+        const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey)));
         return enriched.map(mapIssueToCandidate);
       }
     }
@@ -98,9 +100,9 @@ export class ComicVineProvider implements IdentifiableProvider {
     return [];
   }
 
-  private async generalSearch(query: string, apiKey: string): Promise<MetadataCandidate[]> {
+  private async generalSearch(query: string, apiKey: string, maxCandidates: number): Promise<MetadataCandidate[]> {
     const issues = await this.client.searchIssues(query, apiKey);
-    const enriched = await Promise.all(issues.map((issue) => this.enrichWithDetails(issue, apiKey)));
+    const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey)));
     return enriched.map(mapIssueToCandidate);
   }
 
@@ -110,4 +112,11 @@ export class ComicVineProvider implements IdentifiableProvider {
     const detailed = await this.client.getIssueById(String(issue.id), apiKey);
     return detailed ?? issue;
   }
+}
+
+function normalizeMaxCandidates(value: number | undefined): number {
+  if (!Number.isFinite(value) || value == null) return MAX_RESULTS;
+  const rounded = Math.floor(value);
+  if (rounded < 1) return 1;
+  return Math.min(rounded, MAX_RESULTS);
 }

@@ -27,6 +27,7 @@ const { search: searchAuthors } = useAuthorSearch()
 const { search: searchNarrators } = useNarratorSearch()
 const { search: searchGenres } = useGenreSearch()
 const { search: searchTags } = useTagSearch()
+const searchComicMetadata = async (q: string): Promise<string[]> => (q.trim() ? [] : [])
 
 const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 const searchOpen = ref(false)
@@ -130,6 +131,20 @@ async function autoFill() {
   if (preview.openLibraryId != null) form.openLibraryId = preview.openLibraryId
   if (preview.itunesId != null) form.itunesId = preview.itunesId
   if (preview.audibleId != null) form.audibleId = preview.audibleId
+  if (preview.comicvineId != null) form.comicvineId = preview.comicvineId
+  if (preview.comicMetadata) {
+    if (preview.comicMetadata.issueNumber !== undefined) form.comicIssueNumber = preview.comicMetadata.issueNumber
+    if (preview.comicMetadata.volumeName !== undefined) form.comicVolumeName = preview.comicMetadata.volumeName
+    if (preview.comicMetadata.storyArcs !== undefined) form.comicStoryArcs = preview.comicMetadata.storyArcs
+    if (preview.comicMetadata.pencillers !== undefined) form.comicPencillers = preview.comicMetadata.pencillers
+    if (preview.comicMetadata.inkers !== undefined) form.comicInkers = preview.comicMetadata.inkers
+    if (preview.comicMetadata.colorists !== undefined) form.comicColorists = preview.comicMetadata.colorists
+    if (preview.comicMetadata.letterers !== undefined) form.comicLetterers = preview.comicMetadata.letterers
+    if (preview.comicMetadata.coverArtists !== undefined) form.comicCoverArtists = preview.comicMetadata.coverArtists
+    if (preview.comicMetadata.characters !== undefined) form.comicCharacters = preview.comicMetadata.characters
+    if (preview.comicMetadata.teams !== undefined) form.comicTeams = preview.comicMetadata.teams
+    if (preview.comicMetadata.locations !== undefined) form.comicLocations = preview.comicMetadata.locations
+  }
   if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
 }
 </script>
@@ -391,50 +406,50 @@ async function autoFill() {
           <!-- Story Arcs -->
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Story Arcs</label>
-            <ChipInput v-model="form.comicStoryArcs" />
+            <ChipInput v-model="form.comicStoryArcs" :search-fn="searchComicMetadata" />
           </div>
           <!-- Pencillers | Inkers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="space-y-1">
               <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pencillers</label>
-              <ChipInput v-model="form.comicPencillers" />
+              <ChipInput v-model="form.comicPencillers" :search-fn="searchComicMetadata" />
             </div>
             <div class="space-y-1">
               <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Inkers</label>
-              <ChipInput v-model="form.comicInkers" />
+              <ChipInput v-model="form.comicInkers" :search-fn="searchComicMetadata" />
             </div>
           </div>
           <!-- Colorists | Letterers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="space-y-1">
               <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Colorists</label>
-              <ChipInput v-model="form.comicColorists" />
+              <ChipInput v-model="form.comicColorists" :search-fn="searchComicMetadata" />
             </div>
             <div class="space-y-1">
               <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Letterers</label>
-              <ChipInput v-model="form.comicLetterers" />
+              <ChipInput v-model="form.comicLetterers" :search-fn="searchComicMetadata" />
             </div>
           </div>
           <!-- Cover Artists -->
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cover Artists</label>
-            <ChipInput v-model="form.comicCoverArtists" />
+            <ChipInput v-model="form.comicCoverArtists" :search-fn="searchComicMetadata" />
           </div>
           <!-- Characters | Teams -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="space-y-1">
               <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Characters</label>
-              <ChipInput v-model="form.comicCharacters" />
+              <ChipInput v-model="form.comicCharacters" :search-fn="searchComicMetadata" />
             </div>
             <div class="space-y-1">
               <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Teams</label>
-              <ChipInput v-model="form.comicTeams" />
+              <ChipInput v-model="form.comicTeams" :search-fn="searchComicMetadata" />
             </div>
           </div>
           <!-- Locations -->
           <div class="space-y-1">
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Locations</label>
-            <ChipInput v-model="form.comicLocations" />
+            <ChipInput v-model="form.comicLocations" :search-fn="searchComicMetadata" />
           </div>
         </div>
       </div>

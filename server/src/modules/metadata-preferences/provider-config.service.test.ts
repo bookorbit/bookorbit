@@ -90,6 +90,21 @@ describe('ProviderConfigService', () => {
     expect(config.goodreads).toEqual({ enabled: true });
   });
 
+  it('drops unsupported properties from stored provider sections', async () => {
+    db.query.appSettings.findFirst.mockResolvedValue({
+      value: JSON.stringify({
+        google: { enabled: true, apiKey: 'g-key', extra: 'ignored' },
+        audible: { enabled: true, domain: 'audible.com', cookie: 'legacy-cookie' },
+      }),
+    });
+
+    const config = await service.getConfig();
+
+    expect(config.google).toEqual({ enabled: true, apiKey: 'g-key' });
+    expect(config.audible).toEqual({ enabled: true, domain: 'audible.com' });
+    expect((config.audible as Record<string, unknown>).cookie).toBeUndefined();
+  });
+
   it('falls back to defaults when stored JSON is invalid', async () => {
     db.query.appSettings.findFirst.mockResolvedValue({ value: '{not-json' });
 
@@ -123,6 +138,17 @@ describe('ProviderConfigService', () => {
         value: JSON.stringify(updated),
       }),
     );
+  });
+
+  it('ignores unsupported properties during update merge', async () => {
+    db.query.appSettings.findFirst.mockResolvedValue(undefined);
+
+    const updated = await service.updateConfig({
+      audible: { enabled: true, domain: 'audible.com', cookie: 'legacy-cookie' } as never,
+    } as never);
+
+    expect(updated.audible).toEqual({ enabled: true, domain: 'audible.com' });
+    expect((updated.audible as Record<string, unknown>).cookie).toBeUndefined();
   });
 
   it('builds provider statuses including provider-specific configuration hints', async () => {

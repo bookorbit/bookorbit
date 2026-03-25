@@ -1,23 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put } from '@nestjs/common';
-import { Permission, ALL_METADATA_FIELDS } from '@projectx/types';
-import type { FieldPreference, MetadataField } from '@projectx/types';
+import { Controller, Body, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put } from '@nestjs/common';
+import { Permission } from '@projectx/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { UpdateGlobalPreferencesDto } from './dto/update-global-preferences.dto';
-import { UpdateLibraryFieldDto } from './dto/update-library-field.dto';
+import { UpdateLibraryOverridesDto } from './dto/update-library-overrides.dto';
 import { MetadataPreferencesService } from './metadata-preferences.service';
 
 @Controller('metadata-preferences')
 @RequirePermission(Permission.ManageMetadataConfig)
 export class MetadataPreferencesController {
   constructor(private readonly service: MetadataPreferencesService) {}
-
-  private parseMetadataField(field: string): MetadataField {
-    if ((ALL_METADATA_FIELDS as string[]).includes(field)) {
-      return field as MetadataField;
-    }
-    throw new BadRequestException(`Unsupported metadata field: ${field}`);
-  }
 
   @Get('global')
   getGlobal() {
@@ -35,16 +27,16 @@ export class MetadataPreferencesController {
     return this.service.getForLibrary(id);
   }
 
-  @Put('libraries/:id/fields/:field')
+  @Put('libraries/:id')
   @HttpCode(HttpStatus.OK)
-  setLibraryFieldOverride(@Param('id', ParseIntPipe) id: number, @Param('field') field: string, @Body() dto: UpdateLibraryFieldDto) {
-    return this.service.setLibraryFieldOverride(id, this.parseMetadataField(field), dto as FieldPreference);
+  setLibraryOverrides(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibraryOverridesDto) {
+    return this.service.setLibraryOverrides(id, dto.overrides);
   }
 
-  @Delete('libraries/:id/fields/:field')
+  @Delete('global')
   @HttpCode(HttpStatus.NO_CONTENT)
-  clearLibraryFieldOverride(@Param('id', ParseIntPipe) id: number, @Param('field') field: string) {
-    return this.service.setLibraryFieldOverride(id, this.parseMetadataField(field), null);
+  resetGlobal() {
+    return this.service.resetGlobal();
   }
 
   @Delete('libraries/:id')

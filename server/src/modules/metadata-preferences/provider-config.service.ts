@@ -26,6 +26,64 @@ function asObject(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+function asBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function asString(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function mergeGoogleConfig(base: ProviderConfigurations['google'], value: unknown): ProviderConfigurations['google'] {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+    apiKey: asString(next.apiKey, base.apiKey),
+  };
+}
+
+function mergeAmazonConfig(base: ProviderConfigurations['amazon'], value: unknown): ProviderConfigurations['amazon'] {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+    domain: asString(next.domain, base.domain),
+    cookie: asString(next.cookie, base.cookie),
+  };
+}
+
+type SimpleProviderConfig = { enabled: boolean };
+
+function mergeSimpleConfig<T extends SimpleProviderConfig>(base: T, value: unknown): T {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+  } as T;
+}
+
+function mergeHardcoverConfig(base: ProviderConfigurations['hardcover'], value: unknown): ProviderConfigurations['hardcover'] {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+    apiKey: asString(next.apiKey, base.apiKey),
+  };
+}
+
+function mergeAudibleConfig(base: ProviderConfigurations['audible'], value: unknown): ProviderConfigurations['audible'] {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+    domain: asString(next.domain, base.domain),
+  };
+}
+
+function mergeComicVineConfig(base: ProviderConfigurations['comicvine'], value: unknown): ProviderConfigurations['comicvine'] {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+    apiKey: asString(next.apiKey, base.apiKey),
+  };
+}
+
 const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.GOOGLE]: 'Google Books',
   [MetadataProviderKey.AMAZON]: 'Amazon',
@@ -65,15 +123,15 @@ export class ProviderConfigService {
     try {
       const stored = asObject(JSON.parse(row.value));
       return {
-        google: { ...defaults.google, ...asObject(stored.google) },
-        amazon: { ...defaults.amazon, ...asObject(stored.amazon) },
-        goodreads: { ...defaults.goodreads, ...asObject(stored.goodreads) },
-        hardcover: { ...defaults.hardcover, ...asObject(stored.hardcover) },
-        openLibrary: { ...defaults.openLibrary, ...asObject(stored.openLibrary) },
-        itunes: { ...defaults.itunes, ...asObject(stored.itunes) },
-        audible: { ...defaults.audible, ...asObject(stored.audible) },
-        audnexus: { ...defaults.audnexus, ...asObject(stored.audnexus) },
-        comicvine: { ...defaults.comicvine, ...asObject(stored.comicvine) },
+        google: mergeGoogleConfig(defaults.google, stored.google),
+        amazon: mergeAmazonConfig(defaults.amazon, stored.amazon),
+        goodreads: mergeSimpleConfig(defaults.goodreads, stored.goodreads),
+        hardcover: mergeHardcoverConfig(defaults.hardcover, stored.hardcover),
+        openLibrary: mergeSimpleConfig(defaults.openLibrary, stored.openLibrary),
+        itunes: mergeSimpleConfig(defaults.itunes, stored.itunes),
+        audible: mergeAudibleConfig(defaults.audible, stored.audible),
+        audnexus: mergeSimpleConfig(defaults.audnexus, stored.audnexus),
+        comicvine: mergeComicVineConfig(defaults.comicvine, stored.comicvine),
       };
     } catch {
       return defaults;
@@ -83,15 +141,15 @@ export class ProviderConfigService {
   async updateConfig(patch: Partial<ProviderConfigurations>): Promise<ProviderConfigurations> {
     const current = await this.getConfig();
     const next: ProviderConfigurations = {
-      google: { ...current.google, ...asObject(patch.google) },
-      amazon: { ...current.amazon, ...asObject(patch.amazon) },
-      goodreads: { ...current.goodreads, ...asObject(patch.goodreads) },
-      hardcover: { ...current.hardcover, ...asObject(patch.hardcover) },
-      openLibrary: { ...current.openLibrary, ...asObject(patch.openLibrary) },
-      itunes: { ...current.itunes, ...asObject(patch.itunes) },
-      audible: { ...current.audible, ...asObject(patch.audible) },
-      audnexus: { ...current.audnexus, ...asObject(patch.audnexus) },
-      comicvine: { ...current.comicvine, ...asObject(patch.comicvine) },
+      google: mergeGoogleConfig(current.google, patch.google),
+      amazon: mergeAmazonConfig(current.amazon, patch.amazon),
+      goodreads: mergeSimpleConfig(current.goodreads, patch.goodreads),
+      hardcover: mergeHardcoverConfig(current.hardcover, patch.hardcover),
+      openLibrary: mergeSimpleConfig(current.openLibrary, patch.openLibrary),
+      itunes: mergeSimpleConfig(current.itunes, patch.itunes),
+      audible: mergeAudibleConfig(current.audible, patch.audible),
+      audnexus: mergeSimpleConfig(current.audnexus, patch.audnexus),
+      comicvine: mergeComicVineConfig(current.comicvine, patch.comicvine),
     };
     const value = JSON.stringify(next);
     await this.db

@@ -57,7 +57,7 @@ describe('MetadataPreferenceResolver', () => {
     expect(defaults.fields.title.mergeStrategy).toBe('fillMissing');
     expect(defaults.fields.description.mergeStrategy).toBe('overwriteIfProvided');
     expect(defaults.options).toEqual({
-      genres: { mode: 'merge', providerScope: 'allConfiguredProviders' },
+      genres: { mode: 'merge' },
       saveProviderIds: true,
     });
   });
@@ -114,7 +114,7 @@ describe('MetadataPreferenceResolver', () => {
     const malformed = {
       fields: defaults.fields,
       options: {
-        genres: { mode: 'invalid', providerScope: 'invalid' },
+        genres: { mode: 'invalid' },
         saveProviderIds: 'yes',
       },
     } as unknown as MetadataFetchPreferences;

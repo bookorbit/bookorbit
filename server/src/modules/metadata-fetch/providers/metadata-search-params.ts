@@ -6,4 +6,7 @@ export interface MetadataSearchParams {
   isbn?: string;
   existingProviderIds?: Partial<Record<MetadataProviderKey, string>>;
   isAudiobook?: boolean;
+  // Hint for providers to cap deep candidate exploration in non-interactive flows
+  // (e.g. auto-fill/background refresh where there is no manual candidate picking).
+  maxCandidatesPerProvider?: number;
 }

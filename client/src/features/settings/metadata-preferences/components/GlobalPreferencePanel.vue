@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Loader2, Save, Settings } from 'lucide-vue-next'
+import { Loader2, RotateCcw, Save, Settings, Trash2 } from 'lucide-vue-next'
 import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@projectx/types'
 import FieldPreferenceTable from './FieldPreferenceTable.vue'
 
@@ -10,7 +10,11 @@ const props = defineProps<{
   saving: boolean
 }>()
 
-const emit = defineEmits<{ save: [prefs: MetadataFetchPreferences] }>()
+const emit = defineEmits<{
+  save: [prefs: MetadataFetchPreferences]
+  clearAll: [prefs: MetadataFetchPreferences]
+  resetToDefault: []
+}>()
 
 const draft = ref<MetadataFetchPreferences | null>(null)
 
@@ -19,10 +23,9 @@ function withDefaultOptions(prefs: MetadataFetchPreferences): MetadataFetchPrefe
     ...prefs,
     options: {
       genres: {
-        mode: prefs.options?.genres.mode ?? 'firstProvider',
-        providerScope: prefs.options?.genres.providerScope ?? 'selectedProviders',
+        mode: prefs.options?.genres.mode ?? 'merge',
       },
-      saveProviderIds: prefs.options?.saveProviderIds ?? false,
+      saveProviderIds: prefs.options?.saveProviderIds ?? true,
     },
   }
 }
@@ -49,6 +52,22 @@ function setGenreMerge(enabled: boolean) {
   if (!draft.value?.options) return
   draft.value.options.genres.mode = enabled ? 'merge' : 'firstProvider'
 }
+
+function toggleSaveProviderIds() {
+  if (!draft.value?.options) return
+  draft.value.options.saveProviderIds = !draft.value.options.saveProviderIds
+}
+
+function handleClearAll() {
+  if (!draft.value) return
+  if (!confirm('Remove all active providers from every field? This will be saved immediately and cannot be undone.')) return
+  emit('clearAll', draft.value)
+}
+
+function handleResetToDefault() {
+  if (!confirm('Reset all global field rules to system defaults? This will overwrite your current configuration.')) return
+  emit('resetToDefault')
+}
 </script>
 
 <template>
@@ -58,11 +77,29 @@ function setGenreMerge(enabled: boolean) {
         <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Defaults</span>
         <p class="settings-hint">Default rules applied to every library. Override per-library below.</p>
       </div>
-      <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
-        <Loader2 v-if="saving" :size="14" class="animate-spin" />
-        <Save v-else :size="14" />
-        <span>Save Defaults</span>
-      </button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button
+          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-destructive hover:border-destructive/50 hover:bg-destructive/5 transition-colors disabled:opacity-40"
+          :disabled="saving || !draft"
+          @click="handleClearAll"
+        >
+          <Trash2 :size="13" />
+          <span>Clear All Providers</span>
+        </button>
+        <button
+          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
+          :disabled="saving"
+          @click="handleResetToDefault"
+        >
+          <RotateCcw :size="13" />
+          <span>Reset to Default</span>
+        </button>
+        <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
+          <Loader2 v-if="saving" :size="14" class="animate-spin" />
+          <Save v-else :size="14" />
+          <span>Save Defaults</span>
+        </button>
+      </div>
     </div>
 
     <div v-if="draft">
@@ -90,33 +127,12 @@ function setGenreMerge(enabled: boolean) {
                 />
               </div>
               <div class="space-y-1">
-                <span class="text-sm font-medium text-foreground">Merge genres across providers</span>
-                <p class="text-xs text-muted-foreground">Instead of taking genres from a single provider, combine them from multiple sources.</p>
+                <span class="text-sm font-medium text-foreground">Combine genres from all selected providers</span>
+                <p class="text-xs text-muted-foreground">
+                  Collect and deduplicate genres from every provider assigned to the Genres field, rather than stopping at the first result.
+                </p>
               </div>
             </label>
-
-            <fieldset class="pl-12 space-y-3" :class="draft.options?.genres.mode !== 'merge' ? 'opacity-40 pointer-events-none' : ''">
-              <label class="flex items-center gap-2.5 cursor-pointer group">
-                <input
-                  type="radio"
-                  name="genre-provider-scope"
-                  class="h-4 w-4 border-input accent-primary cursor-pointer"
-                  :checked="draft.options?.genres.providerScope === 'selectedProviders'"
-                  @change="draft.options && (draft.options.genres.providerScope = 'selectedProviders')"
-                />
-                <span class="text-sm text-foreground group-hover:text-primary transition-colors">Use only providers selected for Genres field</span>
-              </label>
-              <label class="flex items-center gap-2.5 cursor-pointer group">
-                <input
-                  type="radio"
-                  name="genre-provider-scope"
-                  class="h-4 w-4 border-input accent-primary cursor-pointer"
-                  :checked="draft.options?.genres.providerScope === 'allConfiguredProviders'"
-                  @change="draft.options && (draft.options.genres.providerScope = 'allConfiguredProviders')"
-                />
-                <span class="text-sm text-foreground group-hover:text-primary transition-colors">Use all enabled and configured providers</span>
-              </label>
-            </fieldset>
           </div>
 
           <!-- IDs Behavior -->
@@ -125,7 +141,7 @@ function setGenreMerge(enabled: boolean) {
               <div
                 class="relative flex h-5 w-9 shrink-0 items-center rounded-full transition-colors mt-0.5"
                 :class="draft.options?.saveProviderIds ? 'bg-primary' : 'bg-muted border border-border'"
-                @click.prevent="draft.options && (draft.options.saveProviderIds = !draft.options.saveProviderIds)"
+                @click.prevent="toggleSaveProviderIds"
               >
                 <span
                   class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
@@ -133,9 +149,10 @@ function setGenreMerge(enabled: boolean) {
                 />
               </div>
               <div class="space-y-1">
-                <span class="text-sm font-medium text-foreground">Save provider IDs</span>
+                <span class="text-sm font-medium text-foreground">Store provider IDs on books</span>
                 <p class="text-xs text-muted-foreground">
-                  Persist IDs (ISBN, ASIN, Goodreads ID, etc.) back to the book records during auto-refresh.
+                  When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future
+                  lookups.
                 </p>
               </div>
             </label>

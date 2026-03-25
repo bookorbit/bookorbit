@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail, ComicMetadataFields } from '@projectx/types'
 import { useCoverVersions } from './useCoverVersions'
 import { toast } from 'vue-sonner'
 
@@ -24,6 +24,8 @@ export interface MetadataRefreshPreview {
   openLibraryId?: string | null
   itunesId?: string | null
   audibleId?: string | null
+  comicvineId?: string | null
+  comicMetadata?: ComicMetadataFields
 }
 
 export function useRefreshMetadata() {

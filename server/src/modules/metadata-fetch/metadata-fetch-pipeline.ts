@@ -1,10 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AudiobookChapter, FieldPreference, MetadataCandidate, MetadataFetchPreferences, MetadataField, MetadataProviderKey } from '@projectx/types';
+import {
+  AudiobookChapter,
+  ComicMetadataFields,
+  FieldPreference,
+  MetadataCandidate,
+  MetadataFetchPreferences,
+  MetadataField,
+  MetadataProviderKey,
+} from '@projectx/types';
 import { firstValueFrom, toArray } from 'rxjs';
 
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
-import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
@@ -13,6 +20,7 @@ import { MetadataSearchParams } from './providers/metadata-search-params';
 export type ResolvedMetadataFields = Partial<Record<MetadataField, string | string[] | number | null>> & {
   coverUrl?: string;
   chapters?: AudiobookChapter[];
+  comicMetadata?: ComicMetadataFields;
 };
 type ResolvedProviderIds = Partial<Record<MetadataProviderKey, string>>;
 
@@ -24,7 +32,6 @@ export class MetadataFetchPipeline {
     private readonly fetchService: MetadataFetchService,
     private readonly preferencesService: MetadataPreferencesService,
     private readonly resolver: MetadataPreferenceResolver,
-    private readonly providerConfigService: ProviderConfigService,
     private readonly registry: ProviderRegistry,
     private readonly throttleTracker: ProviderThrottleTracker,
   ) {}
@@ -56,7 +63,7 @@ export class MetadataFetchPipeline {
     const registeredKeys = this.registry.all().map((p) => p.key) as MetadataProviderKey[];
     const preferences: MetadataFetchPreferences = this.resolver.withForwardCompatibility(this.resolver.resolve(global, overrides), registeredKeys);
 
-    const enabledProviders = await this.deriveProviderSet(preferences, registeredKeys);
+    const enabledProviders = this.deriveProviderSet(preferences, registeredKeys);
     const candidates = await firstValueFrom(this.fetchService.search(params, enabledProviders).pipe(toArray()), {
       defaultValue: [] as MetadataCandidate[],
     });
@@ -65,32 +72,22 @@ export class MetadataFetchPipeline {
     for (const c of candidates) {
       if (!byProvider.has(c.provider)) byProvider.set(c.provider, c);
     }
-    return this.applyPreferences(preferences, byProvider, existingFields, registeredKeys);
+    return this.applyPreferences(preferences, byProvider, existingFields);
   }
 
-  private async deriveProviderSet(preferences: MetadataFetchPreferences, registeredKeys: MetadataProviderKey[]) {
+  private deriveProviderSet(preferences: MetadataFetchPreferences, registeredKeys: MetadataProviderKey[]) {
     const registered = new Set(registeredKeys);
     const keys = new Set<MetadataProviderKey>();
-    const mergeGenresFromAllConfigured =
-      preferences.fields.genres.enabled &&
-      preferences.options?.genres.mode === 'merge' &&
-      preferences.options?.genres.providerScope === 'allConfiguredProviders';
 
-    if (mergeGenresFromAllConfigured) {
-      const configuredKeys = await this.getEnabledConfiguredProviders(registered);
-      configuredKeys.forEach((k) => keys.add(k));
-    }
-
-    for (const [field, fp] of Object.entries(preferences.fields) as [MetadataField, FieldPreference][]) {
+    for (const [, fp] of Object.entries(preferences.fields) as [MetadataField, FieldPreference][]) {
       if (!fp.enabled) continue;
-      if (field === 'genres' && mergeGenresFromAllConfigured) continue;
       fp.providers.filter((k) => registered.has(k)).forEach((k) => keys.add(k));
     }
 
     const active: MetadataProviderKey[] = [];
     for (const key of keys) {
       if (this.throttleTracker.isThrottled(key)) {
-        this.logger.debug(`[${key}] skipped - currently throttled`);
+        this.logger.warn(`[${key}] throttled - skipping metadata fetch for this run`);
       } else {
         active.push(key);
       }
@@ -98,20 +95,10 @@ export class MetadataFetchPipeline {
     return active;
   }
 
-  private async getEnabledConfiguredProviders(registered: Set<MetadataProviderKey>): Promise<MetadataProviderKey[]> {
-    try {
-      const statuses = await this.providerConfigService.getProviderStatuses();
-      return statuses.filter((s) => s.enabled && s.configured && registered.has(s.key)).map((s) => s.key);
-    } catch {
-      return [...registered];
-    }
-  }
-
   private applyPreferences(
     preferences: MetadataFetchPreferences,
     byProvider: Map<string, MetadataCandidate>,
     existing: Partial<Record<MetadataField, unknown>>,
-    providerOrder: MetadataProviderKey[],
   ): { resolved: ResolvedMetadataFields; sources: Record<string, string>; providerIds: ResolvedProviderIds } {
     const result: ResolvedMetadataFields = {};
     const sources: Record<string, string> = {};
@@ -121,9 +108,7 @@ export class MetadataFetchPipeline {
       if (!fp.enabled) continue;
 
       if (field === 'genres' && preferences.options?.genres.mode === 'merge') {
-        const providerKeys =
-          preferences.options.genres.providerScope === 'allConfiguredProviders' ? providerOrder : (fp.providers as MetadataProviderKey[]);
-        const { genres, sourceProvider } = this.mergeGenres(providerKeys, byProvider);
+        const { genres, sourceProvider } = this.mergeGenres(fp.providers as MetadataProviderKey[], byProvider);
         if (!genres.length) continue;
 
         const existingValue = existing[field];
@@ -193,6 +178,9 @@ export class MetadataFetchPipeline {
       }
     }
 
+    const comicMetadata = this.resolveComicMetadata(preferences, byProvider);
+    if (comicMetadata) result.comicMetadata = comicMetadata;
+
     return { resolved: result, sources, providerIds };
   }
 
@@ -244,6 +232,49 @@ export class MetadataFetchPipeline {
   private isMissing(value: unknown): boolean {
     if (value === null || value === undefined || value === '') return true;
     if (Array.isArray(value)) return value.length === 0;
+    return false;
+  }
+
+  private resolveComicMetadata(preferences: MetadataFetchPreferences, byProvider: Map<string, MetadataCandidate>): ComicMetadataFields | undefined {
+    const preferredProviders = [
+      ...(preferences.fields.seriesName?.providers ?? []),
+      ...(preferences.fields.title?.providers ?? []),
+      ...byProvider.keys(),
+    ] as MetadataProviderKey[];
+
+    const seen = new Set<MetadataProviderKey>();
+    for (const providerKey of preferredProviders) {
+      if (seen.has(providerKey)) continue;
+      seen.add(providerKey);
+
+      const comicMetadata = byProvider.get(providerKey)?.comicMetadata;
+      if (comicMetadata && this.hasComicMetadata(comicMetadata)) return comicMetadata;
+    }
+    return undefined;
+  }
+
+  private hasComicMetadata(comicMetadata: ComicMetadataFields): boolean {
+    const scalarFields: (keyof ComicMetadataFields)[] = ['issueNumber', 'volumeName'];
+    for (const field of scalarFields) {
+      const value = comicMetadata[field];
+      if (typeof value === 'string' && value.trim().length > 0) return true;
+    }
+
+    const arrayFields: (keyof ComicMetadataFields)[] = [
+      'storyArcs',
+      'pencillers',
+      'inkers',
+      'colorists',
+      'letterers',
+      'coverArtists',
+      'characters',
+      'teams',
+      'locations',
+    ];
+    for (const field of arrayFields) {
+      const value = comicMetadata[field];
+      if (Array.isArray(value) && value.length > 0) return true;
+    }
     return false;
   }
 }

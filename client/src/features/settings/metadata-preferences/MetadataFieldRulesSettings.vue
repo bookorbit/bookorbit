@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
-import type { FieldPreference, MetadataField } from '@projectx/types'
+import type { FieldPreferenceOverrides } from '@projectx/types'
 import { Info } from 'lucide-vue-next'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import GlobalPreferencePanel from './components/GlobalPreferencePanel.vue'
@@ -9,8 +9,19 @@ import { useProviderConfig } from './composables/useProviderConfig'
 import { useMetadataPreferences } from './composables/useMetadataPreferences'
 
 const { statuses, fetchConfig } = useProviderConfig()
-const { globalPrefs, libraryPrefs, savingGlobal, savingField, fetchGlobal, saveGlobal, fetchLibrary, saveFieldOverride, resetLibrary } =
-  useMetadataPreferences()
+const {
+  globalPrefs,
+  libraryPrefs,
+  savingGlobal,
+  savingLibrary,
+  fetchGlobal,
+  saveGlobal,
+  resetGlobal,
+  clearAllProviders,
+  fetchLibrary,
+  saveLibraryDraft,
+  resetLibrary,
+} = useMetadataPreferences()
 const { libraries, fetchLibraries } = useLibraries()
 
 onMounted(() => {
@@ -19,14 +30,18 @@ onMounted(() => {
 
 const fetchedLibraryIds = new Set<number>()
 
-watch(libraries, async (libs) => {
-  const newLibs = libs.filter((lib) => !fetchedLibraryIds.has(lib.id))
-  newLibs.forEach((lib) => fetchedLibraryIds.add(lib.id))
-  await Promise.all(newLibs.map((lib) => fetchLibrary(lib.id)))
-})
+watch(
+  libraries,
+  async (libs) => {
+    const newLibs = libs.filter((lib) => !fetchedLibraryIds.has(lib.id))
+    newLibs.forEach((lib) => fetchedLibraryIds.add(lib.id))
+    await Promise.all(newLibs.map((lib) => fetchLibrary(lib.id)))
+  },
+  { immediate: true },
+)
 
-async function onFieldChange(libraryId: number, field: MetadataField, pref: FieldPreference | null) {
-  await saveFieldOverride(libraryId, field, pref)
+async function onSaveLibrary(libraryId: number, overrides: FieldPreferenceOverrides) {
+  await saveLibraryDraft(libraryId, overrides)
 }
 
 async function onResetLibrary(libraryId: number) {
@@ -56,7 +71,14 @@ async function onResetLibrary(libraryId: number) {
       </div>
     </div>
 
-    <GlobalPreferencePanel :preferences="globalPrefs" :statuses="statuses" :saving="savingGlobal" @save="saveGlobal" />
+    <GlobalPreferencePanel
+      :preferences="globalPrefs"
+      :statuses="statuses"
+      :saving="savingGlobal"
+      @save="saveGlobal"
+      @clear-all="clearAllProviders"
+      @reset-to-default="resetGlobal"
+    />
 
     <div v-if="libraries.length" class="space-y-4">
       <div class="px-1">
@@ -68,10 +90,12 @@ async function onResetLibrary(libraryId: number) {
           v-for="lib in libraries"
           :key="lib.id"
           :library-name="lib.name"
+          :library-primary-format="lib.formatPriority[0] ?? null"
           :library-prefs="libraryPrefs.get(lib.id) ?? null"
+          :global-prefs="globalPrefs"
           :statuses="statuses"
-          :saving-field="savingField"
-          @field-change="onFieldChange"
+          :saving="savingLibrary === lib.id"
+          @save="onSaveLibrary"
           @reset="onResetLibrary"
         />
       </div>

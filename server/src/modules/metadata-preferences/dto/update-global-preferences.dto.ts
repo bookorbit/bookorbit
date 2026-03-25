@@ -12,11 +12,10 @@ import {
 } from 'class-validator';
 import { plainToInstance, Type } from 'class-transformer';
 import { ALL_METADATA_FIELDS, MetadataProviderKey } from '@projectx/types';
-import type { GenreMergeMode, GenreProviderScope, MetadataField, MergeStrategy } from '@projectx/types';
+import type { GenreMergeMode, MetadataField, MergeStrategy } from '@projectx/types';
 
 const MERGE_STRATEGIES: MergeStrategy[] = ['fillMissing', 'overwrite', 'overwriteIfProvided'];
 const GENRE_MERGE_MODES: GenreMergeMode[] = ['firstProvider', 'merge'];
-const GENRE_PROVIDER_SCOPES: GenreProviderScope[] = ['selectedProviders', 'allConfiguredProviders'];
 const PROVIDER_KEYS = Object.values(MetadataProviderKey);
 
 export class FieldPreferenceDto {
@@ -35,9 +34,6 @@ export class FieldPreferenceDto {
 class GenreOptionsDto {
   @IsIn(GENRE_MERGE_MODES)
   mode!: GenreMergeMode;
-
-  @IsIn(GENRE_PROVIDER_SCOPES)
-  providerScope!: GenreProviderScope;
 }
 
 export class MetadataFetchOptionsDto {
@@ -50,7 +46,7 @@ export class MetadataFetchOptionsDto {
 }
 
 @ValidatorConstraint({ name: 'isFieldPreferencesMap', async: false })
-class IsFieldPreferencesMapConstraint implements ValidatorConstraintInterface {
+export class IsFieldPreferencesMapConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
     const knownFields = new Set<string>(ALL_METADATA_FIELDS);

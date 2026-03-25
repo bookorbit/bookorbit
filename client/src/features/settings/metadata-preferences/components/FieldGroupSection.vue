@@ -10,8 +10,7 @@ defineProps<{
   preferences: Record<MetadataField, FieldPreference>
   statuses: ProviderStatus[]
   overriddenFields?: Set<MetadataField>
-  savingField?: string | null
-  libraryId?: number
+  saving?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -40,7 +39,7 @@ const open = ref(true)
         :preference="preferences[field]"
         :statuses="statuses"
         :inherited="overriddenFields !== undefined ? !overriddenFields.has(field) : undefined"
-        :saving="savingField === `${libraryId}:${field}`"
+        :saving="saving"
         @change="(f, p) => emit('change', f, p)"
         @revert="(f) => emit('revert', f)"
       />

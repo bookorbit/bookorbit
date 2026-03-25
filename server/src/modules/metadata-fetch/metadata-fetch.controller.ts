@@ -54,7 +54,7 @@ export class MetadataFetchController {
     const requestedAudiobookProvider = (dto.providers ?? []).some(
       (provider) => provider === MetadataProviderKey.AUDIBLE || provider === MetadataProviderKey.AUDNEXUS,
     );
-    const isAudiobook = dto.isAudiobook ?? (requestedAudiobookProvider || Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE]));
+    const isAudiobook = requestedAudiobookProvider ? true : (dto.isAudiobook ?? Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE]));
 
     const params: MetadataSearchParams = {
       title: normalizeSearchTitle(dto.title),

@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { FieldPreference, FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences, MetadataField } from '@projectx/types';
+import { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -53,25 +53,20 @@ export class MetadataPreferencesService {
     return { libraryId, overrides, effective };
   }
 
-  async setLibraryFieldOverride(libraryId: number, field: MetadataField, preference: FieldPreference | null): Promise<void> {
+  async setLibraryOverrides(libraryId: number, overrides: FieldPreferenceOverrides): Promise<void> {
     const library = await this.db.query.libraries.findFirst({
       where: eq(schema.libraries.id, libraryId),
-      columns: { metadataFetchPreferences: true },
+      columns: { id: true },
     });
     if (!library) throw new NotFoundException(`Library ${libraryId} not found`);
+    await this.db
+      .update(schema.libraries)
+      .set({ metadataFetchPreferences: Object.keys(overrides).length ? overrides : null })
+      .where(eq(schema.libraries.id, libraryId));
+  }
 
-    const current: FieldPreferenceOverrides = library.metadataFetchPreferences ?? {};
-    if (preference === null) {
-      const next = { ...current };
-      delete next[field];
-      await this.db
-        .update(schema.libraries)
-        .set({ metadataFetchPreferences: Object.keys(next).length ? next : null })
-        .where(eq(schema.libraries.id, libraryId));
-    } else {
-      const next: FieldPreferenceOverrides = { ...current, [field]: preference };
-      await this.db.update(schema.libraries).set({ metadataFetchPreferences: next }).where(eq(schema.libraries.id, libraryId));
-    }
+  async resetGlobal(): Promise<void> {
+    await this.db.delete(schema.appSettings).where(eq(schema.appSettings.key, GLOBAL_PREFERENCES_KEY));
   }
 
   async resetLibraryToGlobal(libraryId: number): Promise<void> {

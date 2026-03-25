@@ -178,6 +178,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
         existingProviderIds: this.collectProviderIds(meta ?? {}),
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
+        maxCandidatesPerProvider: 1,
       };
 
       const existingFields: Partial<Record<MetadataField, unknown>> = {

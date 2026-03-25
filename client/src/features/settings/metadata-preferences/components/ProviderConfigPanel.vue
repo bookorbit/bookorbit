@@ -102,11 +102,8 @@ const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; f
   {
     key: 'audible',
     label: 'Audible',
-    hint: 'Pulls audiobook metadata from Audible product pages. A session cookie is highly recommended.',
-    fields: [
-      { key: 'domain', label: 'Region', type: 'select', options: AUDIBLE_DOMAINS },
-      { key: 'cookie', label: 'Cookie', type: 'password' },
-    ],
+    hint: 'Pulls audiobook metadata from Audible. No additional setup is required.',
+    fields: [{ key: 'domain', label: 'Region', type: 'select', options: AUDIBLE_DOMAINS }],
   },
   { key: 'audnexus', label: 'AudNexus', hint: 'Community-driven audiobook metadata. No setup required.', fields: [] },
   {
@@ -159,6 +156,11 @@ function formatDuration(totalSeconds: number): string {
 function save() {
   if (!draft.value) return
   emit('save', draft.value)
+}
+
+function onSecretFieldFocus(event: FocusEvent) {
+  const input = event.target as HTMLInputElement | null
+  if (input?.readOnly) input.readOnly = false
 }
 </script>
 
@@ -230,10 +232,21 @@ function save() {
               <input
                 v-else
                 v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
-                :type="field.type"
+                :type="field.type === 'password' ? 'text' : field.type"
+                :name="`metadata-${row.key}-${field.key}`"
                 :placeholder="field.label"
                 :disabled="!draft[row.key].enabled"
+                :readonly="field.type === 'password'"
+                :autocomplete="field.type === 'password' ? 'off' : 'off'"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                :data-lpignore="field.type === 'password' ? 'true' : undefined"
+                :data-1p-ignore="field.type === 'password' ? 'true' : undefined"
+                :data-form-type="field.type === 'password' ? 'other' : undefined"
+                :style="field.type === 'password' ? '--webkit-text-security: disc' : undefined"
                 class="h-9 w-64 lg:w-80 rounded-md border border-input bg-background px-3 text-xs font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+                @focus="field.type === 'password' ? onSecretFieldFocus($event) : undefined"
               />
             </div>
           </div>

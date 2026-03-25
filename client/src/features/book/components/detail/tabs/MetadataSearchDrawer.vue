@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { X, Sparkles, ChevronRight } from 'lucide-vue-next'
+import { isAudioFormat } from '@projectx/types'
 import type { BookDetail, MetadataCandidate, MetadataSource } from '@projectx/types'
 import { useMetadataSearch } from '../../../composables/useMetadataSearch'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
@@ -62,7 +63,7 @@ onMounted(() => {
 })
 
 function handleSearch(params: { title: string; author: string; isbn: string }) {
-  const isAudiobook = props.book.durationSeconds != null || !!props.book.providerIds.audible
+  const isAudiobook = props.book.files.some((f) => f.format != null && isAudioFormat(f.format))
   selectedCandidate.value = null
   view.value = 'search'
   search({ ...params, bookId: props.book.id, isAudiobook })

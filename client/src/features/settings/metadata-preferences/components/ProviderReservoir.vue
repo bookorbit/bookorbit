@@ -1,40 +1,67 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical } from 'lucide-vue-next'
-import type { ProviderStatus } from '@projectx/types'
+import type { MetadataProviderKey, ProviderStatus } from '@projectx/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { PROVIDER_DND_GROUP, createProviderDragItem, type ProviderDragItem } from '../lib/provider-drag'
 
-defineProps<{
+const props = defineProps<{
   statuses: ProviderStatus[]
 }>()
 
-function onDragStart(key: string, e: DragEvent) {
-  e.dataTransfer!.effectAllowed = 'copy'
-  e.dataTransfer!.setData('application/x-provider-key', key)
+interface ReservoirProviderItem {
+  key: MetadataProviderKey
+  label: string
+  usable: boolean
+}
+
+const reservoirProviders = computed<ReservoirProviderItem[]>(() =>
+  props.statuses.map((status) => ({
+    key: status.key as MetadataProviderKey,
+    label: status.label,
+    usable: status.enabled && status.configured,
+  })),
+)
+
+function cloneProvider(item: ReservoirProviderItem): ProviderDragItem {
+  return createProviderDragItem(item.key)
+}
+
+function providerTitle(provider: ReservoirProviderItem) {
+  const status = props.statuses.find((item) => item.key === provider.key)
+  if (!status?.enabled) return `${provider.label} - disabled`
+  if (!status?.configured) return `${provider.label} - not configured`
+  return `Drag to assign ${provider.label} to a field`
 }
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2">
+  <VueDraggable
+    :model-value="reservoirProviders"
+    item-key="key"
+    tag="div"
+    class="flex flex-wrap gap-2"
+    :group="{ name: PROVIDER_DND_GROUP, pull: 'clone', put: false }"
+    :sort="false"
+    :animation="150"
+    :clone="cloneProvider"
+    handle=".provider-reservoir-handle"
+  >
     <div
-      v-for="status in statuses"
-      :key="status.key"
-      :draggable="status.enabled && status.configured"
-      :title="
-        !status.enabled
-          ? `${status.label} - disabled`
-          : !status.configured
-            ? `${status.label} - not configured`
-            : `Drag to assign ${status.label} to a field`
-      "
+      v-for="provider in reservoirProviders"
+      :key="provider.key"
+      :title="providerTitle(provider)"
       class="flex items-center gap-1.5 h-7 px-3 rounded text-[10px] font-bold uppercase tracking-tight select-none transition-all shadow-xs"
-      :style="providerChipStyle(status.key, !(status.enabled && status.configured))"
+      :style="providerChipStyle(provider.key, !provider.usable)"
       :class="
-        status.enabled && status.configured ? 'cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95' : 'cursor-not-allowed opacity-40'
+        provider.usable
+          ? 'provider-reservoir-handle cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95'
+          : 'cursor-not-allowed opacity-40'
       "
-      @dragstart="onDragStart(status.key, $event)"
     >
-      <GripVertical v-if="status.enabled && status.configured" :size="10" class="shrink-0 -ml-1 opacity-50" />
-      <span>{{ PROVIDER_SHORT_LABELS[status.key] ?? status.key }}</span>
+      <GripVertical v-if="provider.usable" :size="10" class="shrink-0 -ml-1 opacity-50" />
+      <span>{{ PROVIDER_SHORT_LABELS[provider.key] ?? provider.key }}</span>
     </div>
-  </div>
+  </VueDraggable>
 </template>

@@ -488,6 +488,7 @@ export class BookService {
       isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
       existingProviderIds: providerIds,
       isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
+      maxCandidatesPerProvider: 1,
     };
 
     const existingFields: Partial<Record<MetadataField, unknown>> = {
@@ -518,6 +519,7 @@ export class BookService {
         openLibraryId?: string;
         itunesId?: string;
         audibleId?: string;
+        comicvineId?: string;
       } = { ...resolved };
       this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
       return previewResult;
@@ -538,6 +540,7 @@ export class BookService {
     if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
     if (r.duration !== undefined) dto.durationSeconds = r.duration as number | null;
     if (r.abridged !== undefined) dto.abridged = r.abridged as boolean | null;
+    if (r.comicMetadata !== undefined) dto.comicMetadata = r.comicMetadata as UpdateBookMetadataDto['comicMetadata'];
     this.applyResolvedProviderIds(dto, resolvedProviderIds);
 
     let detail: BookDetailDto | undefined;

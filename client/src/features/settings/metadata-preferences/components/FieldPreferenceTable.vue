@@ -8,8 +8,7 @@ defineProps<{
   preferences: MetadataFetchPreferences
   statuses: ProviderStatus[]
   overriddenFields?: Set<MetadataField>
-  savingField?: string | null
-  libraryId?: number
+  saving?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -65,8 +64,7 @@ const GROUPS: { label: string; fields: MetadataField[] }[] = [
         :preferences="preferences.fields"
         :statuses="statuses"
         :overridden-fields="overriddenFields"
-        :saving-field="savingField"
-        :library-id="libraryId"
+        :saving="saving"
         @change="(f, p) => emit('change', f, p)"
         @revert="(f) => emit('revert', f)"
       />

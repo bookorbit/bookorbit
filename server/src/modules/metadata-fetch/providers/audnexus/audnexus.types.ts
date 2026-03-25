@@ -1,14 +1,25 @@
 export interface AudNexusBook {
   asin: string;
-  name: string;
+  // Historical field (older AudNexus payloads)
+  name?: string;
+  // Current field
+  title?: string;
+  subtitle?: string;
   authors?: Array<{ name: string; asin: string }>;
   narrators?: Array<{ name: string }>;
   image?: string;
   language?: string;
   runtimeLengthMin?: number;
   formatType?: string;
+  description?: string;
+  seriesPrimary?: {
+    asin?: string;
+    name?: string;
+    position?: string | number;
+  };
+  // Historical fields (older AudNexus payloads)
   seriesName?: string;
-  seriesPart?: string;
+  seriesPart?: string | number;
   publisherName?: string;
   releaseDate?: string;
   summary?: string;

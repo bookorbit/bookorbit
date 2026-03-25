@@ -11,7 +11,6 @@ import { of } from 'rxjs';
 
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
-import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
@@ -46,7 +45,6 @@ describe('MetadataFetchPipeline', () => {
   let fetchService: Mocked<MetadataFetchService>;
   let preferencesService: Mocked<MetadataPreferencesService>;
   let resolver: Mocked<MetadataPreferenceResolver>;
-  let providerConfigService: Mocked<ProviderConfigService>;
   let registry: Mocked<ProviderRegistry>;
   let pipeline: MetadataFetchPipeline;
 
@@ -65,16 +63,12 @@ describe('MetadataFetchPipeline', () => {
       withForwardCompatibility: vi.fn(),
     } as unknown as Mocked<MetadataPreferenceResolver>;
 
-    providerConfigService = {
-      getProviderStatuses: vi.fn(),
-    } as unknown as Mocked<ProviderConfigService>;
-
     registry = {
       all: vi.fn(),
     } as unknown as Mocked<ProviderRegistry>;
 
     const throttleTracker = { isThrottled: vi.fn().mockReturnValue(false) } as unknown as ProviderThrottleTracker;
-    pipeline = new MetadataFetchPipeline(fetchService, preferencesService, resolver, providerConfigService, registry, throttleTracker);
+    pipeline = new MetadataFetchPipeline(fetchService, preferencesService, resolver, registry, throttleTracker);
   });
 
   it('derives enabled provider keys from active fields, filters unknown providers, and de-duplicates keys', async () => {
@@ -189,6 +183,45 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.coverUrl).toBe(MetadataProviderKey.OPEN_LIBRARY);
   });
 
+  it('passes through comic metadata from the preferred provider', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.COMICVINE, MetadataProviderKey.AMAZON],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.seriesName = {
+        enabled: true,
+        providers: [MetadataProviderKey.COMICVINE, MetadataProviderKey.AMAZON],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.COMICVINE }, { key: MetadataProviderKey.AMAZON }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.COMICVINE, 'cv1', {
+          comicMetadata: {
+            issueNumber: '12',
+            volumeName: 'Arkham Asylum',
+            pencillers: ['Jock'],
+          },
+        }),
+      ),
+    );
+
+    const { resolved } = await pipeline.runWithSources({ title: 'Arkham Asylum #12' }, {});
+
+    expect(resolved.comicMetadata).toEqual({
+      issueNumber: '12',
+      volumeName: 'Arkham Asylum',
+      pencillers: ['Jock'],
+    });
+  });
+
   it('merges genres from selected providers when genre merge mode is enabled', async () => {
     const prefs = createPreferences((fields) => {
       fields.genres = {
@@ -198,7 +231,7 @@ describe('MetadataFetchPipeline', () => {
       };
     });
     prefs.options = {
-      genres: { mode: 'merge', providerScope: 'selectedProviders' },
+      genres: { mode: 'merge' },
       saveProviderIds: false,
     };
 
@@ -219,48 +252,6 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.genres).toBe(MetadataProviderKey.GOOGLE);
   });
 
-  it('merges genres from all enabled and configured providers when scope is allConfiguredProviders', async () => {
-    const prefs = createPreferences((fields) => {
-      for (const f of ALL_METADATA_FIELDS) {
-        fields[f] = {
-          ...fields[f],
-          providers: [MetadataProviderKey.GOOGLE],
-        };
-      }
-      fields.genres = {
-        enabled: true,
-        providers: [MetadataProviderKey.GOOGLE],
-        mergeStrategy: 'overwriteIfProvided',
-      };
-    });
-    prefs.options = {
-      genres: { mode: 'merge', providerScope: 'allConfiguredProviders' },
-      saveProviderIds: false,
-    };
-
-    preferencesService.getGlobal.mockResolvedValue(prefs);
-    resolver.resolve.mockReturnValue(prefs);
-    resolver.withForwardCompatibility.mockReturnValue(prefs);
-    providerConfigService.getProviderStatuses.mockResolvedValue([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google', enabled: true, configured: true },
-      { key: MetadataProviderKey.AMAZON, label: 'Amazon', enabled: true, configured: true },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', enabled: false, configured: true },
-    ] as never);
-    registry.all.mockReturnValue([
-      { key: MetadataProviderKey.GOOGLE },
-      { key: MetadataProviderKey.AMAZON },
-      { key: MetadataProviderKey.OPEN_LIBRARY },
-    ] as never);
-    fetchService.search.mockReturnValue(
-      of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Fantasy'] }), candidate(MetadataProviderKey.AMAZON, 'a1', { genres: ['Epic'] })),
-    );
-
-    const { resolved } = await pipeline.runWithSources({ title: 'Query' }, {});
-
-    expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.AMAZON]);
-    expect(resolved.genres).toEqual(['Fantasy', 'Epic']);
-  });
-
   it('returns provider ids for matched providers when saveProviderIds is enabled', async () => {
     const prefs = createPreferences((fields) => {
       fields.title = {
@@ -270,7 +261,7 @@ describe('MetadataFetchPipeline', () => {
       };
     });
     prefs.options = {
-      genres: { mode: 'firstProvider', providerScope: 'selectedProviders' },
+      genres: { mode: 'firstProvider' },
       saveProviderIds: true,
     };
 
@@ -295,7 +286,7 @@ describe('MetadataFetchPipeline', () => {
       };
     });
     prefs.options = {
-      genres: { mode: 'firstProvider', providerScope: 'selectedProviders' },
+      genres: { mode: 'firstProvider' },
       saveProviderIds: false,
     };
 

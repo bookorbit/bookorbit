@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, X } from 'lucide-vue-next'
 import type { MetadataProviderKey, ProviderStatus } from '@projectx/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
-
-const REORDER_TYPE = 'application/x-field-chip-index'
+import { PROVIDER_DND_GROUP, toProviderDragItems } from '../lib/provider-drag'
 
 const props = defineProps<{
   providers: MetadataProviderKey[]
@@ -13,6 +13,11 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'update:providers': [value: MetadataProviderKey[]] }>()
+
+interface ProviderChipItem {
+  key: MetadataProviderKey
+  dragId: string
+}
 
 function statusFor(key: MetadataProviderKey) {
   return props.statuses.find((s) => s.key === key)
@@ -23,90 +28,104 @@ function isUsable(key: MetadataProviderKey) {
   return s ? s.enabled && s.configured : true
 }
 
-const draggingIndex = ref<number | null>(null)
-const dragOverIndex = ref<number | null>(null)
+const localProviders = ref<ProviderChipItem[]>([])
+const isDragging = ref(false)
 
-function onDragStart(index: number, e: DragEvent) {
-  draggingIndex.value = index
-  e.dataTransfer!.effectAllowed = 'move'
-  e.dataTransfer!.setData(REORDER_TYPE, String(index))
-  e.stopPropagation()
+watch(
+  () => props.providers,
+  (providers) => {
+    if (isDragging.value) return
+    localProviders.value = toProviderDragItems(providers)
+  },
+  { immediate: true },
+)
+
+function sameOrder(a: MetadataProviderKey[], b: MetadataProviderKey[]) {
+  return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
-function onDragOver(index: number, e: DragEvent) {
-  if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return
-  e.preventDefault()
-  e.stopPropagation()
-  e.dataTransfer.dropEffect = 'move'
-  if (draggingIndex.value !== null && draggingIndex.value !== index) {
-    dragOverIndex.value = index
+function commitProviders() {
+  const seen = new Set<MetadataProviderKey>()
+  const deduplicated = localProviders.value.filter((item) => {
+    if (seen.has(item.key)) return false
+    seen.add(item.key)
+    return true
+  })
+  if (deduplicated.length !== localProviders.value.length) {
+    localProviders.value = deduplicated
+  }
+  const normalized = deduplicated.map((item) => item.key)
+  if (!sameOrder(normalized, props.providers)) {
+    emit('update:providers', normalized)
   }
 }
 
-function onDragLeave(index: number) {
-  if (dragOverIndex.value === index) dragOverIndex.value = null
-}
-
-function onDrop(targetIndex: number, e: DragEvent) {
-  if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return
-  e.stopPropagation()
-  if (draggingIndex.value === null || draggingIndex.value === targetIndex) return
-  const updated = [...props.providers]
-  const [moved] = updated.splice(draggingIndex.value, 1)
-  updated.splice(targetIndex, 0, moved)
-  emit('update:providers', updated)
-  draggingIndex.value = null
-  dragOverIndex.value = null
+function onDragStart() {
+  isDragging.value = true
 }
 
 function onDragEnd() {
-  draggingIndex.value = null
-  dragOverIndex.value = null
+  isDragging.value = false
+  commitProviders()
 }
 
 function removeProvider(index: number) {
-  const updated = [...props.providers]
+  const updated = [...localProviders.value]
   updated.splice(index, 1)
-  emit('update:providers', updated)
+  localProviders.value = updated
+  commitProviders()
 }
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-1.5 min-h-[26px] items-center">
-    <div
-      v-for="(key, index) in providers"
-      :key="key"
-      :draggable="!disabled"
-      :title="statusFor(key)?.label ?? key"
-      class="flex items-center gap-1 h-6 pl-1.5 pr-1 rounded text-xs font-medium select-none"
-      :style="providerChipStyle(key, !isUsable(key))"
-      :class="[
-        !disabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
-        draggingIndex === index ? 'opacity-30 scale-95' : '',
-        dragOverIndex === index ? 'ring-2 ring-white/60 scale-105' : '',
-      ]"
-      style="transition: transform 0.12s ease"
-      @dragstart="onDragStart(index, $event)"
-      @dragover="onDragOver(index, $event)"
-      @dragleave="onDragLeave(index)"
-      @drop="onDrop(index, $event)"
-      @dragend="onDragEnd"
+  <div class="min-h-[26px]">
+    <VueDraggable
+      v-model="localProviders"
+      item-key="dragId"
+      tag="div"
+      class="flex flex-wrap gap-1.5 min-h-[26px] items-center"
+      :animation="150"
+      :group="{ name: PROVIDER_DND_GROUP, pull: false, put: true }"
+      handle=".provider-chip-handle"
+      ghost-class="opacity-40"
+      chosen-class="provider-chip-chosen"
+      drag-class="scale-95"
+      :disabled="disabled"
+      @start="onDragStart"
+      @add="commitProviders"
+      @end="onDragEnd"
     >
-      <GripVertical v-if="!disabled" :size="10" class="opacity-50 shrink-0" />
-      <span class="opacity-70 tabular-nums leading-none">{{ index + 1 }}</span>
-      <span>{{ PROVIDER_SHORT_LABELS[key] ?? key }}</span>
-      <button
-        v-if="!disabled"
-        class="ml-0.5 h-4 w-4 flex items-center justify-center rounded-sm opacity-60 hover:opacity-100 hover:bg-white/20 transition-opacity"
-        @click.stop="removeProvider(index)"
-        @mousedown.stop
+      <div
+        v-for="(item, index) in localProviders"
+        :key="item.dragId"
+        :title="statusFor(item.key)?.label ?? item.key"
+        class="flex items-center gap-1 h-6 pl-1.5 pr-1 rounded text-xs font-medium select-none transition-transform"
+        :style="providerChipStyle(item.key, !isUsable(item.key))"
+        :class="!disabled ? 'provider-chip-handle cursor-grab active:cursor-grabbing' : 'cursor-default'"
       >
-        <X :size="12" :stroke-width="3" />
-      </button>
-    </div>
+        <GripVertical v-if="!disabled" :size="10" class="opacity-50 shrink-0" />
+        <span class="opacity-70 tabular-nums leading-none">{{ index + 1 }}</span>
+        <span>{{ PROVIDER_SHORT_LABELS[item.key] ?? item.key }}</span>
+        <button
+          v-if="!disabled"
+          class="ml-0.5 h-4 w-4 flex items-center justify-center rounded-sm opacity-60 hover:opacity-100 hover:bg-white/20 transition-opacity"
+          @click.stop="removeProvider(index)"
+          @mousedown.stop
+        >
+          <X :size="12" :stroke-width="3" />
+        </button>
+      </div>
+    </VueDraggable>
 
-    <span v-if="providers.length === 0 && !disabled" class="text-xs text-muted-foreground/60 italic h-6 flex items-center px-1">
+    <span v-if="localProviders.length === 0 && !disabled" class="text-xs text-muted-foreground/60 italic h-6 flex items-center px-1">
       drag a provider here
     </span>
   </div>
 </template>
+
+<style scoped>
+.provider-chip-chosen {
+  outline: 2px solid color-mix(in oklch, var(--primary) 55%, white);
+  outline-offset: 1px;
+}
+</style>

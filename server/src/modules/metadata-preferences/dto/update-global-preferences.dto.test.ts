@@ -104,7 +104,6 @@ describe('UpdateGlobalPreferencesDto', () => {
       options: {
         genres: {
           mode: 'merge',
-          providerScope: 'allConfiguredProviders',
         },
         saveProviderIds: true,
       },
@@ -125,7 +124,6 @@ describe('UpdateGlobalPreferencesDto', () => {
       options: {
         genres: {
           mode: 'invalid',
-          providerScope: 'invalid',
         },
         saveProviderIds: 'yes',
       },

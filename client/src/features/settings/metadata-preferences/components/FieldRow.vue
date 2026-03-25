@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { AlertTriangle, RotateCcw, Settings2 } from 'lucide-vue-next'
-import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@projectx/types'
+import type { FieldPreference, MetadataField, ProviderStatus } from '@projectx/types'
 import MergeStrategyPicker from './MergeStrategyPicker.vue'
 import ProviderChipList from './ProviderChipList.vue'
 import FieldConfigSheet from './FieldConfigSheet.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { Badge } from '@/components/ui/badge'
-
-const RESERVOIR_TYPE = 'application/x-provider-key'
 
 const props = defineProps<{
   field: MetadataField
@@ -45,7 +43,6 @@ const FIELD_LABELS: Record<MetadataField, string> = {
 const label = computed(() => FIELD_LABELS[props.field] ?? props.field)
 const noProviders = computed(() => props.preference.enabled && props.preference.providers.length === 0)
 const sheetOpen = ref(false)
-const isDragOver = ref(false)
 
 function update(patch: Partial<FieldPreference>) {
   emit('change', props.field, { ...props.preference, ...patch })
@@ -54,46 +51,10 @@ function update(patch: Partial<FieldPreference>) {
 function onSheetChange(pref: FieldPreference) {
   emit('change', props.field, pref)
 }
-
-function onDragOver(e: DragEvent) {
-  if (!e.dataTransfer?.types.includes(RESERVOIR_TYPE)) return
-  e.preventDefault()
-  e.dataTransfer.dropEffect = 'copy'
-  isDragOver.value = true
-}
-
-function onDragLeave(e: DragEvent) {
-  const row = e.currentTarget as Element
-  if (e.relatedTarget instanceof Node && row.contains(e.relatedTarget)) return
-  isDragOver.value = false
-}
-
-function onDrop(e: DragEvent) {
-  isDragOver.value = false
-  const key = e.dataTransfer?.getData(RESERVOIR_TYPE) as MetadataProviderKey | undefined
-  if (!key) return
-  if (props.preference.providers.includes(key)) return
-  update({ providers: [...props.preference.providers, key] })
-}
 </script>
 
 <template>
-  <div
-    class="flex flex-col md:flex-row md:items-center gap-4 px-6 py-3.5 transition-colors relative hover:bg-muted/15"
-    :class="isDragOver ? 'bg-primary/5 outline outline-primary/25 -outline-offset-1' : ''"
-    @dragover="onDragOver"
-    @dragleave="onDragLeave"
-    @drop="onDrop"
-  >
-    <!-- Drop hint overlay -->
-    <div v-if="isDragOver" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-      <span
-        class="text-xs text-primary font-bold bg-card border-2 border-primary/30 px-4 py-1.5 rounded-full shadow-lg animate-in zoom-in-95 duration-200"
-      >
-        Drop to add to {{ label }}
-      </span>
-    </div>
-
+  <div class="flex flex-col md:flex-row md:items-center gap-4 px-6 py-3.5 transition-colors relative hover:bg-muted/15">
     <!-- Enable toggle + label -->
     <div class="flex items-center gap-3 md:w-44 shrink-0">
       <div

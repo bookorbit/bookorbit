@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import type { Mocked } from 'vitest';
 import { MetadataProviderKey } from '@projectx/types';
 
@@ -13,8 +12,9 @@ describe('MetadataPreferencesController', () => {
     service = {
       getGlobal: vi.fn(),
       setGlobal: vi.fn(),
+      resetGlobal: vi.fn(),
       getForLibrary: vi.fn(),
-      setLibraryFieldOverride: vi.fn(),
+      setLibraryOverrides: vi.fn(),
       resetLibraryToGlobal: vi.fn(),
     } as unknown as Mocked<MetadataPreferencesService>;
 
@@ -46,6 +46,12 @@ describe('MetadataPreferencesController', () => {
     expect(service.setGlobal).toHaveBeenCalledWith(dto);
   });
 
+  it('delegates global reset to service', async () => {
+    await controller.resetGlobal();
+
+    expect(service.resetGlobal).toHaveBeenCalledTimes(1);
+  });
+
   it('returns library-specific effective preferences', async () => {
     service.getForLibrary.mockResolvedValue({ libraryId: 1, overrides: null, effective: { fields: {} } } as never);
 
@@ -55,39 +61,20 @@ describe('MetadataPreferencesController', () => {
     expect(result.libraryId).toBe(1);
   });
 
-  it('writes a field override when the field key is valid', async () => {
+  it('writes bulk library overrides', async () => {
     const dto = {
-      enabled: true,
-      providers: [MetadataProviderKey.OPEN_LIBRARY],
-      mergeStrategy: 'overwriteIfProvided',
+      overrides: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.OPEN_LIBRARY],
+          mergeStrategy: 'overwriteIfProvided',
+        },
+      },
     };
 
-    await controller.setLibraryFieldOverride(2, 'title', dto as never);
+    await controller.setLibraryOverrides(2, dto as never);
 
-    expect(service.setLibraryFieldOverride).toHaveBeenCalledWith(2, 'title', dto);
-  });
-
-  it('rejects invalid field keys when writing a library override', () => {
-    expect(() =>
-      controller.setLibraryFieldOverride(2, 'not-a-field', {
-        enabled: true,
-        providers: [MetadataProviderKey.GOOGLE],
-        mergeStrategy: 'fillMissing',
-      } as never),
-    ).toThrow(BadRequestException);
-
-    expect(service.setLibraryFieldOverride).not.toHaveBeenCalled();
-  });
-
-  it('clears a valid field override', async () => {
-    await controller.clearLibraryFieldOverride(4, 'authors');
-
-    expect(service.setLibraryFieldOverride).toHaveBeenCalledWith(4, 'authors', null);
-  });
-
-  it('rejects invalid field keys when clearing a library override', () => {
-    expect(() => controller.clearLibraryFieldOverride(4, 'invalid')).toThrow(BadRequestException);
-    expect(service.setLibraryFieldOverride).not.toHaveBeenCalled();
+    expect(service.setLibraryOverrides).toHaveBeenCalledWith(2, dto.overrides);
   });
 
   it('delegates library reset to service', async () => {

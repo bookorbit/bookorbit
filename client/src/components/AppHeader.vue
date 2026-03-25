@@ -53,6 +53,10 @@ function navigateToAccount() {
   router.push({ name: 'settings-account' })
 }
 
+function navigateToSettings() {
+  router.push({ name: 'settings-libraries' })
+}
+
 const uploadOpen = ref(false)
 
 const searchFocused = ref(false)
@@ -512,7 +516,7 @@ function formatBadgeClass(fmt: string): string {
                 variant="ghost"
                 size="icon"
                 class="h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
-                @click="router.push({ name: 'settings-account' })"
+                @click="navigateToSettings"
               >
                 <Settings :size="15" />
               </Button>

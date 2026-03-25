@@ -37,10 +37,11 @@ export class AmazonProvider implements IdentifiableProvider {
     const { enabled, domain, cookie } = await this.providerConfig.getConfig().then((c) => c.amazon);
     if (!enabled) return [];
 
-    const asins = await this.searchAsins(params, domain, cookie);
+    const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider);
+    const asins = await this.searchAsins(params, domain, cookie, maxCandidates);
 
     const results: MetadataCandidate[] = [];
-    for (const asin of asins.slice(0, MAX_RESULTS)) {
+    for (const asin of asins.slice(0, maxCandidates)) {
       if (results.length > 0) await sleep(BETWEEN_REQUESTS_MS);
       const candidate = await this.fetchByAsin(asin, domain, cookie);
       if (candidate) results.push(candidate);
@@ -54,12 +55,12 @@ export class AmazonProvider implements IdentifiableProvider {
     return this.fetchByAsin(providerId, domain, cookie);
   }
 
-  private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string): Promise<string[]> {
+  private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string, limit: number): Promise<string[]> {
     const query = params.isbn?.trim() || [params.title, params.author].filter(Boolean).join(' ');
     if (!query) return [];
     const url = `https://www.${domain}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
     const html = await this.fetchHtml(url, cookie, 'search', query);
-    return html ? extractAsins(html, MAX_RESULTS) : [];
+    return html ? extractAsins(html, limit) : [];
   }
 
   private async fetchByAsin(asin: string, domain: string, cookie: string): Promise<MetadataCandidate | null> {
@@ -123,4 +124,11 @@ export class AmazonProvider implements IdentifiableProvider {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeMaxCandidates(value: number | undefined): number {
+  if (!Number.isFinite(value) || value == null) return MAX_RESULTS;
+  const rounded = Math.floor(value);
+  if (rounded < 1) return 1;
+  return Math.min(rounded, MAX_RESULTS);
 }

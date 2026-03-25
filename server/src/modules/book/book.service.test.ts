@@ -361,6 +361,7 @@ describe('BookService', () => {
             [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
           },
           isAudiobook: false,
+          maxCandidatesPerProvider: 1,
         },
         {
           title: 'Old Title',
@@ -471,6 +472,48 @@ describe('BookService', () => {
           title: 'Resolved',
           googleBooksId: 'g-id',
           openLibraryId: 'ol-id',
+        },
+        user,
+      );
+    });
+
+    it('refreshMetadata persists comic metadata returned by pipeline', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: {
+          title: 'Resolved',
+          comicMetadata: {
+            issueNumber: '12',
+            volumeName: 'Arkham Asylum',
+            pencillers: ['Jock'],
+          },
+        },
+        sources: {},
+        providerIds: {},
+      });
+
+      const updateSpy = vi.spyOn(service, 'updateMetadata').mockResolvedValue({ id: 1 } as never);
+
+      await service.refreshMetadata(1, false, user);
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        {
+          title: 'Resolved',
+          comicMetadata: {
+            issueNumber: '12',
+            volumeName: 'Arkham Asylum',
+            pencillers: ['Jock'],
+          },
         },
         user,
       );

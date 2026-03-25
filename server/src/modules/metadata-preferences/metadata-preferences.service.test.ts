@@ -139,63 +139,36 @@ describe('MetadataPreferencesService', () => {
     expect(result.effective.fields.title.providers).toEqual([MetadataProviderKey.AMAZON]);
   });
 
-  it('clears one library override and stores null when no overrides remain', async () => {
-    db.query.libraries.findFirst.mockResolvedValue({
-      metadataFetchPreferences: {
-        title: {
-          enabled: true,
-          providers: [MetadataProviderKey.GOOGLE],
-          mergeStrategy: 'fillMissing',
-        },
-      },
-    });
+  it('writes library overrides and stores null when overrides object is empty', async () => {
+    db.query.libraries.findFirst.mockResolvedValue({ id: 3 });
 
-    await service.setLibraryFieldOverride(3, 'title', null);
+    await service.setLibraryOverrides(3, {});
 
     expect(db.update).toHaveBeenCalledTimes(1);
     expect(db.__updateChain.set).toHaveBeenCalledWith({ metadataFetchPreferences: null });
     expect(db.__updateChain.where).toHaveBeenCalledTimes(1);
   });
 
-  it('writes or replaces a single library override', async () => {
-    db.query.libraries.findFirst.mockResolvedValue({
-      metadataFetchPreferences: {
-        subtitle: {
-          enabled: false,
-          providers: [MetadataProviderKey.OPEN_LIBRARY],
-          mergeStrategy: 'overwriteIfProvided',
-        },
+  it('writes library overrides when overrides object is non-empty', async () => {
+    db.query.libraries.findFirst.mockResolvedValue({ id: 4 });
+
+    const overrides = {
+      title: {
+        enabled: true,
+        providers: [MetadataProviderKey.GOODREADS],
+        mergeStrategy: 'overwrite',
       },
-    });
+    };
 
-    await service.setLibraryFieldOverride(4, 'title', {
-      enabled: true,
-      providers: [MetadataProviderKey.GOODREADS],
-      mergeStrategy: 'overwrite',
-    });
+    await service.setLibraryOverrides(4, overrides as never);
 
-    expect(db.__updateChain.set).toHaveBeenCalledWith({
-      metadataFetchPreferences: expect.objectContaining({
-        subtitle: expect.any(Object),
-        title: {
-          enabled: true,
-          providers: [MetadataProviderKey.GOODREADS],
-          mergeStrategy: 'overwrite',
-        },
-      }),
-    });
+    expect(db.__updateChain.set).toHaveBeenCalledWith({ metadataFetchPreferences: overrides });
   });
 
-  it('throws NotFoundException when writing an override for a missing library', async () => {
+  it('throws NotFoundException when writing overrides for a missing library', async () => {
     db.query.libraries.findFirst.mockResolvedValue(undefined);
 
-    await expect(
-      service.setLibraryFieldOverride(10, 'title', {
-        enabled: true,
-        providers: [MetadataProviderKey.GOOGLE],
-        mergeStrategy: 'fillMissing',
-      }),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.setLibraryOverrides(10, {})).rejects.toThrow(NotFoundException);
   });
 
   it('resets a library to global preferences and throws when library is missing', async () => {

@@ -146,6 +146,26 @@ describe('AmazonProvider', () => {
       expect(result).toHaveLength(2);
     });
 
+    it('should limit lookup fan-out when maxCandidatesPerProvider is set', async () => {
+      const searchHtml = `
+        <div data-component-type="s-search-result" data-asin="ASIN000001"></div>
+        <div data-component-type="s-search-result" data-asin="ASIN000002"></div>
+        <div data-component-type="s-search-result" data-asin="ASIN000003"></div>
+      `;
+      const bookHtml = `<span id="productTitle">Book</span>`;
+
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(searchHtml) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(bookHtml) });
+
+      const result = await provider.search({ title: 'Test', maxCandidatesPerProvider: 1 });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result).toHaveLength(1);
+      expect(result[0].providerId).toBe('ASIN000001');
+    });
+
     it('should handle fetch failure', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const result = await provider.search({ title: 'Test' });
