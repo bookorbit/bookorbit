@@ -16,6 +16,7 @@ describe('UpdateProviderConfigDto', () => {
       google: { enabled: false },
       amazon: { cookie: 'session-cookie' },
       hardcover: { apiKey: 'hardcover-key' },
+      itunes: { coverResolution: 'standard' },
     });
 
     expect(errors).toHaveLength(0);
@@ -33,6 +34,7 @@ describe('UpdateProviderConfigDto', () => {
       amazon: { domain: 123 },
       hardcover: { apiKey: false },
       openLibrary: { enabled: 'true' },
+      itunes: { coverResolution: 'ultra' },
     });
 
     expect(errors).toEqual(
@@ -41,6 +43,7 @@ describe('UpdateProviderConfigDto', () => {
         expect.objectContaining({ property: 'amazon' }),
         expect.objectContaining({ property: 'hardcover' }),
         expect.objectContaining({ property: 'openLibrary' }),
+        expect.objectContaining({ property: 'itunes' }),
       ]),
     );
   });

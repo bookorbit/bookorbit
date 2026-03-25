@@ -84,6 +84,13 @@ export interface SimpleProviderConfig {
   enabled: boolean;
 }
 
+export type ITunesCoverResolution = "standard" | "high";
+
+export interface ITunesProviderConfig {
+  enabled: boolean;
+  coverResolution: ITunesCoverResolution;
+}
+
 export interface AudibleProviderConfig {
   enabled: boolean;
   domain: string;
@@ -104,7 +111,7 @@ export interface ProviderConfigurations {
   goodreads: SimpleProviderConfig;
   hardcover: HardcoverProviderConfig;
   openLibrary: SimpleProviderConfig;
-  itunes: SimpleProviderConfig;
+  itunes: ITunesProviderConfig;
   audible: AudibleProviderConfig;
   audnexus: AudnexusProviderConfig;
   comicvine: ComicVineProviderConfig;

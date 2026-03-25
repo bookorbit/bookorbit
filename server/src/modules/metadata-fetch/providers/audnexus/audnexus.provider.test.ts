@@ -23,7 +23,7 @@ describe('AudnexusProvider', () => {
     goodreads: { enabled: true },
     hardcover: { enabled: false, apiKey: '' },
     openLibrary: { enabled: true },
-    itunes: { enabled: true },
+    itunes: { enabled: true, coverResolution: 'high' },
     audible: { enabled: false, domain: 'audible.com' },
     audnexus: { enabled: true },
     comicvine: { enabled: false, apiKey: '' },

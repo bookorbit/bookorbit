@@ -98,7 +98,12 @@ const rows: { key: keyof ProviderConfigurations; label: string; hint?: string; f
     fields: [{ key: 'apiKey', label: 'API Key', type: 'password' }],
   },
   { key: 'openLibrary', label: 'Open Library', hint: "The Internet Archive's free book catalog. No setup required.", fields: [] },
-  { key: 'itunes', label: 'iTunes', hint: "Apple's digital book catalog. No setup required.", fields: [] },
+  {
+    key: 'itunes',
+    label: 'iTunes',
+    hint: "Apple's digital book catalog. Choose whether to fetch high or standard resolution covers.",
+    fields: [{ key: 'coverResolution', label: 'Cover Resolution', type: 'select', options: ['high', 'standard'] }],
+  },
   {
     key: 'audible',
     label: 'Audible',

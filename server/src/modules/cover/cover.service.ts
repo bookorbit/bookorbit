@@ -11,9 +11,9 @@ import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover
 import { BookRepository } from '../book/book.repository';
 import { LibraryService } from '../library/library.service';
 import type { RequestUser } from '../../common/types/request-user';
-import { DuckDuckGoCoverProvider } from './providers/duckduckgo-cover-provider';
 import { CoverSearchParams } from './providers/cover-provider';
 import { CoverSearchResult } from '@projectx/types';
+import { CoverProviderRegistry } from './provider-registry';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -29,19 +29,76 @@ export class CoverService {
     private readonly bookRepo: BookRepository,
     private readonly libraryService: LibraryService,
     private readonly config: ConfigService,
-    private readonly ddgProvider: DuckDuckGoCoverProvider,
+    private readonly providerRegistry: CoverProviderRegistry,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
 
-  async searchCovers(params: CoverSearchParams): Promise<CoverSearchResult[]> {
-    // Currently only DDG provider, but could be multiple
-    const results = await this.ddgProvider.search(params);
-    return results.map((r) => ({
-      ...r,
-      // Encode URL for proxying
-      previewUrl: `/api/v1/books/cover/proxy?url=${encodeURIComponent(r.previewUrl)}`,
-    }));
+  async searchCovers(params: CoverSearchParams & { provider?: string }): Promise<CoverSearchResult[]> {
+    const { provider, ...searchParams } = params;
+    const providers = this.providerRegistry.select(provider);
+    const resultsByProvider = new Map<string, CoverSearchResult[]>();
+    for (const coverProvider of providers) {
+      let results: CoverSearchResult[] = [];
+      try {
+        results = await coverProvider.search(searchParams);
+      } catch (error) {
+        this.logger.warn(`Cover provider "${coverProvider.key}" failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      resultsByProvider.set(coverProvider.key, results);
+    }
+
+    const ordered =
+      provider === 'all'
+        ? this.orderAllProviderResults(
+            providers.map((providerEntry) => providerEntry.key),
+            resultsByProvider,
+          )
+        : providers.flatMap((providerEntry) => resultsByProvider.get(providerEntry.key) ?? []);
+
+    return this.dedupeAndProxy(ordered);
+  }
+
+  private orderAllProviderResults(keys: string[], resultsByProvider: Map<string, CoverSearchResult[]>): CoverSearchResult[] {
+    const ddgResults = resultsByProvider.get('duckduckgo') ?? [];
+    const itunesResults = resultsByProvider.get('itunes') ?? [];
+    const interleaved = this.interleaveITunesWithDuckDuckGo(ddgResults, itunesResults, 5);
+
+    const remaining = keys.filter((key) => key !== 'duckduckgo' && key !== 'itunes').flatMap((key) => resultsByProvider.get(key) ?? []);
+
+    return [...interleaved, ...remaining];
+  }
+
+  private interleaveITunesWithDuckDuckGo(ddgResults: CoverSearchResult[], itunesResults: CoverSearchResult[], firstN: number): CoverSearchResult[] {
+    const leadingITunes = itunesResults.slice(0, firstN);
+    const trailingITunes = itunesResults.slice(firstN);
+    const mixed: CoverSearchResult[] = [];
+    const rounds = Math.max(ddgResults.length, leadingITunes.length);
+
+    for (let i = 0; i < rounds; i += 1) {
+      const ddg = ddgResults[i];
+      if (ddg) mixed.push(ddg);
+      const itunes = leadingITunes[i];
+      if (itunes) mixed.push(itunes);
+    }
+
+    mixed.push(...trailingITunes);
+    return mixed;
+  }
+
+  private dedupeAndProxy(results: CoverSearchResult[]): CoverSearchResult[] {
+    const deduped: CoverSearchResult[] = [];
+    const seen = new Set<string>();
+    for (const result of results) {
+      const dedupeKey = `${result.sourceUrl}|${String(result.url)}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      deduped.push({
+        ...result,
+        previewUrl: `/api/v1/books/cover/proxy?url=${encodeURIComponent(result.previewUrl)}`,
+      });
+    }
+    return deduped;
   }
 
   async proxyImage(url: string): Promise<{ buffer: Buffer; contentType: string }> {

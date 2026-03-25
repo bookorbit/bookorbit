@@ -39,7 +39,7 @@ describe('ProviderConfigService', () => {
       goodreads: { enabled: true },
       hardcover: { enabled: false, apiKey: '' },
       openLibrary: { enabled: true },
-      itunes: { enabled: true },
+      itunes: { enabled: true, coverResolution: 'high' },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
@@ -64,6 +64,7 @@ describe('ProviderConfigService', () => {
       value: JSON.stringify({
         google: { apiKey: 'key-1' },
         hardcover: { enabled: true, apiKey: 'hardcover-key' },
+        itunes: { enabled: false },
       }),
     });
 
@@ -72,6 +73,7 @@ describe('ProviderConfigService', () => {
     expect(config.google).toEqual({ enabled: true, apiKey: 'key-1' });
     expect(config.amazon).toEqual({ enabled: true, domain: 'amazon.com', cookie: '' });
     expect(config.hardcover).toEqual({ enabled: true, apiKey: 'hardcover-key' });
+    expect(config.itunes).toEqual({ enabled: false, coverResolution: 'high' });
   });
 
   it('handles malformed provider sections without discarding valid sections', async () => {
@@ -126,11 +128,13 @@ describe('ProviderConfigService', () => {
       google: { enabled: false },
       amazon: { cookie: 'session-cookie' },
       hardcover: { enabled: true, apiKey: 'h-key' },
+      itunes: { coverResolution: 'standard' },
     });
 
     expect(updated.google).toEqual({ enabled: false, apiKey: 'old' });
     expect(updated.amazon).toEqual({ enabled: true, domain: 'amazon.com', cookie: 'session-cookie' });
     expect(updated.hardcover).toEqual({ enabled: true, apiKey: 'h-key' });
+    expect(updated.itunes).toEqual({ enabled: true, coverResolution: 'standard' });
     expect(db.insert).toHaveBeenCalledTimes(1);
     expect(db.__insertChain.values).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -158,7 +162,7 @@ describe('ProviderConfigService', () => {
       goodreads: { enabled: false },
       hardcover: { enabled: true, apiKey: '' },
       openLibrary: { enabled: true },
-      itunes: { enabled: true },
+      itunes: { enabled: true, coverResolution: 'high' },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
@@ -188,7 +192,7 @@ describe('ProviderConfigService', () => {
       goodreads: { enabled: true },
       hardcover: { enabled: true, apiKey: 'h-key' },
       openLibrary: { enabled: true },
-      itunes: { enabled: true },
+      itunes: { enabled: true, coverResolution: 'high' },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },

@@ -23,7 +23,7 @@ export class ITunesProvider implements IdentifiableProvider {
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
-    const { enabled } = await this.providerConfig.getConfig().then((c) => c.itunes);
+    const { enabled, coverResolution } = await this.providerConfig.getConfig().then((c) => c.itunes);
     if (!enabled) return [];
 
     const query = this.buildQuery(params);
@@ -46,7 +46,17 @@ export class ITunesProvider implements IdentifiableProvider {
         return [];
       }
       const body = (await res.json()) as ITunesResponse;
-      const results = body.results.map(mapITunesResult);
+      const results = body.results
+        .map((r) => {
+          try {
+            return mapITunesResult(r, coverResolution);
+          } catch (err) {
+            this.logger.warn(`[itunes] skipping result due to error: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
+          }
+        })
+        .filter((r): r is MetadataCandidate => r !== null);
+
       this.logger.log(
         `[itunes] fetch.end op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
       );
@@ -64,7 +74,7 @@ export class ITunesProvider implements IdentifiableProvider {
   }
 
   async lookupById(providerId: string): Promise<MetadataCandidate | null> {
-    const { enabled } = await this.providerConfig.getConfig().then((c) => c.itunes);
+    const { enabled, coverResolution } = await this.providerConfig.getConfig().then((c) => c.itunes);
     if (!enabled) return null;
 
     const url = new URL(LOOKUP_URL);
@@ -82,7 +92,14 @@ export class ITunesProvider implements IdentifiableProvider {
         return null;
       }
       const body = (await res.json()) as ITunesResponse;
-      const result = body.results.length > 0 ? mapITunesResult(body.results[0]) : null;
+      let result: MetadataCandidate | null = null;
+      if (body.results.length > 0) {
+        try {
+          result = mapITunesResult(body.results[0], coverResolution);
+        } catch (err) {
+          this.logger.warn(`[itunes] failed to map lookup result providerId="${providerId}": ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
       this.logger.log(
         `[itunes] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
       );

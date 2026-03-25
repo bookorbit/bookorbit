@@ -16,11 +16,17 @@ export class CoverController {
 
   @Get('cover/search')
   @RequirePermission(Permission.LibraryEditMetadata)
-  async searchCovers(@Query('title') title: string, @Query('author') author?: string, @Query('isAudiobook') isAudiobook?: string) {
+  async searchCovers(
+    @Query('title') title: string,
+    @Query('author') author?: string,
+    @Query('isAudiobook') isAudiobook?: string,
+    @Query('provider') provider?: string,
+  ) {
     return this.coverService.searchCovers({
       title,
       author,
       isAudiobook: isAudiobook === 'true',
+      provider,
     });
   }
 

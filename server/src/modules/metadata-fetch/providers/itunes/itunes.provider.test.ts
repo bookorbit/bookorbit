@@ -14,7 +14,7 @@ describe('ITunesProvider', () => {
     goodreads: { enabled: true },
     hardcover: { enabled: false, apiKey: '' },
     openLibrary: { enabled: true },
-    itunes: { enabled: true },
+    itunes: { enabled: true, coverResolution: 'high' },
     audible: { enabled: false, domain: 'com' },
     audnexus: { enabled: false },
     comicvine: { enabled: false, apiKey: '' },
@@ -45,7 +45,7 @@ describe('ITunesProvider', () => {
     it('should return empty array if disabled', async () => {
       vi.spyOn(providerConfig, 'getConfig').mockResolvedValue({
         ...mockConfig,
-        itunes: { enabled: false },
+        itunes: { enabled: false, coverResolution: 'high' },
       });
 
       const result = await provider.search({ title: 'Test' });
@@ -73,7 +73,73 @@ describe('ITunesProvider', () => {
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('Test Book');
       expect(result[0].providerId).toBe('123');
-      expect(result[0].coverUrl).toBe('https://example.com/1000x1000bb.jpg');
+      expect(result[0].coverUrl).toBe('https://example.com/10000x10000bb.jpg');
+    });
+
+    it('should map cover to standard resolution when configured', async () => {
+      vi.spyOn(providerConfig, 'getConfig').mockResolvedValue({
+        ...mockConfig,
+        itunes: { enabled: true, coverResolution: 'standard' },
+      });
+      const mockResult = {
+        trackId: 123,
+        trackName: 'Test Book',
+        artistName: 'Author',
+        kind: 'ebook',
+        artworkUrl100: 'https://example.com/100x100bb.jpg',
+      };
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ results: [mockResult] }),
+      });
+
+      const result = await provider.search({ title: 'Test Book' });
+      expect(result[0].coverUrl).toBe('https://example.com/600x600bb.jpg');
+    });
+
+    it('should handle audiobook results with collectionId', async () => {
+      const mockResult = {
+        collectionId: 456,
+        collectionName: 'Audiobook Title',
+        artistName: 'Author',
+        kind: 'audiobook',
+      };
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ results: [mockResult] }),
+      });
+
+      const result = await provider.search({ title: 'Audiobook', isAudiobook: true });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].providerId).toBe('456');
+      expect(result[0].title).toBe('Audiobook Title');
+    });
+
+    it('should skip invalid results', async () => {
+      const mockResults = [
+        {
+          trackId: 123,
+          trackName: 'Valid',
+          artistName: 'Author',
+          kind: 'ebook',
+        },
+        {
+          // missing ID
+          trackName: 'Invalid',
+          artistName: 'Author',
+          kind: 'ebook',
+        },
+      ];
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ results: mockResults }),
+      });
+
+      const result = await provider.search({ title: 'Test' });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('Valid');
     });
 
     it('should handle search with ISBN', async () => {

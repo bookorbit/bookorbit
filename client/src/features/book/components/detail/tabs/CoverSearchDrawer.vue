@@ -16,6 +16,7 @@ const emit = defineEmits<{
 
 const searchTitle = ref(props.initialTitle)
 const searchAuthor = ref(props.initialAuthor)
+const searchProvider = ref<'duckduckgo' | 'itunes' | 'all'>('duckduckgo')
 const isSearching = ref(false)
 const searchResults = ref<CoverSearchResult[]>([])
 const hasSearched = ref(false)
@@ -31,6 +32,7 @@ async function performSearch() {
       title: searchTitle.value.trim(),
       author: searchAuthor.value.trim(),
       isAudiobook: String(props.isAudiobook),
+      provider: searchProvider.value,
     })
     const res = await fetch(`/api/v1/books/cover/search?${params}`)
     if (!res.ok) throw new Error('Search failed')
@@ -49,7 +51,6 @@ function handleSelect(url: string) {
 
 onMounted(() => {
   nextTick(() => titleInput.value?.focus())
-  if (searchTitle.value) performSearch()
 })
 </script>
 
@@ -74,7 +75,7 @@ onMounted(() => {
 
       <!-- Search Bar (Sticky) -->
       <div class="p-4 bg-muted/30 border-b space-y-3">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div class="space-y-1">
             <label class="text-[10px] font-bold text-muted-foreground ml-1 uppercase">Title</label>
             <input
@@ -93,6 +94,17 @@ onMounted(() => {
               placeholder="e.g. Nick Harkaway"
               @keyup.enter="performSearch"
             />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-muted-foreground ml-1 uppercase">Source</label>
+            <select
+              v-model="searchProvider"
+              class="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+            >
+              <option value="duckduckgo">DuckDuckGo</option>
+              <option value="itunes">iTunes</option>
+              <option value="all">All Sources</option>
+            </select>
           </div>
         </div>
         <button

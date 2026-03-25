@@ -16,7 +16,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   goodreads: { enabled: true },
   hardcover: { enabled: false, apiKey: '' },
   openLibrary: { enabled: true },
-  itunes: { enabled: true },
+  itunes: { enabled: true, coverResolution: 'high' },
   audible: { enabled: false, domain: 'com' },
   audnexus: { enabled: false },
   comicvine: { enabled: false, apiKey: '' },
@@ -58,6 +58,14 @@ function mergeSimpleConfig<T extends SimpleProviderConfig>(base: T, value: unkno
   return {
     enabled: asBoolean(next.enabled, base.enabled),
   } as T;
+}
+
+function mergeITunesConfig(base: ProviderConfigurations['itunes'], value: unknown): ProviderConfigurations['itunes'] {
+  const next = asObject(value);
+  return {
+    enabled: asBoolean(next.enabled, base.enabled),
+    coverResolution: next.coverResolution === 'standard' || next.coverResolution === 'high' ? next.coverResolution : base.coverResolution,
+  };
 }
 
 function mergeHardcoverConfig(base: ProviderConfigurations['hardcover'], value: unknown): ProviderConfigurations['hardcover'] {
@@ -128,7 +136,7 @@ export class ProviderConfigService {
         goodreads: mergeSimpleConfig(defaults.goodreads, stored.goodreads),
         hardcover: mergeHardcoverConfig(defaults.hardcover, stored.hardcover),
         openLibrary: mergeSimpleConfig(defaults.openLibrary, stored.openLibrary),
-        itunes: mergeSimpleConfig(defaults.itunes, stored.itunes),
+        itunes: mergeITunesConfig(defaults.itunes, stored.itunes),
         audible: mergeAudibleConfig(defaults.audible, stored.audible),
         audnexus: mergeSimpleConfig(defaults.audnexus, stored.audnexus),
         comicvine: mergeComicVineConfig(defaults.comicvine, stored.comicvine),
@@ -146,7 +154,7 @@ export class ProviderConfigService {
       goodreads: mergeSimpleConfig(current.goodreads, patch.goodreads),
       hardcover: mergeHardcoverConfig(current.hardcover, patch.hardcover),
       openLibrary: mergeSimpleConfig(current.openLibrary, patch.openLibrary),
-      itunes: mergeSimpleConfig(current.itunes, patch.itunes),
+      itunes: mergeITunesConfig(current.itunes, patch.itunes),
       audible: mergeAudibleConfig(current.audible, patch.audible),
       audnexus: mergeSimpleConfig(current.audnexus, patch.audnexus),
       comicvine: mergeComicVineConfig(current.comicvine, patch.comicvine),

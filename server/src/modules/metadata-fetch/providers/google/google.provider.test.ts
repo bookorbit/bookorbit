@@ -14,7 +14,7 @@ describe('GoogleProvider', () => {
     goodreads: { enabled: true },
     hardcover: { enabled: false, apiKey: '' },
     openLibrary: { enabled: true },
-    itunes: { enabled: true },
+    itunes: { enabled: true, coverResolution: 'high' },
     audible: { enabled: false, domain: 'com' },
     audnexus: { enabled: false },
     comicvine: { enabled: false, apiKey: '' },

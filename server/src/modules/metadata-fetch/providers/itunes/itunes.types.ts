@@ -1,13 +1,16 @@
 export interface ITunesResult {
-  trackId: number;
-  trackName: string;
-  artistName: string;
+  trackId?: number;
+  collectionId?: number;
+  trackName?: string;
+  collectionName?: string;
+  artistName?: string;
   description?: string;
   releaseDate?: string;
   genres?: string[];
   artworkUrl100?: string;
   kind: 'ebook' | 'audiobook';
   trackViewUrl?: string;
+  collectionViewUrl?: string;
   averageUserRating?: number;
   userRatingCount?: number;
   // Additional fields from documentation

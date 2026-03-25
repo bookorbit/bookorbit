@@ -29,8 +29,21 @@ describe('itunes.mapper', () => {
     expect(mapped.publishedYear).toBe(1937);
     expect(mapped.language).toBe('EN');
     expect(mapped.genres).toEqual(['Fantasy', 'Adventure']);
-    expect(mapped.coverUrl).toBe('https://is1-ssl.mzstatic.com/image/thumb/Publication/v4/8a/d8/61/8ad861cd/9780547951973.jpg/1000x1000bb.jpg');
+    expect(mapped.coverUrl).toBe('https://is1-ssl.mzstatic.com/image/thumb/Publication/v4/8a/d8/61/8ad861cd/9780547951973.jpg/10000x10000bb.jpg');
     expect(mapped.sourceUrl).toBe('https://books.apple.com/us/book/the-hobbit/id12345');
+  });
+
+  it('should map standard resolution cover when explicitly requested', () => {
+    const result: ITunesResult = {
+      trackId: 12345,
+      trackName: 'The Hobbit',
+      artistName: 'J.R.R. Tolkien',
+      artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Publication/v4/8a/d8/61/8ad861cd/9780547951973.jpg/100x100bb.jpg',
+      kind: 'ebook',
+    };
+
+    const mapped = mapITunesResult(result, 'standard');
+    expect(mapped.coverUrl).toBe('https://is1-ssl.mzstatic.com/image/thumb/Publication/v4/8a/d8/61/8ad861cd/9780547951973.jpg/600x600bb.jpg');
   });
 
   it('should handle missing fields', () => {
@@ -61,5 +74,35 @@ describe('itunes.mapper', () => {
 
     const mapped = mapITunesResult(result);
     expect(mapped.coverUrl).toBe('https://example.com/some-other-image.jpg');
+  });
+
+  it('should map an audiobook iTunes result with collectionId and collectionName correctly', () => {
+    const result: ITunesResult = {
+      collectionId: 98765,
+      collectionName: 'The Fellowship of the Ring',
+      artistName: 'J.R.R. Tolkien',
+      description: 'The first part of the Lord of the Rings',
+      releaseDate: '1954-07-29T08:00:00Z',
+      genres: ['Fantasy'],
+      artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Audiobook/v4/a/b/c/d/e/100x100bb.jpg',
+      kind: 'audiobook',
+      collectionViewUrl: 'https://books.apple.com/us/audiobook/the-fellowship/id98765',
+    };
+
+    const mapped = mapITunesResult(result);
+
+    expect(mapped.providerId).toBe('98765');
+    expect(mapped.title).toBe('The Fellowship of the Ring');
+    expect(mapped.sourceUrl).toBe('https://books.apple.com/us/audiobook/the-fellowship/id98765');
+  });
+
+  it('should throw error if both trackId and collectionId are missing', () => {
+    const result: any = {
+      trackName: 'Test',
+      artistName: 'Test',
+      kind: 'ebook',
+    };
+
+    expect(() => mapITunesResult(result)).toThrow('iTunes result missing both trackId and collectionId');
   });
 });

@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GoogleProviderConfigDto {
@@ -14,6 +14,13 @@ export class AmazonProviderConfigDto {
 
 export class SimpleProviderConfigDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
+}
+
+const ITUNES_COVER_RESOLUTIONS = ['standard', 'high'] as const;
+
+export class ITunesProviderConfigDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsIn(ITUNES_COVER_RESOLUTIONS) coverResolution?: (typeof ITUNES_COVER_RESOLUTIONS)[number];
 }
 
 export class HardcoverProviderConfigDto {
@@ -37,7 +44,7 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) goodreads?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => HardcoverProviderConfigDto) hardcover?: HardcoverProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) openLibrary?: SimpleProviderConfigDto;
-  @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) itunes?: SimpleProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => ITunesProviderConfigDto) itunes?: ITunesProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => AudibleProviderConfigDto) audible?: AudibleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) audnexus?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => ComicVineProviderConfigDto) comicvine?: ComicVineProviderConfigDto;
