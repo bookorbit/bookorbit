@@ -207,7 +207,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         .calculateAndSave(bookId)
         .catch((err: Error) => this.logger.warn(`book-metadata-fetch score recalc failed for book ${bookId}: ${err.message}`));
 
-      this.logger.debug(`book-metadata-fetch.done bookId=${bookId}`);
+      this.logger.debug(`[book.metadata_fetch] [end] bookId=${bookId} - metadata fetch completed`);
       await this.queueRepo.markDone(bookId);
       this.session.sessionDone++;
       this.session.currentItemName = null;
@@ -215,7 +215,9 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const httpStatus = extractHttpStatus(error);
-      this.logger.warn(`book-metadata-fetch.failed bookId=${bookId} status=${httpStatus ?? 'none'} message=${message.slice(0, 200)}`);
+      this.logger.warn(
+        `[book.metadata_fetch] [fail] bookId=${bookId} status=${httpStatus ?? 'none'} error="${message.slice(0, 200)}" - metadata fetch failed`,
+      );
       await this.queueRepo.markFailed(bookId, message, httpStatus);
       this.session.currentItemName = null;
       await this.emitStatus();

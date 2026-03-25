@@ -34,29 +34,29 @@ export class AudibleProvider implements IdentifiableProvider {
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
     const requestUrl = url.toString();
     const startedAt = Date.now();
-    this.logger.log(`[audible] fetch.start op=search query="${query}"`);
+    this.logger.log(`[audible] [start] op=search query="${query}"`);
 
     try {
       const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[audible] fetch.fail op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[audible] [fail] op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return [];
       }
       const body = (await res.json()) as AudibleSearchResponse;
       const results = (body.products ?? []).map(mapAudibleProduct);
       this.logger.log(
-        `[audible] fetch.end op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
+        `[audible] [end] op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
       );
       return results;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[audible] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[audible] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.error(
-        `[audible] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[audible] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return [];
     }
@@ -71,29 +71,29 @@ export class AudibleProvider implements IdentifiableProvider {
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
     const requestUrl = url.toString();
     const startedAt = Date.now();
-    this.logger.log(`[audible] fetch.start op=lookup providerId="${providerId}"`);
+    this.logger.log(`[audible] [start] op=lookup providerId="${providerId}"`);
 
     try {
       const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[audible] fetch.fail op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[audible] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
       const body = (await res.json()) as { product: AudibleSearchResponse['products'][0] };
       const result = body.product ? mapAudibleProduct(body.product) : null;
       this.logger.log(
-        `[audible] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
+        `[audible] [end] op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
       );
       return result;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[audible] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[audible] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.error(
-        `[audible] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[audible] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return null;
     }

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { access as fsAccess } from 'fs/promises';
 import { basename, dirname, extname, join } from 'path';
 import { Readable } from 'stream';
@@ -25,6 +25,8 @@ type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class UploadService {
+  private readonly logger = new Logger(UploadService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly appSettings: AppSettingsService,
@@ -35,6 +37,7 @@ export class UploadService {
   ) {}
 
   async upload(libraryId: number, folderId: number | undefined, rawFilename: string, fileStream: Readable, user: RequestUser): Promise<UploadResult> {
+    this.logger.log(`[upload.request] [start] user=${user.id} file="${rawFilename}"`);
     const isSuperuser = user.isSuperuser;
 
     const library = await this.findLibraryOrFail(libraryId);
@@ -63,8 +66,11 @@ export class UploadService {
 
       this.processor.extractMetadataAsync(bookId, absolutePath, format);
 
+      this.logger.log(`[upload.request] [success] user=${user.id} book=${bookId} format=${format} size=${sizeBytes}`);
       return { bookId, filename: basename(absolutePath), format, sizeBytes };
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[upload.request] [fail] user=${user.id} file="${rawFilename}" error="${errorMessage}"`);
       await this.storage.cleanup(tempPath);
       throw err;
     }

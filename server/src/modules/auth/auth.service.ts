@@ -95,6 +95,8 @@ export class AuthService {
         })
         .returning({ id: schema.users.id, username: schema.users.username, name: schema.users.name });
 
+      this.logger.log(`[auth.register] [success] user=${user.id} username=${user.username}`);
+
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: user.id,
         actorUsername: user.username,
@@ -152,9 +154,11 @@ export class AuthService {
         })
         .returning({
           id: schema.users.id,
+          username: schema.users.username,
           tokenVersion: schema.users.tokenVersion,
         });
 
+      this.logger.log(`[auth.setup] [success] admin=${user.username}`);
       return user;
     });
 
@@ -164,6 +168,7 @@ export class AuthService {
   async login(dto: LoginDto, reply: FastifyReply, ip?: string) {
     const user = await this.userService.findByUsername(dto.username);
     if (!user || !user.active || !(await compare(dto.password, user.passwordHash))) {
+      this.logger.warn(`[auth.login] [fail] user=${dto.username} ip=${ip ?? 'unknown'} reason="Invalid credentials"`);
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: null,
         actorUsername: 'system',
@@ -179,6 +184,8 @@ export class AuthService {
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(user.id, user.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
+
+    this.logger.log(`[auth.login] [success] user=${user.id} username=${user.username}`);
 
     this.auditEvents.emit(AUDIT_EVENT, {
       userId: user.id,
@@ -225,16 +232,21 @@ export class AuthService {
       where: eq(schema.refreshTokens.tokenHash, tokenHash),
     });
 
-    if (!row) throw new UnauthorizedException();
+    if (!row) {
+      this.logger.warn(`[auth.refresh] [fail] reason="Token not found"`);
+      throw new UnauthorizedException();
+    }
 
     // Reuse of a revoked token → theft signal, revoke all user sessions
     if (row.revokedAt) {
+      this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Token revoked - reuse attempt"`);
       await this.db.delete(schema.refreshTokens).where(eq(schema.refreshTokens.userId, row.userId));
       this.clearRefreshCookie(reply);
       throw new UnauthorizedException();
     }
 
     if (row.expiresAt < new Date()) {
+      this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Token expired"`);
       this.clearRefreshCookie(reply);
       throw new UnauthorizedException();
     }
@@ -245,6 +257,7 @@ export class AuthService {
     const userForToken = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
     if (!userForToken) throw new UnauthorizedException();
     if (!userForToken.active) {
+      this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Account disabled"`);
       this.clearRefreshCookie(reply);
       this.clearAccessCookie(reply);
       throw new UnauthorizedException('Account disabled');
@@ -266,6 +279,7 @@ export class AuthService {
       const row = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, tokenHash) });
       if (row) {
         userId = row.userId;
+        this.logger.log(`[auth.logout] [success] user=${row.userId}`);
         await Promise.all([
           this.userService.incrementTokenVersion(row.userId),
           this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id)),

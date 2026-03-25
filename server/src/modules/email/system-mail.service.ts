@@ -56,8 +56,10 @@ export class SystemMailService {
         text: this.buildResetText(name, resetUrl),
         html: this.buildResetHtml(name, resetUrl),
       });
+      this.logger.log(`[system-mail.password-reset] [success] to=${to}`);
     } catch (err) {
-      this.logger.error('Failed to send password reset email', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[system-mail.password-reset] [fail] to=${to} error="${errorMessage}"`);
     }
   }
 

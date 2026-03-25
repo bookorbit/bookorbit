@@ -31,7 +31,9 @@ export class FileEventProcessorService {
 
     if (!shouldReevaluate) {
       await this.scannerRepo.deleteBookFile(file.id);
-      this.logger.log(`Book ${file.bookId} non-selected file removed: ${absolutePath}`);
+      this.logger.log(
+        `[scanner.file_event.unlink] [end] libraryId=${libraryId} bookId=${file.bookId} path="${absolutePath.replace(/"/g, '\\"')}" action=remove_non_selected - non-selected file removed`,
+      );
       return { type: 'noop' };
     }
 
@@ -44,7 +46,9 @@ export class FileEventProcessorService {
       // If the file was truly deleted (not renamed), the next full scan will prune it.
       await this.scannerRepo.updateBookPrimaryFile(file.bookId, null);
       await this.scannerRepo.markBooksAsMissing([file.bookId]);
-      this.logger.log(`Book ${file.bookId} marked missing — selected content file removed: ${absolutePath}`);
+      this.logger.log(
+        `[scanner.file_event.unlink] [end] libraryId=${libraryId} bookId=${file.bookId} path="${absolutePath.replace(/"/g, '\\"')}" action=mark_missing_selected_removed - selected content file removed`,
+      );
       return { type: 'book-missing', libraryId, bookIds: [file.bookId] };
     }
 
@@ -55,7 +59,9 @@ export class FileEventProcessorService {
 
     const winner = this.pickPrimaryFile(remainingContent, formatPriority);
     await this.scannerRepo.updateBookPrimaryFile(file.bookId, winner?.id ?? null);
-    this.logger.log(`Book ${file.bookId} selected ${winner?.format ?? 'unknown'} as primary — ${absolutePath} removed`);
+    this.logger.log(
+      `[scanner.file_event.unlink] [end] libraryId=${libraryId} bookId=${file.bookId} path="${absolutePath.replace(/"/g, '\\"')}" action=reselect_primary format=${winner?.format ?? 'unknown'} - primary file re-selected`,
+    );
     return { type: 'book-restored', libraryId, bookIds: [file.bookId] };
   }
 
@@ -68,7 +74,9 @@ export class FileEventProcessorService {
 
     await this.scannerRepo.markBooksAsMissing(bookIds);
 
-    this.logger.log(`${bookIds.length} book(s) marked missing — folder removed: ${absolutePath}`);
+    this.logger.log(
+      `[scanner.file_event.unlink_dir] [end] libraryId=${libraryId} path="${absolutePath.replace(/"/g, '\\"')}" missingCount=${bookIds.length} - books marked missing for removed folder`,
+    );
     return { type: 'book-missing', libraryId, bookIds };
   }
 
@@ -91,7 +99,9 @@ export class FileEventProcessorService {
       await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
       await this.refreshPrimaryFile(book.id, book.libraryId);
       await this.scannerRepo.markBooksAsPresent([book.id]);
-      this.logger.log(`Book ${book.id} restored — file returned: ${absolutePath}`);
+      this.logger.log(
+        `[scanner.file_event.create] [end] libraryId=${book.libraryId} bookId=${book.id} path="${absolutePath.replace(/"/g, '\\"')}" action=restore_existing_file - book restored`,
+      );
       return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
     }
 
@@ -112,7 +122,9 @@ export class FileEventProcessorService {
 
       await this.refreshPrimaryFile(book.id, book.libraryId);
       await this.scannerRepo.markBooksAsPresent([book.id]);
-      this.logger.log(`Book ${book.id} restored — file returned: ${absolutePath}`);
+      this.logger.log(
+        `[scanner.file_event.create] [end] libraryId=${book.libraryId} bookId=${book.id} path="${absolutePath.replace(/"/g, '\\"')}" action=restore_new_file_row - book restored`,
+      );
       return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
     }
 
@@ -120,17 +132,37 @@ export class FileEventProcessorService {
   }
 
   async reconcileMissingBooks(libraryIds: number[]): Promise<FileEventResult[]> {
-    const missing = await this.scannerRepo.findMissingBooksForLibraries(libraryIds);
-    if (missing.length === 0) return [];
+    const event = 'scanner.file_event.reconcile_missing';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryCount=${libraryIds.length} - missing book reconcile started`);
+    try {
+      const missing = await this.scannerRepo.findMissingBooksForLibraries(libraryIds);
+      if (missing.length === 0) {
+        this.logger.log(
+          `[${event}] [end] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} candidateCount=0 restoredCount=0 - missing book reconcile completed`,
+        );
+        return [];
+      }
 
-    const results: FileEventResult[] = [];
+      const results: FileEventResult[] = [];
 
-    for (const book of missing) {
-      const result = await this.tryRestoreBook(book as { id: number; libraryId: number; libraryFolderId: number; folderPath: string });
-      if (result.type !== 'noop') results.push(result);
+      for (const book of missing) {
+        const result = await this.tryRestoreBook(book as { id: number; libraryId: number; libraryFolderId: number; folderPath: string });
+        if (result.type !== 'noop') results.push(result);
+      }
+
+      this.logger.log(
+        `[${event}] [end] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} candidateCount=${missing.length} restoredCount=${results.length} - missing book reconcile completed`,
+      );
+      return results;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - missing book reconcile failed`,
+      );
+      throw err;
     }
-
-    return results;
   }
 
   private async tryRestoreBook(book: { id: number; libraryId: number; libraryFolderId: number; folderPath: string }): Promise<FileEventResult> {
@@ -157,7 +189,9 @@ export class FileEventProcessorService {
 
     await this.scannerRepo.updateBookPrimaryFile(book.id, winner?.id ?? null);
     await this.scannerRepo.markBooksAsPresent([book.id]);
-    this.logger.log(`Book ${book.id} restored — file returned: ${winner?.absolutePath ?? existingContent[0].absolutePath}`);
+    this.logger.log(
+      `[scanner.file_event.restore_missing] [end] libraryId=${book.libraryId} bookId=${book.id} path="${(winner?.absolutePath ?? existingContent[0].absolutePath).replace(/"/g, '\\"')}" - missing book restored`,
+    );
     return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
   }
 
@@ -179,7 +213,9 @@ export class FileEventProcessorService {
     }
 
     await this.scannerRepo.markBooksAsPresent([file.bookId]);
-    this.logger.log(`Book ${file.bookId} moved: ${file.absolutePath} → ${newAbsolutePath}`);
+    this.logger.log(
+      `[scanner.file_event.move] [end] libraryId=${libraryId} bookId=${file.bookId} from="${file.absolutePath.replace(/"/g, '\\"')}" to="${newAbsolutePath.replace(/"/g, '\\"')}" - moved file detected`,
+    );
     return { type: 'book-moved', libraryId, bookIds: [file.bookId] };
   }
 
@@ -209,7 +245,9 @@ export class FileEventProcessorService {
     }
 
     if (movedBookIds.length === 0 || !libraryId) return { type: 'noop' };
-    this.logger.log(`${movedBookIds.length} book(s) moved: folder appeared: ${dirPath}`);
+    this.logger.log(
+      `[scanner.file_event.move_dir] [end] libraryId=${libraryId} dirPath="${dirPath.replace(/"/g, '\\"')}" movedCount=${movedBookIds.length} - moved books detected in directory`,
+    );
     return { type: 'book-moved', libraryId, bookIds: movedBookIds };
   }
 
@@ -242,7 +280,9 @@ export class FileEventProcessorService {
       }
 
       if (restoredIds.length > 0) {
-        this.logger.log(`${restoredIds.length} book(s) restored: folder returned: ${absolutePath}`);
+        this.logger.log(
+          `[scanner.file_event.create_dir] [end] libraryId=${libraryId} path="${absolutePath.replace(/"/g, '\\"')}" restoredCount=${restoredIds.length} - books restored for returned folder`,
+        );
         return { type: 'book-restored', libraryId, bookIds: restoredIds };
       }
     }

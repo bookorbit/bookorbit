@@ -93,29 +93,29 @@ export class AmazonProvider implements IdentifiableProvider {
   private async fetchHtml(url: string, cookie = '', op: 'search' | 'lookup' = 'search', query?: string, providerId?: string): Promise<string | null> {
     const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
     const startedAt = Date.now();
-    this.logger.log(`[amazon] fetch.start op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
+    this.logger.log(`[amazon] [start] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
     try {
       const res = await fetchWithThrottle(url, { headers, signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[amazon] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[amazon] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
       const html = await res.text();
       this.logger.log(
-        `[amazon] fetch.end op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
+        `[amazon] [end] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
       );
       return html;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.logger.warn(
-          `[amazon] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
+          `[amazon] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
         );
         throw err;
       }
       this.logger.warn(
-        `[amazon] fetch.fail op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[amazon] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return null;
     }

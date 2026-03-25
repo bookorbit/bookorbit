@@ -35,13 +35,13 @@ export class ITunesProvider implements IdentifiableProvider {
     url.searchParams.set('limit', '10');
     const requestUrl = url.toString();
     const startedAt = Date.now();
-    this.logger.log(`[itunes] fetch.start op=search query="${query}"`);
+    this.logger.log(`[itunes] [start] op=search query="${query}"`);
 
     try {
       const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[itunes] fetch.fail op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[itunes] [fail] op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return [];
       }
@@ -58,16 +58,16 @@ export class ITunesProvider implements IdentifiableProvider {
         .filter((r): r is MetadataCandidate => r !== null);
 
       this.logger.log(
-        `[itunes] fetch.end op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
+        `[itunes] [end] op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
       );
       return results;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[itunes] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[itunes] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.error(
-        `[itunes] fetch.fail op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[itunes] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return [];
     }
@@ -81,13 +81,13 @@ export class ITunesProvider implements IdentifiableProvider {
     url.searchParams.set('id', providerId);
     const requestUrl = url.toString();
     const startedAt = Date.now();
-    this.logger.log(`[itunes] fetch.start op=lookup providerId="${providerId}"`);
+    this.logger.log(`[itunes] [start] op=lookup providerId="${providerId}"`);
 
     try {
       const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[itunes] fetch.fail op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[itunes] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
@@ -101,16 +101,16 @@ export class ITunesProvider implements IdentifiableProvider {
         }
       }
       this.logger.log(
-        `[itunes] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
+        `[itunes] [end] op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
       );
       return result;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[itunes] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[itunes] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.error(
-        `[itunes] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[itunes] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return null;
     }

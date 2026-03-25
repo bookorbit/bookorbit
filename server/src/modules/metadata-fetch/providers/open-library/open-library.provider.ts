@@ -33,24 +33,24 @@ export class OpenLibraryProvider implements IdentifiableProvider {
 
     const url = `${BASE_URL}/search.json?${query}`;
     const startedAt = Date.now();
-    this.logger.log(`[open-library] fetch.start op=search`);
+    this.logger.log(`[open-library] [start] op=search`);
     try {
       const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
-        this.logger.warn(`[open-library] fetch.fail op=search status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`);
+        this.logger.warn(`[open-library] [fail] op=search status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`);
         return [];
       }
 
       const body = (await res.json()) as OpenLibrarySearchResponse;
       const items = body.docs.map(mapOpenLibraryDoc);
-      this.logger.log(`[open-library] fetch.end op=search status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`);
+      this.logger.log(`[open-library] [end] op=search status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`);
       return items;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[open-library] fetch.fail op=search durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[open-library] [fail] op=search durationMs=${Date.now() - startedAt} message="throttled"`);
       } else {
         this.logger.warn(
-          `[open-library] fetch.fail op=search durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+          `[open-library] [fail] op=search durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
         );
       }
       throw err;
@@ -62,12 +62,12 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     if (!enabled) return null;
     const url = `${BASE_URL}/works/${providerId}.json`;
     const startedAt = Date.now();
-    this.logger.log(`[open-library] fetch.start op=lookup providerId="${providerId}"`);
+    this.logger.log(`[open-library] [start] op=lookup providerId="${providerId}"`);
     try {
       const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[open-library] fetch.fail op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[open-library] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
@@ -76,7 +76,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       const mapped = mapOpenLibraryWork(work);
       if (mapped.genres?.length) {
         this.logger.log(
-          `[open-library] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=true durationMs=${Date.now() - startedAt}`,
+          `[open-library] [end] op=lookup providerId="${providerId}" status=${res.status} found=true durationMs=${Date.now() - startedAt}`,
         );
         return mapped;
       }
@@ -84,15 +84,15 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       const searchGenres = await this.lookupGenresByWorkId(providerId);
       const result = searchGenres?.length ? { ...mapped, genres: searchGenres } : mapped;
       this.logger.log(
-        `[open-library] fetch.end op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
+        `[open-library] [end] op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
       );
       return result;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[open-library] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[open-library] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
       } else {
         this.logger.warn(
-          `[open-library] fetch.fail op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+          `[open-library] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
         );
       }
       throw err;
@@ -120,12 +120,12 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     });
     const url = `${BASE_URL}/search.json?${query}`;
     const startedAt = Date.now();
-    this.logger.log(`[open-library] fetch.start op=lookup-genres providerId="${providerId}"`);
+    this.logger.log(`[open-library] [start] op=lookup-genres providerId="${providerId}"`);
     try {
       const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         this.logger.warn(
-          `[open-library] fetch.fail op=lookup-genres providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[open-library] [fail] op=lookup-genres providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return undefined;
       }
@@ -133,7 +133,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       const body = (await res.json()) as Partial<OpenLibrarySearchResponse>;
       if (!Array.isArray(body.docs) || body.docs.length === 0) {
         this.logger.log(
-          `[open-library] fetch.end op=lookup-genres providerId="${providerId}" status=${res.status} resultCount=0 durationMs=${Date.now() - startedAt}`,
+          `[open-library] [end] op=lookup-genres providerId="${providerId}" status=${res.status} resultCount=0 durationMs=${Date.now() - startedAt}`,
         );
         return undefined;
       }
@@ -141,17 +141,17 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       const doc = body.docs.find((d) => d.key === key);
       const genres = this.extractSubjectGenres(doc);
       this.logger.log(
-        `[open-library] fetch.end op=lookup-genres providerId="${providerId}" status=${res.status} resultCount=${genres?.length ?? 0} durationMs=${Date.now() - startedAt}`,
+        `[open-library] [end] op=lookup-genres providerId="${providerId}" status=${res.status} resultCount=${genres?.length ?? 0} durationMs=${Date.now() - startedAt}`,
       );
       return genres;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.logger.warn(
-          `[open-library] fetch.fail op=lookup-genres providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`,
+          `[open-library] [fail] op=lookup-genres providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`,
         );
       } else {
         this.logger.warn(
-          `[open-library] fetch.fail op=lookup-genres providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+          `[open-library] [fail] op=lookup-genres providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
         );
       }
       throw err;

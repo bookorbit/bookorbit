@@ -105,7 +105,7 @@ describe('UploadProcessorService', () => {
     metadataService.extractAndSave.mockRejectedValue(new Error('upstream failed'));
 
     service.extractMetadataAsync(9, '/tmp/a.epub', 'epub');
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(metadataService.extractAndSave).toHaveBeenCalledWith(9, '/tmp/a.epub', 'epub');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('upstream failed'));
