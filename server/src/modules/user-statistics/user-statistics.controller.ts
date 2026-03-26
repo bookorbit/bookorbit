@@ -1,9 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { UserDailyReadingQueryDto } from './dto/user-daily-reading-query.dto';
 import { UserGoalTrajectoryQueryDto } from './dto/user-goal-trajectory-query.dto';
+import { UserSessionTimelineQueryDto } from './dto/user-session-timeline-query.dto';
+import { UpdateUserSessionTimelineSessionDto } from './dto/update-user-session-timeline-session.dto';
 import { UserStatisticsFilterQueryDto } from './dto/user-statistics-filter-query.dto';
 import { UserStatisticsService } from './user-statistics.service';
 
@@ -34,6 +36,21 @@ export class UserStatisticsController {
   @Get('favorite-days')
   getFavoriteDays(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
     return this.userStatisticsService.getFavoriteReadingDays(user, query);
+  }
+
+  @Get('session-timeline')
+  getSessionTimeline(@CurrentUser() user: RequestUser, @Query() query: UserSessionTimelineQueryDto) {
+    return this.userStatisticsService.getSessionTimeline(user, query);
+  }
+
+  @Patch('session-timeline/:sessionId')
+  updateSessionTimelineSession(
+    @CurrentUser() user: RequestUser,
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Body() dto: UpdateUserSessionTimelineSessionDto,
+    @Query() query: UserStatisticsFilterQueryDto,
+  ) {
+    return this.userStatisticsService.updateSessionTimelineSession(user, sessionId, dto, query);
   }
 
   @Get('completion-timeline')

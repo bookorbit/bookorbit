@@ -186,6 +186,12 @@ export const STATISTICS_CHART_META: Record<StatisticsChartId, StatisticsChartMet
     size: '1x1',
     category: 'user',
   },
+  'reading-session-timeline': {
+    label: 'Reading Session Timeline',
+    icon: Clock3,
+    size: '2x1',
+    category: 'user',
+  },
   'session-archetypes': {
     label: 'Session Archetypes',
     icon: Layers,

@@ -23,7 +23,7 @@ watchEffect(() => {
   option.value = {}
   if (isEmpty.value || !hasEnoughData.value || !data.value.length) return
 
-  const palette = getThemePalette(themeStore.theme, themeStore.accent)
+  const palette = getThemePalette(themeStore.theme, themeStore.accent, 0.8, 0.8)
   const background = readCssColor('--background')
 
   option.value = {
@@ -42,6 +42,8 @@ watchEffect(() => {
         roam: false,
         nodeClick: false,
         breadcrumb: { show: false },
+        top: 20,
+        bottom: 20,
         data: data.value.map((item, i) => ({
           name: item.genre,
           value: item.readingSeconds,

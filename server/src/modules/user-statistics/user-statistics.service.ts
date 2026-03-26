@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type {
   ChordDiagramData,
@@ -14,6 +14,8 @@ import type {
   UserProgressFunnelComparison,
   UserProgressFunnel,
   UserReadingPacePoint,
+  UserReadingSessionTimeline,
+  UserReadingSessionTimelineItem,
   UserReadingSurvivalPoint,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
@@ -22,6 +24,8 @@ import type {
 import type { RequestUser } from '../../common/types/request-user';
 import type { UserDailyReadingQueryDto } from './dto/user-daily-reading-query.dto';
 import type { UserGoalTrajectoryQueryDto } from './dto/user-goal-trajectory-query.dto';
+import type { UserSessionTimelineQueryDto } from './dto/user-session-timeline-query.dto';
+import type { UpdateUserSessionTimelineSessionDto } from './dto/update-user-session-timeline-session.dto';
 import type { UserStatisticsFilterQueryDto } from './dto/user-statistics-filter-query.dto';
 import { UserStatisticsRepository } from './user-statistics.repository';
 
@@ -31,6 +35,7 @@ const COMPLETION_TIMELINE_DEFAULT_DAYS = 1825;
 const GOAL_TRAJECTORY_DEFAULT_DAYS = 365;
 const GOAL_TRAJECTORY_DEFAULT_GOAL_BOOKS = 12;
 const PROGRESS_FUNNEL_DEFAULT_DAYS = 365;
+const SESSION_TIMELINE_MAX_SESSIONS = 3000;
 const COMPLETION_LATENCY_DEFAULT_DAYS = 1825;
 const GENRE_READING_TIME_DEFAULT_DAYS = 365;
 const READING_PACE_DEFAULT_DAYS = 1825;
@@ -57,6 +62,42 @@ export class UserStatisticsService {
 
   private startOfUtcMonth(date: Date): Date {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  }
+
+  private startOfUtcIsoWeek(date: Date): Date {
+    const start = this.startOfUtcDay(date);
+    const day = (start.getUTCDay() + 6) % 7; // Mon=0 ... Sun=6
+    start.setUTCDate(start.getUTCDate() - day);
+    return start;
+  }
+
+  private getUtcIsoWeekYear(date: Date): number {
+    const d = this.startOfUtcDay(date);
+    const day = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - day + 3); // Thursday
+    return d.getUTCFullYear();
+  }
+
+  private getUtcIsoWeek(date: Date): number {
+    const d = this.startOfUtcDay(date);
+    const day = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - day + 3); // Thursday
+    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const firstDay = (firstThursday.getUTCDay() + 6) % 7;
+    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDay + 3);
+    return 1 + Math.round((d.getTime() - firstThursday.getTime()) / 604_800_000);
+  }
+
+  private getUtcIsoWeeksInYear(year: number): number {
+    return this.getUtcIsoWeek(new Date(Date.UTC(year, 11, 28)));
+  }
+
+  private getUtcIsoWeekStart(year: number, week: number): Date {
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const week1Start = this.startOfUtcIsoWeek(jan4);
+    const weekStart = new Date(week1Start);
+    weekStart.setUTCDate(week1Start.getUTCDate() + (week - 1) * 7);
+    return weekStart;
   }
 
   private sinceDateForDays(days: number): Date {
@@ -172,14 +213,25 @@ export class UserStatisticsService {
     const key = this.cacheKey('peak-hours', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     return this.withCache(key, QUERY_CACHE_TTL_MS, async () => {
       const rows = await this.repo.getPeakReadingHours(user.id, user.isSuperuser, query.libraryIds, days);
-      const byHour = new Map(rows.map((row) => [row.hour, row]));
+
+      const byHour = new Map<number, { readingSeconds: number; eventsCount: number; byFormat: Record<string, number> }>();
+      for (const row of rows) {
+        if (!byHour.has(row.hour)) {
+          byHour.set(row.hour, { readingSeconds: 0, eventsCount: 0, byFormat: {} });
+        }
+        const entry = byHour.get(row.hour)!;
+        entry.readingSeconds += row.readingSeconds;
+        entry.eventsCount += row.eventsCount;
+        entry.byFormat[row.format] = row.readingSeconds;
+      }
 
       return Array.from({ length: 24 }, (_, hour) => {
-        const row = byHour.get(hour);
+        const entry = byHour.get(hour);
         return {
           hour,
-          readingSeconds: row?.readingSeconds ?? 0,
-          eventsCount: row?.eventsCount ?? 0,
+          readingSeconds: entry?.readingSeconds ?? 0,
+          eventsCount: entry?.eventsCount ?? 0,
+          byFormat: entry?.byFormat ?? {},
         };
       });
     });
@@ -201,6 +253,112 @@ export class UserStatisticsService {
         };
       });
     });
+  }
+
+  private toTimelineItem(row: {
+    sessionId: number;
+    bookId: number;
+    bookTitle: string | null;
+    bookFormat: string | null;
+    startedAt: Date;
+    endedAt: Date;
+    durationSeconds: number;
+  }): UserReadingSessionTimelineItem {
+    return {
+      sessionId: row.sessionId,
+      bookId: row.bookId,
+      bookTitle: row.bookTitle,
+      bookFormat: row.bookFormat,
+      startedAt: row.startedAt.toISOString(),
+      endedAt: row.endedAt.toISOString(),
+      durationSeconds: row.durationSeconds,
+    };
+  }
+
+  async getSessionTimeline(user: RequestUser, query: UserSessionTimelineQueryDto): Promise<UserReadingSessionTimeline> {
+    const now = new Date();
+    const defaultYear = this.getUtcIsoWeekYear(now);
+    const defaultWeek = this.getUtcIsoWeek(now);
+    const year = query.year ?? defaultYear;
+    const weeksInYear = this.getUtcIsoWeeksInYear(year);
+    const week = Math.min(Math.max(query.week ?? defaultWeek, 1), weeksInYear);
+    const weekStart = this.getUtcIsoWeekStart(year, week);
+    const weekEndExclusive = new Date(weekStart);
+    weekEndExclusive.setUTCDate(weekEndExclusive.getUTCDate() + 7);
+
+    const key = this.cacheKey('session-timeline', user, {
+      libraries: this.normalizeLibraryIds(query.libraryIds),
+      year,
+      week,
+    });
+
+    return this.withCache(key, QUERY_CACHE_TTL_MS, async () => {
+      const rows = await this.repo.getSessionTimelineItems(
+        user.id,
+        user.isSuperuser,
+        query.libraryIds,
+        weekStart,
+        weekEndExclusive,
+        SESSION_TIMELINE_MAX_SESSIONS,
+      );
+      const weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+
+      return {
+        year,
+        week,
+        weekStart: this.formatDayKey(weekStart),
+        weekEnd: this.formatDayKey(weekEnd),
+        items: rows.map((row) => this.toTimelineItem(row)),
+      };
+    });
+  }
+
+  async updateSessionTimelineSession(
+    user: RequestUser,
+    sessionId: number,
+    dto: UpdateUserSessionTimelineSessionDto,
+    query: UserStatisticsFilterQueryDto,
+  ): Promise<UserReadingSessionTimelineItem> {
+    const startedAt = new Date(dto.startedAt);
+    const endedAt = new Date(dto.endedAt);
+    if (!Number.isFinite(startedAt.getTime()) || !Number.isFinite(endedAt.getTime())) {
+      throw new BadRequestException('Invalid session timestamps');
+    }
+    if (endedAt <= startedAt) {
+      throw new BadRequestException('Session end time must be after start time');
+    }
+
+    const existing = await this.repo.getSessionTimelineSessionById(user.id, user.isSuperuser, query.libraryIds, sessionId);
+    if (!existing) {
+      throw new NotFoundException('Reading session not found');
+    }
+
+    const proposedDuration = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
+    if (proposedDuration !== existing.durationSeconds) {
+      throw new BadRequestException('Dragging can move a session only; duration cannot change');
+    }
+
+    const moveResult = await this.repo.moveSessionTimelineSessionAtomic(
+      user.id,
+      sessionId,
+      existing.libraryId,
+      existing.startedAt,
+      startedAt,
+      endedAt,
+      proposedDuration,
+    );
+    if (moveResult.conflict) {
+      const conflictStart = moveResult.conflict.startedAt.toISOString();
+      throw new ConflictException(`Session overlaps with #${moveResult.conflict.sessionId} starting at ${conflictStart}`);
+    }
+    if (!moveResult.updated) {
+      throw new NotFoundException('Reading session not found');
+    }
+
+    this.queryCache.clear();
+
+    return this.toTimelineItem(moveResult.updated);
   }
 
   async getCompletionTimeline(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserCompletionTimelinePoint[]> {

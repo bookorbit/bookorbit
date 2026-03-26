@@ -64,9 +64,9 @@ describe('UserStatisticsService', () => {
 
     expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [], 365);
     expect(result).toHaveLength(24);
-    expect(result[8]).toEqual({ hour: 8, readingSeconds: 600, eventsCount: 3 });
-    expect(result[21]).toEqual({ hour: 21, readingSeconds: 900, eventsCount: 4 });
-    expect(result[0]).toEqual({ hour: 0, readingSeconds: 0, eventsCount: 0 });
+    expect(result[8]).toEqual(expect.objectContaining({ hour: 8, readingSeconds: 600, eventsCount: 3 }));
+    expect(result[21]).toEqual(expect.objectContaining({ hour: 21, readingSeconds: 900, eventsCount: 4 }));
+    expect(result[0]).toEqual(expect.objectContaining({ hour: 0, readingSeconds: 0, eventsCount: 0 }));
   });
 
   it('returns all weekday buckets for favorite reading days', async () => {
@@ -231,5 +231,162 @@ describe('UserStatisticsService', () => {
       current: { started: 20, reached25: 15, reached50: 10, reached75: 8, completed: 5 },
       previous: { started: 18, reached25: 13, reached50: 9, reached75: 6, completed: 4 },
     });
+  });
+
+  it('returns weekly session timeline with ISO week defaults', async () => {
+    const repo = {
+      getSessionTimelineItems: vi.fn().mockResolvedValue([
+        {
+          sessionId: 100,
+          bookId: 55,
+          bookTitle: 'Deep Work',
+          bookFormat: 'EPUB',
+          startedAt: new Date('2026-04-07T02:30:00.000Z'),
+          endedAt: new Date('2026-04-07T03:00:00.000Z'),
+          durationSeconds: 1800,
+        },
+      ]),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    const result = await service.getSessionTimeline({ id: 123, isSuperuser: false } as any, { libraryIds: [1] });
+
+    expect(result.year).toBe(2026);
+    expect(result.week).toBe(15);
+    expect(result.weekStart).toBe('2026-04-06');
+    expect(result.weekEnd).toBe('2026-04-12');
+    expect(result.items[0]).toEqual({
+      sessionId: 100,
+      bookId: 55,
+      bookTitle: 'Deep Work',
+      bookFormat: 'EPUB',
+      startedAt: '2026-04-07T02:30:00.000Z',
+      endedAt: '2026-04-07T03:00:00.000Z',
+      durationSeconds: 1800,
+    });
+
+    expect(repo.getSessionTimelineItems).toHaveBeenCalledTimes(1);
+    const [, , , since, until, limit] = repo.getSessionTimelineItems.mock.calls[0];
+    expect(since.toISOString()).toBe('2026-04-06T00:00:00.000Z');
+    expect(until.toISOString()).toBe('2026-04-13T00:00:00.000Z');
+    expect(limit).toBe(3000);
+  });
+
+  it('updates a timeline session atomically', async () => {
+    const existing = {
+      sessionId: 101,
+      libraryId: 4,
+      bookId: 44,
+      bookTitle: 'Atomic Habits',
+      bookFormat: 'EPUB',
+      startedAt: new Date('2026-04-07T08:00:00.000Z'),
+      endedAt: new Date('2026-04-07T08:30:00.000Z'),
+      durationSeconds: 1800,
+    };
+    const updated = {
+      ...existing,
+      startedAt: new Date('2026-04-08T09:00:00.000Z'),
+      endedAt: new Date('2026-04-08T09:30:00.000Z'),
+    };
+
+    const repo = {
+      getSessionTimelineSessionById: vi.fn().mockResolvedValue(existing),
+      moveSessionTimelineSessionAtomic: vi.fn().mockResolvedValue({
+        updated,
+        conflict: null,
+      }),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    const result = await service.updateSessionTimelineSession(
+      { id: 123, isSuperuser: false } as any,
+      101,
+      {
+        startedAt: '2026-04-08T09:00:00.000Z',
+        endedAt: '2026-04-08T09:30:00.000Z',
+      },
+      { libraryIds: [4] },
+    );
+
+    expect(repo.moveSessionTimelineSessionAtomic).toHaveBeenCalledWith(
+      123,
+      101,
+      4,
+      new Date('2026-04-07T08:00:00.000Z'),
+      new Date('2026-04-08T09:00:00.000Z'),
+      new Date('2026-04-08T09:30:00.000Z'),
+      1800,
+    );
+    expect(result.startedAt).toBe('2026-04-08T09:00:00.000Z');
+    expect(result.endedAt).toBe('2026-04-08T09:30:00.000Z');
+  });
+
+  it('rejects session moves that overlap another session', async () => {
+    const existing = {
+      sessionId: 42,
+      libraryId: 3,
+      bookId: 77,
+      bookTitle: 'Flow',
+      bookFormat: 'PDF',
+      startedAt: new Date('2026-04-07T10:00:00.000Z'),
+      endedAt: new Date('2026-04-07T10:30:00.000Z'),
+      durationSeconds: 1800,
+    };
+    const repo = {
+      getSessionTimelineSessionById: vi.fn().mockResolvedValue(existing),
+      moveSessionTimelineSessionAtomic: vi.fn().mockResolvedValue({
+        updated: null,
+        conflict: {
+          sessionId: 88,
+          startedAt: new Date('2026-04-07T10:10:00.000Z'),
+          endedAt: new Date('2026-04-07T10:40:00.000Z'),
+        },
+      }),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    await expect(
+      service.updateSessionTimelineSession(
+        { id: 123, isSuperuser: false } as any,
+        42,
+        {
+          startedAt: '2026-04-07T10:05:00.000Z',
+          endedAt: '2026-04-07T10:35:00.000Z',
+        },
+        { libraryIds: [3] },
+      ),
+    ).rejects.toThrow('overlaps with #88');
+  });
+
+  it('rejects session moves that change duration', async () => {
+    const existing = {
+      sessionId: 52,
+      libraryId: 5,
+      bookId: 90,
+      bookTitle: 'Ultralearning',
+      bookFormat: 'EPUB',
+      startedAt: new Date('2026-04-07T10:00:00.000Z'),
+      endedAt: new Date('2026-04-07T10:30:00.000Z'),
+      durationSeconds: 1800,
+    };
+
+    const repo = {
+      getSessionTimelineSessionById: vi.fn().mockResolvedValue(existing),
+      moveSessionTimelineSessionAtomic: vi.fn(),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    await expect(
+      service.updateSessionTimelineSession(
+        { id: 123, isSuperuser: false } as any,
+        52,
+        {
+          startedAt: '2026-04-07T10:05:00.000Z',
+          endedAt: '2026-04-07T10:36:00.000Z',
+        },
+        { libraryIds: [5] },
+      ),
+    ).rejects.toThrow('duration cannot change');
+    expect(repo.moveSessionTimelineSessionAtomic).not.toHaveBeenCalled();
   });
 });

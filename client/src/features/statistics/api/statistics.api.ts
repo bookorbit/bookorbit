@@ -13,6 +13,8 @@ import type {
   UserProgressFunnelComparison,
   UserPeakHourStat,
   UserReadingPacePoint,
+  UserReadingSessionTimeline,
+  UserReadingSessionTimelineItem,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
   FormatDistributionItem,
@@ -176,6 +178,31 @@ export async function fetchUserReadingPace(filters: StatisticsFilterConfig): Pro
   const res = await api(`/api/v1/user-statistics/reading-pace${buildParams(filters, { days: '1825' })}`)
   if (!res.ok) throw new Error(`User reading pace request failed: ${res.status}`)
   return res.json() as Promise<UserReadingPacePoint[]>
+}
+
+export async function fetchUserReadingSessionTimeline(
+  filters: StatisticsFilterConfig,
+  year: number,
+  week: number,
+): Promise<UserReadingSessionTimeline> {
+  const res = await api(`/api/v1/user-statistics/session-timeline${buildParams(filters, { year: String(year), week: String(week) })}`)
+  if (!res.ok) throw new Error(`User session timeline request failed: ${res.status}`)
+  return res.json() as Promise<UserReadingSessionTimeline>
+}
+
+export async function updateUserReadingSessionTimelineSession(
+  filters: StatisticsFilterConfig,
+  sessionId: number,
+  startedAt: string,
+  endedAt: string,
+): Promise<UserReadingSessionTimelineItem> {
+  const res = await api(`/api/v1/user-statistics/session-timeline/${sessionId}${buildParams(filters)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ startedAt, endedAt }),
+  })
+  if (!res.ok) throw new Error(`User session timeline update failed: ${res.status}`)
+  return res.json() as Promise<UserReadingSessionTimelineItem>
 }
 
 export async function fetchGenreCooccurrence(filters: StatisticsFilterConfig): Promise<ChordDiagramData> {

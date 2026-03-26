@@ -34,6 +34,7 @@ const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
   'reading-pace': defineAsyncComponent(() => import('./user/ReadingPaceScatterChart.vue')),
   'books-completed': defineAsyncComponent(() => import('./user/BooksCompletedChart.vue')),
   'reading-clock': defineAsyncComponent(() => import('./user/ReadingClockChart.vue')),
+  'reading-session-timeline': defineAsyncComponent(() => import('./user/ReadingSessionTimelineChart.vue')),
   'session-archetypes': defineAsyncComponent(() => import('./user/SessionArchetypesChart.vue')),
 }
 

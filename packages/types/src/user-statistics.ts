@@ -17,6 +17,7 @@ export interface UserPeakHourStat {
   hour: number;
   readingSeconds: number;
   eventsCount: number;
+  byFormat: Record<string, number>;
 }
 
 export interface UserFavoriteDayStat {
@@ -75,6 +76,24 @@ export interface UserCompletionLatencyDistribution {
 export interface UserGenreReadingTimeItem {
   genre: string;
   readingSeconds: number;
+}
+
+export interface UserReadingSessionTimelineItem {
+  sessionId: number;
+  bookId: number;
+  bookTitle: string | null;
+  bookFormat: string | null;
+  startedAt: string;
+  endedAt: string;
+  durationSeconds: number;
+}
+
+export interface UserReadingSessionTimeline {
+  year: number;
+  week: number;
+  weekStart: string;
+  weekEnd: string;
+  items: UserReadingSessionTimelineItem[];
 }
 
 export interface UserReadingPacePoint {

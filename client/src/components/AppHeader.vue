@@ -46,7 +46,7 @@ function navigateToStaging() {
 }
 
 function navigateToStatistics() {
-  router.push({ name: 'statistics' })
+  router.push({ name: 'statistics', query: { tab: 'library' } })
 }
 
 function navigateToAccount() {

@@ -23,6 +23,7 @@ export type StatisticsChartId =
   | "reading-pace"
   | "books-completed"
   | "reading-clock"
+  | "reading-session-timeline"
   | "session-archetypes"
   | "genre-cooccurrence";
 
@@ -77,6 +78,7 @@ export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
   "reading-pace",
   "books-completed",
   "reading-clock",
+  "reading-session-timeline",
   "session-archetypes",
 ];
 

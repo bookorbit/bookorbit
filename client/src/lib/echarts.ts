@@ -4,6 +4,7 @@ import {
   BarChart,
   BoxplotChart,
   ChordChart,
+  CustomChart,
   FunnelChart,
   HeatmapChart,
   LineChart,
@@ -32,6 +33,7 @@ use([
   PieChart,
   BarChart,
   ChordChart,
+  CustomChart,
   LineChart,
   FunnelChart,
   HeatmapChart,
@@ -171,12 +173,12 @@ function oklchToHex(L: number, C: number, H: number): string {
   )
 }
 
-export function getThemePalette(mode: ProjectxThemeMode, accent: string): string[] {
+export function getThemePalette(mode: ProjectxThemeMode, accent: string, chromaScale = 1, lightnessScale = 1): string[] {
   const resolvedAccent = accent in ACCENT_PRIMARY ? accent : DEFAULT_ACCENT
   const def = ACCENT_PRIMARY[resolvedAccent]!
   const dark = mode === 'dark'
-  const L = dark ? def[2] : def[0]
-  const C = dark ? def[3] : def[1]
+  const L = (dark ? def[2] : def[0]) * lightnessScale
+  const C = (dark ? def[3] : def[1]) * chromaScale
   const H = ACCENT_HUE[resolvedAccent]!
   return HUE_OFFSETS.map((off) => oklchToHex(L, C, H + off))
 }

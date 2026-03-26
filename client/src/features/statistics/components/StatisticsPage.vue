@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Check, ChevronDown, GripVertical, Settings2 } from 'lucide-vue-next'
 import { VueDraggable } from 'vue-draggable-plus'
 
@@ -30,9 +31,14 @@ const {
   setLibraryFilter,
 } = useStatisticsConfig()
 
+const route = useRoute()
+const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
 const configOpen = ref(false)
-const activeTab = ref<'library' | 'user'>('library')
+
+const initialTab = route.query.tab === 'user' ? 'user' : 'library'
+const activeTab = ref<'library' | 'user'>(initialTab)
+const loaded = ref<Set<'library' | 'user'>>(new Set([initialTab]))
 
 // Called in setup (not onMounted) so filters are populated before chart children mount.
 init()
@@ -93,6 +99,8 @@ function chartMeta(id: StatisticsChartId) {
 
 function setTab(tab: 'library' | 'user') {
   activeTab.value = tab
+  loaded.value.add(tab)
+  void router.replace({ query: { ...route.query, tab } })
 }
 </script>
 
@@ -224,10 +232,10 @@ function setTab(tab: 'library' | 'user') {
       </SheetContent>
     </Sheet>
 
-    <div v-show="activeTab === 'library'">
+    <div v-if="loaded.has('library')" v-show="activeTab === 'library'">
       <StatisticsGrid :charts="visibleLibraryCharts" />
     </div>
-    <div v-show="activeTab === 'user'">
+    <div v-if="loaded.has('user')" v-show="activeTab === 'user'">
       <StatisticsGrid :charts="visibleUserCharts" />
     </div>
   </div>
