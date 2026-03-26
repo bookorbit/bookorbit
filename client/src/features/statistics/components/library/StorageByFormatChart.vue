@@ -4,8 +4,8 @@ import VChart from 'vue-echarts'
 import { HardDrive } from 'lucide-vue-next'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 
-import { useStorageByFormat } from '../composables/useStorageByFormat'
-import ChartCard from './ChartCard.vue'
+import { useStorageByFormat } from '../../composables/useStorageByFormat'
+import ChartCard from '../ChartCard.vue'
 
 const { data, loading, error } = useStorageByFormat()
 const { md } = useBreakpoints(breakpointsTailwind)
@@ -23,8 +23,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'item',
-      confine: true,
-      enterable: false,
       formatter: (params: { name: string; value: number; percent: number }) => `${params.name}: ${formatBytes(params.value)} (${params.percent}%)`,
     },
     legend: {
@@ -39,9 +37,7 @@ watchEffect(() => {
         radius: ['40%', '70%'],
         center: md.value ? ['38%', '50%'] : ['50%', '44%'],
         data: data.value.items.map((item) => ({ name: item.format.toUpperCase(), value: item.sizeBytes })),
-        cursor: 'default',
         label: { show: false },
-        emphasis: { disabled: true },
       },
     ],
   }

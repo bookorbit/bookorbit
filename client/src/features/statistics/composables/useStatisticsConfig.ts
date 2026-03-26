@@ -12,7 +12,7 @@ import {
 } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
-import { STATISTICS_CHART_IDS } from '../statistics-chart-meta'
+import { LIBRARY_CHART_IDS, STATISTICS_CHART_IDS, STATISTICS_CHART_META, USER_CHART_IDS } from '../statistics-chart-meta'
 
 const KNOWN_CHART_IDS: StatisticsChartId[] = [...STATISTICS_CHART_IDS]
 
@@ -36,6 +36,9 @@ function normalizeCharts(saved: ChartConfigEntry[] | undefined): ChartConfigEntr
   }))
   return [...filtered, ...newEntries]
 }
+
+const libraryChartIdSet = new Set<StatisticsChartId>(LIBRARY_CHART_IDS)
+const userChartIdSet = new Set<StatisticsChartId>(USER_CHART_IDS)
 
 function normalizeFilters(saved: StatisticsFilterConfig | undefined): StatisticsFilterConfig {
   return {
@@ -75,6 +78,16 @@ export function useStatisticsConfig() {
 
   const orderedCharts = computed(() => [...config.value].sort((a, b) => a.order - b.order))
   const visibleCharts = computed(() => orderedCharts.value.filter((c) => c.visible))
+
+  const orderedLibraryCharts = computed(() => orderedCharts.value.filter((c) => libraryChartIdSet.has(c.id)))
+  const orderedUserCharts = computed(() => orderedCharts.value.filter((c) => userChartIdSet.has(c.id)))
+  const visibleLibraryCharts = computed(() => orderedLibraryCharts.value.filter((c) => c.visible))
+  const visibleUserCharts = computed(() => orderedUserCharts.value.filter((c) => c.visible))
+
+  const libraryChartCount = computed(() => orderedLibraryCharts.value.length)
+  const userChartCount = computed(() => orderedUserCharts.value.length)
+  const visibleLibraryChartCount = computed(() => visibleLibraryCharts.value.length)
+  const visibleUserChartCount = computed(() => visibleUserCharts.value.length)
 
   function toggleVisibility(id: StatisticsChartId) {
     const entry = config.value.find((c) => c.id === id)
@@ -129,5 +142,29 @@ export function useStatisticsConfig() {
     scheduleSave()
   }
 
-  return { orderedCharts, visibleCharts, filters, init, toggleVisibility, reorder, resetToDefaults, setLibraryFilter, setGranularity, setDateRange }
+  function chartCategory(id: StatisticsChartId) {
+    return STATISTICS_CHART_META[id].category
+  }
+
+  return {
+    orderedCharts,
+    visibleCharts,
+    orderedLibraryCharts,
+    orderedUserCharts,
+    visibleLibraryCharts,
+    visibleUserCharts,
+    libraryChartCount,
+    userChartCount,
+    visibleLibraryChartCount,
+    visibleUserChartCount,
+    filters,
+    init,
+    toggleVisibility,
+    reorder,
+    resetToDefaults,
+    setLibraryFilter,
+    setGranularity,
+    setDateRange,
+    chartCategory,
+  }
 }

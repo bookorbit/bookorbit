@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { StatisticsDateRange, StatisticsGranularity } from '@projectx/types';
+import type { ChordDiagramData, StatisticsDateRange, StatisticsGranularity } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -442,6 +442,52 @@ export class StatisticsRepository {
       publicationYearMin: pubRangeRow.minYear,
       publicationYearMax: pubRangeRow.maxYear,
       booksAddedThisYear: thisYearRow.count,
+    };
+  }
+
+  async getGenreCooccurrence(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], limit = 15): Promise<ChordDiagramData> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+
+    const topGenresRows = await this.db
+      .select({
+        id: genres.id,
+        name: genres.name,
+      })
+      .from(bookGenres)
+      .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+      .innerJoin(books, eq(books.id, bookGenres.bookId))
+      .where(filter)
+      .groupBy(genres.id, genres.name)
+      .orderBy(desc(sql`count(distinct ${bookGenres.bookId})`))
+      .limit(limit);
+
+    if (topGenresRows.length < 2) return { nodes: topGenresRows.map((g) => ({ name: g.name })), links: [] };
+
+    const topGenreIds = topGenresRows.map((g) => g.id);
+    const topGenreIdList = sql.join(
+      topGenreIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
+
+    const pairRows = await this.db.execute<{ source: string; target: string; value: number }>(sql`
+      select g1.name as source, g2.name as target, count(distinct bg1.book_id)::int as value
+      from book_genres bg1
+      inner join book_genres bg2 on bg1.book_id = bg2.book_id and bg1.genre_id < bg2.genre_id
+      inner join genres g1 on g1.id = bg1.genre_id
+      inner join genres g2 on g2.id = bg2.genre_id
+      inner join books b on b.id = bg1.book_id
+      where bg1.genre_id in (${topGenreIdList})
+        and bg2.genre_id in (${topGenreIdList})
+        ${filter ? sql`and ${filter}` : sql``}
+      group by g1.name, g2.name
+      having count(distinct bg1.book_id) >= 1
+      order by value desc
+    `);
+
+    return {
+      nodes: topGenresRows.map((g) => ({ name: g.name })),
+      links: pairRows.rows.map((r) => ({ source: r.source, target: r.target, value: r.value })),
     };
   }
 }

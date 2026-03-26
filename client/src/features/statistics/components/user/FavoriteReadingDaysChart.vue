@@ -3,8 +3,8 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { CalendarDays } from 'lucide-vue-next'
 
-import { useUserFavoriteReadingDays } from '../composables/useUserFavoriteReadingDays'
-import ChartCard from './ChartCard.vue'
+import { useUserFavoriteReadingDays } from '../../composables/useUserFavoriteReadingDays'
+import ChartCard from '../ChartCard.vue'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MIN_EVENTS = 14
@@ -42,8 +42,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: Array<{ axisValue: string; data: number; dataIndex: number }>) => {
         const point = params[0]
         if (!point) return ''
@@ -77,8 +75,6 @@ watchEffect(() => {
         data: averageMinutesByDay,
         barMaxWidth: 30,
         itemStyle: { borderRadius: [4, 4, 0, 0] },
-        cursor: 'default',
-        emphasis: { disabled: true },
       },
     ],
   }

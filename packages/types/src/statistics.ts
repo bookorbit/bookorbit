@@ -18,7 +18,13 @@ export type StatisticsChartId =
   | "completion-timeline"
   | "goal-trajectory"
   | "progress-funnel"
-  | "completion-latency";
+  | "completion-latency"
+  | "genre-reading-time"
+  | "reading-pace"
+  | "books-completed"
+  | "reading-clock"
+  | "session-archetypes"
+  | "genre-cooccurrence";
 
 export type StatisticsGranularity = "monthly" | "yearly";
 export type StatisticsDateRange = "last-year" | "last-5-years" | "all-time";
@@ -42,19 +48,12 @@ export interface StatisticsSettings {
   filters: StatisticsFilterConfig;
 }
 
-export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [
+export const DEFAULT_LIBRARY_CHART_ORDER: StatisticsChartId[] = [
   "format-distribution",
   "language-distribution",
   "storage-by-format",
   "publication-decade",
   "books-added-over-time",
-  "reading-heatmap",
-  "peak-reading-hours",
-  "favorite-reading-days",
-  "completion-timeline",
-  "goal-trajectory",
-  "progress-funnel",
-  "completion-latency",
   "format-share-over-time",
   "metadata-completeness",
   "metadata-score-distribution",
@@ -63,7 +62,25 @@ export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [
   "genre-distribution",
   "genre-rank-over-time",
   "library-metadata-completeness",
+  "genre-cooccurrence",
 ];
+
+export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
+  "reading-heatmap",
+  "peak-reading-hours",
+  "favorite-reading-days",
+  "completion-timeline",
+  "goal-trajectory",
+  "progress-funnel",
+  "completion-latency",
+  "genre-reading-time",
+  "reading-pace",
+  "books-completed",
+  "reading-clock",
+  "session-archetypes",
+];
+
+export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [...DEFAULT_LIBRARY_CHART_ORDER, ...DEFAULT_USER_CHART_ORDER];
 
 export const DEFAULT_STATISTICS_FILTERS: StatisticsFilterConfig = {
   libraryIds: [],
@@ -85,6 +102,21 @@ export function createDefaultStatisticsSettings(): StatisticsSettings {
 // Generic wrapper returned by all statistics endpoints.
 // unknownCount = books excluded due to NULL in the relevant metadata field.
 // Is 0 for charts where the source column is never NULL (format, addedAt).
+export interface ChordNode {
+  name: string;
+}
+
+export interface ChordLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface ChordDiagramData {
+  nodes: ChordNode[];
+  links: ChordLink[];
+}
+
 export interface StatisticsResult<T> {
   items: T[];
   unknownCount: number;

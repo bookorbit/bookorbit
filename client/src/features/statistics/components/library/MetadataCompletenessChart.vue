@@ -3,8 +3,8 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { ListChecks } from 'lucide-vue-next'
 
-import { useMetadataCompleteness } from '../composables/useMetadataCompleteness'
-import ChartCard from './ChartCard.vue'
+import { useMetadataCompleteness } from '../../composables/useMetadataCompleteness'
+import ChartCard from '../ChartCard.vue'
 
 const { data, loading, error } = useMetadataCompleteness()
 const option = shallowRef({})
@@ -14,8 +14,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: { name: string; value: number }[]) => {
         const p = params[0]
         if (!p) return ''
@@ -45,10 +43,8 @@ watchEffect(() => {
       {
         type: 'bar',
         data: [...data.value.items].reverse().map((d) => (d.totalCount > 0 ? Math.round((d.presentCount / d.totalCount) * 100) : 0)),
-        cursor: 'default',
         itemStyle: { borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 40,
-        emphasis: { disabled: true },
       },
     ],
   }

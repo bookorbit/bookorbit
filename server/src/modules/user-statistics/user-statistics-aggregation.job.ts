@@ -25,7 +25,9 @@ export class UserStatisticsAggregationJob implements OnApplicationBootstrap {
         this.logger.log(`User daily stats recomputed from ${result.since}: deleted=${result.deleted}, inserted=${result.inserted}`);
       }
     } catch (err) {
-      this.logger.error('User daily stats aggregation failed', err as Error);
+      const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined;
+      const stack = err instanceof Error ? err.stack : String(err);
+      this.logger.error(`User daily stats aggregation failed${cause ? `: ${cause}` : ''}`, stack);
     }
   }
 }

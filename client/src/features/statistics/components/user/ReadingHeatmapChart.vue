@@ -4,9 +4,9 @@ import VChart from 'vue-echarts'
 import { Calendar } from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'
 
-import { buildHeatmapPalette } from '../heatmap-palette'
-import { useUserReadingHeatmap } from '../composables/useUserReadingHeatmap'
-import ChartCard from './ChartCard.vue'
+import { buildHeatmapPalette } from '../../heatmap-palette'
+import { useUserReadingHeatmap } from '../../composables/useUserReadingHeatmap'
+import ChartCard from '../ChartCard.vue'
 
 const MIN_ACTIVE_DAYS = 5
 
@@ -64,8 +64,7 @@ watchEffect(() => {
 
   option.value = {
     tooltip: {
-      confine: true,
-      enterable: false,
+      appendToBody: true,
       backgroundColor: palette.tooltipBackground,
       borderColor: palette.tooltipBorder,
       borderWidth: 1,

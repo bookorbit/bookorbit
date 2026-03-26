@@ -4,9 +4,9 @@ import VChart from 'vue-echarts'
 import { ListChecks } from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'
 
-import { buildHeatmapPalette } from '../heatmap-palette'
-import { useLibraryMetadataCompleteness } from '../composables/useLibraryMetadataCompleteness'
-import ChartCard from './ChartCard.vue'
+import { buildHeatmapPalette } from '../../heatmap-palette'
+import { useLibraryMetadataCompleteness } from '../../composables/useLibraryMetadataCompleteness'
+import ChartCard from '../ChartCard.vue'
 
 const FIELD_ORDER = [
   'Title',
@@ -55,8 +55,7 @@ watchEffect(() => {
 
   option.value = {
     tooltip: {
-      confine: true,
-      enterable: false,
+      appendToBody: true,
       backgroundColor: palette.tooltipBackground,
       borderColor: palette.tooltipBorder,
       borderWidth: 1,

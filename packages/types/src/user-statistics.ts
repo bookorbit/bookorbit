@@ -71,3 +71,54 @@ export interface UserCompletionLatencyDistribution {
   percentile90Days: number | null;
   buckets: UserCompletionLatencyBucket[];
 }
+
+export interface UserGenreReadingTimeItem {
+  genre: string;
+  readingSeconds: number;
+}
+
+export interface UserReadingPacePoint {
+  durationSeconds: number;
+  progressDelta: number;
+}
+
+export interface UserReadingSurvivalPoint {
+  threshold: number;
+  survivedCount: number;
+  survivedPct: number;
+}
+
+export interface UserCompletionRacePoint {
+  daysSinceStart: number;
+  progress: number;
+}
+
+export interface UserCompletionRaceBook {
+  bookId: number;
+  title: string;
+  points: UserCompletionRacePoint[];
+}
+
+export interface UserSessionArchetypePoint {
+  hour: number;
+  durationMinutes: number;
+  dayOfWeek: number;
+}
+
+export interface ReadingTimeBreakdownBook {
+  bookId: number;
+  title: string;
+  readingSeconds: number;
+}
+
+export interface ReadingTimeBreakdownAuthor {
+  authorName: string;
+  readingSeconds: number;
+  books: ReadingTimeBreakdownBook[];
+}
+
+export interface ReadingTimeBreakdownGenre {
+  genre: string;
+  readingSeconds: number;
+  authors: ReadingTimeBreakdownAuthor[];
+}

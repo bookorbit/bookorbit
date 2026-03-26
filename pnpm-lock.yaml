@@ -80,8 +80,8 @@ importers:
         specifier: ^0.6.1
         version: 0.6.1(@types/sortablejs@1.15.9)
       vue-echarts:
-        specifier: ^8.0.1
-        version: 8.0.1(echarts@6.0.0)(vue@3.5.32(typescript@5.9.3))
+        specifier: 8.1.0-beta.2
+        version: 8.1.0-beta.2(echarts@6.0.0)(vue@3.5.32(typescript@5.9.3))
       vue-router:
         specifier: ^5.0.4
         version: 5.0.4(@vue/compiler-sfc@3.5.32)(pinia@3.0.4(typescript@5.9.3)(vue@3.5.32(typescript@5.9.3)))(vue@3.5.32(typescript@5.9.3))
@@ -9914,10 +9914,10 @@ packages:
       "@vue/composition-api":
         optional: true
 
-  vue-echarts@8.0.1:
+  vue-echarts@8.1.0-beta.2:
     resolution:
       {
-        integrity: sha512-23rJTFLu1OUEGRWjJGmdGt8fP+8+ja1gVgzMYPIPaHWpXegcO1viIAaeu2H4QHESlVeHzUAHIxKXGrwjsyXAaA==,
+        integrity: sha512-E3pduI5wonT/MydIFQDZ7m/qYAxRZAT3TuIEUbHElmbR+WQMlxywyLZwBCqkxfNSIo4YLvn0cuur/QQADv37/Q==,
       }
     peerDependencies:
       echarts: ^6.0.0
@@ -15819,7 +15819,7 @@ snapshots:
     dependencies:
       "@types/sortablejs": 1.15.9
 
-  vue-echarts@8.0.1(echarts@6.0.0)(vue@3.5.32(typescript@5.9.3)):
+  vue-echarts@8.1.0-beta.2(echarts@6.0.0)(vue@3.5.32(typescript@5.9.3)):
     dependencies:
       echarts: 6.0.0
       vue: 3.5.32(typescript@5.9.3)

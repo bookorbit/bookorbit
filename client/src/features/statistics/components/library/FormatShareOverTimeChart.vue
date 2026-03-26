@@ -3,8 +3,8 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { TrendingUp } from 'lucide-vue-next'
 
-import { useFormatShareOverTime } from '../composables/useFormatShareOverTime'
-import ChartCard from './ChartCard.vue'
+import { useFormatShareOverTime } from '../../composables/useFormatShareOverTime'
+import ChartCard from '../ChartCard.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -32,8 +32,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: { dataIndex: number; marker: string; seriesName: string }[]) => {
         const first = params[0]
         if (!first) return ''

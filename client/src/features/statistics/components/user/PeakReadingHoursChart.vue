@@ -3,8 +3,8 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Clock3 } from 'lucide-vue-next'
 
-import { useUserPeakReadingHours } from '../composables/useUserPeakReadingHours'
-import ChartCard from './ChartCard.vue'
+import { useUserPeakReadingHours } from '../../composables/useUserPeakReadingHours'
+import ChartCard from '../ChartCard.vue'
 
 const MIN_EVENTS = 20
 
@@ -22,8 +22,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: Array<{ axisValue: string; data: number; dataIndex: number }>) => {
         const point = params[0]
         if (!point) return ''
@@ -53,8 +51,6 @@ watchEffect(() => {
         data: data.value.map((item) => Math.round(item.readingSeconds / 60)),
         barMaxWidth: 24,
         itemStyle: { borderRadius: [4, 4, 0, 0] },
-        cursor: 'default',
-        emphasis: { disabled: true },
       },
     ],
   }

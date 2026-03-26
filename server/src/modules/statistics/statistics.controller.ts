@@ -79,4 +79,9 @@ export class StatisticsController {
   getSummary(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getSummary(user, query);
   }
+
+  @Get('genre-cooccurrence')
+  getGenreCooccurrence(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getGenreCooccurrence(user, query);
+  }
 }

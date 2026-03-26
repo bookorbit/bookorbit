@@ -1,8 +1,10 @@
 import { api } from '@/lib/api'
 import type {
   BooksAddedDataPoint,
+  ChordDiagramData,
   UserCompletionLatencyDistribution,
   FormatShareOverTimeItem,
+  UserGenreReadingTimeItem,
   UserGoalTrajectory,
   StatisticsSummary,
   UserCompletionTimelinePoint,
@@ -10,6 +12,8 @@ import type {
   UserFavoriteDayStat,
   UserProgressFunnelComparison,
   UserPeakHourStat,
+  UserReadingPacePoint,
+  UserSessionArchetypePoint,
   UserStatisticsSummary,
   FormatDistributionItem,
   GenreRankOverTimeItem,
@@ -160,4 +164,28 @@ export async function fetchUserCompletionLatency(filters: StatisticsFilterConfig
   const res = await api(`/api/v1/user-statistics/completion-latency${buildParams(filters, { days: '1825' })}`)
   if (!res.ok) throw new Error(`User completion latency request failed: ${res.status}`)
   return res.json() as Promise<UserCompletionLatencyDistribution>
+}
+
+export async function fetchUserGenreReadingTime(filters: StatisticsFilterConfig): Promise<UserGenreReadingTimeItem[]> {
+  const res = await api(`/api/v1/user-statistics/genre-reading-time${buildParams(filters, { days: '365' })}`)
+  if (!res.ok) throw new Error(`User genre reading time request failed: ${res.status}`)
+  return res.json() as Promise<UserGenreReadingTimeItem[]>
+}
+
+export async function fetchUserReadingPace(filters: StatisticsFilterConfig): Promise<UserReadingPacePoint[]> {
+  const res = await api(`/api/v1/user-statistics/reading-pace${buildParams(filters, { days: '1825' })}`)
+  if (!res.ok) throw new Error(`User reading pace request failed: ${res.status}`)
+  return res.json() as Promise<UserReadingPacePoint[]>
+}
+
+export async function fetchGenreCooccurrence(filters: StatisticsFilterConfig): Promise<ChordDiagramData> {
+  const res = await api(`/api/v1/statistics/genre-cooccurrence${buildParams(filters)}`)
+  if (!res.ok) throw new Error(`Genre co-occurrence request failed: ${res.status}`)
+  return res.json() as Promise<ChordDiagramData>
+}
+
+export async function fetchUserSessionArchetypes(filters: StatisticsFilterConfig): Promise<UserSessionArchetypePoint[]> {
+  const res = await api(`/api/v1/user-statistics/session-archetypes${buildParams(filters, { days: '365' })}`)
+  if (!res.ok) throw new Error(`User session archetypes request failed: ${res.status}`)
+  return res.json() as Promise<UserSessionArchetypePoint[]>
 }

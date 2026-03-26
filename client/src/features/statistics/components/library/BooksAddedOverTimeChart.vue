@@ -4,9 +4,9 @@ import VChart from 'vue-echarts'
 import { TrendingUp } from 'lucide-vue-next'
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useBooksAddedOverTime } from '../composables/useBooksAddedOverTime'
-import { useStatisticsConfig } from '../composables/useStatisticsConfig'
-import ChartCard from './ChartCard.vue'
+import { useBooksAddedOverTime } from '../../composables/useBooksAddedOverTime'
+import { useStatisticsConfig } from '../../composables/useStatisticsConfig'
+import ChartCard from '../ChartCard.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -30,8 +30,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: { name: string; value: number }[]) => {
         const p = params[0]
         if (!p) return ''
@@ -58,10 +56,8 @@ watchEffect(() => {
       {
         type: 'bar',
         data: data.value.items.map((d) => d.count),
-        cursor: 'default',
         itemStyle: { borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 40,
-        emphasis: { disabled: true },
       },
     ],
   }

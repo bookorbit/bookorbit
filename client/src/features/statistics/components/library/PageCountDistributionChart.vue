@@ -3,8 +3,8 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { BookOpen } from 'lucide-vue-next'
 
-import { usePageCountDistribution } from '../composables/usePageCountDistribution'
-import ChartCard from './ChartCard.vue'
+import { usePageCountDistribution } from '../../composables/usePageCountDistribution'
+import ChartCard from '../ChartCard.vue'
 
 const { data, loading, error } = usePageCountDistribution()
 const option = shallowRef({})
@@ -15,8 +15,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'item',
-      confine: true,
-      enterable: false,
       formatter: (params: { dataIndex: number }) => {
         const row = data.value.items[params.dataIndex]
         if (!row) return ''
@@ -45,7 +43,6 @@ watchEffect(() => {
       {
         type: 'boxplot',
         data: data.value.items.map((item) => [item.min, item.q1, item.median, item.q3, item.max]),
-        emphasis: { disabled: true },
       },
     ],
   }

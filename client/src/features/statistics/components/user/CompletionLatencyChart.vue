@@ -3,8 +3,8 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Rabbit } from 'lucide-vue-next'
 
-import { useUserCompletionLatency } from '../composables/useUserCompletionLatency'
-import ChartCard from './ChartCard.vue'
+import { useUserCompletionLatency } from '../../composables/useUserCompletionLatency'
+import ChartCard from '../ChartCard.vue'
 
 const MIN_COMPLETIONS = 5
 
@@ -21,8 +21,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: Array<{ axisValue: string; data: number }>) => {
         const point = params[0]
         if (!point) return ''
@@ -49,8 +47,6 @@ watchEffect(() => {
         data: data.value.buckets.map((bucket) => bucket.count),
         barMaxWidth: 28,
         itemStyle: { borderRadius: [4, 4, 0, 0] },
-        cursor: 'default',
-        emphasis: { disabled: true },
       },
     ],
   }

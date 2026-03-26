@@ -3,8 +3,8 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Tag } from 'lucide-vue-next'
 
-import { useGenreRankOverTime } from '../composables/useGenreRankOverTime'
-import ChartCard from './ChartCard.vue'
+import { useGenreRankOverTime } from '../../composables/useGenreRankOverTime'
+import ChartCard from '../ChartCard.vue'
 
 const { data, loading, error } = useGenreRankOverTime()
 const option = shallowRef({})
@@ -32,8 +32,6 @@ watchEffect(() => {
     option.value = {
       tooltip: {
         trigger: 'axis',
-        confine: true,
-        enterable: false,
         formatter: (params: { name: string; value: number }[]) => {
           const p = params[0]
           if (!p) return ''
@@ -58,7 +56,6 @@ watchEffect(() => {
           data: rows.map((r) => r.count),
           barMaxWidth: 38,
           itemStyle: { borderRadius: [3, 3, 0, 0] },
-          emphasis: { disabled: true },
         },
       ],
     }
@@ -68,8 +65,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: { seriesName: string; data: number; axisValue: number }[]) => {
         const rows = params
           .filter((p) => Number.isFinite(p.data))

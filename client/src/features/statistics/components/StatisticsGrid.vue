@@ -6,30 +6,38 @@ import type { ChartConfigEntry, StatisticsChartId } from '@projectx/types'
 import { STATISTICS_CHART_META, type StatisticsChartSize } from '../statistics-chart-meta'
 import { useStatisticsConfig } from '../composables/useStatisticsConfig'
 
+defineProps<{ charts: ChartConfigEntry[] }>()
+
 const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
-  'format-distribution': defineAsyncComponent(() => import('./FormatDistributionChart.vue')),
-  'language-distribution': defineAsyncComponent(() => import('./LanguageDistributionChart.vue')),
-  'books-added-over-time': defineAsyncComponent(() => import('./BooksAddedOverTimeChart.vue')),
-  'storage-by-format': defineAsyncComponent(() => import('./StorageByFormatChart.vue')),
-  'publication-decade': defineAsyncComponent(() => import('./PublicationDecadeChart.vue')),
-  'top-authors': defineAsyncComponent(() => import('./TopAuthorsChart.vue')),
-  'metadata-completeness': defineAsyncComponent(() => import('./MetadataCompletenessChart.vue')),
-  'genre-distribution': defineAsyncComponent(() => import('./GenreDistributionChart.vue')),
-  'metadata-score-distribution': defineAsyncComponent(() => import('./MetadataScoreDistributionChart.vue')),
-  'library-metadata-completeness': defineAsyncComponent(() => import('./LibraryMetadataCompletenessHeatmapChart.vue')),
-  'format-share-over-time': defineAsyncComponent(() => import('./FormatShareOverTimeChart.vue')),
-  'genre-rank-over-time': defineAsyncComponent(() => import('./GenreRankOverTimeChart.vue')),
-  'page-count-distribution': defineAsyncComponent(() => import('./PageCountDistributionChart.vue')),
-  'reading-heatmap': defineAsyncComponent(() => import('./ReadingHeatmapChart.vue')),
-  'peak-reading-hours': defineAsyncComponent(() => import('./PeakReadingHoursChart.vue')),
-  'favorite-reading-days': defineAsyncComponent(() => import('./FavoriteReadingDaysChart.vue')),
-  'completion-timeline': defineAsyncComponent(() => import('./CompletionTimelineChart.vue')),
-  'goal-trajectory': defineAsyncComponent(() => import('./GoalTrajectoryChart.vue')),
-  'progress-funnel': defineAsyncComponent(() => import('./ProgressFunnelChart.vue')),
-  'completion-latency': defineAsyncComponent(() => import('./CompletionLatencyChart.vue')),
+  'format-distribution': defineAsyncComponent(() => import('./library/FormatDistributionChart.vue')),
+  'language-distribution': defineAsyncComponent(() => import('./library/LanguageDistributionChart.vue')),
+  'books-added-over-time': defineAsyncComponent(() => import('./library/BooksAddedOverTimeChart.vue')),
+  'storage-by-format': defineAsyncComponent(() => import('./library/StorageByFormatChart.vue')),
+  'publication-decade': defineAsyncComponent(() => import('./library/PublicationDecadeChart.vue')),
+  'top-authors': defineAsyncComponent(() => import('./library/TopAuthorsChart.vue')),
+  'metadata-completeness': defineAsyncComponent(() => import('./library/MetadataCompletenessChart.vue')),
+  'genre-distribution': defineAsyncComponent(() => import('./library/GenreDistributionChart.vue')),
+  'genre-cooccurrence': defineAsyncComponent(() => import('./library/GenreCooccurrenceChart.vue')),
+  'metadata-score-distribution': defineAsyncComponent(() => import('./library/MetadataScoreDistributionChart.vue')),
+  'library-metadata-completeness': defineAsyncComponent(() => import('./library/LibraryMetadataCompletenessHeatmapChart.vue')),
+  'format-share-over-time': defineAsyncComponent(() => import('./library/FormatShareOverTimeChart.vue')),
+  'genre-rank-over-time': defineAsyncComponent(() => import('./library/GenreRankOverTimeChart.vue')),
+  'page-count-distribution': defineAsyncComponent(() => import('./library/PageCountDistributionChart.vue')),
+  'reading-heatmap': defineAsyncComponent(() => import('./user/ReadingHeatmapChart.vue')),
+  'peak-reading-hours': defineAsyncComponent(() => import('./user/PeakReadingHoursChart.vue')),
+  'favorite-reading-days': defineAsyncComponent(() => import('./user/FavoriteReadingDaysChart.vue')),
+  'completion-timeline': defineAsyncComponent(() => import('./user/CompletionTimelineChart.vue')),
+  'goal-trajectory': defineAsyncComponent(() => import('./user/GoalTrajectoryChart.vue')),
+  'progress-funnel': defineAsyncComponent(() => import('./user/ProgressFunnelChart.vue')),
+  'completion-latency': defineAsyncComponent(() => import('./user/CompletionLatencyChart.vue')),
+  'genre-reading-time': defineAsyncComponent(() => import('./user/GenreReadingTimeTreemapChart.vue')),
+  'reading-pace': defineAsyncComponent(() => import('./user/ReadingPaceScatterChart.vue')),
+  'books-completed': defineAsyncComponent(() => import('./user/BooksCompletedChart.vue')),
+  'reading-clock': defineAsyncComponent(() => import('./user/ReadingClockChart.vue')),
+  'session-archetypes': defineAsyncComponent(() => import('./user/SessionArchetypesChart.vue')),
 }
 
-const { visibleCharts, reorder } = useStatisticsConfig()
+const { reorder } = useStatisticsConfig()
 
 function handleReorder(newList: ChartConfigEntry[]) {
   reorder(newList)
@@ -46,13 +54,13 @@ function tileClass(size: StatisticsChartSize): string {
 
 <template>
   <VueDraggable
-    :model-value="visibleCharts"
+    :model-value="charts"
     class="grid grid-flow-row-dense grid-cols-1 gap-4 md:grid-cols-2 md:auto-rows-[360px] xl:grid-cols-4"
     handle=".drag-handle"
     :animation="200"
     @update:model-value="handleReorder"
   >
-    <div v-for="chart in visibleCharts" :key="chart.id" :class="tileClass(STATISTICS_CHART_META[chart.id].size)">
+    <div v-for="chart in charts" :key="chart.id" :class="tileClass(STATISTICS_CHART_META[chart.id].size)">
       <component :is="CHART_COMPONENTS[chart.id]" />
     </div>
   </VueDraggable>

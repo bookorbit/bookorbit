@@ -1,15 +1,21 @@
 import { Injectable } from '@nestjs/common';
 
 import type {
+  ChordDiagramData,
   UserCompletionLatencyDistribution,
+  UserCompletionRaceBook,
   UserCompletionTimelinePoint,
   UserDailyReadingStat,
   UserFavoriteDayStat,
+  UserGenreReadingTimeItem,
   UserGoalTrajectory,
   UserGoalTrajectoryPoint,
   UserPeakHourStat,
   UserProgressFunnelComparison,
   UserProgressFunnel,
+  UserReadingPacePoint,
+  UserReadingSurvivalPoint,
+  UserSessionArchetypePoint,
   UserStatisticsSummary,
 } from '@projectx/types';
 
@@ -26,6 +32,11 @@ const GOAL_TRAJECTORY_DEFAULT_DAYS = 365;
 const GOAL_TRAJECTORY_DEFAULT_GOAL_BOOKS = 12;
 const PROGRESS_FUNNEL_DEFAULT_DAYS = 365;
 const COMPLETION_LATENCY_DEFAULT_DAYS = 1825;
+const GENRE_READING_TIME_DEFAULT_DAYS = 365;
+const READING_PACE_DEFAULT_DAYS = 1825;
+const READING_SURVIVAL_DEFAULT_DAYS = 1825;
+const COMPLETION_RACE_DEFAULT_DAYS = 1825;
+const SESSION_ARCHETYPES_DEFAULT_DAYS = 365;
 const SUMMARY_CACHE_TTL_MS = 30_000;
 const QUERY_CACHE_TTL_MS = 120_000;
 const QUERY_CACHE_MAX_ENTRIES = 2_000;
@@ -316,6 +327,80 @@ export class UserStatisticsService {
         buckets,
       };
     });
+  }
+
+  async getReadingSurvival(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserReadingSurvivalPoint[]> {
+    const days = query.days ?? READING_SURVIVAL_DEFAULT_DAYS;
+    const key = this.cacheKey('reading-survival', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.withCache(key, QUERY_CACHE_TTL_MS, async () => {
+      const values = await this.repo.getReadingSurvivalMaxProgress(user.id, user.isSuperuser, query.libraryIds, days);
+      const total = values.length;
+      const thresholds = Array.from({ length: 21 }, (_, i) => i * 5);
+      return thresholds.map((threshold) => {
+        const survivedCount = values.filter((v) => v >= threshold).length;
+        return {
+          threshold,
+          survivedCount,
+          survivedPct: total > 0 ? Number(((survivedCount / total) * 100).toFixed(1)) : 0,
+        };
+      });
+    });
+  }
+
+  async getCompletionRace(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserCompletionRaceBook[]> {
+    const days = query.days ?? COMPLETION_RACE_DEFAULT_DAYS;
+    const key = this.cacheKey('completion-race', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.withCache(key, QUERY_CACHE_TTL_MS, async () => {
+      const rows = await this.repo.getCompletionRaceRawSessions(user.id, user.isSuperuser, query.libraryIds, days);
+      const byBook = new Map<number, { title: string; sessions: { startedAt: Date; endProgress: number }[] }>();
+
+      for (const row of rows) {
+        if (!byBook.has(row.bookId)) {
+          byBook.set(row.bookId, { title: row.title ?? `Book ${row.bookId}`, sessions: [] });
+        }
+        byBook.get(row.bookId)!.sessions.push({ startedAt: row.startedAt, endProgress: row.endProgress });
+      }
+
+      const result: UserCompletionRaceBook[] = [];
+      for (const [bookId, { title, sessions }] of byBook.entries()) {
+        if (sessions.length < 2) continue;
+        const firstMs = sessions[0].startedAt.getTime();
+        result.push({
+          bookId,
+          title: title.length > 40 ? `${title.slice(0, 37)}...` : title,
+          points: sessions.map((s) => ({
+            daysSinceStart: Number(((s.startedAt.getTime() - firstMs) / 86_400_000).toFixed(2)),
+            progress: Number(s.endProgress.toFixed(1)),
+          })),
+        });
+      }
+
+      return result;
+    });
+  }
+
+  async getSessionArchetypes(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserSessionArchetypePoint[]> {
+    const days = query.days ?? SESSION_ARCHETYPES_DEFAULT_DAYS;
+    const key = this.cacheKey('session-archetypes', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.withCache(key, QUERY_CACHE_TTL_MS, () => this.repo.getSessionArchetypePoints(user.id, user.isSuperuser, query.libraryIds, days));
+  }
+
+  async getGenreReadingTime(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserGenreReadingTimeItem[]> {
+    const days = query.days ?? GENRE_READING_TIME_DEFAULT_DAYS;
+    const key = this.cacheKey('genre-reading-time', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.withCache(key, QUERY_CACHE_TTL_MS, () => this.repo.getGenreReadingTime(user.id, user.isSuperuser, query.libraryIds, days));
+  }
+
+  async getReadingPace(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserReadingPacePoint[]> {
+    const days = query.days ?? READING_PACE_DEFAULT_DAYS;
+    const key = this.cacheKey('reading-pace', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.withCache(key, QUERY_CACHE_TTL_MS, () => this.repo.getReadingPacePoints(user.id, user.isSuperuser, query.libraryIds, days));
+  }
+
+  async getAuthorGenreChord(user: RequestUser, query: UserDailyReadingQueryDto): Promise<ChordDiagramData> {
+    const days = query.days ?? 1825;
+    const key = this.cacheKey('author-genre-chord', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.withCache(key, QUERY_CACHE_TTL_MS, () => this.repo.getAuthorGenreChord(user.id, user.isSuperuser, query.libraryIds, days));
   }
 
   async recomputeRecentDailyStats(days = 2) {

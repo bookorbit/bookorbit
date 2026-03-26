@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type {
   BooksAddedDataPoint,
+  ChordDiagramData,
   FormatShareOverTimeItem,
   StatisticsSummary,
   GenreRankOverTimeItem,
@@ -254,5 +255,9 @@ export class StatisticsService {
 
   async getSummary(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsSummary> {
     return this.repo.getSummary(user.id, user.isSuperuser, query.libraryIds);
+  }
+
+  async getGenreCooccurrence(user: RequestUser, query: StatisticsFilterQueryDto): Promise<ChordDiagramData> {
+    return this.repo.getGenreCooccurrence(user.id, user.isSuperuser, query.libraryIds);
   }
 }

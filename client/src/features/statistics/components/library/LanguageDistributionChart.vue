@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { PieChart } from 'lucide-vue-next'
+import { Globe } from 'lucide-vue-next'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 
-import { useFormatDistribution } from '../composables/useFormatDistribution'
-import ChartCard from './ChartCard.vue'
+import { useLanguageDistribution } from '../../composables/useLanguageDistribution'
+import ChartCard from '../ChartCard.vue'
 
-const { data, loading, error } = useFormatDistribution()
+const { data, loading, error } = useLanguageDistribution()
 const { md } = useBreakpoints(breakpointsTailwind)
 
 const option = shallowRef({})
@@ -15,7 +15,7 @@ const option = shallowRef({})
 watchEffect(() => {
   if (!data.value.items.length) return
   option.value = {
-    tooltip: { trigger: 'item', confine: true, enterable: false },
+    tooltip: { trigger: 'item' },
     legend: {
       orient: md.value ? 'vertical' : 'horizontal',
       right: md.value ? '2%' : 'auto',
@@ -27,10 +27,8 @@ watchEffect(() => {
         type: 'pie',
         radius: ['40%', '70%'],
         center: md.value ? ['38%', '50%'] : ['50%', '44%'],
-        data: data.value.items.map((item) => ({ name: item.format.toUpperCase(), value: item.count })),
-        cursor: 'default',
+        data: data.value.items.map((item) => ({ name: item.language.toUpperCase(), value: item.count })),
         label: { show: false },
-        emphasis: { disabled: true },
       },
     ],
   }
@@ -39,9 +37,9 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Format Distribution"
-    :icon="PieChart"
-    :color-index="1"
+    title="Language Distribution"
+    :icon="Globe"
+    :color-index="2"
     :loading
     :error
     :empty="!data.items.length"

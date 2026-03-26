@@ -3,8 +3,8 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Users } from 'lucide-vue-next'
 
-import { useTopAuthors } from '../composables/useTopAuthors'
-import ChartCard from './ChartCard.vue'
+import { useTopAuthors } from '../../composables/useTopAuthors'
+import ChartCard from '../ChartCard.vue'
 
 const { data, loading, error } = useTopAuthors()
 const option = shallowRef({})
@@ -14,8 +14,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: { name: string; value: number }[]) => {
         const p = params[0]
         if (!p) return ''
@@ -44,10 +42,8 @@ watchEffect(() => {
       {
         type: 'bar',
         data: data.value.items.map((d) => d.count),
-        cursor: 'default',
         itemStyle: { borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 32,
-        emphasis: { disabled: true },
       },
     ],
   }

@@ -3,8 +3,8 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { CalendarRange } from 'lucide-vue-next'
 
-import { useUserCompletionTimeline } from '../composables/useUserCompletionTimeline'
-import ChartCard from './ChartCard.vue'
+import { useUserCompletionTimeline } from '../../composables/useUserCompletionTimeline'
+import ChartCard from '../ChartCard.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 3
@@ -26,8 +26,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: Array<{ axisValue: string; data: number }>) => {
         const point = params[0]
         if (!point) return ''
@@ -60,8 +58,6 @@ watchEffect(() => {
         showSymbol: false,
         areaStyle: { opacity: 0.2 },
         lineStyle: { width: 2 },
-        cursor: 'default',
-        emphasis: { disabled: true },
       },
     ],
   }

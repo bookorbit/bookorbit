@@ -1,19 +1,34 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
+  ChordDiagramData,
   UserCompletionTimelinePoint,
   UserDailyReadingStat,
   UserFavoriteDayStat,
+  UserGenreReadingTimeItem,
   UserPeakHourStat,
   UserProgressFunnel,
+  UserReadingPacePoint,
+  UserSessionArchetypePoint,
   UserStatisticsSummary,
 } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, books, readingProgress, readingSessions, userBookStatus, userLibraryAccess, userReadingDailyStats } from '../../db/schema';
+import {
+  bookFiles,
+  bookGenres,
+  bookMetadata,
+  books,
+  genres,
+  readingProgress,
+  readingSessions,
+  userBookStatus,
+  userLibraryAccess,
+  userReadingDailyStats,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 const RECENT_DAILY_AGGREGATION_DAYS = 2;
@@ -291,9 +306,225 @@ export class UserStatisticsRepository {
       .filter((daysValue) => Number.isFinite(daysValue) && daysValue >= 0);
   }
 
-  async recomputeRecentDailyStats(days = RECENT_DAILY_AGGREGATION_DAYS): Promise<{ deleted: number; inserted: number; since: string }> {
+  async getGenreReadingTime(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 365): Promise<UserGenreReadingTimeItem[]> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
-    const sinceDay = since.toISOString().slice(0, 10);
+
+    return this.db
+      .select({
+        genre: genres.name,
+        readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
+      })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(bookGenres, eq(bookGenres.bookId, books.id))
+      .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
+      .groupBy(genres.name)
+      .orderBy(sql`sum(${readingSessions.durationSeconds}) desc`)
+      .limit(30);
+  }
+
+  async getReadingPacePoints(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 1825): Promise<UserReadingPacePoint[]> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const since = this.sinceDateForDays(days);
+
+    const rows = await this.db
+      .select({
+        durationSeconds: readingSessions.durationSeconds,
+        progressDelta: readingSessions.progressDelta,
+      })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(
+        and(
+          eq(readingSessions.userId, userId),
+          gte(readingSessions.startedAt, since),
+          isNotNull(readingSessions.progressDelta),
+          gt(readingSessions.progressDelta, 0),
+          libraryFilter,
+        ),
+      )
+      .orderBy(readingSessions.startedAt)
+      .limit(2000);
+
+    return rows.map((r) => ({ durationSeconds: r.durationSeconds, progressDelta: r.progressDelta! }));
+  }
+
+  async getReadingSurvivalMaxProgress(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 1825): Promise<number[]> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const since = this.sinceDateForDays(days);
+
+    const perBook = this.db
+      .select({
+        bookId: bookFiles.bookId,
+        maxProgress: sql<number>`max(${readingSessions.endProgress})`.as('max_progress'),
+      })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), isNotNull(readingSessions.endProgress), libraryFilter))
+      .groupBy(bookFiles.bookId)
+      .as('per_book');
+
+    const rows = await this.db.select({ maxProgress: perBook.maxProgress }).from(perBook);
+    return rows.map((r) => Number(r.maxProgress)).filter((v) => Number.isFinite(v));
+  }
+
+  async getCompletionRaceRawSessions(
+    userId: number,
+    isSuperuser: boolean,
+    filterLibraryIds?: number[],
+    days = 1825,
+    limit = 15,
+  ): Promise<{ bookId: number; title: string | null; startedAt: Date; endProgress: number }[]> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const since = this.sinceDateForDays(days);
+
+    const topBookIds = await this.db
+      .select({ bookId: bookFiles.bookId })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), isNotNull(readingSessions.endProgress), libraryFilter))
+      .groupBy(bookFiles.bookId)
+      .orderBy(sql`count(*) desc`)
+      .limit(limit)
+      .then((rows) => rows.map((r) => r.bookId));
+
+    if (!topBookIds.length) return [];
+
+    return this.db
+      .select({
+        bookId: bookFiles.bookId,
+        title: bookMetadata.title,
+        startedAt: readingSessions.startedAt,
+        endProgress: readingSessions.endProgress,
+      })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .where(and(eq(readingSessions.userId, userId), inArray(bookFiles.bookId, topBookIds), isNotNull(readingSessions.endProgress)))
+      .orderBy(bookFiles.bookId, readingSessions.startedAt)
+      .then((rows) => rows.map((r) => ({ ...r, endProgress: r.endProgress! })));
+  }
+
+  async getSessionArchetypePoints(
+    userId: number,
+    isSuperuser: boolean,
+    filterLibraryIds?: number[],
+    days = 365,
+  ): Promise<UserSessionArchetypePoint[]> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const since = this.sinceDateForDays(days);
+
+    const hourExpr = sql<number>`extract(hour from ${readingSessions.startedAt}) + extract(minute from ${readingSessions.startedAt}) / 60.0`;
+    const durationExpr = sql<number>`${readingSessions.durationSeconds} / 60.0`;
+    const dowExpr = sql<number>`extract(dow from ${readingSessions.startedAt})::int`;
+
+    const rows = await this.db
+      .select({ hour: hourExpr, durationMinutes: durationExpr, dayOfWeek: dowExpr })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), gte(readingSessions.durationSeconds, 300), libraryFilter))
+      .orderBy(readingSessions.startedAt)
+      .limit(2000);
+
+    return rows.map((r) => ({
+      hour: Number(r.hour),
+      durationMinutes: Number(r.durationMinutes),
+      dayOfWeek: Number(r.dayOfWeek),
+    }));
+  }
+
+  async getAuthorGenreChord(
+    userId: number,
+    isSuperuser: boolean,
+    filterLibraryIds?: number[],
+    days = 1825,
+    authorLimit = 12,
+    genreLimit = 12,
+  ): Promise<ChordDiagramData> {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const libFilter = this.intersectLibraryIds(accessible, filterLibraryIds);
+    const since = this.sinceDateForDays(days);
+    const sinceStr = since.toISOString().slice(0, 10);
+
+    const libCondition = libFilter === null ? sql`true` : libFilter.length === 0 ? sql`false` : inArray(books.libraryId, libFilter);
+
+    const rows = await this.db.execute<{ author: string; genre: string; reading_seconds: number }>(sql`
+      with top_authors as (
+        select a.name, sum(rs.duration_seconds) as total
+        from reading_sessions rs
+        inner join book_files bf on bf.id = rs.book_file_id
+        inner join books b on b.id = bf.book_id
+        inner join book_authors ba on ba.book_id = b.id
+        inner join authors a on a.id = ba.author_id
+        where rs.user_id = ${userId}
+          and rs.started_at >= ${sinceStr}::timestamp
+          and ${libCondition}
+        group by a.name
+        order by total desc
+        limit ${authorLimit}
+      ),
+      top_genres as (
+        select g.name, sum(rs.duration_seconds) as total
+        from reading_sessions rs
+        inner join book_files bf on bf.id = rs.book_file_id
+        inner join books b on b.id = bf.book_id
+        inner join book_genres bg on bg.book_id = b.id
+        inner join genres g on g.id = bg.genre_id
+        where rs.user_id = ${userId}
+          and rs.started_at >= ${sinceStr}::timestamp
+          and ${libCondition}
+        group by g.name
+        order by total desc
+        limit ${genreLimit}
+      )
+      select
+        a.name as author,
+        g.name as genre,
+        sum(rs.duration_seconds)::int as reading_seconds
+      from reading_sessions rs
+      inner join book_files bf on bf.id = rs.book_file_id
+      inner join books b on b.id = bf.book_id
+      inner join book_authors ba on ba.book_id = b.id
+      inner join top_authors a on a.name = (
+        select a2.name from book_authors ba2 inner join authors a2 on a2.id = ba2.author_id where ba2.book_id = b.id order by ba2.display_order, ba2.author_id limit 1
+      )
+      inner join book_genres bg on bg.book_id = b.id
+      inner join top_genres g on g.name = (
+        select g2.name from book_genres bg2 inner join genres g2 on g2.id = bg2.genre_id where bg2.book_id = b.id order by bg2.genre_id limit 1
+      )
+      where rs.user_id = ${userId}
+        and rs.started_at >= ${sinceStr}::timestamp
+        and ${libCondition}
+      group by a.name, g.name
+      having sum(rs.duration_seconds) > 0
+      order by reading_seconds desc
+    `);
+
+    if (rows.rows.length === 0) return { nodes: [], links: [] };
+
+    const authorNames = [...new Set(rows.rows.map((r) => r.author))];
+    const genreNames = [...new Set(rows.rows.map((r) => r.genre))];
+
+    return {
+      nodes: [...authorNames.map((n) => ({ name: n })), ...genreNames.map((n) => ({ name: n }))],
+      links: rows.rows.map((r) => ({ source: r.author, target: r.genre, value: r.reading_seconds })),
+    };
+  }
+
+  async recomputeRecentDailyStats(days = RECENT_DAILY_AGGREGATION_DAYS): Promise<{ deleted: number; inserted: number; since: string }> {
+    const sinceDay = this.sinceDateForDays(days).toISOString().slice(0, 10);
 
     return this.db.transaction(async (tx) => {
       const deleteResult = await tx.execute(sql`delete from user_reading_daily_stats where day >= ${sinceDay}::date`);
@@ -311,7 +542,7 @@ export class UserStatisticsRepository {
         from reading_sessions rs
         inner join book_files bf on bf.id = rs.book_file_id
         inner join books b on b.id = bf.book_id
-        where rs.started_at >= ${since}
+        where rs.started_at >= ${sinceDay}::timestamp
         group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
       `);
 

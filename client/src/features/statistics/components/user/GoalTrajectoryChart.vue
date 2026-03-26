@@ -3,8 +3,8 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Goal } from 'lucide-vue-next'
 
-import { useUserGoalTrajectory } from '../composables/useUserGoalTrajectory'
-import ChartCard from './ChartCard.vue'
+import { useUserGoalTrajectory } from '../../composables/useUserGoalTrajectory'
+import ChartCard from '../ChartCard.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 2
@@ -26,8 +26,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: Array<{ seriesName: string; data: number; axisValue: string }>) => {
         const lines = params.map((item) => `${item.seriesName}: <strong>${item.data}</strong>`)
         return `${params[0]?.axisValue ?? ''}<br/>${lines.join('<br/>')}`
@@ -58,8 +56,6 @@ watchEffect(() => {
         symbolSize: 5,
         lineStyle: { width: 2.5 },
         areaStyle: { opacity: 0.15 },
-        cursor: 'default',
-        emphasis: { disabled: true },
       },
       {
         name: `Goal (${data.value.goalBooks}/yr)`,
@@ -69,8 +65,6 @@ watchEffect(() => {
         showSymbol: true,
         symbolSize: 5,
         lineStyle: { width: 2, type: 'dashed' },
-        cursor: 'default',
-        emphasis: { disabled: true },
       },
     ],
   }

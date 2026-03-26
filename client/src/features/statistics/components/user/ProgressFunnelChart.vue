@@ -4,8 +4,8 @@ import VChart from 'vue-echarts'
 import { Waypoints } from 'lucide-vue-next'
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useUserProgressFunnel } from '../composables/useUserProgressFunnel'
-import ChartCard from './ChartCard.vue'
+import { useUserProgressFunnel } from '../../composables/useUserProgressFunnel'
+import ChartCard from '../ChartCard.vue'
 
 type FunnelMode = 'percent' | 'counts' | 'dropoff'
 const MODE_LABELS: Record<FunnelMode, string> = {
@@ -87,8 +87,6 @@ watchEffect(() => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        confine: true,
-        enterable: false,
         formatter: (params: Array<{ axisValue: string; data: number }>) => {
           const point = params[0]
           if (!point) return ''
@@ -116,8 +114,6 @@ watchEffect(() => {
           data: transitionMetrics.value.map((metric) => metric.drop),
           barWidth: 16,
           itemStyle: { borderRadius: [0, 4, 4, 0] },
-          cursor: 'default',
-          emphasis: { disabled: true },
           label: {
             show: true,
             position: 'right',
@@ -142,8 +138,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'item',
-      confine: true,
-      enterable: false,
       formatter: (params: { data: { name: string; rawCount: number; pct: number } }) => {
         const point = params.data
         const plural = point.rawCount === 1 ? 'book' : 'books'
@@ -176,8 +170,6 @@ watchEffect(() => {
           borderWidth: 1,
           borderRadius: 3,
         },
-        cursor: 'default',
-        emphasis: { disabled: true },
         data: funnelValues,
       },
     ],

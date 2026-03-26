@@ -3,8 +3,8 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { BarChart3 } from 'lucide-vue-next'
 
-import { useMetadataScoreDistribution } from '../composables/useMetadataScoreDistribution'
-import ChartCard from './ChartCard.vue'
+import { useMetadataScoreDistribution } from '../../composables/useMetadataScoreDistribution'
+import ChartCard from '../ChartCard.vue'
 
 const { data, loading, error } = useMetadataScoreDistribution()
 const option = shallowRef({})
@@ -25,8 +25,6 @@ watchEffect(() => {
   option.value = {
     tooltip: {
       trigger: 'axis',
-      confine: true,
-      enterable: false,
       formatter: (params: { name: string; value: number }[]) => {
         const p = params[0]
         if (!p) return ''
@@ -51,7 +49,6 @@ watchEffect(() => {
         data: data.value.bins.map((b) => b.count),
         barMaxWidth: 44,
         itemStyle: { borderRadius: [3, 3, 0, 0] },
-        emphasis: { disabled: true },
         markArea:
           p25Index != null && p75Index != null
             ? {

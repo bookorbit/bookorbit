@@ -13,16 +13,34 @@ import { useStatisticsConfig } from '../composables/useStatisticsConfig'
 import StatisticsGrid from './StatisticsGrid.vue'
 import StatisticsSummaryCard from './StatisticsSummaryCard.vue'
 
-const { orderedCharts, filters, init, toggleVisibility, reorder, resetToDefaults, setLibraryFilter } = useStatisticsConfig()
+const {
+  orderedLibraryCharts,
+  orderedUserCharts,
+  visibleLibraryCharts,
+  visibleUserCharts,
+  libraryChartCount,
+  userChartCount,
+  visibleLibraryChartCount,
+  visibleUserChartCount,
+  filters,
+  init,
+  toggleVisibility,
+  reorder,
+  resetToDefaults,
+  setLibraryFilter,
+} = useStatisticsConfig()
+
 const { libraries, fetchLibraries } = useLibraries()
 const configOpen = ref(false)
+const activeTab = ref<'library' | 'user'>('library')
 
 // Called in setup (not onMounted) so filters are populated before chart children mount.
 init()
 onMounted(fetchLibraries)
 
-const visibleCount = computed(() => orderedCharts.value.filter((c) => c.visible).length)
-const totalCount = computed(() => orderedCharts.value.length)
+const activeVisibleCount = computed(() => (activeTab.value === 'library' ? visibleLibraryChartCount.value : visibleUserChartCount.value))
+const activeTotalCount = computed(() => (activeTab.value === 'library' ? libraryChartCount.value : userChartCount.value))
+const activeOrderedCharts = computed(() => (activeTab.value === 'library' ? orderedLibraryCharts.value : orderedUserCharts.value))
 
 const libraryLabel = computed(() => {
   const count = filters.value.libraryIds.length
@@ -72,17 +90,38 @@ function openConfig() {
 function chartMeta(id: StatisticsChartId) {
   return STATISTICS_CHART_META[id]
 }
+
+function setTab(tab: 'library' | 'user') {
+  activeTab.value = tab
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-6 pt-4">
     <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-foreground text-[22px] font-semibold">Library Statistics</h1>
+      <div class="flex items-center gap-1 rounded-lg bg-muted p-1">
+        <button
+          :class="[
+            'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+            activeTab === 'library' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="setTab('library')"
+        >
+          Library Stats
+        </button>
+        <button
+          :class="[
+            'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+            activeTab === 'user' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="setTab('user')"
+        >
+          My Reading
+        </button>
       </div>
 
       <div class="flex items-center gap-2">
-        <Popover v-if="libraries.length > 1">
+        <Popover v-if="activeTab === 'library' && libraries.length > 1">
           <PopoverTrigger as-child>
             <button
               :class="[
@@ -142,7 +181,7 @@ function chartMeta(id: StatisticsChartId) {
           <div class="flex items-center justify-between pr-8">
             <SheetTitle>Configure Charts</SheetTitle>
             <span class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium tabular-nums">
-              {{ visibleCount }} / {{ totalCount }}
+              {{ activeVisibleCount }} / {{ activeTotalCount }}
             </span>
           </div>
           <SheetDescription>Drag to reorder, toggle to show or hide.</SheetDescription>
@@ -150,14 +189,14 @@ function chartMeta(id: StatisticsChartId) {
 
         <div class="flex-1 overflow-y-auto px-4">
           <VueDraggable
-            :model-value="orderedCharts"
+            :model-value="activeOrderedCharts"
             class="flex flex-col gap-2"
             handle=".drawer-drag-handle"
             :animation="150"
             @update:model-value="handleReorder"
           >
             <div
-              v-for="chart in orderedCharts"
+              v-for="chart in activeOrderedCharts"
               :key="chart.id"
               :class="[
                 'border-border/50 bg-muted/40 flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-opacity',
@@ -185,6 +224,11 @@ function chartMeta(id: StatisticsChartId) {
       </SheetContent>
     </Sheet>
 
-    <StatisticsGrid />
+    <div v-show="activeTab === 'library'">
+      <StatisticsGrid :charts="visibleLibraryCharts" />
+    </div>
+    <div v-show="activeTab === 'user'">
+      <StatisticsGrid :charts="visibleUserCharts" />
+    </div>
   </div>
 </template>

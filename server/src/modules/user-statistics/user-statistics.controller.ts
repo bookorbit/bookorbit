@@ -55,4 +55,34 @@ export class UserStatisticsController {
   getCompletionLatency(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
     return this.userStatisticsService.getCompletionLatency(user, query);
   }
+
+  @Get('genre-reading-time')
+  getGenreReadingTime(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getGenreReadingTime(user, query);
+  }
+
+  @Get('reading-pace')
+  getReadingPace(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getReadingPace(user, query);
+  }
+
+  @Get('reading-survival')
+  getReadingSurvival(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getReadingSurvival(user, query);
+  }
+
+  @Get('completion-race')
+  getCompletionRace(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getCompletionRace(user, query);
+  }
+
+  @Get('session-archetypes')
+  getSessionArchetypes(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getSessionArchetypes(user, query);
+  }
+
+  @Get('author-genre-chord')
+  getAuthorGenreChord(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getAuthorGenreChord(user, query);
+  }
 }
