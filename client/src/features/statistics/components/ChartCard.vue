@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
+import { computed } from 'vue'
 import { AlertCircle, GripVertical } from 'lucide-vue-next'
 import { Skeleton } from '@/components/ui/skeleton'
 
-defineProps<{
+const props = defineProps<{
   title: string
   icon: Component
   colorIndex: number
@@ -12,6 +13,14 @@ defineProps<{
   unknownCount?: number
   error?: boolean
 }>()
+
+const ICON_HUE_OFFSETS = [0, 45, 90, 135, 180, 225, 270, 315, 337]
+
+const iconStyle = computed(() => {
+  const offset = ICON_HUE_OFFSETS[(props.colorIndex - 1) % ICON_HUE_OFFSETS.length] ?? 0
+  const color = `oklch(from var(--primary) l c calc(h + ${offset}))`
+  return { backgroundColor: `color-mix(in oklch, ${color} 15%, transparent)`, color }
+})
 </script>
 
 <template>
@@ -23,13 +32,7 @@ defineProps<{
     <div class="flex min-h-0 flex-1 flex-col p-4">
       <div class="mb-3 flex items-center justify-between gap-2 border-b pb-3">
         <div class="flex items-center gap-2.5">
-          <div
-            class="shrink-0 rounded-md p-2"
-            :style="{
-              backgroundColor: `color-mix(in oklch, var(--chart-icon-${colorIndex}) 15%, transparent)`,
-              color: `var(--chart-icon-${colorIndex})`,
-            }"
-          >
+          <div class="shrink-0 rounded-md p-2" :style="iconStyle">
             <component :is="icon" class="size-4" />
           </div>
           <p class="text-foreground text-sm font-semibold">{{ title }}</p>

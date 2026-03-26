@@ -50,7 +50,6 @@ use([
   PolarComponent,
 ])
 
-const PROJECTX_THEME_NAME = 'projectx'
 let themeRegistered = false
 
 export function readCssColor(varName: string): string {
@@ -64,7 +63,45 @@ export function readCssColor(varName: string): string {
 
 type ProjectxThemeMode = 'light' | 'dark'
 
-const ACCENT_HUE_BY_ID: Record<string, number> = {
+// --primary oklch(L C H) per accent, sourced from accents.css.
+// [lightL, lightC, darkL, darkC] — hue is always the tint-h value.
+type PrimaryDef = [lightL: number, lightC: number, darkL: number, darkC: number]
+const ACCENT_PRIMARY: Record<string, PrimaryDef> = {
+  white: [0.2, 0, 0.985, 0],
+  grey: [0.55, 0, 0.75, 0],
+  rose: [0.57, 0.24, 0.73, 0.2],
+  orange: [0.64, 0.22, 0.78, 0.18],
+  amber: [0.72, 0.17, 0.82, 0.17],
+  yellow: [0.75, 0.18, 0.84, 0.16],
+  lime: [0.64, 0.2, 0.77, 0.18],
+  green: [0.527, 0.18, 0.72, 0.18],
+  emerald: [0.52, 0.17, 0.72, 0.15],
+  teal: [0.52, 0.18, 0.74, 0.16],
+  cyan: [0.52, 0.2, 0.75, 0.17],
+  sky: [0.54, 0.21, 0.75, 0.18],
+  blue: [0.487, 0.25, 0.72, 0.2],
+  indigo: [0.51, 0.26, 0.72, 0.22],
+  violet: [0.491, 0.27, 0.72, 0.23],
+  fuchsia: [0.56, 0.27, 0.75, 0.22],
+  pink: [0.56, 0.26, 0.75, 0.22],
+  coral: [0.6, 0.12, 0.76, 0.1],
+  peach: [0.63, 0.11, 0.78, 0.09],
+  butter: [0.66, 0.13, 0.8, 0.11],
+  lemon: [0.7, 0.12, 0.82, 0.1],
+  celadon: [0.61, 0.1, 0.76, 0.08],
+  sage: [0.52, 0.1, 0.72, 0.09],
+  mint: [0.6, 0.1, 0.75, 0.09],
+  seafoam: [0.61, 0.09, 0.76, 0.08],
+  powder: [0.59, 0.1, 0.75, 0.09],
+  mist: [0.56, 0.1, 0.74, 0.09],
+  periwinkle: [0.54, 0.11, 0.73, 0.1],
+  wisteria: [0.55, 0.1, 0.73, 0.09],
+  lavender: [0.55, 0.11, 0.73, 0.1],
+  orchid: [0.56, 0.11, 0.74, 0.1],
+  blush: [0.54, 0.11, 0.73, 0.1],
+}
+
+const ACCENT_HUE: Record<string, number> = {
   white: 0,
   grey: 0,
   rose: 15,
@@ -102,44 +139,63 @@ const ACCENT_HUE_BY_ID: Record<string, number> = {
 const THEME_MODES: ProjectxThemeMode[] = ['light', 'dark']
 const DEFAULT_ACCENT = 'blue'
 
-function normalizeHue(value: number): number {
-  const mod = value % 360
-  return mod < 0 ? mod + 360 : mod
+// Staggered hue offsets so adjacent chart series have more contrast.
+const HUE_OFFSETS = [0, 72, 144, 216, 288, 36, 108, 180, 252, 324]
+
+function oklchToHex(L: number, C: number, H: number): string {
+  const h = (H * Math.PI) / 180
+  const a = C * Math.cos(h)
+  const b = C * Math.sin(h)
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b
+  const l = l_ ** 3
+  const m = m_ ** 3
+  const s = s_ ** 3
+  const lr = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
+  const lg = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
+  const lb = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+  const toSrgb = (v: number) => {
+    const c = Math.max(0, Math.min(1, v))
+    return c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055
+  }
+  return (
+    '#' +
+    [lr, lg, lb]
+      .map((v) =>
+        Math.round(toSrgb(v) * 255)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')
+  )
 }
 
-function hsl(h: number, s: number, l: number): string {
-  return `hsl(${Math.round(normalizeHue(h))}, ${s}%, ${l}%)`
-}
+function buildTheme(accent: string, dark: boolean) {
+  const def = ACCENT_PRIMARY[accent] ?? ACCENT_PRIMARY[DEFAULT_ACCENT]!
+  const L = dark ? def[2] : def[0]
+  const C = dark ? def[3] : def[1]
+  const H = ACCENT_HUE[accent] ?? ACCENT_HUE[DEFAULT_ACCENT]!
 
-function buildSeriesPalette(baseHue: number, dark: boolean): string[] {
-  const offsets = [0, 72, 144, 216, 288, 36, 108, 180, 252, 324]
-  const sat = dark ? [74, 70, 68, 72, 74, 68, 66, 64, 68, 70] : [68, 64, 62, 66, 68, 62, 60, 58, 62, 64]
-  const light = dark ? [64, 62, 60, 66, 64, 48, 46, 44, 50, 47] : [56, 54, 52, 58, 56, 42, 40, 38, 44, 41]
-  return offsets.map((offset, index) => hsl(baseHue + offset, sat[index] ?? sat[0] ?? 68, light[index] ?? light[0] ?? 56))
-}
+  const colors = HUE_OFFSETS.map((off) => oklchToHex(L, C, H + off))
 
-function buildAxisConfig(dark: boolean) {
-  const axisLine = dark ? '#374151' : '#D1D5DB'
+  const border = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)'
   const axisLabel = dark ? '#9CA3AF' : '#6B7280'
-  const splitLine = dark ? '#2A3441' : '#E5E7EB'
-  return {
-    axisLine: { show: true, lineStyle: { color: axisLine } },
+  const axisConfig = {
+    axisLine: { show: true, lineStyle: { color: border } },
     axisTick: { show: false },
     axisLabel: { show: true, color: axisLabel },
-    splitLine: { show: true, lineStyle: { color: [splitLine] } },
+    splitLine: { show: true, lineStyle: { color: [border] } },
     splitArea: { show: false },
   }
-}
 
-function buildTheme(baseHue: number, dark: boolean) {
-  const axisConfig = buildAxisConfig(dark)
   return {
-    color: buildSeriesPalette(baseHue, dark),
+    color: colors,
     backgroundColor: 'transparent',
     legend: { textStyle: { color: dark ? '#F3F4F6' : '#111827' } },
     tooltip: {
       backgroundColor: dark ? '#1F2937' : '#FFFFFF',
-      borderColor: dark ? '#374151' : '#D1D5DB',
+      borderColor: border,
       textStyle: { color: dark ? '#F9FAFB' : '#111827' },
     },
     categoryAxis: axisConfig,
@@ -150,17 +206,15 @@ function buildTheme(baseHue: number, dark: boolean) {
 }
 
 export function getProjectxThemeName(mode: ProjectxThemeMode = 'dark', accent: string = DEFAULT_ACCENT): string {
-  const resolvedAccent = accent in ACCENT_HUE_BY_ID ? accent : DEFAULT_ACCENT
-  return `${PROJECTX_THEME_NAME}-${mode}-${resolvedAccent}`
+  const resolvedAccent = accent in ACCENT_PRIMARY ? accent : DEFAULT_ACCENT
+  return `projectx-${mode}-${resolvedAccent}`
 }
 
 export function initChartThemes(): void {
   if (themeRegistered) return
-  const accents = Object.keys(ACCENT_HUE_BY_ID)
   for (const mode of THEME_MODES) {
-    for (const accent of accents) {
-      const hue = ACCENT_HUE_BY_ID[accent] ?? ACCENT_HUE_BY_ID[DEFAULT_ACCENT] ?? 263
-      registerTheme(getProjectxThemeName(mode, accent), buildTheme(hue, mode === 'dark'))
+    for (const accent of Object.keys(ACCENT_PRIMARY)) {
+      registerTheme(getProjectxThemeName(mode, accent), buildTheme(accent, mode === 'dark'))
     }
   }
   themeRegistered = true

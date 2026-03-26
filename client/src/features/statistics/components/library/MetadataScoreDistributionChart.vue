@@ -52,7 +52,7 @@ watchEffect(() => {
         markArea:
           p25Index != null && p75Index != null
             ? {
-                itemStyle: { color: 'color-mix(in oklch, var(--chart-2) 18%, transparent)' },
+                itemStyle: { color: 'rgba(128, 128, 128, 0.12)' },
                 data: [[{ xAxis: p25Index }, { xAxis: p75Index }]],
               }
             : undefined,

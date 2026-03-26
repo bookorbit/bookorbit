@@ -8,6 +8,14 @@ import { useUserStatisticsSummary } from '../composables/useUserStatisticsSummar
 const { data, loading: libraryLoading } = useStatisticsSummary()
 const { data: userData, loading: userLoading } = useUserStatisticsSummary()
 
+const ICON_HUE_OFFSETS = [0, 45, 90, 135, 180, 225, 270, 315, 337]
+
+function iconStyle(colorIndex: number) {
+  const offset = ICON_HUE_OFFSETS[(colorIndex - 1) % ICON_HUE_OFFSETS.length] ?? 0
+  const color = `oklch(from var(--primary) l c calc(h + ${offset}))`
+  return { backgroundColor: `color-mix(in oklch, ${color} 15%, transparent)`, color }
+}
+
 function formatBytes(bytes: number): string {
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
   if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
@@ -62,13 +70,7 @@ const kpis = computed(() => [
           :key="kpi.label"
           :class="['border-border/60 bg-background/50 flex shrink-0 items-center gap-3 rounded-lg border px-4 py-2.5', loading ? 'opacity-60' : '']"
         >
-          <div
-            class="shrink-0 rounded-md p-1.5"
-            :style="{
-              backgroundColor: `color-mix(in oklch, var(--chart-icon-${kpi.colorIndex}) 15%, transparent)`,
-              color: `var(--chart-icon-${kpi.colorIndex})`,
-            }"
-          >
+          <div class="shrink-0 rounded-md p-1.5" :style="iconStyle(kpi.colorIndex)">
             <component :is="kpi.icon" class="size-4" />
           </div>
           <div>

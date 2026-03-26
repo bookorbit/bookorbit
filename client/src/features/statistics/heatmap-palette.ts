@@ -119,13 +119,13 @@ export function buildHeatmapPalette({ theme, profile = 'soft' }: BuildHeatmapPal
   const border = resolveCssColor(rootStyle.getPropertyValue('--border'), isDark ? 'rgb(52, 64, 84)' : 'rgb(226, 232, 240)')
   const borderRaw = readCssColor('--border')
   const card = resolveCssColor(rootStyle.getPropertyValue('--card'), isDark ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)')
-  const seriesBase = readCssColor('--chart-1')
+  const seriesBase = readCssColor('--primary')
   const foreground = resolveCssColor(rootStyle.getPropertyValue('--foreground'), isDark ? 'rgb(241, 245, 249)' : 'rgb(15, 23, 42)')
 
   let scale: string[]
 
   if (profile === 'github') {
-    // 0% should reveal the chart surface. 100% should match --chart-1 exactly.
+    // 0% should reveal the chart surface. 100% should match --primary exactly.
     scale = [
       withAlpha(seriesBase, 0),
       withAlpha(seriesBase, isDark ? 0.35 : 0.28),
