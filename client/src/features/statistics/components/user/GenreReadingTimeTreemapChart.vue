@@ -3,11 +3,14 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Tag } from 'lucide-vue-next'
 
+import { useThemeStore } from '@/stores/theme'
+import { getThemePalette, readCssColor } from '@/lib/echarts'
 import { useUserGenreReadingTime } from '../../composables/useUserGenreReadingTime'
 import ChartCard from '../ChartCard.vue'
 
 const MIN_GENRES = 2
 
+const themeStore = useThemeStore()
 const { data, loading, error } = useUserGenreReadingTime()
 
 const totalSeconds = computed(() => data.value.reduce((s, item) => s + item.readingSeconds, 0))
@@ -19,6 +22,9 @@ const option = shallowRef({})
 watchEffect(() => {
   option.value = {}
   if (isEmpty.value || !hasEnoughData.value || !data.value.length) return
+
+  const palette = getThemePalette(themeStore.theme, themeStore.accent)
+  const background = readCssColor('--background')
 
   option.value = {
     tooltip: {
@@ -40,9 +46,9 @@ watchEffect(() => {
           name: item.genre,
           value: item.readingSeconds,
           itemStyle: {
-            color: `var(--chart-${(i % 10) + 1})`,
+            color: palette[i % palette.length],
             borderWidth: 2,
-            borderColor: 'var(--background)',
+            borderColor: background,
           },
         })),
         label: {

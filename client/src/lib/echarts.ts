@@ -171,6 +171,16 @@ function oklchToHex(L: number, C: number, H: number): string {
   )
 }
 
+export function getThemePalette(mode: ProjectxThemeMode, accent: string): string[] {
+  const resolvedAccent = accent in ACCENT_PRIMARY ? accent : DEFAULT_ACCENT
+  const def = ACCENT_PRIMARY[resolvedAccent]!
+  const dark = mode === 'dark'
+  const L = dark ? def[2] : def[0]
+  const C = dark ? def[3] : def[1]
+  const H = ACCENT_HUE[resolvedAccent]!
+  return HUE_OFFSETS.map((off) => oklchToHex(L, C, H + off))
+}
+
 function buildTheme(accent: string, dark: boolean) {
   const def = ACCENT_PRIMARY[accent] ?? ACCENT_PRIMARY[DEFAULT_ACCENT]!
   const L = dark ? def[2] : def[0]
