@@ -45,11 +45,6 @@ export class StatisticsController {
     return this.statisticsService.getFormatShareOverTime(user, query);
   }
 
-  @Get('genre-rank-over-time')
-  getGenreRankOverTime(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
-    return this.statisticsService.getGenreRankOverTime(user, query);
-  }
-
   @Get('page-count-distribution')
   getPageCountDistribution(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getPageCountDistribution(user, query);
@@ -58,6 +53,11 @@ export class StatisticsController {
   @Get('publication-decade')
   getPublicationDecade(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getPublicationDecade(user, query);
+  }
+
+  @Get('publication-year-timeline')
+  getPublicationYearTimeline(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getPublicationYearTimeline(user, query);
   }
 
   @Get('top-authors')
@@ -83,5 +83,30 @@ export class StatisticsController {
   @Get('genre-cooccurrence')
   getGenreCooccurrence(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getGenreCooccurrence(user, query);
+  }
+
+  @Get('metadata-freshness-gauge')
+  getMetadataFreshnessGauge(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getMetadataFreshnessGauge(user, query);
+  }
+
+  @Get('library-integrity-gauge')
+  getLibraryIntegrityGauge(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getLibraryIntegrityGauge(user, query);
+  }
+
+  @Get('acquisition-lag-scatter')
+  getAcquisitionLagScatter(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getAcquisitionLagScatter(user, query);
+  }
+
+  @Get('largest-books')
+  getLargestBooks(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getLargestBooks(user, query);
+  }
+
+  @Get('top-series')
+  getTopSeries(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getTopSeries(user, query);
   }
 }

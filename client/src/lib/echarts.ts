@@ -6,6 +6,7 @@ import {
   ChordChart,
   CustomChart,
   FunnelChart,
+  GaugeChart,
   HeatmapChart,
   LineChart,
   PieChart,
@@ -15,10 +16,13 @@ import {
 } from 'echarts/charts'
 import {
   CalendarComponent,
+  DataZoomInsideComponent,
+  DataZoomSliderComponent,
   GridComponent,
   LegendComponent,
   MarkAreaComponent,
   MarkLineComponent,
+  MarkPointComponent,
   PolarComponent,
   TitleComponent,
   TooltipComponent,
@@ -36,6 +40,7 @@ use([
   CustomChart,
   LineChart,
   FunnelChart,
+  GaugeChart,
   HeatmapChart,
   BoxplotChart,
   SunburstChart,
@@ -46,9 +51,12 @@ use([
   LegendComponent,
   GridComponent,
   CalendarComponent,
+  DataZoomInsideComponent,
+  DataZoomSliderComponent,
   VisualMapComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  MarkPointComponent,
   PolarComponent,
 ])
 

@@ -21,8 +21,13 @@ const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
   'metadata-score-distribution': defineAsyncComponent(() => import('./library/MetadataScoreDistributionChart.vue')),
   'library-metadata-completeness': defineAsyncComponent(() => import('./library/LibraryMetadataCompletenessHeatmapChart.vue')),
   'format-share-over-time': defineAsyncComponent(() => import('./library/FormatShareOverTimeChart.vue')),
-  'genre-rank-over-time': defineAsyncComponent(() => import('./library/GenreRankOverTimeChart.vue')),
   'page-count-distribution': defineAsyncComponent(() => import('./library/PageCountDistributionChart.vue')),
+  'metadata-freshness-gauge': defineAsyncComponent(() => import('./library/MetadataFreshnessGaugeChart.vue')),
+  'library-integrity-gauge': defineAsyncComponent(() => import('./library/LibraryIntegrityGaugeChart.vue')),
+  'acquisition-lag-scatter': defineAsyncComponent(() => import('./library/AcquisitionLagScatterChart.vue')),
+  'largest-books': defineAsyncComponent(() => import('./library/LargestBooksChart.vue')),
+  'top-series': defineAsyncComponent(() => import('./library/TopSeriesChart.vue')),
+  'publication-year-timeline': defineAsyncComponent(() => import('./library/PublicationYearTimelineChart.vue')),
   'reading-heatmap': defineAsyncComponent(() => import('./user/ReadingHeatmapChart.vue')),
   'peak-reading-hours': defineAsyncComponent(() => import('./user/PeakReadingHoursChart.vue')),
   'favorite-reading-days': defineAsyncComponent(() => import('./user/FavoriteReadingDaysChart.vue')),
@@ -49,6 +54,7 @@ function tileClass(size: StatisticsChartSize): string {
   if (size === '2x2') return 'md:col-span-2 md:row-span-2'
   if (size === '1x2') return 'md:col-span-1 md:row-span-2'
   if (size === '3x1') return 'md:col-span-2 xl:col-span-3 md:row-span-1'
+  if (size === '4x1') return 'md:col-span-2 xl:col-span-4 md:row-span-1'
   return 'md:col-span-1 md:row-span-1'
 }
 </script>

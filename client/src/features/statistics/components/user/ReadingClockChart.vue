@@ -26,6 +26,16 @@ const totalEvents = computed(() => data.value.reduce((s, d) => s + d.eventsCount
 const isEmpty = computed(() => totalEvents.value === 0)
 const lowConfidence = computed(() => totalEvents.value > 0 && totalEvents.value < MIN_EVENTS)
 
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(total / 3600)
+  const mins = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`
+  if (mins > 0) return `${mins}m ${secs}s`
+  return `${secs}s`
+}
+
 const peakHour = computed(() => {
   if (!data.value.length) return null
   return data.value.reduce((best, d) => (d.readingSeconds > best.readingSeconds ? d : best))
@@ -42,7 +52,7 @@ watchEffect(() => {
   const series = formats.map((fmt, i) => ({
     type: 'bar',
     name: fmt,
-    data: data.value.map((d) => Math.round((d.byFormat[fmt] ?? 0) / 60)),
+    data: data.value.map((d) => (d.byFormat[fmt] ?? 0) / 60),
     coordinateSystem: 'polar',
     stack: 'clock',
     itemStyle: { color: palette[i % palette.length] },
@@ -75,28 +85,28 @@ watchEffect(() => {
         const idx = params[0]!.dataIndex
         const from = HOUR_LABELS[idx]
         const to = HOUR_LABELS[(idx + 1) % 24]
-        const total = data.value[idx]?.readingSeconds ?? 0
+        const totalSeconds = data.value[idx]?.readingSeconds ?? 0
         const events = data.value[idx]?.eventsCount ?? 0
         const eventLabel = events === 1 ? 'session' : 'sessions'
-        const fmtTime = (mins: number) => (mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`)
-        const totalMins = Math.round(total / 60)
         const active = params.filter((p) => p.data > 0)
         const formatRows =
           active.length > 1
             ? `<div style="border-top:1px solid rgba(128,128,128,0.2);margin-top:5px;padding-top:5px">${active
-                .map(
-                  (p) =>
+                .map((p) => {
+                  const formatSeconds = data.value[idx]?.byFormat[p.seriesName] ?? 0
+                  return (
                     `<div style="display:flex;align-items:center;gap:6px;margin-top:2px">` +
                     `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0"></span>` +
                     `<span style="color:rgba(180,180,180,0.9)">${p.seriesName}</span>` +
-                    `<span style="margin-left:auto;padding-left:12px">${fmtTime(p.data)}</span>` +
-                    `</div>`,
-                )
+                    `<span style="margin-left:auto;padding-left:12px">${formatDuration(formatSeconds)}</span>` +
+                    `</div>`
+                  )
+                })
                 .join('')}</div>`
             : ''
         return (
           `<div style="font-size:12px;line-height:1.5">` +
-          `<div><span style="font-weight:600">${from} – ${to}</span> <span style="color:rgba(180,180,180,0.9);margin-left:4px">${fmtTime(totalMins)} · ${events} ${eventLabel}</span></div>` +
+          `<div><span style="font-weight:600">${from} – ${to}</span> <span style="color:rgba(180,180,180,0.9);margin-left:4px">${formatDuration(totalSeconds)} · ${events} ${eventLabel}</span></div>` +
           formatRows +
           `</div>`
         )

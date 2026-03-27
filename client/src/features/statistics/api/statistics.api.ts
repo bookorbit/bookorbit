@@ -1,7 +1,10 @@
 import { api } from '@/lib/api'
 import type {
+  AcquisitionLagPoint,
   BooksAddedDataPoint,
   ChordDiagramData,
+  LibraryIntegrityGauge,
+  MetadataFreshnessGauge,
   UserCompletionLatencyDistribution,
   FormatShareOverTimeItem,
   UserGenreReadingTimeItem,
@@ -18,18 +21,20 @@ import type {
   UserSessionArchetypePoint,
   UserStatisticsSummary,
   FormatDistributionItem,
-  GenreRankOverTimeItem,
   GenreDistributionItem,
   LibraryMetadataCompletenessItem,
   LanguageDistributionItem,
+  LargestBookItem,
   MetadataScoreDistribution,
   MetadataCompletenessItem,
   PageCountDistributionItem,
   PublicationDecadeItem,
+  PublicationYearPoint,
   StatisticsFilterConfig,
   StatisticsResult,
   StorageByFormatItem,
   TopAuthorItem,
+  TopSeriesItem,
 } from '@projectx/types'
 
 async function parseResult<T>(res: Response): Promise<StatisticsResult<T>> {
@@ -79,6 +84,10 @@ export async function fetchPublicationDecade(filters: StatisticsFilterConfig): P
   return parseResult(await api(`/api/v1/statistics/publication-decade${buildParams(filters)}`))
 }
 
+export async function fetchPublicationYearTimeline(filters: StatisticsFilterConfig): Promise<StatisticsResult<PublicationYearPoint>> {
+  return parseResult(await api(`/api/v1/statistics/publication-year-timeline${buildParams(filters)}`))
+}
+
 export async function fetchTopAuthors(filters: StatisticsFilterConfig): Promise<StatisticsResult<TopAuthorItem>> {
   return parseResult(await api(`/api/v1/statistics/top-authors${buildParams(filters)}`))
 }
@@ -103,10 +112,6 @@ export async function fetchLibraryMetadataCompleteness(filters: StatisticsFilter
 
 export async function fetchFormatShareOverTime(filters: StatisticsFilterConfig): Promise<StatisticsResult<FormatShareOverTimeItem>> {
   return parseResult(await api(`/api/v1/statistics/format-share-over-time${buildParams(filters)}`))
-}
-
-export async function fetchGenreRankOverTime(filters: StatisticsFilterConfig): Promise<StatisticsResult<GenreRankOverTimeItem>> {
-  return parseResult(await api(`/api/v1/statistics/genre-rank-over-time${buildParams(filters)}`))
 }
 
 export async function fetchPageCountDistribution(filters: StatisticsFilterConfig): Promise<StatisticsResult<PageCountDistributionItem>> {
@@ -211,8 +216,32 @@ export async function fetchGenreCooccurrence(filters: StatisticsFilterConfig): P
   return res.json() as Promise<ChordDiagramData>
 }
 
+export async function fetchMetadataFreshnessGauge(filters: StatisticsFilterConfig): Promise<MetadataFreshnessGauge> {
+  const res = await api(`/api/v1/statistics/metadata-freshness-gauge${buildParams(filters)}`)
+  if (!res.ok) throw new Error(`Metadata freshness gauge request failed: ${res.status}`)
+  return res.json() as Promise<MetadataFreshnessGauge>
+}
+
+export async function fetchLibraryIntegrityGauge(filters: StatisticsFilterConfig): Promise<LibraryIntegrityGauge> {
+  const res = await api(`/api/v1/statistics/library-integrity-gauge${buildParams(filters)}`)
+  if (!res.ok) throw new Error(`Library integrity gauge request failed: ${res.status}`)
+  return res.json() as Promise<LibraryIntegrityGauge>
+}
+
+export async function fetchAcquisitionLagScatter(filters: StatisticsFilterConfig): Promise<StatisticsResult<AcquisitionLagPoint>> {
+  return parseResult(await api(`/api/v1/statistics/acquisition-lag-scatter${buildParams(filters)}`))
+}
+
 export async function fetchUserSessionArchetypes(filters: StatisticsFilterConfig): Promise<UserSessionArchetypePoint[]> {
   const res = await api(`/api/v1/user-statistics/session-archetypes${buildParams(filters, { days: '365' })}`)
   if (!res.ok) throw new Error(`User session archetypes request failed: ${res.status}`)
   return res.json() as Promise<UserSessionArchetypePoint[]>
+}
+
+export async function fetchLargestBooks(filters: StatisticsFilterConfig): Promise<StatisticsResult<LargestBookItem>> {
+  return parseResult(await api(`/api/v1/statistics/largest-books${buildParams(filters)}`))
+}
+
+export async function fetchTopSeries(filters: StatisticsFilterConfig): Promise<StatisticsResult<TopSeriesItem>> {
+  return parseResult(await api(`/api/v1/statistics/top-series${buildParams(filters)}`))
 }

@@ -15,6 +15,16 @@ const totalEvents = computed(() => data.value.reduce((sum, item) => sum + item.e
 const isEmpty = computed(() => totalEvents.value === 0)
 const lowConfidence = computed(() => totalEvents.value > 0 && totalEvents.value < MIN_EVENTS)
 
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(total / 3600)
+  const mins = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`
+  if (mins > 0) return `${mins}m ${secs}s`
+  return `${secs}s`
+}
+
 watchEffect(() => {
   option.value = {}
   if (isEmpty.value || lowConfidence.value || !data.value.length) return
@@ -26,9 +36,9 @@ watchEffect(() => {
         const point = params[0]
         if (!point) return ''
         const events = data.value[point.dataIndex]?.eventsCount ?? 0
-        const minuteLabel = point.data === 1 ? 'minute' : 'minutes'
+        const readingSeconds = data.value[point.dataIndex]?.readingSeconds ?? 0
         const eventLabel = events === 1 ? 'event' : 'events'
-        return `${point.axisValue}<br/><strong>${point.data}</strong> ${minuteLabel}<br/>${events} ${eventLabel}`
+        return `${point.axisValue}<br/><strong>${formatDuration(readingSeconds)}</strong><br/>${events} ${eventLabel}`
       },
     },
     grid: { left: '3%', right: '3%', bottom: '8%', top: '8%', containLabel: true },
@@ -48,7 +58,7 @@ watchEffect(() => {
     series: [
       {
         type: 'bar',
-        data: data.value.map((item) => Math.round(item.readingSeconds / 60)),
+        data: data.value.map((item) => item.readingSeconds / 60),
         barMaxWidth: 24,
         itemStyle: { borderRadius: [4, 4, 0, 0] },
       },

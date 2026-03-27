@@ -10,7 +10,6 @@ export type StatisticsChartId =
   | "metadata-score-distribution"
   | "library-metadata-completeness"
   | "format-share-over-time"
-  | "genre-rank-over-time"
   | "page-count-distribution"
   | "reading-heatmap"
   | "peak-reading-hours"
@@ -25,7 +24,13 @@ export type StatisticsChartId =
   | "reading-clock"
   | "reading-session-timeline"
   | "session-archetypes"
-  | "genre-cooccurrence";
+  | "genre-cooccurrence"
+  | "metadata-freshness-gauge"
+  | "library-integrity-gauge"
+  | "acquisition-lag-scatter"
+  | "largest-books"
+  | "top-series"
+  | "publication-year-timeline";
 
 export type StatisticsGranularity = "monthly" | "yearly";
 export type StatisticsDateRange = "last-year" | "last-5-years" | "all-time";
@@ -50,20 +55,25 @@ export interface StatisticsSettings {
 }
 
 export const DEFAULT_LIBRARY_CHART_ORDER: StatisticsChartId[] = [
+  "library-integrity-gauge",
   "format-distribution",
-  "language-distribution",
-  "storage-by-format",
-  "publication-decade",
-  "books-added-over-time",
-  "format-share-over-time",
-  "metadata-completeness",
   "metadata-score-distribution",
-  "page-count-distribution",
-  "top-authors",
+  "metadata-freshness-gauge",
+  "largest-books",
   "genre-distribution",
-  "genre-rank-over-time",
+  "format-share-over-time",
+  "top-authors",
+  "metadata-completeness",
+  "acquisition-lag-scatter",
   "library-metadata-completeness",
+  "storage-by-format",
+  "language-distribution",
+  "page-count-distribution",
+  "publication-decade",
   "genre-cooccurrence",
+  "top-series",
+  "books-added-over-time",
+  "publication-year-timeline",
 ];
 
 export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
@@ -85,8 +95,8 @@ export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
 export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [...DEFAULT_LIBRARY_CHART_ORDER, ...DEFAULT_USER_CHART_ORDER];
 
 export const DEFAULT_STATISTICS_FILTERS: StatisticsFilterConfig = {
-  libraryIds: [],
-  booksOverTimeRange: "all-time",
+  libraryIds: [3, 4],
+  booksOverTimeRange: "last-5-years",
   booksOverTimeGranularity: "monthly",
 };
 
@@ -94,7 +104,7 @@ export function createDefaultStatisticsSettings(): StatisticsSettings {
   return {
     charts: DEFAULT_STATISTICS_CHART_ORDER.map((id, order) => ({ id, order, visible: true })),
     filters: {
-      libraryIds: [],
+      libraryIds: [...DEFAULT_STATISTICS_FILTERS.libraryIds],
       booksOverTimeRange: DEFAULT_STATISTICS_FILTERS.booksOverTimeRange,
       booksOverTimeGranularity: DEFAULT_STATISTICS_FILTERS.booksOverTimeGranularity,
     },
@@ -150,6 +160,12 @@ export interface PublicationDecadeItem {
   count: number;
 }
 
+export interface PublicationYearPoint {
+  year: number;
+  count: number;
+  topTitles: string[];
+}
+
 export interface TopAuthorItem {
   name: string;
   count: number;
@@ -198,13 +214,6 @@ export interface FormatShareOverTimeItem {
   count: number;
 }
 
-export interface GenreRankOverTimeItem {
-  year: number;
-  genre: string;
-  rank: number;
-  count: number;
-}
-
 export interface PageCountDistributionItem {
   format: string;
   count: number;
@@ -213,6 +222,42 @@ export interface PageCountDistributionItem {
   median: number;
   q3: number;
   max: number;
+}
+
+export interface MetadataFreshnessGauge {
+  totalBooks: number;
+  neverFetchedCount: number;
+  fresh30dCount: number;
+  stale31To90dCount: number;
+  stale91To180dCount: number;
+  staleOver180dCount: number;
+  freshnessScore: number;
+}
+
+export interface LibraryIntegrityGauge {
+  totalBooks: number;
+  presentCount: number;
+  primaryFileCount: number;
+  metadataCount: number;
+  integrityScore: number;
+}
+
+export interface AcquisitionLagPoint {
+  addedYear: number;
+  lagYears: number;
+  count: number;
+}
+
+export interface LargestBookItem {
+  id: number;
+  title: string;
+  sizeBytes: number;
+  format: string;
+}
+
+export interface TopSeriesItem {
+  name: string;
+  count: number;
 }
 
 export interface StatisticsSummary {

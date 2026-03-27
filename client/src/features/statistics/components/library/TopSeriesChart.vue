@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { Users } from 'lucide-vue-next'
+import { Layers } from 'lucide-vue-next'
 
 import { useThemeStore } from '@/stores/theme'
 import { getThemePalette, readCssColor } from '@/lib/echarts'
-import { useTopAuthors } from '../../composables/useTopAuthors'
+import { useTopSeries } from '../../composables/useTopSeries'
 import ChartCard from '../ChartCard.vue'
 
 const themeStore = useThemeStore()
-const { data, loading, error } = useTopAuthors()
+const { data, loading, error } = useTopSeries()
 const option = shallowRef({})
 
 function withAlpha(hex: string, alpha: number): string {
@@ -49,7 +49,7 @@ watchEffect(() => {
         const bar = params.find((p) => p.seriesType === 'bar')
         if (!bar) return ''
         const pct = total > 0 ? ((bar.value / total) * 100).toFixed(1) : '0'
-        return `<strong>${bar.name}</strong><br/>${bar.value} books &nbsp;&nbsp; ${pct}% of top 25`
+        return `<strong>${bar.name}</strong><br/>${bar.value} books &nbsp;&nbsp; ${pct}% of top 50`
       },
     },
     legend: {
@@ -60,7 +60,29 @@ watchEffect(() => {
       itemWidth: 12,
       itemHeight: 8,
     },
-    grid: { left: 2, right: 55, bottom: 6, top: 26, containLabel: true },
+    grid: { left: 2, right: 74, bottom: 6, top: 26, containLabel: true },
+    dataZoom: [
+      {
+        type: 'inside',
+        yAxisIndex: 0,
+        startValue: 0,
+        endValue: Math.min(19, items.length - 1),
+        zoomOnMouseWheel: false,
+        moveOnMouseMove: true,
+        moveOnMouseWheel: true,
+      },
+      {
+        type: 'slider',
+        yAxisIndex: 0,
+        right: 2,
+        width: 14,
+        borderColor: 'transparent',
+        fillerColor: 'rgba(150, 150, 150, 0.2)',
+        handleSize: 0,
+        showDetail: false,
+        brushSelect: false,
+      },
+    ],
     xAxis: [
       {
         type: 'value',
@@ -86,8 +108,8 @@ watchEffect(() => {
       axisTick: { show: false },
       axisLabel: {
         fontSize: 11,
+        width: 150,
         overflow: 'truncate',
-        width: 130,
       },
     },
     series: [
@@ -123,7 +145,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Top 25 Authors" :icon="Users" :color-index="6" :loading :error :empty="!data.items.length">
+  <ChartCard title="Top 50 Series" :icon="Layers" :color-index="8" :loading :error :empty="!data.items.length">
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

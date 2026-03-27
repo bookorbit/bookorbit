@@ -615,6 +615,10 @@ export class BookService {
         detail = await this.updateMetadata(id, dto, user);
       }
 
+      // Mark successful non-preview provider refreshes so freshness analytics are accurate,
+      // even when no scalar field changed after reconciliation.
+      await this.bookRepo.updateMetadataFields(id, { lastMetadataFetchAt: new Date(), updatedAt: new Date() });
+
       let coverDownloaded = false;
       if (resolved.coverUrl) {
         await this.metadataService.downloadAndSaveCover(resolved.coverUrl, id);

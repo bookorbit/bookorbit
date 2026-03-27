@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ChordDiagramData, StatisticsDateRange, StatisticsGranularity } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -43,7 +44,7 @@ export class StatisticsRepository {
       })
       .from(bookFiles)
       .innerJoin(books, eq(bookFiles.bookId, books.id))
-      .where(and(isNotNull(bookFiles.format), filter))
+      .where(and(isNotNull(bookFiles.format), inArray(bookFiles.format, [...DEFAULT_FORMAT_PRIORITY]), filter))
       .groupBy(bookFiles.format)
       .orderBy(desc(sql<number>`count(distinct ${bookFiles.bookId})`));
   }
@@ -211,28 +212,9 @@ export class StatisticsRepository {
       })
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .where(and(isNotNull(bookFiles.format), filter))
+      .where(and(isNotNull(bookFiles.format), inArray(bookFiles.format, [...DEFAULT_FORMAT_PRIORITY]), filter))
       .groupBy(yearExpr, monthExpr, bookFiles.format)
       .orderBy(yearExpr, monthExpr, bookFiles.format);
-  }
-
-  async genreCountsByYear(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
-    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
-    const yearExpr = sql`extract(year from ${books.addedAt})`;
-
-    return this.db
-      .select({
-        year: sql<number>`${yearExpr}::int`,
-        genre: genres.name,
-        count: sql<number>`count(distinct ${bookGenres.bookId})::int`,
-      })
-      .from(bookGenres)
-      .innerJoin(genres, eq(genres.id, bookGenres.genreId))
-      .innerJoin(books, eq(books.id, bookGenres.bookId))
-      .where(filter)
-      .groupBy(yearExpr, genres.name)
-      .orderBy(yearExpr, desc(sql<number>`count(distinct ${bookGenres.bookId})`), genres.name);
   }
 
   async pageCountDistributionByFormat(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
@@ -253,7 +235,7 @@ export class StatisticsRepository {
         .from(books)
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-        .where(and(isNotNull(bookMetadata.pageCount), isNotNull(bookFiles.format), filter))
+        .where(and(isNotNull(bookMetadata.pageCount), isNotNull(bookFiles.format), inArray(bookFiles.format, [...DEFAULT_FORMAT_PRIORITY]), filter))
         .groupBy(bookFiles.format)
         .orderBy(desc(sql<number>`count(*)`)),
       this.db
@@ -278,9 +260,61 @@ export class StatisticsRepository {
       })
       .from(bookFiles)
       .innerJoin(books, eq(bookFiles.bookId, books.id))
-      .where(and(isNotNull(bookFiles.format), isNotNull(bookFiles.sizeBytes), filter))
+      .where(and(isNotNull(bookFiles.format), isNotNull(bookFiles.sizeBytes), inArray(bookFiles.format, [...DEFAULT_FORMAT_PRIORITY]), filter))
       .groupBy(bookFiles.format)
       .orderBy(desc(sql<number>`sum(${bookFiles.sizeBytes})`));
+  }
+
+  async publicationYearTimeline(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+
+    const [counts, titleRows, [{ unknownCount }]] = await Promise.all([
+      this.db
+        .select({
+          year: bookMetadata.publishedYear,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(books)
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(and(isNotNull(bookMetadata.publishedYear), filter))
+        .groupBy(bookMetadata.publishedYear)
+        .orderBy(bookMetadata.publishedYear),
+
+      this.db
+        .select({
+          year: bookMetadata.publishedYear,
+          title: bookMetadata.title,
+          rn: sql<number>`row_number() over (partition by ${bookMetadata.publishedYear} order by ${bookMetadata.bookId})`,
+        })
+        .from(books)
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(and(isNotNull(bookMetadata.publishedYear), isNotNull(bookMetadata.title), filter))
+        .orderBy(bookMetadata.publishedYear),
+
+      this.db
+        .select({ unknownCount: sql<number>`count(*)::int` })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(and(isNull(bookMetadata.publishedYear), filter)),
+    ]);
+
+    const titlesMap = new Map<number, string[]>();
+    for (const row of titleRows) {
+      if (row.rn > 3 || !row.year || !row.title) continue;
+      const arr = titlesMap.get(row.year) ?? [];
+      arr.push(row.title);
+      titlesMap.set(row.year, arr);
+    }
+
+    return {
+      items: counts.map((r) => ({
+        year: r.year!,
+        count: r.count,
+        topTitles: titlesMap.get(r.year!) ?? [],
+      })),
+      unknownCount,
+    };
   }
 
   async publicationDecade(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
@@ -348,7 +382,16 @@ export class StatisticsRepository {
       .leftJoin(sql`(select distinct book_id from book_authors) ba`, sql`ba.book_id = ${books.id}`)
       .where(filter);
 
-    return row;
+    return (
+      row ?? {
+        totalBooks: 0,
+        neverFetchedCount: 0,
+        fresh30dCount: 0,
+        stale31To90dCount: 0,
+        stale91To180dCount: 0,
+        staleOver180dCount: 0,
+      }
+    );
   }
 
   async genreDistribution(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
@@ -476,7 +519,7 @@ export class StatisticsRepository {
       inner join book_genres bg2 on bg1.book_id = bg2.book_id and bg1.genre_id < bg2.genre_id
       inner join genres g1 on g1.id = bg1.genre_id
       inner join genres g2 on g2.id = bg2.genre_id
-      inner join books b on b.id = bg1.book_id
+      inner join books on books.id = bg1.book_id
       where bg1.genre_id in (${topGenreIdList})
         and bg2.genre_id in (${topGenreIdList})
         ${filter ? sql`and ${filter}` : sql``}
@@ -489,5 +532,137 @@ export class StatisticsRepository {
       nodes: topGenresRows.map((g) => ({ name: g.name })),
       links: pairRows.rows.map((r) => ({ source: r.source, target: r.target, value: r.value })),
     };
+  }
+
+  async metadataFreshnessGauge(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const hasProviderIdExpr = sql`(
+      ${bookMetadata.googleBooksId} is not null or
+      ${bookMetadata.goodreadsId} is not null or
+      ${bookMetadata.amazonId} is not null or
+      ${bookMetadata.hardcoverId} is not null or
+      ${bookMetadata.openLibraryId} is not null or
+      ${bookMetadata.itunesId} is not null or
+      ${bookMetadata.audibleId} is not null or
+      ${bookMetadata.comicvineId} is not null
+    )`;
+
+    const [row] = await this.db
+      .select({
+        totalBooks: sql<number>`count(*)::int`,
+        neverFetchedCount: sql<number>`count(case when ${bookMetadata.lastMetadataFetchAt} is null and not ${hasProviderIdExpr} then 1 end)::int`,
+        fresh30dCount: sql<number>`count(case when ${bookMetadata.lastMetadataFetchAt} >= now() - interval '30 days' then 1 end)::int`,
+        stale31To90dCount: sql<number>`count(case when ${bookMetadata.lastMetadataFetchAt} < now() - interval '30 days' and ${bookMetadata.lastMetadataFetchAt} >= now() - interval '90 days' then 1 end)::int`,
+        stale91To180dCount: sql<number>`count(case when ${bookMetadata.lastMetadataFetchAt} < now() - interval '90 days' and ${bookMetadata.lastMetadataFetchAt} >= now() - interval '180 days' then 1 end)::int`,
+        staleOver180dCount: sql<number>`count(case when ${bookMetadata.lastMetadataFetchAt} < now() - interval '180 days' or (${bookMetadata.lastMetadataFetchAt} is null and ${hasProviderIdExpr}) then 1 end)::int`,
+      })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(filter);
+
+    return (
+      row ?? {
+        totalBooks: 0,
+        neverFetchedCount: 0,
+        fresh30dCount: 0,
+        stale31To90dCount: 0,
+        stale91To180dCount: 0,
+        staleOver180dCount: 0,
+      }
+    );
+  }
+
+  async libraryIntegrityGauge(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+
+    const [row] = await this.db
+      .select({
+        totalBooks: sql<number>`count(*)::int`,
+        presentCount: sql<number>`count(case when ${books.status} = 'present' then 1 end)::int`,
+        primaryFileCount: sql<number>`count(case when ${books.primaryFileId} is not null then 1 end)::int`,
+        metadataCount: sql<number>`count(case when ${bookMetadata.bookId} is not null then 1 end)::int`,
+      })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(filter);
+
+    return (
+      row ?? {
+        totalBooks: 0,
+        presentCount: 0,
+        primaryFileCount: 0,
+        metadataCount: 0,
+      }
+    );
+  }
+
+  async acquisitionLagScatter(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+
+    const addedYearExpr = sql`extract(year from ${books.addedAt})::int`;
+    const rawLagExpr = sql`${addedYearExpr} - ${bookMetadata.publishedYear}`;
+    const lagBucketExpr = sql`greatest(-5, least(120, ${rawLagExpr}))::int`;
+
+    const [items, [unknown]] = await Promise.all([
+      this.db
+        .select({
+          addedYear: sql<number>`${addedYearExpr}`,
+          lagYears: sql<number>`${lagBucketExpr}`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(books)
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(and(isNotNull(bookMetadata.publishedYear), filter))
+        .groupBy(addedYearExpr, lagBucketExpr)
+        .orderBy(addedYearExpr, lagBucketExpr),
+      this.db
+        .select({
+          unknownCount: sql<number>`count(*)::int`,
+        })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(and(isNull(bookMetadata.publishedYear), filter)),
+    ]);
+
+    return { items, unknownCount: unknown?.unknownCount ?? 0 };
+  }
+
+  async largestBooks(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+
+    return this.db
+      .select({
+        id: books.id,
+        title: bookMetadata.title,
+        sizeBytes: sql<number>`${bookFiles.sizeBytes}::bigint`,
+        format: bookFiles.format,
+      })
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(and(isNotNull(bookFiles.sizeBytes), filter))
+      .orderBy(desc(bookFiles.sizeBytes))
+      .limit(50);
+  }
+
+  async topSeries(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+
+    return this.db
+      .select({
+        name: bookMetadata.seriesName,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(books)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(and(isNotNull(bookMetadata.seriesName), filter))
+      .groupBy(bookMetadata.seriesName)
+      .orderBy(desc(sql`count(*)`))
+      .limit(50);
   }
 }

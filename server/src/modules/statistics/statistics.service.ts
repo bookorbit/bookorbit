@@ -1,22 +1,27 @@
 import { Injectable } from '@nestjs/common';
 
 import type {
+  AcquisitionLagPoint,
   BooksAddedDataPoint,
   ChordDiagramData,
   FormatShareOverTimeItem,
+  LibraryIntegrityGauge,
+  MetadataFreshnessGauge,
   StatisticsSummary,
-  GenreRankOverTimeItem,
   FormatDistributionItem,
   GenreDistributionItem,
   LibraryMetadataCompletenessItem,
   LanguageDistributionItem,
+  LargestBookItem,
   MetadataScoreDistribution,
   MetadataCompletenessItem,
   PageCountDistributionItem,
   PublicationDecadeItem,
+  PublicationYearPoint,
   StatisticsResult,
   StorageByFormatItem,
   TopAuthorItem,
+  TopSeriesItem,
 } from '@projectx/types';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -26,7 +31,6 @@ import { StatisticsRepository } from './statistics.repository';
 
 const STATISTICS_TOP_N = 10;
 const STREAM_TOP_FORMATS = 8;
-const BUMP_TOP_GENRES = 8;
 
 @Injectable()
 export class StatisticsService {
@@ -144,43 +148,6 @@ export class StatisticsService {
     return { items, unknownCount: 0 };
   }
 
-  async getGenreRankOverTime(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<GenreRankOverTimeItem>> {
-    const raw = await this.repo.genreCountsByYear(user.id, user.isSuperuser, query.libraryIds);
-    if (raw.length === 0) return { items: [], unknownCount: 0 };
-
-    const genreTotals = new Map<string, number>();
-    for (const row of raw) {
-      genreTotals.set(row.genre, (genreTotals.get(row.genre) ?? 0) + row.count);
-    }
-
-    const trackedGenres = [...genreTotals.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, BUMP_TOP_GENRES)
-      .map(([genre]) => genre);
-
-    const trackedSet = new Set(trackedGenres);
-    const years = [...new Set(raw.map((r) => r.year))].sort((a, b) => a - b);
-    const countsByYearGenre = new Map<string, number>();
-    for (const row of raw) {
-      if (!trackedSet.has(row.genre)) continue;
-      countsByYearGenre.set(`${row.year}|${row.genre}`, row.count);
-    }
-
-    const items: GenreRankOverTimeItem[] = [];
-    for (const year of years) {
-      const entries = trackedGenres.map((genre) => ({
-        genre,
-        count: countsByYearGenre.get(`${year}|${genre}`) ?? 0,
-      }));
-      entries.sort((a, b) => b.count - a.count || a.genre.localeCompare(b.genre));
-      entries.forEach((entry, i) => {
-        items.push({ year, genre: entry.genre, rank: i + 1, count: entry.count });
-      });
-    }
-
-    return { items, unknownCount: 0 };
-  }
-
   async getPageCountDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<PageCountDistributionItem>> {
     const { items: raw, unknownCount } = await this.repo.pageCountDistributionByFormat(user.id, user.isSuperuser, query.libraryIds);
     const items = raw.map((row) => ({
@@ -203,6 +170,11 @@ export class StatisticsService {
 
   async getPublicationDecade(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<PublicationDecadeItem>> {
     const { items, unknownCount } = await this.repo.publicationDecade(user.id, user.isSuperuser, query.libraryIds);
+    return { items, unknownCount };
+  }
+
+  async getPublicationYearTimeline(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<PublicationYearPoint>> {
+    const { items, unknownCount } = await this.repo.publicationYearTimeline(user.id, user.isSuperuser, query.libraryIds);
     return { items, unknownCount };
   }
 
@@ -239,6 +211,55 @@ export class StatisticsService {
     return { items, unknownCount };
   }
 
+  async getMetadataFreshnessGauge(user: RequestUser, query: StatisticsFilterQueryDto): Promise<MetadataFreshnessGauge> {
+    const row = await this.repo.metadataFreshnessGauge(user.id, user.isSuperuser, query.libraryIds);
+    const totalBooks = row.totalBooks ?? 0;
+    const fresh30dCount = row.fresh30dCount ?? 0;
+    const stale31To90dCount = row.stale31To90dCount ?? 0;
+    const stale91To180dCount = row.stale91To180dCount ?? 0;
+    const staleOver180dCount = row.staleOver180dCount ?? 0;
+    const neverFetchedCount = row.neverFetchedCount ?? 0;
+
+    const weightedFreshness = fresh30dCount + stale31To90dCount * 0.7 + stale91To180dCount * 0.4 + staleOver180dCount * 0.15;
+    const freshnessScore = totalBooks > 0 ? Math.round((weightedFreshness / totalBooks) * 100) : 0;
+
+    return {
+      totalBooks,
+      neverFetchedCount,
+      fresh30dCount,
+      stale31To90dCount,
+      stale91To180dCount,
+      staleOver180dCount,
+      freshnessScore,
+    };
+  }
+
+  async getLibraryIntegrityGauge(user: RequestUser, query: StatisticsFilterQueryDto): Promise<LibraryIntegrityGauge> {
+    const row = await this.repo.libraryIntegrityGauge(user.id, user.isSuperuser, query.libraryIds);
+    const totalBooks = row.totalBooks ?? 0;
+    const presentCount = row.presentCount ?? 0;
+    const primaryFileCount = row.primaryFileCount ?? 0;
+    const metadataCount = row.metadataCount ?? 0;
+
+    const presentRatio = totalBooks > 0 ? presentCount / totalBooks : 0;
+    const primaryFileRatio = totalBooks > 0 ? primaryFileCount / totalBooks : 0;
+    const metadataRatio = totalBooks > 0 ? metadataCount / totalBooks : 0;
+    const integrityScore = Math.round(((presentRatio + primaryFileRatio + metadataRatio) / 3) * 100);
+
+    return {
+      totalBooks,
+      presentCount,
+      primaryFileCount,
+      metadataCount,
+      integrityScore,
+    };
+  }
+
+  async getAcquisitionLagScatter(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<AcquisitionLagPoint>> {
+    const { items, unknownCount } = await this.repo.acquisitionLagScatter(user.id, user.isSuperuser, query.libraryIds);
+    return { items, unknownCount };
+  }
+
   private clipToTopN<T extends { count: number }>(items: T[], labelKey: keyof T, n = STATISTICS_TOP_N): T[] {
     if (items.length <= n) return items;
     const top = items.slice(0, n);
@@ -259,5 +280,17 @@ export class StatisticsService {
 
   async getGenreCooccurrence(user: RequestUser, query: StatisticsFilterQueryDto): Promise<ChordDiagramData> {
     return this.repo.getGenreCooccurrence(user.id, user.isSuperuser, query.libraryIds);
+  }
+
+  async getLargestBooks(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<LargestBookItem>> {
+    const raw = await this.repo.largestBooks(user.id, user.isSuperuser, query.libraryIds);
+    const items = raw.map((r) => ({ id: r.id, title: r.title!, sizeBytes: Number(r.sizeBytes), format: r.format! }));
+    return { items, unknownCount: 0 };
+  }
+
+  async getTopSeries(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<TopSeriesItem>> {
+    const raw = await this.repo.topSeries(user.id, user.isSuperuser, query.libraryIds);
+    const items = raw.map((r) => ({ name: r.name!, count: r.count }));
+    return { items, unknownCount: 0 };
   }
 }

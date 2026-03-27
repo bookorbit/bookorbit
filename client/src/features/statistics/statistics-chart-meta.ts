@@ -11,11 +11,13 @@ import {
   GitMerge,
   Goal,
   Globe,
+  Gauge,
   HardDrive,
   Layers,
   ListChecks,
   PieChart,
   Rabbit,
+  ShieldCheck,
   Tag,
   TrendingUp,
   Users,
@@ -25,7 +27,7 @@ import {
 
 import { DEFAULT_LIBRARY_CHART_ORDER, DEFAULT_USER_CHART_ORDER, type StatisticsChartId } from '@projectx/types'
 
-export type StatisticsChartSize = '1x1' | '2x1' | '2x2' | '1x2' | '3x1'
+export type StatisticsChartSize = '1x1' | '2x1' | '2x2' | '1x2' | '3x1' | '4x1'
 export type StatisticsChartCategory = 'library' | 'user'
 
 export interface StatisticsChartMetaEntry {
@@ -108,16 +110,46 @@ export const STATISTICS_CHART_META: Record<StatisticsChartId, StatisticsChartMet
     size: '2x1',
     category: 'library',
   },
-  'genre-rank-over-time': {
-    label: 'Genre Rank Over Time',
-    icon: Tag,
-    size: '2x1',
-    category: 'library',
-  },
   'page-count-distribution': {
     label: 'Page Count Distribution',
     icon: BookOpen,
     size: '1x1',
+    category: 'library',
+  },
+  'metadata-freshness-gauge': {
+    label: 'Metadata Freshness',
+    icon: Gauge,
+    size: '1x1',
+    category: 'library',
+  },
+  'library-integrity-gauge': {
+    label: 'Library Integrity',
+    icon: ShieldCheck,
+    size: '1x1',
+    category: 'library',
+  },
+  'acquisition-lag-scatter': {
+    label: 'Acquisition Lag',
+    icon: CalendarRange,
+    size: '1x1',
+    category: 'library',
+  },
+  'largest-books': {
+    label: 'Top 50 Largest Books',
+    icon: HardDrive,
+    size: '2x1',
+    category: 'library',
+  },
+  'top-series': {
+    label: 'Top 50 Series',
+    icon: Layers,
+    size: '2x1',
+    category: 'library',
+  },
+  'publication-year-timeline': {
+    label: 'Publication Year Timeline',
+    icon: TrendingUp,
+    size: '4x1',
     category: 'library',
   },
   'reading-heatmap': {
