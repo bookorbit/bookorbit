@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { ArrowLeft, RotateCcw, CheckCircle2, X, ZoomIn, Layers } from 'lucide-vue-next'
 import type { MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
 import type { DiffField, DiffFieldKey } from '../../../composables/useMetadataDiff'
 import { hideOnError, providerBadgeStyle } from '../../../lib/metadata-fetch'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
 const props = defineProps<{
   field: DiffField
@@ -16,6 +17,8 @@ const emit = defineEmits<{
   toggle: [DiffFieldKey]
   pickFromProvider: [key: DiffFieldKey, provider: MetadataProviderKey]
 }>()
+
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const lightboxSrc = ref<string | null>(null)
 
@@ -42,19 +45,24 @@ function handlePickFromProvider(provider: MetadataProviderKey) {
       <div
         class="w-16 rounded-lg overflow-hidden bg-muted transition-all duration-300 shadow-sm ring-1 relative group"
         :class="field.isPicked ? 'ring-primary ring-2' : field.bookValue ? 'ring-border cursor-zoom-in' : 'ring-border opacity-50'"
-        style="aspect-ratio: 2/3"
+        :style="{ aspectRatio: coverAspectRatio }"
         @click="
           field.isPicked ? (lightboxSrc = field.pickedDisplay || field.candidateDisplay) : field.bookValue ? (lightboxSrc = field.bookValue) : null
         "
       >
-        <img
-          v-if="field.isPicked && field.pickedDisplay"
-          :src="field.pickedDisplay"
-          alt="Preview"
-          class="w-full h-full object-cover"
-          @error="hideOnError"
-        />
-        <img v-else-if="field.bookValue" :src="field.bookValue" alt="Current cover" class="w-full h-full object-cover" @error="hideOnError" />
+        <template v-if="field.isPicked && field.pickedDisplay">
+          <img
+            :src="field.pickedDisplay"
+            alt=""
+            aria-hidden="true"
+            class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-75"
+          />
+          <img :src="field.pickedDisplay" alt="Preview" class="relative w-full h-full object-contain" @error="hideOnError" />
+        </template>
+        <template v-else-if="field.bookValue">
+          <img :src="field.bookValue" alt="" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-75" />
+          <img :src="field.bookValue" alt="Current cover" class="relative w-full h-full object-contain" @error="hideOnError" />
+        </template>
         <div v-else class="w-full h-full bg-linear-to-br from-muted to-muted-foreground/10" />
         <div
           v-if="field.isPicked || field.bookValue"
@@ -109,8 +117,8 @@ function handlePickFromProvider(provider: MetadataProviderKey) {
                 :class="field.pickedProvider === pv.provider ? 'bg-primary/8 ring-1 ring-inset ring-primary/20' : ''"
                 @click="handlePickFromProvider(pv.provider)"
               >
-                <span class="shrink-0 w-8 rounded overflow-hidden bg-muted" style="aspect-ratio: 2/3">
-                  <img :src="pv.display" alt="" class="w-full h-full object-cover" @error="hideOnError" />
+                <span class="relative shrink-0 w-8 rounded overflow-hidden bg-muted" :style="{ aspectRatio: coverAspectRatio }">
+                  <img :src="pv.display" alt="" class="w-full h-full object-contain" @error="hideOnError" />
                 </span>
                 <span
                   class="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
@@ -134,10 +142,18 @@ function handlePickFromProvider(provider: MetadataProviderKey) {
               : 'ring-border cursor-zoom-in'
             : 'ring-border opacity-50'
         "
-        style="aspect-ratio: 2/3"
+        :style="{ aspectRatio: coverAspectRatio }"
         @click="field.candidateDisplay ? (lightboxSrc = field.candidateDisplay) : null"
       >
-        <img v-if="field.candidateDisplay" :src="field.candidateDisplay" alt="New cover" class="w-full h-full object-cover" @error="hideOnError" />
+        <template v-if="field.candidateDisplay">
+          <img
+            :src="field.candidateDisplay"
+            alt=""
+            aria-hidden="true"
+            class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-75"
+          />
+          <img :src="field.candidateDisplay" alt="New cover" class="relative w-full h-full object-contain" @error="hideOnError" />
+        </template>
         <div v-else class="w-full h-full bg-linear-to-br from-muted to-muted-foreground/10" />
         <div
           v-if="field.candidateDisplay"

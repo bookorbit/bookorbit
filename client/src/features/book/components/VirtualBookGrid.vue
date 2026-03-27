@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useElementSize, useWindowSize } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import type { BookCard } from '@projectx/types'
 import BookCoverCard from './BookCoverCard.vue'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
@@ -63,8 +64,11 @@ const gridItems = computed(() => {
 const itemSecondarySize = computed(() => {
   return Math.max(1, Math.floor((availableWidth.value + gapPx.value) / gridItems.value))
 })
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const aspectMultiplier = computed(() => (coverAspectRatio.value === '1/1' ? 1 : 3 / 2))
+
 const cardWidth = computed(() => Math.max(1, itemSecondarySize.value - gapPx.value))
-const cardHeight = computed(() => Math.max(1, Math.round((cardWidth.value * 3) / 2)))
+const cardHeight = computed(() => Math.max(1, Math.round(cardWidth.value * aspectMultiplier.value)))
 const itemSize = computed(() => cardHeight.value + gapPx.value)
 const buffer = computed(() => Math.max(itemSize.value * 2, 240))
 

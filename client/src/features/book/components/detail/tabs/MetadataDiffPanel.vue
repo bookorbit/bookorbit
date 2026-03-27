@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, inject, reactive, ref, watch } from 'vue'
 import { ArrowLeft, CopyCheck, Copy, CheckCheck } from 'lucide-vue-next'
 import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, MetadataSource, ProviderIds } from '@projectx/types'
 import { useMetadataDiff, type DiffFieldKey, type MetadataPatch } from '../../../composables/useMetadataDiff'
 import { getProviderLabel, getProviderColor, hideOnError, providerBadgeStyle, providerActivePillStyle } from '../../../lib/metadata-fetch'
 import MetadataDiffRow from './MetadataDiffRow.vue'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
 const props = defineProps<{
   current: MetadataSource
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   back: []
   apply: [{ formPatch: MetadataPatch; coverUrl?: string }]
 }>()
+
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const activeProvider = ref<MetadataProviderKey>(props.initialCandidate.provider)
 
@@ -113,7 +116,11 @@ function apply() {
           <ArrowLeft class="size-4 transition-transform group-hover:-translate-x-0.5" />
           {{ backLabel ?? 'Results' }}
         </button>
-        <div v-if="activeCandidate.coverUrl" class="shrink-0 w-8 rounded overflow-hidden bg-muted ring-1 ring-border" style="aspect-ratio: 2/3">
+        <div
+          v-if="activeCandidate.coverUrl"
+          class="shrink-0 w-8 rounded overflow-hidden bg-muted ring-1 ring-border"
+          :style="{ aspectRatio: coverAspectRatio }"
+        >
           <img
             :src="activeCandidate.coverUrl"
             alt=""
@@ -175,9 +182,11 @@ function apply() {
           :key="c.providerId ?? i"
           class="shrink-0 rounded-md overflow-hidden bg-muted ring-1 transition-all active:scale-95"
           :class="isSelectedForTab(c) ? 'ring-2' : 'ring-border/60 hover:ring-border'"
-          :style="isSelectedForTab(c) ? { outline: 'none', boxShadow: `0 0 0 2px ${getProviderColor(c.provider)}` } : {}"
+          :style="[
+            { width: '28px', aspectRatio: coverAspectRatio },
+            isSelectedForTab(c) ? { outline: 'none', boxShadow: `0 0 0 2px ${getProviderColor(c.provider)}` } : {},
+          ]"
           :title="`${c.title}${c.publishedYear ? ' · ' + c.publishedYear : ''}`"
-          style="width: 28px; aspect-ratio: 2/3"
           @click="selectResultForTab(c)"
         >
           <img v-if="c.coverUrl" :src="c.coverUrl" alt="" class="w-full h-full object-cover" @error="hideOnError" />

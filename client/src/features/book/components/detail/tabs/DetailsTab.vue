@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, ChevronDown, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
@@ -7,6 +7,7 @@ import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
 import type { BookDetail, BookKoboState, ReadStatus } from '@projectx/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
@@ -76,8 +77,6 @@ const coverLoaded = ref(false)
 const coverFailed = ref(false)
 const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
-const coverNaturalWidth = ref(0)
-const coverNaturalHeight = ref(0)
 const genresExpanded = ref(false)
 const genreMeasureContainer = ref<HTMLElement | null>(null)
 const genreHiddenCount = ref(0)
@@ -226,13 +225,8 @@ const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(prop
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
-const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const coverAspectRatio = computed(() => {
-  if (!isPrimaryAudio.value) return '2/3'
-  if (coverNaturalWidth.value > 0 && coverNaturalHeight.value > coverNaturalWidth.value) return '2/3'
-  return '1/1'
-})
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 
 // For multi-file audiobooks, collapse all tracks into one representative entry.
@@ -252,7 +246,7 @@ const hasMultipleFiles = computed(() => openableFiles.value.length > 1)
 const authorLine = computed(() => props.book.authors.map((a) => a.name).join(', ') || null)
 const narratorLine = computed(() => props.book.narrators?.map((n) => n.name).join(', ') || null)
 const formats = computed(() => {
-  const all = [...new Set(props.book.files.map((f) => f.format ?? '?'))]
+  const all = [...new Set(props.book.files.filter((f) => f.format && FORMAT_TO_GROUP[f.format]).map((f) => f.format!))]
   const priority = props.book.formatPriority
   const sorted = priority.length
     ? all.sort((a, b) => {
@@ -516,10 +510,7 @@ function handleDeleteFromMenu() {
   promptDelete(props.book.id)
 }
 
-function handleCoverLoad(e: Event) {
-  const img = e.target as HTMLImageElement
-  coverNaturalWidth.value = img.naturalWidth
-  coverNaturalHeight.value = img.naturalHeight
+function handleCoverLoad() {
   coverLoaded.value = true
 }
 
@@ -636,8 +627,8 @@ watch(
     <div class="md:w-56 shrink-0 md:sticky md:top-4 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
-          class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in bg-muted/50"
-          :style="[{ aspectRatio: coverAspectRatio }, coverLoaded ? {} : coverStyle]"
+          class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
+          :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
           @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
         >
           <Tooltip>
@@ -651,10 +642,18 @@ watch(
             </TooltipTrigger>
             <TooltipContent>Edit cover</TooltipContent>
           </Tooltip>
+          <!-- Blurred background fill for mismatched aspect ratios -->
           <img
             v-if="!coverFailed"
             :src="coverSrc"
-            class="w-full h-full object-contain transition-opacity duration-200"
+            class="absolute inset-0 w-full h-full object-cover scale-110 blur-lg brightness-50 transition-opacity duration-200"
+            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+            aria-hidden="true"
+          />
+          <img
+            v-if="!coverFailed"
+            :src="coverSrc"
+            class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             :alt="book.title ?? ''"
             @load="handleCoverLoad"

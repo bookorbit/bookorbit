@@ -39,6 +39,10 @@ export class UpdateLibraryDto {
   folders?: string[];
 
   @IsOptional()
+  @IsIn(['2/3', '1/1'])
+  coverAspectRatio?: string;
+
+  @IsOptional()
   @IsBoolean()
   watch?: boolean;
 

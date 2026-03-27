@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users } from 'lucide-vue-next'
-import type { Library } from '@projectx/types'
+import type { CoverAspectRatio, Library } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useLibraryCreator } from '../composables/useLibraryCreator'
 import LibraryCreatorDetails from './LibraryCreatorDetails.vue'
@@ -111,7 +111,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 const title = computed(() => (props.library ? `Edit: ${props.library.name}` : 'Create Library'))
 
 const sectionProps = computed(() => ({
-  details: { name: form.name, icon: form.icon },
+  details: { name: form.name, icon: form.icon, coverAspectRatio: form.coverAspectRatio },
   folders: { folders: form.folders, prescanResult: prescanResult.value, prescanLoading: prescanLoading.value },
   scanner: {
     metadataPrecedence: form.metadataPrecedence,
@@ -130,6 +130,7 @@ function getSectionProps(id: SectionId) {
 function onSectionEvent(id: SectionId, event: string, value: unknown) {
   if (event === 'update:name') form.name = value as string
   else if (event === 'update:icon') form.icon = value as string | null
+  else if (event === 'update:coverAspectRatio') form.coverAspectRatio = value as CoverAspectRatio
   else if (event === 'update:folders') form.folders = value as string[]
   else if (event === 'prescan') creator.runPrescan()
   else if (event === 'update:metadataPrecedence') form.metadataPrecedence = value as string[]
@@ -228,6 +229,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:formatPriority="onSectionEvent(activeId, 'update:formatPriority', $event)"
                 @update:allowedFormats="onSectionEvent(activeId, 'update:allowedFormats', $event)"
                 @update:excludePatterns="onSectionEvent(activeId, 'update:excludePatterns', $event)"
+                @update:coverAspectRatio="onSectionEvent(activeId, 'update:coverAspectRatio', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
               />
@@ -348,6 +350,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:formatPriority="onSectionEvent(activeId, 'update:formatPriority', $event)"
                 @update:allowedFormats="onSectionEvent(activeId, 'update:allowedFormats', $event)"
                 @update:excludePatterns="onSectionEvent(activeId, 'update:excludePatterns', $event)"
+                @update:coverAspectRatio="onSectionEvent(activeId, 'update:coverAspectRatio', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
               />

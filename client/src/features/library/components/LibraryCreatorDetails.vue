@@ -4,15 +4,23 @@ import * as LucideIcons from 'lucide-vue-next'
 import { Library, Search, X } from 'lucide-vue-next'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import type { CoverAspectRatio } from '@projectx/types'
+
+const ASPECT_RATIO_OPTIONS: { value: CoverAspectRatio; label: string }[] = [
+  { value: '2/3', label: 'Portrait' },
+  { value: '1/1', label: 'Square' },
+]
 
 const props = defineProps<{
   name: string
   icon: string | null
+  coverAspectRatio: CoverAspectRatio
 }>()
 
 const emit = defineEmits<{
   'update:name': [value: string]
   'update:icon': [value: string | null]
+  'update:coverAspectRatio': [value: CoverAspectRatio]
 }>()
 
 // ── Icon grid ──────────────────────────────────────────────────────────────
@@ -72,6 +80,26 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
           @input="emit('update:name', ($event.target as HTMLInputElement).value)"
         />
       </div>
+    </div>
+
+    <!-- Cover aspect ratio -->
+    <div>
+      <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Cover style</label>
+      <div class="flex gap-3">
+        <button
+          v-for="option in ASPECT_RATIO_OPTIONS"
+          :key="option.value"
+          class="flex flex-1 flex-col items-center gap-2 p-3 rounded-lg border-2 transition-colors"
+          :class="
+            coverAspectRatio === option.value ? 'border-primary bg-primary/8' : 'border-border hover:border-muted-foreground/40 hover:bg-muted/40'
+          "
+          @click="emit('update:coverAspectRatio', option.value)"
+        >
+          <div class="w-8 rounded-sm bg-muted-foreground/25" :style="{ aspectRatio: option.value }" />
+          <span class="text-xs font-medium">{{ option.label }}</span>
+        </button>
+      </div>
+      <p class="mt-2 text-xs text-muted-foreground">Use Portrait for ebook or mixed libraries. Square works better for audiobook-only libraries.</p>
     </div>
 
     <!-- Icon picker (fills remaining height) -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue'
+import { computed, inject, ref, onUnmounted } from 'vue'
 import { Image, ImagePlus, Link, Loader2, RotateCcw, Search, Upload, X } from 'lucide-vue-next'
 import type { BookDetail } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
@@ -7,6 +7,7 @@ import { hideOnError } from '../../../lib/metadata-fetch'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 import CoverSearchDrawer from './CoverSearchDrawer.vue'
 
 const props = defineProps<{ book: BookDetail }>()
@@ -42,13 +43,7 @@ const activeSrc = computed(() => previewSrc.value ?? coverUrl(props.book.id, 'co
 const hasPending = computed(() => !!pendingFile.value || !!pendingUrl.value)
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const coverNaturalWidth = ref(0)
-const coverNaturalHeight = ref(0)
-const coverAspectRatio = computed(() => {
-  if (!isPrimaryAudio.value) return '2/3'
-  if (coverNaturalWidth.value > 0 && coverNaturalHeight.value > coverNaturalWidth.value) return '2/3'
-  return '1/1'
-})
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 function cancelPending() {
   clearPending()
@@ -89,12 +84,6 @@ async function handleRevert() {
 
 const lightboxOpen = ref(false)
 
-function handleCoverLoad(e: Event) {
-  const img = e.target as HTMLImageElement
-  coverNaturalWidth.value = img.naturalWidth
-  coverNaturalHeight.value = img.naturalHeight
-}
-
 defineExpose({ setUrl, hasPending, confirm })
 
 onUnmounted(() => clearTimeout(debounceTimer))
@@ -108,7 +97,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
       :style="{ aspectRatio: coverAspectRatio }"
       @click="lightboxOpen = true"
     >
-      <img :src="activeSrc" :alt="book.title ?? ''" class="w-full h-full object-contain" @error="hideOnError" @load="handleCoverLoad" />
+      <img :src="activeSrc" :alt="book.title ?? ''" class="w-full h-full object-contain" @error="hideOnError" />
     </div>
 
     <!-- Lightbox -->

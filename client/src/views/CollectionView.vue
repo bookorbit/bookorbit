@@ -20,14 +20,16 @@ import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
 import type { BookCard } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
-const { coverSize, gridGap, viewMode } = useDisplaySettings()
+const { viewMode } = useDisplaySettings()
 
 const collectionId = computed(() => Number(route.params.id))
+const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId)
 const { collections, fetchCollections, removeBooksFromCollection } = useCollections()
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
 const pageTitle = computed(() => {

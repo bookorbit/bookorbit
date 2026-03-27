@@ -2,7 +2,7 @@
 import type { BookCard, BookFileRef } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { api } from '@/lib/api'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -22,6 +22,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCoverVersions } from '../composables/useCoverVersions'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
@@ -93,6 +94,7 @@ watch(coverSrc, () => {
 })
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 function openFile(file: BookFileRef) {
   router.push({
@@ -129,14 +131,23 @@ function openAuthorBrowse() {
 
     <!-- Cover -->
     <div
-      class="h-24 w-16 rounded shrink-0 overflow-hidden relative"
+      class="w-16 rounded shrink-0 overflow-hidden relative"
       :class="isMissing ? 'opacity-50 grayscale' : ''"
-      :style="coverLoaded ? {} : coverStyle"
+      :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
     >
+      <!-- Blurred background fill for mismatched aspect ratios -->
       <img
         v-if="!coverFailed"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-50 transition-opacity duration-200"
+        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        aria-hidden="true"
+        loading="lazy"
+      />
+      <img
+        v-if="!coverFailed"
+        :src="coverSrc"
+        class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
         :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
         loading="lazy"
         :alt="book.title ?? ''"

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { BookOpen } from 'lucide-vue-next'
 import type { MetadataCandidate, MetadataProviderInfo } from '@projectx/types'
 import { getProviderLabel, hideOnError, providerBadgeStyle } from '../../../lib/metadata-fetch'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
 const props = defineProps<{
   candidate: MetadataCandidate
@@ -10,6 +11,8 @@ const props = defineProps<{
 }>()
 
 defineEmits<{ select: [MetadataCandidate] }>()
+
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const providerLabel = computed(() => getProviderLabel(props.candidate.provider, props.providers))
 </script>
@@ -20,12 +23,12 @@ const providerLabel = computed(() => getProviderLabel(props.candidate.provider, 
     @click="$emit('select', candidate)"
   >
     <!-- Cover -->
-    <span class="relative shrink-0 rounded-lg overflow-hidden bg-muted block shadow-sm" style="width: 64px; aspect-ratio: 2/3">
+    <span class="relative shrink-0 rounded-lg overflow-hidden bg-muted block shadow-sm" :style="{ width: '64px', aspectRatio: coverAspectRatio }">
       <img
         v-if="candidate.coverUrl"
         :src="candidate.coverUrl"
         :alt="candidate.title"
-        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
         @error="hideOnError"
       />
       <span v-else class="absolute inset-0 flex items-center justify-center bg-linear-to-br from-surface-2 to-surface-4">

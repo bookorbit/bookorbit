@@ -102,6 +102,7 @@ CREATE TABLE "libraries" (
 	"name" varchar(255) NOT NULL,
 	"icon" varchar(100),
 	"display_order" integer DEFAULT 0 NOT NULL,
+	"cover_aspect_ratio" varchar(10) DEFAULT '2/3' NOT NULL,
 	"watch" boolean DEFAULT false NOT NULL,
 	"auto_scan_cron_expression" text,
 	"metadata_precedence" jsonb DEFAULT '["folderStructure","embedded","nfoFile","opfFile","sidecar"]'::jsonb NOT NULL,

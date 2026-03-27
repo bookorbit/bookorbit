@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, Filter, Telescope, X } from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
@@ -23,19 +23,22 @@ import { useBookBulkActions } from '@/features/book/composables/useBookBulkActio
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { usePageTitle } from '@/composables/usePageTitle'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import type { GroupRule, SortSpec } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
-const { coverSize, gridGap, viewMode } = useDisplaySettings()
+const { viewMode } = useDisplaySettings()
 const { libraries } = useLibraries()
 
 const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
+const { coverSize, gridGap } = useViewDisplaySettings('library', libraryId)
 
 const currentLibrary = computed(() => libraries.value.find((l) => l.id === libraryId.value))
 const title = computed(() => currentLibrary.value?.name ?? 'Library')
@@ -45,6 +48,11 @@ const pageTitle = computed(() => {
   return libraryId.value === null ? 'Library' : `Library #${libraryId.value}`
 })
 usePageTitle(pageTitle)
+
+provide(
+  COVER_ASPECT_RATIO_KEY,
+  computed(() => currentLibrary.value?.coverAspectRatio ?? DEFAULT_COVER_ASPECT_RATIO),
+)
 
 const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()

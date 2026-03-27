@@ -15,6 +15,7 @@ import { useLens } from '@/features/lens/composables/useLens'
 import { useLenses } from '@/features/lens/composables/useLenses'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
@@ -25,9 +26,10 @@ import type { BookCard, GroupRule, SortField } from '@projectx/types'
 
 const route = useRoute()
 const router = useRouter()
-const { coverSize, gridGap, viewMode, lensFilterExpanded } = useDisplaySettings()
+const { viewMode, lensFilterExpanded } = useDisplaySettings()
 
 const lensId = computed(() => Number(route.params.id))
+const { coverSize, gridGap } = useViewDisplaySettings('lens', lensId)
 
 const { items: books, total, loading, hasMore, load } = useLens(lensId)
 const { setBookContext, registerLoadMore } = useBookNavigation()

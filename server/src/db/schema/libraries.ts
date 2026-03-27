@@ -6,6 +6,7 @@ export const libraries = pgTable('libraries', {
   name: varchar('name', { length: 255 }).notNull(),
   icon: varchar('icon', { length: 100 }),
   displayOrder: integer('display_order').notNull().default(0),
+  coverAspectRatio: varchar('cover_aspect_ratio', { length: 10 }).notNull().default('2/3'),
 
   // File watching & scheduling
   watch: boolean('watch').notNull().default(false),

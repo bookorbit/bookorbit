@@ -1,7 +1,7 @@
 import { reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS } from '@projectx/types'
-import type { Library, OrganizationMode, PrescanResult } from '@projectx/types'
+import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@projectx/types'
 
 export { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS }
 
@@ -17,6 +17,7 @@ function blankForm() {
     name: '',
     icon: null as string | null,
     displayOrder: 0,
+    coverAspectRatio: '2/3' as CoverAspectRatio,
     folders: [] as string[],
     watch: false,
     autoScanCronExpression: null as string | null,
@@ -51,6 +52,7 @@ export function useLibraryCreator() {
     form.name = library.name
     form.icon = library.icon ?? null
     form.displayOrder = library.displayOrder
+    form.coverAspectRatio = library.coverAspectRatio
     form.folders = library.folders.map((f) => f.path)
     form.watch = library.watch
     form.autoScanCronExpression = library.autoScanCronExpression ?? null

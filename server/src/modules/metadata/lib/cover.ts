@@ -19,7 +19,7 @@ export function imageExt(bytes: Buffer): string {
 }
 
 export async function generateThumbnail(bytes: Buffer): Promise<Buffer> {
-  return sharp(bytes).resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'cover', position: 'top' }).jpeg({ quality: 90 }).toBuffer();
+  return sharp(bytes).resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
 }
 
 /**

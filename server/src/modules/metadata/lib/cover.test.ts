@@ -19,6 +19,7 @@ vi.mock('sharp', () => {
 
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import sharp from 'sharp';
 import { extractCb7Cover } from './cover-cb7';
 import { extractCbrCover } from './cover-cbr';
 import { extractCbzCover } from './cover-cbz';
@@ -99,6 +100,14 @@ describe('generateThumbnail', () => {
   it('returns a Buffer', async () => {
     const result = await generateThumbnail(JPEG_BYTES);
     expect(result).toBeInstanceOf(Buffer);
+  });
+
+  it('resizes with inside-fit to avoid cropping', async () => {
+    await generateThumbnail(JPEG_BYTES);
+    const sharpMock = sharp as unknown as MockedFunction<typeof sharp>;
+    expect(sharpMock).toHaveBeenCalledWith(JPEG_BYTES);
+    const chain = sharpMock.mock.results[0]?.value as { resize: Mock };
+    expect(chain.resize).toHaveBeenCalledWith(400, 600, { fit: 'inside', withoutEnlargement: true });
   });
 });
 

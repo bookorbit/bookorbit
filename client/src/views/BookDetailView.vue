@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, provide, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { BookDetail } from '@projectx/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
@@ -12,9 +12,21 @@ import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraries } from '@/features/library/composables/useLibraries'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 
 const route = useRoute()
 const { hasPermission } = usePermissions()
+const { libraries } = useLibraries()
+
+provide(
+  COVER_ASPECT_RATIO_KEY,
+  computed(() => {
+    const libraryId = detail.value?.libraryId
+    const library = libraryId != null ? libraries.value.find((l) => l.id === libraryId) : null
+    return library?.coverAspectRatio ?? DEFAULT_COVER_ASPECT_RATIO
+  }),
+)
 
 const bookId = computed(() => Number(route.params.bookId))
 const tab = computed(() => normalizeBookDetailTab(route.query.tab))

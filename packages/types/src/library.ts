@@ -1,4 +1,5 @@
 export type OrganizationMode = "auto" | "book_per_file" | "book_per_folder";
+export type CoverAspectRatio = "2/3" | "1/1";
 
 export const DEFAULT_FORMAT_PRIORITY = [
   "epub", "pdf", "cbz", "cbr", "cb7",
@@ -36,6 +37,7 @@ export interface Library {
   name: string;
   icon?: string | null;
   displayOrder: number;
+  coverAspectRatio: CoverAspectRatio;
   watch: boolean;
   autoScanCronExpression?: string | null;
   metadataPrecedence: string[];

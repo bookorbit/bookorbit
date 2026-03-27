@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, inject, reactive, ref } from 'vue'
 import { Search, BookOpen, Loader2 } from 'lucide-vue-next'
 import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
 import MetadataResultCard from './MetadataResultCard.vue'
 import { providerActivePillStyle } from '../../../lib/metadata-fetch'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
 const props = defineProps<{
   searchDefaults: { title?: string; author?: string; isbn?: string }
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   clearFilter: []
   select: [MetadataCandidate]
 }>()
+
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const form = reactive({
   title: props.searchDefaults.title ?? '',
@@ -119,7 +122,7 @@ function runSearch() {
       <!-- Skeleton grid while loading with no results yet -->
       <div v-if="isStreaming && !filteredResults.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div v-for="n in 8" :key="n" class="rounded-xl border border-border/40 bg-card overflow-hidden animate-pulse flex gap-3 p-2.5">
-          <div class="rounded-lg bg-muted shrink-0" style="width: 64px; aspect-ratio: 2/3" />
+          <div class="rounded-lg bg-muted shrink-0" :style="{ width: '64px', aspectRatio: coverAspectRatio }" />
           <div class="flex-1 flex flex-col justify-center gap-2 py-1">
             <div class="h-3 bg-muted rounded-md w-full" />
             <div class="h-2.5 bg-muted rounded-md w-3/4" />

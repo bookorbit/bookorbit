@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, Pencil, Star, Trash2, X } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, FolderPlus, Headphones, Pencil, Star, Trash2, X } from 'lucide-vue-next'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -12,6 +12,8 @@ import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { bookCoverStyle } from '../lib/book-cover'
 import { getFormatColor } from '../lib/format-colors'
+import { FORMAT_TO_GROUP } from '@projectx/types'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
@@ -128,7 +130,13 @@ const providerLinks = computed<ProviderLink[]>(() => {
 const descriptionExpanded = ref(false)
 const coverLightboxOpen = ref(false)
 
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+
 const primaryFile = computed(() => detail.value?.files.find((f) => f.role === 'primary') ?? detail.value?.files[0] ?? null)
+const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const knownFormats = computed(() => [
+  ...new Set((detail.value?.files ?? []).filter((f) => f.format && FORMAT_TO_GROUP[f.format]).map((f) => f.format!)),
+])
 
 function providerLinkStyle(provider: string) {
   const color = getProviderColor(provider)
@@ -173,14 +181,14 @@ function openDetails() {
 <template>
   <TooltipProvider :delay-duration="0">
     <Sheet :open="props.open" @update:open="emit('update:open', $event)">
-      <SheetContent side="right" class="sm:max-w-[400px] p-0 overflow-hidden">
+      <SheetContent side="right" class="sm:max-w-100 p-0 overflow-hidden">
         <SheetTitle class="sr-only">{{ detail?.title ? `Quick view for ${detail.title}` : 'Book quick view' }}</SheetTitle>
         <SheetDescription class="sr-only">Preview book details and run quick actions.</SheetDescription>
         <div class="flex flex-col h-full">
           <!-- Header: cover + title block -->
           <div class="p-5 pt-10 border-b shrink-0">
             <div v-if="loading" class="flex gap-4 items-start">
-              <Skeleton class="w-24 rounded shrink-0" style="aspect-ratio: 2/3" />
+              <Skeleton class="w-24 rounded shrink-0" :style="{ aspectRatio: coverAspectRatio }" />
               <div class="flex-1 space-y-2 pt-1">
                 <Skeleton class="h-4 w-full" />
                 <Skeleton class="h-3 w-3/4" />
@@ -192,14 +200,13 @@ function openDetails() {
               <!-- Cover -->
               <div
                 class="w-24 shrink-0 rounded overflow-hidden shadow-md cursor-zoom-in"
-                style="aspect-ratio: 2/3"
-                :style="coverLoaded ? {} : coverStyle"
+                :style="[{ aspectRatio: coverAspectRatio }, coverLoaded ? {} : coverStyle]"
                 @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
               >
                 <img
                   v-if="!coverFailed"
                   :src="coverSrc!"
-                  class="w-full h-full object-cover transition-opacity duration-200"
+                  class="w-full h-full object-contain transition-opacity duration-200"
                   :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
                   :alt="detail.title ?? ''"
                   @load="coverLoaded = true"
@@ -265,14 +272,15 @@ function openDetails() {
             </template>
 
             <template v-else-if="detail">
-              <!-- Meta chips -->
+              <!-- Format badges + meta chips -->
               <div class="flex flex-wrap gap-1.5">
                 <span
-                  v-for="file in detail.files"
-                  :key="file.id"
-                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground"
+                  v-for="fmt in knownFormats"
+                  :key="fmt"
+                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+                  :style="formatBadgeStyle(fmt)"
                 >
-                  {{ file.format ?? '?' }}
+                  {{ fmt }}
                 </span>
                 <span v-if="detail.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
                   {{ detail.pageCount }} pages
@@ -324,7 +332,7 @@ function openDetails() {
 
               <!-- Genres -->
               <div v-if="detail.genres.length" class="flex flex-wrap gap-1.5">
-                <span v-for="genre in detail.genres" :key="genre" class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                <span v-for="genre in detail.genres" :key="genre" class="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {{ genre }}
                 </span>
               </div>
@@ -356,8 +364,9 @@ function openDetails() {
               :disabled="!primaryFile"
               @click="openBook"
             >
-              <BookOpen class="size-4" />
-              Read
+              <Headphones v-if="isPrimaryAudio" class="size-4" />
+              <BookOpen v-else class="size-4" />
+              {{ isPrimaryAudio ? 'Listen' : 'Read' }}
             </button>
             <button
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"

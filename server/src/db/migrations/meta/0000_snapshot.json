@@ -1,5 +1,5 @@
 {
-  "id": "2e38901e-f8a5-4f93-8564-e0f8f44e1883",
+  "id": "00255418-cbd4-4a15-8395-a63bca8ca17f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -767,6 +767,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "cover_aspect_ratio": {
+          "name": "cover_aspect_ratio",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'2/3'"
         },
         "watch": {
           "name": "watch",

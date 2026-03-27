@@ -3,7 +3,7 @@ import type { BookCard, BookFileRef } from '@projectx/types'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { getFormatColor } from '../lib/format-colors'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -40,6 +40,7 @@ import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 
@@ -104,6 +105,7 @@ async function reExtractCover() {
 }
 const { hasPermission } = usePermissions()
 const { cardOverlays } = useDisplaySettings()
+const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const showSendDialog = ref(false)
 
 const showSeriesOverlay = computed(() => cardOverlays.value.includes('series') && seriesLine.value != null)
@@ -136,6 +138,11 @@ watch(coverSrc, () => {
   coverFailed.value = false
 })
 
+function onMainImgRef(el: Element | ComponentPublicInstance | null) {
+  const img = el as HTMLImageElement | null
+  if (img?.complete && img.naturalWidth > 0) coverLoaded.value = true
+}
+
 function openFile(file: BookFileRef) {
   router.push({
     name: 'reader',
@@ -151,6 +158,10 @@ function handleCardClick(event: MouseEvent) {
     return
   }
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+}
+
+function openQuickView() {
+  emit('action', 'quick-view')
 }
 
 function openAuthorBrowse() {
@@ -202,16 +213,26 @@ async function handleSetStatus(status: ReadStatus) {
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
       :class="[isMissing ? '' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]']"
-      style="aspect-ratio: 2/3"
-      :style="coverLoaded ? {} : coverStyle"
+      :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
     >
       <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
       <div v-if="isMissing" class="absolute inset-0 z-30 pointer-events-none rounded-sm ring-2 ring-inset ring-amber-500" />
 
+      <!-- Blurred background fill for mismatched aspect ratios -->
       <img
         v-if="!coverFailed"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90 transition-opacity duration-200"
+        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        aria-hidden="true"
+        loading="lazy"
+      />
+
+      <img
+        v-if="!coverFailed"
+        :ref="onMainImgRef"
+        :src="coverSrc"
+        class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
         :class="coverLoaded ? (isMissing ? 'opacity-100 brightness-50' : 'opacity-100') : 'opacity-0'"
         loading="lazy"
         decoding="async"
@@ -347,28 +368,27 @@ async function handleSetStatus(status: ReadStatus) {
       <!-- Hover overlay -->
       <div
         v-if="!selectionMode"
-        class="absolute inset-0 flex flex-col p-2 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-        @click.stop
+        class="absolute inset-0 flex flex-col p-2 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+        @click.stop="handleCardClick"
       >
-        <!-- Center: primary action buttons -->
-        <div class="flex-1 flex flex-col items-center justify-center gap-[18cqi]">
-          <button
-            v-if="primaryFile && !isMissing"
-            class="p-[7cqi] rounded-full bg-primary/50 hover:bg-primary transition-colors text-white"
-            @click="openFile(primaryFile)"
-          >
-            <BookOpen class="size-[14cqi]" />
-          </button>
-          <button class="p-[7cqi] rounded-full bg-primary/70 hover:bg-primary transition-colors text-white" @click="emit('action', 'quick-view')">
-            <PanelRight class="size-[14cqi]" />
+        <!-- Top row: Quick View -->
+        <div class="shrink-0 flex justify-end">
+          <button class="p-1 rounded bg-primary/70 hover:bg-primary transition-colors text-white" @click="openQuickView">
+            <PanelRight class="size-4" />
           </button>
         </div>
 
+        <div class="flex-1 min-h-0" />
+
         <!-- Bottom: title/author + kebab -->
-        <div class="flex items-end justify-between gap-2">
+        <div class="shrink-0 flex items-center justify-between gap-2">
           <div v-if="coverLoaded" class="min-w-0 flex-1">
             <p class="text-xs font-semibold text-white leading-tight line-clamp-2">{{ book.title ?? '-' }}</p>
-            <button v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5 hover:underline" @click.stop="openAuthorBrowse">
+            <button
+              v-if="authorLine && coverAspectRatio !== '1/1'"
+              class="text-[10px] text-white/70 truncate mt-0.5 hover:underline"
+              @click.stop="openAuthorBrowse"
+            >
               {{ authorLine }}
             </button>
           </div>
