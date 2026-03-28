@@ -163,6 +163,20 @@ describe('reconcile()', () => {
     expect(gateway.emitBookRestored).toHaveBeenCalledWith({ libraryId: 2, bookIds: [20] });
   });
 
+  it('emits book-missing and book-moved for each result from reconcileMissingBooks', async () => {
+    const { service, processor, gateway } = makeService();
+    (service as any).subscriptions.set(1, []);
+    (processor.reconcileMissingBooks as vi.Mock).mockResolvedValue([
+      { type: 'book-missing', libraryId: 1, bookIds: [20] },
+      { type: 'book-moved', libraryId: 1, bookIds: [30] },
+    ]);
+
+    await (service as any).reconcile();
+
+    expect(gateway.emitBookMissing).toHaveBeenCalledWith({ libraryId: 1, bookIds: [20] });
+    expect(gateway.emitBookMoved).toHaveBeenCalledWith({ libraryId: 1, bookIds: [30] });
+  });
+
   it('does nothing when reconcileMissingBooks returns empty', async () => {
     const { service, gateway } = makeService();
     (service as any).subscriptions.set(1, []);

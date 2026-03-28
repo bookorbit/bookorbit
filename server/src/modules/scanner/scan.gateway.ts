@@ -81,14 +81,17 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitBookMissing(event: BookMissingEvent): void {
+    this.logger.debug(`[scanner.ws_emit] [book:missing] libraryId=${event.libraryId} bookCount=${event.bookIds.length}`);
     this.server?.to(`library:${event.libraryId}`).emit('book:missing', event);
   }
 
   emitBookRestored(event: BookRestoredEvent): void {
+    this.logger.debug(`[scanner.ws_emit] [book:restored] libraryId=${event.libraryId} bookCount=${event.bookIds.length}`);
     this.server?.to(`library:${event.libraryId}`).emit('book:restored', event);
   }
 
   emitBookMoved(event: BookMovedEvent): void {
+    this.logger.debug(`[scanner.ws_emit] [book:moved] libraryId=${event.libraryId} bookCount=${event.bookIds.length}`);
     this.server?.to(`library:${event.libraryId}`).emit('book:moved', event);
   }
 }

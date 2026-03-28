@@ -103,8 +103,12 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     try {
       const results = await this.processor.reconcileMissingBooks(libraryIds);
       for (const result of results) {
-        if (result.type === 'book-restored') {
+        if (result.type === 'book-missing') {
+          this.gateway.emitBookMissing({ libraryId: result.libraryId, bookIds: result.bookIds });
+        } else if (result.type === 'book-restored') {
           this.gateway.emitBookRestored({ libraryId: result.libraryId, bookIds: result.bookIds });
+        } else if (result.type === 'book-moved') {
+          this.gateway.emitBookMoved({ libraryId: result.libraryId, bookIds: result.bookIds });
         }
       }
       this.logger.log(

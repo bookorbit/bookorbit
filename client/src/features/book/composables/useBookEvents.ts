@@ -9,8 +9,10 @@ const restoredCallbacks = new Set<BookIdsCallback>()
 const movedCallbacks = new Set<BookIdsCallback>()
 
 let pendingMissingCount = 0
+let pendingRestoredCount = 0
 let pendingMovedCount = 0
 let missingToastTimer: ReturnType<typeof setTimeout> | null = null
+let restoredToastTimer: ReturnType<typeof setTimeout> | null = null
 let movedToastTimer: ReturnType<typeof setTimeout> | null = null
 
 function flushMissingToast() {
@@ -19,6 +21,14 @@ function flushMissingToast() {
   pendingMissingCount = 0
   missingToastTimer = null
   toast.warning(count === 1 ? '1 book is no longer available on disk.' : `${count} books are no longer available on disk.`)
+}
+
+function flushRestoredToast() {
+  if (pendingRestoredCount === 0) return
+  const count = pendingRestoredCount
+  pendingRestoredCount = 0
+  restoredToastTimer = null
+  toast.success(count === 1 ? '1 book was restored on disk.' : `${count} books were restored on disk.`)
 }
 
 function flushMovedToast() {
@@ -46,6 +56,9 @@ function ensureInitialized() {
 
   socket.on('book:restored', (event: BookRestoredEvent) => {
     for (const cb of restoredCallbacks) cb(event.bookIds)
+    pendingRestoredCount += event.bookIds.length
+    clearTimeout(restoredToastTimer ?? undefined)
+    restoredToastTimer = setTimeout(flushRestoredToast, 1000)
   })
 
   socket.on('book:moved', (event: BookMovedEvent) => {

@@ -13,7 +13,11 @@ vi.mock('@/features/scanner/composables/useScanProgress', () => ({
 }))
 
 vi.mock('vue-sonner', () => ({
-  toast: { warning: vi.fn<(message: string) => void>() },
+  toast: {
+    warning: vi.fn<(message: string) => void>(),
+    success: vi.fn<(message: string) => void>(),
+    info: vi.fn<(message: string) => void>(),
+  },
 }))
 
 // Import the composable after mocks are in place.
@@ -21,6 +25,8 @@ import { useBookEvents } from '@/features/book/composables/useBookEvents'
 
 // Shorthand to the hoisted mock fn — accessed via vi.mocked after module loads.
 const toastWarning = vi.mocked(toast.warning)
+const toastSuccess = vi.mocked(toast.success)
+const toastInfo = vi.mocked(toast.info)
 
 beforeAll(() => {
   useBookEvents() // triggers ensureInitialized(), registers socket listeners
@@ -29,6 +35,8 @@ beforeAll(() => {
 beforeEach(() => {
   vi.useFakeTimers()
   toastWarning.mockClear()
+  toastSuccess.mockClear()
+  toastInfo.mockClear()
   vi.clearAllTimers()
 })
 
@@ -90,6 +98,50 @@ describe('onBookMissing', () => {
 
     expect(toastWarning).toHaveBeenCalledTimes(1)
     expect(toastWarning).toHaveBeenCalledWith('5 books are no longer available on disk.')
+    cleanup()
+  })
+})
+
+// ── onBookRestored ─────────────────────────────────────────────────────────────
+
+describe('onBookRestored', () => {
+  it('fires the callback with the bookIds array on book:restored event', () => {
+    const { onBookRestored } = useBookEvents()
+    const cb = vi.fn<(bookIds: number[]) => void>()
+    const cleanup = onBookRestored(cb)
+
+    mockSocket.emit('book:restored', { libraryId: 1, bookIds: [77] })
+
+    expect(cb).toHaveBeenCalledTimes(1)
+    expect(cb).toHaveBeenCalledWith([77])
+    cleanup()
+  })
+
+  it('shows success toast for 1 restored book after 1s debounce', () => {
+    const { onBookRestored } = useBookEvents()
+    const cleanup = onBookRestored(() => {})
+
+    mockSocket.emit('book:restored', { libraryId: 1, bookIds: [123] })
+    expect(toastSuccess).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1000)
+
+    expect(toastSuccess).toHaveBeenCalledTimes(1)
+    expect(toastSuccess).toHaveBeenCalledWith('1 book was restored on disk.')
+    cleanup()
+  })
+
+  it('batches multiple events into one success toast', () => {
+    const { onBookRestored } = useBookEvents()
+    const cleanup = onBookRestored(() => {})
+
+    mockSocket.emit('book:restored', { libraryId: 1, bookIds: [1, 2] })
+    mockSocket.emit('book:restored', { libraryId: 1, bookIds: [3] })
+
+    vi.advanceTimersByTime(1000)
+
+    expect(toastSuccess).toHaveBeenCalledTimes(1)
+    expect(toastSuccess).toHaveBeenCalledWith('3 books were restored on disk.')
     cleanup()
   })
 })
