@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags } from 'lucide-vue-next'
+import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags, BookOpen } from 'lucide-vue-next'
 import type { CoverAspectRatio, Library, OrganizationMode } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useLibraryCreator } from '../composables/useLibraryCreator'
@@ -10,6 +10,7 @@ import LibraryCreatorScanner from './LibraryCreatorScanner.vue'
 import LibraryCreatorSchedule from './LibraryCreatorSchedule.vue'
 import LibraryCreatorAccess from './LibraryCreatorAccess.vue'
 import LibraryCreatorMetadata from './LibraryCreatorMetadata.vue'
+import LibraryCreatorReading from './LibraryCreatorReading.vue'
 
 const props = defineProps<{
   library?: Library | null
@@ -23,19 +24,20 @@ const emit = defineEmits<{
 const creator = useLibraryCreator()
 const { form, mode, editingLibraryId, loading, prescanLoading, prescanResult, error } = creator
 
-type SectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'schedule' | 'access'
+type SectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'reading' | 'schedule' | 'access'
 
 const ALL_SECTIONS: { id: SectionId; label: string; icon: unknown; component: unknown }[] = [
   { id: 'details', label: 'Details', icon: Info, component: LibraryCreatorDetails },
   { id: 'folders', label: 'Folders', icon: FolderOpen, component: LibraryCreatorFolders },
   { id: 'scanner', label: 'Scanner', icon: ScanLine, component: LibraryCreatorScanner },
   { id: 'metadata', label: 'Metadata', icon: Tags, component: LibraryCreatorMetadata },
+  { id: 'reading', label: 'Reading', icon: BookOpen, component: LibraryCreatorReading },
   { id: 'schedule', label: 'Schedule', icon: Clock, component: LibraryCreatorSchedule },
   { id: 'access', label: 'Access', icon: Users, component: LibraryCreatorAccess },
 ]
 
 // Access is only meaningful after a library exists
-const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 5) : ALL_SECTIONS))
+const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 6) : ALL_SECTIONS))
 
 // ── Stepper state ──────────────────────────────────────────────────────────
 
@@ -131,6 +133,10 @@ const sectionProps = computed(() => ({
     metadataPrecedence: form.metadataPrecedence,
     formatPriority: form.formatPriority,
   },
+  reading: {
+    readingThreshold: form.readingThreshold,
+    markAsFinishedPercentComplete: form.markAsFinishedPercentComplete,
+  },
   schedule: { watch: form.watch, autoScanCronExpression: form.autoScanCronExpression },
   access: { libraryId: editingLibraryId.value },
 }))
@@ -150,6 +156,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
   else if (event === 'update:formatPriority') form.formatPriority = value as string[]
   else if (event === 'update:allowedFormats') form.allowedFormats = value as string[]
   else if (event === 'update:excludePatterns') form.excludePatterns = value as string[]
+  else if (event === 'update:readingThreshold') form.readingThreshold = value as number
+  else if (event === 'update:markAsFinishedPercentComplete') form.markAsFinishedPercentComplete = value as number
   else if (event === 'update:watch') form.watch = value as boolean
   else if (event === 'update:autoScanCronExpression') form.autoScanCronExpression = value as string | null
 }
@@ -244,6 +252,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:allowedFormats="onSectionEvent(activeId, 'update:allowedFormats', $event)"
                 @update:excludePatterns="onSectionEvent(activeId, 'update:excludePatterns', $event)"
                 @update:coverAspectRatio="onSectionEvent(activeId, 'update:coverAspectRatio', $event)"
+                @update:readingThreshold="onSectionEvent(activeId, 'update:readingThreshold', $event)"
+                @update:markAsFinishedPercentComplete="onSectionEvent(activeId, 'update:markAsFinishedPercentComplete', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
               />
@@ -369,6 +379,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:allowedFormats="onSectionEvent(activeId, 'update:allowedFormats', $event)"
                 @update:excludePatterns="onSectionEvent(activeId, 'update:excludePatterns', $event)"
                 @update:coverAspectRatio="onSectionEvent(activeId, 'update:coverAspectRatio', $event)"
+                @update:readingThreshold="onSectionEvent(activeId, 'update:readingThreshold', $event)"
+                @update:markAsFinishedPercentComplete="onSectionEvent(activeId, 'update:markAsFinishedPercentComplete', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
               />

@@ -45,8 +45,8 @@ export interface Library {
   allowedFormats: string[];
   organizationMode: OrganizationMode;
   excludePatterns: string[];
-  markAsFinishedSecondsRemaining?: number | null;
-  markAsFinishedPercentComplete?: number | null;
+  readingThreshold: number;
+  markAsFinishedPercentComplete: number;
   fileNamingPattern?: string | null;
   folders: LibraryFolder[];
   bookCount?: number;

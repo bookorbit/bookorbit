@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride } from '@projectx/types';
 
 export const libraries = pgTable('libraries', {
@@ -26,8 +26,8 @@ export const libraries = pgTable('libraries', {
   excludePatterns: jsonb('exclude_patterns').$type<string[]>().notNull().default([]),
 
   // Reading progress thresholds
-  markAsFinishedSecondsRemaining: integer('mark_as_finished_seconds_remaining'),
-  markAsFinishedPercentComplete: integer('mark_as_finished_percent_complete'),
+  readingThreshold: doublePrecision('reading_threshold').notNull().default(0.25),
+  markAsFinishedPercentComplete: integer('mark_as_finished_percent_complete').notNull().default(98),
 
   // File naming pattern for uploads (null = use global default)
   fileNamingPattern: varchar('file_naming_pattern', { length: 500 }),

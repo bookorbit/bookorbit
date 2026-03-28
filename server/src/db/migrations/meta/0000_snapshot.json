@@ -1,5 +1,5 @@
 {
-  "id": "4e9b80be-be3a-4ef7-9c3c-3371568aef96",
+  "id": "6e69fe23-b05c-4a75-8fff-18a9a402877e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -823,17 +823,19 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "mark_as_finished_seconds_remaining": {
-          "name": "mark_as_finished_seconds_remaining",
-          "type": "integer",
+        "reading_threshold": {
+          "name": "reading_threshold",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 0.25
         },
         "mark_as_finished_percent_complete": {
           "name": "mark_as_finished_percent_complete",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 98
         },
         "file_naming_pattern": {
           "name": "file_naming_pattern",

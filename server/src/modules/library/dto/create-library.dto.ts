@@ -5,6 +5,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -77,15 +78,16 @@ export class CreateLibraryDto {
   excludePatterns?: string[];
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  markAsFinishedSecondsRemaining?: number | null;
+  @IsNumber()
+  @Min(0.05)
+  @Max(5)
+  readingThreshold?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(90)
   @Max(100)
-  markAsFinishedPercentComplete?: number | null;
+  markAsFinishedPercentComplete?: number;
 
   @IsOptional()
   @ValidateIf((o: { fileNamingPattern?: unknown }) => o.fileNamingPattern !== null)

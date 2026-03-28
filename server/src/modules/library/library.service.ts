@@ -73,8 +73,8 @@ export class LibraryService {
       organizationMode: dto.organizationMode ?? 'auto',
       excludePatterns: dto.excludePatterns ?? [],
       coverAspectRatio: dto.coverAspectRatio ?? '2/3',
-      markAsFinishedSecondsRemaining: dto.markAsFinishedSecondsRemaining ?? null,
-      markAsFinishedPercentComplete: dto.markAsFinishedPercentComplete ?? null,
+      readingThreshold: dto.readingThreshold ?? 0.25,
+      markAsFinishedPercentComplete: dto.markAsFinishedPercentComplete ?? 98,
       fileNamingPattern: dto.fileNamingPattern ?? null,
     });
 

@@ -26,8 +26,8 @@ function blankForm() {
     allowedFormats: [] as string[],
     organizationMode: 'auto' as OrganizationMode,
     excludePatterns: [] as string[],
-    markAsFinishedSecondsRemaining: null as number | null,
-    markAsFinishedPercentComplete: null as number | null,
+    readingThreshold: 0.25,
+    markAsFinishedPercentComplete: 98,
   }
 }
 
@@ -62,8 +62,8 @@ export function useLibraryCreator() {
     form.allowedFormats = [...library.allowedFormats]
     form.organizationMode = library.organizationMode
     form.excludePatterns = [...library.excludePatterns]
-    form.markAsFinishedSecondsRemaining = library.markAsFinishedSecondsRemaining ?? null
-    form.markAsFinishedPercentComplete = library.markAsFinishedPercentComplete ?? null
+    form.readingThreshold = library.readingThreshold
+    form.markAsFinishedPercentComplete = library.markAsFinishedPercentComplete
     mode.value = 'edit'
     editingLibraryId.value = library.id
     prescanResult.value = null

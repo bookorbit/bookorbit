@@ -4,6 +4,7 @@ import { UserBookStatusRepository } from './user-book-status.repository';
 import type { UserBookStatusRow } from '../../db/schema';
 
 const DEFAULT_FINISH_THRESHOLD = 98;
+const READING_THRESHOLD = 0.25;
 
 @Injectable()
 export class UserBookStatusService {
@@ -13,13 +14,20 @@ export class UserBookStatusService {
     await this.repo.upsert(userId, bookId, status, 'manual', new Date());
   }
 
-  async autoUpdate(userId: number, bookId: number, percentage: number, finishThreshold?: number | null): Promise<void> {
+  async autoUpdate(
+    userId: number,
+    bookId: number,
+    percentage: number,
+    readingThreshold?: number | null,
+    finishThreshold?: number | null,
+  ): Promise<void> {
     const existing = await this.repo.findOne(userId, bookId);
 
     if (existing?.source === 'manual') return;
 
-    const threshold = finishThreshold ?? DEFAULT_FINISH_THRESHOLD;
-    const derived: ReadStatus = percentage >= threshold ? 'read' : percentage > 0 ? 'reading' : 'unread';
+    const readTh = readingThreshold ?? READING_THRESHOLD;
+    const finishTh = finishThreshold ?? DEFAULT_FINISH_THRESHOLD;
+    const derived: ReadStatus = percentage >= finishTh ? 'read' : percentage >= readTh ? 'reading' : 'unread';
 
     if (!existing && derived === 'unread') return;
     if (existing?.status === derived) return;

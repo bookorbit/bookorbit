@@ -470,7 +470,7 @@ export class BookService {
     await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
     this.libraryService
       .findOne(libraryId)
-      .then((lib) => this.userBookStatusService.autoUpdate(userId, bookId, dto.percentage, lib?.markAsFinishedPercentComplete))
+      .then((lib) => this.userBookStatusService.autoUpdate(userId, bookId, dto.percentage, lib.readingThreshold, lib.markAsFinishedPercentComplete))
       .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${bookId}: ${err.message}`));
   }
 
@@ -479,7 +479,9 @@ export class BookService {
     await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage, dto.positionSeconds ?? null);
     this.libraryService
       .findOne(file.libraryId)
-      .then((lib) => this.userBookStatusService.autoUpdate(userId, file.bookId, dto.percentage, lib?.markAsFinishedPercentComplete))
+      .then((lib) =>
+        this.userBookStatusService.autoUpdate(userId, file.bookId, dto.percentage, lib.readingThreshold, lib.markAsFinishedPercentComplete),
+      )
       .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${file.bookId}: ${err.message}`));
   }
 

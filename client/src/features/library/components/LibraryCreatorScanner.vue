@@ -114,9 +114,6 @@ function onPatternKeydown(e: KeyboardEvent) {
           </p>
         </button>
       </div>
-      <p v-if="organizationMode === 'book_per_file'" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-        Folder structure will not be used for metadata. Changes take effect on the next full scan.
-      </p>
     </div>
 
     <!-- Filtering group -->

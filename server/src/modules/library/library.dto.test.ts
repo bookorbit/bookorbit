@@ -23,13 +23,8 @@ describe('Library DTO validation', () => {
     expect(await hasErrors(good)).toBe(false);
   });
 
-  it('CreateLibraryDto validates organization mode and percent bounds', async () => {
+  it('CreateLibraryDto validates organization mode', async () => {
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'bad' }))).toBe(true);
-    expect(
-      await hasErrors(
-        plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'auto', markAsFinishedPercentComplete: 101 }),
-      ),
-    ).toBe(true);
   });
 
   it('UpdateLibraryDto allows explicit null fileNamingPattern while validating string values', async () => {
@@ -53,5 +48,29 @@ describe('Library DTO validation', () => {
 
     const good = plainToInstance(ReorderLibrariesDto, { order: [{ id: 1, displayOrder: 0 }] });
     expect(await hasErrors(good)).toBe(false);
+  });
+
+  it('CreateLibraryDto validates readingThreshold bounds', async () => {
+    const base = { name: 'x', folders: ['/a'] };
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 0.04 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 5.01 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 0.05 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 5 }))).toBe(false);
+  });
+
+  it('CreateLibraryDto validates markAsFinishedPercentComplete bounds', async () => {
+    const base = { name: 'x', folders: ['/a'] };
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 89 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 101 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 90.5 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 90 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 100 }))).toBe(false);
+  });
+
+  it('UpdateLibraryDto validates readingThreshold and markAsFinishedPercentComplete bounds', async () => {
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { readingThreshold: 0.04 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { readingThreshold: 2.5 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { markAsFinishedPercentComplete: 89 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { markAsFinishedPercentComplete: 95 }))).toBe(false);
   });
 });
