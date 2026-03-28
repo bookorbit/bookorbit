@@ -5,13 +5,13 @@ import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/boo
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
-import { basename, dirname, sep } from 'path';
-import { readdir } from 'fs/promises';
+import { basename, dirname, relative, sep } from 'path';
+import { readdir, stat } from 'fs/promises';
 
 import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole, isAudioFormat } from './lib/classify';
 import { fingerprintFile } from './lib/hash';
 import { waitForStability } from './lib/stability';
-import { BookCandidate, FileStat, findBookCandidates, buildSingleBookCandidate } from './lib/walk';
+import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 
 const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
@@ -57,13 +57,14 @@ export class ScannerService implements OnApplicationBootstrap {
       const allowedFormats = settings?.allowedFormats ?? [];
       const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
       const excludePatterns = settings?.excludePatterns ?? [];
+      const organizationMode = settings?.organizationMode ?? 'auto';
 
       const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
 
       this.scanJobStore.create(job.id, libraryId, 0);
       this.emitFromStore(libraryId, job.id, 'running');
 
-      this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns).catch((err) => {
+      this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns, organizationMode).catch((err) => {
         const errorClass = err instanceof Error ? err.name : 'Error';
         const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
         this.logger.error(
@@ -167,6 +168,73 @@ export class ScannerService implements OnApplicationBootstrap {
       return;
     }
 
+    const settings = await this.scannerRepo.findLibrarySettings(libraryId);
+    const allowedFormats = settings?.allowedFormats ?? [];
+    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
+    const excludePatterns = settings?.excludePatterns ?? [];
+    const organizationMode = settings?.organizationMode ?? 'auto';
+
+    // In book_per_file mode each file is its own book — skip folder resolution entirely
+    // and build a single-file candidate directly from the changed file.
+    if (organizationMode === 'book_per_file') {
+      const { role, format } = classifyFile(filePath);
+      if (role !== 'content') {
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedNonContent=true - targeted folder scan completed`,
+        );
+        return;
+      }
+
+      const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
+      if (allowed && format !== null && !allowed.has(format)) {
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedByAllowedFormats=true - targeted folder scan completed`,
+        );
+        return;
+      }
+
+      const fileStat = await stat(filePath).catch(() => null);
+      if (!fileStat || !fileStat.isFile()) {
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateFound=false - targeted folder scan completed`,
+        );
+        return;
+      }
+
+      const candidate: BookCandidate = {
+        folderPath: filePath,
+        files: [
+          {
+            absolutePath: filePath,
+            relPath: relative(libraryFolder.path, filePath),
+            ino: Number(fileStat.ino),
+            sizeBytes: Number(fileStat.size),
+            mtime: fileStat.mtime,
+          },
+        ],
+      };
+
+      const knownBooks = await this.scannerRepo.findBooksByFolderPath(filePath);
+      const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((b) => b.id));
+
+      const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
+        knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
+      );
+      const fileByPath = new Map<
+        string,
+        { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
+      >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
+      const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
+        knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
+      );
+
+      const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, bookByFolderPath, fileByPath, fileByIno, formatPriority);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} - targeted folder scan completed`,
+      );
+      return;
+    }
+
     const bookFolder = dirname(filePath);
 
     // If the file sits directly inside the library root, a targeted scan would
@@ -198,11 +266,6 @@ export class ScannerService implements OnApplicationBootstrap {
         /* ignore unreadable parent */
       }
     }
-
-    const settings = await this.scannerRepo.findLibrarySettings(libraryId);
-    const allowedFormats = settings?.allowedFormats ?? [];
-    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
-    const excludePatterns = settings?.excludePatterns ?? [];
 
     let candidate: BookCandidate | null;
     try {
@@ -270,6 +333,7 @@ export class ScannerService implements OnApplicationBootstrap {
     allowedFormats: string[],
     formatPriority: string[],
     excludePatterns: string[],
+    organizationMode: string,
   ): Promise<void> {
     const event = 'scanner.run_scan';
     const startedAt = Date.now();
@@ -292,11 +356,18 @@ export class ScannerService implements OnApplicationBootstrap {
     for (const folder of folders) {
       let candidates: BookCandidate[] = [];
       try {
-        candidates = await findBookCandidates(folder.path, excludePatterns, (msg) =>
-          this.logger.warn(
-            `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
-          ),
-        );
+        candidates =
+          organizationMode === 'book_per_file'
+            ? await findLooseFileCandidates(folder.path, excludePatterns, (msg) =>
+                this.logger.warn(
+                  `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+                ),
+              )
+            : await findBookCandidates(folder.path, excludePatterns, (msg) =>
+                this.logger.warn(
+                  `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+                ),
+              );
       } catch (err) {
         this.logger.warn(
           `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} path="${folder.path.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk folder`,

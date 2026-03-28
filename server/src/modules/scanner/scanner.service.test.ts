@@ -3,25 +3,31 @@ vi.mock('./lib/hash');
 vi.mock('./lib/stability', () => ({ waitForStability: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();
-  return { ...actual, readdir: vi.fn().mockResolvedValue([]) };
+  return {
+    ...actual,
+    readdir: vi.fn().mockResolvedValue([]),
+    stat: vi.fn().mockResolvedValue({ isFile: () => true, ino: 2001n, size: 1024, mtime: new Date('2024-01-01') }),
+  };
 });
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
-import { readdir } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 
 import { ScannerService } from './scanner.service';
 import { ScanJobStore } from './scan-job-store.service';
 import { DEFAULT_FORMAT_PRIORITY } from './lib/classify';
 import type { BookCandidate, FileStat } from './lib/walk';
-import { findBookCandidates, buildSingleBookCandidate } from './lib/walk';
+import { findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
 import { fingerprintFile } from './lib/hash';
 
 const mockFindCandidates = findBookCandidates as MockedFunction<typeof findBookCandidates>;
+const mockFindLooseCandidates = findLooseFileCandidates as MockedFunction<typeof findLooseFileCandidates>;
 const mockBuildSingleCandidate = buildSingleBookCandidate as MockedFunction<typeof buildSingleBookCandidate>;
 const mockFingerprint = fingerprintFile as MockedFunction<typeof fingerprintFile>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
+const mockStat = stat as MockedFunction<typeof stat>;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -63,7 +69,9 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
   return {
     failAllRunningJobs: vi.fn().mockResolvedValue(undefined),
     findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
-    findLibrarySettings: vi.fn().mockResolvedValue({ allowedFormats: [], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: [] }),
+    findLibrarySettings: vi
+      .fn()
+      .mockResolvedValue({ allowedFormats: [], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: [], organizationMode: 'auto' }),
     createScanJob: vi.fn().mockResolvedValue({ id: 100 }),
     completeScanJob: vi.fn().mockResolvedValue(undefined),
     failScanJob: vi.fn().mockResolvedValue(undefined),
@@ -127,9 +135,11 @@ function awaitScan(repo: ReturnType<typeof makeRepo>): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   mockFindCandidates.mockResolvedValue([]);
+  mockFindLooseCandidates.mockResolvedValue([]);
   mockBuildSingleCandidate.mockResolvedValue(null);
   mockFingerprint.mockResolvedValue('hash-abc');
   mockReaddir.mockResolvedValue([]);
+  mockStat.mockResolvedValue({ isFile: () => true, ino: 2001n, size: 1024, mtime: new Date('2024-01-01') } as any);
 });
 
 // ── startScan — precondition checks ──────────────────────────────────────────
@@ -202,9 +212,12 @@ describe('missing book detection', () => {
 describe('excludePatterns', () => {
   it('passes excludePatterns from library settings to findBookCandidates', async () => {
     const repo = makeRepo({
-      findLibrarySettings: vi
-        .fn()
-        .mockResolvedValue({ allowedFormats: [], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: ['#recycle', '*.bak'] }),
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: ['#recycle', '*.bak'],
+        organizationMode: 'auto',
+      }),
     });
 
     const done = awaitScan(repo);
@@ -453,7 +466,9 @@ describe('format priority', () => {
 describe('allowedFormats filtering', () => {
   it('excludes primary files whose format is not in allowedFormats', async () => {
     const repo = makeRepo({
-      findLibrarySettings: vi.fn().mockResolvedValue({ allowedFormats: ['epub'], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: [] }),
+      findLibrarySettings: vi
+        .fn()
+        .mockResolvedValue({ allowedFormats: ['epub'], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: [], organizationMode: 'auto' }),
     });
 
     // findBookCandidates returns both, but the service filters before processing
@@ -631,6 +646,7 @@ describe('multi-format metadata source routing', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
+        organizationMode: 'auto',
       }),
     });
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
@@ -654,6 +670,7 @@ describe('multi-format metadata source routing', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
+        organizationMode: 'auto',
       }),
     });
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
@@ -740,6 +757,7 @@ describe('multi-format metadata source routing', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
+        organizationMode: 'auto',
       }),
     });
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 7001 });
@@ -771,6 +789,7 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
+        organizationMode: 'auto',
       }),
       // m4b already exists in DB — not new; epub is genuinely new
       findBooksByLibraryFolder: vi
@@ -1118,5 +1137,201 @@ describe('targeted folder scan', () => {
 
     // Should stay in the audio subfolder, not walk up
     expect(mockBuildSingleCandidate).toHaveBeenCalledWith('/library/Author/AudioBook', '/library', expect.any(Array), expect.any(Function));
+  });
+});
+
+// ── book_per_file mode — runScan ──────────────────────────────────────────────
+
+describe('book_per_file mode — runScan', () => {
+  it('calls findLooseFileCandidates instead of findBookCandidates when organizationMode is book_per_file', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function));
+    expect(mockFindCandidates).not.toHaveBeenCalled();
+  });
+
+  it('calls findBookCandidates (not loose) when organizationMode is auto', async () => {
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockFindCandidates).toHaveBeenCalled();
+    expect(mockFindLooseCandidates).not.toHaveBeenCalled();
+  });
+
+  it('passes excludePatterns to findLooseFileCandidates in book_per_file mode', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: ['samples', '*.bak'],
+        organizationMode: 'book_per_file',
+      }),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', ['samples', '*.bak'], expect.any(Function));
+  });
+
+  it('creates one book per loose-file candidate', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+    });
+
+    const file1 = makeFileStat({ absolutePath: '/library/Author/book1.epub', relPath: 'Author/book1.epub', ino: 5001 });
+    const file2 = makeFileStat({ absolutePath: '/library/Author/book2.epub', relPath: 'Author/book2.epub', ino: 5002 });
+    mockFindLooseCandidates.mockResolvedValue([
+      makeCandidate('/library/Author/book1.epub', [file1]),
+      makeCandidate('/library/Author/book2.epub', [file2]),
+    ]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.createBook).toHaveBeenCalledTimes(2);
+    const folderPaths = repo.createBook.mock.calls.map((c: [{ folderPath: string }]) => c[0].folderPath).sort();
+    expect(folderPaths).toContain('/library/Author/book1.epub');
+    expect(folderPaths).toContain('/library/Author/book2.epub');
+  });
+
+  it('allowedFormats filter still applies in book_per_file mode', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: ['epub'],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+    });
+
+    const epubFile = makeFileStat({ absolutePath: '/library/book.epub', relPath: 'book.epub', ino: 6001 });
+    const pdfFile = makeFileStat({ absolutePath: '/library/book.pdf', relPath: 'book.pdf', ino: 6002 });
+    mockFindLooseCandidates.mockResolvedValue([makeCandidate('/library/book.epub', [epubFile]), makeCandidate('/library/book.pdf', [pdfFile])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // Only the epub candidate passes the allowedFormats filter
+    expect(repo.createBook).toHaveBeenCalledTimes(1);
+    expect(repo.createBook.mock.calls[0][0].folderPath).toBe('/library/book.epub');
+  });
+});
+
+// ── book_per_file mode — scanBookFolder ──────────────────────────────────────
+
+describe('book_per_file mode — scanBookFolder', () => {
+  it('builds a single-file candidate from the exact file path (no folder resolution)', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/Author/Book/book.epub', 1);
+
+    // Must NOT call buildSingleBookCandidate or findBookCandidates
+    expect(mockBuildSingleCandidate).not.toHaveBeenCalled();
+    expect(mockFindCandidates).not.toHaveBeenCalled();
+    // Should attempt to create a book with folderPath = file path
+    expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/Author/Book/book.epub' }));
+  });
+
+  it('skips non-content files in book_per_file mode', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    // cover.jpg is not a primary content format
+    await (service as any).scanBookFolder('/library/Author/Book/cover.jpg', 1);
+
+    expect(repo.createBook).not.toHaveBeenCalled();
+    expect(mockBuildSingleCandidate).not.toHaveBeenCalled();
+  });
+
+  it('skips file not matching allowedFormats in book_per_file mode', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: ['epub'],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/Author/Book/book.pdf', 1);
+
+    expect(repo.createBook).not.toHaveBeenCalled();
+  });
+
+  it('skips when stat fails (file disappeared) in book_per_file mode', async () => {
+    mockStat.mockResolvedValueOnce(null as any);
+
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_file',
+      }),
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/Author/Book/book.epub', 1);
+
+    expect(repo.createBook).not.toHaveBeenCalled();
+  });
+
+  it('falls through to normal folder scan when mode is auto', async () => {
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/Author/Book/book.epub', 1);
+
+    // Normal path: buildSingleBookCandidate is called for the folder
+    expect(mockBuildSingleCandidate).toHaveBeenCalledWith('/library/Author/Book', '/library', expect.any(Array), expect.any(Function));
   });
 });

@@ -216,6 +216,39 @@ export async function findBookCandidates(
 }
 
 /**
+ * Walk a library folder and return one BookCandidate per primary content file,
+ * regardless of folder depth. Used when `organizationMode === 'book_per_file'`.
+ *
+ * Each candidate has:
+ *   folderPath = absolutePath of the file  (the unique book key in the DB)
+ *   files      = [that single file]
+ *
+ * Non-primary files (covers, sidecars, NFO, etc.) are intentionally excluded
+ * because in this mode there is no unambiguous way to associate a sidecar with
+ * a specific book without folder co-location.
+ */
+export async function findLooseFileCandidates(
+  libraryFolderPath: string,
+  excludePatterns: string[] = [],
+  logger?: (msg: string) => void,
+): Promise<BookCandidate[]> {
+  const byDir = new Map<string, FileStat[]>();
+  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, excludePatterns, logger);
+
+  const candidates: BookCandidate[] = [];
+
+  for (const files of byDir.values()) {
+    for (const fileStat of files) {
+      if (isPrimaryFormat(fileStat.absolutePath)) {
+        candidates.push({ folderPath: fileStat.absolutePath, files: [fileStat] });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+/**
  * Build a single BookCandidate for a known book folder without treating it as a
  * library root. Reads only direct children of folderPath plus any disc subdirectories
  * (CD 1, Disc 2, etc.). Returns null if the folder is unreadable or has no primary files.

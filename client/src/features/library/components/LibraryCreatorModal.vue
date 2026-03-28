@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users } from 'lucide-vue-next'
-import type { CoverAspectRatio, Library } from '@projectx/types'
+import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags } from 'lucide-vue-next'
+import type { CoverAspectRatio, Library, OrganizationMode } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useLibraryCreator } from '../composables/useLibraryCreator'
 import LibraryCreatorDetails from './LibraryCreatorDetails.vue'
@@ -9,6 +9,7 @@ import LibraryCreatorFolders from './LibraryCreatorFolders.vue'
 import LibraryCreatorScanner from './LibraryCreatorScanner.vue'
 import LibraryCreatorSchedule from './LibraryCreatorSchedule.vue'
 import LibraryCreatorAccess from './LibraryCreatorAccess.vue'
+import LibraryCreatorMetadata from './LibraryCreatorMetadata.vue'
 
 const props = defineProps<{
   library?: Library | null
@@ -22,18 +23,19 @@ const emit = defineEmits<{
 const creator = useLibraryCreator()
 const { form, mode, editingLibraryId, loading, prescanLoading, prescanResult, error } = creator
 
-type SectionId = 'details' | 'folders' | 'scanner' | 'schedule' | 'access'
+type SectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'schedule' | 'access'
 
 const ALL_SECTIONS: { id: SectionId; label: string; icon: unknown; component: unknown }[] = [
   { id: 'details', label: 'Details', icon: Info, component: LibraryCreatorDetails },
   { id: 'folders', label: 'Folders', icon: FolderOpen, component: LibraryCreatorFolders },
   { id: 'scanner', label: 'Scanner', icon: ScanLine, component: LibraryCreatorScanner },
+  { id: 'metadata', label: 'Metadata', icon: Tags, component: LibraryCreatorMetadata },
   { id: 'schedule', label: 'Schedule', icon: Clock, component: LibraryCreatorSchedule },
   { id: 'access', label: 'Access', icon: Users, component: LibraryCreatorAccess },
 ]
 
 // Access is only meaningful after a library exists
-const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 4) : ALL_SECTIONS))
+const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 5) : ALL_SECTIONS))
 
 // ── Stepper state ──────────────────────────────────────────────────────────
 
@@ -110,14 +112,24 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
 const title = computed(() => (props.library ? `Edit: ${props.library.name}` : 'Create Library'))
 
+const stepValid = computed(() => {
+  const id = activeId.value
+  if (id === 'details') return form.name.trim().length > 0 && form.icon !== null
+  if (id === 'folders') return form.folders.length > 0
+  return true
+})
+
 const sectionProps = computed(() => ({
   details: { name: form.name, icon: form.icon, coverAspectRatio: form.coverAspectRatio },
   folders: { folders: form.folders, prescanResult: prescanResult.value, prescanLoading: prescanLoading.value },
   scanner: {
-    metadataPrecedence: form.metadataPrecedence,
-    formatPriority: form.formatPriority,
+    organizationMode: form.organizationMode,
     allowedFormats: form.allowedFormats,
     excludePatterns: form.excludePatterns,
+  },
+  metadata: {
+    metadataPrecedence: form.metadataPrecedence,
+    formatPriority: form.formatPriority,
   },
   schedule: { watch: form.watch, autoScanCronExpression: form.autoScanCronExpression },
   access: { libraryId: editingLibraryId.value },
@@ -133,6 +145,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
   else if (event === 'update:coverAspectRatio') form.coverAspectRatio = value as CoverAspectRatio
   else if (event === 'update:folders') form.folders = value as string[]
   else if (event === 'prescan') creator.runPrescan()
+  else if (event === 'update:organizationMode') form.organizationMode = value as OrganizationMode
   else if (event === 'update:metadataPrecedence') form.metadataPrecedence = value as string[]
   else if (event === 'update:formatPriority') form.formatPriority = value as string[]
   else if (event === 'update:allowedFormats') form.allowedFormats = value as string[]
@@ -225,6 +238,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:icon="onSectionEvent(activeId, 'update:icon', $event)"
                 @update:folders="onSectionEvent(activeId, 'update:folders', $event)"
                 @prescan="onSectionEvent(activeId, 'prescan', null)"
+                @update:organizationMode="onSectionEvent(activeId, 'update:organizationMode', $event)"
                 @update:metadataPrecedence="onSectionEvent(activeId, 'update:metadataPrecedence', $event)"
                 @update:formatPriority="onSectionEvent(activeId, 'update:formatPriority', $event)"
                 @update:allowedFormats="onSectionEvent(activeId, 'update:allowedFormats', $event)"
@@ -243,12 +257,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                     class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     @click="back"
                   >
-                    <ChevronLeft v-if="!isFirstStep" :size="14" />
+                    <X v-if="isFirstStep" :size="14" />
+                    <ChevronLeft v-else :size="14" />
                     {{ isFirstStep ? 'Cancel' : 'Back' }}
                   </button>
                   <button
                     v-if="!isLastStep"
-                    class="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    :disabled="!stepValid"
                     @click="next"
                   >
                     Next
@@ -266,9 +282,10 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 <!-- Edit mode: Cancel / Save -->
                 <template v-else>
                   <button
-                    class="px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     @click="emit('close')"
                   >
+                    <X :size="14" />
                     Cancel
                   </button>
                   <button
@@ -346,6 +363,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:icon="onSectionEvent(activeId, 'update:icon', $event)"
                 @update:folders="onSectionEvent(activeId, 'update:folders', $event)"
                 @prescan="onSectionEvent(activeId, 'prescan', null)"
+                @update:organizationMode="onSectionEvent(activeId, 'update:organizationMode', $event)"
                 @update:metadataPrecedence="onSectionEvent(activeId, 'update:metadataPrecedence', $event)"
                 @update:formatPriority="onSectionEvent(activeId, 'update:formatPriority', $event)"
                 @update:allowedFormats="onSectionEvent(activeId, 'update:allowedFormats', $event)"
@@ -366,7 +384,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                   class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   @click="back"
                 >
-                  <ChevronLeft :size="14" />
+                  <X v-if="isFirstStep" :size="14" />
+                  <ChevronLeft v-else :size="14" />
                   {{ isFirstStep ? 'Cancel' : 'Back' }}
                 </button>
 
@@ -374,7 +393,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
 
                 <button
                   v-if="!isLastStep"
-                  class="flex items-center gap-1.5 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                  class="flex items-center gap-1.5 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                  :disabled="!stepValid"
                   @click="next"
                 >
                   Next
@@ -393,9 +413,10 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
               <!-- Edit mode: cancel + save -->
               <div v-else class="flex items-center justify-end gap-3">
                 <button
-                  class="px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   @click="emit('close')"
                 >
+                  <X :size="14" />
                   Cancel
                 </button>
                 <button

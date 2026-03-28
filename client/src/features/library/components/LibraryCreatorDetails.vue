@@ -61,10 +61,10 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
 </script>
 
 <template>
-  <div class="px-6 py-6 flex flex-col gap-4 h-full min-h-0">
+  <div class="px-6 py-6 flex flex-col gap-7 h-full min-h-0">
     <!-- Name row with inline icon preview -->
     <div>
-      <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Library name</label>
+      <label class="block text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Library name</label>
       <div class="flex items-center gap-3">
         <!-- Icon preview -->
         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20">
@@ -84,28 +84,29 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
 
     <!-- Cover aspect ratio -->
     <div>
-      <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Cover style</label>
-      <div class="flex gap-3">
-        <button
-          v-for="option in ASPECT_RATIO_OPTIONS"
-          :key="option.value"
-          class="flex flex-1 flex-col items-center gap-2 p-3 rounded-lg border-2 transition-colors"
-          :class="
-            coverAspectRatio === option.value ? 'border-primary bg-primary/8' : 'border-border hover:border-muted-foreground/40 hover:bg-muted/40'
-          "
-          @click="emit('update:coverAspectRatio', option.value)"
-        >
-          <div class="w-8 rounded-sm bg-muted-foreground/25" :style="{ aspectRatio: option.value }" />
-          <span class="text-xs font-medium">{{ option.label }}</span>
-        </button>
+      <div class="flex items-center justify-between mb-1">
+        <label class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Cover style</label>
+        <div class="flex rounded-md border border-border bg-muted/40 p-0.5 gap-0.5">
+          <button
+            v-for="option in ASPECT_RATIO_OPTIONS"
+            :key="option.value"
+            class="px-3 py-1 rounded text-xs font-medium transition-colors"
+            :class="
+              coverAspectRatio === option.value ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            "
+            @click="emit('update:coverAspectRatio', option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
-      <p class="mt-2 text-xs text-muted-foreground">Use Portrait for ebook or mixed libraries. Square works better for audiobook-only libraries.</p>
+      <p class="text-xs text-muted-foreground">Portrait for ebook or mixed libraries. Square for audiobook-only libraries.</p>
     </div>
 
     <!-- Icon picker (fills remaining height) -->
     <div class="flex-1 flex flex-col min-h-0">
       <div class="flex items-center justify-between mb-2">
-        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Icon</label>
+        <label class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Icon</label>
         <div class="flex items-center gap-3">
           <span v-if="icon" class="text-xs text-muted-foreground">
             <span class="font-medium text-foreground">{{ icon }}</span>

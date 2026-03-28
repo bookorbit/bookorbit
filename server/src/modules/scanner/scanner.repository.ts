@@ -42,7 +42,12 @@ export class ScannerRepository {
 
   async findLibrarySettings(libraryId: number) {
     const [row] = await this.db
-      .select({ allowedFormats: libraries.allowedFormats, formatPriority: libraries.formatPriority, excludePatterns: libraries.excludePatterns })
+      .select({
+        allowedFormats: libraries.allowedFormats,
+        formatPriority: libraries.formatPriority,
+        excludePatterns: libraries.excludePatterns,
+        organizationMode: libraries.organizationMode,
+      })
       .from(libraries)
       .where(eq(libraries.id, libraryId));
     return row ?? null;

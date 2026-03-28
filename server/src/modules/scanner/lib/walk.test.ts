@@ -540,3 +540,177 @@ describe('buildSingleBookCandidate', () => {
     expect(paths).toContain(join(root, 'Book', 'book.epub'));
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// findLooseFileCandidates
+// ══════════════════════════════════════════════════════════════════════════════
+
+import { findLooseFileCandidates } from './walk';
+
+describe('findLooseFileCandidates — empty / no primaries', () => {
+  it('returns no candidates for an empty library', async () => {
+    expect(await findLooseFileCandidates(root)).toHaveLength(0);
+  });
+
+  it('returns no candidates when only non-primary files exist', async () => {
+    await file('cover.jpg');
+    await file('Author/Book/cover.jpg');
+    await file('Author/Book/book.opf');
+    expect(await findLooseFileCandidates(root)).toHaveLength(0);
+  });
+});
+
+describe('findLooseFileCandidates — one candidate per primary file', () => {
+  it('root-level primary files each get their own candidate', async () => {
+    await file('book1.epub');
+    await file('book2.pdf');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(2);
+    const paths = candidates.map((c) => c.folderPath).sort();
+    expect(paths).toContain(join(root, 'book1.epub'));
+    expect(paths).toContain(join(root, 'book2.pdf'));
+  });
+
+  it('each candidate contains exactly one file and folderPath equals that file path', async () => {
+    await file('book1.epub');
+    await file('book2.pdf');
+
+    const candidates = await findLooseFileCandidates(root);
+    for (const c of candidates) {
+      expect(c.files).toHaveLength(1);
+      expect(c.folderPath).toBe(c.files[0].absolutePath);
+    }
+  });
+
+  it('files in subdirectories each get their own candidate', async () => {
+    await file('Author/BookA/book.epub');
+    await file('Author/BookB/book.pdf');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(2);
+    const paths = candidates.map((c) => c.folderPath).sort();
+    expect(paths).toContain(join(root, 'Author', 'BookA', 'book.epub'));
+    expect(paths).toContain(join(root, 'Author', 'BookB', 'book.pdf'));
+  });
+
+  it('multiple primary files in the same folder each become separate candidates', async () => {
+    await file('Series/book1.epub');
+    await file('Series/book2.epub');
+    await file('Series/book3.mobi');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(3);
+    const paths = candidates.map((c) => c.folderPath).sort();
+    expect(paths).toContain(join(root, 'Series', 'book1.epub'));
+    expect(paths).toContain(join(root, 'Series', 'book2.epub'));
+    expect(paths).toContain(join(root, 'Series', 'book3.mobi'));
+  });
+
+  it('works across deep nested paths', async () => {
+    await file('A/B/C/D/deep.epub');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'A', 'B', 'C', 'D', 'deep.epub'));
+  });
+
+  it('non-primary files are not included even if siblings exist', async () => {
+    await file('Author/Book/book.epub');
+    await file('Author/Book/cover.jpg');
+    await file('Author/Book/book.opf');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].files).toHaveLength(1);
+    expect(candidates[0].files[0].absolutePath).toBe(join(root, 'Author', 'Book', 'book.epub'));
+  });
+
+  it('mix of root and nested files', async () => {
+    await file('root.epub');
+    await file('Sub/nested.pdf');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(2);
+    const paths = candidates.map((c) => c.folderPath).sort();
+    expect(paths).toContain(join(root, 'root.epub'));
+    expect(paths).toContain(join(root, 'Sub', 'nested.pdf'));
+  });
+});
+
+describe('findLooseFileCandidates — excludePatterns', () => {
+  it('skips files and directories matching exclude patterns', async () => {
+    await file('book.epub');
+    await file('samples/sample.epub');
+    await file('Author/.hidden/book.epub');
+
+    const candidates = await findLooseFileCandidates(root, ['samples']);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'book.epub'));
+  });
+
+  it('wildcard pattern skips matching files', async () => {
+    await file('book.epub');
+    await file('book_sample.epub');
+
+    const candidates = await findLooseFileCandidates(root, ['*_sample*']);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'book.epub'));
+  });
+
+  it('skips hidden files (dot-prefixed)', async () => {
+    await file('.hidden.epub');
+    await file('visible.epub');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'visible.epub'));
+  });
+
+  it('skips hidden directories', async () => {
+    await file('.hiddendir/book.epub');
+    await file('visible/book.epub');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'visible', 'book.epub'));
+  });
+});
+
+describe('findLooseFileCandidates — FileStat fields', () => {
+  it('candidate file has correct relPath relative to library root', async () => {
+    await file('Author/Book/book.epub');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates[0].files[0].relPath).toBe(join('Author', 'Book', 'book.epub'));
+  });
+
+  it('candidate file has non-zero sizeBytes and valid mtime', async () => {
+    await file('book.epub', 'content');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates[0].files[0].sizeBytes).toBeGreaterThan(0);
+    expect(candidates[0].files[0].mtime).toBeInstanceOf(Date);
+  });
+
+  it('candidate file has a numeric inode', async () => {
+    await file('book.epub');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(typeof candidates[0].files[0].ino).toBe('number');
+  });
+});
+
+describe('findLooseFileCandidates — audio files', () => {
+  it('each audio file becomes its own candidate (no folder grouping)', async () => {
+    await file('Audiobook/chapter1.mp3');
+    await file('Audiobook/chapter2.mp3');
+    await file('Audiobook/chapter3.m4a');
+
+    const candidates = await findLooseFileCandidates(root);
+    expect(candidates).toHaveLength(3);
+    for (const c of candidates) {
+      expect(c.files).toHaveLength(1);
+    }
+  });
+});

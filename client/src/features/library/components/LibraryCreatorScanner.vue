@@ -1,59 +1,26 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { GripVertical, Plus, X } from 'lucide-vue-next'
-import { METADATA_LABELS, FORMAT_LABELS } from '../composables/useLibraryCreator'
+import { Plus, X } from 'lucide-vue-next'
+import type { OrganizationMode } from '@projectx/types'
+import { FORMAT_LABELS } from '../composables/useLibraryCreator'
 
 const props = defineProps<{
-  metadataPrecedence: string[]
-  formatPriority: string[]
+  organizationMode: OrganizationMode
   allowedFormats: string[]
   excludePatterns: string[]
 }>()
 
 const emit = defineEmits<{
-  'update:metadataPrecedence': [value: string[]]
-  'update:formatPriority': [value: string[]]
+  'update:organizationMode': [value: OrganizationMode]
   'update:allowedFormats': [value: string[]]
   'update:excludePatterns': [value: string[]]
 }>()
 
-// ── Drag-and-drop for reorderable lists ──────────────────────────────────────
+// ── Scan mode ─────────────────────────────────────────────────────────────────
 
-function useDragList(getList: () => string[], onUpdate: (v: string[]) => void) {
-  const dragFrom = ref<number | null>(null)
-  const dragOver = ref<number | null>(null)
-
-  function onDragStart(i: number) {
-    dragFrom.value = i
-  }
-  function onDragEnter(i: number) {
-    dragOver.value = i
-  }
-  function onDrop() {
-    if (dragFrom.value === null || dragOver.value === null || dragFrom.value === dragOver.value) return
-    const list = [...getList()]
-    const [item] = list.splice(dragFrom.value, 1)
-    if (item !== undefined) list.splice(dragOver.value, 0, item)
-    onUpdate(list)
-    dragFrom.value = null
-    dragOver.value = null
-  }
-  function onDragEnd() {
-    dragFrom.value = null
-    dragOver.value = null
-  }
-
-  return { dragFrom, dragOver, onDragStart, onDragEnter, onDrop, onDragEnd }
+function handleSelectMode(mode: OrganizationMode) {
+  emit('update:organizationMode', mode)
 }
-
-const metaDrag = useDragList(
-  () => props.metadataPrecedence,
-  (v) => emit('update:metadataPrecedence', v),
-)
-const fmtDrag = useDragList(
-  () => props.formatPriority,
-  (v) => emit('update:formatPriority', v),
-)
 
 // ── Allowed formats ──────────────────────────────────────────────────────────
 
@@ -100,46 +67,64 @@ function onPatternKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="px-6 py-5 space-y-6">
-    <!-- Metadata group -->
+  <div class="px-6 py-6 space-y-8">
+    <!-- Scan mode -->
     <div>
-      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Metadata</p>
-
-      <!-- Metadata precedence -->
-      <div>
-        <h3 class="text-sm font-semibold text-foreground mb-1">Metadata precedence</h3>
-        <p class="text-xs text-muted-foreground mb-2">Drag to reorder. Higher source is preferred when both are present.</p>
-        <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
-          <div
-            v-for="(key, index) in metadataPrecedence"
-            :key="key"
-            draggable="true"
-            class="flex items-center gap-3 px-3 py-2.5 bg-card cursor-grab active:cursor-grabbing select-none transition-colors relative"
-            :class="metaDrag.dragOver.value === index ? 'bg-primary/10 border-l-2 border-l-primary' : ''"
-            @dragstart="metaDrag.onDragStart(index)"
-            @dragenter.prevent="metaDrag.onDragEnter(index)"
-            @dragover.prevent
-            @drop="metaDrag.onDrop()"
-            @dragend="metaDrag.onDragEnd()"
-          >
-            <GripVertical :size="13" class="text-muted-foreground/50 shrink-0" />
-            <span class="flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 text-primary text-[9px] font-bold shrink-0">
-              {{ index + 1 }}
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Scan mode</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          class="text-left rounded-lg border p-4 transition-colors"
+          :class="organizationMode === 'auto' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'"
+          @click="handleSelectMode('auto')"
+        >
+          <div class="flex items-center gap-2 mb-1.5">
+            <span
+              class="w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center"
+              :class="organizationMode === 'auto' ? 'border-primary' : 'border-muted-foreground/40'"
+            >
+              <span v-if="organizationMode === 'auto'" class="w-1.5 h-1.5 rounded-full bg-primary" />
             </span>
-            <span class="flex-1 text-sm text-foreground truncate">{{ METADATA_LABELS[key] ?? key }}</span>
+            <span class="text-sm font-semibold text-foreground">Folder as Book</span>
+            <span class="ml-auto text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">Recommended</span>
           </div>
-        </div>
+          <p class="text-xs text-muted-foreground leading-relaxed">
+            All files in a folder are grouped into one book. Works well when you keep multiple formats, like EPUB and MOBI, together.
+          </p>
+        </button>
+
+        <button
+          class="text-left rounded-lg border p-4 transition-colors"
+          :class="
+            organizationMode === 'book_per_file' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'
+          "
+          @click="handleSelectMode('book_per_file')"
+        >
+          <div class="flex items-center gap-2 mb-1.5">
+            <span
+              class="w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center"
+              :class="organizationMode === 'book_per_file' ? 'border-primary' : 'border-muted-foreground/40'"
+            >
+              <span v-if="organizationMode === 'book_per_file'" class="w-1.5 h-1.5 rounded-full bg-primary" />
+            </span>
+            <span class="text-sm font-semibold text-foreground">File as Book</span>
+          </div>
+          <p class="text-xs text-muted-foreground leading-relaxed">
+            Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple
+            files.
+          </p>
+        </button>
       </div>
+      <p v-if="organizationMode === 'book_per_file'" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+        Folder structure will not be used for metadata. Changes take effect on the next full scan.
+      </p>
     </div>
 
     <!-- Filtering group -->
     <div>
-      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Filtering</p>
-
       <!-- Allowed formats -->
-      <div class="mb-5">
+      <div class="mb-8">
         <div class="flex items-center justify-between mb-1">
-          <h3 class="text-sm font-semibold text-foreground">Allowed formats</h3>
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Allowed formats</p>
           <button
             v-if="allowedFormats.length > 0"
             class="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -148,14 +133,14 @@ function onPatternKeydown(e: KeyboardEvent) {
             Allow all
           </button>
         </div>
-        <p class="text-xs text-muted-foreground mb-2">
+        <p class="text-xs text-muted-foreground mb-3">
           {{ allowedFormats.length === 0 ? 'All formats are allowed.' : 'Only the selected formats will be imported.' }}
         </p>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="fmt in ALL_FORMATS"
             :key="fmt"
-            class="px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors"
+            class="px-2.75 py-1 rounded-full text-[11px] font-medium border transition-colors"
             :class="
               allowedFormats.length === 0 || allowedFormats.includes(fmt)
                 ? 'border-primary bg-primary/10 text-primary'
@@ -171,37 +156,10 @@ function onPatternKeydown(e: KeyboardEvent) {
         </p>
       </div>
 
-      <!-- Format priority -->
-      <div class="mb-5">
-        <h3 class="text-sm font-semibold text-foreground mb-1">Format priority</h3>
-        <p class="text-xs text-muted-foreground mb-2">When a book has multiple formats, prefer the format highest in the list.</p>
-        <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
-          <div
-            v-for="(fmt, index) in formatPriority"
-            :key="fmt"
-            draggable="true"
-            class="flex items-center gap-3 px-3 py-2.5 bg-card cursor-grab active:cursor-grabbing select-none transition-colors"
-            :class="fmtDrag.dragOver.value === index ? 'bg-primary/10 border-l-2 border-l-primary' : ''"
-            @dragstart="fmtDrag.onDragStart(index)"
-            @dragenter.prevent="fmtDrag.onDragEnter(index)"
-            @dragover.prevent
-            @drop="fmtDrag.onDrop()"
-            @dragend="fmtDrag.onDragEnd()"
-          >
-            <GripVertical :size="13" class="text-muted-foreground/50 shrink-0" />
-            <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10.5px] font-bold shrink-0">
-              {{ index + 1 }}
-            </span>
-            <span class="flex-1 text-sm font-mono text-foreground uppercase">{{ fmt }}</span>
-            <span class="text-xs text-muted-foreground">{{ FORMAT_LABELS[fmt] ?? fmt }}</span>
-          </div>
-        </div>
-      </div>
-
       <!-- Exclude patterns -->
       <div>
-        <h3 class="text-sm font-semibold text-foreground mb-1">Exclude patterns</h3>
-        <p class="text-xs text-muted-foreground mb-2">
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Exclude patterns</p>
+        <p class="text-xs text-muted-foreground mb-3">
           Glob patterns to skip during scanning (e.g. <code class="font-mono bg-muted px-1 rounded">**/samples/**</code>).
         </p>
         <div class="flex gap-2 mb-2">

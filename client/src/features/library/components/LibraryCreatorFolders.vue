@@ -82,10 +82,10 @@ function onManualKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="px-6 py-6 space-y-5">
+  <div class="px-6 py-6 space-y-6">
     <div>
-      <h3 class="text-sm font-semibold text-foreground mb-1">Folders</h3>
-      <p class="text-xs text-muted-foreground mb-4">Add one or more directories to scan for books.</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Scan folders</p>
+      <p class="text-xs text-muted-foreground mb-3">Add one or more directories to scan for books.</p>
 
       <!-- Browse button -->
       <button

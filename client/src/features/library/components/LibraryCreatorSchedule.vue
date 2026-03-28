@@ -62,10 +62,10 @@ function humanReadableCron(cron: string | null): string {
 </script>
 
 <template>
-  <div class="px-6 py-6 space-y-6">
+  <div class="px-6 py-6 space-y-8">
     <!-- Watch folders -->
     <div>
-      <h3 class="text-sm font-semibold text-foreground mb-3">File watching</h3>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">File watching</p>
       <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
         <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer">
           <div>
@@ -90,7 +90,7 @@ function humanReadableCron(cron: string | null): string {
 
     <!-- Auto-scan schedule -->
     <div>
-      <h3 class="text-sm font-semibold text-foreground mb-3">Auto-scan schedule</h3>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Auto-scan schedule</p>
       <div class="grid grid-cols-3 gap-2 mb-4">
         <button
           v-for="preset in PRESETS"

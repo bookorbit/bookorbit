@@ -87,7 +87,7 @@ onMounted(loadAccess)
 </script>
 
 <template>
-  <div class="px-6 py-6 space-y-5">
+  <div class="px-6 py-6 space-y-6">
     <div v-if="!libraryId" class="rounded-lg border border-dashed border-border px-5 py-8 text-center">
       <UserPlus :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
       <p class="text-sm text-muted-foreground">Access can be configured after the library is created.</p>
@@ -95,8 +95,8 @@ onMounted(loadAccess)
 
     <template v-else>
       <div>
-        <h3 class="text-sm font-semibold text-foreground mb-1">Access control</h3>
-        <p class="text-xs text-muted-foreground mb-4">Superusers always have access. Non-superusers must be granted access explicitly.</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Access control</p>
+        <p class="text-xs text-muted-foreground mb-3">Superusers always have full access. Grant access to other users below.</p>
 
         <p v-if="error" class="text-xs text-destructive mb-3">{{ error }}</p>
 
