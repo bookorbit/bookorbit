@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
-import { MetadataProviderKey, Permission, resolveUploadPath } from '@projectx/types';
+import { MetadataProviderKey, Permission, isAudioFormat, resolveUploadPath } from '@projectx/types';
 import type { AudiobookChapter, BookKoboState, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
@@ -22,6 +22,7 @@ import { BookRepository } from './book.repository';
 import { ComicMetadataService } from './comic-metadata.service';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
+import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 
 @Injectable()
@@ -459,7 +460,18 @@ export class BookService {
 
   async getAudioProgress(userId: number, bookId: number, user: RequestUser) {
     await this.verifyBookAccess(bookId, user);
-    return this.bookRepo.findLatestAudioProgress(userId, bookId);
+    return this.bookRepo.findAudioProgress(userId, bookId);
+  }
+
+  async saveAudioProgress(userId: number, bookId: number, dto: UpsertAudioProgressDto, user: RequestUser) {
+    const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
+    if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
+    await this.libraryService.verifyUserAccess(userId, libraryId, this.isSuperuser(user));
+    await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
+    this.libraryService
+      .findOne(libraryId)
+      .then((lib) => this.userBookStatusService.autoUpdate(userId, bookId, dto.percentage, lib?.markAsFinishedPercentComplete))
+      .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${bookId}: ${err.message}`));
   }
 
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
@@ -836,7 +848,7 @@ export class BookService {
       readStatus,
       durationSeconds: meta?.durationSeconds ?? null,
       abridged: meta?.abridged ?? false,
-      chapters: (meta?.chapters as AudiobookChapter[] | null) ?? null,
+      chapters: this.resolveChapters(meta?.chapters as AudiobookChapter[] | null | undefined, fileRows),
       formatPriority: (book.libraries?.formatPriority as string[] | null) ?? [],
       comicMetadata: comicMeta
         ? {
@@ -854,5 +866,25 @@ export class BookService {
           }
         : null,
     };
+  }
+
+  private resolveChapters(
+    stored: AudiobookChapter[] | null | undefined,
+    fileRows: { absolutePath: string; format: string | null; durationSeconds: number | null }[],
+  ): AudiobookChapter[] | null {
+    if (stored && stored.length > 0) return stored;
+
+    const audioFiles = fileRows.filter((f) => f.format && isAudioFormat(f.format));
+    if (audioFiles.length < 2) return stored ?? null;
+
+    const chapters: AudiobookChapter[] = [];
+    let offsetMs = 0;
+    for (const f of audioFiles) {
+      const nameWithExt = basename(f.absolutePath);
+      const title = nameWithExt.replace(/\.[^.]+$/, '');
+      chapters.push({ title, startMs: offsetMs });
+      offsetMs += Math.round((f.durationSeconds ?? 0) * 1000);
+    }
+    return chapters;
   }
 }

@@ -278,21 +278,22 @@ export class EpubService {
     private readonly libraryService: LibraryService,
   ) {}
 
-  async getBookInfo(bookId: number, user: RequestUser): Promise<EpubBookInfo> {
-    const epubPath = await this.resolveEpubPath(bookId, user);
+  async getBookInfo(bookId: number, fileId: number | undefined, user: RequestUser): Promise<EpubBookInfo> {
+    const epubPath = await this.resolveEpubPath(bookId, fileId, user);
     return (await this.getCachedEntry(epubPath)).info;
   }
 
   async streamFile(
     bookId: number,
     filePath: string,
+    fileId: number | undefined,
     user: RequestUser,
   ): Promise<{ stream: NodeJS.ReadableStream; contentType: string; size: number }> {
     if (filePath.includes('..')) throw new ForbiddenException('Invalid path');
     const normalizedPath = normalizeZipPath(filePath);
     if (!normalizedPath) throw new ForbiddenException('Invalid path');
 
-    const epubPath = await this.resolveEpubPath(bookId, user);
+    const epubPath = await this.resolveEpubPath(bookId, fileId, user);
     const cached = await this.getCachedEntry(epubPath);
     const zip = await unzipper.Open.file(epubPath);
     const entry = findInZip(zip.files, normalizedPath);
@@ -304,10 +305,17 @@ export class EpubService {
     return { stream: entry.stream(), contentType, size: entry.uncompressedSize };
   }
 
-  private async resolveEpubPath(bookId: number, user: RequestUser): Promise<string> {
+  private async resolveEpubPath(bookId: number, fileId: number | undefined, user: RequestUser): Promise<string> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+
+    if (fileId != null) {
+      const file = await this.bookRepo.findFileById(fileId);
+      if (!file || file.bookId !== bookId) throw new NotFoundException(`File ${fileId} not found for book ${bookId}`);
+      if (file.format !== 'epub') throw new NotFoundException(`File ${fileId} is not an EPUB file`);
+      return file.absolutePath;
+    }
 
     const [file] = await this.bookRepo.findPrimaryFilesByBookIds([bookId]);
     if (!file || file.format !== 'epub') throw new NotFoundException(`No primary EPUB file for book ${bookId}`);

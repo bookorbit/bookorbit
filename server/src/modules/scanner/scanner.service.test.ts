@@ -98,6 +98,7 @@ const mockMetadata = {
   refreshCoverForBook: vi.fn().mockResolvedValue(false),
   extractAudioFileDuration: vi.fn().mockResolvedValue(undefined),
   aggregateAudioDuration: vi.fn().mockResolvedValue(undefined),
+  extractAudioChaptersAndNarrators: vi.fn().mockResolvedValue(undefined),
 };
 
 function makeService(repo: ReturnType<typeof makeRepo>) {
@@ -476,7 +477,7 @@ describe('allowedFormats filtering', () => {
 // ── Audio multi-file handling ─────────────────────────────────────────────────
 
 describe('audio multi-file audiobook', () => {
-  it('calls extractAndSave on the first audio file only', async () => {
+  it('calls extractAndSave on the winner (first natural-sorted) audio file only', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/chapter-01.mp3', relPath: 'Book/chapter-01.mp3' });
     const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002 });
     const candidate = makeCandidate('/library/Book', [file1, file2]);
@@ -492,7 +493,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-01.mp3', 'mp3');
   });
 
-  it('calls extractAudioFileDuration for each file beyond the first', async () => {
+  it('calls extractAudioFileDuration for ALL new audio files including the winner', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/chapter-01.mp3', relPath: 'Book/chapter-01.mp3' });
     const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002 });
     const file3 = makeFileStat({ absolutePath: '/library/Book/chapter-03.mp3', relPath: 'Book/chapter-03.mp3', ino: 1003 });
@@ -505,7 +506,10 @@ describe('audio multi-file audiobook', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(2);
+    // All 3 files including the first (winner) must get per-file duration so
+    // aggregateAudioDuration can sum them all correctly.
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(3);
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-01.mp3');
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-02.mp3');
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-03.mp3');
   });
@@ -525,7 +529,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
-  it('extracts metadata for a single-file m4b as a normal format (no duration aggregation)', async () => {
+  it('calls extractAudioFileDuration once and aggregates for a single-file m4b', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b' });
     const candidate = makeCandidate('/library/Book', [file1]);
     mockFindCandidates.mockResolvedValue([candidate]);
@@ -537,7 +541,8 @@ describe('audio multi-file audiobook', () => {
     await done;
 
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/book.m4b', 'm4b');
-    expect(mockMetadata.extractAudioFileDuration).not.toHaveBeenCalled();
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/book.m4b');
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -572,7 +577,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), epub.absolutePath, 'epub');
   });
 
-  it('extracts duration from ALL audio files (including first) when ebook metadata won', async () => {
+  it('extracts duration from ALL new audio files when ebook is the winner', async () => {
     const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 2001 });
     const mp3a = makeFileStat({ absolutePath: '/library/Book/book/01.mp3', relPath: 'Book/book/01.mp3', ino: 2002 });
     const mp3b = makeFileStat({ absolutePath: '/library/Book/book/02.mp3', relPath: 'Book/book/02.mp3', ino: 2003 });
@@ -585,11 +590,9 @@ describe('audio multi-file audiobook', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    // All mp3s contribute duration, including the first one
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(2);
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath);
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3b.absolutePath);
-    // Total duration still aggregated
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -605,14 +608,237 @@ describe('audio multi-file audiobook', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    // No epub present — audio metadata extraction runs normally
     expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath, 'mp3');
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath);
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3b.absolutePath);
   });
 });
 
-// ── Missing book restoration ───────────────────────────────────────────────────
+// ── Multi-format metadata source routing ──────────────────────────────────────
+//
+// These tests verify the winner-driven metadata extraction rule:
+//   - Text metadata (title, authors, cover) comes from the winner format only.
+//   - Audio-specific fields (chapters, narrators, duration) always come from audio
+//     via extractAudioChaptersAndNarrators when audio is present and not the winner.
+//   - Only the winner file triggers extractAndSave — no other format does.
+
+describe('multi-format metadata source routing', () => {
+  it('m4b primary + epub secondary: extracts metadata from m4b only, not epub', async () => {
+    // formatPriority has m4b before epub — m4b wins.
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: ['m4b', 'epub', 'pdf'],
+        excludePatterns: [],
+      }),
+    });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 3002 });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [m4b, epub])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
+    // epub must not contribute metadata since audio owns everything
+    expect(mockMetadata.extractAudioChaptersAndNarrators).not.toHaveBeenCalled();
+  });
+
+  it('m4b primary + epub secondary: per-file duration and aggregate run for m4b', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: ['m4b', 'epub', 'pdf'],
+        excludePatterns: [],
+      }),
+    });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 3002 });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [m4b, epub])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
+    expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('epub primary + m4b secondary: epub owns text/cover, m4b provides chapters/narrators', async () => {
+    // Default formatPriority has epub before m4b — epub wins.
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 4001 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 4002 });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [epub, m4b])]);
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // epub wins — full metadata from epub
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), epub.absolutePath, 'epub');
+    // audio-specific fields from m4b
+    expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
+    // per-file duration + aggregate
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
+    expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('epub primary + multi-track m4b: chapters/narrators from first m4b, duration from all m4b files', async () => {
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 5001 });
+    const m4b1 = makeFileStat({ absolutePath: '/library/Book/disc-1.m4b', relPath: 'Book/disc-1.m4b', ino: 5002 });
+    const m4b2 = makeFileStat({ absolutePath: '/library/Book/disc-2.m4b', relPath: 'Book/disc-2.m4b', ino: 5003 });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [epub, m4b1, m4b2])]);
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // epub wins — full metadata from epub only
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), epub.absolutePath, 'epub');
+    // chapters/narrators from the first m4b (natural sort: disc-1 before disc-2)
+    expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b1.absolutePath, 'm4b');
+    // per-file duration for both m4b files
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(2);
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b1.absolutePath);
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b2.absolutePath);
+    expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('epub + pdf + mobi all new: only epub metadata extracted, pdf and mobi are ignored', async () => {
+    // epub comes first in DEFAULT_FORMAT_PRIORITY
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 6001 });
+    const pdf = makeFileStat({ absolutePath: '/library/Book/book.pdf', relPath: 'Book/book.pdf', ino: 6002 });
+    const mobi = makeFileStat({ absolutePath: '/library/Book/book.mobi', relPath: 'Book/book.mobi', ino: 6003 });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [epub, pdf, mobi])]);
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), epub.absolutePath, 'epub');
+  });
+
+  it('m4b wins + epub also present: epub never triggers extractAndSave', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: ['m4b', 'epub', 'pdf'],
+        excludePatterns: [],
+      }),
+    });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 7001 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 7002 });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [m4b, epub])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    const epubCall = mockMetadata.extractAndSave.mock.calls.find(([, path]) => path === epub.absolutePath);
+    expect(epubCall).toBeUndefined();
+  });
+});
+
+// ── Incremental scan — no re-extraction when source file is unchanged ─────────
+//
+// Metadata extraction should only fire when the relevant source file is new or
+// reassigned, not merely because some other file in the same book changed.
+
+describe('incremental scan — no re-extraction on unchanged winner', () => {
+  it('does not call extractAndSave when winner m4b was already scanned and a new epub is added', async () => {
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 8001 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 8002 });
+
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: ['m4b', 'epub', 'pdf'],
+        excludePatterns: [],
+      }),
+      // m4b already exists in DB — not new; epub is genuinely new
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Book', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ id: 10, bookId: 1, absolutePath: m4b.absolutePath, ino: m4b.ino })]),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [m4b, epub])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // m4b is winner but not new — no metadata extraction
+    expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+    // epub is not audio — no audio extraction either
+    expect(mockMetadata.extractAudioChaptersAndNarrators).not.toHaveBeenCalled();
+    expect(mockMetadata.extractAudioFileDuration).not.toHaveBeenCalled();
+    expect(mockMetadata.aggregateAudioDuration).not.toHaveBeenCalled();
+  });
+
+  it('extracts chapters/narrators/duration from new m4b even when winner epub was already scanned', async () => {
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 9001 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 9002 });
+
+    const repo = makeRepo({
+      // epub already exists in DB — not new; m4b is genuinely new
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Book', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ id: 10, bookId: 1, absolutePath: epub.absolutePath, ino: epub.ino })]),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [epub, m4b])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // epub is winner but not new — no extractAndSave
+    expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+    // m4b is new audio and winner is not audio — extract audio-specific fields
+    expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
+    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
+    expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('does not call aggregateAudioDuration when existing audio book has no new files', async () => {
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 10001 });
+
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Book', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ id: 10, bookId: 1, absolutePath: m4b.absolutePath, ino: m4b.ino })]),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/library/Book', [m4b])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+    expect(mockMetadata.aggregateAudioDuration).not.toHaveBeenCalled();
+  });
+});
 
 describe('missing book restoration', () => {
   it('restores a missing book to present when its folder is found again', async () => {

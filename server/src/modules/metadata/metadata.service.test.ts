@@ -1,10 +1,10 @@
 vi.mock('fs/promises', () => ({
   mkdir: vi.fn(),
   writeFile: vi.fn(),
+  readdir: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('./lib/cover', () => ({
-  extractAndSaveCover: vi.fn(),
   generateThumbnail: vi.fn(),
   imageExt: vi.fn(),
 }));
@@ -19,6 +19,26 @@ vi.mock('./lib/epub', () => ({
   extractEpubMetadata: vi.fn(),
 }));
 
+vi.mock('./lib/cover-epub', () => ({
+  extractEpubCover: vi.fn().mockImplementation(() => Promise.resolve(null)),
+}));
+
+vi.mock('./lib/cover-fb2', () => ({
+  extractFb2Cover: vi.fn().mockImplementation(() => Promise.resolve(null)),
+}));
+
+vi.mock('./lib/cover-cbz', () => ({
+  extractCbzCover: vi.fn().mockImplementation(() => Promise.resolve(null)),
+}));
+
+vi.mock('./lib/cover-cbr', () => ({
+  extractCbrCover: vi.fn().mockImplementation(() => Promise.resolve(null)),
+}));
+
+vi.mock('./lib/cover-cb7', () => ({
+  extractCb7Cover: vi.fn().mockImplementation(() => Promise.resolve(null)),
+}));
+
 vi.mock('./lib/filename-parser', () => ({
   parseBookFilename: vi.fn(),
 }));
@@ -29,16 +49,36 @@ vi.mock('./lib/fb2-parser', () => ({
 
 vi.mock('./lib/mobi-parser', () => ({
   parseMobiFile: vi.fn(),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  extractMobiCover: (_path: string) => Promise.resolve(null),
 }));
 
 vi.mock('./lib/pdf-parser', () => ({
   parsePdfFile: vi.fn(),
 }));
 
-import { mkdir, writeFile } from 'fs/promises';
+vi.mock('./extractors/audio.extractor', () => ({
+  extractAudioMetadata: vi.fn().mockImplementation(() =>
+    Promise.resolve({
+      title: null,
+      authors: [],
+      narrators: [],
+      publisher: null,
+      publishedYear: null,
+      description: null,
+      language: null,
+      durationSeconds: null,
+      chapters: [],
+      coverBytes: null,
+    }),
+  ),
+  parseAudioDuration: vi.fn().mockImplementation(() => Promise.resolve(null)),
+}));
+
+import { mkdir, readdir, writeFile } from 'fs/promises';
 
 import { authors, bookAuthors, bookMetadata } from '../../db/schema';
-import { extractAndSaveCover, generateThumbnail, imageExt } from './lib/cover';
+import { generateThumbnail, imageExt } from './lib/cover';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
 import { parsePdfFile } from './lib/pdf-parser';
@@ -47,7 +87,7 @@ import { MetadataService } from './metadata.service';
 
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockWriteFile = writeFile as MockedFunction<typeof writeFile>;
-const mockExtractAndSaveCover = extractAndSaveCover as MockedFunction<typeof extractAndSaveCover>;
+const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockGenerateThumbnail = generateThumbnail as MockedFunction<typeof generateThumbnail>;
 const mockImageExt = imageExt as MockedFunction<typeof imageExt>;
 const mockParseBookFilename = parseBookFilename as MockedFunction<typeof parseBookFilename>;
@@ -101,9 +141,9 @@ describe('MetadataService', () => {
 
     mockMkdir.mockResolvedValue(undefined);
     mockWriteFile.mockResolvedValue(undefined);
+    mockReaddir.mockResolvedValue([]);
     mockGenerateThumbnail.mockResolvedValue(Buffer.from('thumbnail-bytes'));
     mockImageExt.mockReturnValue('png');
-    mockExtractAndSaveCover.mockResolvedValue('/books/covers/7/cover_extracted.jpg');
     mockParseBookFilename.mockReturnValue({ title: 'Fallback Title', publishedYear: 2001 });
     mockParseMobiFile.mockResolvedValue(null);
     mockParsePdfFile.mockResolvedValue(null);
@@ -169,14 +209,14 @@ describe('MetadataService', () => {
       { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
-    mockExtractAndSaveCover.mockResolvedValue('');
-
+    // extractEpubCover is mocked to return null by default; parsePdfFile returns null → no cover
     await expect(service.refreshCoverForBook(7, '/book.epub', 'epub')).resolves.toBe(false);
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('extractAndSave triggers both metadata and cover extraction and propagates metadata errors', async () => {
+  it('extractAndSave propagates extractor errors', async () => {
     const { db } = makeDb();
+    mockParsePdfFile.mockRejectedValue(new Error('bad metadata'));
     const service = new MetadataService(
       db as never,
       config as never,
@@ -185,15 +225,11 @@ describe('MetadataService', () => {
       { upsert: vi.fn().mockResolvedValue(undefined) } as never,
       embedder as never,
     );
-    const metadataSpy = vi.spyOn(service as never, 'extractMetadata').mockRejectedValue(new Error('bad metadata'));
-    const coverSpy = vi.spyOn(service as never, 'extractCover').mockResolvedValue(undefined);
 
     await expect(service.extractAndSave(15, '/books/a.pdf', 'pdf')).rejects.toThrow('bad metadata');
-    expect(metadataSpy).toHaveBeenCalledWith(15, '/books/a.pdf', 'pdf');
-    expect(coverSpy).toHaveBeenCalledWith(15, '/books/a.pdf', 'pdf');
   });
 
-  it('extractMetadata(pdf) persists fallback title/year, page count, and extracted cover bytes', async () => {
+  it('extractAndSave(pdf) persists fallback title/year, page count, and extracted cover bytes', async () => {
     const { db, updateSet } = makeDb();
     const service = new MetadataService(
       db as never,
@@ -205,7 +241,6 @@ describe('MetadataService', () => {
     );
     const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
     const replaceGenresSpy = vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
-    const savePdfCoverSpy = vi.spyOn(service as never, 'savePdfCover').mockResolvedValue(undefined);
 
     mockParsePdfFile.mockResolvedValue({
       title: null,
@@ -220,12 +255,13 @@ describe('MetadataService', () => {
       seriesIndex: 2,
       authors: [{ name: 'Author A', sortName: null }],
       genres: ['Fantasy'],
+      tags: [],
       pageCount: 321,
       coverBuffer: Buffer.from('jpeg-bytes'),
     });
     mockParseBookFilename.mockReturnValue({ title: 'Title From Filename', publishedYear: 1999 });
 
-    await (service as never).extractMetadata(22, '/tmp/book.pdf', 'pdf');
+    await service.extractAndSave(22, '/tmp/book.pdf', 'pdf');
 
     expect(updateSet).toHaveBeenCalledWith({ pageCount: 321 });
     expect(updateSet).toHaveBeenCalledWith(
@@ -237,13 +273,13 @@ describe('MetadataService', () => {
         updatedAt: expect.any(Date),
       }),
     );
-    expect(savePdfCoverSpy).toHaveBeenCalledWith(22, Buffer.from('jpeg-bytes'));
+    expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/22/cover_extracted.png', Buffer.from('jpeg-bytes'));
     expect(replaceAuthorsSpy).toHaveBeenCalledWith(22, [{ name: 'Author A', sortName: null }]);
     expect(replaceGenresSpy).toHaveBeenCalledWith(22, ['Fantasy']);
     expect(embedder.embedBook).toHaveBeenCalledWith(22);
   });
 
-  it('extractMetadata(mobi) ignores malformed publishedDate values from providers', async () => {
+  it('extractAndSave(mobi) ignores malformed publishedDate values from providers', async () => {
     const { db, updateSet } = makeDb();
     const service = new MetadataService(
       db as never,
@@ -267,7 +303,7 @@ describe('MetadataService', () => {
       tags: ['Tag'],
     });
 
-    await (service as never).extractMetadata(33, '/tmp/book.mobi', 'mobi');
+    await service.extractAndSave(33, '/tmp/book.mobi', 'mobi');
 
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ publishedYear: null }));
   });

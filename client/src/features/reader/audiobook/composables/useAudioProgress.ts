@@ -22,7 +22,7 @@ export function useAudioProgress(bookId: number) {
     if (!res.ok) return
     const data = await res.json()
     if (data) {
-      resumeFileId.value = data.fileId ?? null
+      resumeFileId.value = data.currentFileId ?? null
       resumePosition.value = data.positionSeconds ?? 0
     }
   }
@@ -43,18 +43,17 @@ export function useAudioProgress(bookId: number) {
 
   function flushIfDirty() {
     if (!dirty || pendingFileId === null) return
-    const fileId = pendingFileId
     const body = JSON.stringify({
       percentage: pendingPercentage,
+      currentFileId: pendingFileId,
       positionSeconds: pendingPosition,
     })
     dirty = false
-    api(`/api/v1/books/files/${fileId}/progress`, {
-      method: 'POST',
+    api(`/api/v1/books/${bookId}/audio-progress`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body,
     }).catch(() => {
-      // Restore dirty so the next flush attempt retries the save.
       dirty = true
     })
   }

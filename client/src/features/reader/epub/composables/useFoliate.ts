@@ -106,15 +106,15 @@ export function useFoliate(
       })
 
       if (format === 'epub') {
-        const infoRes = await api(`/api/v1/epub/${bookId}/info`)
+        const infoRes = await api(`/api/v1/epub/${bookId}/info?fileId=${fileId}`)
         if (!infoRes.ok) throw new Error(`Failed to fetch EPUB info: ${infoRes.status}`)
         const bookInfo = await infoRes.json()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const makeStreamingBook = (window as any).makeStreamingBook as
-          | ((id: number, base: string, info: unknown, token: string | null) => Promise<unknown>)
+          | ((id: number, base: string, info: unknown, token: string | null, bookType: null, fileId: number) => Promise<unknown>)
           | undefined
         if (!makeStreamingBook) throw new Error('makeStreamingBook not available')
-        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, getAccessToken())
+        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, getAccessToken(), null, fileId)
         await view.open(book as never)
       } else {
         const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip'

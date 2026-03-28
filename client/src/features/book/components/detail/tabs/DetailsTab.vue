@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, ChevronDown, FolderPlus, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { BookOpen, Check, ChevronDown, FolderPlus, Headphones, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
@@ -227,6 +227,7 @@ const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 
 // For multi-file audiobooks, collapse all tracks into one representative entry.
@@ -319,6 +320,7 @@ async function handleSetReadStatus(status: ReadStatus) {
 }
 
 const fileProgressById = ref<Record<number, FileProgress>>({})
+const audiobookProgress = ref<{ percentage: number; currentFileId: number; positionSeconds: number; updatedAt: string | null } | null>(null)
 const collections = ref<CollectionMembership[]>([])
 const koboState = ref<BookKoboState | null>(null)
 const supplementalLoading = ref(false)
@@ -420,6 +422,7 @@ const KOBO_COLOR = '#f59e0b'
 
 const leftColumnProgressRows = computed<ProgressRow[]>(() => {
   const rows: ProgressRow[] = []
+
   for (const { file, progress } of detailProgressRows.value) {
     const color = getFormatColor(file.format ?? '?')
     rows.push({
@@ -429,6 +432,20 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
       badgeStyle: { color, borderColor: `${color}66`, backgroundColor: `${color}1a` },
       tooltipText: file.absolutePath,
       finished: progress.percentage >= 100,
+    })
+  }
+
+  if (audiobookProgress.value && audiobookProgress.value.percentage > 0) {
+    const audioFile = props.book.files.find((f) => f.id === audiobookProgress.value!.currentFileId)
+    const format = audioFile?.format ?? 'audio'
+    const color = getFormatColor(format)
+    rows.push({
+      label: format.toUpperCase(),
+      percentage: audiobookProgress.value.percentage,
+      color,
+      badgeStyle: { color, borderColor: `${color}66`, backgroundColor: `${color}1a` },
+      tooltipText: audioFile?.absolutePath ?? '',
+      finished: audiobookProgress.value.percentage >= 100,
     })
   }
   const koboPercent = koboState.value?.readingState?.progressPercent
@@ -541,12 +558,19 @@ let supplementalRequestId = 0
 async function loadSupplemental() {
   const requestId = ++supplementalRequestId
   supplementalLoading.value = true
+  const hasAudio = props.book.files.some((f) => f.format && FORMAT_TO_GROUP[f.format] === 'audio')
   try {
     const progressPromise = api(`/api/v1/books/${props.book.id}/progress`).catch(() => null)
+    const audioProgressPromise = hasAudio ? api(`/api/v1/books/${props.book.id}/audio-progress`).catch(() => null) : Promise.resolve(null)
     const collectionsPromise = api(`/api/v1/collections?bookIds=${props.book.id}`)
     const koboPromise = canViewKobo.value ? api(`/api/v1/books/${props.book.id}/kobo-state`) : Promise.resolve(null)
 
-    const [progressRes, collectionsRes, koboRes] = await Promise.all([progressPromise, collectionsPromise, koboPromise])
+    const [progressRes, audioProgressRes, collectionsRes, koboRes] = await Promise.all([
+      progressPromise,
+      audioProgressPromise,
+      collectionsPromise,
+      koboPromise,
+    ])
 
     if (requestId !== supplementalRequestId) return
 
@@ -562,6 +586,20 @@ async function loadSupplemental() {
       }
     }
     fileProgressById.value = progressMap
+
+    if (audioProgressRes && audioProgressRes.ok) {
+      const data = await audioProgressRes.json()
+      audiobookProgress.value = data
+        ? {
+            percentage: data.percentage,
+            currentFileId: data.currentFileId,
+            positionSeconds: data.positionSeconds,
+            updatedAt: data.updatedAt ?? null,
+          }
+        : null
+    } else {
+      audiobookProgress.value = null
+    }
 
     collections.value = collectionsRes.ok ? ((await collectionsRes.json()) as CollectionMembership[]) : []
 
@@ -587,6 +625,7 @@ async function loadSupplemental() {
   } catch {
     if (requestId !== supplementalRequestId) return
     fileProgressById.value = {}
+    audiobookProgress.value = null
     collections.value = []
     koboState.value = canViewKobo.value
       ? {
@@ -662,15 +701,16 @@ watch(
         </div>
 
         <div class="mt-4 space-y-2">
-          <!-- Read button: split when multiple files, plain when single -->
+          <!-- Read/Play button: split when multiple files, plain when single -->
           <div v-if="hasMultipleFiles" class="flex w-full h-9 rounded-md overflow-hidden">
             <button
               class="flex flex-1 items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
               :disabled="!primaryFile"
               @click="openBook"
             >
-              <BookOpen class="size-4" />
-              Read
+              <Headphones v-if="isPrimaryAudio" class="size-4" />
+              <BookOpen v-else class="size-4" />
+              {{ isPrimaryAudio ? 'Listen' : 'Read' }}
             </button>
             <div class="w-px bg-primary-foreground/20 shrink-0" />
             <Popover :open="readMenuOpen" @update:open="(v) => (readMenuOpen = v)">
@@ -709,8 +749,9 @@ watch(
             :disabled="!primaryFile"
             @click="openBook"
           >
-            <BookOpen class="size-4" />
-            Read
+            <Headphones v-if="isPrimaryAudio" class="size-4" />
+            <BookOpen v-else class="size-4" />
+            {{ isPrimaryAudio ? 'Listen' : 'Read' }}
           </button>
 
           <div class="flex gap-2">

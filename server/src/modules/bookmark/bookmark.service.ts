@@ -12,7 +12,7 @@ export class BookmarkService {
   }
 
   async createBookmark(userId: number, bookId: number, dto: CreateBookmarkDto) {
-    return this.bookmarkRepo.create(userId, bookId, dto.cfi, dto.title);
+    return this.bookmarkRepo.create(userId, bookId, { cfi: dto.cfi, title: dto.title, positionSeconds: dto.positionSeconds });
   }
 
   async deleteBookmark(bookId: number, bookmarkId: number, userId: number) {

@@ -158,10 +158,11 @@ export const makeBook = async (file) => {
  * @param {Object} bookInfo - Pre-fetched metadata from /api/v1/epub/{bookId}/info
  * @param {string} [authToken] - Optional authentication token
  * @param {string} [bookType] - Optional book type for alternative format (e.g., 'EPUB')
+ * @param {number|null} [fileId] - Optional specific file ID (for books with multiple epub files)
  * @returns {Promise<EPUB>} Initialized EPUB book object
  */
-export const makeStreamingBook = async (bookId, baseUrl, bookInfo, authToken = null, bookType = null) => {
-  const loader = makeStreamingLoader(bookId, baseUrl, bookInfo, authToken, bookType)
+export const makeStreamingBook = async (bookId, baseUrl, bookInfo, authToken = null, bookType = null, fileId = null) => {
+  const loader = makeStreamingLoader(bookId, baseUrl, bookInfo, authToken, bookType, fileId)
   const { EPUB } = await import('./epub.js')
   return new EPUB(loader).init()
 }

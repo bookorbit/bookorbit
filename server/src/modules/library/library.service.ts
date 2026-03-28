@@ -72,6 +72,7 @@ export class LibraryService {
       allowedFormats: dto.allowedFormats ?? [],
       organizationMode: dto.organizationMode ?? 'auto',
       excludePatterns: dto.excludePatterns ?? [],
+      coverAspectRatio: dto.coverAspectRatio ?? '2/3',
       markAsFinishedSecondsRemaining: dto.markAsFinishedSecondsRemaining ?? null,
       markAsFinishedPercentComplete: dto.markAsFinishedPercentComplete ?? null,
       fileNamingPattern: dto.fileNamingPattern ?? null,

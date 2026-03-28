@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -22,6 +22,7 @@ import {
   koboSnapshotBooks,
   libraries,
   narrators,
+  audiobookProgress,
   readingProgress,
   tags,
   userBookStatus,
@@ -441,23 +442,25 @@ export class BookRepository {
       });
   }
 
-  async findLatestAudioProgress(userId: number, bookId: number) {
-    const AUDIO_FORMATS = ['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'];
+  async findAudioProgress(userId: number, bookId: number) {
     const [row] = await this.db
-      .select({
-        fileId: readingProgress.bookFileId,
-        percentage: readingProgress.percentage,
-        positionSeconds: readingProgress.positionSeconds,
-        updatedAt: readingProgress.updatedAt,
-        format: bookFiles.format,
-        absolutePath: bookFiles.absolutePath,
-      })
-      .from(readingProgress)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingProgress.bookFileId))
-      .where(and(eq(readingProgress.userId, userId), eq(bookFiles.bookId, bookId), inArray(bookFiles.format, AUDIO_FORMATS)))
-      .orderBy(desc(readingProgress.updatedAt))
+      .select()
+      .from(audiobookProgress)
+      .where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.bookId, bookId)))
       .limit(1);
-
     return row ?? null;
+  }
+
+  async upsertAudioProgress(userId: number, bookId: number, currentFileId: number, positionSeconds: number, percentage: number) {
+    const now = new Date();
+    const [row] = await this.db
+      .insert(audiobookProgress)
+      .values({ userId, bookId, currentFileId, positionSeconds, percentage, updatedAt: now })
+      .onConflictDoUpdate({
+        target: [audiobookProgress.userId, audiobookProgress.bookId],
+        set: { currentFileId, positionSeconds, percentage, updatedAt: now },
+      })
+      .returning();
+    return row;
   }
 }

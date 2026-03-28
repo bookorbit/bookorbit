@@ -334,12 +334,23 @@ CREATE TABLE "annotations" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "audiobook_progress" (
+	"user_id" integer NOT NULL,
+	"book_id" integer NOT NULL,
+	"percentage" real DEFAULT 0 NOT NULL,
+	"current_file_id" integer NOT NULL,
+	"position_seconds" real DEFAULT 0 NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "audiobook_progress_user_id_book_id_pk" PRIMARY KEY("user_id","book_id")
+);
+--> statement-breakpoint
 CREATE TABLE "bookmarks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
 	"book_id" integer NOT NULL,
-	"cfi" varchar(2000) NOT NULL,
+	"cfi" varchar(2000),
 	"title" varchar(500) NOT NULL,
+	"position_seconds" real,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -655,6 +666,9 @@ ALTER TABLE "book_narrators" ADD CONSTRAINT "book_narrators_narrator_id_narrator
 ALTER TABLE "scan_jobs" ADD CONSTRAINT "scan_jobs_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "annotations" ADD CONSTRAINT "annotations_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "annotations" ADD CONSTRAINT "annotations_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "audiobook_progress" ADD CONSTRAINT "audiobook_progress_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "audiobook_progress" ADD CONSTRAINT "audiobook_progress_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "audiobook_progress" ADD CONSTRAINT "audiobook_progress_current_file_id_book_files_id_fk" FOREIGN KEY ("current_file_id") REFERENCES "public"."book_files"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bookmarks" ADD CONSTRAINT "bookmarks_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bookmarks" ADD CONSTRAINT "bookmarks_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reader_default_preferences" ADD CONSTRAINT "reader_default_preferences_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -722,6 +736,7 @@ CREATE INDEX "bmfq_created_at_idx" ON "book_metadata_fetch_queue" USING btree ("
 CREATE INDEX "book_narrators_narrator_id_idx" ON "book_narrators" USING btree ("narrator_id");--> statement-breakpoint
 CREATE INDEX "narrators_name_trgm_idx" ON "narrators" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "abp_user_id_idx" ON "audiobook_progress" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint
 CREATE UNIQUE INDEX "rp_user_file_idx" ON "reader_preferences" USING btree ("user_id","book_file_id");--> statement-breakpoint

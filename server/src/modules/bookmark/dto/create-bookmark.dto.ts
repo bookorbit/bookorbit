@@ -1,11 +1,16 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateBookmarkDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  cfi!: string;
+  cfi?: string;
 
   @IsString()
   @IsNotEmpty()
   title!: string;
+
+  @IsOptional()
+  @IsNumber()
+  positionSeconds?: number;
 }

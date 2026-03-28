@@ -1,3 +1,6 @@
+import { open } from 'fs/promises';
+
+import mediaInfoFactory from 'mediainfo.js';
 import * as mm from 'music-metadata';
 
 import type { AudiobookChapter } from '@projectx/types';
@@ -43,13 +46,17 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
 
     const durationSeconds = format.duration !== undefined ? Math.round(format.duration) : null;
 
-    const sampleRate = format.sampleRate ?? 44100;
-    const chapters: AudiobookChapter[] = (format.chapters ?? [])
-      .filter((ch) => ch.sampleOffset != null)
-      .map((ch) => ({
-        title: ch.title,
-        startMs: Math.round((ch.sampleOffset! / sampleRate) * 1000),
-      }));
+    // music-metadata fails to read M4B chapter tracks reliably (iterates chunks not samples).
+    // Try mediainfo first; fall back to music-metadata's chapter data.
+    let chapters: AudiobookChapter[] = await extractChaptersWithMediainfo(absolutePath);
+    if (chapters.length === 0) {
+      chapters = (format.chapters ?? [])
+        .filter((ch) => ch.sampleOffset != null || ch.start != null)
+        .map((ch) => {
+          const startSec = ch.sampleOffset != null ? ch.sampleOffset / (format.sampleRate ?? 44100) : ch.start;
+          return { title: ch.title, startMs: Math.round(startSec * 1000) };
+        });
+    }
 
     let coverBytes: Buffer | null = null;
     const picture = common.picture?.[0];
@@ -93,6 +100,38 @@ export async function parseAudioDuration(absolutePath: string): Promise<number |
   } catch {
     return null;
   }
+}
+
+async function extractChaptersWithMediainfo(absolutePath: string): Promise<AudiobookChapter[]> {
+  let fileHandle: Awaited<ReturnType<typeof open>> | null = null;
+  const mi = await mediaInfoFactory({ format: 'object' });
+  try {
+    fileHandle = await open(absolutePath, 'r');
+    const { size } = await fileHandle.stat();
+    const readChunk = async (chunkSize: number, offset: number): Promise<Uint8Array> => {
+      const buf = new Uint8Array(chunkSize);
+      await fileHandle!.read(buf, 0, chunkSize, offset);
+      return buf;
+    };
+    const result = await mi.analyzeData(() => size, readChunk);
+    const menus = (result.media?.track ?? []).filter((t) => t['@type'] === 'Menu' && t.extra);
+    const extra = menus.flatMap((t) => Object.entries(t.extra as Record<string, string>));
+    return extra
+      .filter(([key]) => /^_\d{2}_\d{2}_\d{2}_\d{3}$/.test(key))
+      .map(([key, title]) => ({ title, startMs: parseMediainfoTimestamp(key) }))
+      .sort((a, b) => a.startMs - b.startMs);
+  } catch {
+    return [];
+  } finally {
+    await fileHandle?.close();
+    mi.close();
+  }
+}
+
+function parseMediainfoTimestamp(key: string): number {
+  // Key format: _HH_MM_SS_mmm (e.g. _00_13_24_850 = 13 min 24 sec 850 ms)
+  const [h, m, s, ms] = key.replace(/^_/, '').split('_').map(Number);
+  return h * 3_600_000 + m * 60_000 + s * 1_000 + ms;
 }
 
 function splitArtists(raw: string): string[] {

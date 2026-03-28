@@ -7,9 +7,10 @@
  * @param {Object} bookInfo - Pre-fetched EPUB metadata from /info endpoint
  * @param {string} [authToken] - Optional authentication token
  * @param {string} [bookType] - Optional book type for alternative format (e.g., 'EPUB')
+ * @param {number|null} [fileId] - Optional specific file ID to stream (for books with multiple epub files)
  * @returns {Object} Loader interface compatible with Foliate's EPUB class
  */
-export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null, bookType = null) => {
+export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null, bookType = null, fileId = null) => {
   const OPTIONAL_TEXT_FILES = new Set([
     'META-INF/encryption.xml',
     'META-INF/com.apple.ibooks.display-options.xml',
@@ -27,9 +28,11 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     // URL encode the path but preserve slashes
     const encodedPath = name.split('/').map(encodeURIComponent).join('/')
     let url = `${baseUrl}/${bookId}/file/${encodedPath}`
-    if (bookType) {
-      url += `?bookType=${encodeURIComponent(bookType)}`
-    }
+    const params = new URLSearchParams()
+    if (bookType) params.append('bookType', bookType)
+    if (fileId != null) params.append('fileId', String(fileId))
+    const qs = params.toString()
+    if (qs) url += `?${qs}`
     return url
   }
 

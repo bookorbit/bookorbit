@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Res } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -10,14 +10,15 @@ export class EpubController {
   constructor(private readonly epubService: EpubService) {}
 
   @Get(':bookId/info')
-  getBookInfo(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
-    return this.epubService.getBookInfo(bookId, user);
+  getBookInfo(@Param('bookId', ParseIntPipe) bookId: number, @Query('fileId') fileId: string | undefined, @CurrentUser() user: RequestUser) {
+    return this.epubService.getBookInfo(bookId, fileId != null ? Number(fileId) : undefined, user);
   }
 
   @Get(':bookId/file/*')
   async getFile(
     @Param('bookId', ParseIntPipe) bookId: number,
     @Param('*') encodedPath: string,
+    @Query('fileId') fileId: string | undefined,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
@@ -26,7 +27,7 @@ export class EpubController {
       .map((s) => decodeURIComponent(s))
       .join('/');
 
-    const { stream, contentType, size } = await this.epubService.streamFile(bookId, filePath, user);
+    const { stream, contentType, size } = await this.epubService.streamFile(bookId, filePath, fileId != null ? Number(fileId) : undefined, user);
 
     reply.header('Content-Type', contentType);
     if (size > 0) reply.header('Content-Length', size);

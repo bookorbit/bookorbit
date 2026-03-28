@@ -116,6 +116,31 @@ export const userReadingDailyStats = pgTable(
 export type UserReadingDailyStat = typeof userReadingDailyStats.$inferSelect;
 export type NewUserReadingDailyStat = typeof userReadingDailyStats.$inferInsert;
 
+export const audiobookProgress = pgTable(
+  'audiobook_progress',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    percentage: real('percentage').notNull().default(0),
+    currentFileId: integer('current_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    positionSeconds: real('position_seconds').notNull().default(0),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.bookId] }), index('abp_user_id_idx').on(t.userId)],
+);
+
+export type AudiobookProgress = typeof audiobookProgress.$inferSelect;
+export type NewAudiobookProgress = typeof audiobookProgress.$inferInsert;
+
 export const bookmarks = pgTable(
   'bookmarks',
   {
@@ -126,8 +151,11 @@ export const bookmarks = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
-    cfi: varchar('cfi', { length: 2000 }).notNull(),
+    // EPUB: CFI string pinpoints exact location. Null for audio bookmarks.
+    cfi: varchar('cfi', { length: 2000 }),
     title: varchar('title', { length: 500 }).notNull(),
+    // Audio: absolute book position in seconds (sum of preceding file durations + offset).
+    positionSeconds: real('position_seconds'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => [index('bookmarks_user_id_idx').on(t.userId)],

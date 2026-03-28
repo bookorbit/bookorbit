@@ -444,31 +444,28 @@ export class ScannerService implements OnApplicationBootstrap {
     counts.added += fileCounts.addedCount;
     counts.updated += fileCounts.updatedCount;
 
-    // Determine which format wins primary selection when multiple content-format files exist.
-    // Exclude zero-byte files from the election so a corrupt/empty file doesn't shadow a valid one.
-    const contentFiles = candidate.files.filter((f) => classifyFile(f.absolutePath).role === 'content' && f.sizeBytes > 0);
-    const chosenFormat =
-      contentFiles.length > 1 ? (formatPriority.find((fmt) => contentFiles.some((f) => classifyFile(f.absolutePath).format === fmt)) ?? null) : null;
+    // ── Phase 1: Register every file in bookFiles. No metadata extraction yet. ──
+    type RegisteredFile = {
+      fileId: number;
+      format: string | null;
+      role: FileRole;
+      absolutePath: string;
+      isNew: boolean;
+      wasReassigned: boolean;
+    };
 
-    const contentCandidates: { fileId: number; format: string | null }[] = [];
-    // New audio content files collected for batch metadata processing after the file loop.
-    const newAudioContentFiles: { absolutePath: string; format: string }[] = [];
-    // Track whether a non-audio format already extracted book metadata in this scan.
-    // If so, the audio block should only extract duration, not overwrite metadata.
-    let nonAudioMetadataExtracted = false;
+    const registeredFiles: RegisteredFile[] = [];
 
     for (let sortOrder = 0; sortOrder < candidate.files.length; sortOrder++) {
       const fileStat = candidate.files[sortOrder];
-      const { format, role: classifiedRole } = classifyFile(fileStat.absolutePath);
+      const { format, role } = classifyFile(fileStat.absolutePath);
 
-      if (classifiedRole === 'content' && fileStat.sizeBytes === 0) {
+      if (role === 'content' && fileStat.sizeBytes === 0) {
         this.logger.warn(
           `[scanner.process_file] [fail] bookId=${book.id} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" reason=zero_byte_content - content file skipped`,
         );
         continue;
       }
-
-      const role: FileRole = classifiedRole;
 
       const fileCount: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
       let processResult: { isNew: boolean; reassigned: boolean; fileId: number | null };
@@ -485,60 +482,74 @@ export class ScannerService implements OnApplicationBootstrap {
       counts.added += fileCount.addedCount;
       counts.updated += fileCount.updatedCount;
 
-      if (classifiedRole === 'content' && processResult.fileId !== null) {
-        contentCandidates.push({ fileId: processResult.fileId, format });
-      }
-
-      if ((processResult.isNew || processResult.reassigned) && format && METADATA_FORMATS.has(format)) {
-        if (role === 'content' && isAudioFormat(format)) {
-          newAudioContentFiles.push({ absolutePath: fileStat.absolutePath, format });
-        } else if (!isAudioFormat(format)) {
-          try {
-            await this.metadataService.extractAndSave(book.id, fileStat.absolutePath, format);
-            nonAudioMetadataExtracted = true;
-          } catch (err) {
-            this.logger.warn(
-              `[scanner.extract_metadata] [fail] bookId=${book.id} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" format=${format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - metadata extraction failed`,
-            );
-          }
-        }
+      if (processResult.fileId !== null) {
+        registeredFiles.push({
+          fileId: processResult.fileId,
+          format,
+          role,
+          absolutePath: fileStat.absolutePath,
+          isNew: processResult.isNew,
+          wasReassigned: processResult.reassigned,
+        });
       }
     }
 
+    // ── Phase 2: Pick winner (primary file) from all registered content files. ──
+    const contentFiles = registeredFiles.filter((f) => f.role === 'content');
+
     const winner =
-      formatPriority.reduce<{ fileId: number; format: string | null } | null>(
-        (found, fmt) => found ?? contentCandidates.find((f) => f.format === fmt) ?? null,
-        null,
-      ) ??
-      (chosenFormat ? (contentCandidates.find((f) => f.format === chosenFormat) ?? null) : null) ??
-      contentCandidates[0] ??
+      formatPriority.reduce<RegisteredFile | null>((found, fmt) => found ?? contentFiles.find((f) => f.format === fmt) ?? null, null) ??
+      contentFiles[0] ??
       null;
 
     await this.scannerRepo.updateBookPrimaryFile(book.id, winner?.fileId ?? null);
 
-    // For audiobooks: extract full metadata from the first (natural-sorted) content file,
-    // duration-only from the rest, then aggregate total duration into bookMetadata.
-    // If a non-audio format (epub, mobi, etc.) already extracted metadata in this scan,
-    // skip extractAndSave for audio and only collect durations — the ebook metadata wins.
-    if (newAudioContentFiles.length > 0) {
-      newAudioContentFiles.sort((a, b) => basename(a.absolutePath).localeCompare(basename(b.absolutePath), undefined, { numeric: true }));
+    // ── Phase 3: Metadata extraction — winner-driven, triggered by new/reassigned files. ──
+    //
+    // Design rules (agreed per architecture review):
+    //   - Text metadata (title, authors, cover, etc.) comes from winner only.
+    //   - Audio-specific fields (chapters, narrators, duration) always come from audio if present.
+    //   - Extraction only fires when the relevant source file is new or reassigned.
 
-      const [first, ...rest] = newAudioContentFiles;
+    const winnerIsNew = winner !== null && (winner.isNew || winner.wasReassigned);
+    const audioContentFiles = contentFiles.filter((f) => f.format !== null && isAudioFormat(f.format!));
+    const newAudioFiles = audioContentFiles.filter((f) => f.isNew || f.wasReassigned);
+    const winnerIsAudio = winner !== null && winner.format !== null && isAudioFormat(winner.format);
 
-      if (!nonAudioMetadataExtracted) {
-        try {
-          await this.metadataService.extractAndSave(book.id, first.absolutePath, first.format);
-        } catch (err) {
-          this.logger.warn(
-            `[scanner.extract_audio_metadata] [fail] bookId=${book.id} path="${first.absolutePath.replace(/"/g, '\\"')}" format=${first.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - audio metadata extraction failed`,
-          );
-        }
+    // 3a: Extract all shared metadata from winner when winner file is new or reassigned.
+    if (winnerIsNew && winner!.format !== null && METADATA_FORMATS.has(winner!.format)) {
+      try {
+        await this.metadataService.extractAndSave(book.id, winner!.absolutePath, winner!.format);
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.extract_metadata] [fail] bookId=${book.id} path="${winner!.absolutePath.replace(/"/g, '\\"')}" format=${winner!.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - metadata extraction failed`,
+        );
       }
+    }
 
-      // When ebook metadata already won, all audio files only contribute duration.
-      const durationOnlyFiles = nonAudioMetadataExtracted ? newAudioContentFiles : rest;
+    // 3b: When winner is not audio, extract audio-specific fields (chapters, narrators)
+    //     from the first audio file if any audio file is new or reassigned.
+    //     Cover is intentionally skipped here — winner already owns it from step 3a.
+    if (!winnerIsAudio && newAudioFiles.length > 0) {
+      const sortedAudio = [...audioContentFiles].sort((a, b) =>
+        basename(a.absolutePath).localeCompare(basename(b.absolutePath), undefined, { numeric: true }),
+      );
+      const firstAudio = sortedAudio[0];
+      try {
+        await this.metadataService.extractAudioChaptersAndNarrators(book.id, firstAudio.absolutePath, firstAudio.format!);
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.extract_audio_chapters] [fail] bookId=${book.id} path="${firstAudio.absolutePath.replace(/"/g, '\\"')}" format=${firstAudio.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - audio chapters/narrators extraction failed`,
+        );
+      }
+    }
+
+    // 3c: Write per-file duration to bookFiles for every new/reassigned audio file.
+    //     Running this for all new audio files (including the winner) ensures
+    //     aggregateAudioDuration has accurate per-file data for the total.
+    if (newAudioFiles.length > 0) {
       await Promise.all(
-        durationOnlyFiles.map(async (audioFile) => {
+        newAudioFiles.map(async (audioFile) => {
           try {
             await this.metadataService.extractAudioFileDuration(book.id, audioFile.absolutePath);
           } catch (err) {
@@ -548,7 +559,10 @@ export class ScannerService implements OnApplicationBootstrap {
           }
         }),
       );
+    }
 
+    // 3d: Re-aggregate total duration whenever audio files exist and anything changed.
+    if (audioContentFiles.length > 0 && (winnerIsNew || newAudioFiles.length > 0)) {
       try {
         await this.metadataService.aggregateAudioDuration(book.id);
       } catch (err) {
@@ -557,6 +571,7 @@ export class ScannerService implements OnApplicationBootstrap {
         );
       }
     }
+
     return { bookId: book.id, ...counts };
   }
 

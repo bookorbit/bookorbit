@@ -1,5 +1,5 @@
 {
-  "id": "00255418-cbd4-4a15-8395-a63bca8ca17f",
+  "id": "4e9b80be-be3a-4ef7-9c3c-3371568aef96",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2609,6 +2609,107 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.audiobook_progress": {
+      "name": "audiobook_progress",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "percentage": {
+          "name": "percentage",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "current_file_id": {
+          "name": "current_file_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position_seconds": {
+          "name": "position_seconds",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "abp_user_id_idx": {
+          "name": "abp_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audiobook_progress_user_id_users_id_fk": {
+          "name": "audiobook_progress_user_id_users_id_fk",
+          "tableFrom": "audiobook_progress",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "audiobook_progress_book_id_books_id_fk": {
+          "name": "audiobook_progress_book_id_books_id_fk",
+          "tableFrom": "audiobook_progress",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "audiobook_progress_current_file_id_book_files_id_fk": {
+          "name": "audiobook_progress_current_file_id_book_files_id_fk",
+          "tableFrom": "audiobook_progress",
+          "tableTo": "book_files",
+          "columnsFrom": ["current_file_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "audiobook_progress_user_id_book_id_pk": {
+          "name": "audiobook_progress_user_id_book_id_pk",
+          "columns": ["user_id", "book_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.bookmarks": {
       "name": "bookmarks",
       "schema": "",
@@ -2635,13 +2736,19 @@
           "name": "cfi",
           "type": "varchar(2000)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "title": {
           "name": "title",
           "type": "varchar(500)",
           "primaryKey": false,
           "notNull": true
+        },
+        "position_seconds": {
+          "name": "position_seconds",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

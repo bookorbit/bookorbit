@@ -29,6 +29,7 @@ import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
 import { DeleteBooksDto } from './dto/delete-books.dto';
 import { ExportBooksDto } from './dto/export-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
+import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
@@ -291,6 +292,12 @@ export class BookController {
   @Get(':id/audio-progress')
   async getAudioProgress(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return (await this.bookService.getAudioProgress(user.id, id, user)) ?? null;
+  }
+
+  @Patch(':id/audio-progress')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async saveAudioProgress(@Param('id', ParseIntPipe) id: number, @Body() dto: UpsertAudioProgressDto, @CurrentUser() user: RequestUser) {
+    await this.bookService.saveAudioProgress(user.id, id, dto, user);
   }
 
   @Patch(':id/metadata')

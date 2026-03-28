@@ -55,7 +55,8 @@ function makeService() {
     findProgress: vi.fn(),
     findProgressByBook: vi.fn(),
     upsertProgress: vi.fn(),
-    findLatestAudioProgress: vi.fn(),
+    findAudioProgress: vi.fn(),
+    upsertAudioProgress: vi.fn(),
     updateMetadataFields: vi.fn(),
     deleteByIds: vi.fn(),
     findAllIds: vi.fn(),
@@ -666,11 +667,11 @@ describe('BookService', () => {
       const progressRow = { fileId: 5, positionSeconds: 1234, updatedAt: new Date().toISOString() };
 
       bookRepo.findLibraryIdByBookId = vi.fn().mockResolvedValue(1);
-      bookRepo.findLatestAudioProgress = vi.fn().mockResolvedValue(progressRow);
+      bookRepo.findAudioProgress = vi.fn().mockResolvedValue(progressRow);
 
       const result = await service.getAudioProgress(user.id, 10, user);
       expect(result).toBe(progressRow);
-      expect(bookRepo.findLatestAudioProgress).toHaveBeenCalledWith(user.id, 10);
+      expect(bookRepo.findAudioProgress).toHaveBeenCalledWith(user.id, 10);
     });
 
     it('throws NotFoundException when book does not exist', async () => {
