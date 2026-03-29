@@ -16,7 +16,7 @@ const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = 
   { key: 'format', label: 'File format', hint: 'Color-coded EPUB, PDF, CBZ badge at bottom-right' },
   { key: 'rating', label: 'Rating dots', hint: '5-dot rating indicator at bottom-left' },
   { key: 'new', label: 'New indicator', hint: 'Accent dot on books added in the last 7 days' },
-  { key: 'read-status', label: 'Read status', hint: 'Color icon showing reading, read, or abandoned status' },
+  { key: 'read-status', label: 'Read status', hint: 'Color icon showing the current reading status' },
 ]
 
 function toggleOverlay(key: CardOverlayKey) {

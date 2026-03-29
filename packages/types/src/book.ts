@@ -10,7 +10,15 @@ export function isAudioFormat(format: string): boolean {
   return AUDIO_FORMATS.has(format.toLowerCase());
 }
 
-export type ReadStatus = "unread" | "reading" | "read" | "abandoned";
+export type ReadStatus =
+  | "unread"
+  | "want_to_read"
+  | "reading"
+  | "on_hold"
+  | "rereading"
+  | "read"
+  | "skimmed"
+  | "abandoned";
 export type ReadStatusSource = "auto" | "manual";
 
 export type UserBookStatus = {

@@ -103,8 +103,8 @@ export class UserStatisticsRepository {
     const [statusRow] = await this.db
       .select({
         trackedBooks: sql<number>`count(*)::int`,
-        startedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} in ('reading', 'read', 'abandoned'))::int`,
-        inProgressBooks: sql<number>`count(*) filter (where ${userBookStatus.status} = 'reading')::int`,
+        startedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} in ('reading', 'on_hold', 'rereading', 'read', 'skimmed', 'abandoned'))::int`,
+        inProgressBooks: sql<number>`count(*) filter (where ${userBookStatus.status} in ('reading', 'on_hold', 'rereading'))::int`,
         completedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} = 'read')::int`,
       })
       .from(userBookStatus)

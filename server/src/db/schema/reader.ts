@@ -13,7 +13,7 @@ export const userBookStatus = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
-    // 'unread' | 'reading' | 'read' | 'abandoned'
+    // 'unread' | 'want_to_read' | 'reading' | 'on_hold' | 'rereading' | 'read' | 'skimmed' | 'abandoned'
     status: varchar('status', { length: 20 }).notNull().default('unread'),
     // 'auto' (derived from progress) | 'manual' (user-set; never auto-overridden)
     source: varchar('source', { length: 10 }).notNull().default('auto'),

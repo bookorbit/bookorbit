@@ -8,6 +8,8 @@ import { userBookStatus } from '../../db/schema';
 import type { ReadStatus, ReadStatusSource } from '@projectx/types';
 
 type Db = NodePgDatabase<typeof schema>;
+const STARTED_FROM_ACTIVE_STATUSES: ReadStatus[] = ['reading', 'on_hold', 'rereading'];
+const RESET_FINISHED_AT_STATUSES: ReadStatus[] = ['unread', 'want_to_read', 'reading', 'on_hold', 'rereading', 'skimmed'];
 
 @Injectable()
 export class UserBookStatusRepository {
@@ -40,8 +42,8 @@ export class UserBookStatusRepository {
   ): Promise<void> {
     const row = existing !== undefined ? existing : await this.findOne(userId, bookId);
 
-    const startedAt = row?.startedAt ?? (status === 'reading' ? now : null);
-    const finishedAt = status === 'read' ? now : status === 'unread' || status === 'reading' ? null : (row?.finishedAt ?? null);
+    const startedAt = row?.startedAt ?? (STARTED_FROM_ACTIVE_STATUSES.includes(status) ? now : null);
+    const finishedAt = status === 'read' ? now : RESET_FINISHED_AT_STATUSES.includes(status) ? null : (row?.finishedAt ?? null);
 
     await this.db
       .insert(userBookStatus)
