@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookDetail } from '@projectx/types'
 import { useMetadataEditor } from '../useMetadataEditor'
 
-const apiMock = vi.hoisted(() => vi.fn())
+const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>())
 
 vi.mock('@/lib/api', () => ({
   api: apiMock,

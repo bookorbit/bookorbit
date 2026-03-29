@@ -33,7 +33,7 @@ watchEffect(() => {
       type: 'category',
       data: data.value.buckets.map((bucket) => bucket.label),
       axisTick: { show: false },
-      axisLabel: { fontSize: 11 },
+      axisLabel: { fontSize: 11, rotate: 45 },
     },
     yAxis: {
       type: 'value',

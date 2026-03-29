@@ -187,7 +187,8 @@ describe('UserStatisticsService', () => {
       { label: '31-90d', minDays: 31, maxDays: 90, count: 1 },
       { label: '91-180d', minDays: 91, maxDays: 180, count: 1 },
       { label: '181-365d', minDays: 181, maxDays: 365, count: 0 },
-      { label: '366d+', minDays: 366, maxDays: null, count: 1 },
+      { label: '366-730d', minDays: 366, maxDays: 730, count: 1 },
+      { label: '731d+', minDays: 731, maxDays: null, count: 0 },
     ]);
   });
 

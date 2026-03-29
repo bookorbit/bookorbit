@@ -129,7 +129,7 @@ function setTab(tab: 'library' | 'user') {
       </div>
 
       <div class="flex items-center gap-2">
-        <Popover v-if="activeTab === 'library' && libraries.length > 1">
+        <Popover v-if="libraries.length > 1">
           <PopoverTrigger as-child>
             <button
               :class="[

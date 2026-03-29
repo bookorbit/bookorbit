@@ -45,17 +45,84 @@ const MODIFIERS = [
 
 const EXAMPLES = [
   {
-    pattern: '{authors}/<{series}/><{seriesIndex}. >{title}',
+    label: 'Calibre-style default',
+    pattern: '{authors}/{title}< ({year})>',
     cases: [
-      { label: 'with series', result: 'William Gibson/Sprawl/01. Neuromancer.epub' },
-      { label: 'without', result: 'William Gibson/Neuromancer.epub' },
+      { label: 'with year', result: 'William Gibson/Neuromancer (1984).epub' },
+      { label: 'no year', result: 'William Gibson/Neuromancer.epub' },
     ],
   },
   {
-    pattern: '<{series}|Standalone>/{title}',
+    label: 'Series reader',
+    pattern: '{authors:first}/<{series}/><{seriesIndex}. >{title}',
     cases: [
-      { label: 'with series', result: 'Sprawl/Neuromancer.epub' },
-      { label: 'without', result: 'Standalone/Neuromancer.epub' },
+      { label: 'in series', result: 'William Gibson/Sprawl/01. Neuromancer.epub' },
+      { label: 'standalone', result: 'William Gibson/Neuromancer.epub' },
+    ],
+  },
+  {
+    label: 'Clean download filename',
+    pattern: '{authors:first} - {title}< ({year})>',
+    cases: [
+      { label: 'with year', result: 'William Gibson - Neuromancer (1984).epub' },
+      { label: 'no year', result: 'William Gibson - Neuromancer.epub' },
+    ],
+  },
+  {
+    label: 'Alphabetical grouping with series',
+    pattern: '{authors:initial}/{authors:sort}/<{series}/><{seriesIndex}. >{title}',
+    cases: [
+      { label: 'in series', result: 'G/Gibson, William/Sprawl/01. Neuromancer.epub' },
+      { label: 'standalone', result: 'G/Gibson, William/Neuromancer.epub' },
+    ],
+  },
+  {
+    label: 'Series or Standalone fallback',
+    pattern: '<{series}|Standalone>/<{seriesIndex}. >{title}',
+    cases: [
+      { label: 'in series', result: 'Sprawl/01. Neuromancer.epub' },
+      { label: 'no series', result: 'Standalone/Neuromancer.epub' },
+    ],
+  },
+  {
+    label: 'Download with optional subtitle',
+    pattern: '{authors:first} - {title}< - {subtitle}>< ({year})>',
+    cases: [
+      { label: 'full', result: 'Andrew Hunt - The Pragmatic Programmer - From Journeyman to Master (1999).epub' },
+      { label: 'minimal', result: 'Andrew Hunt - The Pragmatic Programmer.epub' },
+    ],
+  },
+  {
+    label: 'Multilingual library',
+    pattern: '<{language:upper}/>{authors}/{title}',
+    cases: [
+      { label: 'with language', result: 'EN/William Gibson/Neuromancer.epub' },
+      { label: 'no language', result: 'William Gibson/Neuromancer.epub' },
+    ],
+  },
+  {
+    label: 'Publisher-organized',
+    pattern: '<{publisher}/>{authors:first}/{title}',
+    cases: [
+      { label: 'with publisher', result: "O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
+      { label: 'no publisher', result: 'Andrew Hunt/The Pragmatic Programmer.epub' },
+    ],
+  },
+  {
+    label: 'Stacked optional folders',
+    pattern: '<{language:upper}/><{publisher}|Unknown Publisher>/{authors:first}/{title}',
+    cases: [
+      { label: 'all set', result: "EN/O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
+      { label: 'no language', result: "O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
+      { label: 'no publisher', result: 'Unknown Publisher/Andrew Hunt/The Pragmatic Programmer.epub' },
+    ],
+  },
+  {
+    label: 'Folder-drop with sort name',
+    pattern: '{authors:initial}/{authors:sort}/<{series}/>',
+    cases: [
+      { label: 'in series', result: 'G/Gibson, William/Sprawl/neuromancer.epub' },
+      { label: 'standalone', result: 'G/Gibson, William/neuromancer.epub' },
     ],
   },
 ]
@@ -227,8 +294,9 @@ onMounted(async () => {
     <!-- Placeholder Reference -->
     <section class="space-y-4">
       <p class="settings-group-label">Pattern Reference</p>
+
+      <!-- Reference accordion -->
       <div class="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
-        <!-- Accordion header -->
         <button
           class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
           @click="referenceOpen = !referenceOpen"
@@ -246,7 +314,7 @@ onMounted(async () => {
           <!-- Tokens -->
           <div class="p-5 space-y-3">
             <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Tokens</p>
-            <p class="text-xs text-muted-foreground">Click any token to copy it to your clipboard.</p>
+            <p class="text-xs text-muted-foreground leading-relaxed">Click any token to copy it to your clipboard.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               <Tooltip v-for="t in PATTERN_TOKENS" :key="t.token">
                 <TooltipTrigger as-child>
@@ -267,7 +335,7 @@ onMounted(async () => {
           </div>
 
           <!-- Modifiers -->
-          <div class="p-5 space-y-4">
+          <div class="p-5 space-y-3">
             <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Modifiers</p>
             <p class="text-xs text-muted-foreground leading-relaxed">
               Append a modifier inside a token to transform its value:
@@ -288,7 +356,7 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Examples -->
+          <!-- Conditional Logic -->
           <div class="p-5 space-y-3">
             <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Conditional Logic</p>
             <p class="text-xs text-muted-foreground leading-relaxed">
@@ -296,28 +364,40 @@ onMounted(async () => {
               token is empty. Use <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground text-[11px]">|fallback</code> for a default
               value.
             </p>
-            <div class="space-y-3">
-              <div v-for="ex in EXAMPLES" :key="ex.pattern" class="rounded-xl border border-border bg-background overflow-hidden shadow-xs">
-                <div class="flex items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border-b border-border">
-                  <code class="text-[11px] font-mono text-foreground break-all leading-relaxed">{{ ex.pattern }}</code>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <button
-                        class="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-muted-foreground border border-border bg-background hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                        @click="copyPattern(ex.pattern)"
-                      >
-                        <ClipboardCopy :size="12" />
-                        Copy
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Copy pattern to clipboard</TooltipContent>
-                  </Tooltip>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Examples -->
+    <section class="space-y-4">
+      <p class="settings-group-label">Examples</p>
+      <div class="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+        <div class="p-5 space-y-3">
+          <div class="space-y-3">
+            <div v-for="ex in EXAMPLES" :key="ex.pattern" class="rounded-xl border border-border bg-background overflow-hidden shadow-xs">
+              <div class="flex items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border-b border-border">
+                <div class="min-w-0">
+                  <p class="text-[13px] font-semibold text-foreground mb-0.5">{{ ex.label }}</p>
+                  <code class="text-[12px] font-mono text-muted-foreground break-all leading-relaxed">{{ ex.pattern }}</code>
                 </div>
-                <div class="px-4 py-3 space-y-2">
-                  <div v-for="c in ex.cases" :key="c.label" class="flex items-baseline gap-2">
-                    <span class="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold shrink-0 w-20">{{ c.label }}</span>
-                    <code class="text-[11px] font-mono text-primary/80 break-all leading-tight">{{ c.result }}</code>
-                  </div>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      class="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-muted-foreground border border-border bg-background hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                      @click="copyPattern(ex.pattern)"
+                    >
+                      <ClipboardCopy :size="12" />
+                      Copy
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy pattern to clipboard</TooltipContent>
+                </Tooltip>
+              </div>
+              <div class="px-4 py-3 space-y-2">
+                <div v-for="c in ex.cases" :key="c.label" class="flex items-baseline gap-2">
+                  <span class="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold shrink-0 w-20">{{ c.label }}</span>
+                  <code class="text-[11.5px] font-mono text-primary/80 break-all leading-tight">{{ c.result }}</code>
                 </div>
               </div>
             </div>

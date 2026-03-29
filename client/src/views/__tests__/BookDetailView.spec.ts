@@ -8,7 +8,7 @@ const mockState = vi.hoisted(() => ({
   route: null as unknown as { params: { bookId: string }; query: Record<string, unknown> },
   detail: null as unknown as { value: BookDetail | null },
   loading: null as unknown as { value: boolean },
-  fetch: vi.fn(),
+  fetch: vi.fn<() => void>(),
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -36,7 +36,7 @@ vi.mock('@/features/book/composables/useBookEvents', () => ({
 }))
 
 vi.mock('@/features/scanner/composables/useScanProgress', () => ({
-  useScanProgress: () => ({ subscribeLibrary: vi.fn() }),
+  useScanProgress: () => ({ subscribeLibrary: vi.fn<() => void>() }),
 }))
 
 vi.mock('@/composables/usePageTitle', () => ({
