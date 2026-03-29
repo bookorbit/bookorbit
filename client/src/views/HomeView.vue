@@ -196,14 +196,6 @@ function clearFilters() {
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
-function loadIfSentinelVisible() {
-  if (!hasMore.value || loading.value) return
-  const el = sentinel.value
-  if (!el) return
-  const rect = el.getBoundingClientRect()
-  if (rect.top < window.innerHeight + 300) load()
-}
-
 onMounted(() => {
   load(true)
 
@@ -232,14 +224,6 @@ watch(libraryId, (newId) => {
 })
 
 watch(filter, () => load(true), { deep: true })
-
-watch(
-  loading,
-  (isLoading) => {
-    if (!isLoading) loadIfSentinelVisible()
-  },
-  { flush: 'post' },
-)
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 const {

@@ -19,12 +19,14 @@ export function useBookQuery(libraryId: Ref<number | null>) {
 
   async function load(reset = false) {
     if (loading.value || libraryId.value === null) return
+    if (!reset && !hasMore.value) return
     loading.value = true
     error.value = null
 
     if (reset) {
       pagination.page = 0
       items.value = []
+      total.value = 0
     }
 
     try {
