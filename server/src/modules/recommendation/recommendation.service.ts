@@ -1,13 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { inArray } from 'drizzle-orm';
 
 import type { BookRecommendation } from '@projectx/types';
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookRepository } from '../book/book.repository';
 import { LibraryService } from '../library/library.service';
-import { books } from '../../db/schema';
 import { AnnCandidate, CandidateMetadata, RecommendationRepository, TargetBookData } from './recommendation.repository';
 
 @Injectable()
@@ -52,18 +49,9 @@ export class RecommendationService {
     if (rescored.length === 0) return [];
 
     const topIds = rescored.map((r) => r.bookId);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows } = await this.bookRepo.findCards({
-      where: inArray(books.id, topIds),
-      orderBy: [],
-      limit: 25,
-      offset: 0,
-      userId: user.id,
-    });
-
-    const cards = assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
-    const cardMap = new Map(cards.map((c) => [c.id, c]));
-
-    return rescored.map((r) => ({ book: cardMap.get(r.bookId)!, score: r.score })).filter((r) => r.book != null);
+    const rows = await this.bookRepo.findRecommendationTitlesByBookIds(topIds);
+    const rowMap = new Map(rows.map((row) => [row.id, row]));
+    return rescored.map((r) => rowMap.get(r.bookId)).filter((row): row is { id: number; title: string | null } => row != null);
   }
 
   private rescore(candidate: AnnCandidate, target: TargetBookData, meta: CandidateMetadata | null): number {

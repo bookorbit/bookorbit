@@ -55,18 +55,18 @@ function scroll(direction: 'left' | 'right') {
     <div v-else ref="scrollEl" class="flex gap-6 overflow-x-auto pb-2">
       <button
         v-for="rec in recommendations"
-        :key="rec.book.id"
+        :key="rec.id"
         class="w-30 shrink-0 text-left group"
-        @click="router.push({ name: 'book-detail', params: { bookId: rec.book.id } })"
+        @click="router.push({ name: 'book-detail', params: { bookId: rec.id } })"
       >
         <div
           class="w-full rounded-sm overflow-hidden shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all duration-150"
           style="aspect-ratio: 2/3"
-          :style="bookCoverStyle(rec.book.title ?? String(rec.book.id))"
+          :style="bookCoverStyle(rec.title ?? String(rec.id))"
         >
           <img
-            :src="coverUrl(rec.book.id, 'thumbnail')"
-            :alt="rec.book.title ?? ''"
+            :src="coverUrl(rec.id, 'thumbnail')"
+            :alt="rec.title ?? ''"
             class="w-full h-full object-cover"
             loading="lazy"
             @error="(e) => ((e.target as HTMLImageElement).style.display = 'none')"

@@ -16,7 +16,7 @@ describe('RecommendationController', () => {
   });
 
   it('delegates recommendation lookup to the service', async () => {
-    const recommendation = [{ book: { id: 10 }, score: 0.9 }];
+    const recommendation = [{ id: 10, title: 'Book 10' }];
     const recommendationService = {
       getRecommendations: vi.fn().mockResolvedValue(recommendation),
     };

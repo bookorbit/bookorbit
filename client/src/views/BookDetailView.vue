@@ -76,7 +76,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 <template>
   <BookDetailLayout :book-id="bookId">
     <template v-if="detail">
-      <DetailsTab v-if="tab === 'details'" :book="detail" />
+      <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" />
       <EditMetadataTab
         v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
         :book="detail"

@@ -133,8 +133,8 @@ export type BooksPage = {
 };
 
 export type BookRecommendation = {
-  book: BookCard;
-  score: number;
+  id: number;
+  title: string | null;
 };
 
 export type CoverSearchResult = {

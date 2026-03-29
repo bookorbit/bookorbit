@@ -169,6 +169,8 @@ function openAuthorBrowse() {
   void router.push({ name: 'authors', query: { q: authorQuery.value } })
 }
 
+const showAuthorOnHover = computed(() => coverLoaded.value && !!authorLine.value && coverAspectRatio.value !== '1/1')
+
 const { downloadFile, exportBooks } = useBookDownload()
 
 function handleDownloadFile(file: BookFileRef) {
@@ -368,7 +370,7 @@ async function handleSetStatus(status: ReadStatus) {
       <!-- Hover overlay -->
       <div
         v-if="!selectionMode"
-        class="absolute inset-0 flex flex-col p-2 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+        class="absolute inset-0 flex flex-col p-2 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
         @click.stop="handleCardClick"
       >
         <!-- Top row: Quick View -->
@@ -381,132 +383,249 @@ async function handleSetStatus(status: ReadStatus) {
         <div class="flex-1 min-h-0" />
 
         <!-- Bottom: title/author + kebab -->
-        <div class="shrink-0 flex items-center justify-between gap-2">
-          <div v-if="coverLoaded" class="min-w-0 flex-1">
-            <p class="text-xs font-semibold text-white leading-tight line-clamp-2">{{ book.title ?? '-' }}</p>
-            <button
-              v-if="authorLine && coverAspectRatio !== '1/1'"
-              class="text-[10px] text-white/70 truncate mt-0.5 hover:underline"
-              @click.stop="openAuthorBrowse"
-            >
-              {{ authorLine }}
-            </button>
-          </div>
-          <div v-else class="flex-1" />
+        <div class="shrink-0 flex flex-col gap-0.5">
+          <div class="flex items-start justify-between gap-2">
+            <p v-if="coverLoaded" class="text-xs font-semibold text-white leading-tight line-clamp-2 min-w-0 flex-1">
+              {{ book.title ?? '-' }}
+            </p>
+            <div v-else class="flex-1" />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button class="p-1.5 rounded-full bg-black/40 hover:bg-white/20 transition-colors text-white shrink-0">
-                <MoreHorizontal class="size-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <!-- Open submenu (only when multiple openable files; single file = direct item) -->
-              <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
-                <BookOpen class="size-4 mr-2" />
-                Open
-              </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
-                <DropdownMenuSubTrigger>
-                  <BookOpen class="size-4 mr-2" />
-                  Open
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
-                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+            <div v-if="!showAuthorOnHover" class="shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <button class="p-1.5 rounded-full bg-black/40 hover:bg-white/20 transition-colors text-white shrink-0">
+                    <MoreHorizontal class="size-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
+                    <BookOpen class="size-4 mr-2" />
+                    Open
                   </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+                  <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
+                    <DropdownMenuSubTrigger>
+                      <BookOpen class="size-4 mr-2" />
+                      Open
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
+                        <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                        <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
 
-              <!-- Download submenu -->
-              <DropdownMenuItem
-                v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
-                @click="handleDownloadFile(primaryFile)"
-              >
-                <Download class="size-4 mr-2" />
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
-                <DropdownMenuSubTrigger>
-                  <Download class="size-4 mr-2" />
-                  Download
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
-                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  <!-- Download submenu -->
+                  <DropdownMenuItem
+                    v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
+                    @click="handleDownloadFile(primaryFile)"
+                  >
+                    <Download class="size-4 mr-2" />
+                    Download
+                  </DropdownMenuItem>
+                  <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
+                    <DropdownMenuSubTrigger>
+                      <Download class="size-4 mr-2" />
+                      Download
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                        <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                        <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
+                    <ExternalLink class="size-4 mr-2" />
+                    Book Details
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
+                  <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+                    <DropdownMenuSubTrigger>
+                      <Pencil class="size-4 mr-2" />
+                      Metadata
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
+                        <Pencil class="size-4 mr-2" />
+                        Edit Metadata
+                      </DropdownMenuItem>
+                      <DropdownMenuItem :disabled="anyRefreshing" @click="refreshWithFeedback(book.id)">
+                        <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
+                        <RefreshCw v-else class="size-4 mr-2" />
+                        Refresh Metadata
+                      </DropdownMenuItem>
+                      <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
+                        <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
+                        <Image v-else class="size-4 mr-2" />
+                        Regenerate Cover
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuItem @click="emit('action', 'add-to-collection')">
+                    <FolderPlus class="size-4 mr-2" />
+                    Add to Collection
+                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <component
+                        :is="STATUS_ICONS[localReadStatus ?? 'unread']"
+                        class="size-4 mr-2"
+                        :class="STATUS_COLORS[localReadStatus ?? 'unread']"
+                      />
+                      Set Status
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
+                        <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+                        {{ opt.label }}
+                        <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
+                    <Send class="size-4 mr-2" />
+                    Send via Email
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+                  <DropdownMenuItem
+                    v-if="hasPermission('library_delete_books')"
+                    class="text-destructive focus:text-destructive"
+                    @click="emit('action', 'delete')"
+                  >
+                    <Trash2 class="size-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
 
-              <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
-                <ExternalLink class="size-4 mr-2" />
-                Book Details
-              </DropdownMenuItem>
-              <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-              <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
-                <DropdownMenuSubTrigger>
-                  <Pencil class="size-4 mr-2" />
-                  Metadata
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
+          <div v-if="showAuthorOnHover" class="flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <button class="text-[10px] text-white/70 truncate hover:underline text-left block w-full" @click.stop="openAuthorBrowse">
+                {{ authorLine }}
+              </button>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button class="p-1.5 rounded-full bg-black/40 hover:bg-white/20 transition-colors text-white shrink-0">
+                  <MoreHorizontal class="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
+                  <BookOpen class="size-4 mr-2" />
+                  Open
+                </DropdownMenuItem>
+                <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
+                  <DropdownMenuSubTrigger>
+                    <BookOpen class="size-4 mr-2" />
+                    Open
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
+                      <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                      <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                      <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                <!-- Download submenu -->
+                <DropdownMenuItem
+                  v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
+                  @click="handleDownloadFile(primaryFile)"
+                >
+                  <Download class="size-4 mr-2" />
+                  Download
+                </DropdownMenuItem>
+                <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
+                  <DropdownMenuSubTrigger>
+                    <Download class="size-4 mr-2" />
+                    Download
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                      <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                      <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                      <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
+                  <ExternalLink class="size-4 mr-2" />
+                  Book Details
+                </DropdownMenuItem>
+                <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
+                <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+                  <DropdownMenuSubTrigger>
                     <Pencil class="size-4 mr-2" />
-                    Edit Metadata
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="anyRefreshing" @click="refreshWithFeedback(book.id)">
-                    <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
-                    <RefreshCw v-else class="size-4 mr-2" />
-                    Refresh Metadata
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
-                    <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
-                    <Image v-else class="size-4 mr-2" />
-                    Regenerate Cover
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem @click="emit('action', 'add-to-collection')">
-                <FolderPlus class="size-4 mr-2" />
-                Add to Collection
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <component
-                    :is="STATUS_ICONS[localReadStatus ?? 'unread']"
-                    class="size-4 mr-2"
-                    :class="STATUS_COLORS[localReadStatus ?? 'unread']"
-                  />
-                  Set Status
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
-                    <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                    {{ opt.label }}
-                    <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
-                <Send class="size-4 mr-2" />
-                Send via Email
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                v-if="hasPermission('library_delete_books')"
-                class="text-destructive focus:text-destructive"
-                @click="emit('action', 'delete')"
-              >
-                <Trash2 class="size-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    Metadata
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
+                      <Pencil class="size-4 mr-2" />
+                      Edit Metadata
+                    </DropdownMenuItem>
+                    <DropdownMenuItem :disabled="anyRefreshing" @click="refreshWithFeedback(book.id)">
+                      <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
+                      <RefreshCw v-else class="size-4 mr-2" />
+                      Refresh Metadata
+                    </DropdownMenuItem>
+                    <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
+                      <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
+                      <Image v-else class="size-4 mr-2" />
+                      Regenerate Cover
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem @click="emit('action', 'add-to-collection')">
+                  <FolderPlus class="size-4 mr-2" />
+                  Add to Collection
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <component
+                      :is="STATUS_ICONS[localReadStatus ?? 'unread']"
+                      class="size-4 mr-2"
+                      :class="STATUS_COLORS[localReadStatus ?? 'unread']"
+                    />
+                    Set Status
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
+                      <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+                      {{ opt.label }}
+                      <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
+                  <Send class="size-4 mr-2" />
+                  Send via Email
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  v-if="hasPermission('library_delete_books')"
+                  class="text-destructive focus:text-destructive"
+                  @click="emit('action', 'delete')"
+                >
+                  <Trash2 class="size-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </div>

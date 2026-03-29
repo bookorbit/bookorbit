@@ -1,14 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { RecommendationService } from './recommendation.service';
-
-vi.mock('../book/utils/assemble-book-cards', () => ({
-  assembleBookCards: vi.fn(),
-}));
-
-const mockedAssembleBookCards = vi.mocked(assembleBookCards);
 
 function makeUser(isSuperuser = false): RequestUser {
   return {
@@ -35,7 +28,7 @@ function makeService() {
   };
   const bookRepo = {
     findLibraryIdByBookId: vi.fn(),
-    findCards: vi.fn(),
+    findRecommendationTitlesByBookIds: vi.fn(),
   };
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
@@ -51,10 +44,6 @@ function makeService() {
 }
 
 describe('RecommendationService', () => {
-  beforeEach(() => {
-    mockedAssembleBookCards.mockReset();
-  });
-
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -124,24 +113,16 @@ describe('RecommendationService', () => {
       { bookId: 100, authorNames: ['Frank Herbert'], genreTagNames: ['Sci-Fi'] },
       { bookId: 200, authorNames: [], genreTagNames: [] },
     ]);
-    bookRepo.findCards.mockResolvedValue({
-      rows: [{ id: 100 }, { id: 200 }],
-      authorRows: [],
-      fileRows: [],
-      genreRows: [],
-      tagRows: [],
-      progressRows: [],
-      total: 2,
-    });
-    mockedAssembleBookCards.mockReturnValue([{ id: 200, title: 'Second' } as never, { id: 100, title: 'First' } as never]);
+    bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
+      { id: 200, title: 'Second' },
+      { id: 100, title: 'First' },
+    ]);
 
     const result = await service.getRecommendations(9, makeUser());
 
     expect(result).toHaveLength(2);
-    expect(result[0].book.id).toBe(100);
-    expect(result[1].book.id).toBe(200);
-    expect(result[0].score).toBeCloseTo(0.825, 6);
-    expect(result[1].score).toBeCloseTo(0.05, 6);
+    expect(result[0]).toEqual({ id: 100, title: 'First' });
+    expect(result[1]).toEqual({ id: 200, title: 'Second' });
   });
 
   it('filters out ANN results that cannot be mapped to cards', async () => {
@@ -163,14 +144,12 @@ describe('RecommendationService', () => {
       { bookId: 10, authorNames: [], genreTagNames: [] },
       { bookId: 11, authorNames: [], genreTagNames: [] },
     ]);
-    bookRepo.findCards.mockResolvedValue({ rows: [], authorRows: [], fileRows: [], genreRows: [], tagRows: [], progressRows: [], total: 0 });
-    mockedAssembleBookCards.mockReturnValue([{ id: 11, title: 'Only Card' } as never]);
+    bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([{ id: 11, title: 'Only Card' }]);
 
     const result = await service.getRecommendations(2, makeUser());
 
     expect(result).toHaveLength(1);
-    expect(result[0].book).toEqual({ id: 11, title: 'Only Card' });
-    expect(result[0].score).toBeCloseTo(0.425, 6);
+    expect(result[0]).toEqual({ id: 11, title: 'Only Card' });
   });
 
   it('limits rescored output to 25 candidates before loading cards', async () => {
@@ -194,26 +173,11 @@ describe('RecommendationService', () => {
 
     recRepo.findAnnCandidates.mockResolvedValue(candidates);
     recRepo.getCandidateMetadata.mockResolvedValue(candidates.map((c) => ({ bookId: c.bookId, authorNames: [], genreTagNames: [] })));
-    bookRepo.findCards.mockResolvedValue({
-      rows: Array.from({ length: 30 }, (_, i) => ({ id: i + 1 })),
-      authorRows: [],
-      fileRows: [],
-      genreRows: [],
-      tagRows: [],
-      progressRows: [],
-      total: 30,
-    });
-    mockedAssembleBookCards.mockReturnValue(Array.from({ length: 30 }, (_, i) => ({ id: i + 1, title: `Book ${i + 1}` })) as never);
+    bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue(Array.from({ length: 30 }, (_, i) => ({ id: i + 1, title: `Book ${i + 1}` })));
 
     const result = await service.getRecommendations(8, makeUser());
 
     expect(result).toHaveLength(25);
-    expect(bookRepo.findCards).toHaveBeenCalledWith(
-      expect.objectContaining({
-        limit: 25,
-        offset: 0,
-        userId: 12,
-      }),
-    );
+    expect(bookRepo.findRecommendationTitlesByBookIds).toHaveBeenCalledWith(Array.from({ length: 25 }, (_, i) => i + 1));
   });
 });

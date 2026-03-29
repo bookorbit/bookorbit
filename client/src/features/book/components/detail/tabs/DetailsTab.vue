@@ -52,6 +52,7 @@ type ProviderLink = {
 }
 
 const props = defineProps<{ book: BookDetail }>()
+const emit = defineEmits<{ saved: [BookDetail] }>()
 const router = useRouter()
 
 const addToCollectionOpen = ref(false)
@@ -292,6 +293,9 @@ async function setRating(star: number) {
       body: JSON.stringify({ rating: newRating }),
     })
     if (!res.ok) throw new Error()
+    const updated = (await res.json()) as BookDetail
+    localRating.value = updated.rating ?? null
+    emit('saved', updated)
   } catch {
     localRating.value = props.book.rating ?? null
   }
