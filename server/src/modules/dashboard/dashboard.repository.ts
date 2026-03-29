@@ -5,7 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { BookCard } from '@projectx/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, bookTags, genres, readingProgress, tags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, genres, readingProgress } from '../../db/schema';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -30,10 +30,10 @@ export class DashboardRepository {
 
   private async fetchSupplementary(bookIds: number[], userId: number) {
     if (bookIds.length === 0) {
-      return { authorRows: [], fileRows: [], genreRows: [], tagRows: [], progressRows: [] };
+      return { authorRows: [], fileRows: [], genreRows: [], progressRows: [] };
     }
 
-    const [authorRows, fileRows, genreRows, tagRows, primaryRows] = await Promise.all([
+    const [authorRows, fileRows, genreRows, primaryRows] = await Promise.all([
       this.db
         .select({ bookId: bookAuthors.bookId, name: authors.name })
         .from(bookAuthors)
@@ -49,11 +49,6 @@ export class DashboardRepository {
         .from(bookGenres)
         .innerJoin(genres, eq(genres.id, bookGenres.genreId))
         .where(inArray(bookGenres.bookId, bookIds)),
-      this.db
-        .select({ bookId: bookTags.bookId, name: tags.name })
-        .from(bookTags)
-        .innerJoin(tags, eq(tags.id, bookTags.tagId))
-        .where(inArray(bookTags.bookId, bookIds)),
       this.db.select({ id: books.id, primaryFileId: books.primaryFileId }).from(books).where(inArray(books.id, bookIds)),
     ]);
 
@@ -66,7 +61,7 @@ export class DashboardRepository {
             .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
         : [];
 
-    return { authorRows, fileRows, genreRows, tagRows, progressRows };
+    return { authorRows, fileRows, genreRows, progressRows };
   }
 
   async findRecentlyAdded(accessibleLibraryIds: number[], userId: number, limit: number): Promise<BookCard[]> {
@@ -79,8 +74,8 @@ export class DashboardRepository {
       .limit(limit);
 
     const bookIds = rows.map((r) => r.id);
-    const { authorRows, fileRows, genreRows, tagRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
-    return assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
+    const { authorRows, fileRows, genreRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
+    return assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows);
   }
 
   async findContinueReading(accessibleLibraryIds: number[], userId: number, limit: number): Promise<BookCard[]> {
@@ -106,8 +101,8 @@ export class DashboardRepository {
     const rows = rawRows.filter((r) => !seen.has(r.id) && seen.add(r.id));
 
     const bookIds = rows.map((r) => r.id);
-    const { authorRows, fileRows, genreRows, tagRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
-    return assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
+    const { authorRows, fileRows, genreRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
+    return assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows);
   }
 
   async findRandom(accessibleLibraryIds: number[], userId: number, limit: number): Promise<BookCard[]> {
@@ -125,7 +120,7 @@ export class DashboardRepository {
     const rows = rawRows.filter((r) => !seen.has(r.id) && seen.add(r.id));
 
     const bookIds = rows.map((r) => r.id);
-    const { authorRows, fileRows, genreRows, tagRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
-    return assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows);
+    const { authorRows, fileRows, genreRows, progressRows } = await this.fetchSupplementary(bookIds, userId);
+    return assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows);
   }
 }

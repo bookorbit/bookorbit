@@ -69,6 +69,7 @@ const seriesLine = computed(() => {
 
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
+const isAudiobook = computed(() => readableFiles.value.some((f) => FORMAT_TO_GROUP[f.format!] === 'audio'))
 
 // For multi-file audiobooks, collapse all tracks into one representative entry.
 // The audio reader loads the full track queue from the book, so opening any track is equivalent.
@@ -308,7 +309,7 @@ async function handleSetStatus(status: ReadStatus) {
 
       <!-- Audiobook badge - bottom-left, distinct from series/read-status badges at top-left -->
       <div
-        v-if="book.durationSeconds != null && !selectionMode"
+        v-if="isAudiobook && !selectionMode"
         class="absolute bottom-5 left-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
       >
         <span class="flex items-center gap-0.5 bg-black/60 text-white rounded px-1.5 py-0.5">
@@ -319,7 +320,7 @@ async function handleSetStatus(status: ReadStatus) {
       <!-- Reading progress bar - bottom edge -->
       <div
         v-if="showProgressBar && !selectionMode"
-        class="absolute bottom-0 left-0 z-10 h-[3px] transition-all duration-300"
+        class="absolute bottom-0 left-0 z-10 h-0.75 transition-all duration-300"
         :class="book.readingProgress === 100 ? 'bg-green-500/80' : 'bg-primary/70'"
         :style="{ width: `${book.readingProgress}%` }"
       />
@@ -347,7 +348,7 @@ async function handleSetStatus(status: ReadStatus) {
       </div>
 
       <!-- Title + author (no-cover fallback, always visible when cover absent) -->
-      <div v-if="!coverLoaded" class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+      <div v-if="!coverLoaded" class="absolute bottom-0 left-0 right-0 p-2 bg-linear-to-t from-black/60 to-transparent">
         <p class="text-xs font-bold leading-tight" :class="hoverTitleClampClass" :style="{ color: coverStyle.color }">
           {{ book.title ?? '-' }}
         </p>

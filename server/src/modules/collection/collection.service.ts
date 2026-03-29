@@ -110,7 +110,7 @@ export class CollectionService {
 
     const bookIds = bookIdRows.map((r) => r.bookId);
     const where = inArray(books.id, bookIds);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy: [],
       limit: size,
@@ -118,6 +118,6 @@ export class CollectionService {
       userId: user.id,
     });
 
-    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows), total, page, size };
+    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows), total, page, size };
   }
 }

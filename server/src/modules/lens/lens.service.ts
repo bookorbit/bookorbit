@@ -100,7 +100,7 @@ export class LensService {
 
     const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy((lens.defaultSort as SortSpec[]) ?? []);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: size,
@@ -108,6 +108,6 @@ export class LensService {
       userId: user.id,
     });
 
-    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows), total, page, size };
+    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows), total, page, size };
   }
 }

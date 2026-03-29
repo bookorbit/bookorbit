@@ -113,7 +113,7 @@ export class BookService {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
@@ -121,7 +121,7 @@ export class BookService {
       userId: user.id,
     });
     return {
-      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows),
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
       total,
       page: query.pagination.page,
       size: query.pagination.size,
@@ -133,7 +133,7 @@ export class BookService {
     const accessibleLibraryIds = libs.map((l) => l.id);
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort);
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: query.pagination.size,
@@ -141,7 +141,7 @@ export class BookService {
       userId: user.id,
     });
     return {
-      items: assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows),
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
       total,
       page: query.pagination.page,
       size: query.pagination.size,

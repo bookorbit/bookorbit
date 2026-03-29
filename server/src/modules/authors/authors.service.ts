@@ -106,7 +106,7 @@ export class AuthorsService {
     }
 
     const orderMap = new Map(page.bookIds.map((id, index) => [id, index]));
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows } = await this.bookRepo.findCards({
       where: inArray(books.id, page.bookIds),
       orderBy: [],
       limit: page.bookIds.length,
@@ -114,7 +114,7 @@ export class AuthorsService {
       userId: user.id,
     });
 
-    const items = assembleBookCards(rows, authorRows, fileRows, genreRows, tagRows, progressRows).sort(
+    const items = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows).sort(
       (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
     );
 

@@ -38,13 +38,10 @@ const missingBook: BookCard = {
   publishedYear: null,
   language: null,
   genres: [],
-  tags: [],
   rating: null,
   readingProgress: null,
   readStatus: null,
-  metadataScore: null,
   addedAt: '2026-01-01T00:00:00.000Z',
-  durationSeconds: null,
 }
 
 const presentBook: BookCard = {
@@ -58,13 +55,10 @@ const presentBook: BookCard = {
   publishedYear: 2024,
   language: 'en',
   genres: ['Fiction'],
-  tags: [],
   rating: null,
   readingProgress: null,
   readStatus: null,
-  metadataScore: null,
   addedAt: '2026-01-01T00:00:00.000Z',
-  durationSeconds: null,
 }
 
 describe('BookListRow — missing state', () => {

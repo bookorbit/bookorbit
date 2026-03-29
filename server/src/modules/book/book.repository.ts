@@ -63,7 +63,6 @@ export class BookRepository {
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
           rating: bookMetadata.rating,
-          metadataScore: bookMetadata.metadataScore,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -76,7 +75,7 @@ export class BookRepository {
 
     const bookIds = rows.map((r) => r.id);
 
-    const [authorRows, fileRows, genreRows, tagRows] = await Promise.all([
+    const [authorRows, fileRows, genreRows] = await Promise.all([
       bookIds.length > 0
         ? this.db
             .select({ bookId: bookAuthors.bookId, name: authors.name })
@@ -97,13 +96,6 @@ export class BookRepository {
             .from(bookGenres)
             .innerJoin(genres, eq(genres.id, bookGenres.genreId))
             .where(inArray(bookGenres.bookId, bookIds))
-        : [],
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookTags.bookId, name: tags.name })
-            .from(bookTags)
-            .innerJoin(tags, eq(tags.id, bookTags.tagId))
-            .where(inArray(bookTags.bookId, bookIds))
         : [],
     ]);
 
@@ -130,7 +122,7 @@ export class BookRepository {
         : Promise.resolve([]),
     ]);
 
-    return { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, total: Number(total) };
+    return { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total: Number(total) };
   }
 
   async findById(id: number) {

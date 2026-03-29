@@ -38,13 +38,10 @@ export type BookCard = {
   publishedYear: number | null;
   language: string | null;
   genres: string[];
-  tags: string[];
   rating: number | null;
   readingProgress: number | null;
   readStatus: UserBookStatus | null;
-  metadataScore: number | null;
   addedAt: string;
-  durationSeconds: number | null;
 };
 
 export type BookDetailFile = {

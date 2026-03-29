@@ -14,8 +14,6 @@ type BookRow = {
   publishedYear: number | null;
   language: string | null;
   rating: number | null;
-  metadataScore?: number | null;
-  durationSeconds?: number | null;
 };
 
 type NameRow = { bookId: number; name: string };
@@ -35,7 +33,6 @@ export function assembleBookCards(
   authorRows: NameRow[],
   fileRows: FileRow[],
   genreRows: NameRow[],
-  tagRows: NameRow[],
   progressRows: ProgressRow[],
   statusRows: StatusRow[] = [],
 ): BookCard[] {
@@ -58,13 +55,6 @@ export function assembleBookCards(
     const list = genresByBook.get(row.bookId) ?? [];
     list.push(row.name);
     genresByBook.set(row.bookId, list);
-  }
-
-  const tagsByBook = new Map<number, string[]>();
-  for (const row of tagRows) {
-    const list = tagsByBook.get(row.bookId) ?? [];
-    list.push(row.name);
-    tagsByBook.set(row.bookId, list);
   }
 
   const progressByFileId = new Map<number, number | null>();
@@ -105,13 +95,10 @@ export function assembleBookCards(
       publishedYear: row.publishedYear ?? null,
       language: row.language ?? null,
       genres: genresByBook.get(row.id) ?? [],
-      tags: tagsByBook.get(row.id) ?? [],
       rating: row.rating ?? null,
-      metadataScore: row.metadataScore !== undefined ? (row.metadataScore ?? null) : null,
       readingProgress,
       readStatus: statusByBookId.get(row.id) ?? null,
       addedAt: row.addedAt.toISOString(),
-      durationSeconds: row.durationSeconds ?? null,
     };
   });
 }
