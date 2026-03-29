@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookDetail } from '@projectx/types'
+import { FORMAT_TO_GROUP, type BookDetail } from '@projectx/types'
 
 export function useMetadataEditor() {
   const saving = ref(false)
@@ -47,6 +47,7 @@ export function useMetadataEditor() {
   })
 
   const snapshot = ref(JSON.stringify(form))
+  const includeAudioMetadata = ref(false)
 
   const isDirty = computed(() => JSON.stringify(form) !== snapshot.value)
 
@@ -66,9 +67,9 @@ export function useMetadataEditor() {
     form.authors = book.authors.map((a) => a.name)
     form.genres = [...book.genres]
     form.tags = [...book.tags]
-    form.narrators = book.narrators?.map((n) => n.name) ?? []
-    form.durationSeconds = book.durationSeconds ?? null
-    form.abridged = book.abridged ?? false
+    form.narrators = book.audioMetadata?.narrators?.map((n) => n.name) ?? []
+    form.durationSeconds = book.audioMetadata?.durationSeconds ?? null
+    form.abridged = book.audioMetadata?.abridged ?? false
     form.googleBooksId = book.providerIds.google ?? null
     form.goodreadsId = book.providerIds.goodreads ?? null
     form.amazonId = book.providerIds.amazon ?? null
@@ -89,6 +90,7 @@ export function useMetadataEditor() {
     form.comicCharacters = cm?.characters ?? []
     form.comicTeams = cm?.teams ?? []
     form.comicLocations = cm?.locations ?? []
+    includeAudioMetadata.value = book.audioMetadata != null || book.files.some((f) => f.format != null && FORMAT_TO_GROUP[f.format] === 'audio')
     snapshot.value = JSON.stringify(form)
     error.value = null
   }
@@ -112,9 +114,12 @@ export function useMetadataEditor() {
       comicCharacters,
       comicTeams,
       comicLocations,
+      narrators,
+      durationSeconds,
+      abridged,
       ...rest
     } = form
-    return {
+    const payload = {
       ...rest,
       comicMetadata: {
         issueNumber: comicIssueNumber ?? undefined,
@@ -130,6 +135,17 @@ export function useMetadataEditor() {
         locations: comicLocations,
       },
     }
+    if (includeAudioMetadata.value) {
+      return {
+        ...payload,
+        audioMetadata: {
+          narrators,
+          durationSeconds,
+          abridged,
+        },
+      }
+    }
+    return payload
   }
 
   async function save(bookId: number): Promise<BookDetail | null> {

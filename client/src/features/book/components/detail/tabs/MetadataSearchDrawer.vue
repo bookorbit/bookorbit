@@ -37,9 +37,9 @@ const currentSource = computed<MetadataSource>(() => ({
   isbn13: props.book.isbn13,
   authors: props.book.authors.map((a) => a.name),
   genres: props.book.genres,
-  narrators: props.book.narrators.map((n) => n.name),
-  durationSeconds: props.book.durationSeconds,
-  abridged: props.book.abridged,
+  narrators: props.book.audioMetadata?.narrators.map((n) => n.name) ?? [],
+  durationSeconds: props.book.audioMetadata?.durationSeconds ?? null,
+  abridged: props.book.audioMetadata?.abridged ?? null,
 }))
 
 const {

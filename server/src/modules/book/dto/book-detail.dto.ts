@@ -11,6 +11,13 @@ export class BookFileDto {
   durationSeconds: number | null;
 }
 
+export class AudioMetadataDto {
+  narrators: NarratorRef[];
+  durationSeconds: number | null;
+  abridged: boolean;
+  chapters: AudiobookChapter[] | null;
+}
+
 export class BookDetailDto {
   id: number;
   libraryId: number;
@@ -33,16 +40,13 @@ export class BookDetailDto {
   coverSource: 'extracted' | 'custom' | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
-  narrators: NarratorRef[];
   genres: string[];
   tags: string[];
   files: BookFileDto[];
   lastWrittenAt: Date | null;
   metadataScore: number | null;
   readStatus: UserBookStatus | null;
-  durationSeconds: number | null;
-  abridged: boolean;
-  chapters: AudiobookChapter[] | null;
+  audioMetadata: AudioMetadataDto | null;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
 }

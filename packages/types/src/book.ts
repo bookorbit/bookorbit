@@ -60,6 +60,13 @@ export type BookDetailFile = {
 
 export type ProviderIds = Partial<Record<MetadataProviderKey, string | null>>;
 
+export type AudioMetadata = {
+  narrators: NarratorRef[];
+  durationSeconds: number | null;
+  abridged: boolean;
+  chapters: AudiobookChapter[] | null;
+};
+
 export type BookDetail = {
   id: number;
   libraryId: number;
@@ -82,16 +89,13 @@ export type BookDetail = {
   coverSource: "extracted" | "custom" | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
-  narrators: NarratorRef[];
   genres: string[];
   tags: string[];
   files: BookDetailFile[];
   lastWrittenAt: string | null;
   metadataScore: number | null;
   readStatus: UserBookStatus | null;
-  durationSeconds: number | null;
-  abridged: boolean;
-  chapters: AudiobookChapter[] | null;
+  audioMetadata: AudioMetadata | null;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
 };

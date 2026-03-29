@@ -401,7 +401,7 @@ function setSleepTimer(minutes: number) {
 
 function setEndOfChapterSleep() {
   // If there are no chapters to watch, fall back to a 30-minute timer.
-  if (!detail.value?.chapters?.length) {
+  if (!detail.value?.audioMetadata?.chapters?.length) {
     setSleepTimer(30)
     return
   }
@@ -467,8 +467,8 @@ const progressPct = computed(() => {
 })
 
 const chapterTicks = computed(() => {
-  if (!detail.value?.chapters?.length || !totalBookDuration.value) return []
-  return detail.value.chapters
+  if (!detail.value?.audioMetadata?.chapters?.length || !totalBookDuration.value) return []
+  return detail.value.audioMetadata.chapters
     .filter((ch) => ch.startMs > 0)
     .map((ch) => ({
       startMs: ch.startMs,
@@ -487,7 +487,7 @@ const bookmarkTicks = computed(() => {
 })
 
 const chapterDurations = computed<number[]>(() => {
-  const chapters = detail.value?.chapters
+  const chapters = detail.value?.audioMetadata?.chapters
   if (!chapters?.length) return []
   return chapters.map((ch, i) => {
     const nextStartMs = chapters[i + 1]?.startMs ?? totalBookDuration.value * 1000
@@ -498,7 +498,7 @@ const chapterDurations = computed<number[]>(() => {
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0] as const
 
 const currentChapter = computed<AudiobookChapter | null>(() => {
-  const chapters = detail.value?.chapters
+  const chapters = detail.value?.audioMetadata?.chapters
   if (!chapters?.length) return null
   const pos = absolutePositionMs.value
   let current: AudiobookChapter | null = null
@@ -511,7 +511,7 @@ const currentChapter = computed<AudiobookChapter | null>(() => {
 
 const scrubberHoverChapter = computed<AudiobookChapter | null>(() => {
   if (scrubberHoverSeconds.value === null) return null
-  const chapters = detail.value?.chapters
+  const chapters = detail.value?.audioMetadata?.chapters
   if (!chapters?.length) return null
   const posMs = scrubberHoverSeconds.value * 1000
   let cur: AudiobookChapter | null = null
@@ -570,8 +570,8 @@ onMounted(async () => {
     ])
     if (!mounted) return
     detail.value = detailRes
-    if (detailRes.chapters) {
-      detailRes.chapters.sort((a, b) => a.startMs - b.startMs)
+    if (detailRes.audioMetadata?.chapters) {
+      detailRes.audioMetadata.chapters.sort((a, b) => a.startMs - b.startMs)
     }
 
     if ('mediaSession' in navigator) {
@@ -658,8 +658,8 @@ onMounted(async () => {
           </button>
           <div class="flex-1 min-w-0 px-1">
             <p class="text-sm font-semibold truncate">{{ detail.title ?? 'Untitled' }}</p>
-            <p v-if="detail.narrators.length" class="text-xs text-white/55 truncate">
-              {{ detail.narrators.map((n) => n.name).join(', ') }}
+            <p v-if="detail.audioMetadata?.narrators.length" class="text-xs text-white/55 truncate">
+              {{ detail.audioMetadata.narrators.map((n) => n.name).join(', ') }}
             </p>
           </div>
           <!-- Bookmark toggle -->
@@ -993,9 +993,9 @@ onMounted(async () => {
 
           <!-- Chapters list -->
           <div v-if="chaptersTab === 'chapters'" class="flex-1 overflow-y-auto">
-            <div v-if="detail.chapters?.length">
+            <div v-if="detail.audioMetadata?.chapters?.length">
               <button
-                v-for="(chapter, i) in detail.chapters"
+                v-for="(chapter, i) in detail.audioMetadata.chapters"
                 :key="chapter.startMs"
                 class="w-full text-left px-5 py-3 hover:bg-white/10 transition-colors text-sm"
                 :class="currentChapter?.startMs === chapter.startMs ? 'text-white font-semibold' : 'text-white/65'"

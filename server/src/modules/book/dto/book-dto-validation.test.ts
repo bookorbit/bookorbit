@@ -17,6 +17,11 @@ async function errorsFor<T extends object>(cls: new () => T, value: Record<strin
   return validate(dto);
 }
 
+async function strictErrorsFor<T extends object>(cls: new () => T, value: Record<string, unknown>) {
+  const dto = plainToInstance(cls, value);
+  return validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+}
+
 describe('Book DTO validation', () => {
   it('validates book id array DTOs require non-empty integer arrays', async () => {
     expect((await errorsFor(BulkBookIdsDto, { bookIds: [1, 2] })).length).toBe(0);
@@ -84,6 +89,29 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'english-too-long' })).length).toBeGreaterThan(0);
+  });
+
+  it('rejects legacy top-level audiobook fields and accepts nested audioMetadata', async () => {
+    const legacyErrors = await strictErrorsFor(UpdateBookMetadataDto, {
+      narrators: ['Narrator One'],
+      durationSeconds: 3600,
+      abridged: true,
+      chapters: [{ title: 'Chapter 1', startMs: 0 }],
+    });
+
+    expect(legacyErrors.length).toBeGreaterThan(0);
+    expect(legacyErrors.map((e) => e.property)).toEqual(expect.arrayContaining(['narrators', 'durationSeconds', 'abridged', 'chapters']));
+
+    const nestedErrors = await strictErrorsFor(UpdateBookMetadataDto, {
+      audioMetadata: {
+        narrators: ['Narrator One'],
+        durationSeconds: 3600,
+        abridged: true,
+        chapters: [{ title: 'Chapter 1', startMs: 0 }],
+      },
+    });
+
+    expect(nestedErrors.length).toBe(0);
   });
 
   it('allows optional null rating reset and rejects out-of-range values', async () => {

@@ -25,6 +25,12 @@ export interface MetadataRefreshPreview {
   itunesId?: string | null
   audibleId?: string | null
   comicvineId?: string | null
+  audioMetadata?: {
+    narrators?: string[]
+    durationSeconds?: number | null
+    abridged?: boolean | null
+    chapters?: { title: string; startMs: number; durationMs?: number | null }[]
+  }
   comicMetadata?: ComicMetadataFields
 }
 

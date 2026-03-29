@@ -443,6 +443,46 @@ describe('BookService', () => {
       });
     });
 
+    it('refreshMetadata preview nests audiobook fields under audioMetadata', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: {
+          title: 'Resolved',
+          narrators: ['Narrator One'],
+          duration: 3600,
+          abridged: true,
+          chapters: [{ title: 'Chapter 1', startMs: 0 }],
+        },
+        sources: {},
+        providerIds: {},
+      });
+
+      const result = await service.refreshMetadata(1, true, user);
+
+      expect(result).toEqual({
+        title: 'Resolved',
+        audioMetadata: {
+          narrators: ['Narrator One'],
+          durationSeconds: 3600,
+          abridged: true,
+          chapters: [{ title: 'Chapter 1', startMs: 0 }],
+        },
+      });
+      expect((result as Record<string, unknown>).narrators).toBeUndefined();
+      expect((result as Record<string, unknown>).duration).toBeUndefined();
+      expect((result as Record<string, unknown>).abridged).toBeUndefined();
+      expect((result as Record<string, unknown>).chapters).toBeUndefined();
+    });
+
     it('refreshMetadata persists provider ids returned by pipeline', async () => {
       const { service, bookRepo, pipeline } = makeService();
       const user = makeUser();
@@ -473,6 +513,48 @@ describe('BookService', () => {
           title: 'Resolved',
           googleBooksId: 'g-id',
           openLibraryId: 'ol-id',
+        },
+        user,
+      );
+    });
+
+    it('refreshMetadata persists audiobook fields under audioMetadata', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: {
+          title: 'Resolved',
+          narrators: ['Narrator One'],
+          duration: 3600,
+          abridged: false,
+          chapters: [{ title: 'Chapter 1', startMs: 0 }],
+        },
+        sources: {},
+        providerIds: {},
+      });
+
+      const updateSpy = vi.spyOn(service, 'updateMetadata').mockResolvedValue({ id: 1 } as never);
+
+      await service.refreshMetadata(1, false, user);
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        {
+          title: 'Resolved',
+          audioMetadata: {
+            narrators: ['Narrator One'],
+            durationSeconds: 3600,
+            abridged: false,
+            chapters: [{ title: 'Chapter 1', startMs: 0 }],
+          },
         },
         user,
       );

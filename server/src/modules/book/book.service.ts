@@ -351,9 +351,12 @@ export class BookService {
       if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
       if ('itunesId' in dto) scalarFields.itunesId = dto.itunesId ?? null;
       if ('audibleId' in dto) scalarFields.audibleId = dto.audibleId ?? null;
-      if ('durationSeconds' in dto) scalarFields.durationSeconds = dto.durationSeconds ?? null;
-      if ('abridged' in dto) scalarFields.abridged = dto.abridged ?? false;
       if ('comicvineId' in dto) scalarFields.comicvineId = dto.comicvineId ?? null;
+      if (dto.audioMetadata) {
+        if ('durationSeconds' in dto.audioMetadata) scalarFields.durationSeconds = dto.audioMetadata.durationSeconds ?? null;
+        if ('abridged' in dto.audioMetadata) scalarFields.abridged = dto.audioMetadata.abridged ?? false;
+        if ('chapters' in dto.audioMetadata) scalarFields.chapters = dto.audioMetadata.chapters ?? null;
+      }
 
       const scalarFieldCount = Object.keys(scalarFields).length;
       if (scalarFieldCount > 0) {
@@ -371,8 +374,8 @@ export class BookService {
           dto.authors.map((name) => ({ name, sortName: null })),
         );
       }
-      if (dto.narrators !== undefined) {
-        await this.narratorService.replaceForBook(id, dto.narrators);
+      if (dto.audioMetadata?.narrators !== undefined) {
+        await this.narratorService.replaceForBook(id, dto.audioMetadata.narrators);
       }
       if (dto.genres !== undefined) {
         await this.metadataService.replaceGenres(id, dto.genres);
@@ -386,7 +389,7 @@ export class BookService {
       this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
       const detail = await this.getDetail(id, user);
       this.logger.log(
-        `[${event}] [end] bookId=${id} durationMs=${Date.now() - startedAt} scalarFields=${scalarFieldCount} authorsUpdated=${dto.authors !== undefined} narratorsUpdated=${dto.narrators !== undefined} genresUpdated=${dto.genres !== undefined} tagsUpdated=${dto.tags !== undefined} comicMetadataUpdated=${dto.comicMetadata !== undefined} - metadata update completed`,
+        `[${event}] [end] bookId=${id} durationMs=${Date.now() - startedAt} scalarFields=${scalarFieldCount} authorsUpdated=${dto.authors !== undefined} narratorsUpdated=${dto.audioMetadata?.narrators !== undefined} genresUpdated=${dto.genres !== undefined} tagsUpdated=${dto.tags !== undefined} audioMetadataUpdated=${dto.audioMetadata !== undefined} comicMetadataUpdated=${dto.comicMetadata !== undefined} - metadata update completed`,
       );
       return detail;
     } catch (err) {
@@ -597,7 +600,29 @@ export class BookService {
           itunesId?: string;
           audibleId?: string;
           comicvineId?: string;
+          audioMetadata?: {
+            narrators?: string[];
+            durationSeconds?: number | null;
+            abridged?: boolean | null;
+            chapters?: AudiobookChapter[];
+          };
         } = { ...resolved };
+        if (
+          previewResult.narrators !== undefined ||
+          previewResult.duration !== undefined ||
+          previewResult.abridged !== undefined ||
+          previewResult.chapters !== undefined
+        ) {
+          previewResult.audioMetadata = {};
+          if (previewResult.narrators !== undefined) previewResult.audioMetadata.narrators = previewResult.narrators as string[];
+          if (previewResult.duration !== undefined) previewResult.audioMetadata.durationSeconds = previewResult.duration as number | null;
+          if (previewResult.abridged !== undefined) previewResult.audioMetadata.abridged = previewResult.abridged as boolean | null;
+          if (previewResult.chapters !== undefined) previewResult.audioMetadata.chapters = previewResult.chapters as AudiobookChapter[];
+          delete (previewResult as Record<string, unknown>).narrators;
+          delete (previewResult as Record<string, unknown>).duration;
+          delete (previewResult as Record<string, unknown>).abridged;
+          delete (previewResult as Record<string, unknown>).chapters;
+        }
         this.applyResolvedProviderIds(previewResult, resolvedProviderIds);
         this.logger.log(
           `[${event}] [end] bookId=${id} preview=true durationMs=${Date.now() - startedAt} resolvedFields=${Object.keys(previewResult).length} - refresh metadata completed`,
@@ -618,8 +643,13 @@ export class BookService {
       if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
       if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
       if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
-      if (r.duration !== undefined) dto.durationSeconds = r.duration as number | null;
-      if (r.abridged !== undefined) dto.abridged = r.abridged as boolean | null;
+      if (r.narrators !== undefined || r.duration !== undefined || r.abridged !== undefined || r.chapters !== undefined) {
+        dto.audioMetadata = {};
+        if (r.narrators !== undefined) dto.audioMetadata.narrators = r.narrators as string[];
+        if (r.duration !== undefined) dto.audioMetadata.durationSeconds = r.duration as number | null;
+        if (r.abridged !== undefined) dto.audioMetadata.abridged = r.abridged as boolean | null;
+        if (r.chapters !== undefined) dto.audioMetadata.chapters = r.chapters as NonNullable<typeof dto.audioMetadata.chapters>;
+      }
       if (r.comicMetadata !== undefined) dto.comicMetadata = r.comicMetadata as UpdateBookMetadataDto['comicMetadata'];
       this.applyResolvedProviderIds(dto, resolvedProviderIds);
 
@@ -800,6 +830,8 @@ export class BookService {
 
     const { book, authorRows, genreRows, tagRows, fileRows, narratorRows } = result;
     const meta = book.book_metadata;
+    const hasAudioFiles = fileRows.some((f) => f.format && isAudioFormat(f.format));
+    const resolvedChapters = this.resolveChapters(meta?.chapters as AudiobookChapter[] | null | undefined, fileRows);
 
     return {
       id: book.books.id,
@@ -832,7 +864,6 @@ export class BookService {
         [MetadataProviderKey.COMICVINE]: meta?.comicvineId ?? null,
       },
       authors: authorRows,
-      narrators: narratorRows.map((n, i) => ({ id: n.id, name: n.name, sortName: n.sortName, displayOrder: i })),
       genres: genreRows.map((g) => g.name),
       tags: tagRows.map((t) => t.name),
       files: fileRows.map((f) => ({
@@ -848,9 +879,14 @@ export class BookService {
       lastWrittenAt: meta?.lastWrittenAt ?? null,
       metadataScore: meta?.metadataScore ?? null,
       readStatus,
-      durationSeconds: meta?.durationSeconds ?? null,
-      abridged: meta?.abridged ?? false,
-      chapters: this.resolveChapters(meta?.chapters as AudiobookChapter[] | null | undefined, fileRows),
+      audioMetadata: hasAudioFiles
+        ? {
+            narrators: narratorRows.map((n, i) => ({ id: n.id, name: n.name, sortName: n.sortName, displayOrder: i })),
+            durationSeconds: meta?.durationSeconds ?? null,
+            abridged: meta?.abridged ?? false,
+            chapters: resolvedChapters,
+          }
+        : null,
       formatPriority: (book.libraries?.formatPriority as string[] | null) ?? [],
       comicMetadata: comicMeta
         ? {

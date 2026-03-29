@@ -152,6 +152,11 @@ async function autoFill() {
     if (preview.comicMetadata.teams !== undefined) form.comicTeams = preview.comicMetadata.teams
     if (preview.comicMetadata.locations !== undefined) form.comicLocations = preview.comicMetadata.locations
   }
+  if (preview.audioMetadata) {
+    if (preview.audioMetadata.narrators !== undefined) form.narrators = preview.audioMetadata.narrators
+    if (preview.audioMetadata.durationSeconds !== undefined) form.durationSeconds = preview.audioMetadata.durationSeconds
+    if (preview.audioMetadata.abridged !== undefined) form.abridged = !!preview.audioMetadata.abridged
+  }
   if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
 }
 </script>

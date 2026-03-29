@@ -1,6 +1,19 @@
 import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class AudiobookChapterDto {
+  @IsString() title!: string;
+  @IsInt() @Min(0) startMs!: number;
+  @IsOptional() @IsInt() @Min(0) durationMs?: number | null;
+}
+
+export class AudioMetadataDto {
+  @IsOptional() @IsArray() @IsString({ each: true }) narrators?: string[];
+  @IsOptional() @IsInt() @Min(0) durationSeconds?: number | null;
+  @IsOptional() @IsBoolean() abridged?: boolean | null;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AudiobookChapterDto) chapters?: AudiobookChapterDto[] | null;
+}
+
 export class ComicMetadataDto {
   @IsOptional() @IsString() @MaxLength(50) issueNumber?: string | null;
   @IsOptional() @IsString() @MaxLength(500) volumeName?: string | null;
@@ -29,7 +42,6 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
-  @IsOptional() @IsArray() @IsString({ each: true }) narrators?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
@@ -39,8 +51,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
   @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
   @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
-  @IsOptional() @IsInt() @Min(0) durationSeconds?: number | null;
-  @IsOptional() @IsBoolean() abridged?: boolean | null;
+  @IsOptional() @ValidateNested() @Type(() => AudioMetadataDto) audioMetadata?: AudioMetadataDto;
   @IsOptional() @IsString() @MaxLength(50) comicvineId?: string | null;
   @IsOptional() @ValidateNested() @Type(() => ComicMetadataDto) comicMetadata?: ComicMetadataDto;
 }

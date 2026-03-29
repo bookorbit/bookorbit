@@ -246,7 +246,7 @@ const openableFiles = computed(() => {
 })
 const hasMultipleFiles = computed(() => openableFiles.value.length > 1)
 const authorLine = computed(() => props.book.authors.map((a) => a.name).join(', ') || null)
-const narratorLine = computed(() => props.book.narrators?.map((n) => n.name).join(', ') || null)
+const narratorLine = computed(() => props.book.audioMetadata?.narrators?.map((n) => n.name).join(', ') || null)
 const formats = computed(() => {
   const all = [...new Set(props.book.files.filter((f) => f.format && FORMAT_TO_GROUP[f.format]).map((f) => f.format!))]
   const priority = props.book.formatPriority
@@ -1025,13 +1025,13 @@ watch(
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Pages</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ book.pageCount || '-' }}</dd>
         </div>
-        <div v-if="book.durationSeconds != null">
+        <div v-if="book.audioMetadata?.durationSeconds != null">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Duration</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ formatDuration(book.durationSeconds) }}</dd>
+          <dd class="text-sm text-foreground mt-0.5">{{ formatDuration(book.audioMetadata.durationSeconds) }}</dd>
         </div>
-        <div v-if="book.durationSeconds != null">
+        <div v-if="book.audioMetadata?.durationSeconds != null">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Edition</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ book.abridged ? 'Abridged' : 'Unabridged' }}</dd>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.audioMetadata.abridged ? 'Abridged' : 'Unabridged' }}</dd>
         </div>
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN</dt>
