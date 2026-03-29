@@ -6,12 +6,18 @@ export function useBookDetail() {
   const detail = ref<BookDetail | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const notFound = ref(false)
 
   async function fetch(bookId: number) {
     loading.value = true
     error.value = null
+    notFound.value = false
     try {
       const res = await api(`/api/v1/books/${bookId}`)
+      if (res.status === 404) {
+        notFound.value = true
+        return
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       detail.value = await res.json()
     } catch (e) {
@@ -21,5 +27,5 @@ export function useBookDetail() {
     }
   }
 
-  return { detail, loading, error, fetch }
+  return { detail, loading, error, notFound, fetch }
 }

@@ -23,6 +23,7 @@ import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { usePageTitle } from '@/composables/usePageTitle'
 import type { BookCard, GroupRule, SortField } from '@projectx/types'
+import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,7 +32,7 @@ const { viewMode, lensFilterExpanded } = useDisplaySettings()
 const lensId = computed(() => Number(route.params.id))
 const { coverSize, gridGap } = useViewDisplaySettings('lens', lensId)
 
-const { items: books, total, loading, hasMore, load } = useLens(lensId)
+const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useLens(lensId)
 const { setBookContext, registerLoadMore } = useBookNavigation()
 watch(
   [books, total],
@@ -53,6 +54,7 @@ onUnmounted(() => {
   registerLoadMore(null)
 })
 const { lenses, fetchLenses, deleteLens } = useLenses()
+const lensNotFound = ref(false)
 
 const lens = computed(() => lenses.value.find((l) => l.id === lensId.value))
 const pageTitle = computed(() => {
@@ -183,7 +185,7 @@ onMounted(async () => {
 
   await fetchLenses()
   if (!lens.value) {
-    router.push({ name: 'home' })
+    lensNotFound.value = true
     return
   }
   load(true)
@@ -278,80 +280,90 @@ watch(
     </ViewHeader>
 
     <main class="flex-1 min-h-0">
-      <!-- Filter summary -->
-      <div
-        v-if="filterExpanded && (lens?.filter || sortChip)"
-        class="flex flex-wrap items-center gap-2 mb-4 cursor-pointer"
-        @click="editorOpen = true"
-      >
-        <FilterSummary v-if="lens?.filter" :node="lens.filter as GroupRule" />
-        <span v-if="sortChip" class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden">
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
-            <ArrowUpDown :size="10" class="shrink-0" />
-            <span class="font-semibold">Sort</span>
-          </span>
-          <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
-        </span>
-      </div>
+      <EntityNotFound v-if="lensNotFound" entity="Lens" />
 
-      <!-- Empty state: no rules configured -->
-      <div v-if="!loading && !lens?.filter && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
-        <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <Settings2 :size="28" class="text-muted-foreground/70" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <p class="text-sm font-medium text-foreground">No rules configured</p>
-          <p class="text-xs text-muted-foreground max-w-xs">
-            Open the editor to define which books appear in this lens using filters and sort rules.
-          </p>
-        </div>
-        <button
+      <template v-else>
+        <!-- Filter summary -->
+        <div
+          v-if="filterExpanded && (lens?.filter || sortChip)"
+          class="flex flex-wrap items-center gap-2 mb-4 cursor-pointer"
           @click="editorOpen = true"
-          class="h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
-          Configure Lens
-        </button>
-      </div>
-
-      <!-- Empty state: rules set but no matches -->
-      <div v-else-if="!loading && books.length === 0 && lens?.filter" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
-        <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <Aperture :size="28" class="text-muted-foreground/70" />
+          <FilterSummary v-if="lens?.filter" :node="lens.filter as GroupRule" />
+          <span v-if="sortChip" class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
+              <ArrowUpDown :size="10" class="shrink-0" />
+              <span class="font-semibold">Sort</span>
+            </span>
+            <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
+          </span>
         </div>
-        <p class="text-sm font-medium text-foreground">No books match this lens</p>
-        <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>
-        <button @click="editorOpen = true" class="text-xs text-primary hover:underline">Edit Lens</button>
-      </div>
 
-      <!-- Grid view -->
-      <VirtualBookGrid
-        v-if="viewMode === 'grid' && books.length > 0"
-        :books="books"
-        :cover-size="coverSize"
-        :grid-gap="gridGap"
-        :selection-mode="selectionMode"
-        :is-selected="isSelected"
-        @action="handleBookAction"
-        @select="handleSelect"
-      />
+        <!-- Empty state: no rules configured -->
+        <div
+          v-if="booksInitialized && !loading && !lens?.filter && books.length === 0"
+          class="flex flex-col items-center justify-center py-24 gap-4 text-center"
+        >
+          <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+            <Settings2 :size="28" class="text-muted-foreground/70" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <p class="text-sm font-medium text-foreground">No rules configured</p>
+            <p class="text-xs text-muted-foreground max-w-xs">
+              Open the editor to define which books appear in this lens using filters and sort rules.
+            </p>
+          </div>
+          <button
+            @click="editorOpen = true"
+            class="h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            Configure Lens
+          </button>
+        </div>
 
-      <!-- List view -->
-      <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-        <BookListRow
-          v-for="book in books"
-          :key="book.id"
-          :book="book"
+        <!-- Empty state: rules set but no matches -->
+        <div
+          v-else-if="booksInitialized && !loading && books.length === 0 && lens?.filter"
+          class="flex flex-col items-center justify-center py-24 gap-3 text-center"
+        >
+          <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+            <Aperture :size="28" class="text-muted-foreground/70" />
+          </div>
+          <p class="text-sm font-medium text-foreground">No books match this lens</p>
+          <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>
+          <button @click="editorOpen = true" class="text-xs text-primary hover:underline">Edit Lens</button>
+        </div>
+
+        <!-- Grid view -->
+        <VirtualBookGrid
+          v-if="viewMode === 'grid' && books.length > 0"
+          :books="books"
+          :cover-size="coverSize"
+          :grid-gap="gridGap"
           :selection-mode="selectionMode"
-          :selected="isSelected(book.id)"
-          @select="handleSelect(book.id, $event)"
-          @action="handleBookAction(book, $event)"
+          :is-selected="isSelected"
+          @action="handleBookAction"
+          @select="handleSelect"
         />
-      </div>
 
-      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-        <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
-      </div>
+        <!-- List view -->
+        <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+          <BookListRow
+            v-for="book in books"
+            :key="book.id"
+            :book="book"
+            :selection-mode="selectionMode"
+            :selected="isSelected(book.id)"
+            @select="handleSelect(book.id, $event)"
+            @action="handleBookAction(book, $event)"
+          />
+        </div>
+
+        <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
+        </div>
+      </template>
     </main>
   </section>
 </template>

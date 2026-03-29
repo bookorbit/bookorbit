@@ -111,8 +111,9 @@ export async function fetchAuthors(params: ListAuthorsParams): Promise<AuthorsPa
   return res.json()
 }
 
-export async function fetchAuthor(id: number): Promise<AuthorDetail> {
+export async function fetchAuthor(id: number): Promise<AuthorDetail | null> {
   const res = await api(`/api/v1/authors/${id}`)
+  if (res.status === 404) return null
   if (!res.ok) throw new Error('Failed to load author')
   return res.json()
 }

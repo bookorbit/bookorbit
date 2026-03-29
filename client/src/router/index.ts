@@ -158,12 +158,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/audit/AuditLogPage.vue'),
             meta: { maxWidth: 'max-w-7xl', title: 'Audit Log' },
           },
-          {
-            path: 'about',
-            name: 'settings-about',
-            component: () => import('@/features/settings/AboutSettings.vue'),
-            meta: { title: 'About' },
-          },
+          { path: ':pathMatch(.*)*', redirect: { name: 'settings-libraries' } },
         ],
       },
       {
@@ -229,6 +224,7 @@ export const routes: RouteRecordRaw[] = [
         path: '/book/:bookId/edit',
         redirect: (to) => ({ name: 'book-detail', params: to.params, query: { tab: 'edit' } }),
       },
+      { path: ':pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue'), meta: { title: 'Not Found' } },
     ],
   },
   {
@@ -267,6 +263,7 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/features/auth/OidcCallbackPage.vue'),
     meta: { public: true, title: 'Completing Sign In' },
   },
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({

@@ -8,6 +8,7 @@ export function useBookQuery(libraryId: Ref<number | null>) {
   const items = ref<BookCard[]>([])
   const total = ref(0)
   const loading = ref(false)
+  const initialized = ref(false)
   const error = ref<string | null>(null)
 
   const filter = ref<GroupRule | undefined>(undefined)
@@ -54,6 +55,7 @@ export function useBookQuery(libraryId: Ref<number | null>) {
       error.value = e instanceof Error ? e.message : 'Failed to load books'
     } finally {
       loading.value = false
+      initialized.value = true
     }
   }
 
@@ -67,5 +69,5 @@ export function useBookQuery(libraryId: Ref<number | null>) {
     if (newId !== oldId) load(true)
   })
 
-  return { items, total, loading, error, filter, sort, pagination, hasMore, load, clear }
+  return { items, total, loading, initialized, error, filter, sort, pagination, hasMore, load, clear }
 }

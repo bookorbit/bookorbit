@@ -17,6 +17,7 @@ import { deleteAuthors, fetchAuthors, mergeAuthors, refreshAuthorMetadata, updat
 import { useAuthorBooks } from '../composables/useAuthorBooks'
 import { useAuthorDetail } from '../composables/useAuthorDetail'
 import { useAuthorMetadataPreview } from '../composables/useAuthorMetadataPreview'
+import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,7 +27,7 @@ const { coverSize, gridGap, viewMode } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
 
 const authorId = computed(() => Number(route.params.id))
-const { author, loading: loadingAuthor, error: authorError, load: loadAuthor } = useAuthorDetail(authorId)
+const { author, loading: loadingAuthor, error: authorError, notFound: authorNotFound, load: loadAuthor } = useAuthorDetail(authorId)
 const { items: books, total, loading: loadingBooks, error: booksError, hasMore, sort, order, libraryId, load: loadBooks } = useAuthorBooks(authorId)
 const authorName = computed(() => author.value?.name ?? '')
 const pageTitle = computed(() => {
@@ -326,155 +327,161 @@ watch(authorName, () => {
       </button>
     </div>
 
-    <div v-if="authorError" class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-      {{ authorError }}
+    <div v-if="authorNotFound">
+      <EntityNotFound entity="Author" />
     </div>
 
-    <div v-if="loadingAuthor && !author" class="mb-4 rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
-      Loading author...
-    </div>
-    <AuthorHeader
-      v-else-if="author"
-      :author="author"
-      :image-url="author.imageUrl ?? metadataPreview?.imageUrl ?? null"
-      :preview-description="metadataPreview?.description ?? null"
-      :preview-provider="metadataPreview?.provider ?? null"
-      :loading-preview="loadingMetadataPreview"
-      :can-update="canUpdate"
-      :can-merge="canMerge"
-      :can-delete="canDelete"
-      :refreshing="refreshingMetadata"
-      @edit="toggleEdit"
-      @merge="toggleMerge"
-      @refresh="refreshMetadata"
-      @delete="confirmDeleteOpen = true"
-    />
-
-    <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      Could not load external author preview metadata right now.
-    </div>
-
-    <section v-if="author && (editOpen || mergeOpen)" class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3 space-y-3">
-      <div v-if="editOpen && canUpdate" class="space-y-2">
-        <div class="grid gap-2 md:grid-cols-2">
-          <label class="text-xs text-muted-foreground">
-            Name
-            <input v-model="draftName" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm" />
-          </label>
-          <label class="text-xs text-muted-foreground">
-            Sort Name
-            <input v-model="draftSortName" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm" />
-          </label>
-        </div>
-        <label class="block text-xs text-muted-foreground">
-          Description
-          <textarea v-model="draftDescription" rows="3" class="mt-1 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm" />
-        </label>
-        <div class="flex items-center justify-end gap-2">
-          <button class="h-8 rounded-md border border-input px-3 text-sm text-muted-foreground hover:bg-muted" @click="editOpen = false">
-            Cancel
-          </button>
-          <button
-            :disabled="savingEdit"
-            class="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
-            @click="saveAuthorEdits"
-          >
-            {{ savingEdit ? 'Saving...' : 'Save' }}
-          </button>
-        </div>
+    <template v-else>
+      <div v-if="authorError" class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        {{ authorError }}
       </div>
 
-      <div v-if="mergeOpen && canMerge" class="space-y-2">
-        <input
-          v-model="mergeQuery"
-          class="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
-          placeholder="Search authors to merge into this author"
-        />
-
-        <div v-if="searchingMergeCandidates" class="text-xs text-muted-foreground">Searching...</div>
-
-        <div v-if="mergeCandidates.length > 0" class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border/70 bg-background/50 p-2">
-          <label v-for="candidate in mergeCandidates" :key="candidate.id" class="flex items-center gap-2 text-sm">
-            <input type="checkbox" :checked="selectedMergeIds.includes(candidate.id)" @change="onMergeCandidateToggle(candidate.id, $event)" />
-            <span class="min-w-0 flex-1 truncate">{{ candidate.name }}</span>
-            <span class="text-xs text-muted-foreground">{{ candidate.bookCount }} books</span>
-          </label>
-        </div>
-
-        <div v-if="selectedMergeIds.length > 0" class="text-xs text-muted-foreground">
-          Selected {{ selectedMergeIds.length }} author(s), approx. {{ selectedMergeBookCount }} books affected.
-        </div>
-
-        <div class="flex items-center justify-end">
-          <button
-            :disabled="merging || selectedMergeIds.length === 0"
-            class="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
-            @click="promptRunMerge"
-          >
-            {{ merging ? 'Merging...' : 'Merge Selected' }}
-          </button>
-        </div>
+      <div v-if="loadingAuthor && !author" class="mb-4 rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
+        Loading author...
       </div>
-    </section>
-
-    <section class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3">
-      <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h2 class="text-sm font-semibold text-foreground">Books</h2>
-        <div class="flex items-center gap-2">
-          <select
-            v-model="sort"
-            class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-          >
-            <option value="addedAt">Recently Added</option>
-            <option value="title">Title</option>
-            <option value="publishedYear">Published Year</option>
-          </select>
-
-          <select
-            v-model="order"
-            class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-          >
-            <option value="desc">Descending</option>
-            <option value="asc">Ascending</option>
-          </select>
-
-          <select
-            :value="libraryId ?? ''"
-            class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-            @change="libraryId = ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null"
-          >
-            <option value="">All Libraries</option>
-            <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-          </select>
-        </div>
-      </div>
-
-      <div v-if="booksError" class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-        {{ booksError }}
-      </div>
-
-      <div v-if="!loadingBooks && books.length === 0" class="flex flex-col items-center justify-center gap-2 py-16 text-center">
-        <p class="text-sm font-medium text-foreground">No books found for this author</p>
-        <p class="text-xs text-muted-foreground">Try changing sort/order or selecting another library.</p>
-      </div>
-
-      <VirtualBookGrid
-        v-if="viewMode === 'grid' && books.length > 0"
-        :books="books"
-        :cover-size="coverSize"
-        :grid-gap="gridGap"
-        @action="handleBookAction"
+      <AuthorHeader
+        v-else-if="author"
+        :author="author"
+        :image-url="author.imageUrl ?? metadataPreview?.imageUrl ?? null"
+        :preview-description="metadataPreview?.description ?? null"
+        :preview-provider="metadataPreview?.provider ?? null"
+        :loading-preview="loadingMetadataPreview"
+        :can-update="canUpdate"
+        :can-merge="canMerge"
+        :can-delete="canDelete"
+        :refreshing="refreshingMetadata"
+        @edit="toggleEdit"
+        @merge="toggleMerge"
+        @refresh="refreshMetadata"
+        @delete="confirmDeleteOpen = true"
       />
 
-      <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-        <BookListRow v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
+      <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        Could not load external author preview metadata right now.
       </div>
 
-      <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
-        <span v-if="loadingBooks" class="text-xs text-muted-foreground">Loading...</span>
-        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
-      </div>
-    </section>
+      <section v-if="author && (editOpen || mergeOpen)" class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3 space-y-3">
+        <div v-if="editOpen && canUpdate" class="space-y-2">
+          <div class="grid gap-2 md:grid-cols-2">
+            <label class="text-xs text-muted-foreground">
+              Name
+              <input v-model="draftName" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm" />
+            </label>
+            <label class="text-xs text-muted-foreground">
+              Sort Name
+              <input v-model="draftSortName" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm" />
+            </label>
+          </div>
+          <label class="block text-xs text-muted-foreground">
+            Description
+            <textarea v-model="draftDescription" rows="3" class="mt-1 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm" />
+          </label>
+          <div class="flex items-center justify-end gap-2">
+            <button class="h-8 rounded-md border border-input px-3 text-sm text-muted-foreground hover:bg-muted" @click="editOpen = false">
+              Cancel
+            </button>
+            <button
+              :disabled="savingEdit"
+              class="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              @click="saveAuthorEdits"
+            >
+              {{ savingEdit ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="mergeOpen && canMerge" class="space-y-2">
+          <input
+            v-model="mergeQuery"
+            class="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
+            placeholder="Search authors to merge into this author"
+          />
+
+          <div v-if="searchingMergeCandidates" class="text-xs text-muted-foreground">Searching...</div>
+
+          <div v-if="mergeCandidates.length > 0" class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border/70 bg-background/50 p-2">
+            <label v-for="candidate in mergeCandidates" :key="candidate.id" class="flex items-center gap-2 text-sm">
+              <input type="checkbox" :checked="selectedMergeIds.includes(candidate.id)" @change="onMergeCandidateToggle(candidate.id, $event)" />
+              <span class="min-w-0 flex-1 truncate">{{ candidate.name }}</span>
+              <span class="text-xs text-muted-foreground">{{ candidate.bookCount }} books</span>
+            </label>
+          </div>
+
+          <div v-if="selectedMergeIds.length > 0" class="text-xs text-muted-foreground">
+            Selected {{ selectedMergeIds.length }} author(s), approx. {{ selectedMergeBookCount }} books affected.
+          </div>
+
+          <div class="flex items-center justify-end">
+            <button
+              :disabled="merging || selectedMergeIds.length === 0"
+              class="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              @click="promptRunMerge"
+            >
+              {{ merging ? 'Merging...' : 'Merge Selected' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <h2 class="text-sm font-semibold text-foreground">Books</h2>
+          <div class="flex items-center gap-2">
+            <select
+              v-model="sort"
+              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+            >
+              <option value="addedAt">Recently Added</option>
+              <option value="title">Title</option>
+              <option value="publishedYear">Published Year</option>
+            </select>
+
+            <select
+              v-model="order"
+              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+
+            <select
+              :value="libraryId ?? ''"
+              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+              @change="libraryId = ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null"
+            >
+              <option value="">All Libraries</option>
+              <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="booksError" class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {{ booksError }}
+        </div>
+
+        <div v-if="!loadingBooks && books.length === 0" class="flex flex-col items-center justify-center gap-2 py-16 text-center">
+          <p class="text-sm font-medium text-foreground">No books found for this author</p>
+          <p class="text-xs text-muted-foreground">Try changing sort/order or selecting another library.</p>
+        </div>
+
+        <VirtualBookGrid
+          v-if="viewMode === 'grid' && books.length > 0"
+          :books="books"
+          :cover-size="coverSize"
+          :grid-gap="gridGap"
+          @action="handleBookAction"
+        />
+
+        <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+          <BookListRow v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
+        </div>
+
+        <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
+          <span v-if="loadingBooks" class="text-xs text-muted-foreground">Loading...</span>
+          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+        </div>
+      </section>
+    </template>
   </main>
 
   <AuthorConfirmDialog

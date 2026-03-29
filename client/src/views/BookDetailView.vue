@@ -14,6 +14,7 @@ import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
+import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const { hasPermission } = usePermissions()
@@ -31,7 +32,7 @@ provide(
 const bookId = computed(() => Number(route.params.bookId))
 const tab = computed(() => normalizeBookDetailTab(route.query.tab))
 
-const { detail, loading, fetch } = useBookDetail()
+const { detail, loading, notFound, fetch } = useBookDetail()
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
   const base = title || (Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book')
@@ -115,6 +116,10 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
       <div v-else-if="tab === 'files'" class="space-y-3">
         <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-pulse" />
       </div>
+    </template>
+
+    <template v-else-if="notFound">
+      <EntityNotFound entity="Book" />
     </template>
   </BookDetailLayout>
 </template>

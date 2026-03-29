@@ -59,8 +59,6 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
   }
 
-  result.push({ label: 'About', routeName: 'settings-about' })
-
   return result
 })
 </script>

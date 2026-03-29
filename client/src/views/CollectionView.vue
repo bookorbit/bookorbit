@@ -23,6 +23,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
 import type { BookCard } from '@projectx/types'
+import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +32,7 @@ const { viewMode } = useDisplaySettings()
 const collectionId = computed(() => Number(route.params.id))
 const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId)
 const { collections, fetchCollections, removeBooksFromCollection } = useCollections()
+const collectionNotFound = ref(false)
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
 const pageTitle = computed(() => {
   if (collection.value?.name) return `Collection · ${collection.value.name}`
@@ -38,7 +40,7 @@ const pageTitle = computed(() => {
 })
 usePageTitle(pageTitle)
 
-const { items: books, total, loading, hasMore, load } = useCollectionBooks(collectionId)
+const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useCollectionBooks(collectionId)
 const { setBookContext, registerLoadMore } = useBookNavigation()
 watch(
   [books, total],
@@ -139,7 +141,7 @@ let observer: IntersectionObserver | null = null
 onMounted(async () => {
   await fetchCollections()
   if (!collection.value) {
-    router.push({ name: 'home' })
+    collectionNotFound.value = true
     return
   }
   load(true)
@@ -229,7 +231,9 @@ watch(
     </ViewHeader>
 
     <main class="flex-1 min-h-0">
-      <div v-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+      <EntityNotFound v-if="collectionNotFound" entity="Collection" />
+
+      <div v-else-if="booksInitialized && !loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
           <FolderOpen :size="28" class="text-muted-foreground/70" />
         </div>

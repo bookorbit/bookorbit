@@ -8,6 +8,7 @@ export function useCollectionBooks(collectionId: Ref<number>) {
   const items = ref<BookCard[]>([])
   const total = ref(0)
   const loading = ref(false)
+  const initialized = ref(false)
   const hasMore = ref(false)
   let page = 0
 
@@ -29,8 +30,9 @@ export function useCollectionBooks(collectionId: Ref<number>) {
       page++
     } finally {
       loading.value = false
+      initialized.value = true
     }
   }
 
-  return { items, total, loading, hasMore, load }
+  return { items, total, loading, initialized, hasMore, load }
 }

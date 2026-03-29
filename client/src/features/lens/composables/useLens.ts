@@ -8,6 +8,7 @@ export function useLens(lensId: Ref<number>) {
   const items = ref<BookCard[]>([])
   const total = ref(0)
   const loading = ref(false)
+  const initialized = ref(false)
   const page = ref(0)
 
   const hasMore = computed(() => items.value.length < total.value)
@@ -36,8 +37,9 @@ export function useLens(lensId: Ref<number>) {
       page.value++
     } finally {
       loading.value = false
+      initialized.value = true
     }
   }
 
-  return { items, total, loading, hasMore, load }
+  return { items, total, loading, initialized, hasMore, load }
 }

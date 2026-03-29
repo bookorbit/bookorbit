@@ -31,16 +31,18 @@ import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import type { GroupRule, SortSpec } from '@projectx/types'
+import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { viewMode } = useDisplaySettings()
-const { libraries } = useLibraries()
+const { libraries, loaded: librariesLoaded } = useLibraries()
 
 const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
 const { coverSize, gridGap } = useViewDisplaySettings('library', libraryId)
 
 const currentLibrary = computed(() => libraries.value.find((l) => l.id === libraryId.value))
+const libraryNotFound = computed(() => librariesLoaded.value && libraryId.value !== null && !currentLibrary.value)
 const title = computed(() => currentLibrary.value?.name ?? 'Library')
 const libraryIcon = computed(() => currentLibrary.value?.icon ?? 'BookOpen')
 const pageTitle = computed(() => {
@@ -54,7 +56,7 @@ provide(
   computed(() => currentLibrary.value?.coverAspectRatio ?? DEFAULT_COVER_ASPECT_RATIO),
 )
 
-const { items: books, total, loading, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+const { items: books, total, loading, initialized: booksInitialized, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const { setBookContext, registerLoadMore } = useBookNavigation()
@@ -385,109 +387,116 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     </ViewHeader>
 
     <main class="flex-1 min-h-0">
-      <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
+      <EntityNotFound v-if="libraryNotFound" entity="Library" />
 
-      <!-- Filter builder panel -->
-      <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
-        <div class="flex items-center justify-between mb-3">
-          <span class="text-xs font-medium text-muted-foreground">Filter rules</span>
-          <div class="flex items-center gap-1.5">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="activeFilterCount > 0"
-                  @click="saveAsLensOpen = true"
-                  class="flex items-center gap-1.5 h-7 px-3 rounded-md border border-input text-xs font-medium text-muted-foreground bg-background hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <Telescope :size="13" />
-                  Save as Lens
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Save this filter as a named lens</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="activeFilterCount > 0"
-                  @click="saveFilter"
-                  class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
-                  :class="
-                    isFilterSaved
-                      ? 'border-primary/40 text-primary bg-primary/8'
-                      : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                  "
-                >
-                  <BookmarkCheck v-if="isFilterSaved" :size="13" />
-                  <Bookmark v-else :size="13" />
-                  {{ isFilterSaved ? 'Saved' : 'Save filter' }}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ isFilterSaved ? 'Filter saved' : 'Save filter for this library' }}</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="hasSavedFilter"
-                  @click="forgetSavedFilter"
-                  class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <X :size="11" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Remove saved filter</TooltipContent>
-            </Tooltip>
+      <template v-else>
+        <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
+
+        <!-- Filter builder panel -->
+        <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-medium text-muted-foreground">Filter rules</span>
+            <div class="flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    v-if="activeFilterCount > 0"
+                    @click="saveAsLensOpen = true"
+                    class="flex items-center gap-1.5 h-7 px-3 rounded-md border border-input text-xs font-medium text-muted-foreground bg-background hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Telescope :size="13" />
+                    Save as Lens
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Save this filter as a named lens</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    v-if="activeFilterCount > 0"
+                    @click="saveFilter"
+                    class="flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium transition-colors"
+                    :class="
+                      isFilterSaved
+                        ? 'border-primary/40 text-primary bg-primary/8'
+                        : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                    "
+                  >
+                    <BookmarkCheck v-if="isFilterSaved" :size="13" />
+                    <Bookmark v-else :size="13" />
+                    {{ isFilterSaved ? 'Saved' : 'Save filter' }}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ isFilterSaved ? 'Filter saved' : 'Save filter for this library' }}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    v-if="hasSavedFilter"
+                    @click="forgetSavedFilter"
+                    class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <X :size="11" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Remove saved filter</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+          <BookFilterBuilder v-model="filter" />
+        </div>
+
+        <!-- Empty state: no matches with filters -->
+        <div
+          v-if="booksInitialized && !loading && books.length === 0 && activeFilterCount > 0"
+          class="flex flex-col items-center justify-center py-24 gap-3 text-center"
+        >
+          <p class="text-sm font-medium text-foreground">No books match your filters</p>
+          <p class="text-xs text-muted-foreground">Try adjusting or clearing your filters to see more books.</p>
+          <button @click="clearFilters" class="text-xs text-primary hover:underline">Clear filters</button>
+        </div>
+
+        <!-- Empty state: no books in library -->
+        <div v-else-if="booksInitialized && !loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+            <BookOpen :size="28" class="text-muted-foreground/70" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <p class="text-sm font-medium text-foreground">Your library is empty</p>
+            <p class="text-xs text-muted-foreground max-w-xs">Once you add books to this library, they will appear here.</p>
           </div>
         </div>
-        <BookFilterBuilder v-model="filter" />
-      </div>
 
-      <!-- Empty state: no matches with filters -->
-      <div v-if="!loading && books.length === 0 && activeFilterCount > 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
-        <p class="text-sm font-medium text-foreground">No books match your filters</p>
-        <p class="text-xs text-muted-foreground">Try adjusting or clearing your filters to see more books.</p>
-        <button @click="clearFilters" class="text-xs text-primary hover:underline">Clear filters</button>
-      </div>
-
-      <!-- Empty state: no books in library -->
-      <div v-else-if="!loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-4 text-center">
-        <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <BookOpen :size="28" class="text-muted-foreground/70" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <p class="text-sm font-medium text-foreground">Your library is empty</p>
-          <p class="text-xs text-muted-foreground max-w-xs">Once you add books to this library, they will appear here.</p>
-        </div>
-      </div>
-
-      <!-- Grid view -->
-      <VirtualBookGrid
-        v-if="viewMode === 'grid' && books.length > 0"
-        :books="books"
-        :cover-size="coverSize"
-        :grid-gap="gridGap"
-        :selection-mode="selectionMode"
-        :is-selected="isSelected"
-        @action="handleBookAction"
-        @select="handleSelect"
-      />
-
-      <!-- List view -->
-      <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
-        <BookListRow
-          v-for="book in books"
-          :key="book.id"
-          :book="book"
+        <!-- Grid view -->
+        <VirtualBookGrid
+          v-if="viewMode === 'grid' && books.length > 0"
+          :books="books"
+          :cover-size="coverSize"
+          :grid-gap="gridGap"
           :selection-mode="selectionMode"
-          :selected="isSelected(book.id)"
-          @action="handleBookAction(book, $event)"
-          @select="handleSelect(book.id, $event)"
+          :is-selected="isSelected"
+          @action="handleBookAction"
+          @select="handleSelect"
         />
-      </div>
 
-      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-        <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
-      </div>
+        <!-- List view -->
+        <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+          <BookListRow
+            v-for="book in books"
+            :key="book.id"
+            :book="book"
+            :selection-mode="selectionMode"
+            :selected="isSelected(book.id)"
+            @action="handleBookAction(book, $event)"
+            @select="handleSelect(book.id, $event)"
+          />
+        </div>
+
+        <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+        </div>
+      </template>
     </main>
   </section>
 
