@@ -18,8 +18,9 @@ export interface BookCandidate {
 
 const MAX_PATH_LENGTH = 4096;
 
-// Matches common disc subdirectory names: "CD 1", "Disc 2", "Disk 3", "Part 2", "Side A"
-const DISC_DIR_PATTERN = /^(?:cd|disc|disk|part|side)\s*[\dA-Za-z]+$/i;
+// Matches common disc subdirectory names: "CD 1", "Disc 2", "Disk03", "Part A", "Side IV"
+// but avoids broad matches like "Discography".
+const DISC_DIR_PATTERN = /^(?:cd|disc|disk|part|side)(?:[\s_-]*(?:\d+|[A-Za-z]|[IVXLCM]+))$/i;
 
 function isDiscDirectory(name: string): boolean {
   return DISC_DIR_PATTERN.test(name);

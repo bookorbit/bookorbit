@@ -24,7 +24,7 @@ function blankForm() {
     metadataPrecedence: [...DEFAULT_METADATA_PRECEDENCE],
     formatPriority: [...DEFAULT_FORMAT_PRIORITY] as string[],
     allowedFormats: [] as string[],
-    organizationMode: 'auto' as OrganizationMode,
+    organizationMode: 'book_per_folder' as OrganizationMode,
     excludePatterns: [] as string[],
     readingThreshold: 0.25,
     markAsFinishedPercentComplete: 98,

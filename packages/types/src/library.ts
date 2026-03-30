@@ -1,10 +1,22 @@
-export type OrganizationMode = "auto" | "book_per_file" | "book_per_folder";
+export type OrganizationMode = "book_per_file" | "book_per_folder";
 export type CoverAspectRatio = "2/3" | "1/1";
 
 export const DEFAULT_FORMAT_PRIORITY = [
-  "epub", "pdf", "cbz", "cbr", "cb7",
-  "mobi", "azw3", "azw", "fb2",
-  "m4b", "mp3", "m4a", "opus", "ogg", "flac",
+  "epub",
+  "pdf",
+  "cbz",
+  "cbr",
+  "cb7",
+  "mobi",
+  "azw3",
+  "azw",
+  "fb2",
+  "m4b",
+  "mp3",
+  "m4a",
+  "opus",
+  "ogg",
+  "flac",
 ] as const;
 
 export const FORMAT_LABELS: Record<string, string> = {

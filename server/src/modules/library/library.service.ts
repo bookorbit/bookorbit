@@ -46,7 +46,7 @@ export class LibraryService {
       else foldersByLibrary.set(f.libraryId, [f]);
     }
     return libs.map((lib) => ({
-      ...lib,
+      ...normalizeLibraryOrganizationMode(lib),
       folders: (foldersByLibrary.get(lib.id) ?? []).map(({ id, path, createdAt }) => ({ id, path, createdAt })),
     }));
   }
@@ -55,7 +55,7 @@ export class LibraryService {
     const [library] = await this.libraryRepo.findById(id);
     if (!library) throw new NotFoundException('Library not found');
     const folders = await this.libraryRepo.findFoldersByLibrary(id);
-    return { ...library, folders };
+    return { ...normalizeLibraryOrganizationMode(library), folders };
   }
 
   async create(dto: CreateLibraryDto) {
@@ -70,7 +70,7 @@ export class LibraryService {
       metadataPrecedence: dto.metadataPrecedence ?? ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
       formatPriority: dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY],
       allowedFormats: dto.allowedFormats ?? [],
-      organizationMode: dto.organizationMode ?? 'auto',
+      organizationMode: dto.organizationMode ?? 'book_per_folder',
       excludePatterns: dto.excludePatterns ?? [],
       coverAspectRatio: dto.coverAspectRatio ?? '2/3',
       readingThreshold: dto.readingThreshold ?? 0.25,
@@ -89,7 +89,7 @@ export class LibraryService {
 
     this.scannerService.startScanAsync(library.id);
 
-    return { ...library, folders: folders.map(([f]) => f) };
+    return { ...normalizeLibraryOrganizationMode(library), folders: folders.map(([f]) => f) };
   }
 
   async update(id: number, dto: UpdateLibraryDto) {
@@ -137,10 +137,14 @@ export class LibraryService {
     }
 
     const shouldRescan =
-      dto.formatPriority !== undefined || dto.allowedFormats !== undefined || dto.excludePatterns !== undefined || folderPaths !== undefined;
+      dto.formatPriority !== undefined ||
+      dto.allowedFormats !== undefined ||
+      dto.excludePatterns !== undefined ||
+      dto.organizationMode !== undefined ||
+      folderPaths !== undefined;
     if (shouldRescan) this.scannerService.startScanAsync(id);
 
-    return { ...updated, folders };
+    return { ...normalizeLibraryOrganizationMode(updated), folders };
   }
 
   async remove(id: number) {
@@ -259,4 +263,18 @@ function pathsOverlap(a: string, b: string): boolean {
   const na = normalize(a);
   const nb = normalize(b);
   return na.startsWith(nb) || nb.startsWith(na);
+}
+
+function normalizeOrganizationMode(mode: string | null | undefined): 'book_per_file' | 'book_per_folder' {
+  return mode === 'book_per_file' ? 'book_per_file' : 'book_per_folder';
+}
+
+function normalizeLibraryOrganizationMode<T extends Record<string, unknown>>(library: T): T {
+  if (!Object.prototype.hasOwnProperty.call(library, 'organizationMode')) {
+    return library;
+  }
+  return {
+    ...library,
+    organizationMode: normalizeOrganizationMode((library as { organizationMode?: string | null }).organizationMode),
+  };
 }

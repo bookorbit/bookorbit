@@ -360,6 +360,15 @@ describe('disc folder flattening', () => {
     const candidates = await findBookCandidates(root);
     expect(candidates).toHaveLength(2);
   });
+
+  it('does NOT treat names like "Discography" as disc directories', async () => {
+    await file('AudioBook/Discography/01.mp3');
+    await file('AudioBook/cover.jpg');
+
+    const candidates = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].folderPath).toBe(join(root, 'AudioBook', 'Discography'));
+  });
 });
 
 // ── STEM-NAMED AUDIO SUBFOLDER FLATTENING ────────────────────────────────────

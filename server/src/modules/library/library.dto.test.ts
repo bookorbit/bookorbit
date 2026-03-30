@@ -25,6 +25,8 @@ describe('Library DTO validation', () => {
 
   it('CreateLibraryDto validates organization mode', async () => {
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'bad' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'book_per_folder' }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'book_per_file' }))).toBe(false);
   });
 
   it('UpdateLibraryDto allows explicit null fileNamingPattern while validating string values', async () => {

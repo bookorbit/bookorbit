@@ -162,37 +162,40 @@ export class ScannerRepository {
     return file;
   }
 
-  async findBookFileByAbsolutePath(absolutePath: string) {
+  async findBookFileByAbsolutePath(absolutePath: string, libraryId?: number) {
+    const whereClause =
+      libraryId == null ? eq(bookFiles.absolutePath, absolutePath) : and(eq(bookFiles.absolutePath, absolutePath), eq(books.libraryId, libraryId));
     const [row] = await this.db
       .select({ file: bookFiles, libraryId: books.libraryId, primaryFileId: books.primaryFileId })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(eq(bookFiles.absolutePath, absolutePath))
+      .where(whereClause)
       .limit(1);
     return row ?? null;
   }
 
-  async findBooksByFolderPath(folderPath: string) {
-    return this.db
-      .select()
-      .from(books)
-      .where(or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%')));
+  async findBooksByFolderPath(folderPath: string, libraryId?: number) {
+    const folderScope = or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%'));
+    const whereClause = libraryId == null ? folderScope : and(eq(books.libraryId, libraryId), folderScope);
+    return this.db.select().from(books).where(whereClause);
   }
 
-  async findMissingBookByFolderPath(folderPath: string) {
-    const [row] = await this.db
-      .select()
-      .from(books)
-      .where(and(eq(books.folderPath, folderPath), eq(books.status, 'missing')))
-      .limit(1);
+  async findMissingBookByFolderPath(folderPath: string, libraryId?: number) {
+    const whereClause =
+      libraryId == null
+        ? and(eq(books.folderPath, folderPath), eq(books.status, 'missing'))
+        : and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath), eq(books.status, 'missing'));
+    const [row] = await this.db.select().from(books).where(whereClause).limit(1);
     return row ?? null;
   }
 
-  async findMissingBooksByFolderPath(folderPath: string) {
-    return this.db
-      .select()
-      .from(books)
-      .where(and(or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%')), eq(books.status, 'missing')));
+  async findMissingBooksByFolderPath(folderPath: string, libraryId?: number) {
+    const folderScope = or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%'));
+    const whereClause =
+      libraryId == null
+        ? and(folderScope, eq(books.status, 'missing'))
+        : and(eq(books.libraryId, libraryId), folderScope, eq(books.status, 'missing'));
+    return this.db.select().from(books).where(whereClause);
   }
 
   async findMissingBooksForLibraries(libraryIds: number[]) {
@@ -208,6 +211,21 @@ export class ScannerRepository {
     await this.db.update(books).set({ status: 'present', updatedAt: new Date() }).where(inArray(books.id, bookIds));
   }
 
+  async moveBookToLibrary(bookId: number, libraryId: number, libraryFolderId: number, folderPath: string) {
+    const [book] = await this.db
+      .update(books)
+      .set({
+        libraryId,
+        libraryFolderId,
+        folderPath,
+        status: 'present',
+        updatedAt: new Date(),
+      })
+      .where(eq(books.id, bookId))
+      .returning();
+    return book ?? null;
+  }
+
   async findBookFilesByBookId(bookId: number) {
     return this.db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId));
   }
@@ -221,7 +239,8 @@ export class ScannerRepository {
     await this.db.delete(bookFiles).where(eq(bookFiles.id, id));
   }
 
-  async findBookFileWithContextByIno(ino: number) {
+  async findBookFileWithContextByIno(ino: number, libraryId?: number) {
+    const whereClause = libraryId == null ? eq(bookFiles.ino, ino) : and(eq(bookFiles.ino, ino), eq(books.libraryId, libraryId));
     const [row] = await this.db
       .select({
         file: bookFiles,
@@ -233,7 +252,58 @@ export class ScannerRepository {
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
-      .where(eq(bookFiles.ino, ino))
+      .where(whereClause)
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findMissingBookFileWithContextByIno(ino: number) {
+    const [row] = await this.db
+      .select({
+        file: bookFiles,
+        libraryId: books.libraryId,
+        bookStatus: books.status,
+        folderPath: books.folderPath,
+        libraryFolderPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
+      .where(and(eq(bookFiles.ino, ino), eq(books.status, 'missing')))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findBookFileWithContextByHash(hash: string) {
+    const [row] = await this.db
+      .select({
+        file: bookFiles,
+        libraryId: books.libraryId,
+        bookStatus: books.status,
+        folderPath: books.folderPath,
+        libraryFolderPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
+      .where(eq(bookFiles.hash, hash))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findMissingBookFileWithContextByHash(hash: string) {
+    const [row] = await this.db
+      .select({
+        file: bookFiles,
+        libraryId: books.libraryId,
+        bookStatus: books.status,
+        folderPath: books.folderPath,
+        libraryFolderPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
+      .where(and(eq(bookFiles.hash, hash), eq(books.status, 'missing')))
       .limit(1);
     return row ?? null;
   }

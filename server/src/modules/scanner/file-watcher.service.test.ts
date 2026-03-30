@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
 import { FileWatcherService } from './file-watcher.service';
 import { FileEventProcessorService } from './file-event-processor.service';
 import { ScanGateway } from './scan.gateway';
@@ -20,6 +24,7 @@ function makeService() {
   const scannerService = {
     startScanAsync: vi.fn(),
     scanBookFolderAsync: vi.fn(),
+    isScanRunning: vi.fn().mockReturnValue(false),
   } as unknown as ScannerService;
 
   const db = {} as any;
@@ -51,8 +56,8 @@ describe('process()', () => {
 
     await (service as any).process('delete', '/books/Author', 3);
 
-    expect(processor.handleUnlink).toHaveBeenCalledWith('/books/Author');
-    expect(processor.handleUnlinkDir).toHaveBeenCalledWith('/books/Author');
+    expect(processor.handleUnlink).toHaveBeenCalledWith('/books/Author', 3);
+    expect(processor.handleUnlinkDir).toHaveBeenCalledWith('/books/Author', 3);
     expect(gateway.emitBookMissing).toHaveBeenCalledWith({ libraryId: 3, bookIds: [20] });
   });
 
@@ -63,7 +68,7 @@ describe('process()', () => {
 
     await (service as any).process('create', '/books/Author/book.epub', 1);
 
-    expect(processor.handleCreate).toHaveBeenCalledWith('/books/Author/book.epub');
+    expect(processor.handleCreate).toHaveBeenCalledWith('/books/Author/book.epub', 1);
     expect((gateway as any).emitBookRestored).toHaveBeenCalledWith({ libraryId: 1, bookIds: [7] });
     expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
@@ -76,6 +81,37 @@ describe('process()', () => {
 
     expect(scheduleFolderScanSpy).toHaveBeenCalledWith('/books/new.epub', 5);
     expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+  });
+
+  it('starts a full scan when handleCreate noop targets a directory', async () => {
+    const { service, scannerService } = makeService();
+    const tempDir = await mkdtemp(join(tmpdir(), 'watcher-dir-create-'));
+
+    try {
+      await (service as any).process('create', tempDir, 8);
+      expect(scannerService.startScanAsync).toHaveBeenCalledWith(8);
+      expect(scannerService.scanBookFolderAsync).not.toHaveBeenCalled();
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('suppresses folder scan for file creates under a recently created directory while full scan is running', async () => {
+    const { service, scannerService } = makeService();
+    const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
+    const tempDir = await mkdtemp(join(tmpdir(), 'watcher-dir-suppress-'));
+    const nestedFile = join(tempDir, 'book.epub');
+
+    try {
+      await (service as any).process('create', tempDir, 9);
+      (scannerService.isScanRunning as vi.Mock).mockReturnValue(true);
+      await (service as any).process('create', nestedFile, 9);
+
+      expect(scannerService.startScanAsync).toHaveBeenCalledWith(9);
+      expect(scheduleFolderScanSpy).not.toHaveBeenCalled();
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('schedules a folder scan and emits book-moved when handleCreate returns book-moved', async () => {

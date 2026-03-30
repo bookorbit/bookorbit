@@ -69,9 +69,12 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
   return {
     failAllRunningJobs: vi.fn().mockResolvedValue(undefined),
     findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
-    findLibrarySettings: vi
-      .fn()
-      .mockResolvedValue({ allowedFormats: [], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: [], organizationMode: 'auto' }),
+    findLibrarySettings: vi.fn().mockResolvedValue({
+      allowedFormats: [],
+      formatPriority: DEFAULT_FORMAT_PRIORITY,
+      excludePatterns: [],
+      organizationMode: 'book_per_folder',
+    }),
     createScanJob: vi.fn().mockResolvedValue({ id: 100 }),
     completeScanJob: vi.fn().mockResolvedValue(undefined),
     failScanJob: vi.fn().mockResolvedValue(undefined),
@@ -84,9 +87,24 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     createBookFile: vi.fn().mockResolvedValue(makeBookFile()),
     updateBookFile: vi.fn().mockResolvedValue(makeBookFile()),
     findBookFileByHash: vi.fn().mockResolvedValue(null),
+    findBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
+    findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
+    findBookFileWithContextByHash: vi.fn().mockResolvedValue(null),
+    findMissingBookFileWithContextByHash: vi.fn().mockResolvedValue(null),
+    moveBookToLibrary: vi.fn().mockImplementation((bookId: number, libraryId: number, libraryFolderId: number, folderPath: string) =>
+      Promise.resolve({
+        id: bookId,
+        libraryId,
+        libraryFolderId,
+        folderPath,
+        status: 'present',
+      }),
+    ),
     findPrimaryBookFilesByLibrary: vi.fn().mockResolvedValue([]),
     findBooksByFolderPath: vi.fn().mockResolvedValue([]),
+    findBookFilesByBookId: vi.fn().mockResolvedValue([]),
     findBookFilesByBookIds: vi.fn().mockResolvedValue([]),
+    deleteBookFile: vi.fn().mockResolvedValue(undefined),
     updateBookFolderPath: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -216,7 +234,7 @@ describe('excludePatterns', () => {
         allowedFormats: [],
         formatPriority: DEFAULT_FORMAT_PRIORITY,
         excludePatterns: ['#recycle', '*.bak'],
-        organizationMode: 'auto',
+        organizationMode: 'book_per_folder',
       }),
     });
 
@@ -401,7 +419,7 @@ describe('file identity resolution', () => {
   it('gracefully skips a file that disappears during fingerprinting (ENOENT) — scan still completes', async () => {
     const fileStat = makeFileStat({ ino: 7777 }); // different ino so inode match fails
     mockFindCandidates.mockResolvedValue([makeCandidate('/library/Author/Book', [fileStat])]);
-    mockFingerprint.mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    mockFingerprint.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
     const repo = makeRepo();
     const done = awaitScan(repo);
@@ -466,9 +484,12 @@ describe('format priority', () => {
 describe('allowedFormats filtering', () => {
   it('excludes primary files whose format is not in allowedFormats', async () => {
     const repo = makeRepo({
-      findLibrarySettings: vi
-        .fn()
-        .mockResolvedValue({ allowedFormats: ['epub'], formatPriority: DEFAULT_FORMAT_PRIORITY, excludePatterns: [], organizationMode: 'auto' }),
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: ['epub'],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        excludePatterns: [],
+        organizationMode: 'book_per_folder',
+      }),
     });
 
     // findBookCandidates returns both, but the service filters before processing
@@ -646,7 +667,7 @@ describe('multi-format metadata source routing', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
-        organizationMode: 'auto',
+        organizationMode: 'book_per_folder',
       }),
     });
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
@@ -670,7 +691,7 @@ describe('multi-format metadata source routing', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
-        organizationMode: 'auto',
+        organizationMode: 'book_per_folder',
       }),
     });
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
@@ -757,7 +778,7 @@ describe('multi-format metadata source routing', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
-        organizationMode: 'auto',
+        organizationMode: 'book_per_folder',
       }),
     });
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 7001 });
@@ -789,7 +810,7 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
         allowedFormats: [],
         formatPriority: ['m4b', 'epub', 'pdf'],
         excludePatterns: [],
-        organizationMode: 'auto',
+        organizationMode: 'book_per_folder',
       }),
       // m4b already exists in DB — not new; epub is genuinely new
       findBooksByLibraryFolder: vi
@@ -891,6 +912,223 @@ describe('missing book restoration', () => {
     await done;
 
     expect(repo.updateBookStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('cross-library transfer', () => {
+  it('transfers a missing source book into the destination library via inode match', async () => {
+    const destinationFile = makeFileStat({
+      absolutePath: '/dest/Inbox/book.epub',
+      relPath: 'Inbox/book.epub',
+      ino: 4242,
+    });
+    const sourceFile = makeBookFile({
+      id: 500,
+      bookId: 42,
+      libraryFolderId: 10,
+      absolutePath: '/source/Book/book.epub',
+      relPath: 'Book/book.epub',
+      ino: 4242,
+      hash: 'transfer-hash',
+    });
+
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 20, path: '/dest', libraryId: 2 }]),
+      findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 1,
+        bookStatus: 'missing',
+        folderPath: '/source/Book',
+        libraryFolderPath: '/source',
+      }),
+      findBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 2,
+        bookStatus: 'present',
+        folderPath: '/dest/Inbox',
+        libraryFolderPath: '/source',
+      }),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/dest/Inbox', [destinationFile])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(2, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).toHaveBeenCalledWith(42, 2, 20, '/dest/Inbox');
+    expect(repo.createBook).not.toHaveBeenCalled();
+    expect(repo.updateBookFile).toHaveBeenCalledWith(
+      500,
+      expect.objectContaining({
+        bookId: 42,
+        libraryFolderId: 20,
+        absolutePath: '/dest/Inbox/book.epub',
+        relPath: 'Inbox/book.epub',
+      }),
+    );
+    expect(repo.updateBookPrimaryFile).toHaveBeenCalledWith(42, 500);
+  });
+
+  it('transfers a source book when inode matches and the previous path no longer exists', async () => {
+    const destinationFile = makeFileStat({
+      absolutePath: '/dest/Inbox/book.epub',
+      relPath: 'Inbox/book.epub',
+      ino: 4343,
+    });
+    const sourceFile = makeBookFile({
+      id: 510,
+      bookId: 55,
+      libraryFolderId: 10,
+      absolutePath: '/source/Book/book.epub',
+      relPath: 'Book/book.epub',
+      ino: 4343,
+      hash: 'transfer-hash',
+    });
+
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 22, path: '/dest', libraryId: 2 }]),
+      findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
+      findBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 1,
+        bookStatus: 'present',
+        folderPath: '/source/Book',
+        libraryFolderPath: '/source',
+      }),
+      findMissingBookFileWithContextByHash: vi.fn().mockResolvedValue(null),
+      findBookFileWithContextByHash: vi.fn().mockResolvedValue(null),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/dest/Inbox', [destinationFile])]);
+    mockStat.mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(2, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).toHaveBeenCalledWith(55, 2, 22, '/dest/Inbox');
+    expect(repo.createBook).not.toHaveBeenCalled();
+    expect(repo.updateBookFile).toHaveBeenCalledWith(
+      510,
+      expect.objectContaining({
+        bookId: 55,
+        libraryFolderId: 22,
+        absolutePath: '/dest/Inbox/book.epub',
+        relPath: 'Inbox/book.epub',
+      }),
+    );
+    expect(repo.updateBookPrimaryFile).toHaveBeenCalledWith(55, 510);
+  });
+
+  it('transfers a missing source book via hash fallback when inode differs', async () => {
+    const destinationFile = makeFileStat({
+      absolutePath: '/dest/Inbox/book.epub',
+      relPath: 'Inbox/book.epub',
+      ino: 9999,
+    });
+    const sourceFile = makeBookFile({
+      id: 600,
+      bookId: 77,
+      libraryFolderId: 11,
+      absolutePath: '/source/Book/book.epub',
+      relPath: 'Book/book.epub',
+      ino: 2222,
+      hash: 'transfer-hash',
+    });
+
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 21, path: '/dest', libraryId: 3 }]),
+      findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
+      findMissingBookFileWithContextByHash: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 1,
+        bookStatus: 'missing',
+        folderPath: '/source/Book',
+        libraryFolderPath: '/source',
+      }),
+      findBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
+      findBookFileWithContextByHash: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 3,
+        bookStatus: 'present',
+        folderPath: '/dest/Inbox',
+        libraryFolderPath: '/source',
+      }),
+      findBookFileByHash: vi.fn().mockResolvedValue(null),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/dest/Inbox', [destinationFile])]);
+    mockFingerprint.mockResolvedValue('transfer-hash');
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(3, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).toHaveBeenCalledWith(77, 3, 21, '/dest/Inbox');
+    expect(repo.createBook).not.toHaveBeenCalled();
+    expect(repo.updateBookFile).toHaveBeenCalledWith(
+      600,
+      expect.objectContaining({
+        bookId: 77,
+        libraryFolderId: 21,
+        absolutePath: '/dest/Inbox/book.epub',
+      }),
+    );
+    expect(repo.updateBookPrimaryFile).toHaveBeenCalledWith(77, 600);
+  });
+
+  it('does not transfer ownership when destination folder already has a book', async () => {
+    const destinationFile = makeFileStat({
+      absolutePath: '/dest/Inbox/book.epub',
+      relPath: 'Inbox/book.epub',
+      ino: 5151,
+    });
+    const sourceFile = makeBookFile({
+      id: 700,
+      bookId: 88,
+      libraryFolderId: 12,
+      absolutePath: '/source/Book/book.epub',
+      relPath: 'Book/book.epub',
+      ino: 5151,
+      hash: 'transfer-hash',
+    });
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 30, path: '/dest', libraryId: 4 }]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 9, libraryId: 4, libraryFolderId: 30, folderPath: '/dest/Inbox', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 1,
+        bookStatus: 'missing',
+        folderPath: '/source/Book',
+        libraryFolderPath: '/source',
+      }),
+      findBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 1,
+        bookStatus: 'missing',
+        folderPath: '/source/Book',
+        libraryFolderPath: '/source',
+      }),
+    });
+    mockFindCandidates.mockResolvedValue([makeCandidate('/dest/Inbox', [destinationFile])]);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(4, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).not.toHaveBeenCalled();
+    expect(repo.createBook).not.toHaveBeenCalled();
   });
 });
 
@@ -1162,7 +1400,7 @@ describe('book_per_file mode — runScan', () => {
     expect(mockFindCandidates).not.toHaveBeenCalled();
   });
 
-  it('calls findBookCandidates (not loose) when organizationMode is auto', async () => {
+  it('calls findBookCandidates (not loose) when organizationMode is book_per_folder', async () => {
     const repo = makeRepo();
     const done = awaitScan(repo);
     const { service } = makeService(repo);
@@ -1323,7 +1561,7 @@ describe('book_per_file mode — scanBookFolder', () => {
     expect(repo.createBook).not.toHaveBeenCalled();
   });
 
-  it('falls through to normal folder scan when mode is auto', async () => {
+  it('falls through to normal folder scan when mode is book_per_folder', async () => {
     const repo = makeRepo({
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
     });

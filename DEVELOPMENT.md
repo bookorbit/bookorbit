@@ -115,6 +115,8 @@ pnpm run test              # all tests (server + client)
 pnpm run test:server       # server unit tests only
 pnpm run test:client       # client unit tests only
 pnpm run test:e2e:smoke    # e2e smoke suite (requires running DB)
+pnpm run test:e2e:scanner  # scanner e2e suite (uses dedicated projectx_e2e DB)
+pnpm run test:e2e:scanner:file-ops  # scanner file operation e2e suite
 ```
 
 Watch mode while working on a specific area:
@@ -122,6 +124,34 @@ Watch mode while working on a specific area:
 ```bash
 cd server && pnpm test:watch
 ```
+
+### Scanner e2e details
+
+- `pnpm run test:e2e:scanner` prepares and migrates a dedicated e2e database (`projectx_e2e`) on each run.
+- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
+- Results are written to `test-results/server/`:
+  - `scanner-e2e-junit.xml`
+  - `scanner-e2e-scenarios.json`
+
+### Scanner file operation e2e details
+
+- `pnpm run test:e2e:scanner:file-ops` prepares and migrates the same dedicated e2e database (`projectx_e2e`) before running.
+- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
+- Results are written to `test-results/server/`:
+  - `scanner-file-ops-e2e-junit.xml`
+  - `scanner-file-ops-e2e-scenarios.json`
+
+### Scanner e2e in CI (manual)
+
+- Open GitHub Actions and run the **Scanner E2E** workflow manually (`workflow_dispatch`).
+- The workflow runs the full scanner scenario matrix against a service-container Postgres instance.
+- It uploads `test-results/server/` as an artifact and publishes JUnit annotations.
+
+### Scanner file operation e2e in CI
+
+- Open GitHub Actions and run the **Scanner File Ops E2E** workflow manually (`workflow_dispatch`) or wait for the nightly run.
+- The workflow runs the full file operation matrix against a service-container Postgres instance.
+- It uploads `test-results/server/` as an artifact and publishes JUnit annotations.
 
 ---
 

@@ -108,7 +108,7 @@ CREATE TABLE "libraries" (
 	"metadata_precedence" jsonb DEFAULT '["folderStructure","embedded","nfoFile","opfFile","sidecar"]'::jsonb NOT NULL,
 	"format_priority" jsonb DEFAULT '["epub","pdf","cbz","cbr","cb7","mobi","azw3","azw","fb2","m4b","mp3","m4a","opus","ogg","flac"]'::jsonb NOT NULL,
 	"allowed_formats" jsonb DEFAULT '[]'::jsonb NOT NULL,
-	"organization_mode" varchar(20) DEFAULT 'auto' NOT NULL,
+	"organization_mode" varchar(20) DEFAULT 'book_per_folder' NOT NULL,
 	"exclude_patterns" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"reading_threshold" double precision DEFAULT 0.25 NOT NULL,
 	"mark_as_finished_percent_complete" integer DEFAULT 98 NOT NULL,

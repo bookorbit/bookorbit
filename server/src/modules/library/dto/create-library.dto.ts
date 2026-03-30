@@ -69,7 +69,7 @@ export class CreateLibraryDto {
   allowedFormats?: string[];
 
   @IsOptional()
-  @IsIn(['auto', 'book_per_file', 'book_per_folder'])
+  @IsIn(['book_per_file', 'book_per_folder'])
   organizationMode?: string;
 
   @IsOptional()

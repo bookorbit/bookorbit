@@ -1,5 +1,5 @@
 {
-  "id": "6e69fe23-b05c-4a75-8fff-18a9a402877e",
+  "id": "c7f761cf-14d7-477f-87c2-84e7e901258c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -814,7 +814,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'auto'"
+          "default": "'book_per_folder'"
         },
         "exclude_patterns": {
           "name": "exclude_patterns",

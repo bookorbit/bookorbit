@@ -74,15 +74,19 @@ function onPatternKeydown(e: KeyboardEvent) {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           class="text-left rounded-lg border p-4 transition-colors"
-          :class="organizationMode === 'auto' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'"
-          @click="handleSelectMode('auto')"
+          :class="
+            organizationMode === 'book_per_folder'
+              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+              : 'border-border bg-card hover:border-primary/40'
+          "
+          @click="handleSelectMode('book_per_folder')"
         >
           <div class="flex items-center gap-2 mb-1.5">
             <span
               class="w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center"
-              :class="organizationMode === 'auto' ? 'border-primary' : 'border-muted-foreground/40'"
+              :class="organizationMode === 'book_per_folder' ? 'border-primary' : 'border-muted-foreground/40'"
             >
-              <span v-if="organizationMode === 'auto'" class="w-1.5 h-1.5 rounded-full bg-primary" />
+              <span v-if="organizationMode === 'book_per_folder'" class="w-1.5 h-1.5 rounded-full bg-primary" />
             </span>
             <span class="text-sm font-semibold text-foreground">Folder as Book</span>
             <span class="ml-auto text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">Recommended</span>
