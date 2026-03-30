@@ -33,8 +33,8 @@
     "db:reset": "bash ./scripts/db/reset.sh",
     "db:seed": "bash ./scripts/db/seed.sh",
     "db:prepare:e2e": "bash ./scripts/db/prepare-e2e.sh",
-    "test:e2e:scanner": "bash ./scripts/test/scanner-e2e.sh",
-    "test:e2e:scanner:file-ops": "bash ./scripts/test/scanner-file-ops-e2e.sh",
+    "test:e2e:scanner": "bash ./scripts/test/run-e2e-suite.sh test:e2e:scanner",
+    "test:e2e:scanner:file-ops": "bash ./scripts/test/run-e2e-suite.sh test:e2e:scanner:file-ops",
     "prepare": "husky"
   },
   "engines": {

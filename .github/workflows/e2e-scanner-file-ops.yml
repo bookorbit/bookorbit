@@ -5,6 +5,22 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 4 * * *"
+  push:
+    paths:
+      - "server/src/modules/scanner/**"
+      - "server/test/scanner*"
+      - "server/test/e2e/**"
+      - "server/src/db/schema/**"
+      - "scripts/test/**"
+      - "scripts/db/**"
+  pull_request:
+    paths:
+      - "server/src/modules/scanner/**"
+      - "server/test/scanner*"
+      - "server/test/e2e/**"
+      - "server/src/db/schema/**"
+      - "scripts/test/**"
+      - "scripts/db/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,64 +30,12 @@ permissions:
   contents: read
   checks: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NODE_VERSION: "24"
-  PNPM_VERSION: "10"
-  E2E_DATABASE_URL: postgres://projectx:projectx@localhost:5432/projectx_e2e
-  NODE_ENV: test
-  JWT_SECRET: scanner-e2e-secret-1234
-  JWT_EXPIRES_IN: 15m
-  JWT_REFRESH_EXPIRES_IN: 7d
-  BOOKS_PATH: ../local/data
-  APP_URL: http://localhost:5173
-
 jobs:
   scanner-file-ops-e2e:
-    name: Scanner File Ops E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: projectx
-          POSTGRES_PASSWORD: projectx
-          POSTGRES_DB: projectx
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U projectx"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Set up Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
-
-      - name: Run scanner file ops e2e suite
-        shell: bash
-        run: pnpm run test:e2e:scanner:file-ops
-
-      - name: Publish test report annotations
-        if: always()
-        uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2
-        with:
-          check_name: Server Scanner File Ops E2E
-          files: test-results/server/scanner-file-ops-e2e-junit.xml
-          fail_on: nothing
-          comment_mode: off
-
-      - name: Upload scanner file ops e2e artifacts
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: scanner-file-ops-e2e-report
-          path: test-results/server
-          retention-days: 7
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-script: test:e2e:scanner:file-ops
+      check-name: Server Scanner File Ops E2E
+      artifact-name: scanner-file-ops-e2e-report
+      junit-glob: test-results/server/scanner-file-ops-e2e-junit.xml
+      job-timeout-minutes: 60

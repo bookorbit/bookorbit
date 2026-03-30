@@ -5,9 +5,10 @@ vi.mock('../src/modules/scanner/lib/stability', () => ({
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
-import type { FixtureEntry } from './e2e/scanner-fixture-builder';
-import { createFixtureTree, file } from './e2e/scanner-fixture-builder';
+import type { FixtureEntry } from './e2e/scanner/scanner-fixture-builder';
+import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
 import {
+  assertNoIntegrityViolations,
   closeScannerE2EContext,
   createScannerE2EContext,
   loadLibraryBookState,
@@ -16,7 +17,7 @@ import {
   waitForScanCompletion,
   type LibraryBookState,
   type ScannerE2EContext,
-} from './e2e/scanner-harness';
+} from './e2e/scanner/scanner-harness';
 
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
 
@@ -390,6 +391,7 @@ async function runScenario(context: ScannerE2EContext, scenario: ScannerScenario
 
     const actual = await loadLibraryBookState(context.db, libraryId);
     assertScenarioOutcome(fixture.rootPath, scenario.expected, actual);
+    await assertNoIntegrityViolations(context.db);
 
     results.push({
       id: scenario.id,
@@ -440,6 +442,9 @@ describe('Scanner structures (e2e)', () => {
   });
 
   afterAll(async () => {
+    if (context) {
+      await assertNoIntegrityViolations(context.db);
+    }
     await writeScenarioReport(scenarioResults);
     if (context) {
       await closeScannerE2EContext(context);

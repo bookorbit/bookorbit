@@ -26,5 +26,8 @@ local/
 coverage/
 *.tsbuildinfo
 
+# Test results (generated artifacts - uploaded to CI, not committed)
+test-results/
+
 # IDE
 .idea/

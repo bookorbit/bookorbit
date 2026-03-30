@@ -6,12 +6,14 @@ import { randomUUID } from 'crypto';
 import { mkdir, realpath, rename, rm, stat, writeFile } from 'fs/promises';
 import { dirname, join, relative } from 'path';
 
-import { and, count, eq, isNull, like, sql } from 'drizzle-orm';
+import { and, count, eq, like } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
-import type { FixtureEntry } from './e2e/scanner-fixture-builder';
-import { createFixtureTree, file } from './e2e/scanner-fixture-builder';
+import { WATCHER_DEBOUNCE_MS } from '../src/modules/scanner/file-watcher.service';
+import type { FixtureEntry, FixtureTree } from './e2e/scanner/scanner-fixture-builder';
+import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
 import {
+  assertNoIntegrityViolations,
   closeScannerE2EContext,
   createScannerE2EContext,
   loadLibraryBookState,
@@ -22,7 +24,7 @@ import {
   waitForCondition,
   type LibraryBookState,
   type ScannerE2EContext,
-} from './e2e/scanner-harness';
+} from './e2e/scanner/scanner-harness';
 
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
 type TriggerMode = 'manual' | 'watcher';
@@ -74,27 +76,6 @@ interface SeededLibrary {
   key: LibraryKey;
   rootPath: string;
   libraryId: number;
-}
-
-interface IntegritySnapshot {
-  orphanBookMetadata: number;
-  orphanBookFiles: number;
-  orphanBookAuthors: number;
-  orphanBookGenres: number;
-  orphanBookTags: number;
-  orphanBookNarrators: number;
-  orphanCollectionBooks: number;
-  orphanUserBookStatus: number;
-  orphanReadingProgress: number;
-  orphanReadingSessions: number;
-  orphanAudiobookProgressBook: number;
-  orphanAudiobookProgressFile: number;
-  orphanBookmarks: number;
-  orphanAnnotations: number;
-  orphanReaderPreferences: number;
-  booksWithoutMetadata: number;
-  invalidPrimaryFileRef: number;
-  duplicatePresentFilePathPerLibrary: number;
 }
 
 interface StatefulSnapshot {
@@ -486,6 +467,7 @@ const structuralScenarios: StructuralScenario[] = [
       a: {
         statusByFolder: { Shelf: 'present' },
         fileOwners: { 'Shelf/book.epub': 'Shelf' },
+        presentCount: 1,
       },
     },
   },
@@ -499,6 +481,7 @@ const structuralScenarios: StructuralScenario[] = [
       a: {
         statusByFolder: { 'book.epub': 'present' },
         fileOwners: { 'book.epub': 'book.epub' },
+        presentCount: 1,
       },
     },
   },
@@ -582,7 +565,7 @@ const structuralScenarios: StructuralScenario[] = [
     entries: [file('lib-a/Track.mp3')],
     operations: [
       { type: 'deleteFile', path: 'lib-a/Track.mp3' },
-      { type: 'sleep', ms: 900 },
+      { type: 'sleep', ms: WATCHER_DEBOUNCE_MS + 400 },
       { type: 'writeFile', path: 'lib-a/Track.mp3' },
     ],
     expected: { a: { statusByFolder: { 'Track.mp3': 'present' }, presentCount: 1, missingCount: 0 } },
@@ -627,7 +610,7 @@ const structuralScenarios: StructuralScenario[] = [
     entries: [file('lib-a/Swap/old.epub')],
     operations: [
       { type: 'deleteDir', path: 'lib-a/Swap' },
-      { type: 'sleep', ms: 900 },
+      { type: 'sleep', ms: WATCHER_DEBOUNCE_MS + 400 },
       { type: 'writeFile', path: 'lib-a/Swap/new.epub' },
     ],
     expected: {
@@ -650,7 +633,7 @@ const structuralScenarios: StructuralScenario[] = [
     entries: [file('lib-a/Book/book.epub')],
     operations: [
       { type: 'move', from: 'lib-a/Book/book.epub', to: 'lib-b/Inbox/book.epub' },
-      { type: 'sleep', ms: 900 },
+      { type: 'sleep', ms: WATCHER_DEBOUNCE_MS + 400 },
       { type: 'writeFile', path: 'lib-a/Book/book.epub' },
     ],
     expected: {
@@ -782,152 +765,6 @@ function assertLibraryExpectation(rootPath: string, actual: LibraryBookState[], 
     const absoluteFilePath = join(rootPath, filePath);
     const owners = actual.filter((book) => book.filePaths.includes(absoluteFilePath));
     expect(owners, `file "${filePath}" should not be owned by any book`).toHaveLength(0);
-  }
-}
-
-async function loadIntegritySnapshot(db: ScannerE2EContext['db']): Promise<IntegritySnapshot> {
-  const [orphanBookMetadata] = await db
-    .select({ value: count() })
-    .from(schema.bookMetadata)
-    .leftJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanBookFiles] = await db
-    .select({ value: count() })
-    .from(schema.bookFiles)
-    .leftJoin(schema.books, eq(schema.bookFiles.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanBookAuthors] = await db
-    .select({ value: count() })
-    .from(schema.bookAuthors)
-    .leftJoin(schema.books, eq(schema.bookAuthors.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanBookGenres] = await db
-    .select({ value: count() })
-    .from(schema.bookGenres)
-    .leftJoin(schema.books, eq(schema.bookGenres.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanBookTags] = await db
-    .select({ value: count() })
-    .from(schema.bookTags)
-    .leftJoin(schema.books, eq(schema.bookTags.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanBookNarrators] = await db
-    .select({ value: count() })
-    .from(schema.bookNarrators)
-    .leftJoin(schema.books, eq(schema.bookNarrators.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanCollectionBooks] = await db
-    .select({ value: count() })
-    .from(schema.collectionBooks)
-    .leftJoin(schema.books, eq(schema.collectionBooks.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanUserBookStatus] = await db
-    .select({ value: count() })
-    .from(schema.userBookStatus)
-    .leftJoin(schema.books, eq(schema.userBookStatus.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanReadingProgress] = await db
-    .select({ value: count() })
-    .from(schema.readingProgress)
-    .leftJoin(schema.bookFiles, eq(schema.readingProgress.bookFileId, schema.bookFiles.id))
-    .where(isNull(schema.bookFiles.id));
-
-  const [orphanReadingSessions] = await db
-    .select({ value: count() })
-    .from(schema.readingSessions)
-    .leftJoin(schema.bookFiles, eq(schema.readingSessions.bookFileId, schema.bookFiles.id))
-    .where(isNull(schema.bookFiles.id));
-
-  const [orphanAudiobookProgressBook] = await db
-    .select({ value: count() })
-    .from(schema.audiobookProgress)
-    .leftJoin(schema.books, eq(schema.audiobookProgress.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanAudiobookProgressFile] = await db
-    .select({ value: count() })
-    .from(schema.audiobookProgress)
-    .leftJoin(schema.bookFiles, eq(schema.audiobookProgress.currentFileId, schema.bookFiles.id))
-    .where(isNull(schema.bookFiles.id));
-
-  const [orphanBookmarks] = await db
-    .select({ value: count() })
-    .from(schema.bookmarks)
-    .leftJoin(schema.books, eq(schema.bookmarks.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanAnnotations] = await db
-    .select({ value: count() })
-    .from(schema.annotations)
-    .leftJoin(schema.books, eq(schema.annotations.bookId, schema.books.id))
-    .where(isNull(schema.books.id));
-
-  const [orphanReaderPreferences] = await db
-    .select({ value: count() })
-    .from(schema.readerPreferences)
-    .leftJoin(schema.bookFiles, eq(schema.readerPreferences.bookFileId, schema.bookFiles.id))
-    .where(isNull(schema.bookFiles.id));
-
-  const [booksWithoutMetadata] = await db
-    .select({ value: count() })
-    .from(schema.books)
-    .leftJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
-    .where(isNull(schema.bookMetadata.bookId));
-
-  const invalidPrimaryRows = await db
-    .select({ bookId: schema.books.id })
-    .from(schema.books)
-    .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-    .where(
-      sql`${schema.books.status} = 'present' AND ${schema.books.primaryFileId} IS NOT NULL AND (${schema.bookFiles.id} IS NULL OR ${schema.bookFiles.bookId} <> ${schema.books.id})`,
-    );
-
-  const duplicatePresentRows = await db
-    .select({
-      libraryId: schema.books.libraryId,
-      absolutePath: schema.bookFiles.absolutePath,
-      fileCount: sql<number>`count(*)`,
-    })
-    .from(schema.bookFiles)
-    .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-    .where(eq(schema.books.status, 'present'))
-    .groupBy(schema.books.libraryId, schema.bookFiles.absolutePath)
-    .having(sql`count(*) > 1`);
-
-  return {
-    orphanBookMetadata: Number(orphanBookMetadata.value),
-    orphanBookFiles: Number(orphanBookFiles.value),
-    orphanBookAuthors: Number(orphanBookAuthors.value),
-    orphanBookGenres: Number(orphanBookGenres.value),
-    orphanBookTags: Number(orphanBookTags.value),
-    orphanBookNarrators: Number(orphanBookNarrators.value),
-    orphanCollectionBooks: Number(orphanCollectionBooks.value),
-    orphanUserBookStatus: Number(orphanUserBookStatus.value),
-    orphanReadingProgress: Number(orphanReadingProgress.value),
-    orphanReadingSessions: Number(orphanReadingSessions.value),
-    orphanAudiobookProgressBook: Number(orphanAudiobookProgressBook.value),
-    orphanAudiobookProgressFile: Number(orphanAudiobookProgressFile.value),
-    orphanBookmarks: Number(orphanBookmarks.value),
-    orphanAnnotations: Number(orphanAnnotations.value),
-    orphanReaderPreferences: Number(orphanReaderPreferences.value),
-    booksWithoutMetadata: Number(booksWithoutMetadata.value),
-    invalidPrimaryFileRef: invalidPrimaryRows.length,
-    duplicatePresentFilePathPerLibrary: duplicatePresentRows.length,
-  };
-}
-
-async function assertNoIntegrityViolations(db: ScannerE2EContext['db']): Promise<void> {
-  const snapshot = await loadIntegritySnapshot(db);
-  for (const [key, value] of Object.entries(snapshot)) {
-    expect(value, `integrity violation ${key}`).toBe(0);
   }
 }
 
@@ -1293,22 +1130,284 @@ async function writeScenarioReport(results: ScenarioRunResult[]): Promise<void> 
   );
 }
 
-async function runRecordedScenario(scenarioId: string, trigger: TriggerMode, results: ScenarioRunResult[], work: () => Promise<void>): Promise<void> {
+interface StatefulScenario {
+  id: string;
+  trigger: TriggerMode;
+  fixturePrefix: string;
+  fixtureEntries: FixtureEntry[];
+  run: (context: ScannerE2EContext, fixture: FixtureTree) => Promise<void>;
+}
+
+async function runStatefulScenario(context: ScannerE2EContext, scenario: StatefulScenario, results: ScenarioRunResult[]): Promise<void> {
   const startedAt = Date.now();
+  await resetScannerFileOpsState(context.db);
+  const fixture = await createFixtureTree(scenario.fixtureEntries, scenario.fixturePrefix);
   try {
-    await work();
-    results.push({ id: scenarioId, trigger, status: 'passed', durationMs: Date.now() - startedAt });
+    await scenario.run(context, fixture);
+    results.push({ id: scenario.id, trigger: scenario.trigger, status: 'passed', durationMs: Date.now() - startedAt });
   } catch (err) {
     results.push({
-      id: scenarioId,
-      trigger,
+      id: scenario.id,
+      trigger: scenario.trigger,
       status: 'failed',
       durationMs: Date.now() - startedAt,
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;
+  } finally {
+    await fixture.cleanup();
   }
 }
+
+const statefulScenarios: StatefulScenario[] = [
+  {
+    id: 'stateful-manual-delete-primary-preserves-data',
+    trigger: 'manual',
+    fixturePrefix: 'scanner-file-ops-stateful-manual-delete-',
+    fixtureEntries: [file('lib-a/Book/book.epub')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      await mkdir(requestedRootA, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      const library = await seedLibrary(context.db, {
+        rootPath: rootA,
+        mode: 'book_per_folder',
+        watch: false,
+        name: `scanner-file-ops-stateful-manual-delete-${randomUUID()}`,
+      });
+
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Book'));
+      if (sourceBook.primaryFileId == null) throw new Error('Expected primary file id to be present');
+
+      const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
+
+      await applyOperation(fixture.rootPath, { type: 'deleteFile', path: 'lib-a/Book/book.epub' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const sourceAfter = await getBookById(context.db, sourceBook.id);
+      expect(sourceAfter.status).toBe('missing');
+
+      await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
+      await assertNoIntegrityViolations(context.db);
+    },
+  },
+  {
+    id: 'stateful-manual-cross-library-move-preserves-book-identity',
+    trigger: 'manual',
+    fixturePrefix: 'scanner-file-ops-stateful-cross-lib-manual-',
+    fixtureEntries: [file('lib-a/Book/book.epub')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      const requestedRootB = join(fixture.rootPath, 'lib-b');
+      await mkdir(requestedRootA, { recursive: true });
+      await mkdir(requestedRootB, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      const rootB = await realpath(requestedRootB);
+
+      const sourceLibrary = await seedLibrary(context.db, {
+        rootPath: rootA,
+        mode: 'book_per_folder',
+        watch: false,
+        name: `scanner-file-ops-stateful-source-${randomUUID()}`,
+      });
+      const destinationLibrary = await seedLibrary(context.db, {
+        rootPath: rootB,
+        mode: 'book_per_folder',
+        watch: false,
+        name: `scanner-file-ops-stateful-destination-${randomUUID()}`,
+      });
+
+      await triggerAndWaitForLibraryScan(context, sourceLibrary.libraryId);
+      await triggerAndWaitForLibraryScan(context, destinationLibrary.libraryId);
+
+      const sourceBook = await getBookByFolderPath(context.db, sourceLibrary.libraryId, join(rootA, 'Book'));
+      if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
+
+      const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
+
+      await applyOperation(fixture.rootPath, { type: 'move', from: 'lib-a/Book/book.epub', to: 'lib-b/Inbox/book.epub' });
+
+      await triggerAndWaitForLibraryScan(context, sourceLibrary.libraryId);
+      await triggerAndWaitForLibraryScan(context, destinationLibrary.libraryId);
+
+      const movedBook = await getBookById(context.db, sourceBook.id);
+      expect(movedBook.libraryId).toBe(destinationLibrary.libraryId);
+      expect(movedBook.status).toBe('present');
+      expect(movedBook.folderPath).toBe(join(rootB, 'Inbox'));
+      expect(movedBook.primaryFileId).toBe(sourceBook.primaryFileId);
+
+      const destinationBook = await getBookByFolderPath(context.db, destinationLibrary.libraryId, join(rootB, 'Inbox'));
+      expect(destinationBook.id).toBe(sourceBook.id);
+      expect(destinationBook.status).toBe('present');
+      expect(destinationBook.primaryFileId).toBe(sourceBook.primaryFileId);
+
+      const sourceState = await loadLibraryBookState(context.db, sourceLibrary.libraryId);
+      expect(sourceState).toHaveLength(0);
+
+      await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
+      await assertNoIntegrityViolations(context.db);
+    },
+  },
+  {
+    id: 'stateful-watcher-cross-library-move-preserves-book-identity',
+    trigger: 'watcher',
+    fixturePrefix: 'scanner-file-ops-stateful-cross-lib-watcher-',
+    fixtureEntries: [file('lib-a/Book/book.epub')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      const requestedRootB = join(fixture.rootPath, 'lib-b');
+      await mkdir(requestedRootA, { recursive: true });
+      await mkdir(requestedRootB, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      const rootB = await realpath(requestedRootB);
+
+      let sourceLibraryId: number | null = null;
+      let destinationLibraryId: number | null = null;
+      try {
+        const sourceLibrary = await seedLibrary(context.db, {
+          rootPath: rootA,
+          mode: 'book_per_folder',
+          watch: false,
+          name: `scanner-file-ops-stateful-source-watcher-${randomUUID()}`,
+        });
+        sourceLibraryId = sourceLibrary.libraryId;
+        const destinationLibrary = await seedLibrary(context.db, {
+          rootPath: rootB,
+          mode: 'book_per_folder',
+          watch: false,
+          name: `scanner-file-ops-stateful-destination-watcher-${randomUUID()}`,
+        });
+        destinationLibraryId = destinationLibrary.libraryId;
+
+        await triggerAndWaitForLibraryScan(context, sourceLibrary.libraryId);
+        await triggerAndWaitForLibraryScan(context, destinationLibrary.libraryId);
+
+        const sourceBook = await getBookByFolderPath(context.db, sourceLibrary.libraryId, join(rootA, 'Book'));
+        if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
+
+        const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
+
+        await startLibraryWatcher(context, sourceLibrary.libraryId, [rootA]);
+        await startLibraryWatcher(context, destinationLibrary.libraryId, [rootB]);
+        await applyOperation(fixture.rootPath, { type: 'move', from: 'lib-a/Book/book.epub', to: 'lib-b/Inbox/book.epub' });
+
+        await waitForCondition(async () => {
+          const movedBook = await getBookById(context.db, sourceBook.id);
+          expect(movedBook.libraryId).toBe(destinationLibrary.libraryId);
+          expect(movedBook.status).toBe('present');
+          expect(movedBook.folderPath).toBe(join(rootB, 'Inbox'));
+          expect(movedBook.primaryFileId).toBe(sourceBook.primaryFileId);
+
+          const destinationBook = await getBookByFolderPath(context.db, destinationLibrary.libraryId, join(rootB, 'Inbox'));
+          expect(destinationBook.id).toBe(sourceBook.id);
+          expect(destinationBook.primaryFileId).toBe(sourceBook.primaryFileId);
+
+          const sourceState = await loadLibraryBookState(context.db, sourceLibrary.libraryId);
+          expect(sourceState).toHaveLength(0);
+        }, 40_000);
+
+        await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
+        await assertNoIntegrityViolations(context.db);
+      } finally {
+        if (sourceLibraryId != null) await stopLibraryWatcher(context, sourceLibraryId);
+        if (destinationLibraryId != null) await stopLibraryWatcher(context, destinationLibraryId);
+      }
+    },
+  },
+  {
+    id: 'stateful-watcher-rename-folder-preserves-data',
+    trigger: 'watcher',
+    fixturePrefix: 'scanner-file-ops-stateful-watcher-rename-',
+    fixtureEntries: [file('lib-a/Old/book.epub')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      await mkdir(requestedRootA, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      let libraryId: number | null = null;
+      try {
+        const library = await seedLibrary(context.db, {
+          rootPath: rootA,
+          mode: 'book_per_folder',
+          watch: false,
+          name: `scanner-file-ops-stateful-watcher-rename-${randomUUID()}`,
+        });
+        libraryId = library.libraryId;
+
+        await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+        const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Old'));
+        if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
+
+        const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
+
+        await startLibraryWatcher(context, library.libraryId, [rootA]);
+        await applyOperation(fixture.rootPath, { type: 'move', from: 'lib-a/Old', to: 'lib-a/New' });
+
+        await waitForCondition(async () => {
+          const book = await getBookById(context.db, sourceBook.id);
+          expect(book.status).toBe('present');
+          expect(book.folderPath).toBe(join(rootA, 'New'));
+        }, 40_000);
+
+        await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
+        await assertNoIntegrityViolations(context.db);
+      } finally {
+        if (libraryId != null) await stopLibraryWatcher(context, libraryId);
+      }
+    },
+  },
+  {
+    id: 'stateful-watcher-delete-then-restore-preserves-data',
+    trigger: 'watcher',
+    fixturePrefix: 'scanner-file-ops-stateful-watcher-delete-restore-',
+    fixtureEntries: [file('lib-a/Book/book.epub')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      await mkdir(requestedRootA, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      let libraryId: number | null = null;
+      try {
+        const library = await seedLibrary(context.db, {
+          rootPath: rootA,
+          mode: 'book_per_folder',
+          watch: false,
+          name: `scanner-file-ops-stateful-watcher-delete-restore-${randomUUID()}`,
+        });
+        libraryId = library.libraryId;
+
+        await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+        const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Book'));
+        if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
+
+        const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
+
+        await startLibraryWatcher(context, library.libraryId, [rootA]);
+
+        await applyOperation(fixture.rootPath, { type: 'deleteFile', path: 'lib-a/Book/book.epub' });
+
+        await waitForCondition(async () => {
+          const book = await getBookById(context.db, sourceBook.id);
+          expect(book.status).toBe('missing');
+        }, 40_000);
+
+        await applyOperation(fixture.rootPath, { type: 'writeFile', path: 'lib-a/Book/book.epub' });
+
+        await waitForCondition(async () => {
+          const book = await getBookById(context.db, sourceBook.id);
+          expect(book.status).toBe('present');
+        }, 40_000);
+
+        await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
+        await assertNoIntegrityViolations(context.db);
+      } finally {
+        if (libraryId != null) await stopLibraryWatcher(context, libraryId);
+      }
+    },
+  },
+];
 
 describe('Scanner file operations (e2e)', () => {
   let context: ScannerE2EContext | null = null;
@@ -1319,6 +1418,9 @@ describe('Scanner file operations (e2e)', () => {
   });
 
   afterAll(async () => {
+    if (context) {
+      await assertNoIntegrityViolations(context.db);
+    }
     await writeScenarioReport(scenarioResults);
     if (context) {
       await closeScannerE2EContext(context);
@@ -1339,295 +1441,15 @@ describe('Scanner file operations (e2e)', () => {
   });
 
   describe('stateful consistency scenarios', () => {
-    it(
-      'stateful-manual-delete-primary-preserves-data',
-      async () => {
-        if (!context) throw new Error('E2E context not initialized');
-
-        await runRecordedScenario('stateful-manual-delete-primary-preserves-data', 'manual', scenarioResults, async () => {
-          await resetScannerFileOpsState(context.db);
-          const fixture = await createFixtureTree([file('lib-a/Book/book.epub')], 'scanner-file-ops-stateful-manual-delete-');
-          try {
-            const requestedRootA = join(fixture.rootPath, 'lib-a');
-            await mkdir(requestedRootA, { recursive: true });
-            const rootA = await realpath(requestedRootA);
-            const library = await seedLibrary(context.db, {
-              rootPath: rootA,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-manual-delete-${randomUUID()}`,
-            });
-
-            await triggerAndWaitForLibraryScan(context, library.libraryId);
-
-            const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Book'));
-            if (sourceBook.primaryFileId == null) throw new Error('Expected primary file id to be present');
-
-            const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
-
-            await applyOperation(fixture.rootPath, { type: 'deleteFile', path: 'lib-a/Book/book.epub' });
-            await triggerAndWaitForLibraryScan(context, library.libraryId);
-
-            const sourceAfter = await getBookById(context.db, sourceBook.id);
-            expect(sourceAfter.status).toBe('missing');
-
-            await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
-            await assertNoIntegrityViolations(context.db);
-          } finally {
-            await fixture.cleanup();
-          }
-        });
-      },
-      SCENARIO_TIMEOUT_MS,
-    );
-
-    it(
-      'stateful-manual-cross-library-move-preserves-book-identity',
-      async () => {
-        if (!context) throw new Error('E2E context not initialized');
-
-        await runRecordedScenario('stateful-manual-cross-library-move-preserves-book-identity', 'manual', scenarioResults, async () => {
-          await resetScannerFileOpsState(context.db);
-          const fixture = await createFixtureTree([file('lib-a/Book/book.epub')], 'scanner-file-ops-stateful-cross-lib-manual-');
-          try {
-            const requestedRootA = join(fixture.rootPath, 'lib-a');
-            const requestedRootB = join(fixture.rootPath, 'lib-b');
-            await mkdir(requestedRootA, { recursive: true });
-            await mkdir(requestedRootB, { recursive: true });
-            const rootA = await realpath(requestedRootA);
-            const rootB = await realpath(requestedRootB);
-
-            const sourceLibrary = await seedLibrary(context.db, {
-              rootPath: rootA,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-source-${randomUUID()}`,
-            });
-            const destinationLibrary = await seedLibrary(context.db, {
-              rootPath: rootB,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-destination-${randomUUID()}`,
-            });
-
-            await triggerAndWaitForLibraryScan(context, sourceLibrary.libraryId);
-            await triggerAndWaitForLibraryScan(context, destinationLibrary.libraryId);
-
-            const sourceBook = await getBookByFolderPath(context.db, sourceLibrary.libraryId, join(rootA, 'Book'));
-            if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
-
-            const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
-
-            await applyOperation(fixture.rootPath, { type: 'move', from: 'lib-a/Book/book.epub', to: 'lib-b/Inbox/book.epub' });
-
-            await triggerAndWaitForLibraryScan(context, sourceLibrary.libraryId);
-            await triggerAndWaitForLibraryScan(context, destinationLibrary.libraryId);
-
-            const movedBook = await getBookById(context.db, sourceBook.id);
-            expect(movedBook.libraryId).toBe(destinationLibrary.libraryId);
-            expect(movedBook.status).toBe('present');
-            expect(movedBook.folderPath).toBe(join(rootB, 'Inbox'));
-            expect(movedBook.primaryFileId).toBe(sourceBook.primaryFileId);
-
-            const destinationBook = await getBookByFolderPath(context.db, destinationLibrary.libraryId, join(rootB, 'Inbox'));
-            expect(destinationBook.id).toBe(sourceBook.id);
-            expect(destinationBook.status).toBe('present');
-            expect(destinationBook.primaryFileId).toBe(sourceBook.primaryFileId);
-
-            const sourceState = await loadLibraryBookState(context.db, sourceLibrary.libraryId);
-            expect(sourceState).toHaveLength(0);
-
-            await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
-            await assertNoIntegrityViolations(context.db);
-          } finally {
-            await fixture.cleanup();
-          }
-        });
-      },
-      SCENARIO_TIMEOUT_MS,
-    );
-
-    it(
-      'stateful-watcher-cross-library-move-preserves-book-identity',
-      async () => {
-        if (!context) throw new Error('E2E context not initialized');
-
-        await runRecordedScenario('stateful-watcher-cross-library-move-preserves-book-identity', 'watcher', scenarioResults, async () => {
-          await resetScannerFileOpsState(context.db);
-          const fixture = await createFixtureTree([file('lib-a/Book/book.epub')], 'scanner-file-ops-stateful-cross-lib-watcher-');
-          let sourceLibraryId: number | null = null;
-          let destinationLibraryId: number | null = null;
-          try {
-            const requestedRootA = join(fixture.rootPath, 'lib-a');
-            const requestedRootB = join(fixture.rootPath, 'lib-b');
-            await mkdir(requestedRootA, { recursive: true });
-            await mkdir(requestedRootB, { recursive: true });
-            const rootA = await realpath(requestedRootA);
-            const rootB = await realpath(requestedRootB);
-
-            const sourceLibrary = await seedLibrary(context.db, {
-              rootPath: rootA,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-source-watcher-${randomUUID()}`,
-            });
-            sourceLibraryId = sourceLibrary.libraryId;
-            const destinationLibrary = await seedLibrary(context.db, {
-              rootPath: rootB,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-destination-watcher-${randomUUID()}`,
-            });
-            destinationLibraryId = destinationLibrary.libraryId;
-
-            await triggerAndWaitForLibraryScan(context, sourceLibrary.libraryId);
-            await triggerAndWaitForLibraryScan(context, destinationLibrary.libraryId);
-
-            const sourceBook = await getBookByFolderPath(context.db, sourceLibrary.libraryId, join(rootA, 'Book'));
-            if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
-
-            const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
-
-            await startLibraryWatcher(context, sourceLibrary.libraryId, [rootA]);
-            await startLibraryWatcher(context, destinationLibrary.libraryId, [rootB]);
-            await applyOperation(fixture.rootPath, { type: 'move', from: 'lib-a/Book/book.epub', to: 'lib-b/Inbox/book.epub' });
-
-            await waitForCondition(async () => {
-              const movedBook = await getBookById(context.db, sourceBook.id);
-              expect(movedBook.libraryId).toBe(destinationLibrary.libraryId);
-              expect(movedBook.status).toBe('present');
-              expect(movedBook.folderPath).toBe(join(rootB, 'Inbox'));
-              expect(movedBook.primaryFileId).toBe(sourceBook.primaryFileId);
-
-              const destinationBook = await getBookByFolderPath(context.db, destinationLibrary.libraryId, join(rootB, 'Inbox'));
-              expect(destinationBook.id).toBe(sourceBook.id);
-              expect(destinationBook.primaryFileId).toBe(sourceBook.primaryFileId);
-
-              const sourceState = await loadLibraryBookState(context.db, sourceLibrary.libraryId);
-              expect(sourceState).toHaveLength(0);
-            }, 40_000);
-
-            await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
-            await assertNoIntegrityViolations(context.db);
-          } finally {
-            if (sourceLibraryId != null) {
-              await stopLibraryWatcher(context, sourceLibraryId);
-            }
-            if (destinationLibraryId != null) {
-              await stopLibraryWatcher(context, destinationLibraryId);
-            }
-            await fixture.cleanup();
-          }
-        });
-      },
-      SCENARIO_TIMEOUT_MS,
-    );
-
-    it(
-      'stateful-watcher-rename-folder-preserves-data',
-      async () => {
-        if (!context) throw new Error('E2E context not initialized');
-
-        await runRecordedScenario('stateful-watcher-rename-folder-preserves-data', 'watcher', scenarioResults, async () => {
-          await resetScannerFileOpsState(context.db);
-          const fixture = await createFixtureTree([file('lib-a/Old/book.epub')], 'scanner-file-ops-stateful-watcher-rename-');
-          let libraryId: number | null = null;
-          try {
-            const requestedRootA = join(fixture.rootPath, 'lib-a');
-            await mkdir(requestedRootA, { recursive: true });
-            const rootA = await realpath(requestedRootA);
-            const library = await seedLibrary(context.db, {
-              rootPath: rootA,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-watcher-rename-${randomUUID()}`,
-            });
-            libraryId = library.libraryId;
-
-            await triggerAndWaitForLibraryScan(context, library.libraryId);
-
-            const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Old'));
-            if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
-
-            const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
-
-            await startLibraryWatcher(context, library.libraryId, [rootA]);
-            await applyOperation(fixture.rootPath, { type: 'move', from: 'lib-a/Old', to: 'lib-a/New' });
-
-            await waitForCondition(async () => {
-              const book = await getBookById(context.db, sourceBook.id);
-              expect(book.status).toBe('present');
-              expect(book.folderPath).toBe(join(rootA, 'New'));
-            }, 40_000);
-
-            await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
-            await assertNoIntegrityViolations(context.db);
-          } finally {
-            if (libraryId != null) {
-              await stopLibraryWatcher(context, libraryId);
-            }
-            await fixture.cleanup();
-          }
-        });
-      },
-      SCENARIO_TIMEOUT_MS,
-    );
-
-    it(
-      'stateful-watcher-delete-then-restore-preserves-data',
-      async () => {
-        if (!context) throw new Error('E2E context not initialized');
-
-        await runRecordedScenario('stateful-watcher-delete-then-restore-preserves-data', 'watcher', scenarioResults, async () => {
-          await resetScannerFileOpsState(context.db);
-          const fixture = await createFixtureTree([file('lib-a/Book/book.epub')], 'scanner-file-ops-stateful-watcher-delete-restore-');
-          let libraryId: number | null = null;
-          try {
-            const requestedRootA = join(fixture.rootPath, 'lib-a');
-            await mkdir(requestedRootA, { recursive: true });
-            const rootA = await realpath(requestedRootA);
-            const library = await seedLibrary(context.db, {
-              rootPath: rootA,
-              mode: 'book_per_folder',
-              watch: false,
-              name: `scanner-file-ops-stateful-watcher-delete-restore-${randomUUID()}`,
-            });
-            libraryId = library.libraryId;
-
-            await triggerAndWaitForLibraryScan(context, library.libraryId);
-
-            const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Book'));
-            if (sourceBook.primaryFileId == null) throw new Error('Expected source primary file id to be present');
-
-            const seeded = await seedStatefulData(context.db, sourceBook.id, sourceBook.primaryFileId);
-
-            await startLibraryWatcher(context, library.libraryId, [rootA]);
-
-            await applyOperation(fixture.rootPath, { type: 'deleteFile', path: 'lib-a/Book/book.epub' });
-
-            await waitForCondition(async () => {
-              const book = await getBookById(context.db, sourceBook.id);
-              expect(book.status).toBe('missing');
-            }, 40_000);
-
-            await applyOperation(fixture.rootPath, { type: 'writeFile', path: 'lib-a/Book/book.epub' });
-
-            await waitForCondition(async () => {
-              const book = await getBookById(context.db, sourceBook.id);
-              expect(book.status).toBe('present');
-            }, 40_000);
-
-            await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
-            await assertNoIntegrityViolations(context.db);
-          } finally {
-            if (libraryId != null) {
-              await stopLibraryWatcher(context, libraryId);
-            }
-            await fixture.cleanup();
-          }
-        });
-      },
-      SCENARIO_TIMEOUT_MS,
-    );
+    for (const scenario of statefulScenarios) {
+      it(
+        scenario.id,
+        async () => {
+          if (!context) throw new Error('E2E context not initialized');
+          await runStatefulScenario(context, scenario, scenarioResults);
+        },
+        SCENARIO_TIMEOUT_MS,
+      );
+    }
   });
 });

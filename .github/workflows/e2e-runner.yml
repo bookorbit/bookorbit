@@ -1,0 +1,89 @@
+name: E2E Runner (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      suite-script:
+        description: "pnpm root script to run (e.g. test:e2e:scanner)"
+        required: true
+        type: string
+      check-name:
+        description: "Name shown in the GitHub checks UI"
+        required: true
+        type: string
+      artifact-name:
+        description: "Name for the uploaded artifact"
+        required: true
+        type: string
+      junit-glob:
+        description: "Glob pattern for the JUnit XML report"
+        required: true
+        type: string
+      job-timeout-minutes:
+        description: "Job timeout in minutes"
+        required: false
+        type: number
+        default: 45
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
+  PNPM_VERSION: "10"
+  E2E_DATABASE_URL: postgres://projectx:projectx@localhost:5432/projectx_e2e
+  NODE_ENV: test
+  JWT_SECRET: scanner-e2e-secret-1234
+  JWT_EXPIRES_IN: 15m
+  JWT_REFRESH_EXPIRES_IN: 7d
+  BOOKS_PATH: ../local/data
+  APP_URL: http://localhost:5173
+
+jobs:
+  run-suite:
+    name: ${{ inputs.check-name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.job-timeout-minutes }}
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: projectx
+          POSTGRES_PASSWORD: projectx
+          POSTGRES_DB: projectx
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U projectx"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+
+      - name: Run e2e suite
+        shell: bash
+        run: pnpm run ${{ inputs.suite-script }}
+
+      - name: Publish test report annotations
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2
+        with:
+          check_name: ${{ inputs.check-name }}
+          files: ${{ inputs.junit-glob }}
+          fail_on: nothing
+          comment_mode: off
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: test-results/server
+          retention-days: 7

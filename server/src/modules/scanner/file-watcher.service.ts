@@ -16,7 +16,8 @@ import { classifyFile } from './lib/classify';
 type Db = NodePgDatabase<typeof schema>;
 type EventType = 'delete' | 'create';
 
-const DEBOUNCE_MS = 500;
+export const WATCHER_DEBOUNCE_MS = 500;
+const DEBOUNCE_MS = WATCHER_DEBOUNCE_MS;
 const SCAN_DEBOUNCE_MS = 3_000;
 const DIR_CREATE_SUPPRESS_MS = 6_000;
 const CROSS_LIBRARY_RESCAN_DEBOUNCE_MS = 1_500;
