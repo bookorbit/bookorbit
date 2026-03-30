@@ -304,6 +304,7 @@ describe('AuthService', () => {
 
     it('throws UnauthorizedException and revokes all sessions when revoked token is reused', async () => {
       const { service, db } = makeService();
+      const reply = makeReply();
       (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({
         id: 1,
         userId: 5,
@@ -311,8 +312,19 @@ describe('AuthService', () => {
         expiresAt: new Date(Date.now() + 100000),
       });
 
-      await expect(service.refresh(makeRequest({ refresh_token: 'revoked-token' }), makeReply())).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh(makeRequest({ refresh_token: 'revoked-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect(db.update).toHaveBeenCalled();
       expect(db.delete).toHaveBeenCalled();
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.objectContaining({ path: '/api/v1/auth', maxAge: 0 }),
+      );
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'access_token',
+        '',
+        expect.objectContaining({ path: '/api', maxAge: 0 }),
+      );
     });
 
     it('throws UnauthorizedException when token is expired', async () => {
@@ -595,14 +607,79 @@ describe('AuthService', () => {
       expect(result).toEqual({});
     });
 
-    it('returns empty object when OIDC is disabled', async () => {
-      const { service, db, userService, appSettings } = makeService();
+    it('revokes OIDC session and returns empty object when OIDC is disabled', async () => {
+      const { service, db, userService, appSettings, oidcSessionRepo } = makeService();
       (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({ id: 1, userId: 5 });
       userService.incrementTokenVersion.mockResolvedValue(undefined);
       appSettings.getOidcConfig.mockResolvedValue({ enabled: false });
+      oidcSessionRepo.findActiveByUserId.mockResolvedValue({
+        idTokenHint: 'id-token-hint',
+      });
 
       const result = await service.logout(makeRequest({ refresh_token: 'some-token' }), makeReply());
       expect(result).toEqual({});
+      expect(oidcSessionRepo.revokeByUserId).toHaveBeenCalledWith(5);
+    });
+
+    it('revokes OIDC session even when there is no id token hint', async () => {
+      const { service, db, userService, oidcSessionRepo } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({ id: 1, userId: 6 });
+      userService.incrementTokenVersion.mockResolvedValue(undefined);
+      oidcSessionRepo.findActiveByUserId.mockResolvedValue({
+        idTokenHint: null,
+      });
+
+      const result = await service.logout(makeRequest({ refresh_token: 'some-token' }), makeReply());
+      expect(result).toEqual({});
+      expect(oidcSessionRepo.revokeByUserId).toHaveBeenCalledWith(6);
+    });
+
+    it('returns logout URL when OIDC end-session endpoint is available', async () => {
+      const { service, db, userService, appSettings, oidcSessionRepo, oidcDiscovery } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({ id: 1, userId: 7 });
+      userService.incrementTokenVersion.mockResolvedValue(undefined);
+      appSettings.getOidcConfig.mockResolvedValue({ enabled: true, issuerUri: 'https://issuer.example' });
+      oidcSessionRepo.findActiveByUserId.mockResolvedValue({
+        idTokenHint: 'id-token-hint',
+      });
+      oidcDiscovery.getDiscoveryDoc.mockResolvedValue({
+        authorizationEndpoint: 'https://issuer.example/auth',
+        tokenEndpoint: 'https://issuer.example/token',
+        userinfoEndpoint: 'https://issuer.example/userinfo',
+        jwksUri: 'https://issuer.example/jwks',
+        issuer: 'https://issuer.example',
+        endSessionEndpoint: 'https://issuer.example/logout',
+      });
+
+      const request = makeRequest({ refresh_token: 'some-token' });
+      request.headers.origin = 'http://localhost:5173';
+
+      const result = await service.logout(request, makeReply());
+      expect(result).toEqual({
+        logoutUrl: 'https://issuer.example/logout?id_token_hint=id-token-hint&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A5173%2Flogin',
+      });
+      expect(oidcSessionRepo.revokeByUserId).toHaveBeenCalledWith(7);
+    });
+
+    it('revokes OIDC session and returns empty object when end-session endpoint is missing', async () => {
+      const { service, db, userService, appSettings, oidcSessionRepo, oidcDiscovery } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({ id: 1, userId: 8 });
+      userService.incrementTokenVersion.mockResolvedValue(undefined);
+      appSettings.getOidcConfig.mockResolvedValue({ enabled: true, issuerUri: 'https://issuer.example' });
+      oidcSessionRepo.findActiveByUserId.mockResolvedValue({
+        idTokenHint: 'id-token-hint',
+      });
+      oidcDiscovery.getDiscoveryDoc.mockResolvedValue({
+        authorizationEndpoint: 'https://issuer.example/auth',
+        tokenEndpoint: 'https://issuer.example/token',
+        userinfoEndpoint: 'https://issuer.example/userinfo',
+        jwksUri: 'https://issuer.example/jwks',
+        issuer: 'https://issuer.example',
+      });
+
+      const result = await service.logout(makeRequest({ refresh_token: 'some-token' }), makeReply());
+      expect(result).toEqual({});
+      expect(oidcSessionRepo.revokeByUserId).toHaveBeenCalledWith(8);
     });
   });
 });

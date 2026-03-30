@@ -237,11 +237,19 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    // Reuse of a revoked token → theft signal, revoke all user sessions
+    // Reuse of a revoked token indicates possible theft.
+    // Revoke refresh sessions and bump tokenVersion to invalidate active access tokens.
     if (row.revokedAt) {
       this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Token revoked - reuse attempt"`);
-      await this.db.delete(schema.refreshTokens).where(eq(schema.refreshTokens.userId, row.userId));
+      await this.db.transaction(async (tx) => {
+        await tx
+          .update(schema.users)
+          .set({ tokenVersion: sql`${schema.users.tokenVersion} + 1` })
+          .where(eq(schema.users.id, row.userId));
+        await tx.delete(schema.refreshTokens).where(eq(schema.refreshTokens.userId, row.userId));
+      });
       this.clearRefreshCookie(reply);
+      this.clearAccessCookie(reply);
       throw new UnauthorizedException();
     }
 
@@ -306,7 +314,10 @@ export class AuthService {
     if (!userId) return {};
 
     const oidcSession = await this.oidcSessionRepo.findActiveByUserId(userId);
-    if (!oidcSession?.idTokenHint) return {};
+    if (!oidcSession) return {};
+
+    await this.oidcSessionRepo.revokeByUserId(userId);
+    if (!oidcSession.idTokenHint) return {};
 
     try {
       const config = await this.appSettings.getOidcConfig();
@@ -320,8 +331,6 @@ export class AuthService {
 
       const params = new URLSearchParams({ id_token_hint: oidcSession.idTokenHint });
       if (postLogoutUri) params.set('post_logout_redirect_uri', postLogoutUri);
-
-      await this.oidcSessionRepo.revokeByUserId(userId);
 
       return { logoutUrl: `${disc.endSessionEndpoint}?${params.toString()}` };
     } catch {

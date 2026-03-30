@@ -50,8 +50,16 @@ pnpm db:studio                      # open Drizzle Studio (DB browser)
 ```bash
 pnpm test           # unit tests
 pnpm test:watch     # unit tests in watch mode
-pnpm test:e2e       # end-to-end tests
+pnpm test:e2e       # smoke end-to-end test from server package
 pnpm test:cov       # unit tests with coverage
+```
+
+For suite-based e2e runs (scanner, scanner-file-ops, auth suites), run from the repository root:
+
+```bash
+pnpm run test:e2e:list
+pnpm run test:e2e -- all
+pnpm run test:e2e -- scanner
 ```
 
 ## Quality

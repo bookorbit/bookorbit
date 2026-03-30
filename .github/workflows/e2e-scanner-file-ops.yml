@@ -34,8 +34,7 @@ jobs:
   scanner-file-ops-e2e:
     uses: ./.github/workflows/e2e-runner.yml
     with:
-      suite-script: test:e2e:scanner:file-ops
+      suite-id: scanner-file-ops
       check-name: Server Scanner File Ops E2E
       artifact-name: scanner-file-ops-e2e-report
-      junit-glob: test-results/server/scanner-file-ops-e2e-junit.xml
       job-timeout-minutes: 60

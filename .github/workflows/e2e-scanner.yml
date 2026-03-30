@@ -32,8 +32,7 @@ jobs:
   scanner-e2e:
     uses: ./.github/workflows/e2e-runner.yml
     with:
-      suite-script: test:e2e:scanner
+      suite-id: scanner
       check-name: Server Scanner E2E
       artifact-name: scanner-e2e-report
-      junit-glob: test-results/server/scanner-e2e-junit.xml
       job-timeout-minutes: 45

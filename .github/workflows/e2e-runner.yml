@@ -3,8 +3,8 @@ name: E2E Runner (reusable)
 on:
   workflow_call:
     inputs:
-      suite-script:
-        description: "pnpm root script to run (e.g. test:e2e:scanner)"
+      suite-id:
+        description: "E2E suite id from scripts/test/e2e-suites.mjs (e.g. scanner)"
         required: true
         type: string
       check-name:
@@ -13,10 +13,6 @@ on:
         type: string
       artifact-name:
         description: "Name for the uploaded artifact"
-        required: true
-        type: string
-      junit-glob:
-        description: "Glob pattern for the JUnit XML report"
         required: true
         type: string
       job-timeout-minutes:
@@ -69,14 +65,14 @@ jobs:
 
       - name: Run e2e suite
         shell: bash
-        run: pnpm run ${{ inputs.suite-script }}
+        run: pnpm run test:e2e -- ${{ inputs.suite-id }}
 
       - name: Publish test report annotations
         if: always()
         uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2
         with:
           check_name: ${{ inputs.check-name }}
-          files: ${{ inputs.junit-glob }}
+          files: test-results/server/*-e2e-junit.xml
           fail_on: nothing
           comment_mode: off
 

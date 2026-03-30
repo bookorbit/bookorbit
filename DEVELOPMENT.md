@@ -114,9 +114,12 @@ Opens Drizzle Studio in your browser for browsing and editing tables directly.
 pnpm run test              # all tests (server + client)
 pnpm run test:server       # server unit tests only
 pnpm run test:client       # client unit tests only
-pnpm run test:e2e:smoke    # e2e smoke suite (requires running DB)
-pnpm run test:e2e:scanner  # scanner e2e suite (uses dedicated projectx_e2e DB)
-pnpm run test:e2e:scanner:file-ops  # scanner file operation e2e suite
+pnpm run test:e2e -- all               # run all e2e suites sequentially
+pnpm run test:e2e -- smoke             # e2e smoke suite (default DB)
+pnpm run test:e2e -- scanner           # scanner e2e suite (dedicated projectx_e2e DB)
+pnpm run test:e2e -- scanner-file-ops  # scanner file operation e2e suite (dedicated projectx_e2e DB)
+pnpm run test:e2e:all                  # alias for "pnpm run test:e2e -- all"
+pnpm run test:e2e:list                 # list all supported e2e suite ids
 ```
 
 Watch mode while working on a specific area:
@@ -125,9 +128,23 @@ Watch mode while working on a specific area:
 cd server && pnpm test:watch
 ```
 
+Run a focused scanner scenario:
+
+```bash
+pnpm run test:e2e -- scanner --testNamePattern=book-per-folder-disc-folder-flattening
+```
+
+### E2E runner architecture
+
+- All suite metadata lives in `scripts/test/e2e-suites.mjs` (suite id, spec file, JUnit output, DB prep mode).
+- Local and CI use the same command: `pnpm run test:e2e -- <suite-id>`.
+- Use `all` as a composite suite id to run every configured suite in order.
+- Dedicated-db suites auto-start local PostgreSQL when `CI != true`, then reset and migrate the e2e database through `pnpm run db:prepare:e2e`.
+- JUnit outputs are written to `test-results/server/`.
+
 ### Scanner e2e details
 
-- `pnpm run test:e2e:scanner` prepares and migrates a dedicated e2e database (`projectx_e2e`) on each run.
+- `pnpm run test:e2e -- scanner` prepares and migrates a dedicated e2e database (`projectx_e2e`) on each run.
 - Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
 - Results are written to `test-results/server/`:
   - `scanner-e2e-junit.xml`
@@ -135,23 +152,32 @@ cd server && pnpm test:watch
 
 ### Scanner file operation e2e details
 
-- `pnpm run test:e2e:scanner:file-ops` prepares and migrates the same dedicated e2e database (`projectx_e2e`) before running.
+- `pnpm run test:e2e -- scanner-file-ops` prepares and migrates the same dedicated e2e database (`projectx_e2e`) before running.
 - Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
 - Results are written to `test-results/server/`:
   - `scanner-file-ops-e2e-junit.xml`
   - `scanner-file-ops-e2e-scenarios.json`
 
-### Scanner e2e in CI (manual)
+### E2E in CI (how to trigger)
 
-- Open GitHub Actions and run the **Scanner E2E** workflow manually (`workflow_dispatch`).
-- The workflow runs the full scanner scenario matrix against a service-container Postgres instance.
-- It uploads `test-results/server/` as an artifact and publishes JUnit annotations.
+Both workflows call the reusable `E2E Runner (reusable)` workflow, which runs:
 
-### Scanner file operation e2e in CI
+```bash
+pnpm run test:e2e -- <suite-id>
+```
 
-- Open GitHub Actions and run the **Scanner File Ops E2E** workflow manually (`workflow_dispatch`) or wait for the nightly run.
-- The workflow runs the full file operation matrix against a service-container Postgres instance.
-- It uploads `test-results/server/` as an artifact and publishes JUnit annotations.
+| Workflow             | Suite id           | Triggered by                                                                     |
+| -------------------- | ------------------ | -------------------------------------------------------------------------------- |
+| Scanner E2E          | `scanner`          | `workflow_dispatch`, `push` (scanner-related paths), `pull_request` (same paths) |
+| Scanner File Ops E2E | `scanner-file-ops` | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request`      |
+
+Manual trigger steps:
+
+1. Open GitHub Actions.
+2. Select **Scanner E2E** or **Scanner File Ops E2E**.
+3. Click **Run workflow**.
+
+Each run uploads `test-results/server/` as an artifact and publishes JUnit annotations from `test-results/server/*-e2e-junit.xml`.
 
 ---
 
