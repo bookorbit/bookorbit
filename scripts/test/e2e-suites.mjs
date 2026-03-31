@@ -41,6 +41,14 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "staging-ingest-finalize": {
+    id: "staging-ingest-finalize",
+    description: "Staging ingest and finalize suite",
+    vitestTarget: "test/staging-ingest-finalize.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/staging-ingest-finalize-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
 });
 
 export function listE2ESuites() {

@@ -171,7 +171,7 @@ onUnmounted(() => stopUploadCompletedListener())
         <!-- Brand name -->
         <div class="flex flex-col leading-none group-data-[collapsible=icon]:hidden">
           <span class="text-lg font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
-            Project<span class="text-primary"> X</span>
+            Project<span class="text-primary"> Q</span>
           </span>
           <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">Library Control</span>
         </div>

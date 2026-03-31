@@ -1,0 +1,42 @@
+name: Staging Ingest Finalize E2E
+run-name: ${{ format('Staging Ingest Finalize E2E - {0}', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "server/src/modules/staging/**"
+      - "server/src/modules/upload/**"
+      - "server/src/modules/metadata/**"
+      - "server/test/staging-ingest-finalize.e2e-spec.ts"
+      - "server/test/e2e/staging/**"
+      - "server/src/db/schema/**"
+      - "scripts/test/**"
+      - "scripts/db/**"
+  pull_request:
+    paths:
+      - "server/src/modules/staging/**"
+      - "server/src/modules/upload/**"
+      - "server/src/modules/metadata/**"
+      - "server/test/staging-ingest-finalize.e2e-spec.ts"
+      - "server/test/e2e/staging/**"
+      - "server/src/db/schema/**"
+      - "scripts/test/**"
+      - "scripts/db/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  staging-ingest-finalize-e2e:
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: staging-ingest-finalize
+      check-name: Server Staging Ingest Finalize E2E
+      artifact-name: staging-ingest-finalize-e2e-report
+      job-timeout-minutes: 45

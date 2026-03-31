@@ -76,7 +76,7 @@ export class StagingFinalizeService implements OnModuleInit {
     status?: string,
     search?: string,
   ): Promise<StagingFinalizeResult> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
+    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : dedupeIds(fileIds ?? []);
     const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
 
     const results: StagingFinalizeFileResult[] = [];
@@ -86,8 +86,21 @@ export class StagingFinalizeService implements OnModuleInit {
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const batch = ids.slice(i, i + BATCH_SIZE);
       const rows = await this.repo.findByIds(batch);
+      const rowById = new Map(rows.map((row) => [row.id, row]));
 
-      for (const row of rows) {
+      for (const fileId of batch) {
+        const row = rowById.get(fileId);
+        if (!row) {
+          failed++;
+          results.push({
+            fileId,
+            fileName: `staging-file-${fileId}`,
+            success: false,
+            message: 'Staging file not found',
+          });
+          continue;
+        }
+
         const result = await this.finalizeFile(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
         results.push(result);
         if (result.success) succeeded++;
@@ -499,4 +512,8 @@ function shouldAutoFinalize(row: StagingFileRow, mode: StagingAutoFinalizeMetada
     return row.status === 'ready';
   }
   return row.confidence !== null && row.confidence >= threshold;
+}
+
+function dedupeIds(ids: number[]): number[] {
+  return [...new Set(ids)];
 }
