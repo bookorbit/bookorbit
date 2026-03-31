@@ -1,5 +1,5 @@
 {
-  "id": "c7f761cf-14d7-477f-87c2-84e7e901258c",
+  "id": "c08571cb-9e94-4d9f-a4b0-ac8bf63c3abf",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2574,6 +2574,27 @@
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "annotations_user_book_idx": {
+          "name": "annotations_user_book_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

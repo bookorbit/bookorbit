@@ -4,7 +4,7 @@ import { OpdsEnabledGuard } from '../opds-enabled.guard';
 import type { AppSettingsService } from '../../app-settings/app-settings.service';
 
 function makeGuard(settings: { key: string; value: string }[]) {
-  const appSettingsService = { findAll: vi.fn().mockResolvedValue(settings) } as unknown as AppSettingsService;
+  const appSettingsService = { listSettings: vi.fn().mockResolvedValue(settings) } as unknown as AppSettingsService;
   return new OpdsEnabledGuard(appSettingsService);
 }
 

@@ -1,7 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
-import type { GlobalFileWriteSettings } from '@projectx/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
@@ -9,6 +8,7 @@ import { AppSettingsService } from './app-settings.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
 import { UpdateOidcConfigDto } from './dto/update-oidc-config.dto';
+import { UpdateFileWriteSettingsDto } from './dto/update-file-write-settings.dto';
 
 @Controller('app-settings')
 @RequirePermission(Permission.ManageAppSettings)
@@ -16,8 +16,8 @@ export class AppSettingsController {
   constructor(private readonly appSettingsService: AppSettingsService) {}
 
   @Get()
-  findAll() {
-    return this.appSettingsService.findAll();
+  listSettings() {
+    return this.appSettingsService.listSettings();
   }
 
   @Patch(':key')
@@ -84,21 +84,8 @@ export class AppSettingsController {
 
   @Post('oidc/test')
   @HttpCode(HttpStatus.OK)
-  async testOidcConnection(@Query('issuerUri') issuerUri?: string) {
-    const uri = issuerUri || (await this.appSettingsService.getOidcConfig()).issuerUri;
-    if (!uri) {
-      return { success: false, error: 'Issuer URI is not configured' };
-    }
-    try {
-      const url = `${uri.replace(/\/$/, '')}/.well-known/openid-configuration`;
-      const res = await fetch(url);
-      if (!res.ok) return { success: false, error: `Provider returned HTTP ${res.status}` };
-      const json: unknown = await res.json();
-      const doc = json as { issuer: string; authorization_endpoint: string };
-      return { success: true, issuer: doc.issuer, authorizationEndpoint: doc.authorization_endpoint };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+  testOidcConnection(@Query('issuerUri') issuerUri?: string) {
+    return this.appSettingsService.testOidcConnection(issuerUri);
   }
 
   @Get('file-write-settings')
@@ -109,7 +96,7 @@ export class AppSettingsController {
   @Put('file-write-settings')
   @HttpCode(HttpStatus.OK)
   @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated file write settings' })
-  updateFileWriteSettings(@Body() patch: Partial<GlobalFileWriteSettings>) {
-    return this.appSettingsService.updateFileWriteSettings(patch);
+  updateFileWriteSettings(@Body() dto: UpdateFileWriteSettingsDto) {
+    return this.appSettingsService.updateFileWriteSettings(dto);
   }
 }

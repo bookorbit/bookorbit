@@ -187,7 +187,7 @@ export const annotations = pgTable(
       .defaultNow()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [index('annotations_user_id_idx').on(t.userId)],
+  (t) => [index('annotations_user_id_idx').on(t.userId), index('annotations_user_book_idx').on(t.userId, t.bookId)],
 );
 
 export type AnnotationRow = typeof annotations.$inferSelect;

@@ -1,101 +1,123 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 
+import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
+
+import { AppSettingsRepository } from './app-settings.repository';
 import { AppSettingsService } from './app-settings.service';
 
-function makeDb() {
+function makeRepo(): jest.Mocked<AppSettingsRepository> {
   return {
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    orderBy: vi.fn().mockResolvedValue([]),
-    update: vi.fn().mockReturnThis(),
-    set: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    values: vi.fn().mockReturnThis(),
-    onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-    returning: vi.fn().mockResolvedValue([]),
-    query: {
-      appSettings: {
-        findFirst: vi.fn(),
-      },
-    },
-  };
+    listPublic: vi.fn().mockResolvedValue([]),
+    findByKey: vi.fn().mockResolvedValue(undefined),
+    findMany: vi.fn().mockResolvedValue([]),
+    updateByKey: vi.fn().mockResolvedValue(null),
+    upsert: vi.fn().mockResolvedValue(undefined),
+  } as unknown as jest.Mocked<AppSettingsRepository>;
 }
 
 describe('AppSettingsService', () => {
   let service: AppSettingsService;
-  let db: ReturnType<typeof makeDb>;
+  let repo: ReturnType<typeof makeRepo>;
 
   beforeEach(() => {
-    db = makeDb();
-    service = new AppSettingsService(db as never);
+    repo = makeRepo();
+    service = new AppSettingsService(repo);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('listSettings', () => {
+    it('delegates to repo.listPublic', async () => {
+      const rows = [{ key: 'allow_registration', value: 'true' }];
+      repo.listPublic.mockResolvedValue(rows as never);
+      const result = await service.listSettings();
+      expect(result).toEqual(rows);
+      expect(repo.listPublic).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('getValue', () => {
+    it('returns the stored value', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'opds_enabled', value: 'false' } as never);
+      expect(await service.getValue('opds_enabled')).toBe('false');
+    });
+
+    it('returns null when key not found', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.getValue('missing')).toBeNull();
+    });
   });
 
   describe('update', () => {
     it('returns updated setting', async () => {
       const setting = { key: 'allow_registration', value: 'true' };
-      db.returning.mockResolvedValue([setting]);
-
+      repo.updateByKey.mockResolvedValue(setting as never);
       const result = await service.update('allow_registration', 'true');
       expect(result).toEqual(setting);
     });
 
     it('throws NotFoundException when key does not exist', async () => {
-      db.returning.mockResolvedValue([]);
+      repo.updateByKey.mockResolvedValue(null);
       await expect(service.update('nonexistent_key', 'value')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('isStagingAutoFetchEnabled', () => {
     it('returns true by default when setting is absent', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue(undefined);
       expect(await service.isStagingAutoFetchEnabled()).toBe(true);
     });
 
     it('returns false when value is "false"', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'false' });
+      repo.findByKey.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'false' } as never);
       expect(await service.isStagingAutoFetchEnabled()).toBe(false);
     });
 
     it('returns true when value is "true"', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'true' });
+      repo.findByKey.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'true' } as never);
+      expect(await service.isStagingAutoFetchEnabled()).toBe(true);
+    });
+
+    it('returns true when value is unrecognised', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'yes' } as never);
       expect(await service.isStagingAutoFetchEnabled()).toBe(true);
     });
   });
 
-  describe('author auto-enrichment settings', () => {
-    it('isAuthorsAutoEnrichmentEnabled defaults to true when missing', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
-      expect(await service.isAuthorsAutoEnrichmentEnabled()).toBe(true);
-    });
-
-    it('isAuthorsAutoEnrichmentEnabled reads stored false values', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'authors_auto_enrichment_enabled', value: 'false' });
-      expect(await service.isAuthorsAutoEnrichmentEnabled()).toBe(false);
-    });
-
+  describe('author settings', () => {
     it('getAuthorsAutoEnrichmentWriteMode defaults to missing_only', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue(undefined);
       expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('missing_only');
     });
 
     it('getAuthorsAutoEnrichmentWriteMode accepts always_refetch', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'authors_auto_enrichment_write_mode', value: 'always_refetch' });
+      repo.findByKey.mockResolvedValue({ key: 'authors_auto_enrichment_write_mode', value: 'always_refetch' } as never);
       expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('always_refetch');
     });
 
-    it('isAuthorsProviderAudnexusEnabled defaults to true and reads false', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
-      expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(true);
+    it('getAuthorsAutoEnrichmentWriteMode falls back to missing_only for unknown value', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'authors_auto_enrichment_write_mode', value: 'unknown' } as never);
+      expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('missing_only');
+    });
 
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'authors_provider_audnexus_enabled', value: 'false' });
+    it('isAuthorsProviderAudnexusEnabled defaults to true', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(true);
+    });
+
+    it('isAuthorsProviderAudnexusEnabled returns false when stored', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'authors_provider_audnexus_enabled', value: 'false' } as never);
       expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(false);
     });
   });
 
   describe('getOidcConfig', () => {
     it('returns default config when no row in db', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue(undefined);
       const config = await service.getOidcConfig();
       expect(config.enabled).toBe(false);
       expect(config.scopes).toBe('openid profile email');
@@ -113,7 +135,7 @@ describe('AppSettingsService', () => {
         claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
         autoProvision: { enabled: true, allowLocalLinking: false, defaultPermissionNames: ['library_download'] },
       };
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) });
+      repo.findByKey.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) } as never);
       const config = await service.getOidcConfig();
       expect(config).toEqual(stored);
     });
@@ -125,7 +147,7 @@ describe('AppSettingsService', () => {
         clientId: 'projectx',
         claimMapping: { username: 'upn' },
       };
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) });
+      repo.findByKey.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) } as never);
 
       const config = await service.getOidcConfig();
       expect(config.enabled).toBe(true);
@@ -136,10 +158,12 @@ describe('AppSettingsService', () => {
       expect(config.autoProvision.allowLocalLinking).toBe(true);
     });
 
-    it('returns default config when stored value is corrupt JSON', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: 'not-json' });
+    it('returns default config and warns when stored value is corrupt JSON', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'oidc_config', value: 'not-json' } as never);
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
       const config = await service.getOidcConfig();
       expect(config.enabled).toBe(false);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('oidc_config'));
     });
   });
 
@@ -155,22 +179,21 @@ describe('AppSettingsService', () => {
         claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
         autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
       };
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(existing) });
-      db.onConflictDoUpdate.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(existing) } as never);
 
       const result = await service.updateOidcConfig({ enabled: true, clientId: 'new-client' });
       expect(result.enabled).toBe(true);
       expect(result.clientId).toBe('new-client');
       expect(result.scopes).toBe('openid profile email');
+      expect(repo.upsert).toHaveBeenCalledOnce();
     });
 
     it('deep-merges claimMapping and autoProvision', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
-      db.onConflictDoUpdate.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue(undefined);
 
       const result = await service.updateOidcConfig({
-        claimMapping: { groups: 'cognito:groups' } as never,
-        autoProvision: { enabled: true } as never,
+        claimMapping: { groups: 'cognito:groups', username: 'preferred_username', name: 'name', email: 'email' },
+        autoProvision: { enabled: true, allowLocalLinking: true, defaultPermissionNames: [] },
       });
       expect(result.claimMapping.username).toBe('preferred_username');
       expect(result.claimMapping.groups).toBe('cognito:groups');
@@ -179,9 +202,78 @@ describe('AppSettingsService', () => {
     });
   });
 
+  describe('testOidcConnection', () => {
+    const discoveryDoc = {
+      issuer: 'https://kc.example.com/realms/main',
+      authorization_endpoint: 'https://kc.example.com/realms/main/protocol/openid-connect/auth',
+    };
+
+    it('throws BadRequestException when no issuer URI is configured', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      await expect(service.testOidcConnection()).rejects.toThrow(BadRequestException);
+    });
+
+    it('returns success with issuer and authorizationEndpoint on valid discovery doc', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
+      const result = await service.testOidcConnection('https://kc.example.com/realms/main');
+      expect(result.success).toBe(true);
+      expect(result.issuer).toBe(discoveryDoc.issuer);
+      expect(result.authorizationEndpoint).toBe(discoveryDoc.authorization_endpoint);
+      vi.unstubAllGlobals();
+    });
+
+    it('throws BadRequestException when provider returns non-ok HTTP status', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+      await expect(service.testOidcConnection('https://kc.example.com/realms/main')).rejects.toThrow(BadRequestException);
+      vi.unstubAllGlobals();
+    });
+
+    it('throws BadRequestException when discovery doc is missing required fields', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ issuer: 'only-issuer' }) }));
+      await expect(service.testOidcConnection('https://kc.example.com/realms/main')).rejects.toThrow(BadRequestException);
+      vi.unstubAllGlobals();
+    });
+
+    it('throws BadRequestException when fetch rejects (network error)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+      await expect(service.testOidcConnection('https://bad.host')).rejects.toThrow(BadRequestException);
+      vi.unstubAllGlobals();
+    });
+
+    it('strips trailing slash from issuer URI before building discovery URL', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) });
+      vi.stubGlobal('fetch', fetchMock);
+      await service.testOidcConnection('https://kc.example.com/realms/main/');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://kc.example.com/realms/main/.well-known/openid-configuration',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      vi.unstubAllGlobals();
+    });
+
+    it('uses saved issuerUri when none is provided via argument', async () => {
+      const stored = JSON.stringify({
+        enabled: true,
+        issuerUri: 'https://saved.host',
+        clientId: '',
+        clientSecret: '',
+        providerName: '',
+        scopes: '',
+        claimMapping: { username: '', name: '', email: '', groups: '' },
+        autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
+      });
+      repo.findByKey.mockResolvedValue({ key: 'oidc_config', value: stored } as never);
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) });
+      vi.stubGlobal('fetch', fetchMock);
+      await service.testOidcConnection();
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('https://saved.host'), expect.any(Object));
+      vi.unstubAllGlobals();
+    });
+  });
+
   describe('getAutoFinalizeSettings', () => {
     it('returns defaults when no rows exist', async () => {
-      db.where.mockResolvedValue([]);
+      repo.findMany.mockResolvedValue([]);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.enabled).toBe(false);
@@ -192,13 +284,13 @@ describe('AppSettingsService', () => {
     });
 
     it('parses stored values correctly', async () => {
-      db.where.mockResolvedValue([
+      repo.findMany.mockResolvedValue([
         { key: 'staging_auto_finalize_enabled', value: 'true' },
         { key: 'staging_auto_finalize_threshold', value: '90' },
         { key: 'staging_auto_finalize_library_id', value: '5' },
         { key: 'staging_auto_finalize_folder_id', value: '12' },
         { key: 'staging_auto_finalize_metadata_mode', value: 'fetched_only' },
-      ]);
+      ] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.enabled).toBe(true);
@@ -209,10 +301,10 @@ describe('AppSettingsService', () => {
     });
 
     it('returns null for library/folder when values are not valid numbers', async () => {
-      db.where.mockResolvedValue([
+      repo.findMany.mockResolvedValue([
         { key: 'staging_auto_finalize_library_id', value: 'abc' },
         { key: 'staging_auto_finalize_folder_id', value: '' },
-      ]);
+      ] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.libraryId).toBeNull();
@@ -221,69 +313,142 @@ describe('AppSettingsService', () => {
     });
 
     it('falls back to safe_merge when metadata mode is invalid', async () => {
-      db.where.mockResolvedValue([{ key: 'staging_auto_finalize_metadata_mode', value: 'invalid_mode' }]);
+      repo.findMany.mockResolvedValue([{ key: 'staging_auto_finalize_metadata_mode', value: 'invalid_mode' }] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.metadataMode).toBe('safe_merge');
+    });
+
+    it('accepts embedded_only as a valid metadata mode', async () => {
+      repo.findMany.mockResolvedValue([{ key: 'staging_auto_finalize_metadata_mode', value: 'embedded_only' }] as never);
+
+      const result = await service.getAutoFinalizeSettings();
+      expect(result.metadataMode).toBe('embedded_only');
     });
   });
 
   describe('getUploadPattern / getDownloadPattern', () => {
     it('returns DEFAULT_UPLOAD_PATTERN when not set', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
-      const pattern = await service.getUploadPattern();
-      expect(typeof pattern).toBe('string');
-      expect(pattern.length).toBeGreaterThan(0);
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.getUploadPattern()).toBe(DEFAULT_UPLOAD_PATTERN);
     });
 
     it('returns stored upload pattern', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'upload_file_pattern', value: '{title}' });
+      repo.findByKey.mockResolvedValue({ key: 'upload_file_pattern', value: '{title}' } as never);
       expect(await service.getUploadPattern()).toBe('{title}');
     });
 
-    it('returns {originalFilename} as default download pattern', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
-      expect(await service.getDownloadPattern()).toBe('{originalFilename}');
+    it(`returns '${DEFAULT_DOWNLOAD_PATTERN}' as default download pattern`, async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.getDownloadPattern()).toBe(DEFAULT_DOWNLOAD_PATTERN);
     });
 
     it('returns stored download pattern', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'download_file_pattern', value: '{author} - {title}' });
+      repo.findByKey.mockResolvedValue({ key: 'download_file_pattern', value: '{author} - {title}' } as never);
       expect(await service.getDownloadPattern()).toBe('{author} - {title}');
+    });
+
+    it('upserts upload pattern on setUploadPattern', async () => {
+      await service.setUploadPattern('{title}');
+      expect(repo.upsert).toHaveBeenCalledWith('upload_file_pattern', '{title}');
+    });
+
+    it('upserts download pattern on setDownloadPattern', async () => {
+      await service.setDownloadPattern('{title}');
+      expect(repo.upsert).toHaveBeenCalledWith('download_file_pattern', '{title}');
     });
   });
 
   describe('getFileWriteSettings', () => {
     it('returns default settings when not configured', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue(undefined);
       const settings = await service.getFileWriteSettings();
       expect(settings).toHaveProperty('epub');
       expect(settings).toHaveProperty('pdf');
       expect(settings).toHaveProperty('cbx');
+      expect(settings.enabled).toBe(false);
+    });
+
+    it('returns defaults when row value is empty string', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'file_write_settings', value: '' } as never);
+      const settings = await service.getFileWriteSettings();
+      expect(settings).toHaveProperty('epub');
     });
 
     it('merges stored partial settings with defaults', async () => {
-      const stored = { epub: { writeMetadata: true } };
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'file_write_settings', value: JSON.stringify(stored) });
+      const stored = { epub: { writeMetadata: true, enabled: true, maxFileSizeBytes: 1000 } };
+      repo.findByKey.mockResolvedValue({ key: 'file_write_settings', value: JSON.stringify(stored) } as never);
       const settings = await service.getFileWriteSettings();
-      expect(settings.epub.writeMetadata).toBe(true);
+      expect(settings.epub.enabled).toBe(true);
+      expect(settings.epub.maxFileSizeBytes).toBe(1000);
       expect(settings.pdf).toBeDefined();
     });
 
-    it('returns defaults when stored value is corrupt JSON', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue({ key: 'file_write_settings', value: '{broken' });
+    it('returns defaults and warns when stored value is corrupt JSON', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'file_write_settings', value: '{broken' } as never);
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
       const settings = await service.getFileWriteSettings();
       expect(settings).toHaveProperty('epub');
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('file_write_settings'));
     });
   });
 
   describe('updateFileWriteSettings', () => {
     it('deep-merges epub patch without overwriting pdf/cbx', async () => {
-      db.query.appSettings.findFirst.mockResolvedValue(undefined);
-      db.onConflictDoUpdate.mockResolvedValue(undefined);
+      repo.findByKey.mockResolvedValue(undefined);
 
-      const result = await service.updateFileWriteSettings({ epub: { writeMetadata: true } as never });
-      expect(result.epub.writeMetadata).toBe(true);
+      const result = await service.updateFileWriteSettings({ epub: { enabled: true, maxFileSizeBytes: 500 } });
+      expect(result.epub.enabled).toBe(true);
+      expect(result.epub.maxFileSizeBytes).toBe(500);
       expect(result.pdf).toBeDefined();
+      expect(result.cbx).toBeDefined();
+    });
+
+    it('merges top-level enabled flag', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      const result = await service.updateFileWriteSettings({ enabled: true });
+      expect(result.enabled).toBe(true);
+      expect(result.epub).toBeDefined();
+    });
+
+    it('calls upsert once with serialized merged settings', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      await service.updateFileWriteSettings({ writeCover: false });
+      expect(repo.upsert).toHaveBeenCalledOnce();
+      const [key, value] = repo.upsert.mock.calls[0];
+      expect(key).toBe('file_write_settings');
+      expect(JSON.parse(value)).toMatchObject({ writeCover: false });
+    });
+  });
+
+  describe('getMetadataScoreWeights', () => {
+    it('returns defaults when not configured', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      const weights = await service.getMetadataScoreWeights();
+      expect(typeof weights).toBe('object');
+    });
+
+    it('merges stored weights over defaults', async () => {
+      const stored = { title: 99 };
+      repo.findByKey.mockResolvedValue({ key: 'metadata_score_weights', value: JSON.stringify(stored) } as never);
+      const weights = await service.getMetadataScoreWeights();
+      expect(weights.title).toBe(99);
+    });
+
+    it('returns defaults and warns when stored weights are corrupt JSON', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'metadata_score_weights', value: 'bad-json' } as never);
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+      await service.getMetadataScoreWeights();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('metadata_score_weights'));
+    });
+  });
+
+  describe('setMetadataScoreWeights', () => {
+    it('upserts and returns the provided weights', async () => {
+      const weights = { title: 10, author: 20, isbn: 30, cover: 5, description: 5, publisher: 5, year: 5, language: 5, series: 5, tags: 5 };
+      const result = await service.setMetadataScoreWeights(weights as never);
+      expect(result).toEqual(weights);
+      expect(repo.upsert).toHaveBeenCalledOnce();
     });
   });
 });

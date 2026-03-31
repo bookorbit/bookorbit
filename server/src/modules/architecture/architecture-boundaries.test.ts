@@ -39,7 +39,6 @@ describe('Architecture boundaries', () => {
 
   it('freezes direct DB injection in services to an explicit allowlist', async () => {
     const allowlist = [
-      'src/modules/app-settings/app-settings.service.ts',
       'src/modules/auth/auth.service.ts',
       'src/modules/auth/oidc/backchannel-logout.service.ts',
       'src/modules/auth/oidc/oidc-group-mapping.service.ts',

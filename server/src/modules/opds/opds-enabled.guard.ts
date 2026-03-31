@@ -8,7 +8,7 @@ export class OpdsEnabledGuard implements CanActivate {
   constructor(private readonly appSettingsService: AppSettingsService) {}
 
   async canActivate(): Promise<boolean> {
-    const settings = await this.appSettingsService.findAll();
+    const settings = await this.appSettingsService.listSettings();
     const opdsRow = settings.find((s) => s.key === APP_SETTING_KEYS.OPDS_ENABLED);
     if (opdsRow?.value !== 'true') {
       throw new ForbiddenException('OPDS server is disabled');

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
-import { MetadataProviderKey, Permission, isAudioFormat, resolveUploadPath } from '@projectx/types';
+import { DEFAULT_DOWNLOAD_PATTERN, MetadataProviderKey, Permission, isAudioFormat, resolveUploadPath } from '@projectx/types';
 import type { AudiobookChapter, BookKoboState, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
@@ -29,7 +29,6 @@ import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 export class BookService {
   private readonly logger = new Logger(BookService.name);
   private readonly booksPath: string;
-  private static readonly DEFAULT_DOWNLOAD_PATTERN = '{originalFilename}';
 
   constructor(
     private readonly bookRepo: BookRepository,
@@ -258,7 +257,7 @@ export class BookService {
         this.bookRepo.findPatternMetadataByBookIds([file.bookId]),
       ]);
       const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metaRows[0]);
-      const resolvedPath = resolveUploadPath(pattern || BookService.DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
+      const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
       const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
       return this.sanitizeFilenameSegment(resolvedName ?? originalFilename, originalFilename);
     } catch (err) {
@@ -798,7 +797,7 @@ export class BookService {
 
       const result = files.map((file) => {
         const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metadataByBookId.get(file.bookId));
-        const resolvedPath = resolveUploadPath(pattern || BookService.DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
+        const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
         const fallbackFilename = basename(file.absolutePath);
         const rawZipPath = resolvedPath ?? fallbackFilename;
         const safeZipPath = this.sanitizeZipPath(rawZipPath, fallbackFilename);

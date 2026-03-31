@@ -736,6 +736,7 @@ CREATE INDEX "bmfq_created_at_idx" ON "book_metadata_fetch_queue" USING btree ("
 CREATE INDEX "book_narrators_narrator_id_idx" ON "book_narrators" USING btree ("narrator_id");--> statement-breakpoint
 CREATE INDEX "narrators_name_trgm_idx" ON "narrators" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "annotations_user_book_idx" ON "annotations" USING btree ("user_id","book_id");--> statement-breakpoint
 CREATE INDEX "abp_user_id_idx" ON "audiobook_progress" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -16,7 +16,8 @@ export class AnnotationRepository {
     return this.db
       .select()
       .from(annotations)
-      .where(and(eq(annotations.bookId, bookId), eq(annotations.userId, userId)));
+      .where(and(eq(annotations.bookId, bookId), eq(annotations.userId, userId)))
+      .orderBy(asc(annotations.createdAt));
   }
 
   async create(data: NewAnnotation) {

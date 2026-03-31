@@ -12,12 +12,12 @@ export class AnnotationController {
 
   @Get()
   getAnnotations(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
-    return this.annotationService.getAnnotations(bookId, user.id);
+    return this.annotationService.getAnnotations(bookId, user);
   }
 
   @Post()
   createAnnotation(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateAnnotationDto, @CurrentUser() user: RequestUser) {
-    return this.annotationService.createAnnotation(user.id, bookId, dto);
+    return this.annotationService.createAnnotation(bookId, user, dto);
   }
 
   @Patch(':annotationId')
@@ -27,7 +27,7 @@ export class AnnotationController {
     @Body() dto: UpdateAnnotationDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.annotationService.updateAnnotation(bookId, annotationId, user.id, dto);
+    return this.annotationService.updateAnnotation(bookId, annotationId, user, dto);
   }
 
   @Delete(':annotationId')
@@ -37,6 +37,6 @@ export class AnnotationController {
     @Param('annotationId', ParseIntPipe) annotationId: number,
     @CurrentUser() user: RequestUser,
   ) {
-    await this.annotationService.deleteAnnotation(bookId, annotationId, user.id);
+    await this.annotationService.deleteAnnotation(bookId, annotationId, user);
   }
 }
