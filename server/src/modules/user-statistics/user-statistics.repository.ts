@@ -249,40 +249,6 @@ export class UserStatisticsRepository {
     return row ?? null;
   }
 
-  async findSessionTimelineConflict(userId: number, sessionId: number, startedAt: Date, endedAt: Date): Promise<SessionTimelineConflictRow | null> {
-    const [row] = await this.db
-      .select({
-        sessionId: readingSessions.id,
-        startedAt: readingSessions.startedAt,
-        endedAt: readingSessions.endedAt,
-      })
-      .from(readingSessions)
-      .where(
-        and(
-          eq(readingSessions.userId, userId),
-          ne(readingSessions.id, sessionId),
-          lt(readingSessions.startedAt, endedAt),
-          gt(readingSessions.endedAt, startedAt),
-        ),
-      )
-      .orderBy(readingSessions.startedAt)
-      .limit(1);
-
-    return row ?? null;
-  }
-
-  async updateSessionTimelineSession(userId: number, sessionId: number, startedAt: Date, endedAt: Date): Promise<SessionTimelineSessionRow | null> {
-    const durationSeconds = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
-    const updated = await this.db
-      .update(readingSessions)
-      .set({ startedAt, endedAt, durationSeconds })
-      .where(and(eq(readingSessions.userId, userId), eq(readingSessions.id, sessionId)))
-      .returning({ id: readingSessions.id });
-
-    if (updated.length === 0) return null;
-    return this.getSessionTimelineSessionById(userId, true, undefined, sessionId);
-  }
-
   async moveSessionTimelineSessionAtomic(
     userId: number,
     sessionId: number,
@@ -382,47 +348,6 @@ export class UserStatisticsRepository {
     });
   }
 
-  async recomputeUserDailyStatsForLibraryDays(userId: number, libraryId: number, days: string[]): Promise<void> {
-    const uniqueDays = [...new Set(days)];
-    if (uniqueDays.length === 0) return;
-
-    const dayDateList = sql.join(
-      uniqueDays.map((day) => sql`${day}::date`),
-      sql`, `,
-    );
-
-    await this.db.transaction(async (tx) => {
-      await tx
-        .delete(userReadingDailyStats)
-        .where(
-          and(
-            eq(userReadingDailyStats.userId, userId),
-            eq(userReadingDailyStats.libraryId, libraryId),
-            inArray(userReadingDailyStats.day, uniqueDays),
-          ),
-        );
-
-      await tx.execute(sql`
-        insert into user_reading_daily_stats (user_id, library_id, day, reading_seconds, progress_delta, sessions_count, updated_at)
-        select
-          rs.user_id,
-          b.library_id,
-          date_trunc('day', rs.started_at)::date as day,
-          coalesce(sum(rs.duration_seconds), 0)::int as reading_seconds,
-          coalesce(sum(rs.progress_delta), 0)::real as progress_delta,
-          count(*)::int as sessions_count,
-          now() as updated_at
-        from reading_sessions rs
-        inner join book_files bf on bf.id = rs.book_file_id
-        inner join books b on b.id = bf.book_id
-        where rs.user_id = ${userId}
-          and b.library_id = ${libraryId}
-          and date_trunc('day', rs.started_at)::date in (${dayDateList})
-        group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
-      `);
-    });
-  }
-
   async getFavoriteReadingDays(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 365): Promise<UserFavoriteDayStat[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
@@ -482,11 +407,6 @@ export class UserStatisticsRepository {
 
   async getMonthlyCompletions(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 365): Promise<UserCompletionTimelinePoint[]> {
     return this.getCompletionTimeline(userId, isSuperuser, filterLibraryIds, days);
-  }
-
-  async getProgressFunnel(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 365): Promise<UserProgressFunnel> {
-    const since = this.sinceDateForDays(days);
-    return this.getProgressFunnelInRange(userId, isSuperuser, filterLibraryIds, since);
   }
 
   async getProgressFunnelInRange(

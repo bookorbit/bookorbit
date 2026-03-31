@@ -41,12 +41,17 @@ export class BackchannelLogoutService {
 
     // Replay prevention
     if (claims.jti) {
-      if (this.usedJtis.has(claims.jti)) {
-        this.logger.warn('Replay detected for logout token JTI');
+      const jti = typeof claims.jti === 'string' ? claims.jti : undefined;
+      if (jti && this.usedJtis.has(jti)) {
+        this.logger.warn(
+          '[auth.oidc_backchannel_logout] [fail] errorClass=UnauthorizedException error="logout token jti replay" - backchannel logout rejected',
+        );
         return;
       }
       const exp = claims.exp ? claims.exp * 1000 : Date.now() + 3_600_000;
-      this.usedJtis.set(claims.jti, exp);
+      if (jti) {
+        this.usedJtis.set(jti, exp);
+      }
 
       // Prune expired JTIs
       const now = Date.now();
@@ -78,7 +83,9 @@ export class BackchannelLogoutService {
     }
 
     if (!userId) {
-      this.logger.warn(`Backchannel logout: no active OIDC session for sub=${subject} sid=${sid}`);
+      this.logger.warn(
+        `[auth.oidc_backchannel_logout] [fail] subject=${subject} sid=${sid ?? 'none'} errorClass=UnauthorizedException error="no active oidc session" - backchannel logout skipped`,
+      );
       return;
     }
 
@@ -91,6 +98,6 @@ export class BackchannelLogoutService {
     // Invalidate all JWTs via token version bump
     await this.userService.incrementTokenVersion(userId);
 
-    this.logger.log(`Backchannel logout: revoked all sessions for userId=${userId}`);
+    this.logger.log(`[auth.oidc_backchannel_logout] [end] userId=${userId} - backchannel logout completed`);
   }
 }

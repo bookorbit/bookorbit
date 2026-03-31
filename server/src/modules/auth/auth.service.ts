@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Inject,
+  InternalServerErrorException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -38,7 +39,9 @@ import { OidcSessionRepository } from './oidc/oidc-session.repository';
 
 function parseDurationMs(duration: string): number {
   const match = duration.match(/^(\d+)([smhd])$/);
-  if (!match) throw new Error(`Invalid duration: ${duration}`);
+  if (!match) {
+    throw new InternalServerErrorException(`Invalid auth duration config value: ${duration}`);
+  }
   const n = parseInt(match[1], 10);
   const units: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
   return n * units[match[2]];
@@ -95,7 +98,7 @@ export class AuthService {
         })
         .returning({ id: schema.users.id, username: schema.users.username, name: schema.users.name });
 
-      this.logger.log(`[auth.register] [success] user=${user.id} username=${user.username}`);
+      this.logger.log(`[auth.register] [end] userId=${user.id} username=${user.username} - registration completed`);
 
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: user.id,
@@ -158,7 +161,7 @@ export class AuthService {
           tokenVersion: schema.users.tokenVersion,
         });
 
-      this.logger.log(`[auth.setup] [success] admin=${user.username}`);
+      this.logger.log(`[auth.setup] [end] userId=${user.id} username=${user.username} isSuperuser=true - setup completed`);
       return user;
     });
 
@@ -168,7 +171,9 @@ export class AuthService {
   async login(dto: LoginDto, reply: FastifyReply, ip?: string) {
     const user = await this.userService.findByUsername(dto.username);
     if (!user || !user.active || !(await compare(dto.password, user.passwordHash))) {
-      this.logger.warn(`[auth.login] [fail] user=${dto.username} ip=${ip ?? 'unknown'} reason="Invalid credentials"`);
+      this.logger.warn(
+        `[auth.login] [fail] username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="invalid credentials" - login failed`,
+      );
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: null,
         actorUsername: 'system',
@@ -185,7 +190,7 @@ export class AuthService {
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
 
-    this.logger.log(`[auth.login] [success] user=${user.id} username=${user.username}`);
+    this.logger.log(`[auth.login] [end] userId=${user.id} username=${user.username} ip=${ip ?? 'unknown'} - login completed`);
 
     this.auditEvents.emit(AUDIT_EVENT, {
       userId: user.id,
@@ -233,14 +238,16 @@ export class AuthService {
     });
 
     if (!row) {
-      this.logger.warn(`[auth.refresh] [fail] reason="Token not found"`);
+      this.logger.warn('[auth.refresh] [fail] errorClass=UnauthorizedException error="token not found" - refresh failed');
       throw new UnauthorizedException();
     }
 
     // Reuse of a revoked token indicates possible theft.
     // Revoke refresh sessions and bump tokenVersion to invalidate active access tokens.
     if (row.revokedAt) {
-      this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Token revoked - reuse attempt"`);
+      this.logger.warn(
+        `[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="token revoked - reuse attempt" - refresh failed`,
+      );
       await this.db.transaction(async (tx) => {
         await tx
           .update(schema.users)
@@ -254,7 +261,7 @@ export class AuthService {
     }
 
     if (row.expiresAt < new Date()) {
-      this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Token expired"`);
+      this.logger.warn(`[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="token expired" - refresh failed`);
       this.clearRefreshCookie(reply);
       throw new UnauthorizedException();
     }
@@ -265,7 +272,7 @@ export class AuthService {
     const userForToken = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
     if (!userForToken) throw new UnauthorizedException();
     if (!userForToken.active) {
-      this.logger.warn(`[auth.refresh] [fail] user=${row.userId} reason="Account disabled"`);
+      this.logger.warn(`[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="account disabled" - refresh failed`);
       this.clearRefreshCookie(reply);
       this.clearAccessCookie(reply);
       throw new UnauthorizedException('Account disabled');
@@ -287,7 +294,7 @@ export class AuthService {
       const row = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, tokenHash) });
       if (row) {
         userId = row.userId;
-        this.logger.log(`[auth.logout] [success] user=${row.userId}`);
+        this.logger.log(`[auth.logout] [end] userId=${row.userId} source=refresh_token - logout completed`);
         await Promise.all([
           this.userService.incrementTokenVersion(row.userId),
           this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id)),
@@ -333,7 +340,13 @@ export class AuthService {
       if (postLogoutUri) params.set('post_logout_redirect_uri', postLogoutUri);
 
       return { logoutUrl: `${disc.endSessionEndpoint}?${params.toString()}` };
-    } catch {
+    } catch (error) {
+      const durationMs = 0;
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(
+        `[auth.logout] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${errorMessage}" - oidc logout url generation failed`,
+      );
       return {};
     }
   }

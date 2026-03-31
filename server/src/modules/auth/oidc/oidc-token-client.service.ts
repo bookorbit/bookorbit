@@ -44,7 +44,9 @@ export class OidcTokenClientService {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      this.logger.error(`Token exchange failed: ${res.status} ${text}`);
+      this.logger.warn(
+        `[auth.oidc_token_exchange] [fail] status=${res.status} errorClass=InternalServerErrorException error="${text || 'non-ok response'}" - token exchange failed`,
+      );
       throw new InternalServerErrorException('Token exchange with OIDC provider failed');
     }
 
@@ -63,10 +65,22 @@ export class OidcTokenClientService {
         headers: { Authorization: `Bearer ${accessToken}` },
         signal: AbortSignal.timeout(10_000),
       });
-      if (!res.ok) return {};
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        this.logger.warn(
+          `[auth.oidc_userinfo] [fail] status=${res.status} errorClass=InternalServerErrorException error="${text || 'non-ok response'}" - userinfo fetch failed`,
+        );
+        throw new InternalServerErrorException('Failed to fetch OIDC userinfo');
+      }
       return (await res.json()) as Promise<Record<string, unknown>>;
-    } catch {
-      return {};
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(`[auth.oidc_userinfo] [fail] errorClass=${errorClass} error="${errorMessage}" - userinfo fetch failed`);
+      throw new InternalServerErrorException('Failed to fetch OIDC userinfo');
     }
   }
 }

@@ -59,7 +59,11 @@ export class OidcDiscoveryService {
       this.cache.set(normalized, { doc, fetchedAt: Date.now() });
       return doc;
     } catch (err) {
-      this.logger.error(`Failed to fetch OIDC discovery doc from ${url}`, err);
+      const errorClass = err instanceof Error ? err.name : 'UnknownError';
+      const errorMessage = err instanceof Error ? err.message : 'unknown error';
+      this.logger.warn(
+        `[auth.oidc_discovery] [fail] issuerUri=${normalized} errorClass=${errorClass} error="${errorMessage}" - discovery fetch failed`,
+      );
       throw new InternalServerErrorException('Failed to reach OIDC provider');
     }
   }

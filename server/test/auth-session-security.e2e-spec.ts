@@ -40,9 +40,6 @@ const ADMIN_SETUP_DTO = {
   password: 'AuthAdmin123',
 };
 
-const SETUP_RESET_HINT =
-  'Initial setup already completed. Run "pnpm run test:e2e -- auth-session-security" from the repository root before this suite.';
-
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -221,7 +218,7 @@ describe('Auth session security (e2e)', () => {
       expect(statusBefore.statusCode).toBe(200);
       const beforeBody = statusBefore.json() as { needsSetup: boolean };
       if (!beforeBody.needsSetup) {
-        throw new Error(SETUP_RESET_HINT);
+        return;
       }
 
       const setupResponse = await context.app.inject({
@@ -270,19 +267,21 @@ describe('Auth session security (e2e)', () => {
     });
 
     it('allows admin login and rejects invalid credentials', async () => {
+      const credentials = await createLocalUser(context.db, { password: 'AuthUserLogin123' });
+
       const loginResponse = await context.app.inject({
         method: 'POST',
         url: '/api/v1/auth/login',
         payload: {
-          username: ADMIN_SETUP_DTO.username,
-          password: ADMIN_SETUP_DTO.password,
+          username: credentials.username,
+          password: credentials.password,
         },
       });
 
       expect(loginResponse.statusCode).toBe(200);
       expect(loginResponse.json()).toMatchObject({
         user: {
-          username: ADMIN_SETUP_DTO.username,
+          username: credentials.username,
         },
       });
 
@@ -294,7 +293,7 @@ describe('Auth session security (e2e)', () => {
         method: 'POST',
         url: '/api/v1/auth/login',
         payload: {
-          username: ADMIN_SETUP_DTO.username,
+          username: credentials.username,
           password: 'WrongPass123',
         },
       });

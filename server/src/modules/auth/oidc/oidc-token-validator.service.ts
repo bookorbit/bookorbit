@@ -40,7 +40,9 @@ export class OidcTokenValidatorService {
       return payload;
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      this.logger.warn('ID token validation failed', err);
+      const errorClass = err instanceof Error ? err.name : 'UnknownError';
+      const errorMessage = err instanceof Error ? err.message : 'unknown error';
+      this.logger.warn(`[auth.oidc_id_token_validate] [fail] errorClass=${errorClass} error="${errorMessage}" - ID token validation failed`);
       throw new UnauthorizedException('Invalid ID token');
     }
   }
@@ -68,7 +70,9 @@ export class OidcTokenValidatorService {
       return payload;
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      this.logger.warn('Logout token validation failed', err);
+      const errorClass = err instanceof Error ? err.name : 'UnknownError';
+      const errorMessage = err instanceof Error ? err.message : 'unknown error';
+      this.logger.warn(`[auth.oidc_logout_token_validate] [fail] errorClass=${errorClass} error="${errorMessage}" - logout token validation failed`);
       throw new UnauthorizedException('Invalid logout token');
     }
   }

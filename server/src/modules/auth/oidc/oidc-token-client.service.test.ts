@@ -112,16 +112,14 @@ describe('OidcTokenClientService', () => {
       expect(options.headers.Authorization).toBe('Bearer my-token');
     });
 
-    it('returns empty object on non-OK response', async () => {
+    it('throws InternalServerErrorException on non-OK response', async () => {
       fetchMock.mockResolvedValue({ ok: false, status: 401 });
-      const result = await service.fetchUserInfo('https://idp.example.com/userinfo', 'bad-token');
-      expect(result).toEqual({});
+      await expect(service.fetchUserInfo('https://idp.example.com/userinfo', 'bad-token')).rejects.toThrow(InternalServerErrorException);
     });
 
-    it('returns empty object on network failure', async () => {
+    it('throws InternalServerErrorException on network failure', async () => {
       fetchMock.mockRejectedValue(new Error('timeout'));
-      const result = await service.fetchUserInfo('https://idp.example.com/userinfo', 'token');
-      expect(result).toEqual({});
+      await expect(service.fetchUserInfo('https://idp.example.com/userinfo', 'token')).rejects.toThrow(InternalServerErrorException);
     });
   });
 });

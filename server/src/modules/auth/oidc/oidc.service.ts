@@ -72,6 +72,10 @@ export class OidcService {
     }
 
     const claims = this.claimExtractor.extract(idTokenClaims as Record<string, unknown>, userInfoClaims, config.claimMapping);
+    if (!claims.subject) {
+      this.logger.warn('[auth.oidc_callback] [fail] errorClass=UnauthorizedException error="missing sub claim" - OIDC callback failed');
+      throw new UnauthorizedException('Invalid ID token: missing subject claim');
+    }
 
     const user = await this.findOrProvisionUser(claims, config, disc.issuer);
 
