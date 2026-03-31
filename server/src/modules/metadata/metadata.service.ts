@@ -8,7 +8,7 @@ import { join } from 'path';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
-import { ComicMetadataService } from '../book/comic-metadata.service';
+import { ComicMetadataRepository } from './comic-metadata.repository';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
@@ -37,7 +37,7 @@ export class MetadataService {
     private readonly config: ConfigService,
     private readonly scoreService: MetadataScoreService,
     private readonly narratorService: NarratorService,
-    private readonly comicMetadataService: ComicMetadataService,
+    private readonly comicMetadataService: ComicMetadataRepository,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {

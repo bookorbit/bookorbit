@@ -44,7 +44,6 @@ describe('Architecture boundaries', () => {
       'src/modules/auth/oidc/oidc-group-mapping.service.ts',
       'src/modules/authors/author-enrichment-config.service.ts',
       'src/modules/book/book-query-builder.service.ts',
-      'src/modules/book/comic-metadata.service.ts',
       'src/modules/book-metadata-fetch/book-metadata-fetch-config.service.ts',
       'src/modules/catalog/catalog.service.ts',
       'src/modules/cover/cover.service.ts',

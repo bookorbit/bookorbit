@@ -19,7 +19,7 @@ import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
-import { ComicMetadataService } from './comic-metadata.service';
+import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
@@ -41,7 +41,7 @@ export class BookService {
     private readonly appSettings: AppSettingsService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly narratorService: NarratorService,
-    private readonly comicMetadataService: ComicMetadataService,
+    private readonly comicMetadataService: ComicMetadataRepository,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {

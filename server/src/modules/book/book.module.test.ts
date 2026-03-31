@@ -13,18 +13,11 @@ import { BookController } from './book.controller';
 import { BookModule } from './book.module';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
-import { ComicMetadataService } from './comic-metadata.service';
 
 describe('BookModule', () => {
   it('registers expected controller/providers/exports', () => {
     expect(Reflect.getMetadata('controllers', BookModule)).toEqual([BookController]);
-    expect(Reflect.getMetadata('providers', BookModule)).toEqual([
-      BookService,
-      BookRepository,
-      BookReadService,
-      BookQueryBuilder,
-      ComicMetadataService,
-    ]);
+    expect(Reflect.getMetadata('providers', BookModule)).toEqual([BookService, BookRepository, BookReadService, BookQueryBuilder]);
     expect(Reflect.getMetadata('exports', BookModule)).toEqual([BookService, BookReadService, BookQueryBuilder]);
   });
 });

@@ -4,12 +4,12 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { ComicMetadataDto } from './dto/update-book-metadata.dto';
+import { ComicMetadataDto } from '../book/dto/update-book-metadata.dto';
 
 type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
-export class ComicMetadataService {
+export class ComicMetadataRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async upsert(bookId: number, fields: ComicMetadataDto): Promise<void> {
