@@ -67,14 +67,20 @@ describe('RecommendationService', () => {
     expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 21, true);
   });
 
-  it('returns empty recommendations when the target book has no metadata row', async () => {
-    const { service, bookRepo, recRepo, embedder } = makeService();
+  it('uses fallback embedding when the target book has no metadata row', async () => {
+    const { service, bookRepo, recRepo, embedder, libraryService } = makeService();
 
     bookRepo.findLibraryIdByBookId.mockResolvedValue(21);
     recRepo.getTargetBookData.mockResolvedValue(null);
+    embedder.embedBook.mockResolvedValue([0.4, 0.6]);
+    libraryService.findAll.mockResolvedValue([{ id: 7 }, { id: 9 }]);
+    recRepo.findAnnCandidates.mockResolvedValue([{ bookId: 91, cosineSim: 0.78, seriesName: null, rating: null }]);
+    recRepo.getCandidateMetadata.mockResolvedValue([{ bookId: 91, authorNames: [], genreTagNames: [] }]);
+    bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([{ id: 91, title: 'Fallback Match' }]);
 
-    await expect(service.getRecommendations(55, makeUser())).resolves.toEqual([]);
-    expect(embedder.embedBook).not.toHaveBeenCalled();
+    await expect(service.getRecommendations(55, makeUser())).resolves.toEqual([{ id: 91, title: 'Fallback Match' }]);
+    expect(embedder.embedBook).toHaveBeenCalledWith(55);
+    expect(recRepo.findAnnCandidates).toHaveBeenCalledWith([0.4, 0.6], 55, [7, 9]);
   });
 
   it('returns empty recommendations when fallback embedding is invalid', async () => {
@@ -91,6 +97,17 @@ describe('RecommendationService', () => {
     embedder.embedBook.mockResolvedValue([]);
 
     await expect(service.getRecommendations(3, makeUser())).resolves.toEqual([]);
+    expect(recRepo.findAnnCandidates).not.toHaveBeenCalled();
+  });
+
+  it('returns empty recommendations when metadata row is missing and generated embedding is invalid', async () => {
+    const { service, bookRepo, recRepo, embedder } = makeService();
+
+    bookRepo.findLibraryIdByBookId.mockResolvedValue(6);
+    recRepo.getTargetBookData.mockResolvedValue(null);
+    embedder.embedBook.mockResolvedValue([Number.NaN]);
+
+    await expect(service.getRecommendations(6, makeUser())).resolves.toEqual([]);
     expect(recRepo.findAnnCandidates).not.toHaveBeenCalled();
   });
 
@@ -125,6 +142,37 @@ describe('RecommendationService', () => {
     expect(result[1]).toEqual({ id: 200, title: 'Second' });
   });
 
+  it('normalizes author and genre-tag metadata before similarity scoring', async () => {
+    const { service, recRepo, bookRepo } = makeService();
+
+    bookRepo.findLibraryIdByBookId.mockResolvedValue(13);
+    recRepo.getTargetBookData.mockResolvedValue({
+      embedding: [0.4, 0.2],
+      seriesName: null,
+      rating: null,
+      authorNames: [' Frank Herbert '],
+      genreTagNames: [' Sci-Fi '],
+    });
+    recRepo.findAnnCandidates.mockResolvedValue([
+      { bookId: 1, cosineSim: 0.7, seriesName: null, rating: null },
+      { bookId: 2, cosineSim: 0.85, seriesName: null, rating: null },
+    ]);
+    recRepo.getCandidateMetadata.mockResolvedValue([
+      { bookId: 1, authorNames: ['frank herbert'], genreTagNames: ['sci-fi'] },
+      { bookId: 2, authorNames: [], genreTagNames: [] },
+    ]);
+    bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
+      { id: 1, title: 'Token Match' },
+      { id: 2, title: 'Cosine Only' },
+    ]);
+
+    const result = await service.getRecommendations(13, makeUser());
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ id: 1, title: 'Token Match' });
+    expect(result[1]).toEqual({ id: 2, title: 'Cosine Only' });
+  });
+
   it('filters out ANN results that cannot be mapped to cards', async () => {
     const { service, recRepo, bookRepo } = makeService();
 
@@ -150,6 +198,25 @@ describe('RecommendationService', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ id: 11, title: 'Only Card' });
+  });
+
+  it('returns empty recommendations when user has no accessible libraries with ANN candidates', async () => {
+    const { service, recRepo, bookRepo, libraryService } = makeService();
+
+    bookRepo.findLibraryIdByBookId.mockResolvedValue(15);
+    recRepo.getTargetBookData.mockResolvedValue({
+      embedding: [0.2],
+      seriesName: null,
+      rating: null,
+      authorNames: [],
+      genreTagNames: [],
+    });
+    libraryService.findAll.mockResolvedValue([]);
+    recRepo.findAnnCandidates.mockResolvedValue([]);
+
+    await expect(service.getRecommendations(15, makeUser())).resolves.toEqual([]);
+    expect(recRepo.getCandidateMetadata).not.toHaveBeenCalled();
+    expect(bookRepo.findRecommendationTitlesByBookIds).not.toHaveBeenCalled();
   });
 
   it('limits rescored output to 25 candidates before loading cards', async () => {

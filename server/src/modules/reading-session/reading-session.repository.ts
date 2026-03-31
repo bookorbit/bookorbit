@@ -8,7 +8,14 @@ import { bookFiles, books, readingSessions, userReadingDailyStats } from '../../
 
 type Db = NodePgDatabase<typeof schema>;
 
-const MIN_SESSION_SECONDS = 10;
+const MIN_READING_SESSION_SECONDS = 10;
+
+export type SaveReadingSessionResult =
+  | { kind: 'saved' }
+  | {
+      kind: 'skipped';
+      reason: 'duration_below_minimum' | 'book_file_not_found' | 'duplicate_session_id';
+    };
 
 @Injectable()
 export class ReadingSessionRepository {
@@ -23,8 +30,10 @@ export class ReadingSessionRepository {
     durationSeconds: number,
     progressDelta: number | null,
     endProgress: number | null,
-  ): Promise<void> {
-    if (durationSeconds < MIN_SESSION_SECONDS) return;
+  ): Promise<SaveReadingSessionResult> {
+    if (durationSeconds < MIN_READING_SESSION_SECONDS) {
+      return { kind: 'skipped', reason: 'duration_below_minimum' };
+    }
 
     const [fileRow] = await this.db
       .select({ libraryId: books.libraryId })
@@ -33,26 +42,29 @@ export class ReadingSessionRepository {
       .where(eq(bookFiles.id, bookFileId))
       .limit(1);
 
-    if (!fileRow) return;
+    if (!fileRow) {
+      return { kind: 'skipped', reason: 'book_file_not_found' };
+    }
 
     const { libraryId } = fileRow;
-    const day = startedAt.toISOString().slice(0, 10);
 
-    await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx): Promise<SaveReadingSessionResult> => {
       const inserted = await tx
         .insert(readingSessions)
         .values({ userId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress })
         .onConflictDoNothing({ target: [readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
 
-      if (inserted.length === 0) return;
+      if (inserted.length === 0) {
+        return { kind: 'skipped', reason: 'duplicate_session_id' };
+      }
 
       await tx
         .insert(userReadingDailyStats)
         .values({
           userId,
           libraryId,
-          day,
+          day: sql<string>`date_trunc('day', ${startedAt}::timestamp)::date`,
           readingSeconds: durationSeconds,
           progressDelta: progressDelta ?? 0,
           sessionsCount: 1,
@@ -67,41 +79,8 @@ export class ReadingSessionRepository {
             updatedAt: new Date(),
           },
         });
-    });
-  }
 
-  async recomputeRecentDailyStats(since: Date): Promise<{ deleted: number; inserted: number }> {
-    const sinceDay = since.toISOString().slice(0, 10);
-
-    return this.db.transaction(async (tx) => {
-      const deleteResult = await tx.execute(sql`delete from user_reading_daily_stats where day >= ${sinceDay}::date`);
-
-      const insertResult = await tx.execute(sql`
-        insert into user_reading_daily_stats (user_id, library_id, day, reading_seconds, progress_delta, sessions_count, updated_at)
-        select
-          rs.user_id,
-          b.library_id,
-          date_trunc('day', rs.started_at)::date as day,
-          coalesce(sum(rs.duration_seconds), 0)::int as reading_seconds,
-          coalesce(sum(rs.progress_delta), 0)::real as progress_delta,
-          count(*)::int as sessions_count,
-          now() as updated_at
-        from reading_sessions rs
-        inner join book_files bf on bf.id = rs.book_file_id
-        inner join books b on b.id = bf.book_id
-        where rs.started_at >= ${since}
-        group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
-        on conflict (user_id, library_id, day) do update set
-          reading_seconds = excluded.reading_seconds,
-          progress_delta = excluded.progress_delta,
-          sessions_count = excluded.sessions_count,
-          updated_at = excluded.updated_at
-      `);
-
-      return {
-        deleted: Number((deleteResult as { rowCount?: number }).rowCount ?? 0),
-        inserted: Number((insertResult as { rowCount?: number }).rowCount ?? 0),
-      };
+      return { kind: 'saved' };
     });
   }
 }

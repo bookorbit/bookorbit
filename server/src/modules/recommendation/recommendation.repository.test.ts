@@ -56,9 +56,21 @@ describe('RecommendationRepository', () => {
   it('combines metadata, authors, genres, and tags for target book data', async () => {
     const { db, select } = makeDb([
       { terminal: 'limit', result: [{ embedding: [0.1, 0.2], seriesName: 'Saga', rating: 4.5 }] },
-      { terminal: 'where', result: [{ name: 'Author A' }, { name: 'Author B' }] },
-      { terminal: 'where', result: [{ name: 'Fantasy' }] },
-      { terminal: 'where', result: [{ name: 'Epic' }, { name: 'Classic' }] },
+      {
+        terminal: 'where',
+        result: [
+          { bookId: 7, name: 'Author A' },
+          { bookId: 7, name: 'Author B' },
+        ],
+      },
+      { terminal: 'where', result: [{ bookId: 7, name: 'Fantasy' }] },
+      {
+        terminal: 'where',
+        result: [
+          { bookId: 7, name: 'Epic' },
+          { bookId: 7, name: 'Classic' },
+        ],
+      },
     ]);
     const repo = new RecommendationRepository(db);
 

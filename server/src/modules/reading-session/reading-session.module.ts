@@ -9,6 +9,5 @@ import { ReadingSessionService } from './reading-session.service';
   imports: [BookModule],
   controllers: [ReadingSessionController],
   providers: [ReadingSessionService, ReadingSessionRepository],
-  exports: [ReadingSessionRepository],
 })
 export class ReadingSessionModule {}

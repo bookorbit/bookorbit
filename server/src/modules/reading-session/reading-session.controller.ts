@@ -10,7 +10,7 @@ export class ReadingSessionController {
   constructor(private readonly service: ReadingSessionService) {}
 
   @Post(':fileId/sessions')
-  @HttpCode(202)
+  @HttpCode(204)
   async saveSession(@Param('fileId', ParseIntPipe) fileId: number, @Body() dto: SaveReadingSessionDto, @CurrentUser() user: RequestUser) {
     await this.service.save(fileId, dto, user);
   }
