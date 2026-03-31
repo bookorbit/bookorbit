@@ -22,7 +22,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { FileWriteRepository } from '../file-write/file-write.repository';
+import { FileWriteService } from '../file-write/file-write.service';
 import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
 import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
@@ -81,7 +81,7 @@ function resolveAudioMimeType(format: string | null): string | null {
 export class BookController {
   constructor(
     private readonly bookService: BookService,
-    private readonly fileWriteRepo: FileWriteRepository,
+    private readonly fileWriteService: FileWriteService,
   ) {}
 
   @Post('embed-all')
@@ -328,7 +328,7 @@ export class BookController {
   @RequirePermission(Permission.LibraryEditMetadata)
   async getWriteLog(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     await this.bookService.verifyBookAccess(id, user);
-    const entries = await this.fileWriteRepo.findWriteLog(id);
+    const entries = await this.fileWriteService.findWriteLog(id);
     return { entries };
   }
 

@@ -17,7 +17,7 @@ import type {
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { books } from '../../db/schema';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { AuthorImageStorageService } from './author-image-storage.service';
@@ -43,7 +43,7 @@ export class AuthorsService {
 
   constructor(
     private readonly authorsRepo: AuthorsRepository,
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
     private readonly appSettings: AppSettingsService,
     private readonly authorMetadataFetchService: AuthorMetadataFetchService,
@@ -106,7 +106,7 @@ export class AuthorsService {
     }
 
     const orderMap = new Map(page.bookIds.map((id, index) => [id, index]));
-    const { rows, authorRows, fileRows, genreRows, progressRows } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows } = await this.bookReadService.findCards({
       where: inArray(books.id, page.bookIds),
       orderBy: [],
       limit: page.bookIds.length,

@@ -5,7 +5,7 @@ import type { BooksPage } from '@projectx/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { books } from '../../db/schema';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
@@ -16,7 +16,7 @@ import { CollectionRepository } from './collection.repository';
 export class CollectionService {
   constructor(
     private readonly collectionRepo: CollectionRepository,
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
   ) {}
 
   private isSuperuser(user: RequestUser): boolean {
@@ -110,7 +110,7 @@ export class CollectionService {
 
     const bookIds = bookIdRows.map((r) => r.bookId);
     const where = inArray(books.id, bookIds);
-    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
       where,
       orderBy: [],
       limit: size,

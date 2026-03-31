@@ -142,6 +142,18 @@ export class FileWriteService implements OnModuleDestroy {
     return result;
   }
 
+  findWriteLog(bookId: number, limit = 20) {
+    return this.fileWriteRepo.findWriteLog(bookId, limit);
+  }
+
+  findNonMissingBookFilesByLibrary(libraryId: number) {
+    return this.fileWriteRepo.findNonMissingBookFilesByLibrary(libraryId);
+  }
+
+  resolveSettings(libraryId: number) {
+    return this.settingsService.resolve(libraryId);
+  }
+
   private async loadCoverBytes(bookId: number): Promise<Buffer | null> {
     const dir = join(this.booksPath, 'covers', String(bookId));
     try {

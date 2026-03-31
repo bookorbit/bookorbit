@@ -104,14 +104,14 @@ function makeController() {
     getKoboState: vi.fn(),
     getDetail: vi.fn(),
   };
-  const fileWriteRepo = {
+  const fileWriteService = {
     findWriteLog: vi.fn(),
   };
 
   return {
-    controller: new BookController(bookService as never, fileWriteRepo as never),
+    controller: new BookController(bookService as never, fileWriteService as never),
     bookService,
-    fileWriteRepo,
+    fileWriteService,
   };
 }
 
@@ -272,9 +272,9 @@ describe('BookController', () => {
   });
 
   it('verifies access before returning file write log entries', async () => {
-    const { controller, bookService, fileWriteRepo } = makeController();
+    const { controller, bookService, fileWriteService } = makeController();
     bookService.verifyBookAccess.mockResolvedValue(undefined);
-    fileWriteRepo.findWriteLog.mockResolvedValue([{ id: 1 }]);
+    fileWriteService.findWriteLog.mockResolvedValue([{ id: 1 }]);
 
     const result = await controller.getWriteLog(12, makeUser());
 

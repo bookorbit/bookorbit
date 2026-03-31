@@ -20,17 +20,13 @@ describe('LibraryController', () => {
   };
 
   const bookService = { queryForLibrary: vi.fn() };
-  const fileWriteService = { writeToFile: vi.fn() };
-  const fileWriteRepo = { findNonMissingBookFilesByLibrary: vi.fn() };
-  const fileWriteSettings = { resolve: vi.fn() };
+  const fileWriteService = {
+    writeToFile: vi.fn(),
+    findNonMissingBookFilesByLibrary: vi.fn(),
+    resolveSettings: vi.fn(),
+  };
 
-  const controller = new LibraryController(
-    libraryService as any,
-    bookService as any,
-    fileWriteService as any,
-    fileWriteRepo as any,
-    fileWriteSettings as any,
-  );
+  const controller = new LibraryController(libraryService as any, bookService as any, fileWriteService as any);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -38,7 +34,7 @@ describe('LibraryController', () => {
   });
 
   it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {
-    fileWriteSettings.resolve.mockResolvedValue({ enabled: false });
+    fileWriteService.resolveSettings.mockResolvedValue({ enabled: false });
 
     await expect(controller.writeMetadataToFiles(1, undefined, { id: 1, isSuperuser: true } as any, { raw: {} } as any)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -46,8 +42,8 @@ describe('LibraryController', () => {
   });
 
   it('writeMetadataToFiles streams progress and final done event with counters', async () => {
-    fileWriteSettings.resolve.mockResolvedValue({ enabled: true });
-    fileWriteRepo.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
+    fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
+    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
 
     fileWriteService.writeToFile
       .mockResolvedValueOnce({ status: 'success', fieldsWritten: [], durationMs: 1 })
@@ -74,11 +70,11 @@ describe('LibraryController', () => {
   });
 
   it('writeMetadataToFiles in dry-run mode skips settings check', async () => {
-    fileWriteRepo.findNonMissingBookFilesByLibrary.mockResolvedValue([]);
+    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([]);
     const reply = { raw: { writeHead: vi.fn(), write: vi.fn(), end: vi.fn() } };
 
     await controller.writeMetadataToFiles(1, 'true', { id: 1, isSuperuser: true } as any, reply as any);
 
-    expect(fileWriteSettings.resolve).not.toHaveBeenCalled();
+    expect(fileWriteService.resolveSettings).not.toHaveBeenCalled();
   });
 });

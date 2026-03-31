@@ -236,7 +236,7 @@ export class OpdsBookService {
       .from(bookFiles)
       .leftJoin(books, eq(books.id, bookFiles.bookId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
-      .where(fileId ? eq(bookFiles.id, fileId) : and(eq(books.id, bookId), eq(bookFiles.id, books.primaryFileId)))
+      .where(fileId ? and(eq(bookFiles.id, fileId), eq(bookFiles.bookId, bookId)) : and(eq(books.id, bookId), eq(bookFiles.id, books.primaryFileId)))
       .limit(1);
 
     const [file] = await fileQuery;

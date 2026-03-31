@@ -8,7 +8,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata } from '../../db/schema';
 import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { CoverSearchParams } from './providers/cover-provider';
@@ -26,7 +26,7 @@ export class CoverService {
 
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
     private readonly config: ConfigService,
     private readonly providerRegistry: CoverProviderRegistry,
@@ -182,7 +182,7 @@ export class CoverService {
   }
 
   private async verifyAccess(bookId: number, user: RequestUser): Promise<void> {
-    const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
+    const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
   }

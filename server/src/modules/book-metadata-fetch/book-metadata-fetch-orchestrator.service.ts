@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import type { BookMetadataFetchReason, MetadataField } from '@projectx/types';
 import { MetadataProviderKey } from '@projectx/types';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { MetadataService } from '../metadata/metadata.service';
@@ -28,7 +28,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     private readonly queueRepo: BookMetadataFetchQueueRepository,
     private readonly configService: BookMetadataFetchConfigService,
     private readonly eligibilityService: BookMetadataFetchEligibilityService,
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
     private readonly pipeline: MetadataFetchPipeline,
     private readonly metadataService: MetadataService,
     private readonly scoreService: MetadataScoreService,
@@ -159,7 +159,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     await this.emitStatus();
 
     try {
-      const found = await this.bookRepo.findById(bookId);
+      const found = await this.bookReadService.findById(bookId);
       if (!found) {
         await this.queueRepo.markDone(bookId);
         this.session.sessionDone++;
@@ -261,7 +261,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
 
     scalarFields.lastMetadataFetchAt = new Date();
     scalarFields.updatedAt = new Date();
-    await this.bookRepo.updateMetadataFields(bookId, scalarFields);
+    await this.bookReadService.updateMetadataFields(bookId, scalarFields);
 
     if (r.authors !== undefined) {
       const names = r.authors as string[];
@@ -296,7 +296,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   }
 
   private async loadEligibilityData(bookId: number) {
-    const found = await this.bookRepo.findById(bookId);
+    const found = await this.bookReadService.findById(bookId);
     if (!found) return null;
     const { book, authorRows, genreRows, narratorRows } = found;
     const meta = book.book_metadata;

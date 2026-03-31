@@ -8,6 +8,7 @@ vi.mock('../metadata/metadata.module', () => ({ MetadataModule: class MetadataMo
 vi.mock('../metadata-fetch/metadata-fetch.module', () => ({ MetadataFetchModule: class MetadataFetchModule {} }));
 
 import { BookQueryBuilder } from './book-query-builder.service';
+import { BookReadService } from './book-read.service';
 import { BookController } from './book.controller';
 import { BookModule } from './book.module';
 import { BookRepository } from './book.repository';
@@ -17,7 +18,13 @@ import { ComicMetadataService } from './comic-metadata.service';
 describe('BookModule', () => {
   it('registers expected controller/providers/exports', () => {
     expect(Reflect.getMetadata('controllers', BookModule)).toEqual([BookController]);
-    expect(Reflect.getMetadata('providers', BookModule)).toEqual([BookService, BookRepository, BookQueryBuilder, ComicMetadataService]);
-    expect(Reflect.getMetadata('exports', BookModule)).toEqual([BookService, BookRepository, BookQueryBuilder]);
+    expect(Reflect.getMetadata('providers', BookModule)).toEqual([
+      BookService,
+      BookRepository,
+      BookReadService,
+      BookQueryBuilder,
+      ComicMetadataService,
+    ]);
+    expect(Reflect.getMetadata('exports', BookModule)).toEqual([BookService, BookReadService, BookQueryBuilder]);
   });
 });

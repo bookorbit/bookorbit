@@ -274,4 +274,29 @@ export class UserRepository {
       })
       .where(eq(schema.users.id, userId));
   }
+
+  async assignViewerLibraries(userId: number, libraryIds: number[]) {
+    if (libraryIds.length === 0) return;
+    await this.db
+      .insert(schema.userLibraryAccess)
+      .values(libraryIds.map((libraryId) => ({ userId, libraryId, accessLevel: 'viewer' as const })))
+      .onConflictDoNothing();
+  }
+
+  async findLibraryIdsByUserId(userId: number): Promise<number[]> {
+    const rows = await this.db
+      .select({ libraryId: schema.userLibraryAccess.libraryId })
+      .from(schema.userLibraryAccess)
+      .where(eq(schema.userLibraryAccess.userId, userId));
+    return rows.map((r) => r.libraryId);
+  }
+
+  async replaceViewerLibraries(userId: number, libraryIds: number[]): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.userLibraryAccess).where(eq(schema.userLibraryAccess.userId, userId));
+      if (libraryIds.length > 0) {
+        await tx.insert(schema.userLibraryAccess).values(libraryIds.map((libraryId) => ({ userId, libraryId, accessLevel: 'viewer' as const })));
+      }
+    });
+  }
 }

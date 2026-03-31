@@ -70,7 +70,7 @@ describe('EmailSendOrchestrator', () => {
         },
         {
           provide: EmailRecipientService,
-          useValue: { getOwnedById: vi.fn().mockResolvedValue(mockRecipient), getById: vi.fn().mockResolvedValue(mockRecipient) },
+          useValue: { getOwnedById: vi.fn().mockResolvedValue(mockRecipient) },
         },
         {
           provide: EmailRecipientGroupService,
@@ -147,7 +147,7 @@ describe('EmailSendOrchestrator', () => {
       const result = await orchestrator.quickSend(1, mockUser);
 
       expect(result.queued).toBe(1);
-      expect(recipientService.getById).toHaveBeenCalledWith(10);
+      expect(recipientService.getOwnedById).toHaveBeenCalledWith(10, mockUser);
     });
 
     it('should throw if no default recipient', async () => {

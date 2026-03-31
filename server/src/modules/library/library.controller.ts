@@ -21,9 +21,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { FileWriteRepository } from '../file-write/file-write.repository';
 import { FileWriteService } from '../file-write/file-write.service';
-import { FileWriteSettingsService } from '../file-write/file-write-settings.service';
 import { BookQueryPipe } from '../book/pipes/book-query.pipe';
 import { BookService } from '../book/book.service';
 import { CreateLibraryDto } from './dto/create-library.dto';
@@ -40,8 +38,6 @@ export class LibraryController {
     private readonly libraryService: LibraryService,
     private readonly bookService: BookService,
     private readonly fileWriteService: FileWriteService,
-    private readonly fileWriteRepo: FileWriteRepository,
-    private readonly fileWriteSettings: FileWriteSettingsService,
   ) {}
 
   @Get()
@@ -136,13 +132,13 @@ export class LibraryController {
     const dryRun = dryRunParam === 'true';
 
     if (!dryRun) {
-      const settings = await this.fileWriteSettings.resolve(libraryId);
+      const settings = await this.fileWriteService.resolveSettings(libraryId);
       if (!settings.enabled) {
         throw new BadRequestException('Metadata file write is not enabled. Enable it in Maintenance settings first.');
       }
     }
 
-    const rows = await this.fileWriteRepo.findNonMissingBookFilesByLibrary(libraryId);
+    const rows = await this.fileWriteService.findNonMissingBookFilesByLibrary(libraryId);
 
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',

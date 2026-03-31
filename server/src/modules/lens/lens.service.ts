@@ -4,7 +4,7 @@ import type { BooksPage, GroupRule, SortSpec } from '@projectx/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import { validateGroupRule } from '../book/utils/group-rule.validator';
 import { LibraryService } from '../library/library.service';
 import { CreateLensDto } from './dto/create-lens.dto';
@@ -16,7 +16,7 @@ import { LensRepository } from './lens.repository';
 export class LensService {
   constructor(
     private readonly lensRepo: LensRepository,
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly libraryService: LibraryService,
   ) {}
@@ -32,7 +32,7 @@ export class LensService {
     return Promise.all(
       lenses.map(async (lens) => {
         const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
-        const bookCount = await this.bookRepo.countWhere(where);
+        const bookCount = await this.bookReadService.countWhere(where);
         return { ...lens, bookCount };
       }),
     );
@@ -100,7 +100,7 @@ export class LensService {
 
     const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy((lens.defaultSort as SortSpec[]) ?? []);
-    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
       where,
       orderBy,
       limit: size,

@@ -9,6 +9,7 @@ import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NarratorModule } from '../narrator/narrator.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
+import { BookReadService } from './book-read.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookController } from './book.controller';
 import { BookRepository } from './book.repository';
@@ -28,7 +29,7 @@ import { ComicMetadataService } from './comic-metadata.service';
     UserBookStatusModule,
   ],
   controllers: [BookController],
-  providers: [BookService, BookRepository, BookQueryBuilder, ComicMetadataService],
-  exports: [BookService, BookRepository, BookQueryBuilder],
+  providers: [BookService, BookRepository, BookReadService, BookQueryBuilder, ComicMetadataService],
+  exports: [BookService, BookReadService, BookQueryBuilder],
 })
 export class BookModule {}

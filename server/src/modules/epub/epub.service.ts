@@ -4,7 +4,7 @@ import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
 import type { EpubBookInfo, EpubManifestItem, EpubSpineItem, EpubTocItem } from '@projectx/types';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import type { RequestUser } from '../../common/types/request-user';
 
@@ -274,7 +274,7 @@ export class EpubService {
   private readonly cache = new Map<string, CacheEntry>();
 
   constructor(
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
   ) {}
 
@@ -306,18 +306,18 @@ export class EpubService {
   }
 
   private async resolveEpubPath(bookId: number, fileId: number | undefined, user: RequestUser): Promise<string> {
-    const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
+    const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
 
     if (fileId != null) {
-      const file = await this.bookRepo.findFileById(fileId);
+      const file = await this.bookReadService.findFileById(fileId);
       if (!file || file.bookId !== bookId) throw new NotFoundException(`File ${fileId} not found for book ${bookId}`);
       if (file.format !== 'epub') throw new NotFoundException(`File ${fileId} is not an EPUB file`);
       return file.absolutePath;
     }
 
-    const [file] = await this.bookRepo.findPrimaryFilesByBookIds([bookId]);
+    const [file] = await this.bookReadService.findPrimaryFilesByBookIds([bookId]);
     if (!file || file.format !== 'epub') throw new NotFoundException(`No primary EPUB file for book ${bookId}`);
     return file.absolutePath;
   }

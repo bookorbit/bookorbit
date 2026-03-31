@@ -109,7 +109,7 @@ export class EmailSendOrchestrator {
       throw new BadRequestException('No default recipient configured. Set one in email settings.');
     }
 
-    const recipient = await this.recipientService.getById(prefs.defaultRecipientId);
+    const recipient = await this.recipientService.getOwnedById(prefs.defaultRecipientId, user);
     const resolved = await this.providerResolver.resolve(user, null);
 
     await this.enqueueOne(

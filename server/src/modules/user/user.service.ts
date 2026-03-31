@@ -1,14 +1,10 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { eq } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Permission } from '@projectx/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { DB } from '../../db/db.module';
-import * as schema from '../../db/schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
@@ -20,7 +16,6 @@ export class UserService {
   constructor(
     private readonly userRepo: UserRepository,
     private readonly config: ConfigService,
-    @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   findByUsername(username: string) {
@@ -93,9 +88,7 @@ export class UserService {
     }
 
     if (dto.libraryIds?.length) {
-      for (const libraryId of dto.libraryIds) {
-        await this.db.insert(schema.userLibraryAccess).values({ userId: user.id, libraryId, accessLevel: 'viewer' }).onConflictDoNothing();
-      }
+      await this.userRepo.assignViewerLibraries(user.id, dto.libraryIds);
     }
 
     const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
@@ -182,11 +175,7 @@ export class UserService {
   }
 
   async getLibraryIds(userId: number): Promise<number[]> {
-    const rows = await this.db
-      .select({ libraryId: schema.userLibraryAccess.libraryId })
-      .from(schema.userLibraryAccess)
-      .where(eq(schema.userLibraryAccess.userId, userId));
-    return rows.map((r) => r.libraryId);
+    return this.userRepo.findLibraryIdsByUserId(userId);
   }
 
   async setLibraries(targetUserId: number, libraryIds: number[], requestingUser: RequestUser): Promise<void> {
@@ -196,14 +185,7 @@ export class UserService {
       throw new ForbiddenException('Only administrators can edit administrator accounts');
     }
 
-    await this.db.transaction(async (tx) => {
-      await tx.delete(schema.userLibraryAccess).where(eq(schema.userLibraryAccess.userId, targetUserId));
-      if (libraryIds.length) {
-        await tx
-          .insert(schema.userLibraryAccess)
-          .values(libraryIds.map((libraryId) => ({ userId: targetUserId, libraryId, accessLevel: 'viewer' as const })));
-      }
-    });
+    await this.userRepo.replaceViewerLibraries(targetUserId, libraryIds);
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {

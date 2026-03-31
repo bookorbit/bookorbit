@@ -3,7 +3,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { BookRecommendation } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
-import { BookRepository } from '../book/book.repository';
+import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import { AnnCandidate, CandidateMetadata, RecommendationRepository, TargetBookData } from './recommendation.repository';
 
@@ -13,13 +13,13 @@ export class RecommendationService {
 
   constructor(
     private readonly recRepo: RecommendationRepository,
-    private readonly bookRepo: BookRepository,
+    private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
     private readonly embedder: BookEmbedderService,
   ) {}
 
   async getRecommendations(bookId: number, user: RequestUser): Promise<BookRecommendation[]> {
-    const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
+    const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
 
@@ -49,7 +49,7 @@ export class RecommendationService {
     if (rescored.length === 0) return [];
 
     const topIds = rescored.map((r) => r.bookId);
-    const rows = await this.bookRepo.findRecommendationTitlesByBookIds(topIds);
+    const rows = await this.bookReadService.findRecommendationTitlesByBookIds(topIds);
     const rowMap = new Map(rows.map((row) => [row.id, row]));
     return rescored.map((r) => rowMap.get(r.bookId)).filter((row): row is { id: number; title: string | null } => row != null);
   }
