@@ -37,7 +37,11 @@ export class UploadService {
   ) {}
 
   async upload(libraryId: number, folderId: number | undefined, rawFilename: string, fileStream: Readable, user: RequestUser): Promise<UploadResult> {
-    this.logger.log(`[upload.request] [start] user=${user.id} file="${rawFilename}"`);
+    const event = 'upload.book';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] libraryId=${libraryId} userId=${user.id} folderId=${folderId ?? 'auto'} rawFilename="${rawFilename}" - upload started`,
+    );
     const isSuperuser = user.isSuperuser;
 
     const library = await this.findLibraryOrFail(libraryId);
@@ -49,14 +53,13 @@ export class UploadService {
     const format = this.validator.validateFormat(filename, library.allowedFormats);
 
     const { tempPath, sizeBytes } = await this.storage.streamToTemp(fileStream);
+    let destinationPath: string | null = null;
 
     try {
       const { absolutePath, folderPath, relPath } = await this.resolveDestination(library, folder.path, tempPath, filename, format);
+      destinationPath = absolutePath;
 
-      const exists = await fsAccess(absolutePath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
+      if (await this.destinationExists(absolutePath)) {
         throw new ConflictException(`A file named "${basename(absolutePath)}" already exists at the target location`);
       }
 
@@ -66,12 +69,16 @@ export class UploadService {
 
       this.processor.extractMetadataAsync(bookId, absolutePath, format);
 
-      this.logger.log(`[upload.request] [success] user=${user.id} book=${bookId} format=${format} size=${sizeBytes}`);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} bookId=${bookId} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - upload completed`,
+      );
       return { bookId, filename: basename(absolutePath), format, sizeBytes };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[upload.request] [fail] user=${user.id} file="${rawFilename}" error="${errorMessage}"`);
-      await this.storage.cleanup(tempPath);
+      const { errorClass, errorMessage } = this.parseError(err);
+      this.logger.error(
+        `[${event}] [fail] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - upload failed`,
+      );
+      await Promise.allSettled([this.storage.cleanup(tempPath), destinationPath ? this.storage.cleanup(destinationPath) : Promise.resolve()]);
       throw err;
     }
   }
@@ -107,6 +114,8 @@ export class UploadService {
 
   private async buildPatternTokens(tempPath: string, format: string, stem: string): Promise<Record<string, string>> {
     const base: Record<string, string> = { originalFilename: stem, extension: format };
+    const event = 'upload.pattern_tokens';
+    const startedAt = Date.now();
 
     try {
       let parsed: {
@@ -169,11 +178,33 @@ export class UploadService {
       if (parsed.authors.length > 0) {
         base['authors'] = parsed.authors.map((a) => a.name).join(', ');
       }
-    } catch {
-      // Non-fatal: fall back to filename-only tokens
+    } catch (err) {
+      const { errorClass, errorMessage } = this.parseError(err);
+      this.logger.warn(
+        `[${event}] [fail] format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - token extraction failed, using filename tokens`,
+      );
     }
 
     return base;
+  }
+
+  private parseError(err: unknown): { errorClass: string; errorMessage: string } {
+    const errorClass = err instanceof Error ? err.name : 'Error';
+    const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+    return { errorClass, errorMessage };
+  }
+
+  private async destinationExists(absolutePath: string): Promise<boolean> {
+    try {
+      await fsAccess(absolutePath);
+      return true;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        return false;
+      }
+      throw err;
+    }
   }
 
   private async findLibraryOrFail(libraryId: number) {
@@ -191,6 +222,6 @@ export class UploadService {
 
     const folders = await this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
     if (folders.length === 0) throw new BadRequestException('Library has no folders configured');
-    return folders[0];
+    return folders.toSorted((a, b) => a.id - b.id)[0];
   }
 }

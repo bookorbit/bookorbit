@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -35,40 +35,46 @@ export class UploadProcessorService {
   ): Promise<{ bookId: number }> {
     const [fileStat, hash] = await Promise.all([stat(absolutePath), fingerprintFile(absolutePath)]);
 
-    const insertedBooks = (await this.db.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning()) as Array<{
-      id: number;
-    }>;
-    const book = insertedBooks[0];
-    if (!book) throw new Error('Failed to create book record');
+    const { bookId } = await this.db.transaction(async (tx) => {
+      const [book] = await tx.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning({ id: books.id });
+      if (!book) throw new InternalServerErrorException('Failed to create book record');
 
-    // Always create an empty metadata row so joins never return null (mirrors scanner behaviour).
-    await this.db.insert(bookMetadata).values({ bookId: book.id });
+      // Always create an empty metadata row so joins never return null (mirrors scanner behaviour).
+      await tx.insert(bookMetadata).values({ bookId: book.id });
 
-    const insertedFiles = (await this.db
-      .insert(bookFiles)
-      .values({
-        bookId: book.id,
-        libraryFolderId,
-        absolutePath,
-        relPath,
-        ino: fileStat.ino,
-        sizeBytes,
-        mtime: fileStat.mtime,
-        hash,
-        format,
-        role: 'content',
-      })
-      .returning()) as Array<{ id: number }>;
-    const file = insertedFiles[0];
-    if (!file) throw new Error('Failed to create book file');
+      const [file] = await tx
+        .insert(bookFiles)
+        .values({
+          bookId: book.id,
+          libraryFolderId,
+          absolutePath,
+          relPath,
+          ino: fileStat.ino,
+          sizeBytes,
+          mtime: fileStat.mtime,
+          hash,
+          format,
+          role: 'content',
+        })
+        .returning({ id: bookFiles.id });
+      if (!file) throw new InternalServerErrorException('Failed to create book file');
 
-    await this.db.update(books).set({ primaryFileId: file.id }).where(eq(books.id, book.id));
+      await tx.update(books).set({ primaryFileId: file.id }).where(eq(books.id, book.id));
 
-    this.autoFetchOrchestrator
-      ?.scheduleIfEligible(book.id, libraryId, 'event_import')
-      .catch((err: Error) => this.logger.warn(`book-metadata-fetch schedule failed for book ${book.id}: ${err.message}`));
+      return { bookId: book.id };
+    });
 
-    return { bookId: book.id };
+    const event = 'upload.schedule_metadata_fetch';
+    const startedAt = Date.now();
+    this.autoFetchOrchestrator?.scheduleIfEligible(bookId, libraryId, 'event_import').catch((err: Error) => {
+      const errorClass = err.name ?? 'Error';
+      const errorMessage = err.message.replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata fetch scheduling failed`,
+      );
+    });
+
+    return { bookId };
   }
 
   /**
@@ -78,14 +84,20 @@ export class UploadProcessorService {
   extractMetadataAsync(bookId: number, absolutePath: string, format: string): void {
     if (!METADATA_FORMATS.has(format)) return;
 
-    this.logger.debug(`[upload.metadata] [start] book=${bookId} format=${format}`);
+    const event = 'upload.extract_metadata';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] bookId=${bookId} format=${format} - metadata extraction started`);
     this.metadataService
       .extractAndSave(bookId, absolutePath, format)
       .then(() => {
-        this.logger.debug(`[upload.metadata] [success] book=${bookId}`);
+        this.logger.debug(`[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} - metadata extraction completed`);
       })
       .catch((err: Error) => {
-        this.logger.warn(`[upload.metadata] [fail] book=${bookId} error="${err.message}"`);
+        const errorClass = err.name ?? 'Error';
+        const errorMessage = err.message.replace(/"/g, '\\"');
+        this.logger.warn(
+          `[${event}] [fail] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata extraction failed`,
+        );
       });
   }
 }

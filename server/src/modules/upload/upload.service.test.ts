@@ -61,13 +61,13 @@ describe('UploadService', () => {
 
     validator.sanitizeFilename.mockReturnValue('book.epub');
     validator.validateFormat.mockReturnValue('epub');
-    storage.streamToTemp.mockResolvedValue({ tempPath: '/tmp/upload.bin', sizeBytes: 456, truncated: false });
+    storage.streamToTemp.mockResolvedValue({ tempPath: '/tmp/upload.bin', sizeBytes: 456 });
     storage.moveToPath.mockResolvedValue(undefined);
     storage.cleanup.mockResolvedValue(undefined);
     processor.createBookRecord.mockResolvedValue({ bookId: 99 });
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     appSettings.getUploadPattern.mockResolvedValue(null);
-    mockFsAccess.mockRejectedValue(new Error('ENOENT'));
+    mockFsAccess.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
     mockExtractEpubMetadata.mockResolvedValue(null);
   });
 
@@ -118,7 +118,19 @@ describe('UploadService', () => {
     expect(processor.createBookRecord).toHaveBeenCalledWith(1, 2, '/library/book', '/library/book/book.epub', 'book/book.epub', 'epub', 456);
   });
 
-  it('throws ConflictException when destination already exists and cleans temp file', async () => {
+  it('falls back to stem folder when metadata token extraction fails', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{title}' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockExtractEpubMetadata.mockRejectedValue(new Error('metadata parser broke'));
+
+    const result = await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(result).toEqual({ bookId: 99, filename: 'book.epub', format: 'epub', sizeBytes: 456 });
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/book/book.epub');
+  });
+
+  it('throws ConflictException when destination already exists and cleans both temp and destination paths', async () => {
     db.select
       .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
       .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
@@ -126,10 +138,11 @@ describe('UploadService', () => {
 
     await expect(service.upload(1, 2, 'raw.epub', {} as any, user)).rejects.toBeInstanceOf(ConflictException);
     expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
+    expect(storage.cleanup).toHaveBeenCalledWith('/library/book/book.epub');
     expect(storage.moveToPath).not.toHaveBeenCalled();
   });
 
-  it('cleans up temp file when move fails', async () => {
+  it('cleans up both paths when move fails', async () => {
     db.select
       .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
       .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
@@ -137,6 +150,28 @@ describe('UploadService', () => {
 
     await expect(service.upload(1, 2, 'raw.epub', {} as any, user)).rejects.toThrow('disk full');
     expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
+    expect(storage.cleanup).toHaveBeenCalledWith('/library/book/book.epub');
+  });
+
+  it('cleans destination when DB write fails after move', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    processor.createBookRecord.mockRejectedValue(new Error('insert failed'));
+
+    await expect(service.upload(1, 2, 'raw.epub', {} as any, user)).rejects.toThrow('insert failed');
+    expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
+    expect(storage.cleanup).toHaveBeenCalledWith('/library/book/book.epub');
+  });
+
+  it('propagates access errors other than ENOENT', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockFsAccess.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
+
+    await expect(service.upload(1, 2, 'raw.epub', {} as any, user)).rejects.toThrow('permission denied');
+    expect(storage.moveToPath).not.toHaveBeenCalled();
   });
 
   it('rejects folder IDs that do not belong to the selected library', async () => {
@@ -146,6 +181,19 @@ describe('UploadService', () => {
 
     await expect(service.upload(1, 2, 'raw.epub', {} as any, user)).rejects.toBeInstanceOf(BadRequestException);
     expect(storage.streamToTemp).not.toHaveBeenCalled();
+  });
+
+  it('chooses a deterministic default folder by smallest ID', async () => {
+    db.select.mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }])).mockReturnValueOnce(
+      selectChain([
+        { id: 20, libraryId: 1, path: '/folder-b' },
+        { id: 2, libraryId: 1, path: '/folder-a' },
+      ]),
+    );
+
+    await service.upload(1, undefined, 'raw.epub', {} as any, user);
+
+    expect(processor.createBookRecord).toHaveBeenCalledWith(1, 2, '/folder-a/book', '/folder-a/book/book.epub', 'book/book.epub', 'epub', 456);
   });
 
   it('rejects uploads when no default folder exists for the library', async () => {

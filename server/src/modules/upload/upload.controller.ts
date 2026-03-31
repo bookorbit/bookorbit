@@ -32,12 +32,24 @@ export class UploadController {
     const data = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
     if (!data) throw new BadRequestException('No file provided');
 
-    let folderId: number | undefined;
-    if (rawFolderId !== undefined) {
-      folderId = parseInt(rawFolderId, 10);
-      if (isNaN(folderId)) throw new BadRequestException('Invalid folderId');
-    }
+    const folderId = this.parseFolderId(rawFolderId);
 
     return this.uploadService.upload(libraryId, folderId, data.filename, data.file, user);
+  }
+
+  private parseFolderId(rawFolderId: string | undefined): number | undefined {
+    if (rawFolderId === undefined) return undefined;
+
+    const value = rawFolderId.trim();
+    if (!/^\d+$/.test(value)) {
+      throw new BadRequestException('Invalid folderId');
+    }
+
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException('Invalid folderId');
+    }
+
+    return parsed;
   }
 }

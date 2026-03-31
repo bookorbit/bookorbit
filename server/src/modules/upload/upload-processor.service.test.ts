@@ -1,6 +1,7 @@
 vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('../scanner/lib/hash', () => ({ fingerprintFile: vi.fn() }));
 
+import { InternalServerErrorException } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { fingerprintFile } from '../scanner/lib/hash';
 import { books, bookFiles, bookMetadata } from '../../db/schema';
@@ -13,6 +14,9 @@ describe('UploadProcessorService', () => {
   const metadataService = {
     extractAndSave: vi.fn(),
   };
+  const orchestrator = {
+    scheduleIfEligible: vi.fn(),
+  };
 
   const insertBooksReturning = vi.fn();
   const insertBooksValues = vi.fn();
@@ -22,7 +26,7 @@ describe('UploadProcessorService', () => {
   const updateBooksSet = vi.fn();
   const updateBooksWhere = vi.fn();
 
-  const db = {
+  const tx = {
     insert: vi.fn((table: unknown) => {
       if (table === books) {
         return { values: insertBooksValues };
@@ -41,23 +45,14 @@ describe('UploadProcessorService', () => {
     }),
   };
 
+  const db = {
+    transaction: vi.fn(async (callback: (innerTx: typeof tx) => Promise<unknown>) => callback(tx)),
+  };
+
   let service: UploadProcessorService;
 
   beforeEach(() => {
     vi.resetAllMocks();
-
-    db.insert.mockImplementation((table: unknown) => {
-      if (table === books) {
-        return { values: insertBooksValues };
-      }
-      if (table === bookMetadata) {
-        return { values: insertBookMetadataValues };
-      }
-      if (table === bookFiles) {
-        return { values: insertBookFilesValues };
-      }
-      throw new Error('unexpected table');
-    });
 
     insertBooksValues.mockReturnValue({ returning: insertBooksReturning });
     insertBooksReturning.mockResolvedValue([{ id: 42 }]);
@@ -67,16 +62,19 @@ describe('UploadProcessorService', () => {
     updateBooksSet.mockReturnValue({ where: updateBooksWhere });
     updateBooksWhere.mockResolvedValue(undefined);
 
+    orchestrator.scheduleIfEligible.mockResolvedValue(undefined);
+
     mockStat.mockResolvedValue({ ino: 111, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
     mockFingerprintFile.mockResolvedValue('hash-abc');
 
-    service = new UploadProcessorService(db as any, metadataService as any);
+    service = new UploadProcessorService(db as any, metadataService as any, orchestrator as any);
   });
 
-  it('creates book, metadata, and content file rows with fingerprint/stat data', async () => {
+  it('creates book, metadata, and content file rows with fingerprint/stat data in a transaction', async () => {
     const result = await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
 
     expect(result).toEqual({ bookId: 42 });
+    expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(insertBooksValues).toHaveBeenCalledWith({ libraryId: 1, libraryFolderId: 2, folderPath: '/folder', status: 'present' });
     expect(insertBookMetadataValues).toHaveBeenCalledWith({ bookId: 42 });
     expect(insertBookFilesValues).toHaveBeenCalledWith(
@@ -93,6 +91,33 @@ describe('UploadProcessorService', () => {
       }),
     );
     expect(updateBooksSet).toHaveBeenCalledWith({ primaryFileId: 420 });
+    expect(orchestrator.scheduleIfEligible).toHaveBeenCalledWith(42, 1, 'event_import');
+  });
+
+  it('throws InternalServerErrorException when creating the book row fails', async () => {
+    insertBooksReturning.mockResolvedValueOnce([]);
+
+    await expect(service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+
+  it('throws InternalServerErrorException when creating the book file row fails', async () => {
+    insertBookFilesReturning.mockResolvedValueOnce([]);
+
+    await expect(service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+
+  it('logs but suppresses scheduling failures', async () => {
+    const warn = vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation();
+    orchestrator.scheduleIfEligible.mockRejectedValue(new Error('queue offline'));
+
+    await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('queue offline'));
   });
 
   it('extractMetadataAsync ignores unsupported formats', () => {

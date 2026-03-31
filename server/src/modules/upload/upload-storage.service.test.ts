@@ -45,7 +45,7 @@ describe('UploadStorageService', () => {
     const p = service.streamToTemp(source);
     source.end(Buffer.from('abc'));
 
-    await expect(p).resolves.toEqual({ tempPath: '/tmp/projectx-upload-unit-test-id', sizeBytes: 123, truncated: false });
+    await expect(p).resolves.toEqual({ tempPath: '/tmp/projectx-upload-unit-test-id', sizeBytes: 123 });
   });
 
   it('throws PayloadTooLargeException and cleans up when busboy truncates stream', async () => {
@@ -58,6 +58,18 @@ describe('UploadStorageService', () => {
     source.end(Buffer.from('x'));
 
     await expect(p).rejects.toBeInstanceOf(PayloadTooLargeException);
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/projectx-upload-unit-test-id');
+  });
+
+  it('cleans up temp file when the source stream errors', async () => {
+    const source = new PassThrough();
+    const sink = new PassThrough();
+    mockCreateWriteStream.mockReturnValue(sink as unknown as ReturnType<typeof createWriteStream>);
+
+    const p = service.streamToTemp(source);
+    source.destroy(new Error('stream read failed'));
+
+    await expect(p).rejects.toThrow('stream read failed');
     expect(mockUnlink).toHaveBeenCalledWith('/tmp/projectx-upload-unit-test-id');
   });
 
