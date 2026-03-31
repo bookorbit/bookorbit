@@ -1,7 +1,14 @@
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 
 function makeGateway() {
-  return new AuthorEnrichmentGateway({ verify: vi.fn() } as any, { validateUser: vi.fn() } as any, { getStatusSummary: vi.fn() } as any);
+  return new AuthorEnrichmentGateway(
+    { verify: vi.fn() } as any,
+    { validateUser: vi.fn() } as any,
+    { getStatusSummary: vi.fn() } as any,
+    { isPaused: vi.fn() } as any,
+    { getSnapshot: vi.fn() } as any,
+    { get: vi.fn().mockReturnValue('http://localhost:5173') } as any,
+  );
 }
 
 describe('AuthorEnrichmentGateway', () => {

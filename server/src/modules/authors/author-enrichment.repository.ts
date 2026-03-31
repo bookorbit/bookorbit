@@ -12,8 +12,6 @@ type Db = NodePgDatabase<typeof schema>;
 
 export const AUTHOR_ENRICHMENT_ACTIVE_STATUSES = ['queued', 'rate_limited'] as const;
 
-export type AuthorEnrichmentActiveStatus = (typeof AUTHOR_ENRICHMENT_ACTIVE_STATUSES)[number];
-
 export type AuthorEnrichmentQueueRow = typeof authorEnrichmentQueue.$inferSelect;
 
 @Injectable()

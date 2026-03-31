@@ -27,8 +27,9 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import type { AuthorAutoEnrichmentConfig, AuthorEnrichmentConditions, AuthorMetadataCandidate } from '@projectx/types';
+import type { AuthorMetadataCandidate } from '@projectx/types';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
+import { AuthorAutoEnrichmentConfigDto } from './dto/author-auto-enrichment-config.dto';
 import { BulkAuthorIdsDto } from './dto/bulk-author-ids.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
@@ -38,6 +39,7 @@ import { ListAuthorsDto } from './dto/list-authors.dto';
 import { ListDuplicateSuggestionsDto } from './dto/list-duplicate-suggestions.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
+import { PreviewAuthorEnrichmentCountDto } from './dto/preview-author-enrichment-count.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 import { AuthorsService } from './authors.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
@@ -112,14 +114,14 @@ export class AuthorsController {
   @HttpCode(HttpStatus.OK)
   @RequirePermission(Permission.ManageMetadataConfig)
   @Auditable({ action: AuditAction.AuthorEnrichmentConfigUpdate, description: 'Updated author enrichment configuration' })
-  async setEnrichmentConfig(@Body() config: AuthorAutoEnrichmentConfig) {
+  async setEnrichmentConfig(@Body() config: AuthorAutoEnrichmentConfigDto) {
     await this.enrichmentConfig.setConfig(config);
     return this.enrichmentConfig.getConfig();
   }
 
   @Post('enrichment/preview-count')
   @RequirePermission(Permission.ManageMetadataConfig)
-  async previewCount(@Body() body: { conditions: AuthorEnrichmentConditions }) {
+  async previewCount(@Body() body: PreviewAuthorEnrichmentCountDto) {
     const count = await this.queueRepo.countEligibleLinkedAuthors(body.conditions);
     return { count };
   }

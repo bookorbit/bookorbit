@@ -1,3 +1,5 @@
+import { firstValueFrom, toArray } from 'rxjs';
+
 import { AuthorMetadataProviderError } from './providers/author-metadata-provider';
 import { AuthorMetadataFetchService } from './author-metadata-fetch.service';
 
@@ -67,5 +69,31 @@ describe('AuthorMetadataFetchService', () => {
         transient: true,
       },
     });
+  });
+
+  it('stream enforces global result limit across providers', async () => {
+    registry.select.mockReturnValue([
+      {
+        key: 'audnexus',
+        label: 'Audnexus',
+        identifiable: false,
+        search: vi.fn().mockResolvedValue([
+          { provider: 'audnexus', providerId: 'A1', name: 'Author One' },
+          { provider: 'audnexus', providerId: 'A2', name: 'Author Two' },
+        ]),
+      },
+      {
+        key: 'other',
+        label: 'Other',
+        identifiable: false,
+        search: vi.fn().mockResolvedValue([
+          { provider: 'other', providerId: 'B1', name: 'Author Three' },
+          { provider: 'other', providerId: 'B2', name: 'Author Four' },
+        ]),
+      },
+    ]);
+
+    const emitted = await firstValueFrom(service.stream({ name: 'author', limit: 2 }).pipe(toArray()));
+    expect(emitted).toHaveLength(2);
   });
 });

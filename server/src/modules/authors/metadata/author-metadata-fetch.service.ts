@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AuthorMetadataCandidate, AuthorMetadataProviderInfo, AuthorMetadataProviderKey } from '@projectx/types';
-import { from, merge, Observable, switchMap } from 'rxjs';
+import { from, merge, Observable, switchMap, take } from 'rxjs';
 
 import { AuthorMetadataProviderRegistry } from './provider-registry';
 import { AuthorMetadataProviderError, AuthorMetadataSearchParams, isIdentifiableAuthorProvider } from './providers/author-metadata-provider';
@@ -73,12 +73,7 @@ export class AuthorMetadataFetchService {
           ),
         ).pipe(switchMap((candidates) => from(candidates.slice(0, limit)))),
       ),
-    );
-  }
-
-  async quickSearch(params: AuthorMetadataSearchParams, options?: SearchOptions): Promise<AuthorMetadataCandidate | null> {
-    const detailed = await this.quickSearchDetailed(params, options);
-    return detailed.candidate;
+    ).pipe(take(limit));
   }
 
   async quickSearchDetailed(params: AuthorMetadataSearchParams, options?: SearchOptions): Promise<AuthorQuickSearchResult> {

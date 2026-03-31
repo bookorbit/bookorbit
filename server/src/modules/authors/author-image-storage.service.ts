@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { lookup } from 'dns/promises';
 import { access, mkdir, readdir, stat, unlink, writeFile } from 'fs/promises';
 import { constants as fsConstants } from 'fs';
+import { isIP } from 'net';
 import { join } from 'path';
 
 import { generateThumbnail, imageExt } from '../metadata/lib/cover';
@@ -19,7 +21,7 @@ export class AuthorImageStorageService {
   }
 
   async saveFromUrl(authorId: number, rawUrl: string): Promise<boolean> {
-    const url = this.normalizeUrl(rawUrl);
+    const url = await this.normalizeUrl(rawUrl);
     if (!url) return false;
 
     try {
@@ -31,7 +33,10 @@ export class AuthorImageStorageService {
 
       const existing = await readdir(dir).catch(() => [] as string[]);
       for (const file of existing.filter((entry) => entry.startsWith('photo.'))) {
-        await unlink(join(dir, file)).catch(() => {});
+        await unlink(join(dir, file)).catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`author image cleanup failed for authorId=${authorId} file=${file}: ${message}`);
+        });
       }
 
       const ext = imageExt(bytes);
@@ -96,7 +101,7 @@ export class AuthorImageStorageService {
     }
   }
 
-  private normalizeUrl(rawUrl: string): string | null {
+  private async normalizeUrl(rawUrl: string): Promise<string | null> {
     const trimmed = rawUrl.trim();
     if (!trimmed) return null;
 
@@ -113,7 +118,31 @@ export class AuthorImageStorageService {
       return null;
     }
 
+    if (!(await this.isSafeRemoteHost(parsed.hostname))) {
+      return null;
+    }
+
     return parsed.toString();
+  }
+
+  private async isSafeRemoteHost(hostname: string): Promise<boolean> {
+    const normalizedHost = hostname.trim().toLowerCase();
+    if (!normalizedHost) return false;
+    if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost') || normalizedHost.endsWith('.local')) {
+      return false;
+    }
+
+    if (isIP(normalizedHost) > 0) {
+      return !isPrivateOrLocalAddress(normalizedHost);
+    }
+
+    try {
+      const resolved = await lookup(normalizedHost, { all: true, verbatim: true });
+      if (resolved.length === 0) return false;
+      return resolved.every((entry) => !isPrivateOrLocalAddress(entry.address));
+    } catch {
+      return false;
+    }
   }
 
   private async fetchImageFromUrl(url: string): Promise<Buffer | null> {
@@ -148,4 +177,46 @@ export class AuthorImageStorageService {
       clearTimeout(timeout);
     }
   }
+}
+
+function isPrivateOrLocalAddress(address: string): boolean {
+  const normalized = address.toLowerCase();
+  const mappedV4Prefix = '::ffff:';
+  const maybeV4 = normalized.startsWith(mappedV4Prefix) ? normalized.slice(mappedV4Prefix.length) : normalized;
+  const family = isIP(maybeV4);
+
+  if (family === 4) {
+    return isPrivateOrLocalV4(maybeV4);
+  }
+
+  if (family === 6) {
+    return (
+      maybeV4 === '::1' ||
+      maybeV4 === '::' ||
+      maybeV4.startsWith('fc') ||
+      maybeV4.startsWith('fd') ||
+      maybeV4.startsWith('fe8') ||
+      maybeV4.startsWith('fe9') ||
+      maybeV4.startsWith('fea') ||
+      maybeV4.startsWith('feb')
+    );
+  }
+
+  return true;
+}
+
+function isPrivateOrLocalV4(address: string): boolean {
+  const octets = address.split('.').map((part) => Number.parseInt(part, 10));
+  if (octets.length !== 4 || octets.some((value) => !Number.isFinite(value) || value < 0 || value > 255)) {
+    return true;
+  }
+
+  const [a, b] = octets;
+  if (a === 10 || a === 127) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 0) return true;
+
+  return false;
 }
