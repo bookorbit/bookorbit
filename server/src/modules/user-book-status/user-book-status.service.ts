@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import type { ReadStatus, UserBookStatus } from '@projectx/types';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import type { UserBookStatusRow } from '../../db/schema';
+import { isReadStatus, isReadStatusSource } from './user-book-status.constants';
 
 const DEFAULT_FINISH_THRESHOLD = 98;
 const READING_THRESHOLD = 0.25;
+const MIN_PERCENTAGE = 0;
+const MAX_PERCENTAGE = 100;
 
 @Injectable()
 export class UserBookStatusService {
@@ -25,9 +28,10 @@ export class UserBookStatusService {
 
     if (existing?.source === 'manual') return;
 
-    const readTh = readingThreshold ?? READING_THRESHOLD;
-    const finishTh = finishThreshold ?? DEFAULT_FINISH_THRESHOLD;
-    const derived: ReadStatus = percentage >= finishTh ? 'read' : percentage >= readTh ? 'reading' : 'unread';
+    const normalizedPercentage = this.normalizePercentage(percentage);
+    const { readThreshold, finishThreshold: normalizedFinishThreshold } = this.normalizeThresholds(readingThreshold, finishThreshold);
+    const derived: ReadStatus =
+      normalizedPercentage >= normalizedFinishThreshold ? 'read' : normalizedPercentage >= readThreshold ? 'reading' : 'unread';
 
     if (!existing && derived === 'unread') return;
     if (existing?.status === derived) return;
@@ -50,12 +54,48 @@ export class UserBookStatusService {
   }
 
   private toDto(row: UserBookStatusRow): UserBookStatus {
+    const status = this.toReadStatus(row.status);
+    const source = this.toReadStatusSource(row.source);
+
     return {
-      status: row.status as ReadStatus,
-      source: row.source as 'auto' | 'manual',
+      status,
+      source,
       startedAt: row.startedAt?.toISOString() ?? null,
       finishedAt: row.finishedAt?.toISOString() ?? null,
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  private normalizePercentage(value: number): number {
+    if (!Number.isFinite(value)) return MIN_PERCENTAGE;
+    return Math.min(MAX_PERCENTAGE, Math.max(MIN_PERCENTAGE, value));
+  }
+
+  private normalizeThresholds(readingThreshold?: number | null, finishThreshold?: number | null) {
+    const normalizedReading = this.normalizeThreshold(readingThreshold, READING_THRESHOLD);
+    const normalizedFinish = this.normalizeThreshold(finishThreshold, DEFAULT_FINISH_THRESHOLD);
+    if (normalizedReading <= normalizedFinish) {
+      return { readThreshold: normalizedReading, finishThreshold: normalizedFinish };
+    }
+    return { readThreshold: normalizedFinish, finishThreshold: normalizedFinish };
+  }
+
+  private normalizeThreshold(value: number | null | undefined, fallback: number): number {
+    if (value == null || !Number.isFinite(value)) return fallback;
+    return Math.min(MAX_PERCENTAGE, Math.max(MIN_PERCENTAGE, value));
+  }
+
+  private toReadStatus(value: string): ReadStatus {
+    if (!isReadStatus(value)) {
+      throw new InternalServerErrorException(`Invalid read status value: ${value}`);
+    }
+    return value;
+  }
+
+  private toReadStatusSource(value: string): 'auto' | 'manual' {
+    if (!isReadStatusSource(value)) {
+      throw new InternalServerErrorException(`Invalid read status source value: ${value}`);
+    }
+    return value;
   }
 }

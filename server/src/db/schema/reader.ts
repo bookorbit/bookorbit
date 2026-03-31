@@ -1,4 +1,5 @@
 import { date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import type { ReadStatus, ReadStatusSource } from '@projectx/types';
 
 import { bookFiles, books } from './books';
 import { libraries } from './libraries';
@@ -14,9 +15,9 @@ export const userBookStatus = pgTable(
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
     // 'unread' | 'want_to_read' | 'reading' | 'on_hold' | 'rereading' | 'read' | 'skimmed' | 'abandoned'
-    status: varchar('status', { length: 20 }).notNull().default('unread'),
+    status: varchar('status', { length: 20 }).$type<ReadStatus>().notNull().default('unread'),
     // 'auto' (derived from progress) | 'manual' (user-set; never auto-overridden)
-    source: varchar('source', { length: 10 }).notNull().default('auto'),
+    source: varchar('source', { length: 10 }).$type<ReadStatusSource>().notNull().default('auto'),
     startedAt: timestamp('started_at'),
     finishedAt: timestamp('finished_at'),
     updatedAt: timestamp('updated_at')

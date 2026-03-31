@@ -6,10 +6,27 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { userBookStatus } from '../../db/schema';
 import type { ReadStatus, ReadStatusSource } from '@projectx/types';
+import type { UserBookStatusRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
-const STARTED_FROM_ACTIVE_STATUSES: ReadStatus[] = ['reading', 'on_hold', 'rereading'];
-const RESET_FINISHED_AT_STATUSES: ReadStatus[] = ['unread', 'want_to_read', 'reading', 'on_hold', 'rereading', 'skimmed'];
+
+export type UserBookStatusLifecycle = Pick<UserBookStatusRow, 'startedAt' | 'finishedAt'>;
+
+export function deriveLifecycle(status: ReadStatus, now: Date, existing: UserBookStatusRow | null): UserBookStatusLifecycle {
+  switch (status) {
+    case 'unread':
+    case 'want_to_read':
+      return { startedAt: null, finishedAt: null };
+    case 'reading':
+    case 'on_hold':
+    case 'rereading':
+    case 'skimmed':
+    case 'abandoned':
+      return { startedAt: existing?.startedAt ?? now, finishedAt: null };
+    case 'read':
+      return { startedAt: existing?.startedAt ?? now, finishedAt: now };
+  }
+}
 
 @Injectable()
 export class UserBookStatusRepository {
@@ -41,9 +58,7 @@ export class UserBookStatusRepository {
     existing?: Awaited<ReturnType<typeof this.findOne>>,
   ): Promise<void> {
     const row = existing !== undefined ? existing : await this.findOne(userId, bookId);
-
-    const startedAt = row?.startedAt ?? (STARTED_FROM_ACTIVE_STATUSES.includes(status) ? now : null);
-    const finishedAt = status === 'read' ? now : RESET_FINISHED_AT_STATUSES.includes(status) ? null : (row?.finishedAt ?? null);
+    const { startedAt, finishedAt } = deriveLifecycle(status, now, row);
 
     await this.db
       .insert(userBookStatus)

@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UserBookStatusService } from './user-book-status.service';
+import { InternalServerErrorException } from '@nestjs/common';
+import type { ReadStatus, ReadStatusSource } from '@projectx/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { UserBookStatusRow } from '../../db/schema';
+import { UserBookStatusRepository } from './user-book-status.repository';
+import { UserBookStatusService } from './user-book-status.service';
 
 function makeRow(overrides: Partial<UserBookStatusRow> = {}): UserBookStatusRow {
   return {
@@ -16,140 +20,155 @@ function makeRow(overrides: Partial<UserBookStatusRow> = {}): UserBookStatusRow 
 }
 
 const mockRepo = {
-  findOne: vi.fn(),
-  findByBookIds: vi.fn(),
-  upsert: vi.fn(),
+  findOne: vi.fn<(...args: [number, number]) => Promise<UserBookStatusRow | null>>(),
+  findByBookIds: vi.fn<(...args: [number, number[]]) => Promise<UserBookStatusRow[]>>(),
+  upsert: vi.fn<(...args: [number, number, ReadStatus, ReadStatusSource, Date, (UserBookStatusRow | null)?]) => Promise<void>>(),
 };
 
 let service: UserBookStatusService;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRepo.findOne.mockResolvedValue(null);
+  mockRepo.findByBookIds.mockResolvedValue([]);
   mockRepo.upsert.mockResolvedValue(undefined);
-  service = new UserBookStatusService(mockRepo as any);
+  service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository);
 });
 
 describe('setManual', () => {
-  it('calls upsert with source manual and correct args', async () => {
+  it('calls upsert with manual source', async () => {
     await service.setManual(1, 10, 'reading');
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    const [userId, bookId, status, source] = mockRepo.upsert.mock.calls[0];
+    const [userId, bookId, status, source, now] = mockRepo.upsert.mock.calls[0];
     expect(userId).toBe(1);
     expect(bookId).toBe(10);
     expect(status).toBe('reading');
     expect(source).toBe('manual');
-  });
-
-  it('passes a Date instance for now', async () => {
-    await service.setManual(1, 10, 'read');
-    const now = mockRepo.upsert.mock.calls[0][4];
     expect(now).toBeInstanceOf(Date);
   });
 });
 
-describe('autoUpdate — default thresholds', () => {
-  it('does not call upsert when no existing record and percentage is below reading threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 0.1);
-    expect(mockRepo.upsert).not.toHaveBeenCalled();
-  });
+describe('autoUpdate with default thresholds', () => {
+  it.each([
+    { percentage: 0.1, expectedStatus: null },
+    { percentage: 0.25, expectedStatus: 'reading' },
+    { percentage: 50, expectedStatus: 'reading' },
+    { percentage: 98, expectedStatus: 'read' },
+    { percentage: 100, expectedStatus: 'read' },
+  ])('derives expected status for percentage=$percentage', async ({ percentage, expectedStatus }) => {
+    await service.autoUpdate(1, 10, percentage);
 
-  it('calls upsert with reading when no existing record and percentage equals reading threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 0.25);
+    if (expectedStatus === null) {
+      expect(mockRepo.upsert).not.toHaveBeenCalled();
+      return;
+    }
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('reading');
+    expect(mockRepo.upsert.mock.calls[0][2]).toBe(expectedStatus);
   });
+});
 
-  it('calls upsert with reading when no existing record and percentage is above reading but below finish', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 50);
-    expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('reading');
-  });
+describe('autoUpdate with custom thresholds', () => {
+  it.each([
+    { percentage: 0.5, readingThreshold: 1, finishThreshold: 90, existingStatus: 'reading', expectedStatus: 'unread' },
+    { percentage: 1, readingThreshold: 1, finishThreshold: 90, existingStatus: 'unread', expectedStatus: 'reading' },
+    { percentage: 90, readingThreshold: 1, finishThreshold: 90, existingStatus: 'reading', expectedStatus: 'read' },
+  ])(
+    'derives expected status for percentage=$percentage',
+    async ({ percentage, readingThreshold, finishThreshold, existingStatus, expectedStatus }) => {
+      mockRepo.findOne.mockResolvedValue(makeRow({ status: existingStatus, source: 'auto' }));
 
-  it('calls upsert with read when no existing record and percentage equals finish threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 98);
-    expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('read');
-  });
+      await service.autoUpdate(1, 10, percentage, readingThreshold, finishThreshold);
 
-  it('calls upsert with read when no existing record and percentage is above finish threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 100);
+      expect(mockRepo.upsert).toHaveBeenCalledOnce();
+      expect(mockRepo.upsert.mock.calls[0][2]).toBe(expectedStatus);
+    },
+  );
+
+  it('falls back to defaults for null and undefined thresholds', async () => {
+    await service.autoUpdate(1, 10, 98, null, undefined);
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
     expect(mockRepo.upsert.mock.calls[0][2]).toBe('read');
   });
 });
 
-describe('autoUpdate — custom thresholds', () => {
-  it('derives unread when percentage is below custom reading threshold', async () => {
+describe('autoUpdate normalization and guard behavior', () => {
+  it('does not override manual statuses', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'unread', source: 'manual' }));
+
+    await service.autoUpdate(1, 10, 100);
+
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('skips updates when derived status is unchanged', async () => {
     mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
-    await service.autoUpdate(1, 10, 0.5, 1, 90);
+
+    await service.autoUpdate(1, 10, 50);
+
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('passes existing row to upsert for lifecycle derivation', async () => {
+    const existing = makeRow({ status: 'reading', source: 'auto' });
+    mockRepo.findOne.mockResolvedValue(existing);
+
+    await service.autoUpdate(1, 10, 99);
+
+    expect(mockRepo.upsert).toHaveBeenCalledOnce();
+    expect(mockRepo.upsert.mock.calls[0][5]).toBe(existing);
+  });
+
+  it('clamps percentage values outside 0..100', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
+
+    await service.autoUpdate(1, 10, 120);
+    expect(mockRepo.upsert).toHaveBeenCalledOnce();
+    expect(mockRepo.upsert.mock.calls[0][2]).toBe('read');
+
+    vi.clearAllMocks();
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'read', source: 'auto' }));
+    mockRepo.upsert.mockResolvedValue(undefined);
+
+    await service.autoUpdate(1, 10, -12);
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
     expect(mockRepo.upsert.mock.calls[0][2]).toBe('unread');
   });
 
-  it('derives reading when percentage equals custom reading threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 1.0, 1, 90);
+  it('treats non-finite percentages as 0', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
+
+    await service.autoUpdate(1, 10, Number.NaN);
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('reading');
+    expect(mockRepo.upsert.mock.calls[0][2]).toBe('unread');
   });
 
-  it('derives read when percentage equals custom finish threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 90, 1, 90);
-    expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('read');
-  });
-
-  it('falls back to default thresholds when null is passed', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 0.25, null, null);
-    expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('reading');
-  });
-
-  it('falls back to default thresholds when undefined is passed', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
-    await service.autoUpdate(1, 10, 98, undefined, undefined);
-    expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('read');
-  });
-});
-
-describe('autoUpdate — existing record logic', () => {
-  it('calls upsert when existing auto record is unread and derived is reading', async () => {
+  it('falls back to default thresholds for non-finite values', async () => {
     mockRepo.findOne.mockResolvedValue(makeRow({ status: 'unread', source: 'auto' }));
-    await service.autoUpdate(1, 10, 50);
+
+    await service.autoUpdate(1, 10, 50, Number.NaN, Number.POSITIVE_INFINITY);
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
     expect(mockRepo.upsert.mock.calls[0][2]).toBe('reading');
   });
 
-  it('does not call upsert when existing auto record matches derived status', async () => {
-    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
-    await service.autoUpdate(1, 10, 50);
-    expect(mockRepo.upsert).not.toHaveBeenCalled();
-  });
+  it('clamps custom thresholds into the 0..100 range', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'unread', source: 'auto' }));
 
-  it('calls upsert when existing auto record is reading and derived is read', async () => {
-    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
-    await service.autoUpdate(1, 10, 99);
+    await service.autoUpdate(1, 10, 50, -5, 150);
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
-    expect(mockRepo.upsert.mock.calls[0][2]).toBe('read');
+    expect(mockRepo.upsert.mock.calls[0][2]).toBe('reading');
   });
 
-  it('does not call upsert when existing record source is manual', async () => {
-    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'unread', source: 'manual' }));
-    await service.autoUpdate(1, 10, 100);
-    expect(mockRepo.upsert).not.toHaveBeenCalled();
-  });
+  it('normalizes inverted thresholds to keep read threshold <= finish threshold', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
 
-  it('calls upsert with unread when existing auto read record drops below reading threshold', async () => {
-    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'read', source: 'auto' }));
-    await service.autoUpdate(1, 10, 0.1);
+    await service.autoUpdate(1, 10, 79, 90, 80);
+
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
     expect(mockRepo.upsert.mock.calls[0][2]).toBe('unread');
   });
@@ -157,17 +176,18 @@ describe('autoUpdate — existing record logic', () => {
 
 describe('findOne', () => {
   it('returns null when repo returns null', async () => {
-    mockRepo.findOne.mockResolvedValue(null);
     const result = await service.findOne(1, 10);
     expect(result).toBeNull();
   });
 
-  it('maps row to DTO with all fields as ISO strings', async () => {
+  it('maps valid rows into DTO shape', async () => {
     const started = new Date('2024-03-01T08:00:00.000Z');
     const finished = new Date('2024-06-01T12:00:00.000Z');
     const updated = new Date('2024-06-01T12:00:00.000Z');
     mockRepo.findOne.mockResolvedValue(makeRow({ status: 'read', source: 'manual', startedAt: started, finishedAt: finished, updatedAt: updated }));
+
     const result = await service.findOne(1, 10);
+
     expect(result).toEqual({
       status: 'read',
       source: 'manual',
@@ -177,45 +197,51 @@ describe('findOne', () => {
     });
   });
 
-  it('returns null startedAt and finishedAt when they are null on the row', async () => {
-    mockRepo.findOne.mockResolvedValue(makeRow({ startedAt: null, finishedAt: null }));
-    const result = await service.findOne(1, 10);
-    expect(result?.startedAt).toBeNull();
-    expect(result?.finishedAt).toBeNull();
+  it('throws when row status is invalid', async () => {
+    mockRepo.findOne.mockResolvedValue(
+      makeRow({
+        status: 'not_a_status' as unknown as UserBookStatusRow['status'],
+      }),
+    );
+
+    await expect(service.findOne(1, 10)).rejects.toThrowError(InternalServerErrorException);
+  });
+
+  it('throws when row source is invalid', async () => {
+    mockRepo.findOne.mockResolvedValue(
+      makeRow({
+        source: 'not_a_source' as unknown as UserBookStatusRow['source'],
+      }),
+    );
+
+    await expect(service.findOne(1, 10)).rejects.toThrowError(InternalServerErrorException);
   });
 });
 
 describe('findByBookIds', () => {
-  it('returns empty Map when repo returns empty array', async () => {
-    mockRepo.findByBookIds.mockResolvedValue([]);
+  it('returns empty map when repo returns no rows', async () => {
     const result = await service.findByBookIds(1, []);
     expect(result.size).toBe(0);
   });
 
-  it('maps a single row correctly into the Map', async () => {
-    const updated = new Date('2024-05-01T00:00:00.000Z');
-    mockRepo.findByBookIds.mockResolvedValue([makeRow({ bookId: 10, status: 'reading', source: 'auto', updatedAt: updated })]);
-    const result = await service.findByBookIds(1, [10]);
-    expect(result.size).toBe(1);
-    expect(result.get(10)).toEqual({
-      status: 'reading',
-      source: 'auto',
-      startedAt: null,
-      finishedAt: null,
-      updatedAt: updated.toISOString(),
-    });
-  });
-
-  it('maps multiple rows keyed by bookId', async () => {
+  it('maps rows keyed by bookId', async () => {
     const updated1 = new Date('2024-05-01T00:00:00.000Z');
     const updated2 = new Date('2024-06-01T00:00:00.000Z');
     mockRepo.findByBookIds.mockResolvedValue([
       makeRow({ bookId: 10, status: 'reading', source: 'auto', updatedAt: updated1 }),
       makeRow({ bookId: 20, status: 'read', source: 'manual', updatedAt: updated2 }),
     ]);
+
     const result = await service.findByBookIds(1, [10, 20]);
+
     expect(result.size).toBe(2);
-    expect(result.get(10)?.status).toBe('reading');
+    expect(result.get(10)).toEqual({
+      status: 'reading',
+      source: 'auto',
+      startedAt: null,
+      finishedAt: null,
+      updatedAt: updated1.toISOString(),
+    });
     expect(result.get(20)?.status).toBe('read');
   });
 });
