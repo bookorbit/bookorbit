@@ -18,6 +18,7 @@ import type { FastifyReply } from 'fastify';
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import type { BookQuery, LibraryFileSyncProgressEvent, WriteResult } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -46,12 +47,14 @@ export class LibraryController {
   }
 
   @Get(':id')
+  @RequireLibraryAccess('viewer')
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     const isSuperuser = user.isSuperuser;
     return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.findOne(id));
   }
 
   @Post(':id/books')
+  @RequireLibraryAccess('viewer')
   queryBooks(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.bookService.queryForLibrary(user, libraryId, query);
   }
@@ -107,12 +110,14 @@ export class LibraryController {
   }
 
   @Get(':id/stats')
+  @RequireLibraryAccess('viewer')
   getStats(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     const isSuperuser = user.isSuperuser;
     return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.getStats(id));
   }
 
   @Post(':id/write-metadata-to-files')
+  @RequireLibraryAccess('editor')
   @RequirePermission(Permission.LibraryEditMetadata)
   @Auditable({
     action: AuditAction.LibraryWriteMetadataToFiles,

@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Param, Pa
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { AuditAction, AuditResource } from '@projectx/types';
+import { AllowDefaultPassword } from '../../common/decorators/allow-default-password.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -64,6 +65,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @AllowDefaultPassword()
   me(@CurrentUser() user: RequestUser) {
     return this.authService.buildUserResponse(user);
   }
@@ -101,6 +103,7 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AllowDefaultPassword()
   changePassword(
     @CurrentUser() user: RequestUser,
     @Body() dto: ChangePasswordDto,

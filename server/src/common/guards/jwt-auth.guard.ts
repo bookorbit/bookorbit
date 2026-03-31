@@ -1,8 +1,8 @@
 import { ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { FastifyRequest } from 'fastify';
 
+import { ALLOW_DEFAULT_PASSWORD_KEY } from '../decorators/allow-default-password.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { RequestUser } from '../types/request-user';
 
@@ -20,15 +20,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   handleRequest<T extends RequestUser>(err: unknown, user: T, _info: unknown, context: ExecutionContext): T {
     if (err || !user) {
-      throw (err as Error) || new UnauthorizedException();
+      throw new UnauthorizedException();
     }
 
     if (user.isDefaultPassword) {
-      const req = context.switchToHttp().getRequest<FastifyRequest>();
-      const url = req.url.split('?')[0];
-      const isChangePassword = url === '/api/v1/auth/change-password' && req.method === 'POST';
-      const isMe = url === '/api/v1/auth/me' && req.method === 'GET';
-      if (!isChangePassword && !isMe) {
+      const allowDefaultPassword = this.reflector.getAllAndOverride<boolean>(ALLOW_DEFAULT_PASSWORD_KEY, [context.getHandler(), context.getClass()]);
+      if (!allowDefaultPassword) {
         throw new ForbiddenException('Password change required');
       }
     }
