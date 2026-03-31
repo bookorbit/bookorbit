@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ChordDiagramData, StatisticsDateRange, StatisticsGranularity } from '@projectx/types';
@@ -32,6 +32,11 @@ export class StatisticsRepository {
     if (libraryIds === null) return undefined;
     if (libraryIds.length === 0) return sql`false`;
     return inArray(books.libraryId, libraryIds);
+  }
+
+  private async resolveLibraryFilter(userId: number, isSuperuser: boolean, requestedLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    return this.libraryFilter(this.intersectLibraryIds(accessible, requestedLibraryIds));
   }
 
   async formatDistribution(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
@@ -266,8 +271,17 @@ export class StatisticsRepository {
   }
 
   async publicationYearTimeline(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
-    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const filter = await this.resolveLibraryFilter(userId, isSuperuser, filterLibraryIds);
+    const rankedTitleRows = this.db
+      .select({
+        year: bookMetadata.publishedYear,
+        title: bookMetadata.title,
+        rn: sql<number>`row_number() over (partition by ${bookMetadata.publishedYear} order by ${bookMetadata.bookId})`.as('rn'),
+      })
+      .from(books)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(and(isNotNull(bookMetadata.publishedYear), isNotNull(bookMetadata.title), filter))
+      .as('ranked_title_rows');
 
     const [counts, titleRows, [{ unknownCount }]] = await Promise.all([
       this.db
@@ -283,14 +297,12 @@ export class StatisticsRepository {
 
       this.db
         .select({
-          year: bookMetadata.publishedYear,
-          title: bookMetadata.title,
-          rn: sql<number>`row_number() over (partition by ${bookMetadata.publishedYear} order by ${bookMetadata.bookId})`,
+          year: rankedTitleRows.year,
+          title: rankedTitleRows.title,
         })
-        .from(books)
-        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(and(isNotNull(bookMetadata.publishedYear), isNotNull(bookMetadata.title), filter))
-        .orderBy(bookMetadata.publishedYear),
+        .from(rankedTitleRows)
+        .where(lte(rankedTitleRows.rn, 3))
+        .orderBy(rankedTitleRows.year),
 
       this.db
         .select({ unknownCount: sql<number>`count(*)::int` })
@@ -301,18 +313,24 @@ export class StatisticsRepository {
 
     const titlesMap = new Map<number, string[]>();
     for (const row of titleRows) {
-      if (row.rn > 3 || !row.year || !row.title) continue;
+      if (row.year === null || row.title === null) continue;
       const arr = titlesMap.get(row.year) ?? [];
       arr.push(row.title);
       titlesMap.set(row.year, arr);
     }
 
     return {
-      items: counts.map((r) => ({
-        year: r.year!,
-        count: r.count,
-        topTitles: titlesMap.get(r.year!) ?? [],
-      })),
+      items: counts.flatMap((r) =>
+        r.year === null
+          ? []
+          : [
+              {
+                year: r.year,
+                count: r.count,
+                topTitles: titlesMap.get(r.year) ?? [],
+              },
+            ],
+      ),
       unknownCount,
     };
   }
@@ -359,8 +377,7 @@ export class StatisticsRepository {
   }
 
   async metadataCompleteness(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
-    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const filter = await this.resolveLibraryFilter(userId, isSuperuser, filterLibraryIds);
 
     const [row] = await this.db
       .select({
@@ -384,12 +401,18 @@ export class StatisticsRepository {
 
     return (
       row ?? {
-        totalBooks: 0,
-        neverFetchedCount: 0,
-        fresh30dCount: 0,
-        stale31To90dCount: 0,
-        stale91To180dCount: 0,
-        staleOver180dCount: 0,
+        total: 0,
+        hasTitle: 0,
+        hasCover: 0,
+        hasDescription: 0,
+        hasPublisher: 0,
+        hasYear: 0,
+        hasLanguage: 0,
+        hasPageCount: 0,
+        hasRating: 0,
+        hasSeries: 0,
+        hasIsbn: 0,
+        hasAuthor: 0,
       }
     );
   }
@@ -631,8 +654,7 @@ export class StatisticsRepository {
   }
 
   async largestBooks(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
-    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const filter = await this.resolveLibraryFilter(userId, isSuperuser, filterLibraryIds);
 
     return this.db
       .select({
@@ -644,14 +666,13 @@ export class StatisticsRepository {
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(isNotNull(bookFiles.sizeBytes), filter))
+      .where(and(isNotNull(bookFiles.sizeBytes), isNotNull(bookFiles.format), isNotNull(bookMetadata.title), filter))
       .orderBy(desc(bookFiles.sizeBytes))
       .limit(50);
   }
 
   async topSeries(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]) {
-    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const filter = await this.resolveLibraryFilter(userId, isSuperuser, filterLibraryIds);
 
     return this.db
       .select({

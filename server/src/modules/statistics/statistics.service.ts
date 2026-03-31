@@ -31,6 +31,47 @@ import { StatisticsRepository } from './statistics.repository';
 
 const STATISTICS_TOP_N = 10;
 const STREAM_TOP_FORMATS = 8;
+const TOP_LIST_LIMIT = 25;
+const METADATA_SCORE_BIN_COUNT = 10;
+const OTHER_BUCKET_LABEL = 'Other';
+const UNKNOWN_FORMAT_LABEL = 'UNKNOWN';
+
+type MetadataCompletenessFieldKey =
+  | 'hasTitle'
+  | 'hasCover'
+  | 'hasAuthor'
+  | 'hasGenre'
+  | 'hasTag'
+  | 'hasDescription'
+  | 'hasPublisher'
+  | 'hasYear'
+  | 'hasLanguage'
+  | 'hasPageCount'
+  | 'hasRating'
+  | 'hasSeries'
+  | 'hasIsbn';
+
+type MetadataCompletenessFieldDefinition = {
+  field: string;
+  key: MetadataCompletenessFieldKey;
+  includeInOverall: boolean;
+};
+
+const METADATA_COMPLETENESS_FIELDS: MetadataCompletenessFieldDefinition[] = [
+  { field: 'Title', key: 'hasTitle', includeInOverall: false },
+  { field: 'Cover', key: 'hasCover', includeInOverall: true },
+  { field: 'Author', key: 'hasAuthor', includeInOverall: true },
+  { field: 'Genres', key: 'hasGenre', includeInOverall: false },
+  { field: 'Tags', key: 'hasTag', includeInOverall: false },
+  { field: 'Description', key: 'hasDescription', includeInOverall: true },
+  { field: 'Publisher', key: 'hasPublisher', includeInOverall: true },
+  { field: 'Year', key: 'hasYear', includeInOverall: true },
+  { field: 'Language', key: 'hasLanguage', includeInOverall: true },
+  { field: 'Page Count', key: 'hasPageCount', includeInOverall: true },
+  { field: 'Rating', key: 'hasRating', includeInOverall: true },
+  { field: 'Series', key: 'hasSeries', includeInOverall: true },
+  { field: 'ISBN', key: 'hasIsbn', includeInOverall: true },
+];
 
 @Injectable()
 export class StatisticsService {
@@ -38,14 +79,14 @@ export class StatisticsService {
 
   async getFormatDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<FormatDistributionItem>> {
     const raw = await this.repo.formatDistribution(user.id, user.isSuperuser, query.libraryIds);
-    const all = raw.map((r) => ({ format: r.format!, count: r.count }));
-    return { items: this.clipToTopN(all, 'format'), unknownCount: 0 };
+    const all = raw.flatMap((r) => (r.format ? [{ format: r.format, count: r.count }] : []));
+    return { items: this.clipCountsToTopN(all, (count) => ({ format: OTHER_BUCKET_LABEL, count })), unknownCount: 0 };
   }
 
   async getLanguageDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<LanguageDistributionItem>> {
     const { items: raw, unknownCount } = await this.repo.languageDistribution(user.id, user.isSuperuser, query.libraryIds);
-    const all = raw.map((r) => ({ language: r.language!, count: r.count }));
-    return { items: this.clipToTopN(all, 'language'), unknownCount };
+    const all = raw.flatMap((r) => (r.language ? [{ language: r.language, count: r.count }] : []));
+    return { items: this.clipCountsToTopN(all, (count) => ({ language: OTHER_BUCKET_LABEL, count })), unknownCount };
   }
 
   async getBooksAddedOverTime(user: RequestUser, query: BooksOverTimeQueryDto): Promise<StatisticsResult<BooksAddedDataPoint>> {
@@ -56,9 +97,9 @@ export class StatisticsService {
   async getMetadataScoreDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<MetadataScoreDistribution> {
     const raw = await this.repo.metadataScoreDistribution(user.id, user.isSuperuser, query.libraryIds);
     const byMin = new Map(raw.bins.map((b) => [b.minScore, b.count]));
-    const bins = Array.from({ length: 10 }, (_, i) => {
+    const bins = Array.from({ length: METADATA_SCORE_BIN_COUNT }, (_, i) => {
       const minScore = i * 10;
-      const maxScore = i === 9 ? 100 : minScore + 9;
+      const maxScore = i === METADATA_SCORE_BIN_COUNT - 1 ? 100 : minScore + 9;
       return {
         minScore,
         maxScore,
@@ -82,24 +123,9 @@ export class StatisticsService {
     query: StatisticsFilterQueryDto,
   ): Promise<StatisticsResult<LibraryMetadataCompletenessItem>> {
     const rows = await this.repo.libraryMetadataCompleteness(user.id, user.isSuperuser, query.libraryIds);
-    const fieldDefs: Array<{ field: string; key: keyof (typeof rows)[number] }> = [
-      { field: 'Title', key: 'hasTitle' },
-      { field: 'Cover', key: 'hasCover' },
-      { field: 'Author', key: 'hasAuthor' },
-      { field: 'Genres', key: 'hasGenre' },
-      { field: 'Tags', key: 'hasTag' },
-      { field: 'Description', key: 'hasDescription' },
-      { field: 'Publisher', key: 'hasPublisher' },
-      { field: 'Year', key: 'hasYear' },
-      { field: 'Language', key: 'hasLanguage' },
-      { field: 'Page Count', key: 'hasPageCount' },
-      { field: 'Rating', key: 'hasRating' },
-      { field: 'Series', key: 'hasSeries' },
-      { field: 'ISBN', key: 'hasIsbn' },
-    ];
 
     const items: LibraryMetadataCompletenessItem[] = rows.flatMap((row) =>
-      fieldDefs.map((f) => {
+      METADATA_COMPLETENESS_FIELDS.map((f) => {
         const presentCount = Number(row[f.key] ?? 0);
         const totalCount = row.total ?? 0;
         return {
@@ -120,7 +146,7 @@ export class StatisticsService {
     const raw = await this.repo.formatShareOverTime(user.id, user.isSuperuser, query.libraryIds);
     const totals = new Map<string, number>();
     for (const row of raw) {
-      const format = (row.format ?? 'unknown').toUpperCase();
+      const format = this.normalizeFormatLabel(row.format);
       totals.set(format, (totals.get(format) ?? 0) + row.count);
     }
 
@@ -133,7 +159,7 @@ export class StatisticsService {
 
     const grouped = new Map<string, FormatShareOverTimeItem>();
     for (const row of raw) {
-      const normalizedFormat = (row.format ?? 'unknown').toUpperCase();
+      const normalizedFormat = this.normalizeFormatLabel(row.format);
       const format = topFormats.has(normalizedFormat) ? normalizedFormat : 'OTHER';
       const key = `${row.year}-${row.month}-${format}`;
       const existing = grouped.get(key);
@@ -150,21 +176,27 @@ export class StatisticsService {
 
   async getPageCountDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<PageCountDistributionItem>> {
     const { items: raw, unknownCount } = await this.repo.pageCountDistributionByFormat(user.id, user.isSuperuser, query.libraryIds);
-    const items = raw.map((row) => ({
-      format: row.format!.toUpperCase(),
-      count: row.count,
-      min: row.min,
-      q1: Number(row.q1),
-      median: Number(row.median),
-      q3: Number(row.q3),
-      max: row.max,
-    }));
+    const items = raw.flatMap((row) =>
+      row.format
+        ? [
+            {
+              format: row.format.toUpperCase(),
+              count: row.count,
+              min: row.min,
+              q1: Number(row.q1),
+              median: Number(row.median),
+              q3: Number(row.q3),
+              max: row.max,
+            },
+          ]
+        : [],
+    );
     return { items, unknownCount };
   }
 
   async getStorageByFormat(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<StorageByFormatItem>> {
     const raw = await this.repo.storageByFormat(user.id, user.isSuperuser, query.libraryIds);
-    const all = raw.map((r) => ({ format: r.format!, sizeBytes: Number(r.sizeBytes) }));
+    const all = raw.flatMap((r) => (r.format ? [{ format: r.format, sizeBytes: Number(r.sizeBytes) }] : []));
     return { items: this.clipStorageToTopN(all), unknownCount: 0 };
   }
 
@@ -180,34 +212,22 @@ export class StatisticsService {
 
   async getTopAuthors(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<TopAuthorItem>> {
     const raw = await this.repo.topAuthors(user.id, user.isSuperuser, query.libraryIds);
-    const items = raw.slice(0, 25).map((r) => ({ name: r.name, count: r.count }));
+    const items = raw.slice(0, TOP_LIST_LIMIT).map((r) => ({ name: r.name, count: r.count }));
     return { items, unknownCount: 0 };
   }
 
   async getMetadataCompleteness(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<MetadataCompletenessItem>> {
     const row = await this.repo.metadataCompleteness(user.id, user.isSuperuser, query.libraryIds);
-    const total = row.total ?? 0;
-    const fields: Array<{ field: string; presentCount: number }> = [
-      { field: 'Cover', presentCount: row.hasCover ?? 0 },
-      { field: 'Author', presentCount: row.hasAuthor ?? 0 },
-      { field: 'Description', presentCount: row.hasDescription ?? 0 },
-      { field: 'Publisher', presentCount: row.hasPublisher ?? 0 },
-      { field: 'Year', presentCount: row.hasYear ?? 0 },
-      { field: 'Language', presentCount: row.hasLanguage ?? 0 },
-      { field: 'Page Count', presentCount: row.hasPageCount ?? 0 },
-      { field: 'Rating', presentCount: row.hasRating ?? 0 },
-      { field: 'Series', presentCount: row.hasSeries ?? 0 },
-      { field: 'ISBN', presentCount: row.hasIsbn ?? 0 },
-    ];
-    const items = fields
-      .map((f) => ({ field: f.field, presentCount: f.presentCount, totalCount: total }))
+    const total = row?.total ?? 0;
+    const items = METADATA_COMPLETENESS_FIELDS.filter((fieldDef) => fieldDef.includeInOverall)
+      .map((fieldDef) => ({ field: fieldDef.field, presentCount: row?.[fieldDef.key] ?? 0, totalCount: total }))
       .sort((a, b) => b.presentCount - a.presentCount);
     return { items, unknownCount: 0 };
   }
 
   async getGenreDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<GenreDistributionItem>> {
     const { items: raw, unknownCount } = await this.repo.genreDistribution(user.id, user.isSuperuser, query.libraryIds);
-    const items = raw.slice(0, 25).map((r) => ({ genre: r.genre, count: r.count }));
+    const items = raw.slice(0, TOP_LIST_LIMIT).map((r) => ({ genre: r.genre, count: r.count }));
     return { items, unknownCount };
   }
 
@@ -260,18 +280,22 @@ export class StatisticsService {
     return { items, unknownCount };
   }
 
-  private clipToTopN<T extends { count: number }>(items: T[], labelKey: keyof T, n = STATISTICS_TOP_N): T[] {
+  private clipCountsToTopN<T extends { count: number }>(items: T[], createOtherItem: (count: number) => T, n = STATISTICS_TOP_N): T[] {
     if (items.length <= n) return items;
     const top = items.slice(0, n);
-    const otherCount = items.slice(n).reduce((s, item) => s + item.count, 0);
-    return [...top, { [labelKey]: 'Other', count: otherCount } as unknown as T];
+    const otherCount = items.slice(n).reduce((sum, item) => sum + item.count, 0);
+    return [...top, createOtherItem(otherCount)];
+  }
+
+  private normalizeFormatLabel(format: string | null | undefined): string {
+    return (format ?? UNKNOWN_FORMAT_LABEL).toUpperCase();
   }
 
   private clipStorageToTopN(items: StorageByFormatItem[]): StorageByFormatItem[] {
     if (items.length <= STATISTICS_TOP_N) return items;
     const top = items.slice(0, STATISTICS_TOP_N);
-    const otherBytes = items.slice(STATISTICS_TOP_N).reduce((s, item) => s + item.sizeBytes, 0);
-    return [...top, { format: 'Other', sizeBytes: otherBytes }];
+    const otherBytes = items.slice(STATISTICS_TOP_N).reduce((sum, item) => sum + item.sizeBytes, 0);
+    return [...top, { format: OTHER_BUCKET_LABEL, sizeBytes: otherBytes }];
   }
 
   async getSummary(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsSummary> {
@@ -284,13 +308,13 @@ export class StatisticsService {
 
   async getLargestBooks(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<LargestBookItem>> {
     const raw = await this.repo.largestBooks(user.id, user.isSuperuser, query.libraryIds);
-    const items = raw.map((r) => ({ id: r.id, title: r.title!, sizeBytes: Number(r.sizeBytes), format: r.format! }));
+    const items = raw.flatMap((r) => (r.title && r.format ? [{ id: r.id, title: r.title, sizeBytes: Number(r.sizeBytes), format: r.format }] : []));
     return { items, unknownCount: 0 };
   }
 
   async getTopSeries(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<TopSeriesItem>> {
     const raw = await this.repo.topSeries(user.id, user.isSuperuser, query.libraryIds);
-    const items = raw.map((r) => ({ name: r.name!, count: r.count }));
+    const items = raw.flatMap((r) => (r.name ? [{ name: r.name, count: r.count }] : []));
     return { items, unknownCount: 0 };
   }
 }
