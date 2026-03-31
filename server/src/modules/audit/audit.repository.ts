@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, gte, lte, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { AuditAction, AuditResource } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -10,8 +11,8 @@ type Db = NodePgDatabase<typeof schema>;
 
 export interface AuditLogQuery {
   userId?: number;
-  action?: string;
-  resource?: string;
+  action?: AuditAction;
+  resource?: AuditResource;
   dateFrom?: Date;
   dateTo?: Date;
   page: number;

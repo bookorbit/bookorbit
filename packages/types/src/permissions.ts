@@ -19,6 +19,7 @@ export enum Permission {
   ManageMetadataConfig = "manage_metadata_config",
   ManageAppSettings = "manage_app_settings",
   ManageUsers = "manage_users",
+  ViewAuditLog = "view_audit_log",
 }
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -35,4 +36,5 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.ManageMetadataConfig]: "Metadata config",
   [Permission.ManageAppSettings]: "App settings",
   [Permission.ManageUsers]: "Manage users",
+  [Permission.ViewAuditLog]: "View audit log",
 };

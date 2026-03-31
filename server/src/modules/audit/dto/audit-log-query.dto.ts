@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsPositive, IsString, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsPositive, Max, Min } from 'class-validator';
+import { AuditAction, AuditResource } from '@projectx/types';
 
 export class AuditLogQueryDto {
   @IsOptional()
@@ -9,12 +10,12 @@ export class AuditLogQueryDto {
   userId?: number;
 
   @IsOptional()
-  @IsString()
-  action?: string;
+  @IsEnum(AuditAction)
+  action?: AuditAction;
 
   @IsOptional()
-  @IsString()
-  resource?: string;
+  @IsEnum(AuditResource)
+  resource?: AuditResource;
 
   @IsOptional()
   @IsDateString()

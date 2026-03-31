@@ -1,7 +1,7 @@
-import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
+import { Permission } from '@projectx/types';
 
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { RequestUser } from '../../common/types/request-user';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { AuditLogQueryDto } from './dto/audit-log-query.dto';
 import { AuditService } from './audit.service';
 
@@ -10,17 +10,16 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  getAuditLogs(@CurrentUser() user: RequestUser, @Query() query: AuditLogQueryDto) {
-    if (!user.isSuperuser) throw new ForbiddenException();
-
+  @RequirePermission(Permission.ViewAuditLog)
+  getAuditLogs(@Query() query: AuditLogQueryDto) {
     return this.auditService.getAuditLogs({
       userId: query.userId,
       action: query.action,
       resource: query.resource,
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 50,
+      page: query.page!,
+      pageSize: query.pageSize!,
     });
   }
 }
