@@ -20,6 +20,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { AuditAction } from '@projectx/types';
 
+import { APP_SETTING_KEYS } from '../../common/constants/app-settings.constants';
 import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
@@ -51,8 +52,6 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-const INITIAL_SETUP_KEY = 'initial_setup_completed_at';
-
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -71,7 +70,7 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const setting = await this.db.query.appSettings.findFirst({
-      where: eq(schema.appSettings.key, 'allow_registration'),
+      where: eq(schema.appSettings.key, APP_SETTING_KEYS.ALLOW_REGISTRATION),
     });
     if (setting?.value !== 'true') {
       throw new ForbiddenException('Registration is not open');
@@ -123,7 +122,7 @@ export class AuthService {
     const created = await this.db.transaction(async (tx) => {
       const [setupMarker] = await tx
         .insert(schema.appSettings)
-        .values({ key: INITIAL_SETUP_KEY, value: new Date().toISOString() })
+        .values({ key: APP_SETTING_KEYS.INITIAL_SETUP_COMPLETED_AT, value: new Date().toISOString() })
         .onConflictDoNothing({ target: schema.appSettings.key })
         .returning({ id: schema.appSettings.id });
       if (!setupMarker) {

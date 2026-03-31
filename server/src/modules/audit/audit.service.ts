@@ -1,11 +1,9 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 
+import { APP_SETTING_KEYS, DEFAULT_AUDIT_RETENTION_DAYS } from '../../common/constants/app-settings.constants';
 import { AUDIT_EVENT, AuditEventPayload, AuditEventsService } from './audit-events.service';
 import { AuditRepository, AuditLogQuery } from './audit.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
-
-const AUDIT_RETENTION_DAYS_KEY = 'audit_retention_days';
-const DEFAULT_RETENTION_DAYS = 90;
 
 @Injectable()
 export class AuditService implements OnModuleInit, OnModuleDestroy {
@@ -51,12 +49,12 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
 
   async getRetentionDays(): Promise<number> {
     try {
-      const value = await this.appSettings.getValue(AUDIT_RETENTION_DAYS_KEY);
-      if (!value) return DEFAULT_RETENTION_DAYS;
+      const value = await this.appSettings.getValue(APP_SETTING_KEYS.AUDIT_RETENTION_DAYS);
+      if (!value) return DEFAULT_AUDIT_RETENTION_DAYS;
       const parsed = parseInt(value, 10);
-      return isNaN(parsed) || parsed <= 0 ? DEFAULT_RETENTION_DAYS : parsed;
+      return isNaN(parsed) || parsed <= 0 ? DEFAULT_AUDIT_RETENTION_DAYS : parsed;
     } catch {
-      return DEFAULT_RETENTION_DAYS;
+      return DEFAULT_AUDIT_RETENTION_DAYS;
     }
   }
 

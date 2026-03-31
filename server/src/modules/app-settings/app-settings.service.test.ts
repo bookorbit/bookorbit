@@ -118,6 +118,24 @@ describe('AppSettingsService', () => {
       expect(config).toEqual(stored);
     });
 
+    it('merges missing stored fields with defaults', async () => {
+      const stored = {
+        enabled: true,
+        issuerUri: 'https://kc.example.com/realms/main',
+        clientId: 'projectx',
+        claimMapping: { username: 'upn' },
+      };
+      db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) });
+
+      const config = await service.getOidcConfig();
+      expect(config.enabled).toBe(true);
+      expect(config.providerName).toBe('');
+      expect(config.clientId).toBe('projectx');
+      expect(config.claimMapping.username).toBe('upn');
+      expect(config.claimMapping.groups).toBe('groups');
+      expect(config.autoProvision.allowLocalLinking).toBe(true);
+    });
+
     it('returns default config when stored value is corrupt JSON', async () => {
       db.query.appSettings.findFirst.mockResolvedValue({ key: 'oidc_config', value: 'not-json' });
       const config = await service.getOidcConfig();

@@ -12,60 +12,12 @@ import {
   type StagingAutoFinalizeMetadataMode,
 } from '@projectx/types';
 
+import { APP_SETTING_KEYS, DEFAULT_OIDC_CONFIG, type OidcFullConfig } from '../../common/constants/app-settings.constants';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
-const APP_SETTING_KEYS = {
-  OIDC_CONFIG: 'oidc_config',
-  UPLOAD_FILE_PATTERN: 'upload_file_pattern',
-  DOWNLOAD_FILE_PATTERN: 'download_file_pattern',
-  STAGING_AUTO_FETCH_METADATA: 'staging_auto_fetch_metadata',
-  STAGING_AUTO_FINALIZE_ENABLED: 'staging_auto_finalize_enabled',
-  STAGING_AUTO_FINALIZE_THRESHOLD: 'staging_auto_finalize_threshold',
-  STAGING_AUTO_FINALIZE_LIBRARY_ID: 'staging_auto_finalize_library_id',
-  STAGING_AUTO_FINALIZE_FOLDER_ID: 'staging_auto_finalize_folder_id',
-  STAGING_AUTO_FINALIZE_METADATA_MODE: 'staging_auto_finalize_metadata_mode',
-  FILE_WRITE_SETTINGS: 'file_write_settings',
-  METADATA_SCORE_WEIGHTS: 'metadata_score_weights',
-  AUTHORS_AUTO_ENRICHMENT_ENABLED: 'authors_auto_enrichment_enabled',
-  AUTHORS_AUTO_ENRICHMENT_WRITE_MODE: 'authors_auto_enrichment_write_mode',
-  AUTHORS_PROVIDER_AUDNEXUS_ENABLED: 'authors_provider_audnexus_enabled',
-  AUTHORS_ENRICHMENT_PAUSED: 'authors_enrichment_paused',
-} as const;
-
 type Db = NodePgDatabase<typeof schema>;
 const DEFAULT_DOWNLOAD_PATTERN = '{originalFilename}';
-
-export interface OidcFullConfig {
-  enabled: boolean;
-  providerName: string;
-  issuerUri: string;
-  clientId: string;
-  clientSecret: string;
-  scopes: string;
-  claimMapping: {
-    username: string;
-    name: string;
-    email: string;
-    groups: string;
-  };
-  autoProvision: {
-    enabled: boolean;
-    allowLocalLinking: boolean;
-    defaultPermissionNames: string[];
-  };
-}
-
-const DEFAULT_OIDC_CONFIG: OidcFullConfig = {
-  enabled: false,
-  providerName: '',
-  issuerUri: '',
-  clientId: '',
-  clientSecret: '',
-  scopes: 'openid profile email',
-  claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
-  autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
-};
 
 function parseSafe<T>(val: string | undefined, fallback: T): T {
   if (!val) return fallback;
@@ -143,7 +95,8 @@ export class AppSettingsService {
 
   async getOidcConfig(): Promise<OidcFullConfig> {
     const row = await this.db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, APP_SETTING_KEYS.OIDC_CONFIG) });
-    return parseSafe<OidcFullConfig>(row?.value, { ...DEFAULT_OIDC_CONFIG });
+    const stored = parseSafe<Partial<OidcFullConfig>>(row?.value, {});
+    return mergeOidcConfig(DEFAULT_OIDC_CONFIG, stored);
   }
 
   async getUploadPattern(): Promise<string> {
@@ -172,12 +125,7 @@ export class AppSettingsService {
 
   async updateOidcConfig(config: Partial<OidcFullConfig>): Promise<OidcFullConfig> {
     const current = await this.getOidcConfig();
-    const merged: OidcFullConfig = {
-      ...current,
-      ...config,
-      claimMapping: { ...current.claimMapping, ...(config.claimMapping ?? {}) },
-      autoProvision: { ...current.autoProvision, ...(config.autoProvision ?? {}) },
-    };
+    const merged = mergeOidcConfig(current, config);
     const value = JSON.stringify(merged);
 
     await this.db
@@ -269,5 +217,14 @@ function mergeFileWriteSettings(base: GlobalFileWriteSettings, patch: Partial<Gl
     epub: { ...base.epub, ...(patch.epub ?? {}) },
     pdf: { ...base.pdf, ...(patch.pdf ?? {}) },
     cbx: { ...base.cbx, ...(patch.cbx ?? {}) },
+  };
+}
+
+function mergeOidcConfig(base: OidcFullConfig, patch: Partial<OidcFullConfig>): OidcFullConfig {
+  return {
+    ...base,
+    ...patch,
+    claimMapping: { ...base.claimMapping, ...(patch.claimMapping ?? {}) },
+    autoProvision: { ...base.autoProvision, ...(patch.autoProvision ?? {}) },
   };
 }

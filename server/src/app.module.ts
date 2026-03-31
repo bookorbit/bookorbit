@@ -35,7 +35,6 @@ import { MetadataModule } from './modules/metadata/metadata.module';
 import { NarratorModule } from './modules/narrator/narrator.module';
 import { ReaderPreferencesModule } from './modules/reader-preferences/reader-preferences.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
-import { RoleModule } from './modules/role/role.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { EmailModule } from './modules/email/email.module';
@@ -69,7 +68,6 @@ import { AuditModule } from './modules/audit/audit.module';
     UserModule,
     AuthorsModule,
     BookMetadataFetchModule,
-    RoleModule,
     LibraryModule,
     PathModule,
     BookModule,
