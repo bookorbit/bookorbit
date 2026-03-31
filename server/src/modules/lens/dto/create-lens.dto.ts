@@ -1,12 +1,16 @@
-import { IsArray, IsBoolean, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import type { GroupRule, SortField, SortSpec } from '@projectx/types';
+import { SORT_FIELDS } from '@projectx/types';
+import { IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+
+const SORT_DIRECTIONS: ReadonlyArray<SortSpec['dir']> = ['asc', 'desc'];
 
 export class SortSpecDto {
-  @IsString()
-  field: string;
+  @IsIn(SORT_FIELDS)
+  field: SortField;
 
-  @IsString()
-  dir: 'asc' | 'desc';
+  @IsIn(SORT_DIRECTIONS)
+  dir: SortSpec['dir'];
 }
 
 export class CreateLensDto {
@@ -19,7 +23,8 @@ export class CreateLensDto {
   icon?: string;
 
   @IsOptional()
-  filter?: Record<string, unknown>;
+  @IsObject()
+  filter?: GroupRule | null;
 
   @IsArray()
   @ValidateNested({ each: true })

@@ -14,6 +14,18 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import type { CoverAspectRatio, OrganizationMode } from '@projectx/types';
+
+import {
+  LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,
+  LIBRARY_AUTO_SCAN_CRON_EXPRESSION_REGEX,
+  LIBRARY_COVER_ASPECT_RATIOS,
+  LIBRARY_MARK_AS_FINISHED_MAX,
+  LIBRARY_MARK_AS_FINISHED_MIN,
+  LIBRARY_ORGANIZATION_MODES,
+  LIBRARY_READING_THRESHOLD_MAX,
+  LIBRARY_READING_THRESHOLD_MIN,
+} from '../library.constants';
 
 export class UpdateLibraryDto {
   @IsOptional()
@@ -40,8 +52,8 @@ export class UpdateLibraryDto {
   folders?: string[];
 
   @IsOptional()
-  @IsIn(['2/3', '1/1'])
-  coverAspectRatio?: string;
+  @IsIn(LIBRARY_COVER_ASPECT_RATIOS)
+  coverAspectRatio?: CoverAspectRatio;
 
   @IsOptional()
   @IsBoolean()
@@ -50,8 +62,8 @@ export class UpdateLibraryDto {
   @IsOptional()
   @IsString()
   @ValidateIf((o: { autoScanCronExpression?: unknown }) => o.autoScanCronExpression !== null)
-  @Matches(/^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/, {
-    message: 'autoScanCronExpression must be a valid 5-field cron expression',
+  @Matches(LIBRARY_AUTO_SCAN_CRON_EXPRESSION_REGEX, {
+    message: LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,
   })
   autoScanCronExpression?: string | null;
 
@@ -71,8 +83,8 @@ export class UpdateLibraryDto {
   allowedFormats?: string[];
 
   @IsOptional()
-  @IsIn(['book_per_file', 'book_per_folder'])
-  organizationMode?: string;
+  @IsIn(LIBRARY_ORGANIZATION_MODES)
+  organizationMode?: OrganizationMode;
 
   @IsOptional()
   @IsArray()
@@ -81,14 +93,14 @@ export class UpdateLibraryDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(0.05)
-  @Max(5)
+  @Min(LIBRARY_READING_THRESHOLD_MIN)
+  @Max(LIBRARY_READING_THRESHOLD_MAX)
   readingThreshold?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(90)
-  @Max(100)
+  @Min(LIBRARY_MARK_AS_FINISHED_MIN)
+  @Max(LIBRARY_MARK_AS_FINISHED_MAX)
   markAsFinishedPercentComplete?: number;
 
   @IsOptional()

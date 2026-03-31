@@ -1,11 +1,12 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
-import type { BooksPage, GroupRule, SortSpec } from '@projectx/types';
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
+import type { BooksPage } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
+import type { Lens } from '../../db/schema/lenses';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { BookReadService } from '../book/book-read.service';
 import { validateGroupRule } from '../book/utils/group-rule.validator';
+import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { LibraryService } from '../library/library.service';
 import { CreateLensDto } from './dto/create-lens.dto';
 import { ReorderLensesDto } from './dto/reorder-lenses.dto';
@@ -21,17 +22,33 @@ export class LensService {
     private readonly libraryService: LibraryService,
   ) {}
 
-  private isSuperuser(user: RequestUser): boolean {
-    return user.isSuperuser;
+  private async getLensOrThrow(id: number): Promise<Lens> {
+    const [lens] = await this.lensRepo.findById(id);
+    if (!lens) {
+      throw new NotFoundException('Lens not found');
+    }
+    return lens;
+  }
+
+  private assertReadAccess(lens: Lens, user: RequestUser): void {
+    if (!lens.isPublic && lens.userId !== user.id && !user.isSuperuser) {
+      throw new ForbiddenException('No access to this lens');
+    }
+  }
+
+  private assertWriteAccess(lens: Lens, user: RequestUser, action: 'modify' | 'delete'): void {
+    if (lens.userId !== user.id && !user.isSuperuser) {
+      const message = action === 'modify' ? 'Cannot modify this lens' : 'Cannot delete this lens';
+      throw new ForbiddenException(message);
+    }
   }
 
   async findAll(user: RequestUser) {
     const lenses = await this.lensRepo.findAllForUser(user.id);
-    const libs = await this.libraryService.findAll(user);
-    const accessibleLibraryIds = (libs as { id: number }[]).map((l) => l.id);
+    const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     return Promise.all(
       lenses.map(async (lens) => {
-        const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
+        const where = this.queryBuilder.buildWhere(lens.filter, { accessibleLibraryIds, userId: user.id });
         const bookCount = await this.bookReadService.countWhere(where);
         return { ...lens, bookCount };
       }),
@@ -39,11 +56,8 @@ export class LensService {
   }
 
   async findOne(id: number, user: RequestUser) {
-    const [lens] = await this.lensRepo.findById(id);
-    if (!lens) throw new NotFoundException('Lens not found');
-    if (!lens.isPublic && lens.userId !== user.id && !this.isSuperuser(user)) {
-      throw new ForbiddenException('No access to this lens');
-    }
+    const lens = await this.getLensOrThrow(id);
+    this.assertReadAccess(lens, user);
     return lens;
   }
 
@@ -54,52 +68,53 @@ export class LensService {
       name: dto.name,
       icon: dto.icon ?? null,
       filter,
-      defaultSort: (dto.defaultSort as SortSpec[]) ?? [],
+      defaultSort: dto.defaultSort ?? [],
       isPublic: dto.isPublic ?? false,
     });
     return lens;
   }
 
   async update(id: number, dto: UpdateLensDto, user: RequestUser) {
-    const [lens] = await this.lensRepo.findById(id);
-    if (!lens) throw new NotFoundException('Lens not found');
-    if (lens.userId !== user.id && !this.isSuperuser(user)) throw new ForbiddenException('Cannot modify this lens');
+    const lens = await this.getLensOrThrow(id);
+    this.assertWriteAccess(lens, user, 'modify');
 
-    const filter = validateGroupRule(dto.filter);
+    const hasFilterField = Object.prototype.hasOwnProperty.call(dto, 'filter');
+    const filter = hasFilterField ? validateGroupRule(dto.filter) : undefined;
     const [updated] = await this.lensRepo.update(id, lens.userId, {
       name: dto.name,
       icon: dto.icon,
-      filter: filter ?? undefined,
-      defaultSort: dto.defaultSort as SortSpec[] | undefined,
+      filter,
+      defaultSort: dto.defaultSort,
       isPublic: dto.isPublic,
     });
     return updated;
   }
 
   async remove(id: number, user: RequestUser) {
-    const [lens] = await this.lensRepo.findById(id);
-    if (!lens) throw new NotFoundException('Lens not found');
-    if (lens.userId !== user.id && !this.isSuperuser(user)) throw new ForbiddenException('Cannot delete this lens');
-
+    const lens = await this.getLensOrThrow(id);
+    this.assertWriteAccess(lens, user, 'delete');
     await this.lensRepo.delete(id, lens.userId);
   }
 
   async reorder(dto: ReorderLensesDto, user: RequestUser) {
-    await this.lensRepo.updateDisplayOrders(user.id, dto.order);
+    const distinctIds = new Set(dto.order.map((item) => item.id));
+    if (distinctIds.size !== dto.order.length) {
+      throw new BadRequestException('Duplicate lens IDs are not allowed in reorder payload');
+    }
+
+    const updatedCount = await this.lensRepo.updateDisplayOrders(user.id, dto.order);
+    if (updatedCount !== dto.order.length) {
+      throw new ForbiddenException('Cannot reorder one or more lenses');
+    }
   }
 
   async executeLens(id: number, user: RequestUser, page: number, size: number): Promise<BooksPage> {
-    const [lens] = await this.lensRepo.findById(id);
-    if (!lens) throw new NotFoundException('Lens not found');
-    if (!lens.isPublic && lens.userId !== user.id && !this.isSuperuser(user)) {
-      throw new ForbiddenException('No access to this lens');
-    }
+    const lens = await this.getLensOrThrow(id);
+    this.assertReadAccess(lens, user);
+    const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
 
-    const libs = await this.libraryService.findAll(user);
-    const accessibleLibraryIds = (libs as { id: number }[]).map((l) => l.id);
-
-    const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds, userId: user.id });
-    const orderBy = this.queryBuilder.buildOrderBy((lens.defaultSort as SortSpec[]) ?? []);
+    const where = this.queryBuilder.buildWhere(lens.filter, { accessibleLibraryIds, userId: user.id });
+    const orderBy = this.queryBuilder.buildOrderBy(lens.defaultSort ?? []);
     const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
       where,
       orderBy,

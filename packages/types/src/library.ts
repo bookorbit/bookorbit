@@ -77,6 +77,7 @@ export interface PrescanPathResult {
   accessible: boolean;
   fileCount: number;
   overlapLibrary?: string;
+  error?: string;
 }
 
 export interface PrescanResult {

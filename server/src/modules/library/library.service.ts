@@ -1,10 +1,20 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
+import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@projectx/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { FileWriteService } from '../file-write/file-write.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { FileWatcherService } from '../scanner/file-watcher.service';
 import { ScannerService } from '../scanner/scanner.service';
@@ -13,7 +23,21 @@ import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
 import { ReorderLibrariesDto } from './dto/reorder-libraries.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
+import { DEFAULT_LIBRARY_COVER_ASPECT_RATIO, DEFAULT_LIBRARY_ORGANIZATION_MODE, LIBRARY_METADATA_PRECEDENCE_DEFAULT } from './library.constants';
 import { LibraryRepository } from './library.repository';
+
+interface LibraryMetadataWriteStreamOptions {
+  onProgress?: (event: LibraryFileSyncProgressEvent) => void;
+  isCancelled?: () => boolean;
+}
+
+interface LibraryMetadataWriteSummary {
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  cancelled: boolean;
+}
 
 @Injectable()
 export class LibraryService {
@@ -25,6 +49,7 @@ export class LibraryService {
     private readonly config: ConfigService,
     private readonly scannerService: ScannerService,
     private readonly fileWatcherService: FileWatcherService,
+    private readonly fileWriteService: FileWriteService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
@@ -36,19 +61,30 @@ export class LibraryService {
   }
 
   async findAll(user: RequestUser) {
-    const isSuperuser = user.isSuperuser;
-    const libs = isSuperuser ? await this.libraryRepo.findAll() : await this.libraryRepo.findAllForUser(user.id);
-    const allFolders = await this.libraryRepo.findAllFolders();
-    const foldersByLibrary = new Map<number, typeof allFolders>();
-    for (const f of allFolders) {
-      const arr = foldersByLibrary.get(f.libraryId);
-      if (arr) arr.push(f);
-      else foldersByLibrary.set(f.libraryId, [f]);
+    const librariesForUser = user.isSuperuser ? await this.libraryRepo.findAll() : await this.libraryRepo.findAllForUser(user.id);
+    const folders = user.isSuperuser
+      ? await this.libraryRepo.findAllFolders()
+      : await this.libraryRepo.findFoldersByLibraryIds(librariesForUser.map((library) => library.id));
+
+    const foldersByLibraryId = new Map<number, typeof folders>();
+    for (const folder of folders) {
+      const currentFolders = foldersByLibraryId.get(folder.libraryId);
+      if (currentFolders) {
+        currentFolders.push(folder);
+      } else {
+        foldersByLibraryId.set(folder.libraryId, [folder]);
+      }
     }
-    return libs.map((lib) => ({
-      ...normalizeLibraryOrganizationMode(lib),
-      folders: (foldersByLibrary.get(lib.id) ?? []).map(({ id, path, createdAt }) => ({ id, path, createdAt })),
+
+    return librariesForUser.map((library) => ({
+      ...normalizeLibraryOrganizationMode(library),
+      folders: (foldersByLibraryId.get(library.id) ?? []).map(({ id, path, createdAt }) => ({ id, path, createdAt })),
     }));
+  }
+
+  async findAccessibleLibraryIds(user: RequestUser): Promise<number[]> {
+    const ids = user.isSuperuser ? await this.libraryRepo.findAllIds() : await this.libraryRepo.findAccessibleIdsForUser(user.id);
+    return ids.map(({ id }) => id);
   }
 
   async findOne(id: number) {
@@ -67,12 +103,12 @@ export class LibraryService {
       displayOrder: dto.displayOrder ?? 0,
       watch: dto.watch ?? false,
       autoScanCronExpression: dto.autoScanCronExpression ?? null,
-      metadataPrecedence: dto.metadataPrecedence ?? ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
+      metadataPrecedence: dto.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT],
       formatPriority: dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY],
       allowedFormats: dto.allowedFormats ?? [],
-      organizationMode: dto.organizationMode ?? 'book_per_folder',
+      organizationMode: dto.organizationMode ?? DEFAULT_LIBRARY_ORGANIZATION_MODE,
       excludePatterns: dto.excludePatterns ?? [],
-      coverAspectRatio: dto.coverAspectRatio ?? '2/3',
+      coverAspectRatio: dto.coverAspectRatio ?? DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
       readingThreshold: dto.readingThreshold ?? 0.25,
       markAsFinishedPercentComplete: dto.markAsFinishedPercentComplete ?? 98,
       fileNamingPattern: dto.fileNamingPattern ?? null,
@@ -155,14 +191,7 @@ export class LibraryService {
 
     const bookRows = await this.libraryRepo.findBookIdsByLibrary(id);
     await this.libraryRepo.delete(id);
-
-    // Clean up cover/thumbnail directories for all deleted books (best-effort, non-blocking)
-    for (const { id: bookId } of bookRows) {
-      const coverDir = join(this.booksPath, 'covers', String(bookId));
-      rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
-        this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
-      );
-    }
+    await this.cleanupCoverDirectories(bookRows.map(({ id: bookId }) => bookId));
   }
 
   async prescan(dto: PrescanLibraryDto) {
@@ -172,24 +201,31 @@ export class LibraryService {
       dto.paths.map(async (inputPath) => {
         let accessible: boolean;
         let fileCount = 0;
+        let error: string | undefined;
         let overlapLibrary: string | undefined;
 
-        const s = await stat(inputPath).catch(() => null);
-        if (s === null) {
+        let inputStat: Awaited<ReturnType<typeof stat>> | null = null;
+        try {
+          inputStat = await stat(inputPath);
+        } catch (err) {
+          error = formatPrescanError(err);
+        }
+
+        if (inputStat === null) {
           accessible = false;
-        } else if (!s.isDirectory()) {
+        } else if (!inputStat.isDirectory()) {
           return { path: inputPath, accessible: false, fileCount: 0, error: 'Not a directory' };
         } else {
           accessible = true;
           try {
             fileCount = await countPrimaryFiles(inputPath);
-          } catch {
+          } catch (err) {
             accessible = false;
             fileCount = 0;
+            error = formatPrescanError(err);
           }
         }
 
-        // Check if this path overlaps an existing library folder
         for (const existing of allFolderPaths) {
           if (pathsOverlap(inputPath, existing.path)) {
             overlapLibrary = existing.libraryName;
@@ -197,7 +233,7 @@ export class LibraryService {
           }
         }
 
-        return { path: inputPath, accessible, fileCount, overlapLibrary };
+        return { path: inputPath, accessible, fileCount, overlapLibrary, error };
       }),
     );
 
@@ -208,7 +244,14 @@ export class LibraryService {
   async getStats(libraryId: number) {
     const [existing] = await this.libraryRepo.findById(libraryId);
     if (!existing) throw new NotFoundException('Library not found');
-    return this.libraryRepo.getStats(libraryId);
+    try {
+      return await this.libraryRepo.getStats(libraryId);
+    } catch (err) {
+      if (err instanceof RangeError) {
+        throw new InternalServerErrorException('Library stats exceed supported size range');
+      }
+      throw err;
+    }
   }
 
   async reorder(dto: ReorderLibrariesDto) {
@@ -223,7 +266,7 @@ export class LibraryService {
     return this.libraryRepo.grantAccess(libraryId, dto.userId, dto.accessLevel);
   }
 
-  updateAccess(libraryId: number, userId: number, accessLevel: 'viewer' | 'editor' | 'owner') {
+  updateAccess(libraryId: number, userId: number, accessLevel: AccessLevel) {
     return this.libraryRepo.updateAccess(libraryId, userId, accessLevel);
   }
 
@@ -231,50 +274,142 @@ export class LibraryService {
     return this.libraryRepo.revokeAccess(libraryId, userId);
   }
 
+  async writeMetadataToFiles(
+    libraryId: number,
+    userId: number,
+    dryRun: boolean,
+    options: LibraryMetadataWriteStreamOptions = {},
+  ): Promise<LibraryMetadataWriteSummary> {
+    if (!dryRun) {
+      const settings = await this.fileWriteService.resolveSettings(libraryId);
+      if (!settings.enabled) {
+        throw new BadRequestException('Metadata file write is not enabled. Enable it in Maintenance settings first.');
+      }
+    }
+
+    const rows = await this.fileWriteService.findNonMissingBookFilesByLibrary(libraryId);
+    const onProgress = options.onProgress ?? (() => undefined);
+    const isCancelled = options.isCancelled ?? (() => false);
+
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const row of rows) {
+      if (isCancelled()) break;
+
+      let result: WriteResult;
+      try {
+        result = await this.fileWriteService.writeToFile(row.bookId, 'sync', userId, dryRun);
+      } catch (err) {
+        result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason: getErrorMessage(err) };
+      }
+
+      if (result.status === 'success') succeeded++;
+      else if (result.status === 'failed') failed++;
+      else skipped++;
+
+      onProgress({ bookId: row.bookId, status: result.status, reason: result.reason });
+    }
+
+    return {
+      processed: succeeded + failed + skipped,
+      succeeded,
+      failed,
+      skipped,
+      cancelled: isCancelled(),
+    };
+  }
+
   private async assertNameAvailable(name: string, excludeId?: number) {
     const existing = await this.libraryRepo.findByName(name, excludeId);
     if (existing.length > 0) throw new ConflictException('A library with this name already exists');
   }
+
+  private async cleanupCoverDirectories(bookIds: number[]): Promise<void> {
+    const event = 'library.remove_cover_dirs';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] bookCount=${bookIds.length} - cover directory cleanup started`);
+
+    let deletedCount = 0;
+    let failedCount = 0;
+    const concurrency = 10;
+
+    for (let index = 0; index < bookIds.length; index += concurrency) {
+      const chunk = bookIds.slice(index, index + concurrency);
+      await Promise.all(
+        chunk.map(async (bookId) => {
+          const coverDir = join(this.booksPath, 'covers', String(bookId));
+          try {
+            await rm(coverDir, { recursive: true, force: true });
+            deletedCount++;
+          } catch (err) {
+            failedCount++;
+            const errorClass = err instanceof Error ? err.name : 'Error';
+            const errorMessage = getErrorMessage(err).replace(/"/g, '\\"');
+            this.logger.warn(
+              `[${event}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover directory cleanup failed`,
+            );
+          }
+        }),
+      );
+    }
+
+    this.logger.log(
+      `[${event}] [end] bookCount=${bookIds.length} durationMs=${Date.now() - startedAt} deletedCount=${deletedCount} failedCount=${failedCount} - cover directory cleanup completed`,
+    );
+  }
 }
 
-// Count primary-format files recursively in a directory (non-throwing)
 async function countPrimaryFiles(dir: string): Promise<number> {
   let count = 0;
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        count += await countPrimaryFiles(full);
-      } else if (entry.isFile() && isPrimaryFormat(full)) {
-        count++;
-      }
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      count += await countPrimaryFiles(full);
+    } else if (entry.isFile() && isPrimaryFormat(full)) {
+      count++;
     }
-  } catch {
-    // Unreadable sub-directory — skip
   }
   return count;
 }
 
-// True if one path is a prefix of the other (i.e. they overlap in the file tree)
-function pathsOverlap(a: string, b: string): boolean {
-  const normalize = (p: string) => (p.endsWith('/') ? p : p + '/');
-  const na = normalize(a);
-  const nb = normalize(b);
-  return na.startsWith(nb) || nb.startsWith(na);
+function formatPrescanError(error: unknown): string {
+  const errorCode = getErrorCode(error);
+  if (errorCode === 'ENOENT') return 'Path does not exist';
+  if (errorCode === 'EACCES' || errorCode === 'EPERM') return 'Permission denied';
+  return 'Directory is not readable';
 }
 
-function normalizeOrganizationMode(mode: string | null | undefined): 'book_per_file' | 'book_per_folder' {
-  return mode === 'book_per_file' ? 'book_per_file' : 'book_per_folder';
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
+  if (mode === 'book_per_file') return 'book_per_file';
+  return DEFAULT_LIBRARY_ORGANIZATION_MODE;
 }
 
 function normalizeLibraryOrganizationMode<T extends Record<string, unknown>>(library: T): T {
-  if (!Object.prototype.hasOwnProperty.call(library, 'organizationMode')) {
-    return library;
-  }
+  if (!Object.prototype.hasOwnProperty.call(library, 'organizationMode')) return library;
   return {
     ...library,
     organizationMode: normalizeOrganizationMode((library as { organizationMode?: string | null }).organizationMode),
   };
+}
+
+function pathsOverlap(a: string, b: string): boolean {
+  const normalize = (path: string) => (path.endsWith('/') ? path : `${path}/`);
+  const left = normalize(a);
+  const right = normalize(b);
+  return left.startsWith(right) || right.startsWith(left);
 }

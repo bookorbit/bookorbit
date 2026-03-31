@@ -1,27 +1,21 @@
-import { Controller, Get, Inject } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, HealthIndicatorResult } from '@nestjs/terminus';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
+import { Controller, Get } from '@nestjs/common';
+import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 
 import { Public } from '../../common/decorators/public.decorator';
-import { DB } from '../../db/db.module';
+import { HEALTH_ROUTE } from './health.constants';
+import { HealthService } from './health.service';
 
-@Controller('health')
+@Controller(HEALTH_ROUTE)
 @Public()
 export class HealthController {
   constructor(
-    private readonly health: HealthCheckService,
-    @Inject(DB) private readonly db: NodePgDatabase,
+    private readonly healthCheckService: HealthCheckService,
+    private readonly healthService: HealthService,
   ) {}
 
   @Get()
   @HealthCheck()
   check() {
-    return this.health.check([() => this.checkDatabase()]);
-  }
-
-  private async checkDatabase(): Promise<HealthIndicatorResult> {
-    await this.db.execute(sql`SELECT 1`);
-    return { database: { status: 'up' } };
+    return this.healthCheckService.check([() => this.healthService.checkDatabase()]);
   }
 }

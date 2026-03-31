@@ -1,5 +1,6 @@
-import { IsArray, IsBoolean, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import type { GroupRule } from '@projectx/types';
+import { IsArray, IsBoolean, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { SortSpecDto } from './create-lens.dto';
 
 export class UpdateLensDto {
@@ -13,7 +14,8 @@ export class UpdateLensDto {
   icon?: string;
 
   @IsOptional()
-  filter?: Record<string, unknown>;
+  @IsObject()
+  filter?: GroupRule | null;
 
   @IsOptional()
   @IsArray()

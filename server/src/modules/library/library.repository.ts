@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { AccessLevel } from '@projectx/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
+import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -43,6 +45,18 @@ export class LibraryRepository {
       .orderBy(libraries.displayOrder, libraries.name);
   }
 
+  findAllIds() {
+    return this.db.select({ id: libraries.id }).from(libraries).orderBy(libraries.displayOrder, libraries.name);
+  }
+
+  findAccessibleIdsForUser(userId: number) {
+    return this.db
+      .select({ id: libraries.id })
+      .from(libraries)
+      .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
+      .orderBy(libraries.displayOrder, libraries.name);
+  }
+
   findById(id: number) {
     return this.db.select().from(libraries).where(eq(libraries.id, id)).limit(1);
   }
@@ -65,6 +79,11 @@ export class LibraryRepository {
 
   findAllFolders() {
     return this.db.select().from(libraryFolders);
+  }
+
+  findFoldersByLibraryIds(libraryIds: number[]) {
+    if (libraryIds.length === 0) return Promise.resolve([]);
+    return this.db.select().from(libraryFolders).where(inArray(libraryFolders.libraryId, libraryIds));
   }
 
   findAllFolderPaths() {
@@ -107,16 +126,18 @@ export class LibraryRepository {
   }
 
   async updateDisplayOrders(order: { id: number; displayOrder: number }[]) {
-    for (const item of order) {
-      await this.db.update(libraries).set({ displayOrder: item.displayOrder }).where(eq(libraries.id, item.id));
-    }
+    await this.db.transaction(async (tx) => {
+      for (const item of order) {
+        await tx.update(libraries).set({ displayOrder: item.displayOrder }).where(eq(libraries.id, item.id));
+      }
+    });
   }
 
   async getStats(libraryId: number) {
     const [countRow] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(books)
-      .where(and(eq(books.libraryId, libraryId), eq(books.status, 'present')));
+      .where(and(eq(books.libraryId, libraryId), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)));
 
     const formatRows = await this.db
       .select({
@@ -126,19 +147,19 @@ export class LibraryRepository {
       })
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .where(and(eq(books.libraryId, libraryId), eq(books.status, 'present')))
+      .where(and(eq(books.libraryId, libraryId), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
       .groupBy(bookFiles.format);
 
     const formatCounts: Record<string, number> = {};
-    let totalSizeBytes = 0;
+    let totalSizeBytes = 0n;
     for (const row of formatRows) {
       if (row.format) formatCounts[row.format] = row.count;
-      totalSizeBytes += Number(row.totalSize);
+      totalSizeBytes += toBigInt(row.totalSize);
     }
 
     return {
       totalBooks: countRow?.count ?? 0,
-      totalSizeBytes,
+      totalSizeBytes: toSafeNumber(totalSizeBytes),
       formatCounts,
     };
   }
@@ -156,7 +177,7 @@ export class LibraryRepository {
     });
   }
 
-  async grantAccess(libraryId: number, userId: number, accessLevel: 'viewer' | 'editor' | 'owner') {
+  async grantAccess(libraryId: number, userId: number, accessLevel: AccessLevel) {
     await this.db
       .insert(schema.userLibraryAccess)
       .values({ libraryId, userId, accessLevel })
@@ -166,7 +187,7 @@ export class LibraryRepository {
       });
   }
 
-  async updateAccess(libraryId: number, userId: number, accessLevel: 'viewer' | 'editor' | 'owner') {
+  async updateAccess(libraryId: number, userId: number, accessLevel: AccessLevel) {
     await this.db
       .update(schema.userLibraryAccess)
       .set({ accessLevel })
@@ -203,4 +224,19 @@ export class LibraryRepository {
       .innerJoin(schema.users, eq(schema.users.id, schema.userLibraryAccess.userId))
       .where(eq(schema.userLibraryAccess.libraryId, libraryId));
   }
+}
+
+function toBigInt(value: unknown): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number') return BigInt(value);
+  if (typeof value === 'string') return BigInt(value);
+  throw new TypeError(`Unsupported bigint value: ${String(value)}`);
+}
+
+function toSafeNumber(value: bigint): number {
+  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+  if (value > maxSafe) {
+    throw new RangeError('Library stats totalSizeBytes exceeds Number.MAX_SAFE_INTEGER');
+  }
+  return Number(value);
 }

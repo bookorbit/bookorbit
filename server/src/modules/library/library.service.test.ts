@@ -1,5 +1,4 @@
 vi.mock('fs/promises', () => ({
-  access: vi.fn(),
   readdir: vi.fn(),
   rm: vi.fn(),
   stat: vi.fn(),
@@ -9,13 +8,12 @@ vi.mock('../scanner/lib/classify', () => ({
   isPrimaryFormat: vi.fn(),
 }));
 
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { access, readdir, rm, stat } from 'fs/promises';
+import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { readdir, rm, stat } from 'fs/promises';
 
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { LibraryService } from './library.service';
 
-const mockAccess = access as MockedFunction<typeof access>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockRm = rm as MockedFunction<typeof rm>;
 const mockStat = stat as MockedFunction<typeof stat>;
@@ -35,6 +33,7 @@ describe('LibraryService', () => {
     findAll: vi.fn(),
     findAllForUser: vi.fn(),
     findAllFolders: vi.fn(),
+    findFoldersByLibraryIds: vi.fn(),
     findById: vi.fn(),
     findFoldersByLibrary: vi.fn(),
     findByName: vi.fn(),
@@ -56,19 +55,35 @@ describe('LibraryService', () => {
   const config = { get: vi.fn().mockReturnValue('/books') };
   const scannerService = { startScanAsync: vi.fn() };
   const fileWatcherService = { startWatcher: vi.fn(), stopWatcher: vi.fn() };
+  const fileWriteService = {
+    resolveSettings: vi.fn(),
+    findNonMissingBookFilesByLibrary: vi.fn(),
+    writeToFile: vi.fn(),
+  };
 
   let service: LibraryService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('/books');
-    service = new LibraryService(libraryRepo as any, config as any, scannerService as any, fileWatcherService as any);
+    service = new LibraryService(libraryRepo as any, config as any, scannerService as any, fileWatcherService as any, fileWriteService as any);
 
-    mockAccess.mockResolvedValue(undefined);
     mockStat.mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
     mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockRm.mockResolvedValue(undefined);
     mockIsPrimaryFormat.mockReturnValue(false);
+  });
+
+  it('findAll uses scoped folder query for non-superusers', async () => {
+    libraryRepo.findAllForUser.mockResolvedValue([{ id: 10, name: 'A' }]);
+    libraryRepo.findFoldersByLibraryIds.mockResolvedValue([{ id: 1, libraryId: 10, path: '/a', createdAt: new Date() }]);
+
+    const result = await service.findAll({ id: 7, isSuperuser: false } as any);
+
+    expect(libraryRepo.findAllForUser).toHaveBeenCalledWith(7);
+    expect(libraryRepo.findFoldersByLibraryIds).toHaveBeenCalledWith([10]);
+    expect(libraryRepo.findAllFolders).not.toHaveBeenCalled();
+    expect(result[0].folders).toEqual([{ id: 1, path: '/a', createdAt: expect.any(Date) }]);
   });
 
   it('verifyUserAccess bypasses lookup for superusers', async () => {
@@ -76,10 +91,9 @@ describe('LibraryService', () => {
     expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
   });
 
-  it('verifyUserAccess throws ForbiddenException when user has no access', async () => {
+  it('verifyUserAccess throws when user has no library access', async () => {
     libraryRepo.hasUserAccess.mockResolvedValue(false);
-
-    await expect(service.verifyUserAccess(1, 2, false)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.verifyUserAccess(1, 2, false)).rejects.toThrow('No access to this library');
   });
 
   it('create applies defaults, inserts folders, and starts an async scan', async () => {
@@ -96,6 +110,8 @@ describe('LibraryService', () => {
         watch: false,
         metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
         formatPriority: ['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'],
+        organizationMode: 'book_per_folder',
+        coverAspectRatio: '2/3',
       }),
     );
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(5);
@@ -241,5 +257,61 @@ describe('LibraryService', () => {
     const result = await service.prescan({ paths: ['/tmp/file'] } as any);
 
     expect(result.paths[0]).toEqual({ path: '/tmp/file', accessible: false, fileCount: 0, error: 'Not a directory' });
+  });
+
+  it('prescan reports ENOENT paths with a sanitized message', async () => {
+    libraryRepo.findAllFolderPaths.mockResolvedValue([]);
+    mockStat.mockRejectedValue({ code: 'ENOENT' });
+
+    const result = await service.prescan({ paths: ['/tmp/missing'] } as any);
+
+    expect(result.paths[0]).toEqual(expect.objectContaining({ accessible: false, error: 'Path does not exist' }));
+  });
+
+  it('getStats maps repository overflow errors to InternalServerErrorException', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
+    libraryRepo.getStats.mockRejectedValue(new RangeError('overflow'));
+
+    await expect(service.getStats(1)).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+
+  it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {
+    fileWriteService.resolveSettings.mockResolvedValue({ enabled: false });
+
+    await expect(service.writeMetadataToFiles(1, 7, false)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('writeMetadataToFiles emits progress and returns summary counters', async () => {
+    fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
+    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
+    fileWriteService.writeToFile
+      .mockResolvedValueOnce({ status: 'success', fieldsWritten: [], durationMs: 1 })
+      .mockResolvedValueOnce({ status: 'failed', fieldsWritten: [], durationMs: 1, reason: 'write failed' })
+      .mockResolvedValueOnce({ status: 'skipped', fieldsWritten: [], durationMs: 1, reason: 'no changes' });
+
+    const onProgress = vi.fn();
+    const summary = await service.writeMetadataToFiles(1, 7, false, { onProgress });
+
+    expect(summary).toEqual({ processed: 3, succeeded: 1, failed: 1, skipped: 1, cancelled: false });
+    expect(onProgress).toHaveBeenNthCalledWith(1, { bookId: 1, status: 'success', reason: undefined });
+    expect(onProgress).toHaveBeenNthCalledWith(2, { bookId: 2, status: 'failed', reason: 'write failed' });
+    expect(onProgress).toHaveBeenNthCalledWith(3, { bookId: 3, status: 'skipped', reason: 'no changes' });
+  });
+
+  it('writeMetadataToFiles stops when cancellation is requested', async () => {
+    fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
+    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }]);
+    fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
+
+    let isCancelled = false;
+    const summary = await service.writeMetadataToFiles(1, 7, false, {
+      onProgress: () => {
+        isCancelled = true;
+      },
+      isCancelled: () => isCancelled,
+    });
+
+    expect(fileWriteService.writeToFile).toHaveBeenCalledTimes(1);
+    expect(summary).toEqual({ processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: true });
   });
 });

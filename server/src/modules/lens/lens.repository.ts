@@ -7,6 +7,7 @@ import * as schema from '../../db/schema';
 import { lenses } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type LensDisplayOrderUpdate = { id: number; displayOrder: number };
 
 @Injectable()
 export class LensRepository {
@@ -43,12 +44,18 @@ export class LensRepository {
       .returning();
   }
 
-  async updateDisplayOrders(userId: number, order: { id: number; displayOrder: number }[]) {
-    for (const item of order) {
-      await this.db
-        .update(lenses)
-        .set({ displayOrder: item.displayOrder })
-        .where(and(eq(lenses.id, item.id), eq(lenses.userId, userId)));
-    }
+  updateDisplayOrders(userId: number, order: LensDisplayOrderUpdate[]): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      let updatedCount = 0;
+      for (const item of order) {
+        const updatedRows = await tx
+          .update(lenses)
+          .set({ displayOrder: item.displayOrder, updatedAt: sql`now()` })
+          .where(and(eq(lenses.id, item.id), eq(lenses.userId, userId)))
+          .returning({ id: lenses.id });
+        updatedCount += updatedRows.length;
+      }
+      return updatedCount;
+    });
   }
 }

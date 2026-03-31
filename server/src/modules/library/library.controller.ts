@@ -1,28 +1,13 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-  Res,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
-import type { BookQuery, LibraryFileSyncProgressEvent, WriteResult } from '@projectx/types';
+import type { BookQuery, LibraryFileSyncProgressEvent } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { FileWriteService } from '../file-write/file-write.service';
 import { BookQueryPipe } from '../book/pipes/book-query.pipe';
 import { BookService } from '../book/book.service';
 import { CreateLibraryDto } from './dto/create-library.dto';
@@ -38,7 +23,6 @@ export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,
     private readonly bookService: BookService,
-    private readonly fileWriteService: FileWriteService,
   ) {}
 
   @Get()
@@ -48,9 +32,8 @@ export class LibraryController {
 
   @Get(':id')
   @RequireLibraryAccess('viewer')
-  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    const isSuperuser = user.isSuperuser;
-    return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.findOne(id));
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.libraryService.findOne(id);
   }
 
   @Post(':id/books')
@@ -111,9 +94,8 @@ export class LibraryController {
 
   @Get(':id/stats')
   @RequireLibraryAccess('viewer')
-  getStats(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    const isSuperuser = user.isSuperuser;
-    return this.libraryService.verifyUserAccess(user.id, id, isSuperuser).then(() => this.libraryService.getStats(id));
+  getStats(@Param('id', ParseIntPipe) id: number) {
+    return this.libraryService.getStats(id);
   }
 
   @Post(':id/write-metadata-to-files')
@@ -131,19 +113,12 @@ export class LibraryController {
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
-    const isSuperuser = user.isSuperuser;
-    await this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser);
-
     const dryRun = dryRunParam === 'true';
 
-    if (!dryRun) {
-      const settings = await this.fileWriteService.resolveSettings(libraryId);
-      if (!settings.enabled) {
-        throw new BadRequestException('Metadata file write is not enabled. Enable it in Maintenance settings first.');
-      }
-    }
-
-    const rows = await this.fileWriteService.findNonMissingBookFilesByLibrary(libraryId);
+    let disconnected = false;
+    const handleDisconnect = () => {
+      disconnected = true;
+    };
 
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -151,29 +126,36 @@ export class LibraryController {
       Connection: 'keep-alive',
     });
 
-    let succeeded = 0;
-    let failed = 0;
-    let skipped = 0;
+    reply.raw.on('close', handleDisconnect);
+    reply.raw.on('aborted', handleDisconnect);
 
-    for (const row of rows) {
-      let result: WriteResult;
-      try {
-        result = await this.fileWriteService.writeToFile(row.bookId, 'sync', user.id, dryRun);
-      } catch (err) {
-        result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason: (err as Error).message };
-      }
-
-      if (result.status === 'success') succeeded++;
-      else if (result.status === 'failed') failed++;
-      else skipped++;
-
-      const event: LibraryFileSyncProgressEvent = { bookId: row.bookId, status: result.status, reason: result.reason };
+    const writeEvent = (event: LibraryFileSyncProgressEvent) => {
+      if (disconnected || reply.raw.writableEnded || reply.raw.destroyed) return;
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    }
+    };
 
-    const doneEvent: LibraryFileSyncProgressEvent = { done: true, processed: rows.length, succeeded, failed, skipped };
-    reply.raw.write(`data: ${JSON.stringify(doneEvent)}\n\n`);
-    reply.raw.end();
+    try {
+      const summary = await this.libraryService.writeMetadataToFiles(libraryId, user.id, dryRun, {
+        onProgress: writeEvent,
+        isCancelled: () => disconnected || reply.raw.writableEnded || reply.raw.destroyed,
+      });
+
+      const doneEvent: LibraryFileSyncProgressEvent = {
+        done: true,
+        processed: summary.processed,
+        succeeded: summary.succeeded,
+        failed: summary.failed,
+        skipped: summary.skipped,
+      };
+      writeEvent(doneEvent);
+
+      if (!reply.raw.writableEnded && !reply.raw.destroyed) {
+        reply.raw.end();
+      }
+    } finally {
+      reply.raw.off('close', handleDisconnect);
+      reply.raw.off('aborted', handleDisconnect);
+    }
   }
 
   // ── Library access management ─────────────────────────────────────────────

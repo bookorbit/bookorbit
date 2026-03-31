@@ -5,7 +5,6 @@ import { LibraryController } from './library.controller';
 describe('LibraryController', () => {
   const libraryService = {
     findAll: vi.fn(),
-    verifyUserAccess: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -17,44 +16,53 @@ describe('LibraryController', () => {
     grantAccess: vi.fn(),
     updateAccess: vi.fn(),
     revokeAccess: vi.fn(),
+    writeMetadataToFiles: vi.fn(),
   };
 
   const bookService = { queryForLibrary: vi.fn() };
-  const fileWriteService = {
-    writeToFile: vi.fn(),
-    findNonMissingBookFilesByLibrary: vi.fn(),
-    resolveSettings: vi.fn(),
-  };
 
-  const controller = new LibraryController(libraryService as any, bookService as any, fileWriteService as any);
+  const controller = new LibraryController(libraryService as any, bookService as any);
 
   beforeEach(() => {
     vi.resetAllMocks();
-    libraryService.verifyUserAccess.mockResolvedValue(undefined);
   });
 
   it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {
-    fileWriteService.resolveSettings.mockResolvedValue({ enabled: false });
+    libraryService.writeMetadataToFiles.mockRejectedValue(new BadRequestException('disabled'));
+    const reply = {
+      raw: {
+        writeHead: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        writableEnded: false,
+        destroyed: false,
+      },
+    };
 
-    await expect(controller.writeMetadataToFiles(1, undefined, { id: 1, isSuperuser: true } as any, { raw: {} } as any)).rejects.toBeInstanceOf(
+    await expect(controller.writeMetadataToFiles(1, undefined, { id: 1, isSuperuser: true } as any, reply as any)).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
 
   it('writeMetadataToFiles streams progress and final done event with counters', async () => {
-    fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
-    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
-
-    fileWriteService.writeToFile
-      .mockResolvedValueOnce({ status: 'success', fieldsWritten: [], durationMs: 1 })
-      .mockRejectedValueOnce(new Error('write failed'))
-      .mockResolvedValueOnce({ status: 'skipped', fieldsWritten: [], durationMs: 1, reason: 'no changes' });
+    libraryService.writeMetadataToFiles.mockImplementation(
+      (_libraryId: number, _userId: number, _dryRun: boolean, options: { onProgress?: (event: unknown) => void }) => {
+        options.onProgress?.({ bookId: 1, status: 'success' });
+        options.onProgress?.({ bookId: 2, status: 'failed', reason: 'write failed' });
+        options.onProgress?.({ bookId: 3, status: 'skipped', reason: 'no changes' });
+        return Promise.resolve({ processed: 3, succeeded: 1, failed: 1, skipped: 1 });
+      },
+    );
 
     const reply = {
       raw: {
         writeHead: vi.fn(),
         write: vi.fn(),
         end: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        writableEnded: false,
+        destroyed: false,
       },
     };
 
@@ -62,6 +70,8 @@ describe('LibraryController', () => {
 
     expect(reply.raw.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({ 'Content-Type': 'text/event-stream' }));
     expect(reply.raw.write).toHaveBeenCalledTimes(4);
+    expect(reply.raw.off).toHaveBeenCalledWith('close', expect.any(Function));
+    expect(reply.raw.off).toHaveBeenCalledWith('aborted', expect.any(Function));
 
     const doneLine = (reply.raw.write as vi.Mock).mock.calls[3][0] as string;
     const donePayload = JSON.parse(doneLine.replace(/^data:\s*/, '').trim());
@@ -69,12 +79,33 @@ describe('LibraryController', () => {
     expect(reply.raw.end).toHaveBeenCalled();
   });
 
-  it('writeMetadataToFiles in dry-run mode skips settings check', async () => {
-    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([]);
-    const reply = { raw: { writeHead: vi.fn(), write: vi.fn(), end: vi.fn() } };
+  it('writeMetadataToFiles does not emit done event when disconnected mid-stream', async () => {
+    let disconnect: (() => void) | undefined;
+    libraryService.writeMetadataToFiles.mockImplementation(
+      (_libraryId: number, _userId: number, _dryRun: boolean, options: { onProgress?: (event: unknown) => void }) => {
+        options.onProgress?.({ bookId: 1, status: 'success' });
+        disconnect?.();
+        options.onProgress?.({ bookId: 2, status: 'success' });
+        return Promise.resolve({ processed: 2, succeeded: 2, failed: 0, skipped: 0 });
+      },
+    );
+    const reply = {
+      raw: {
+        writeHead: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn(),
+        on: vi.fn((event: string, handler: () => void) => {
+          if (event === 'close') disconnect = handler;
+        }),
+        off: vi.fn(),
+        writableEnded: false,
+        destroyed: false,
+      },
+    };
 
     await controller.writeMetadataToFiles(1, 'true', { id: 1, isSuperuser: true } as any, reply as any);
 
-    expect(fileWriteService.resolveSettings).not.toHaveBeenCalled();
+    expect(reply.raw.write).toHaveBeenCalledTimes(1);
+    expect(reply.raw.end).toHaveBeenCalled();
   });
 });

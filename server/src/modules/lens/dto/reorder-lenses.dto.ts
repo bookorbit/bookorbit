@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsInt, Min, ValidateNested } from 'class-validator';
 
 class LensOrderItem {
   @IsInt()
@@ -13,6 +13,8 @@ class LensOrderItem {
 
 export class ReorderLensesDto {
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique((item: LensOrderItem) => item.id)
   @ValidateNested({ each: true })
   @Type(() => LensOrderItem)
   order: LensOrderItem[];
