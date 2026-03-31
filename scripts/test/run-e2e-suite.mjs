@@ -112,7 +112,10 @@ async function main() {
   }
 
   for (const [index, suite] of suites.entries()) {
-    const runEnvironment = suite.useDedicatedDatabase ? { DATABASE_URL: e2eDatabaseUrl, E2E_DATABASE_URL: e2eDatabaseUrl } : {};
+    // E2E_DATABASE_URL is not in .env so pnpm's auto-loading cannot override it.
+    // vitest.config.e2e.ts reads this and injects it as DATABASE_URL into all
+    // test workers, ensuring NestJS never connects to the dev database.
+    const runEnvironment = { E2E_DATABASE_URL: e2eDatabaseUrl };
 
     if (suite.prepareDedicatedDatabase) {
       console.log(`Resetting and migrating dedicated e2e database for suite ${suite.id}...`);
@@ -134,6 +137,8 @@ async function main() {
         "exec",
         "vitest",
         "run",
+        "--config",
+        "vitest.config.e2e.ts",
         suite.vitestTarget,
         "--reporter=default",
         "--reporter=junit",
