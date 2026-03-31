@@ -164,10 +164,4 @@ describe('MetadataPreferenceResolver', () => {
     expect(result.fields.title.providers).toEqual([MetadataProviderKey.GOOGLE]);
     expect(result.fields.subtitle.providers).toEqual([MetadataProviderKey.GOOGLE]);
   });
-
-  it('resolves a single field from resolved preferences', () => {
-    const prefs = resolver.getDefaultPreferences();
-
-    expect(resolver.resolveField(prefs, 'authors')).toEqual(prefs.fields.authors);
-  });
 });

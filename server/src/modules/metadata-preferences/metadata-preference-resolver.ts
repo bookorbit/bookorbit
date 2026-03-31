@@ -3,11 +3,12 @@ import {
   ALL_METADATA_FIELDS,
   FieldPreference,
   FieldPreferenceOverrides,
-  GenreMergeMode,
+  GENRE_MERGE_MODES,
   MetadataFetchPreferences,
   MetadataFetchOptions,
   MetadataField,
   MetadataProviderKey,
+  MERGE_STRATEGIES,
   MergeStrategy,
 } from '@projectx/types';
 
@@ -19,8 +20,8 @@ const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
 ];
 
 const DEFAULT_MERGE_STRATEGY: MergeStrategy = 'overwriteIfProvided';
-const MERGE_STRATEGIES: Set<MergeStrategy> = new Set(['fillMissing', 'overwrite', 'overwriteIfProvided']);
-const GENRE_MERGE_MODES: Set<GenreMergeMode> = new Set(['firstProvider', 'merge']);
+const MERGE_STRATEGY_SET: Set<MergeStrategy> = new Set(MERGE_STRATEGIES);
+const GENRE_MERGE_MODE_SET = new Set(GENRE_MERGE_MODES);
 
 const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
   MetadataProviderKey.GOODREADS,
@@ -103,10 +104,6 @@ export class MetadataPreferenceResolver {
     return { fields, options };
   }
 
-  resolveField(preferences: MetadataFetchPreferences, field: MetadataField): FieldPreference {
-    return preferences.fields[field];
-  }
-
   private normalizeFieldPreference(value: unknown, fallback: FieldPreference): FieldPreference {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return { ...fallback, providers: [...fallback.providers] };
@@ -118,7 +115,7 @@ export class MetadataPreferenceResolver {
       Array.isArray(candidate.providers) && candidate.providers.every((p) => typeof p === 'string')
         ? [...candidate.providers]
         : [...fallback.providers];
-    const mergeStrategy = MERGE_STRATEGIES.has(candidate.mergeStrategy as MergeStrategy)
+    const mergeStrategy = MERGE_STRATEGY_SET.has(candidate.mergeStrategy as MergeStrategy)
       ? (candidate.mergeStrategy as MergeStrategy)
       : fallback.mergeStrategy;
 
@@ -134,7 +131,9 @@ export class MetadataPreferenceResolver {
     const genresCandidate: Partial<MetadataFetchOptions['genres']> =
       candidate.genres && typeof candidate.genres === 'object' && !Array.isArray(candidate.genres) ? candidate.genres : {};
 
-    const mode = GENRE_MERGE_MODES.has(genresCandidate.mode as GenreMergeMode) ? (genresCandidate.mode as GenreMergeMode) : fallback.genres.mode;
+    const mode = GENRE_MERGE_MODE_SET.has(genresCandidate.mode as MetadataFetchOptions['genres']['mode'])
+      ? (genresCandidate.mode as MetadataFetchOptions['genres']['mode'])
+      : fallback.genres.mode;
     const saveProviderIds = typeof candidate.saveProviderIds === 'boolean' ? candidate.saveProviderIds : fallback.saveProviderIds;
 
     return {

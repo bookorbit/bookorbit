@@ -1,46 +1,42 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { count, eq, inArray } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Injectable, Logger } from '@nestjs/common';
 
-import { type MetadataScoreWeights } from '@projectx/types';
-import { DB } from '../../db';
-import * as schema from '../../db/schema';
-import { bookAuthors, bookGenres, bookMetadata, bookTags } from '../../db/schema';
+import type { MetadataScoreWeights } from '@projectx/types';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { MetadataScoreRepository } from './metadata-score.repository';
+import { MetadataScoreScorer, type ScoreData } from './metadata-score.scorer';
 
-type Db = NodePgDatabase<typeof schema>;
+const RECALCULATION_PAGE_SIZE = 200;
+const RECALCULATION_WRITE_CONCURRENCY = 25;
+const RECALCULATION_EVENT = 'metadata_score.recalculate_all';
+const RECALCULATION_BOOK_EVENT = 'metadata_score.recalculate_book';
 
-type ScoreData = {
-  title: string | null;
-  subtitle: string | null;
-  description: string | null;
-  isbn10: string | null;
-  isbn13: string | null;
-  publisher: string | null;
-  publishedYear: number | null;
-  language: string | null;
-  pageCount: number | null;
-  seriesName: string | null;
-  seriesIndex: number | null;
-  rating: number | null;
-  coverSource: string | null;
-  googleBooksId: string | null;
-  goodreadsId: string | null;
-  amazonId: string | null;
-  hardcoverId: string | null;
-  openLibraryId: string | null;
-  itunesId: string | null;
-  authorCount: number;
-  genreCount: number;
-  tagCount: number;
+export enum MetadataRecalculationTrigger {
+  MANUAL = 'manual',
+  WEIGHTS_UPDATE = 'weights_update',
+}
+
+export type MetadataRecalculationState = 'idle' | 'running' | 'completed' | 'failed';
+
+export type MetadataRecalculationStatus = {
+  state: MetadataRecalculationState;
+  trigger: MetadataRecalculationTrigger | null;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  error: string | null;
 };
 
 @Injectable()
 export class MetadataScoreService {
   private readonly logger = new Logger(MetadataScoreService.name);
+  private runningPromise: Promise<void> | null = null;
+  private status: MetadataRecalculationStatus = this.makeInitialStatus();
 
   constructor(
-    @Inject(DB) private readonly db: Db,
+    private readonly repo: MetadataScoreRepository,
+    private readonly scorer: MetadataScoreScorer,
     private readonly appSettings: AppSettingsService,
   ) {}
 
@@ -48,185 +44,132 @@ export class MetadataScoreService {
     return this.appSettings.getMetadataScoreWeights();
   }
 
+  getRecalculationStatus(): MetadataRecalculationStatus {
+    return { ...this.status };
+  }
+
   async updateWeights(weights: MetadataScoreWeights): Promise<MetadataScoreWeights> {
     await this.appSettings.setMetadataScoreWeights(weights);
-    this.recalculateAll().catch((err: Error) => this.logger.warn(`Recalculate-all after weight update failed: ${err.message}`));
+    this.requestRecalculation(MetadataRecalculationTrigger.WEIGHTS_UPDATE);
     return weights;
   }
 
-  async calculateAndSave(bookId: number): Promise<void> {
-    const [data, weights] = await Promise.all([this.loadScoreData(bookId), this.appSettings.getMetadataScoreWeights()]);
-    if (!data) return;
-    const score = this.compute(data, weights);
-    await this.db.update(bookMetadata).set({ metadataScore: score }).where(eq(bookMetadata.bookId, bookId));
-  }
-
-  async recalculateAll(): Promise<{ processed: number }> {
-    const weights = await this.appSettings.getMetadataScoreWeights();
-    const allRows = await this.loadAllScoreData();
-    const BATCH = 200;
-    let processed = 0;
-
-    for (let i = 0; i < allRows.length; i += BATCH) {
-      const batch = allRows.slice(i, i + BATCH);
-      await Promise.all(
-        batch.map(({ bookId, data }) => {
-          const score = this.compute(data, weights);
-          return this.db
-            .update(bookMetadata)
-            .set({ metadataScore: score })
-            .where(eq(bookMetadata.bookId, bookId))
-            .catch((err: Error) => this.logger.warn(`Score recalculation failed for book ${bookId}: ${err.message}`));
-        }),
-      );
-      processed += batch.length;
+  requestRecalculation(trigger: MetadataRecalculationTrigger): { started: boolean; status: MetadataRecalculationStatus } {
+    if (this.runningPromise) {
+      return { started: false, status: this.getRecalculationStatus() };
     }
 
-    this.logger.log(`Metadata score recalculation complete: ${processed} books processed`);
-    return { processed };
+    this.runningPromise = this.runRecalculation(trigger).finally(() => {
+      this.runningPromise = null;
+    });
+
+    return { started: true, status: this.getRecalculationStatus() };
   }
 
-  private async loadAllScoreData(): Promise<{ bookId: number; data: ScoreData }[]> {
-    const metaRows = await this.db
-      .select({
-        bookId: bookMetadata.bookId,
-        title: bookMetadata.title,
-        subtitle: bookMetadata.subtitle,
-        description: bookMetadata.description,
-        isbn10: bookMetadata.isbn10,
-        isbn13: bookMetadata.isbn13,
-        publisher: bookMetadata.publisher,
-        publishedYear: bookMetadata.publishedYear,
-        language: bookMetadata.language,
-        pageCount: bookMetadata.pageCount,
-        seriesName: bookMetadata.seriesName,
-        seriesIndex: bookMetadata.seriesIndex,
-        rating: bookMetadata.rating,
-        coverSource: bookMetadata.coverSource,
-        googleBooksId: bookMetadata.googleBooksId,
-        goodreadsId: bookMetadata.goodreadsId,
-        amazonId: bookMetadata.amazonId,
-        hardcoverId: bookMetadata.hardcoverId,
-        openLibraryId: bookMetadata.openLibraryId,
-        itunesId: bookMetadata.itunesId,
-      })
-      .from(bookMetadata);
-
-    if (metaRows.length === 0) return [];
-
-    const bookIds = metaRows.map((r) => r.bookId);
-
-    const [authorCounts, genreCounts, tagCounts] = await Promise.all([
-      this.db
-        .select({ bookId: bookAuthors.bookId, cnt: count() })
-        .from(bookAuthors)
-        .where(inArray(bookAuthors.bookId, bookIds))
-        .groupBy(bookAuthors.bookId),
-      this.db
-        .select({ bookId: bookGenres.bookId, cnt: count() })
-        .from(bookGenres)
-        .where(inArray(bookGenres.bookId, bookIds))
-        .groupBy(bookGenres.bookId),
-      this.db.select({ bookId: bookTags.bookId, cnt: count() }).from(bookTags).where(inArray(bookTags.bookId, bookIds)).groupBy(bookTags.bookId),
-    ]);
-
-    const authorMap = new Map(authorCounts.map((r) => [r.bookId, Number(r.cnt)]));
-    const genreMap = new Map(genreCounts.map((r) => [r.bookId, Number(r.cnt)]));
-    const tagMap = new Map(tagCounts.map((r) => [r.bookId, Number(r.cnt)]));
-
-    return metaRows.map((row) => ({
-      bookId: row.bookId,
-      data: {
-        ...row,
-        authorCount: authorMap.get(row.bookId) ?? 0,
-        genreCount: genreMap.get(row.bookId) ?? 0,
-        tagCount: tagMap.get(row.bookId) ?? 0,
-      },
-    }));
+  async calculateAndSave(bookId: number): Promise<void> {
+    const [data, weights] = await Promise.all([this.repo.loadScoreData(bookId), this.appSettings.getMetadataScoreWeights()]);
+    if (!data) return;
+    const score = this.scorer.compute(data, weights);
+    await this.repo.updateMetadataScore(bookId, score);
   }
 
-  private async loadScoreData(bookId: number): Promise<ScoreData | null> {
-    const [metaRow] = await this.db
-      .select({
-        title: bookMetadata.title,
-        subtitle: bookMetadata.subtitle,
-        description: bookMetadata.description,
-        isbn10: bookMetadata.isbn10,
-        isbn13: bookMetadata.isbn13,
-        publisher: bookMetadata.publisher,
-        publishedYear: bookMetadata.publishedYear,
-        language: bookMetadata.language,
-        pageCount: bookMetadata.pageCount,
-        seriesName: bookMetadata.seriesName,
-        seriesIndex: bookMetadata.seriesIndex,
-        rating: bookMetadata.rating,
-        coverSource: bookMetadata.coverSource,
-        googleBooksId: bookMetadata.googleBooksId,
-        goodreadsId: bookMetadata.goodreadsId,
-        amazonId: bookMetadata.amazonId,
-        hardcoverId: bookMetadata.hardcoverId,
-        openLibraryId: bookMetadata.openLibraryId,
-        itunesId: bookMetadata.itunesId,
-      })
-      .from(bookMetadata)
-      .where(eq(bookMetadata.bookId, bookId))
-      .limit(1);
+  private async runRecalculation(trigger: MetadataRecalculationTrigger): Promise<void> {
+    const startedAt = Date.now();
+    this.status = {
+      state: 'running',
+      trigger,
+      startedAt: new Date(startedAt),
+      endedAt: null,
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      error: null,
+    };
+    this.logger.log(`[${RECALCULATION_EVENT}] [start] trigger=${trigger} - metadata score recalculation started`);
 
-    if (!metaRow) return null;
+    try {
+      const weights = await this.appSettings.getMetadataScoreWeights();
+      let cursor: number | null = null;
+      while (true) {
+        const page = await this.repo.loadScoreDataPage(cursor, RECALCULATION_PAGE_SIZE);
+        if (page.rows.length === 0) break;
 
-    const [[{ authorCount }], [{ genreCount }], [{ tagCount }]] = await Promise.all([
-      this.db.select({ authorCount: count() }).from(bookAuthors).where(eq(bookAuthors.bookId, bookId)),
-      this.db.select({ genreCount: count() }).from(bookGenres).where(eq(bookGenres.bookId, bookId)),
-      this.db.select({ tagCount: count() }).from(bookTags).where(eq(bookTags.bookId, bookId)),
-    ]);
+        for (let i = 0; i < page.rows.length; i += RECALCULATION_WRITE_CONCURRENCY) {
+          const chunk = page.rows.slice(i, i + RECALCULATION_WRITE_CONCURRENCY);
+          const outcomes = await Promise.all(chunk.map((row) => this.recalculateBook(row.bookId, row.data, weights)));
+          this.status.processed += outcomes.length;
+          this.status.succeeded += outcomes.filter((ok) => ok).length;
+          this.status.failed += outcomes.filter((ok) => !ok).length;
+        }
+
+        cursor = page.nextCursor;
+      }
+
+      this.status = {
+        ...this.status,
+        state: 'completed',
+        endedAt: new Date(),
+      };
+      this.logger.log(
+        `[${RECALCULATION_EVENT}] [end] trigger=${trigger} durationMs=${Date.now() - startedAt} processed=${this.status.processed} succeeded=${this.status.succeeded} failed=${this.status.failed} - metadata score recalculation completed`,
+      );
+    } catch (err) {
+      const { errorClass, errorMessage } = this.parseError(err);
+      this.status = {
+        ...this.status,
+        state: 'failed',
+        endedAt: new Date(),
+        error: errorMessage,
+      };
+      this.logger.warn(
+        `[${RECALCULATION_EVENT}] [fail] trigger=${trigger} durationMs=${Date.now() - startedAt} processed=${this.status.processed} succeeded=${this.status.succeeded} failed=${this.status.failed} errorClass=${errorClass} error="${errorMessage}" - metadata score recalculation failed`,
+      );
+    }
+  }
+
+  private async recalculateBook(bookId: number, data: ScoreData, weights: MetadataScoreWeights): Promise<boolean> {
+    const startedAt = Date.now();
+    try {
+      const score = this.scorer.compute(data, weights);
+      await this.repo.updateMetadataScore(bookId, score);
+      return true;
+    } catch (err) {
+      const { errorClass, errorMessage } = this.parseError(err);
+      this.logger.warn(
+        `[${RECALCULATION_BOOK_EVENT}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata score update failed`,
+      );
+      return false;
+    }
+  }
+
+  private parseError(err: unknown): { errorClass: string; errorMessage: string } {
+    if (err instanceof Error) {
+      return {
+        errorClass: err.constructor.name,
+        errorMessage: this.sanitizeErrorMessage(err.message),
+      };
+    }
 
     return {
-      ...metaRow,
-      authorCount: Number(authorCount),
-      genreCount: Number(genreCount),
-      tagCount: Number(tagCount),
+      errorClass: 'UnknownError',
+      errorMessage: this.sanitizeErrorMessage(String(err)),
     };
   }
 
-  private compute(data: ScoreData, weights: MetadataScoreWeights): number {
-    const earned =
-      this.scoreString(data.title, weights.title) +
-      this.scoreString(data.subtitle, weights.subtitle) +
-      this.scoreString(data.description, weights.description) +
-      this.scoreString(data.coverSource, weights.coverSource) +
-      this.scoreCount(data.authorCount, weights.authors) +
-      this.scoreCount(data.genreCount, weights.genres) +
-      this.scoreCount(data.tagCount, weights.tags) +
-      this.scoreString(data.isbn13, weights.isbn13) +
-      this.scoreString(data.isbn10, weights.isbn10) +
-      this.scoreString(data.publisher, weights.publisher) +
-      this.scorePositiveNumber(data.publishedYear, weights.publishedYear) +
-      this.scoreString(data.language, weights.language) +
-      this.scorePositiveNumber(data.pageCount, weights.pageCount) +
-      this.scorePositiveNumber(data.rating, weights.rating) +
-      this.scoreString(data.seriesName, weights.seriesName) +
-      this.scorePositiveNumber(data.seriesIndex, weights.seriesIndex) +
-      this.scoreString(data.googleBooksId, weights.googleBooksId) +
-      this.scoreString(data.goodreadsId, weights.goodreadsId) +
-      this.scoreString(data.amazonId, weights.amazonId) +
-      this.scoreString(data.hardcoverId, weights.hardcoverId) +
-      this.scoreString(data.openLibraryId, weights.openLibraryId) +
-      this.scoreString(data.itunesId, weights.itunesId);
-
-    const total = (Object.values(weights) as number[]).reduce((sum, w) => sum + w, 0);
-    if (total === 0) return 0;
-    return Math.floor((earned / total) * 100);
+  private sanitizeErrorMessage(message: string): string {
+    return message.replace(/[\r\n"]/g, ' ').slice(0, 200);
   }
 
-  private scoreString(value: string | null | undefined, weight: number): number {
-    return value != null && value.trim().length > 0 ? weight : 0;
-  }
-
-  private scoreCount(count: number, weight: number): number {
-    return count > 0 ? weight : 0;
-  }
-
-  private scorePositiveNumber(value: number | null | undefined, weight: number): number {
-    return value != null && value > 0 ? weight : 0;
+  private makeInitialStatus(): MetadataRecalculationStatus {
+    return {
+      state: 'idle',
+      trigger: null,
+      startedAt: null,
+      endedAt: null,
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      error: null,
+    };
   }
 }

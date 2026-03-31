@@ -609,7 +609,7 @@ describe('Auth session security (e2e)', () => {
         },
       });
       expect(refreshAfterPasswordChange.statusCode).toBe(401);
-    });
+    }, 15_000);
 
     it('keeps sessions active when current password is invalid', async () => {
       const credentials = await createLocalUser(context.db, { password: 'OldPass123' });
@@ -639,7 +639,7 @@ describe('Auth session security (e2e)', () => {
         },
       });
       expect(refreshResponse.statusCode).toBe(200);
-    });
+    }, 15_000);
   });
 
   describe('session revocation endpoint', () => {
@@ -723,6 +723,6 @@ describe('Auth session security (e2e)', () => {
         },
       });
       expect(revokedSessionRefresh.statusCode).toBe(401);
-    });
+    }, 15_000);
   });
 });

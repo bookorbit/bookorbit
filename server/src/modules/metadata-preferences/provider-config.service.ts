@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { MetadataProviderKey, ProviderConfigurations, ProviderStatus } from '@projectx/types';
 
@@ -7,6 +7,9 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type ProviderConfigPatch = {
+  [K in keyof ProviderConfigurations]?: Partial<ProviderConfigurations[K]>;
+};
 
 const PROVIDER_CONFIG_KEY = 'metadata_provider_config';
 
@@ -106,6 +109,8 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
 
 @Injectable()
 export class ProviderConfigService {
+  private readonly logger = new Logger(ProviderConfigService.name);
+
   constructor(@Inject(DB) private readonly db: Db) {}
 
   private createDefaultConfig(): ProviderConfigurations {
@@ -122,49 +127,69 @@ export class ProviderConfigService {
     };
   }
 
+  private mergeConfig(base: ProviderConfigurations, value: unknown): ProviderConfigurations {
+    const next = asObject(value);
+    return {
+      google: mergeGoogleConfig(base.google, next.google),
+      amazon: mergeAmazonConfig(base.amazon, next.amazon),
+      goodreads: mergeSimpleConfig(base.goodreads, next.goodreads),
+      hardcover: mergeHardcoverConfig(base.hardcover, next.hardcover),
+      openLibrary: mergeSimpleConfig(base.openLibrary, next.openLibrary),
+      itunes: mergeITunesConfig(base.itunes, next.itunes),
+      audible: mergeAudibleConfig(base.audible, next.audible),
+      audnexus: mergeSimpleConfig(base.audnexus, next.audnexus),
+      comicvine: mergeComicVineConfig(base.comicvine, next.comicvine),
+    };
+  }
+
+  private parsePersistedConfig(
+    rawValue: string,
+    fallback: ProviderConfigurations,
+    source: 'get' | 'update',
+    startedAt: number,
+  ): ProviderConfigurations {
+    try {
+      return this.mergeConfig(fallback, JSON.parse(rawValue));
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const rawMessage = error instanceof Error ? error.message : 'unknown error';
+      const errorMessage = rawMessage.replace(/"/g, '\\"');
+      this.logger.warn(
+        `[metadata_provider_config.parse] [fail] key=${PROVIDER_CONFIG_KEY} source=${source} durationMs=${durationMs} errorClass=${errorClass} error="${errorMessage}" - failed to parse persisted provider config`,
+      );
+      return fallback;
+    }
+  }
+
   async getConfig(): Promise<ProviderConfigurations> {
+    const startedAt = Date.now();
     const defaults = this.createDefaultConfig();
     const row = await this.db.query.appSettings.findFirst({
       where: eq(schema.appSettings.key, PROVIDER_CONFIG_KEY),
     });
     if (!row) return defaults;
-    try {
-      const stored = asObject(JSON.parse(row.value));
-      return {
-        google: mergeGoogleConfig(defaults.google, stored.google),
-        amazon: mergeAmazonConfig(defaults.amazon, stored.amazon),
-        goodreads: mergeSimpleConfig(defaults.goodreads, stored.goodreads),
-        hardcover: mergeHardcoverConfig(defaults.hardcover, stored.hardcover),
-        openLibrary: mergeSimpleConfig(defaults.openLibrary, stored.openLibrary),
-        itunes: mergeITunesConfig(defaults.itunes, stored.itunes),
-        audible: mergeAudibleConfig(defaults.audible, stored.audible),
-        audnexus: mergeSimpleConfig(defaults.audnexus, stored.audnexus),
-        comicvine: mergeComicVineConfig(defaults.comicvine, stored.comicvine),
-      };
-    } catch {
-      return defaults;
-    }
+    return this.parsePersistedConfig(row.value, defaults, 'get', startedAt);
   }
 
-  async updateConfig(patch: Partial<ProviderConfigurations>): Promise<ProviderConfigurations> {
-    const current = await this.getConfig();
-    const next: ProviderConfigurations = {
-      google: mergeGoogleConfig(current.google, patch.google),
-      amazon: mergeAmazonConfig(current.amazon, patch.amazon),
-      goodreads: mergeSimpleConfig(current.goodreads, patch.goodreads),
-      hardcover: mergeHardcoverConfig(current.hardcover, patch.hardcover),
-      openLibrary: mergeSimpleConfig(current.openLibrary, patch.openLibrary),
-      itunes: mergeITunesConfig(current.itunes, patch.itunes),
-      audible: mergeAudibleConfig(current.audible, patch.audible),
-      audnexus: mergeSimpleConfig(current.audnexus, patch.audnexus),
-      comicvine: mergeComicVineConfig(current.comicvine, patch.comicvine),
-    };
-    const value = JSON.stringify(next);
-    await this.db
-      .insert(schema.appSettings)
-      .values({ key: PROVIDER_CONFIG_KEY, value })
-      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
-    return next;
+  async updateConfig(patch: ProviderConfigPatch): Promise<ProviderConfigurations> {
+    const startedAt = Date.now();
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${PROVIDER_CONFIG_KEY})::bigint)`);
+
+      const defaults = this.createDefaultConfig();
+      const row = await tx.query.appSettings.findFirst({
+        where: eq(schema.appSettings.key, PROVIDER_CONFIG_KEY),
+      });
+      const current = row ? this.parsePersistedConfig(row.value, defaults, 'update', startedAt) : defaults;
+      const next = this.mergeConfig(current, patch);
+      const value = JSON.stringify(next);
+      await tx
+        .insert(schema.appSettings)
+        .values({ key: PROVIDER_CONFIG_KEY, value })
+        .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
+      return next;
+    });
   }
 
   async getProviderStatuses(config?: ProviderConfigurations): Promise<ProviderStatus[]> {

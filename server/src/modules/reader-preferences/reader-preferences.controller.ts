@@ -11,20 +11,20 @@ export class ReaderPreferencesController {
 
   @Get('preferences/:bookFileId')
   async getPreference(@Param('bookFileId', ParseIntPipe) bookFileId: number, @CurrentUser() user: RequestUser) {
-    const pref = await this.readerPreferencesService.getPreference(user.id, bookFileId);
+    const pref = await this.readerPreferencesService.getPreference(user, bookFileId);
     return { settings: pref?.settings ?? null, isCustomized: !!pref };
   }
 
   @Put('preferences/:bookFileId')
   @HttpCode(204)
   async upsertPreference(@Param('bookFileId', ParseIntPipe) bookFileId: number, @Body() dto: UpsertPreferenceDto, @CurrentUser() user: RequestUser) {
-    await this.readerPreferencesService.upsertPreference(user.id, bookFileId, dto.settings);
+    await this.readerPreferencesService.upsertPreference(user, bookFileId, dto.settings);
   }
 
   @Delete('preferences/:bookFileId')
   @HttpCode(204)
   async deletePreference(@Param('bookFileId', ParseIntPipe) bookFileId: number, @CurrentUser() user: RequestUser) {
-    await this.readerPreferencesService.deletePreference(user.id, bookFileId);
+    await this.readerPreferencesService.deletePreference(user, bookFileId);
   }
 
   @Get('defaults')

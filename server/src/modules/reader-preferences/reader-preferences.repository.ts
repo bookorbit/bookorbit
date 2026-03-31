@@ -18,12 +18,13 @@ export class ReaderPreferencesRepository {
   }
 
   async upsertPreference(userId: number, bookFileId: number, settings: Record<string, unknown>) {
+    const now = new Date();
     await this.db
       .insert(schema.readerPreferences)
-      .values({ userId, bookFileId, settings, updatedAt: new Date() })
+      .values({ userId, bookFileId, settings, updatedAt: now })
       .onConflictDoUpdate({
         target: [schema.readerPreferences.userId, schema.readerPreferences.bookFileId],
-        set: { settings, updatedAt: new Date() },
+        set: { settings, updatedAt: now },
       });
   }
 
@@ -40,12 +41,13 @@ export class ReaderPreferencesRepository {
   }
 
   async upsertDefault(userId: number, formatGroup: string, settings: Record<string, unknown>) {
+    const now = new Date();
     await this.db
       .insert(schema.readerDefaultPreferences)
-      .values({ userId, formatGroup, settings, updatedAt: new Date() })
+      .values({ userId, formatGroup, settings, updatedAt: now })
       .onConflictDoUpdate({
         target: [schema.readerDefaultPreferences.userId, schema.readerDefaultPreferences.formatGroup],
-        set: { settings, updatedAt: new Date() },
+        set: { settings, updatedAt: now },
       });
   }
 

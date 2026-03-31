@@ -1,5 +1,6 @@
 import { IsBoolean, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ITUNES_COVER_RESOLUTIONS } from '@projectx/types';
 
 export class GoogleProviderConfigDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
@@ -15,8 +16,6 @@ export class AmazonProviderConfigDto {
 export class SimpleProviderConfigDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
 }
-
-const ITUNES_COVER_RESOLUTIONS = ['standard', 'high'] as const;
 
 export class ITunesProviderConfigDto {
   @IsOptional() @IsBoolean() enabled?: boolean;

@@ -37,6 +37,8 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
 
 export type MergeStrategy = "fillMissing" | "overwrite" | "overwriteIfProvided";
 export type GenreMergeMode = "firstProvider" | "merge";
+export const MERGE_STRATEGIES: MergeStrategy[] = ["fillMissing", "overwrite", "overwriteIfProvided"];
+export const GENRE_MERGE_MODES: GenreMergeMode[] = ["firstProvider", "merge"];
 
 export interface FieldPreference {
   enabled: boolean;
@@ -85,6 +87,7 @@ export interface SimpleProviderConfig {
 }
 
 export type ITunesCoverResolution = "standard" | "high";
+export const ITUNES_COVER_RESOLUTIONS: ITunesCoverResolution[] = ["standard", "high"];
 
 export interface ITunesProviderConfig {
   enabled: boolean;

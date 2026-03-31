@@ -20,6 +20,6 @@ export class ProviderConfigController {
   @Put()
   @HttpCode(HttpStatus.OK)
   updateConfig(@Body() dto: UpdateProviderConfigDto) {
-    return this.service.updateConfig(dto as Parameters<typeof this.service.updateConfig>[0]);
+    return this.service.updateConfig(dto);
   }
 }

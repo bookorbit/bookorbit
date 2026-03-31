@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@projectx/types';
@@ -13,12 +13,15 @@ const GLOBAL_PREFERENCES_KEY = 'metadata_fetch_preferences';
 
 @Injectable()
 export class MetadataPreferencesService {
+  private readonly logger = new Logger(MetadataPreferencesService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly resolver: MetadataPreferenceResolver,
   ) {}
 
   async getGlobal(): Promise<MetadataFetchPreferences> {
+    const startedAt = Date.now();
     const row = await this.db.query.appSettings.findFirst({
       where: eq(schema.appSettings.key, GLOBAL_PREFERENCES_KEY),
     });
@@ -26,7 +29,14 @@ export class MetadataPreferencesService {
     try {
       const parsed = JSON.parse(row.value) as MetadataFetchPreferences;
       return this.resolver.resolve(parsed, null);
-    } catch {
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const rawMessage = error instanceof Error ? error.message : 'unknown error';
+      const errorMessage = rawMessage.replace(/"/g, '\\"');
+      this.logger.warn(
+        `[metadata_preferences.global_parse] [fail] key=${GLOBAL_PREFERENCES_KEY} durationMs=${durationMs} errorClass=${errorClass} error="${errorMessage}" - failed to parse persisted global preferences`,
+      );
       return this.resolver.getDefaultPreferences();
     }
   }

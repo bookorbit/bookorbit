@@ -11,11 +11,8 @@ import {
   validateSync,
 } from 'class-validator';
 import { plainToInstance, Type } from 'class-transformer';
-import { ALL_METADATA_FIELDS, MetadataProviderKey } from '@projectx/types';
-import type { GenreMergeMode, MetadataField, MergeStrategy } from '@projectx/types';
-
-const MERGE_STRATEGIES: MergeStrategy[] = ['fillMissing', 'overwrite', 'overwriteIfProvided'];
-const GENRE_MERGE_MODES: GenreMergeMode[] = ['firstProvider', 'merge'];
+import { ALL_METADATA_FIELDS, GENRE_MERGE_MODES, MERGE_STRATEGIES, MetadataProviderKey } from '@projectx/types';
+import type { GenreMergeMode, MergeStrategy, MetadataField } from '@projectx/types';
 const PROVIDER_KEYS = Object.values(MetadataProviderKey);
 
 export class FieldPreferenceDto {

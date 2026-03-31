@@ -61,7 +61,6 @@ describe('Architecture boundaries', () => {
       'src/modules/metadata-fetch/metadata-fetch.service.ts',
       'src/modules/metadata-preferences/metadata-preferences.service.ts',
       'src/modules/metadata-preferences/provider-config.service.ts',
-      'src/modules/metadata-score/metadata-score.service.ts',
       'src/modules/opds/opds-book.service.ts',
       'src/modules/opds/opds-user.service.ts',
       'src/modules/scanner/file-watcher.service.ts',

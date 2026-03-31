@@ -2,20 +2,20 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post } from '@nestj
 import { Permission } from '@projectx/types';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { UpdateWeightsDto } from './dto/update-weights.dto';
-import { MetadataScoreService } from './metadata-score.service';
+import { MetadataRecalculationTrigger, MetadataScoreService } from './metadata-score.service';
 
 @Controller('metadata-score')
 export class MetadataScoreController {
   constructor(private readonly service: MetadataScoreService) {}
 
   @Get('weights')
-  async getWeights() {
+  getWeights() {
     return this.service.getWeights();
   }
 
   @Patch('weights')
   @RequirePermission(Permission.ManageAppSettings)
-  async updateWeights(@Body() dto: UpdateWeightsDto) {
+  updateWeights(@Body() dto: UpdateWeightsDto) {
     return this.service.updateWeights(dto);
   }
 
@@ -23,7 +23,17 @@ export class MetadataScoreController {
   @HttpCode(HttpStatus.ACCEPTED)
   @RequirePermission(Permission.ManageAppSettings)
   recalculate() {
-    this.service.recalculateAll().catch(() => undefined);
-    return { message: 'Recalculation started' };
+    const result = this.service.requestRecalculation(MetadataRecalculationTrigger.MANUAL);
+    return {
+      started: result.started,
+      status: result.status,
+      message: result.started ? 'Recalculation started' : 'Recalculation already running',
+    };
+  }
+
+  @Get('recalculate/status')
+  @RequirePermission(Permission.ManageAppSettings)
+  getRecalculationStatus() {
+    return this.service.getRecalculationStatus();
   }
 }

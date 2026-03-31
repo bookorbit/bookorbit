@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import type { Mocked } from 'vitest';
 import { MetadataProviderKey } from '@projectx/types';
 
@@ -45,11 +45,17 @@ describe('MetadataPreferencesService', () => {
   let db: ReturnType<typeof createDb>;
   let resolver: Mocked<MetadataPreferenceResolver>;
   let service: MetadataPreferencesService;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     db = createDb();
     resolver = createResolver();
     service = new MetadataPreferencesService(db as never, resolver);
+    warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
   });
 
   it('returns defaults when global preferences are missing', async () => {
@@ -94,6 +100,21 @@ describe('MetadataPreferencesService', () => {
 
     expect(resolver.getDefaultPreferences).toHaveBeenCalled();
     expect(prefs.fields.cover.enabled).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[metadata_preferences.global_parse] [fail] key=metadata_fetch_preferences durationMs='),
+    );
+  });
+
+  it('escapes quotes in parse errors before logging', async () => {
+    db.query.appSettings.findFirst.mockResolvedValue({ value: '{"fields":{}}' });
+    const parseSpy = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+      throw new Error('invalid "json" payload');
+    });
+
+    await service.getGlobal();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('error="invalid \\"json\\" payload"'));
+    parseSpy.mockRestore();
   });
 
   it('normalizes and upserts global preferences', async () => {
@@ -160,7 +181,7 @@ describe('MetadataPreferencesService', () => {
       },
     };
 
-    await service.setLibraryOverrides(4, overrides as never);
+    await service.setLibraryOverrides(4, overrides);
 
     expect(db.__updateChain.set).toHaveBeenCalledWith({ metadataFetchPreferences: overrides });
   });
