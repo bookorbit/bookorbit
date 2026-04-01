@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
+import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorsService } from './authors.service';
 
 function reqUser(id = 7, superuser = false) {
@@ -134,7 +135,7 @@ describe('AuthorsService', () => {
     const result = await service.merge(reqUser(7, true), { targetAuthorId: 10, sourceAuthorIds: [10, 11, 11, 12] });
 
     expect(authorsRepo.mergeAuthors).toHaveBeenCalledWith(10, [11, 12]);
-    expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(10, 'author_merge_target');
+    expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(10, AUTHOR_ENRICHMENT_REASONS.AUTHOR_MERGE_TARGET);
     expect(result.mergedAuthorIds).toEqual([11, 12]);
     expect(result.affectedBookCount).toBe(8);
   });
@@ -163,7 +164,7 @@ describe('AuthorsService', () => {
       sortName: null,
       description: 'Bio',
     });
-    expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(20, 'author_rename');
+    expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(20, AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);
   });
 
   it('findOne returns not found when author is outside user-accessible libraries', async () => {
@@ -224,5 +225,22 @@ describe('AuthorsService', () => {
       writeMode: 'missing_only',
       audnexusEnabled: true,
     });
+  });
+
+  it('refreshEnrichment throws when provider fails so callers can surface failure', async () => {
+    authorsRepo.findVisibleAuthorIds.mockResolvedValue([22]);
+    authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
+    enrichmentExecutor.execute.mockResolvedValue({
+      kind: 'failed',
+      provider: 'audnexus',
+      message: 'upstream timeout',
+      httpStatus: 504,
+      retryAfterMs: 5_000,
+      transient: true,
+      descriptionUpdated: false,
+      imageUpdated: false,
+    });
+
+    await expect(service.refreshEnrichment(reqUser(), 22)).rejects.toThrow('Author enrichment failed');
   });
 });

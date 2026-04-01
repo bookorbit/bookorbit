@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuthorAutoEnrichmentWriteMode, AuthorMetadataProviderKey } from '@projectx/types';
 
 import { AuthorMetadataFetchService } from './metadata/author-metadata-fetch.service';
-import { AuthorImageStorageService } from './author-image-storage.service';
+import { AuthorImageStorageError, AuthorImageStorageService } from './author-image-storage.service';
 import { AuthorsRepository } from './authors.repository';
 
 export type AuthorEnrichmentExecutionResult =
@@ -127,13 +127,14 @@ export class AuthorEnrichmentExecutorService {
       try {
         imageUpdated = await this.authorImageStorage.saveFromUrl(author.id, metadata.imageUrl);
       } catch (error) {
+        const storageError = error instanceof AuthorImageStorageError ? error : null;
         return {
           kind: 'failed',
-          message: error instanceof Error ? error.message : 'Failed to save author image',
+          message: storageError?.message ?? (error instanceof Error ? error.message : 'Failed to save author image'),
           provider: metadata.provider,
-          httpStatus: null,
-          retryAfterMs: null,
-          transient: true,
+          httpStatus: storageError?.httpStatus ?? null,
+          retryAfterMs: storageError?.retryAfterMs ?? null,
+          transient: storageError?.transient ?? true,
           descriptionUpdated: false,
           imageUpdated: false,
         };

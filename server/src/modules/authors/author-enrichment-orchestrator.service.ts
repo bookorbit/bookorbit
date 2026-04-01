@@ -6,6 +6,7 @@ import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEvents
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
+import { AUTHOR_ENRICHMENT_REASONS, AuthorEnrichmentReason } from './author-enrichment-reasons';
 import { AuthorEnrichmentRepository } from './author-enrichment.repository';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 
@@ -25,7 +26,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   private paused = false;
 
   private readonly handleMetadataAuthorsReplaced = (event: MetadataAuthorsReplacedEvent) => {
-    void this.scheduleMany(event.authorIds, 'metadata_replace');
+    void this.scheduleMany(event.authorIds, AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE);
   };
 
   constructor(
@@ -59,15 +60,15 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     }
   }
 
-  async schedule(authorId: number, reason: string, options?: { ignoreEnabled?: boolean }): Promise<number> {
+  async schedule(authorId: number, reason: AuthorEnrichmentReason, options?: { ignoreEnabled?: boolean }): Promise<number> {
     return this.scheduleMany([authorId], reason, options);
   }
 
-  async scheduleMany(authorIds: number[], reason: string, options?: { ignoreEnabled?: boolean }): Promise<number> {
+  async scheduleMany(authorIds: number[], reason: AuthorEnrichmentReason, options?: { ignoreEnabled?: boolean }): Promise<number> {
     if (!options?.ignoreEnabled) {
       const config = await this.enrichmentConfig.getConfig();
       if (!config.enabled) return 0;
-      if (reason === 'metadata_replace' && !config.triggerOnImport) return 0;
+      if (reason === AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE && !config.triggerOnImport) return 0;
       authorIds = await this.queueRepo.filterEligibleAuthorIds(authorIds, config.conditions);
       if (authorIds.length === 0) return 0;
     }
@@ -77,11 +78,11 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     if (this.paused && !options?.ignoreEnabled) return 0;
     const queued = await this.queueRepo.upsertSchedule(authorIds, reason);
     if (queued > 0) {
-      this.logger.debug(`author.enrichment.auto.queued reason=${reason} count=${queued}`);
+      this.logger.debug(`[author.enrichment.queue] [end] reason=${reason} queued=${queued} - queued author enrichment jobs`);
       // metadata_replace is a background side-effect of book metadata fetch. Don't update
       // the session or emit status — these authors are enriched silently so the widget
       // doesn't flash for every book the metadata fetcher processes.
-      if (reason !== 'metadata_replace') {
+      if (reason !== AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE) {
         this.session.sessionTotal += queued;
         await this.emitStatusSnapshot();
       }
@@ -91,7 +92,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
   async backfillLinkedAuthors(): Promise<number> {
     const config = await this.enrichmentConfig.getConfig();
-    const queued = await this.queueRepo.enqueueEligibleLinkedAuthors('manual_backfill', config.conditions);
+    const queued = await this.queueRepo.enqueueEligibleLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, config.conditions);
     if (queued > 0) {
       this.session.sessionTotal += queued;
       await this.unpauseIfNeeded();
@@ -102,7 +103,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   }
 
   async backfillAllLinkedAuthors(): Promise<number> {
-    const queued = await this.queueRepo.enqueueAllLinkedAuthors('manual_backfill_all');
+    const queued = await this.queueRepo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL);
     if (queued > 0) {
       this.session.sessionTotal += queued;
       await this.unpauseIfNeeded();
@@ -162,7 +163,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
         await this.randomDelay();
       }
     } catch (error) {
-      this.logger.warn(`Author enrichment poll failed: ${error instanceof Error ? error.message : String(error)}`);
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const message = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+      this.logger.warn(`[author.enrichment.poll] [fail] errorClass=${errorClass} error="${message}" - author enrichment poll failed`);
     } finally {
       this.running = false;
     }
@@ -200,7 +203,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
     if (result.kind === 'done') {
       this.logger.debug(
-        `author.enrichment.auto.done authorId=${authorId} provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated}`,
+        `[author.enrichment.process] [end] authorId=${authorId} outcome=done provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated} - author enrichment processed`,
       );
       await this.queueRepo.markDone(authorId, result.imageUpdated);
       if (this.session.sessionTotal > 0) this.session.sessionDone++;
@@ -210,7 +213,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     }
 
     if (result.kind === 'skipped') {
-      this.logger.debug(`author.enrichment.auto.skipped authorId=${authorId} reason=${result.reason}`);
+      this.logger.debug(
+        `[author.enrichment.process] [end] authorId=${authorId} outcome=skipped reason=${result.reason} - author enrichment processed`,
+      );
       await this.queueRepo.markDone(authorId, false);
       if (this.session.sessionTotal > 0) this.session.sessionDone++;
       this.session.currentItemName = null;
@@ -224,11 +229,11 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
     if (nextAttemptAt) {
       this.logger.debug(
-        `author.enrichment.auto.retry authorId=${authorId} attempt=${attemptNumber}/${MAX_ATTEMPTS} status=${result.httpStatus ?? 'none'} nextAttemptAt=${nextAttemptAt.toISOString()} message=${truncateError(result.message)}`,
+        `[author.enrichment.process] [fail] authorId=${authorId} attempts=${attemptNumber}/${MAX_ATTEMPTS} status=${result.httpStatus ?? 'none'} nextAttemptAt=${nextAttemptAt.toISOString()} errorClass=AuthorEnrichmentError error="${truncateError(result.message).replace(/"/g, '\\"')}" - author enrichment failed and will retry`,
       );
     } else {
       this.logger.warn(
-        `author.enrichment.auto.failed authorId=${authorId} attempts=${attemptNumber} status=${result.httpStatus ?? 'none'} message=${truncateError(result.message)}`,
+        `[author.enrichment.process] [fail] authorId=${authorId} attempts=${attemptNumber} status=${result.httpStatus ?? 'none'} errorClass=AuthorEnrichmentError error="${truncateError(result.message).replace(/"/g, '\\"')}" - author enrichment failed`,
       );
     }
 
@@ -269,7 +274,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     const staleBefore = new Date(Date.now() - PROCESSING_STALE_AFTER_MS);
     const recovered = await this.queueRepo.recoverStuckProcessing(staleBefore);
     if (recovered > 0) {
-      this.logger.warn(`author.enrichment.auto.recovered_stuck_processing count=${recovered}`);
+      this.logger.warn(
+        `[author.enrichment.recovery] [end] recoveredCount=${recovered} staleAfterMs=${PROCESSING_STALE_AFTER_MS} - recovered stuck processing rows`,
+      );
       await this.emitStatusSnapshot();
     }
   }

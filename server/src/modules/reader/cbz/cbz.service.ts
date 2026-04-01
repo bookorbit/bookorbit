@@ -4,10 +4,10 @@ import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { createInflateRaw } from 'zlib';
 import { createExtractorFromData } from 'node-unrar-js';
-import { getSevenZip } from '../../common/sevenzip';
+import { getSevenZip } from '../../../common/sevenzip';
 
-import type { RequestUser } from '../../common/types/request-user';
-import { BookService } from '../book/book.service';
+import type { RequestUser } from '../../../common/types/request-user';
+import { BookService } from '../../book/book.service';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 

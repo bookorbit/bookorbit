@@ -10,6 +10,28 @@ import { generateThumbnail, imageExt } from '../metadata/lib/cover';
 
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_REDIRECTS = 5;
+
+export class AuthorImageStorageError extends Error {
+  readonly transient: boolean;
+  readonly httpStatus: number | null;
+  readonly retryAfterMs: number | null;
+
+  constructor(
+    message: string,
+    options?: {
+      transient?: boolean;
+      httpStatus?: number | null;
+      retryAfterMs?: number | null;
+    },
+  ) {
+    super(message);
+    this.name = 'AuthorImageStorageError';
+    this.transient = options?.transient ?? false;
+    this.httpStatus = options?.httpStatus ?? null;
+    this.retryAfterMs = options?.retryAfterMs ?? null;
+  }
+}
 
 @Injectable()
 export class AuthorImageStorageService {
@@ -24,21 +46,24 @@ export class AuthorImageStorageService {
     const url = await this.normalizeUrl(rawUrl);
     if (!url) return false;
 
+    const bytes = await this.fetchImageFromUrl(url);
+    if (!bytes || bytes.length === 0) return false;
+
+    const dir = this.authorDir(authorId);
+    await mkdir(dir, { recursive: true });
+
+    const existing = await readdir(dir).catch(() => [] as string[]);
+    for (const file of existing.filter((entry) => entry.startsWith('photo.'))) {
+      await unlink(join(dir, file)).catch((error: unknown) => {
+        const errorClass = error instanceof Error ? error.name : 'Error';
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[author.image.cleanup] [fail] authorId=${authorId} file=${file} errorClass=${errorClass} error="${message.replace(/"/g, '\\"')}" - author image cleanup failed`,
+        );
+      });
+    }
+
     try {
-      const bytes = await this.fetchImageFromUrl(url);
-      if (!bytes || bytes.length === 0) return false;
-
-      const dir = this.authorDir(authorId);
-      await mkdir(dir, { recursive: true });
-
-      const existing = await readdir(dir).catch(() => [] as string[]);
-      for (const file of existing.filter((entry) => entry.startsWith('photo.'))) {
-        await unlink(join(dir, file)).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          this.logger.warn(`author image cleanup failed for authorId=${authorId} file=${file}: ${message}`);
-        });
-      }
-
       const ext = imageExt(bytes);
       await writeFile(join(dir, `photo.${ext}`), bytes);
       const thumb = await generateThumbnail(bytes);
@@ -46,8 +71,7 @@ export class AuthorImageStorageService {
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`author image save failed for authorId=${authorId}: ${message}`);
-      return false;
+      throw new AuthorImageStorageError(`Failed to persist author image: ${message}`, { transient: true });
     }
   }
 
@@ -145,18 +169,36 @@ export class AuthorImageStorageService {
     }
   }
 
-  private async fetchImageFromUrl(url: string): Promise<Buffer | null> {
+  private async fetchImageFromUrl(url: string, redirectCount = 0): Promise<Buffer | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
       const res = await fetch(url, {
         signal: controller.signal,
+        redirect: 'manual',
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; ProjectX/1.0; +https://projectx.local)',
           Accept: 'image/*',
         },
       });
+      if (isRedirectStatus(res.status)) {
+        if (redirectCount >= MAX_REDIRECTS) {
+          throw new AuthorImageStorageError('Too many image redirects', { transient: false });
+        }
+        const location = res.headers.get('location');
+        if (!location) return null;
+        const nextUrl = await this.resolveRedirectUrl(url, location);
+        if (!nextUrl) return null;
+        return this.fetchImageFromUrl(nextUrl, redirectCount + 1);
+      }
+      if (res.status === 429 || res.status >= 500) {
+        throw new AuthorImageStorageError(`Image fetch failed with status ${res.status}`, {
+          transient: true,
+          httpStatus: res.status,
+          retryAfterMs: parseRetryAfterMs(res.headers.get('retry-after')),
+        });
+      }
       if (!res.ok) return null;
 
       const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
@@ -173,9 +215,25 @@ export class AuthorImageStorageService {
       }
 
       return Buffer.concat(chunks);
+    } catch (error) {
+      if (error instanceof AuthorImageStorageError) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AuthorImageStorageError(`Image fetch failed: ${message}`, { transient: true });
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private async resolveRedirectUrl(currentUrl: string, location: string): Promise<string | null> {
+    let resolved: URL;
+    try {
+      resolved = new URL(location, currentUrl);
+    } catch {
+      return null;
+    }
+    return this.normalizeUrl(resolved.toString());
   }
 }
 
@@ -219,4 +277,21 @@ function isPrivateOrLocalV4(address: string): boolean {
   if (a === 0) return true;
 
   return false;
+}
+
+function isRedirectStatus(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function parseRetryAfterMs(value: string | null): number | null {
+  if (!value) return null;
+  const seconds = Number.parseInt(value, 10);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return seconds * 1000;
+  }
+
+  const dateMs = new Date(value).getTime();
+  if (!Number.isFinite(dateMs)) return null;
+  const delta = dateMs - Date.now();
+  return delta > 0 ? delta : null;
 }

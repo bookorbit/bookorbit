@@ -97,11 +97,22 @@ export class AuthorsController {
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     });
-    const result = await this.authorsService.bulkRefreshMetadata(dto.authorIds, user, (event) => {
+    const sendEvent = (event: object) => {
+      if (reply.raw.destroyed || reply.raw.writableEnded) {
+        throw new Error('SSE stream closed');
+      }
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    });
-    reply.raw.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
-    reply.raw.end();
+    };
+    try {
+      const result = await this.authorsService.bulkRefreshMetadata(dto.authorIds, user, (event) => {
+        sendEvent(event);
+      });
+      sendEvent({ done: true, ...result });
+    } finally {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
+        reply.raw.end();
+      }
+    }
   }
 
   @Get('enrichment/config')

@@ -7,6 +7,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authorEnrichmentQueue, authors, bookAuthors } from '../../db/schema';
+import { AuthorEnrichmentReason } from './author-enrichment-reasons';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -18,7 +19,7 @@ export type AuthorEnrichmentQueueRow = typeof authorEnrichmentQueue.$inferSelect
 export class AuthorEnrichmentRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async upsertSchedule(authorIds: number[], reason: string): Promise<number> {
+  async upsertSchedule(authorIds: number[], reason: AuthorEnrichmentReason): Promise<number> {
     const uniqueAuthorIds = [...new Set(authorIds)].filter((id) => Number.isInteger(id) && id > 0);
     if (uniqueAuthorIds.length === 0) return 0;
 
@@ -50,7 +51,7 @@ export class AuthorEnrichmentRepository {
     return touched.length;
   }
 
-  async enqueueAllLinkedAuthors(reason: string): Promise<number> {
+  async enqueueAllLinkedAuthors(reason: AuthorEnrichmentReason): Promise<number> {
     const rows = await this.db.selectDistinct({ authorId: bookAuthors.authorId }).from(bookAuthors);
     const authorIds = rows.map((row) => row.authorId);
     return this.upsertSchedule(authorIds, reason);
@@ -59,33 +60,38 @@ export class AuthorEnrichmentRepository {
   async filterEligibleAuthorIds(authorIds: number[], conditions: AuthorEnrichmentConditions): Promise<number[]> {
     if (authorIds.length === 0) return [];
 
-    const clauses: SQL[] = [];
-    if (conditions.neverEnriched) clauses.push(isNull(authors.lastEnrichedAt));
-    if (conditions.missingBio) clauses.push(isNull(authors.description));
-    if (conditions.missingPhoto) clauses.push(eq(authors.hasPhoto, false));
-
-    if (clauses.length === 0) return [];
+    const eligibility = this.buildEligibilityPredicate(conditions);
+    if (!eligibility) return [];
 
     const rows = await this.db
       .select({ id: authors.id })
       .from(authors)
-      .where(and(inArray(authors.id, authorIds), or(...clauses)));
+      .where(and(inArray(authors.id, authorIds), eligibility));
 
     return rows.map((r) => r.id);
   }
 
-  async enqueueEligibleLinkedAuthors(reason: string, conditions: AuthorEnrichmentConditions): Promise<number> {
-    const allRows = await this.db.selectDistinct({ authorId: bookAuthors.authorId }).from(bookAuthors);
-    const allIds = allRows.map((r) => r.authorId);
-    const eligibleIds = await this.filterEligibleAuthorIds(allIds, conditions);
+  async enqueueEligibleLinkedAuthors(reason: AuthorEnrichmentReason, conditions: AuthorEnrichmentConditions): Promise<number> {
+    const eligibility = this.buildEligibilityPredicate(conditions);
+    if (!eligibility) return 0;
+    const rows = await this.db
+      .selectDistinct({ authorId: bookAuthors.authorId })
+      .from(bookAuthors)
+      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+      .where(eligibility);
+    const eligibleIds = rows.map((row) => row.authorId);
     return this.upsertSchedule(eligibleIds, reason);
   }
 
   async countEligibleLinkedAuthors(conditions: AuthorEnrichmentConditions): Promise<number> {
-    const allRows = await this.db.selectDistinct({ authorId: bookAuthors.authorId }).from(bookAuthors);
-    const allIds = allRows.map((r) => r.authorId);
-    const eligibleIds = await this.filterEligibleAuthorIds(allIds, conditions);
-    return eligibleIds.length;
+    const eligibility = this.buildEligibilityPredicate(conditions);
+    if (!eligibility) return 0;
+    const [row] = await this.db
+      .select({ total: sql<number>`count(distinct ${bookAuthors.authorId})::int` })
+      .from(bookAuthors)
+      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+      .where(eligibility);
+    return Number(row?.total ?? 0);
   }
 
   async fetchDue(limit: number): Promise<(AuthorEnrichmentQueueRow & { authorName: string | null })[]> {
@@ -264,6 +270,15 @@ export class AuthorEnrichmentRepository {
         updatedAt: now,
       })
       .where(eq(authorEnrichmentQueue.authorId, params.authorId));
+  }
+
+  private buildEligibilityPredicate(conditions: AuthorEnrichmentConditions): SQL | null {
+    const clauses: SQL[] = [];
+    if (conditions.neverEnriched) clauses.push(isNull(authors.lastEnrichedAt));
+    if (conditions.missingBio) clauses.push(isNull(authors.description));
+    if (conditions.missingPhoto) clauses.push(eq(authors.hasPhoto, false));
+    if (clauses.length === 0) return null;
+    return or(...clauses)!;
   }
 }
 

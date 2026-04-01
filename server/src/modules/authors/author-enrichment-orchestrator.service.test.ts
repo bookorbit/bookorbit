@@ -1,5 +1,6 @@
 import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
 
+import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
 
@@ -103,12 +104,13 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
     });
 
-    await expect(service.scheduleMany([1, 2], 'metadata_replace')).resolves.toBe(0);
+    await expect(service.scheduleMany([1, 2], AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE)).resolves.toBe(0);
     expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
   });
 
   it('pollOnce processes due rows and marks them done on success', async () => {
     queueRepo.fetchDue.mockResolvedValue([{ authorId: 22, attemptCount: 0, authorName: null }]);
+    vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
 
     await (service as any).pollOnce();
 

@@ -40,6 +40,7 @@ export class AuthorEnrichmentGateway implements OnGatewayInit, OnGatewayConnecti
   }
 
   async handleConnection(client: Socket): Promise<void> {
+    const event = 'author.enrichment.socket';
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new Error('No token provided');
@@ -49,18 +50,19 @@ export class AuthorEnrichmentGateway implements OnGatewayInit, OnGatewayConnecti
       if (!user) throw new Error('User not found or token revoked');
 
       this.assertCanViewStatus(user);
-      (client.data as Record<string, unknown>).user = user;
-      this.logger.debug(`WS connected: user=${user.id} socket=${client.id}`);
+      this.logger.debug(`[${event}] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
       const [summary, paused] = await Promise.all([this.queueRepo.getStatusSummary(), this.enrichmentConfig.isPaused()]);
       client.emit(AUTHOR_ENRICHMENT_STATUS_EVENT, { ...summary, paused, ...this.session.getSnapshot() });
     } catch (err) {
-      this.logger.warn(`WS rejected: ${(err as Error).message} socket=${client.id}`);
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const message = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(`[${event}] [fail] socketId=${client.id} errorClass=${errorClass} error="${message}" - websocket rejected`);
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket): void {
-    this.logger.debug(`WS disconnected: socket=${client.id}`);
+    this.logger.debug(`[author.enrichment.socket] [end] socketId=${client.id} - websocket disconnected`);
   }
 
   emitStatus(status: AuthorEnrichmentStatusEvent): void {

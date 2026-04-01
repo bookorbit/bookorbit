@@ -13,6 +13,7 @@ vi.mock('drizzle-orm', () => ({
 import { and, eq, inArray, lte, or } from 'drizzle-orm';
 
 import { authorEnrichmentQueue } from '../../db/schema';
+import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AUTHOR_ENRICHMENT_ACTIVE_STATUSES, AuthorEnrichmentRepository } from './author-enrichment.repository';
 
 describe('AuthorEnrichmentRepository', () => {
@@ -32,12 +33,14 @@ describe('AuthorEnrichmentRepository', () => {
       orderBy: vi.fn(),
       limit: vi.fn(),
       groupBy: vi.fn(),
+      innerJoin: vi.fn(),
       leftJoin: vi.fn(),
       offset: vi.fn(),
     };
     selectBuilder.from.mockReturnValue(selectBuilder);
     selectBuilder.where.mockReturnValue(selectBuilder);
     selectBuilder.orderBy.mockReturnValue(selectBuilder);
+    selectBuilder.innerJoin.mockReturnValue(selectBuilder);
     selectBuilder.leftJoin.mockReturnValue(selectBuilder);
     selectBuilder.offset.mockReturnValue(selectBuilder);
     selectBuilder.limit.mockResolvedValue([]);
@@ -181,6 +184,37 @@ describe('AuthorEnrichmentRepository', () => {
         nextAttemptAt: expect.any(Date),
       }),
     );
+  });
+
+  it('enqueueEligibleLinkedAuthors selects eligible linked ids directly in SQL', async () => {
+    const { db, selectBuilder, insertBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ authorId: 31 }, { authorId: 32 }]);
+    insertBuilder.returning.mockResolvedValueOnce([{ authorId: 31 }, { authorId: 32 }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    const queued = await repo.enqueueEligibleLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, {
+      neverEnriched: true,
+      missingBio: false,
+      missingPhoto: false,
+    });
+
+    expect(queued).toBe(2);
+    expect(db.selectDistinct).toHaveBeenCalled();
+  });
+
+  it('countEligibleLinkedAuthors returns SQL count without materializing all ids', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ total: 9 }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    const total = await repo.countEligibleLinkedAuthors({
+      neverEnriched: false,
+      missingBio: true,
+      missingPhoto: false,
+    });
+
+    expect(total).toBe(9);
+    expect(db.selectDistinct).not.toHaveBeenCalled();
   });
 
   it('getStatusSummary maps grouped queue statuses to typed counters', async () => {

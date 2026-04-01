@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { inArray } from 'drizzle-orm';
 import { Observable } from 'rxjs';
 
@@ -21,6 +21,7 @@ import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { AuthorImageStorageService } from './author-image-storage.service';
+import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
 import { AuthorsRepository } from './authors.repository';
@@ -328,7 +329,7 @@ export class AuthorsService {
       const updated = await this.authorsRepo.updateAuthorById(authorId, values);
       if (!updated) throw new NotFoundException('Author not found');
       if (values.name !== undefined) {
-        await this.enrichmentOrchestrator.schedule(authorId, 'author_rename');
+        await this.enrichmentOrchestrator.schedule(authorId, AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);
       }
       const detail = await this.findOne(user, authorId);
       this.logger.log(
@@ -366,7 +367,7 @@ export class AuthorsService {
 
       const affectedBookCount = await this.authorsRepo.countDistinctBooks(uniqueSourceIds);
       await this.authorsRepo.mergeAuthors(dto.targetAuthorId, uniqueSourceIds);
-      await this.enrichmentOrchestrator.schedule(dto.targetAuthorId, 'author_merge_target');
+      await this.enrichmentOrchestrator.schedule(dto.targetAuthorId, AUTHOR_ENRICHMENT_REASONS.AUTHOR_MERGE_TARGET);
       const target = await this.findOne(user, dto.targetAuthorId);
 
       this.logger.log(
@@ -638,8 +639,8 @@ export class AuthorsService {
     }
 
     if (result.kind === 'failed') {
-      this.logger.warn(`author.enrichment.refresh.failed authorId=${authorId} status=${result.httpStatus ?? 'none'} message=${result.message}`);
-      return { descriptionUpdated: false, imageUpdated: false, provider: result.provider };
+      const provider = result.provider ?? 'unknown';
+      throw new ServiceUnavailableException(`Author enrichment failed for provider ${provider}: ${result.message}`);
     }
 
     return {

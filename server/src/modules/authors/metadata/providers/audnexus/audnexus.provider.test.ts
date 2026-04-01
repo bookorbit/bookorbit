@@ -72,9 +72,25 @@ describe('AudnexusAuthorMetadataProvider', () => {
   });
 
   it('throws when upstream fails so callers can apply retry policy', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: {
+        get: vi.fn((name: string) => (name === 'retry-after' ? '15' : null)),
+      },
+    });
 
-    await expect(provider.search({ name: 'Any' })).rejects.toThrow();
-    await expect(provider.lookupById('A1')).rejects.toThrow();
+    await expect(provider.search({ name: 'Any' })).rejects.toMatchObject({
+      name: 'AuthorMetadataProviderError',
+      httpStatus: 429,
+      retryAfterMs: 15_000,
+      transient: true,
+    });
+    await expect(provider.lookupById('A1')).rejects.toMatchObject({
+      name: 'AuthorMetadataProviderError',
+      httpStatus: 429,
+      retryAfterMs: 15_000,
+      transient: true,
+    });
   });
 });

@@ -1,17 +1,9 @@
 import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsDefined, IsEnum, ValidateNested } from 'class-validator';
+import { AuthorEnrichmentConditionsDto } from './author-enrichment-conditions.dto';
 
-export class AuthorEnrichmentConditionsDto {
-  @IsBoolean()
-  neverEnriched!: boolean;
-
-  @IsBoolean()
-  missingBio!: boolean;
-
-  @IsBoolean()
-  missingPhoto!: boolean;
-}
+export { AuthorEnrichmentConditionsDto };
 
 export class AuthorAutoEnrichmentConfigDto {
   @IsBoolean()

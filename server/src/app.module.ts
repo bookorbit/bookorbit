@@ -19,7 +19,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AppSettingsModule } from './modules/app-settings/app-settings.module';
 import { CollectionModule } from './modules/collection/collection.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { CbzModule } from './modules/cbz/cbz.module';
+import { CbzModule } from './modules/reader/cbz/cbz.module';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookModule } from './modules/book/book.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
@@ -38,7 +38,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { EmailModule } from './modules/email/email.module';
-import { EpubModule } from './modules/epub/epub.module';
+import { EpubModule } from './modules/reader/epub/epub.module';
 import { StagingModule } from './modules/staging/staging.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';

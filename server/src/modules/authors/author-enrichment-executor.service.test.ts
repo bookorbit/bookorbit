@@ -1,5 +1,6 @@
 import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
 
+import { AuthorImageStorageError } from './author-image-storage.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 
 describe('AuthorEnrichmentExecutorService', () => {
@@ -165,6 +166,31 @@ describe('AuthorEnrichmentExecutorService', () => {
         kind: 'failed',
         httpStatus: 429,
         retryAfterMs: 30_000,
+      }),
+    );
+  });
+
+  it('returns failed result with retry metadata when image storage throws typed error', async () => {
+    imageStorage.saveFromUrl.mockRejectedValue(
+      new AuthorImageStorageError('cdn unavailable', {
+        transient: true,
+        httpStatus: 503,
+        retryAfterMs: 10_000,
+      }),
+    );
+
+    await expect(
+      service.execute({
+        authorId: 5,
+        writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
+        audnexusEnabled: true,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        kind: 'failed',
+        httpStatus: 503,
+        retryAfterMs: 10_000,
+        transient: true,
       }),
     );
   });

@@ -4,9 +4,9 @@ import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
 import type { EpubBookInfo, EpubManifestItem, EpubSpineItem, EpubTocItem } from '@projectx/types';
-import { BookReadService } from '../book/book-read.service';
-import { LibraryService } from '../library/library.service';
-import type { RequestUser } from '../../common/types/request-user';
+import { BookReadService } from '../../book/book-read.service';
+import { LibraryService } from '../../library/library.service';
+import type { RequestUser } from '../../../common/types/request-user';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.xhtml': 'application/xhtml+xml',

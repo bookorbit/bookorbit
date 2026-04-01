@@ -1,7 +1,7 @@
 import { Controller, Get, Param, ParseIntPipe, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { RequestUser } from '../../common/types/request-user';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../../common/types/request-user';
 import { CbzService } from './cbz.service';
 
 @Controller('cbz')

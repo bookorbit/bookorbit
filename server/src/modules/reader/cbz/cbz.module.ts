@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { BookModule } from '../book/book.module';
+import { BookModule } from '../../book/book.module';
 import { CbzController } from './cbz.controller';
 import { CbzService } from './cbz.service';
 
