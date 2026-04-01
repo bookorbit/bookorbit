@@ -25,14 +25,26 @@ export interface ParsedCbzComicMetadata {
 
 export interface ParsedCbzMetadata {
   title: string | null;
+  subtitle: string | null;
   seriesName: string | null;
   seriesIndex: number | null;
   description: string | null;
   publisher: string | null;
   publishedYear: number | null;
   language: string | null;
+  pageCount: number | null;
+  rating: number | null;
+  isbn10: string | null;
+  isbn13: string | null;
   authors: { name: string; sortName: string | null }[];
+  genres: string[];
   tags: string[];
+  googleBooksId: string | null;
+  goodreadsId: string | null;
+  amazonId: string | null;
+  hardcoverId: string | null;
+  openLibraryId: string | null;
+  itunesId: string | null;
   comicMetadata: ParsedCbzComicMetadata | null;
 }
 
@@ -124,6 +136,59 @@ function splitDelimited(value: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+function parseProjectxManagedNotes(notes: string | null): Map<string, string> {
+  const fields = new Map<string, string>();
+  if (!notes) return fields;
+
+  for (const line of notes.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(/^\[projectx:([^\]]+)\]\s*(.*)$/);
+    if (!match) continue;
+    const [, key, value] = match;
+    fields.set(key, value.trim());
+  }
+
+  return fields;
+}
+
+function parseProviderIdsFromWebUrl(
+  webUrl: string | null,
+): Partial<Record<'goodreadsId' | 'amazonId' | 'hardcoverId' | 'googleBooksId' | 'openLibraryId', string>> {
+  if (!webUrl) return {};
+
+  if (webUrl.startsWith('https://www.goodreads.com/book/show/')) {
+    return { goodreadsId: webUrl.slice('https://www.goodreads.com/book/show/'.length) || '' };
+  }
+  if (webUrl.startsWith('https://www.amazon.com/dp/')) {
+    return { amazonId: webUrl.slice('https://www.amazon.com/dp/'.length) || '' };
+  }
+  if (webUrl.startsWith('https://hardcover.app/books/')) {
+    return { hardcoverId: webUrl.slice('https://hardcover.app/books/'.length) || '' };
+  }
+  if (webUrl.startsWith('https://books.google.com/books?id=')) {
+    return { googleBooksId: webUrl.slice('https://books.google.com/books?id='.length) || '' };
+  }
+  if (webUrl.startsWith('https://openlibrary.org/works/')) {
+    return { openLibraryId: webUrl.slice('https://openlibrary.org/works/'.length) || '' };
+  }
+
+  return {};
+}
+
+function parseCbxRating(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(5, Math.max(0, parsed * 2));
+}
+
+function parseIsbn13(value: string | null): string | null {
+  if (!value) return null;
+  const digits = value.replace(/[^\d]/g, '');
+  return digits.length === 13 ? digits : null;
+}
+
 function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
   try {
     const parsed = xmlParser.parse(xmlBuf.toString('utf-8')) as Record<string, unknown>;
@@ -143,8 +208,12 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
 
     const writers = splitDelimited(str('Writer'));
     const year = num('Year');
+    const managedNotes = parseProjectxManagedNotes(str('Notes'));
+    const providerIdsFromWeb = parseProviderIdsFromWebUrl(str('Web'));
 
-    const tags = [...splitDelimited(str('Genre')), ...splitDelimited(str('Tags'))];
+    const genres = splitDelimited(str('Genre'));
+    const tags = splitDelimited(str('Tags'));
+    const uniqueGenres = [...new Set(genres)];
     const uniqueTags = [...new Set(tags)];
 
     const pencillers = splitDelimited(str('Penciller'));
@@ -172,14 +241,26 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
 
     return {
       title: str('Title'),
+      subtitle: managedNotes.get('subtitle') ?? null,
       seriesName: str('Series'),
       seriesIndex: num('Number'),
       description: str('Summary') ?? str('Description'),
       publisher: str('Publisher'),
       publishedYear: year != null ? Math.floor(year) : null,
       language: str('LanguageISO'),
+      pageCount: num('PageCount'),
+      rating: parseCbxRating(str('CommunityRating')),
+      isbn10: managedNotes.get('isbn10') ?? null,
+      isbn13: parseIsbn13(str('GTIN')),
       authors: writers.map((name) => ({ name, sortName: null })),
+      genres: uniqueGenres,
       tags: uniqueTags,
+      googleBooksId: managedNotes.get('googleBooksId') ?? providerIdsFromWeb.googleBooksId ?? null,
+      goodreadsId: managedNotes.get('goodreadsId') ?? providerIdsFromWeb.goodreadsId ?? null,
+      amazonId: managedNotes.get('amazonId') ?? providerIdsFromWeb.amazonId ?? null,
+      hardcoverId: managedNotes.get('hardcoverId') ?? providerIdsFromWeb.hardcoverId ?? null,
+      openLibraryId: managedNotes.get('openLibraryId') ?? providerIdsFromWeb.openLibraryId ?? null,
+      itunesId: null,
       comicMetadata: hasComicFields
         ? {
             issueNumber: str('Number'),
@@ -215,14 +296,26 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
 
     return {
       title: (cbi['title'] as string) ?? null,
+      subtitle: null,
       seriesName: (cbi['series'] as string) ?? null,
       seriesIndex: cbi['issue'] != null ? (Number.isFinite(Number(cbi['issue'])) ? Number(cbi['issue']) : null) : null,
       description: (cbi['comments'] as string) ?? null,
       publisher: (cbi['publisher'] as string) ?? null,
       publishedYear: (cbi['publicationYear'] as number) ?? null,
       language: null,
+      pageCount: null,
+      rating: null,
+      isbn10: null,
+      isbn13: null,
       authors: writers,
+      genres: [],
       tags,
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      openLibraryId: null,
+      itunesId: null,
       comicMetadata: null,
     };
   } catch {

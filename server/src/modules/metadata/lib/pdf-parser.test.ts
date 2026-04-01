@@ -94,7 +94,7 @@ describe('parsePdfFile', () => {
         title: 'XMP Title',
         authors: [{ name: 'XMP Author', sortName: null }],
         tags: ['favorite'],
-        pageCount: 123,
+        pageCount: 999,
         coverBuffer: Buffer.from([0xff, 0xd8, 0xff]),
       }),
     );

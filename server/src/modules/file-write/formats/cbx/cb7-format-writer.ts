@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 
 import type { WriteResult } from '@projectx/types';
 import { getSevenZip, type SevenZipFS } from '../../../../common/sevenzip';
-import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
+import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';
 import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
@@ -19,6 +19,28 @@ import { buildComicInfoXml } from './comic-info-builder';
 // is always written before it is added to the archive, with no await in between.
 const VFS_XML_PATH = '/ComicInfo.xml';
 const ENOENT_ERRNO = 44;
+const CBX_WRITABLE_FIELDS = new Set<BookWritePayloadKey>([
+  'title',
+  'subtitle',
+  'description',
+  'publisher',
+  'publishedYear',
+  'language',
+  'pageCount',
+  'seriesName',
+  'seriesIndex',
+  'isbn10',
+  'isbn13',
+  'rating',
+  'authors',
+  'genres',
+  'tags',
+  'googleBooksId',
+  'goodreadsId',
+  'amazonId',
+  'hardcoverId',
+  'openLibraryId',
+]);
 
 @Injectable()
 export class Cb7FormatWriter implements FormatWriter {
@@ -27,7 +49,8 @@ export class Cb7FormatWriter implements FormatWriter {
   async write(filePath: string, payload: BookWritePayload, options: FormatWriteOptions): Promise<WriteResult> {
     const start = Date.now();
     const { fieldMask, dryRun } = options;
-    const fieldsWritten = resolveFieldsWritten(payload, fieldMask);
+    const cbxFieldMask = new Set([...fieldMask].filter((key) => CBX_WRITABLE_FIELDS.has(key)));
+    const fieldsWritten = resolveFieldsWritten(payload, cbxFieldMask);
 
     if (dryRun) {
       return { status: 'skipped', reason: 'dry-run', fieldsWritten, durationMs: Date.now() - start };
@@ -61,7 +84,7 @@ export class Cb7FormatWriter implements FormatWriter {
         // No ComicInfo.xml in archive - start fresh
       }
 
-      const xml = buildComicInfoXml(existingXml, payload, fieldMask);
+      const xml = buildComicInfoXml(existingXml, payload, cbxFieldMask);
       const xmlBytes = Buffer.from(xml, 'utf-8');
 
       const fd2 = sz.FS.open(VFS_XML_PATH, 'w+');

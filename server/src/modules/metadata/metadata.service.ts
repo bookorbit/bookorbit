@@ -25,6 +25,12 @@ import { generateThumbnail, imageExt } from './lib/cover';
 import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 
 type Db = NodePgDatabase<typeof schema>;
+type RelationMutationExecutor = Pick<Db, 'delete' | 'insert' | 'select'>;
+
+interface RelationMutationOptions {
+  executor?: RelationMutationExecutor;
+  emitEvent?: boolean;
+}
 
 const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] as const;
 const MAX_RELATION_NAME_LENGTH = 200;
@@ -237,7 +243,11 @@ export class MetadataService {
 
   // ── Authors ──────────────────────────────────────────────────────────────────
 
-  async replaceAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
+  async replaceAuthors(
+    bookId: number,
+    parsedAuthors: { name: string; sortName: string | null }[],
+    options: RelationMutationOptions = {},
+  ): Promise<number[]> {
     const normalized = parsedAuthors
       .map((author) => ({
         name: author.name.trim(),
@@ -253,34 +263,21 @@ export class MetadataService {
       return true;
     });
 
-    const linkedAuthorIds = await this.db.transaction(async (tx) => {
-      await tx.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
+    const linkedAuthorIds = options.executor
+      ? await this.replaceAuthorsInExecutor(options.executor, bookId, unique)
+      : await this.db.transaction(async (tx) => this.replaceAuthorsInExecutor(tx, bookId, unique));
 
-      if (unique.length === 0) return [] as number[];
-
-      const authorIds: number[] = [];
-      for (let index = 0; index < unique.length; index += 1) {
-        const { name, sortName } = unique[index];
-
-        let [author] = await tx.insert(authors).values({ name, sortName }).onConflictDoNothing().returning();
-        if (!author) {
-          [author] = await tx.select().from(authors).where(eq(authors.name, name)).limit(1);
-        }
-        if (!author) continue;
-
-        await tx.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: index }).onConflictDoNothing();
-        authorIds.push(author.id);
-      }
-
-      return authorIds;
-    });
-
-    if (linkedAuthorIds.length > 0) {
-      this.metadataEvents?.emit(METADATA_AUTHORS_REPLACED, {
-        bookId,
-        authorIds: linkedAuthorIds,
-      });
+    const emitEvent = options.emitEvent ?? true;
+    if (emitEvent && linkedAuthorIds.length > 0) {
+      this.emitAuthorsReplaced(bookId, linkedAuthorIds);
     }
+
+    return linkedAuthorIds;
+  }
+
+  emitAuthorsReplaced(bookId: number, authorIds: number[]): void {
+    if (authorIds.length === 0) return;
+    this.metadataEvents?.emit(METADATA_AUTHORS_REPLACED, { bookId, authorIds });
   }
 
   // ── Genres ───────────────────────────────────────────────────────────────────
@@ -289,44 +286,88 @@ export class MetadataService {
     await this.narratorService.replaceForBook(bookId, narratorNames);
   }
 
-  async replaceGenres(bookId: number, parsedGenres: string[]) {
+  async replaceGenres(bookId: number, parsedGenres: string[], options: RelationMutationOptions = {}) {
     const uniqueGenres = this.normalizeUniqueRelationNames(parsedGenres);
 
+    if (options.executor) {
+      await this.replaceGenresInExecutor(options.executor, bookId, uniqueGenres);
+      return;
+    }
+
     await this.db.transaction(async (tx) => {
-      await tx.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
-      if (uniqueGenres.length === 0) return;
-
-      for (const genreName of uniqueGenres) {
-        let [genre] = await tx.insert(genres).values({ name: genreName }).onConflictDoNothing().returning();
-        if (!genre) {
-          [genre] = await tx.select().from(genres).where(eq(genres.name, genreName)).limit(1);
-        }
-        if (!genre) continue;
-
-        await tx.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
-      }
+      await this.replaceGenresInExecutor(tx, bookId, uniqueGenres);
     });
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
 
-  async replaceTags(bookId: number, userTags: string[]) {
+  async replaceTags(bookId: number, userTags: string[], options: RelationMutationOptions = {}) {
     const uniqueTags = this.normalizeUniqueRelationNames(userTags);
 
+    if (options.executor) {
+      await this.replaceTagsInExecutor(options.executor, bookId, uniqueTags);
+      return;
+    }
+
     await this.db.transaction(async (tx) => {
-      await tx.delete(bookTags).where(eq(bookTags.bookId, bookId));
-      if (uniqueTags.length === 0) return;
-
-      for (const tagName of uniqueTags) {
-        let [tag] = await tx.insert(tags).values({ name: tagName }).onConflictDoNothing().returning();
-        if (!tag) {
-          [tag] = await tx.select().from(tags).where(eq(tags.name, tagName)).limit(1);
-        }
-        if (!tag) continue;
-
-        await tx.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
-      }
+      await this.replaceTagsInExecutor(tx, bookId, uniqueTags);
     });
+  }
+
+  private async replaceAuthorsInExecutor(
+    executor: RelationMutationExecutor,
+    bookId: number,
+    uniqueAuthors: { name: string; sortName: string | null }[],
+  ): Promise<number[]> {
+    await executor.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
+
+    if (uniqueAuthors.length === 0) return [];
+
+    const authorIds: number[] = [];
+    for (let index = 0; index < uniqueAuthors.length; index += 1) {
+      const { name, sortName } = uniqueAuthors[index];
+
+      let [author] = await executor.insert(authors).values({ name, sortName }).onConflictDoNothing().returning();
+      if (!author) {
+        [author] = await executor.select().from(authors).where(eq(authors.name, name)).limit(1);
+      }
+      if (!author) continue;
+
+      await executor.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: index }).onConflictDoNothing();
+      authorIds.push(author.id);
+    }
+
+    return authorIds;
+  }
+
+  private async replaceGenresInExecutor(executor: RelationMutationExecutor, bookId: number, uniqueGenres: string[]): Promise<void> {
+    await executor.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
+    if (uniqueGenres.length === 0) return;
+
+    for (const genreName of uniqueGenres) {
+      let [genre] = await executor.insert(genres).values({ name: genreName }).onConflictDoNothing().returning();
+      if (!genre) {
+        [genre] = await executor.select().from(genres).where(eq(genres.name, genreName)).limit(1);
+      }
+      if (!genre) continue;
+
+      await executor.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
+    }
+  }
+
+  private async replaceTagsInExecutor(executor: RelationMutationExecutor, bookId: number, uniqueTags: string[]): Promise<void> {
+    await executor.delete(bookTags).where(eq(bookTags.bookId, bookId));
+    if (uniqueTags.length === 0) return;
+
+    for (const tagName of uniqueTags) {
+      let [tag] = await executor.insert(tags).values({ name: tagName }).onConflictDoNothing().returning();
+      if (!tag) {
+        [tag] = await executor.select().from(tags).where(eq(tags.name, tagName)).limit(1);
+      }
+      if (!tag) continue;
+
+      await executor.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
+    }
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────────

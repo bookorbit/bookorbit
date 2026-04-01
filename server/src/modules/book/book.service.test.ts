@@ -58,6 +58,7 @@ function makeService() {
     findAudioProgress: vi.fn(),
     upsertAudioProgress: vi.fn(),
     updateMetadataFields: vi.fn(),
+    withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
     findAllIds: vi.fn(),
   };
@@ -70,9 +71,10 @@ function makeService() {
     buildOrderBy: vi.fn(),
   };
   const metadataService = {
-    replaceAuthors: vi.fn().mockResolvedValue(undefined),
+    replaceAuthors: vi.fn().mockResolvedValue([]),
     replaceGenres: vi.fn().mockResolvedValue(undefined),
     replaceTags: vi.fn().mockResolvedValue(undefined),
+    emitAuthorsReplaced: vi.fn(),
     downloadAndSaveCover: vi.fn().mockResolvedValue(undefined),
     refreshCoverForBook: vi.fn(),
   };
@@ -95,12 +97,21 @@ function makeService() {
   const fileWriteService = {
     scheduleWrite: vi.fn(),
   };
+  const narratorService = {
+    replaceForBook: vi.fn().mockResolvedValue(undefined),
+  };
+  const comicMetadataService = {
+    upsert: vi.fn().mockResolvedValue(undefined),
+    findByBookId: vi.fn().mockResolvedValue(null),
+  };
   const userBookStatusService = {
     autoUpdate: vi.fn().mockResolvedValue(undefined),
     setManual: vi.fn().mockResolvedValue(undefined),
     findOne: vi.fn().mockResolvedValue(null),
     findByBookIds: vi.fn().mockResolvedValue(new Map()),
   };
+
+  bookRepo.withTransaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({}));
 
   const service = new BookService(
     bookRepo as never,
@@ -112,8 +123,8 @@ function makeService() {
     config as never,
     appSettings as never,
     userBookStatusService as never,
-    { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-    { upsert: vi.fn().mockResolvedValue(undefined), findByBookId: vi.fn().mockResolvedValue(null) } as never,
+    narratorService as never,
+    comicMetadataService as never,
     embedder as never,
     fileWriteService as never,
   );
@@ -130,6 +141,8 @@ function makeService() {
     userBookStatusService,
     embedder,
     fileWriteService,
+    narratorService,
+    comicMetadataService,
   };
 }
 
@@ -638,6 +651,7 @@ describe('BookService', () => {
       );
 
       expect(verifySpy).toHaveBeenCalledWith(5, user);
+      expect(bookRepo.withTransaction).toHaveBeenCalledTimes(1);
       expect(bookRepo.updateMetadataFields).toHaveBeenCalledWith(
         5,
         expect.objectContaining({
@@ -645,13 +659,19 @@ describe('BookService', () => {
           rating: 4,
           updatedAt: expect.any(Date),
         }),
+        expect.anything(),
       );
-      expect(metadataService.replaceAuthors).toHaveBeenCalledWith(5, [
-        { name: 'A1', sortName: null },
-        { name: 'A2', sortName: null },
-      ]);
-      expect(metadataService.replaceGenres).toHaveBeenCalledWith(5, ['Sci-Fi']);
-      expect(metadataService.replaceTags).toHaveBeenCalledWith(5, ['favorite']);
+      expect(metadataService.replaceAuthors).toHaveBeenCalledWith(
+        5,
+        [
+          { name: 'A1', sortName: null },
+          { name: 'A2', sortName: null },
+        ],
+        { executor: expect.anything(), emitEvent: false },
+      );
+      expect(metadataService.replaceGenres).toHaveBeenCalledWith(5, ['Sci-Fi'], { executor: expect.anything() });
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(5, ['favorite'], { executor: expect.anything() });
+      expect(metadataService.emitAuthorsReplaced).toHaveBeenCalledWith(5, []);
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(5, 'auto', user.id);
       expect(embedder.embedBook).toHaveBeenCalledWith(5);
       expect(detailSpy).toHaveBeenCalledWith(5, user);

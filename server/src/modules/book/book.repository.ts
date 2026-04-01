@@ -29,6 +29,8 @@ import {
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
+type MetadataUpdateExecutor = Pick<Db, 'update'>;
 type PatternMetadataRow = {
   bookId: number;
   title: string | null;
@@ -45,6 +47,10 @@ type PatternMetadataRow = {
 @Injectable()
 export class BookRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
+
+  async withTransaction<T>(callback: (tx: DbTransaction) => Promise<T>): Promise<T> {
+    return this.db.transaction((tx) => callback(tx));
+  }
 
   async findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }) {
     const { where, orderBy, limit, offset, userId } = opts;
@@ -444,8 +450,12 @@ export class BookRepository {
     await this.db.delete(books).where(inArray(books.id, bookIds));
   }
 
-  async updateMetadataFields(bookId: number, fields: Partial<typeof bookMetadata.$inferInsert>): Promise<void> {
-    await this.db.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
+  async updateMetadataFields(
+    bookId: number,
+    fields: Partial<typeof bookMetadata.$inferInsert>,
+    executor: MetadataUpdateExecutor = this.db,
+  ): Promise<void> {
+    await executor.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
   }
 
   async upsertProgress(

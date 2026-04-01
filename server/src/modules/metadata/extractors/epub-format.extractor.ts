@@ -18,7 +18,7 @@ export class EpubFormatExtractor implements FormatExtractor {
       seriesName: metadata.seriesName,
       seriesIndex: metadata.seriesIndex,
       authors: metadata.authors,
-      genres: metadata.tags,
+      genres: metadata.genres.length > 0 ? metadata.genres : metadata.tags,
       cover: cover ?? null,
     };
   }

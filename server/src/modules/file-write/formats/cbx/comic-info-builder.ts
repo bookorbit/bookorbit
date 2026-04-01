@@ -35,19 +35,19 @@ function parseComicInfoXml(xml: string): ComicInfoObject {
 export function buildComicInfoXml(existingXml: string | null, payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string {
   const info: ComicInfoObject = existingXml ? parseComicInfoXml(existingXml) : {};
 
-  if (fieldMask.has('title') && payload.title != null) info['Title'] = payload.title;
-  if (fieldMask.has('description') && payload.description != null) info['Summary'] = stripHtml(payload.description);
-  if (fieldMask.has('publisher') && payload.publisher != null) info['Publisher'] = payload.publisher;
-  if (fieldMask.has('seriesName') && payload.seriesName != null) info['Series'] = payload.seriesName;
-  if (fieldMask.has('seriesIndex') && payload.seriesIndex != null) info['Number'] = formatSeriesIndex(payload.seriesIndex);
-  if (fieldMask.has('publishedYear') && payload.publishedYear != null) info['Year'] = payload.publishedYear;
-  if (fieldMask.has('pageCount') && payload.pageCount != null) info['PageCount'] = payload.pageCount;
-  if (fieldMask.has('language') && payload.language != null) info['LanguageISO'] = payload.language;
-  if (fieldMask.has('authors') && payload.authors?.length) info['Writer'] = payload.authors.map((a) => a.name).join(', ');
-  if (fieldMask.has('genres') && payload.genres?.length) info['Genre'] = payload.genres.join(', ');
-  if (fieldMask.has('tags') && payload.tags?.length) info['Tags'] = payload.tags.join(', ');
-  if (fieldMask.has('rating') && payload.rating != null) info['CommunityRating'] = formatRating(payload.rating);
-  if (fieldMask.has('isbn13') && payload.isbn13 != null) info['GTIN'] = payload.isbn13;
+  setComicInfoField(info, fieldMask, 'title', 'Title', payload.title);
+  setComicInfoField(info, fieldMask, 'description', 'Summary', payload.description, stripHtml);
+  setComicInfoField(info, fieldMask, 'publisher', 'Publisher', payload.publisher);
+  setComicInfoField(info, fieldMask, 'seriesName', 'Series', payload.seriesName);
+  setComicInfoField(info, fieldMask, 'seriesIndex', 'Number', payload.seriesIndex, formatSeriesIndex);
+  setComicInfoField(info, fieldMask, 'publishedYear', 'Year', payload.publishedYear);
+  setComicInfoField(info, fieldMask, 'pageCount', 'PageCount', payload.pageCount);
+  setComicInfoField(info, fieldMask, 'language', 'LanguageISO', payload.language);
+  setComicInfoField(info, fieldMask, 'authors', 'Writer', payload.authors?.length ? payload.authors.map((a) => a.name).join(', ') : null);
+  setComicInfoField(info, fieldMask, 'genres', 'Genre', payload.genres?.length ? payload.genres.join(', ') : null);
+  setComicInfoField(info, fieldMask, 'tags', 'Tags', payload.tags?.length ? payload.tags.join(', ') : null);
+  setComicInfoField(info, fieldMask, 'rating', 'CommunityRating', payload.rating, formatRating);
+  setComicInfoField(info, fieldMask, 'isbn13', 'GTIN', payload.isbn13);
 
   const hasProviderSelection = COMIC_INFO_PROVIDER_ID_KEYS.some((key) => fieldMask.has(key));
   if (hasProviderSelection) {
@@ -153,4 +153,21 @@ function buildNotes(existing: string | null, payload: BookWritePayload, fieldMas
 function resolveManagedTextField(payload: BookWritePayload, key: BookWritePayloadKey): string | null {
   const value = payload[key];
   return typeof value === 'string' ? value : null;
+}
+
+function setComicInfoField<TValue>(
+  info: ComicInfoObject,
+  fieldMask: Set<BookWritePayloadKey>,
+  key: BookWritePayloadKey,
+  comicInfoKey: string,
+  value: TValue | null | undefined,
+  formatter?: (value: TValue) => string | number,
+): void {
+  if (!fieldMask.has(key)) return;
+  if (value == null || (typeof value === 'string' && value === '')) {
+    delete info[comicInfoKey];
+    return;
+  }
+
+  info[comicInfoKey] = formatter ? formatter(value) : value;
 }

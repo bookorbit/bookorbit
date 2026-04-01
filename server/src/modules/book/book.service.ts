@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
@@ -25,11 +25,24 @@ import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 
+const METADATA_UPDATE_FAILPOINTS = [
+  'afterScalarUpdate',
+  'afterComicMetadataUpsert',
+  'afterAuthorsReplace',
+  'afterNarratorsReplace',
+  'afterGenresReplace',
+  'afterTagsReplace',
+  'beforeTransactionCommit',
+] as const;
+
+export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
+
 @Injectable()
 export class BookService {
   private readonly logger = new Logger(BookService.name);
   private readonly booksPath: string;
   private embeddingRun: Promise<void> | null = null;
+  private metadataUpdateFailpoint: MetadataUpdateFailpoint | null = null;
 
   constructor(
     private readonly bookRepo: BookRepository,
@@ -404,30 +417,46 @@ export class BookService {
       }
 
       const scalarFieldCount = Object.keys(scalarFields).length;
-      if (scalarFieldCount > 0) {
-        scalarFields.updatedAt = new Date();
-        await this.bookRepo.updateMetadataFields(id, scalarFields);
-      }
+      let replacedAuthorIds: number[] = [];
+      await this.bookRepo.withTransaction(async (tx) => {
+        if (scalarFieldCount > 0) {
+          scalarFields.updatedAt = new Date();
+          await this.bookRepo.updateMetadataFields(id, scalarFields, tx);
+        }
+        this.throwIfMetadataUpdateFailpoint('afterScalarUpdate');
 
-      if (dto.comicMetadata) {
-        await this.comicMetadataService.upsert(id, dto.comicMetadata);
-      }
+        if (dto.comicMetadata) {
+          await this.comicMetadataService.upsert(id, dto.comicMetadata, tx);
+        }
+        this.throwIfMetadataUpdateFailpoint('afterComicMetadataUpsert');
 
-      if (dto.authors !== undefined) {
-        await this.metadataService.replaceAuthors(
-          id,
-          dto.authors.map((name) => ({ name, sortName: null })),
-        );
-      }
-      if (dto.audioMetadata?.narrators !== undefined) {
-        await this.narratorService.replaceForBook(id, dto.audioMetadata.narrators);
-      }
-      if (dto.genres !== undefined) {
-        await this.metadataService.replaceGenres(id, dto.genres);
-      }
-      if (dto.tags !== undefined) {
-        await this.metadataService.replaceTags(id, dto.tags);
-      }
+        if (dto.authors !== undefined) {
+          replacedAuthorIds = await this.metadataService.replaceAuthors(
+            id,
+            dto.authors.map((name) => ({ name, sortName: null })),
+            { executor: tx, emitEvent: false },
+          );
+        }
+        this.throwIfMetadataUpdateFailpoint('afterAuthorsReplace');
+
+        if (dto.audioMetadata?.narrators !== undefined) {
+          await this.narratorService.replaceForBook(id, dto.audioMetadata.narrators, { executor: tx });
+        }
+        this.throwIfMetadataUpdateFailpoint('afterNarratorsReplace');
+
+        if (dto.genres !== undefined) {
+          await this.metadataService.replaceGenres(id, dto.genres, { executor: tx });
+        }
+        this.throwIfMetadataUpdateFailpoint('afterGenresReplace');
+
+        if (dto.tags !== undefined) {
+          await this.metadataService.replaceTags(id, dto.tags, { executor: tx });
+        }
+        this.throwIfMetadataUpdateFailpoint('afterTagsReplace');
+        this.throwIfMetadataUpdateFailpoint('beforeTransactionCommit');
+      });
+
+      this.metadataService.emitAuthorsReplaced(id, replacedAuthorIds);
 
       this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
       this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
@@ -445,6 +474,23 @@ export class BookService {
       );
       throw err;
     }
+  }
+
+  setMetadataUpdateFailpointForTests(failpoint: MetadataUpdateFailpoint | null): void {
+    if (failpoint !== null && !METADATA_UPDATE_FAILPOINTS.includes(failpoint)) {
+      throw new InternalServerErrorException(`Unknown metadata update failpoint: ${failpoint}`);
+    }
+    this.metadataUpdateFailpoint = failpoint;
+  }
+
+  clearMetadataUpdateFailpointForTests(): void {
+    this.metadataUpdateFailpoint = null;
+  }
+
+  private throwIfMetadataUpdateFailpoint(stage: MetadataUpdateFailpoint): void {
+    if (this.metadataUpdateFailpoint !== stage) return;
+    this.metadataUpdateFailpoint = null;
+    throw new InternalServerErrorException(`Metadata update failpoint triggered: ${stage}`);
   }
 
   async embedAll(): Promise<{ queued: number }> {

@@ -121,13 +121,15 @@ describe('extractCbzMetadata', () => {
       expect(r?.authors.map((a) => a.name)).toEqual(['Writer One', 'Writer Two']);
     });
 
-    it('merges Genre and Tags into deduplicated tags array', async () => {
+    it('extracts Genre and Tags into separate deduplicated lists', async () => {
       const xml = `<ComicInfo><Genre>Superhero,Fantasy</Genre><Tags>Fantasy,Horror</Tags></ComicInfo>`;
       mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
 
       const r = await extractCbzMetadata('/book.cbz');
-      // "Fantasy" appears in both Genre and Tags — must be deduplicated
-      expect(r?.tags).toContain('Superhero');
+      expect(r?.genres).toContain('Superhero');
+      expect(r?.genres).toContain('Fantasy');
+      expect(r?.genres?.filter((t) => t === 'Fantasy')).toHaveLength(1);
+
       expect(r?.tags).toContain('Fantasy');
       expect(r?.tags).toContain('Horror');
       expect(r?.tags?.filter((t) => t === 'Fantasy')).toHaveLength(1);

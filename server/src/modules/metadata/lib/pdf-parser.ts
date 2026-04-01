@@ -73,6 +73,7 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
     // Info Dictionary is used only as fallback for fields XMP doesn't cover.
     const xmpXml = extractXmpXml(doc);
     const xmp: XmpParsed | null = xmpXml ? parseXmp(xmpXml) : null;
+    const hasXmp = xmp !== null;
 
     const infoTitle = clean(doc.getTitle());
     const infoAuthorRaw = clean(doc.getAuthor());
@@ -90,22 +91,22 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
     const coverBuffer = await extractPdfCover(absolutePath);
 
     return {
-      title: xmp?.title ?? infoTitle,
+      title: hasXmp ? xmp.title : infoTitle,
       subtitle: xmp?.subtitle ?? null,
-      authors: xmp?.authors?.length ? xmp.authors : infoAuthors,
-      description: xmp?.description ?? infoSubject,
+      authors: hasXmp ? xmp.authors : infoAuthors,
+      description: hasXmp ? xmp.description : infoSubject,
       publisher: xmp?.publisher ?? null,
       publishedYear: xmp?.publishedYear ?? null,
       language: xmp?.language ?? null,
       genres: xmp?.genres?.length ? xmp.genres : [],
-      // Info Dict keywords are genres+tags mixed — only use as tags when no XMP
-      tags: xmp ? xmp.tags : infoKeywords,
+      // Info Dict keywords are genres+tags mixed — only use as tags when XMP is absent
+      tags: hasXmp ? xmp.tags : infoKeywords,
       isbn10: xmp?.isbn10 ?? null,
       isbn13: xmp?.isbn13 ?? null,
       seriesName: xmp?.seriesName ?? null,
       seriesIndex: xmp?.seriesIndex ?? null,
       rating: xmp?.rating ?? null,
-      pageCount: doc.getPageCount(),
+      pageCount: hasXmp ? xmp.pageCount : doc.getPageCount(),
       googleBooksId: xmp?.googleBooksId ?? null,
       goodreadsId: xmp?.goodreadsId ?? null,
       amazonId: xmp?.amazonId ?? null,

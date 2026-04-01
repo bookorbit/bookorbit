@@ -3,6 +3,12 @@ run-name: ${{ format('Metadata Write E2E - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
+    inputs:
+      vitest-args:
+        description: "Optional vitest args (examples: --shard=1/2, --testNamePattern=\"concurrency hardening\")"
+        required: false
+        default: ""
+        type: string
   push:
     paths:
       - "server/src/modules/book/**"
@@ -46,3 +52,4 @@ jobs:
       check-name: Server Metadata Write E2E
       artifact-name: metadata-write-e2e-report
       job-timeout-minutes: 60
+      vitest-args: ${{ github.event_name == 'workflow_dispatch' && inputs.vitest-args || '' }}

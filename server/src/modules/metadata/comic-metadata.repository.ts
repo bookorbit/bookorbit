@@ -7,13 +7,14 @@ import * as schema from '../../db/schema';
 import { ComicMetadataDto } from '../book/dto/update-book-metadata.dto';
 
 type Db = NodePgDatabase<typeof schema>;
+type ComicMetadataExecutor = Pick<Db, 'insert'>;
 
 @Injectable()
 export class ComicMetadataRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async upsert(bookId: number, fields: ComicMetadataDto): Promise<void> {
-    await this.db
+  async upsert(bookId: number, fields: ComicMetadataDto, executor: ComicMetadataExecutor = this.db): Promise<void> {
+    await executor
       .insert(schema.comicMetadata)
       .values({
         bookId,
