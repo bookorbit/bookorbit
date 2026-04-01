@@ -79,15 +79,17 @@ export class MetadataFetchPipeline {
     const registered = new Set(registeredKeys);
     const keys = new Set<MetadataProviderKey>();
 
-    for (const [, fp] of Object.entries(preferences.fields) as [MetadataField, FieldPreference][]) {
-      if (!fp.enabled) continue;
-      fp.providers.filter((k) => registered.has(k)).forEach((k) => keys.add(k));
+    for (const [, fieldPreference] of Object.entries(preferences.fields) as [MetadataField, FieldPreference][]) {
+      if (!fieldPreference.enabled) continue;
+      fieldPreference.providers.filter((providerKey) => registered.has(providerKey)).forEach((providerKey) => keys.add(providerKey));
     }
 
     const active: MetadataProviderKey[] = [];
     for (const key of keys) {
       if (this.throttleTracker.isThrottled(key)) {
-        this.logger.warn(`[${key}] [throttle] - skipping metadata fetch for this run`);
+        this.logger.warn(
+          `[metadata_fetch.pipeline_provider] [fail] provider=${key} durationMs=0 errorClass=ProviderThrottleError error="provider is in cooldown" - provider skipped`,
+        );
       } else {
         active.push(key);
       }
@@ -104,15 +106,15 @@ export class MetadataFetchPipeline {
     const sources: Record<string, string> = {};
 
     for (const field of Object.keys(preferences.fields) as MetadataField[]) {
-      const fp = preferences.fields[field];
-      if (!fp.enabled) continue;
+      const fieldPreference = preferences.fields[field];
+      if (!fieldPreference.enabled) continue;
 
       if (field === 'genres' && preferences.options?.genres.mode === 'merge') {
-        const { genres, sourceProvider } = this.mergeGenres(fp.providers as MetadataProviderKey[], byProvider);
+        const { genres, sourceProvider } = this.mergeGenres(fieldPreference.providers as MetadataProviderKey[], byProvider);
         if (!genres.length) continue;
 
         const existingValue = existing[field];
-        switch (fp.mergeStrategy) {
+        switch (fieldPreference.mergeStrategy) {
           case 'fillMissing':
             if (this.isMissing(existingValue)) {
               result.genres = genres;
@@ -128,7 +130,7 @@ export class MetadataFetchPipeline {
         continue;
       }
 
-      for (const providerKey of fp.providers) {
+      for (const providerKey of fieldPreference.providers) {
         const candidate = byProvider.get(providerKey);
         if (!candidate) continue;
 
@@ -142,7 +144,7 @@ export class MetadataFetchPipeline {
         }
 
         const existingValue = existing[field];
-        switch (fp.mergeStrategy) {
+        switch (fieldPreference.mergeStrategy) {
           case 'fillMissing':
             if (this.isMissing(existingValue)) {
               (result as Record<string, unknown>)[field] = value;

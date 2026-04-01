@@ -5,7 +5,9 @@ import { ProviderConfigService } from '../../../metadata-preferences/provider-co
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
+import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { buildRequestSignal, sleep } from '../provider-utils';
 import { mapGoodreadsApolloState } from './goodreads.mapper';
 import { GoodreadsNextData } from './goodreads.types';
 
@@ -14,9 +16,6 @@ const HEADERS: HeadersInit = {
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'accept-language': 'en-US,en;q=0.9',
 };
-
-const MAX_RESULTS = 3;
-const BETWEEN_REQUESTS_MS = 600;
 
 @Injectable()
 export class GoodreadsProvider implements IdentifiableProvider {
@@ -31,33 +30,35 @@ export class GoodreadsProvider implements IdentifiableProvider {
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.goodreads);
     if (!enabled) return [];
-    const ids = params.isbn ? await this.findIdByIsbn(params.isbn).then((id) => (id ? [id] : [])) : await this.searchIds(params);
+    const ids = params.isbn
+      ? await this.findIdByIsbn(params.isbn, params.signal).then((id) => (id ? [id] : []))
+      : await this.searchIds(params, params.signal);
 
     const results: MetadataCandidate[] = [];
-    for (const id of ids.slice(0, MAX_RESULTS)) {
-      if (results.length > 0) await sleep(BETWEEN_REQUESTS_MS);
-      const candidate = await this.fetchBook(id);
+    for (const id of ids.slice(0, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS)) {
+      if (results.length > 0) await sleep(PROVIDER_DELAYS_MS.GOODREADS_BETWEEN_REQUESTS, params.signal);
+      const candidate = await this.fetchBook(id, params.signal);
       if (candidate) results.push(candidate);
     }
 
     return results;
   }
 
-  async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.goodreads);
     if (!enabled) return null;
-    return this.fetchBook(providerId);
+    return this.fetchBook(providerId, signal);
   }
 
-  private async searchIds(params: MetadataSearchParams): Promise<string[]> {
+  private async searchIds(params: MetadataSearchParams, signal?: AbortSignal): Promise<string[]> {
     const query = [params.title, params.author].filter(Boolean).join(' ');
     const url = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}&search_type=books`;
-    const html = await this.fetchHtml(url, 'search', query);
-    return html ? extractBookIds(html, params.title, MAX_RESULTS) : [];
+    const html = await this.fetchHtml(url, 'search', query, undefined, signal);
+    return html ? extractBookIds(html, params.title, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS) : [];
   }
 
-  private async findIdByIsbn(isbn: string): Promise<string | null> {
-    const html = await this.fetchHtml(`https://www.goodreads.com/book/isbn/${isbn}`, 'search-by-isbn', isbn);
+  private async findIdByIsbn(isbn: string, signal?: AbortSignal): Promise<string | null> {
+    const html = await this.fetchHtml(`https://www.goodreads.com/book/isbn/${isbn}`, 'search-by-isbn', isbn, undefined, signal);
     if (!html) return null;
     return (
       html.match(/property="og:url"\s+content="[^"]*\/book\/show\/(\d+)/)?.[1] ??
@@ -66,9 +67,9 @@ export class GoodreadsProvider implements IdentifiableProvider {
     );
   }
 
-  private async fetchBook(bookId: string): Promise<MetadataCandidate | null> {
+  private async fetchBook(bookId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const url = `https://www.goodreads.com/book/show/${bookId}`;
-    const html = await this.fetchHtml(url, 'lookup', undefined, bookId);
+    const html = await this.fetchHtml(url, 'lookup', undefined, bookId, signal);
     if (!html) return null;
     const nextData = extractNextData(html);
     const state = nextData?.props?.pageProps?.apolloState;
@@ -76,11 +77,17 @@ export class GoodreadsProvider implements IdentifiableProvider {
     return mapGoodreadsApolloState(state, bookId);
   }
 
-  private async fetchHtml(url: string, op: 'search' | 'search-by-isbn' | 'lookup', query?: string, providerId?: string): Promise<string | null> {
+  private async fetchHtml(
+    url: string,
+    op: 'search' | 'search-by-isbn' | 'lookup',
+    query?: string,
+    providerId?: string,
+    signal?: AbortSignal,
+  ): Promise<string | null> {
     const startedAt = Date.now();
     this.logger.log(`[goodreads] [start] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
     try {
-      const res = await fetchWithThrottle(url, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
+      const res = await fetchWithThrottle(url, { headers: HEADERS, signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.SCRAPE, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
@@ -151,8 +158,4 @@ function extractBookIds(html: string, titleHint: string | undefined, limit: numb
   }));
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((s) => s.id);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -11,7 +11,7 @@ export interface MetadataProvider {
 
 export interface IdentifiableProvider extends MetadataProvider {
   readonly identifiable: true;
-  lookupById(providerId: string): Promise<MetadataCandidate | null>;
+  lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null>;
 }
 
 export function isIdentifiable(p: MetadataProvider): p is IdentifiableProvider {

@@ -53,7 +53,7 @@ describe('ProviderThrottleTracker', () => {
     ]);
   });
 
-  it('keeps backoff history but marks runtime state as not throttled after cooldown expires', () => {
+  it('resets backoff level and marks runtime state as not throttled after cooldown expires', () => {
     tracker.record(MetadataProviderKey.GOOGLE, 30);
     vi.advanceTimersByTime(31_000);
 
@@ -65,7 +65,7 @@ describe('ProviderThrottleTracker', () => {
         throttled: false,
         throttledUntil: null,
         remainingSeconds: 0,
-        backoffLevel: 1,
+        backoffLevel: 0,
       },
     ]);
   });

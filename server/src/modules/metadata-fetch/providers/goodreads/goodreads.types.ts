@@ -13,7 +13,10 @@ export interface GoodreadsApolloBook {
   imageUrl?: string;
   details?: GoodreadsApolloDetails;
   bookGenres?: Array<{ genre?: { name?: string } }>;
-  bookSeries?: Array<{ userPosition?: string }>;
+  bookSeries?: Array<{
+    userPosition?: string;
+    series?: { __ref?: string; title?: string };
+  }>;
   primaryContributorEdge?: { node?: { __ref?: string }; role?: string };
 }
 

@@ -107,4 +107,16 @@ describe('GoodreadsMapper', () => {
     expect(result?.publisher).toBeUndefined();
     expect(result?.isbn10).toBeUndefined();
   });
+
+  it('prefers exact book key for the requested bookId when multiple book entries exist', () => {
+    const mockState = {
+      'Book:kca:111': { title: 'Wrong Book' },
+      'Book:kca:222': { title: 'Right Book' },
+      'Contributor:kca:200': { name: 'Author Two' },
+    };
+
+    const result = mapGoodreadsApolloState(mockState, '222');
+
+    expect(result?.title).toBe('Right Book');
+  });
 });

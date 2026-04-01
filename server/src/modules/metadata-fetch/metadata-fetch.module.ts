@@ -6,6 +6,7 @@ import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataProvider } from './providers/metadata-provider';
 import { MetadataFetchService } from './metadata-fetch.service';
+import { MetadataFetchRepository } from './metadata-fetch.repository';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { AmazonProvider } from './providers/amazon/amazon.provider';
@@ -45,6 +46,7 @@ const PROVIDER_CLASSES = [
     ComicVineClient,
     ProviderRegistry,
     ProviderThrottleTracker,
+    MetadataFetchRepository,
     MetadataFetchService,
     MetadataFetchPipeline,
   ],

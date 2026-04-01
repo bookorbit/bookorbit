@@ -40,9 +40,3 @@ export interface AudNexusChaptersResponse {
   runtimeLengthMs?: number;
   runtimeLengthSec?: number;
 }
-
-export interface AudNexusSearchResult {
-  asin: string;
-  name: string;
-  authors?: Array<{ name: string; asin: string }>;
-}

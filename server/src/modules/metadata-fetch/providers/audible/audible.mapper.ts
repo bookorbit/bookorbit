@@ -1,18 +1,7 @@
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
+import { stripHtml } from '../provider-utils';
 import { AudibleProduct } from './audible.types';
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 const GENERIC_CATEGORIES = new Set(['audible books & originals', 'books', 'kindle books', 'audible originals']);
 

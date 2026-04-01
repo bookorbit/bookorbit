@@ -150,6 +150,23 @@ describe('ComicVineClient', () => {
       vi.advanceTimersByTime(HOUR_MS + 1000);
       expect(client.windowResetMs()).toBe(0);
     });
+
+    it('prunes expired timestamps during throttle to avoid unbounded growth', async () => {
+      mockFetch.mockResolvedValue(makeOkResponse([]));
+
+      const p1 = client.searchVolumes('Batman', 'key');
+      await vi.runAllTimersAsync();
+      await p1;
+
+      vi.advanceTimersByTime(HOUR_MS + 1);
+
+      const p2 = client.searchIssues('Batman', 'key');
+      await vi.runAllTimersAsync();
+      await p2;
+
+      const internalLimiter = (client as unknown as { rateLimiter: { timestamps: number[] } }).rateLimiter;
+      expect(internalLimiter.timestamps).toHaveLength(1);
+    });
   });
 
   // ---------------------------------------------------------------------------

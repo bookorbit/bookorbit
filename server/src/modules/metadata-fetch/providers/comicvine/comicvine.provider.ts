@@ -6,12 +6,13 @@ import { ProviderThrottleTracker } from '../../provider-throttle.tracker';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { PROVIDER_LIMITS } from '../provider-constants';
+import { normalizeMaxCandidates } from '../provider-utils';
 import { ComicVineClient } from './comicvine.client';
 import { mapIssueToCandidate } from './comicvine.mapper';
 import { ComicVineIssue } from './comicvine.types';
 
 const ISSUE_PATTERN = /^(.*?)\s*#(\d[\d.]*)(.*)$/;
-const MAX_RESULTS = 10;
 
 interface ParsedIssueTitle {
   seriesName: string;
@@ -60,11 +61,11 @@ export class ComicVineProvider implements IdentifiableProvider {
     if (!params.title) return [];
 
     try {
-      const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider);
+      const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider, PROVIDER_LIMITS.COMICVINE_MAX_RESULTS);
       const parsed = parseIssueTitle(params.title);
       return parsed
-        ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates)
-        : await this.generalSearch(params.title, apiKey, maxCandidates);
+        ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates, params.signal)
+        : await this.generalSearch(params.title, apiKey, maxCandidates, params.signal);
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.recordThrottle();
@@ -74,12 +75,12 @@ export class ComicVineProvider implements IdentifiableProvider {
     }
   }
 
-  async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.comicvine);
     if (!enabled || !apiKey) return null;
 
     try {
-      const issue = await this.client.getIssueById(providerId, apiKey);
+      const issue = signal ? await this.client.getIssueById(providerId, apiKey, signal) : await this.client.getIssueById(providerId, apiKey);
       return issue ? mapIssueToCandidate(issue) : null;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
@@ -96,8 +97,14 @@ export class ComicVineProvider implements IdentifiableProvider {
     this.throttleTracker.record(MetadataProviderKey.COMICVINE, retryAfterSeconds);
   }
 
-  private async structuredSearch(seriesName: string, issueNumber: string, apiKey: string, maxCandidates: number): Promise<MetadataCandidate[]> {
-    const volumes = await this.client.searchVolumes(seriesName, apiKey);
+  private async structuredSearch(
+    seriesName: string,
+    issueNumber: string,
+    apiKey: string,
+    maxCandidates: number,
+    signal?: AbortSignal,
+  ): Promise<MetadataCandidate[]> {
+    const volumes = signal ? await this.client.searchVolumes(seriesName, apiKey, signal) : await this.client.searchVolumes(seriesName, apiKey);
     if (volumes.length === 0) {
       this.logger.debug(`ComicVine: no volumes found for "${seriesName}"`);
       return [];
@@ -110,9 +117,11 @@ export class ComicVineProvider implements IdentifiableProvider {
     });
 
     for (const volume of sorted.slice(0, 8)) {
-      const issues = await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey);
+      const issues = signal
+        ? await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey, signal)
+        : await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey);
       if (issues.length > 0) {
-        const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey)));
+        const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey, signal)));
         return enriched.map(mapIssueToCandidate);
       }
     }
@@ -121,23 +130,18 @@ export class ComicVineProvider implements IdentifiableProvider {
     return [];
   }
 
-  private async generalSearch(query: string, apiKey: string, maxCandidates: number): Promise<MetadataCandidate[]> {
-    const issues = await this.client.searchIssues(query, apiKey);
-    const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey)));
+  private async generalSearch(query: string, apiKey: string, maxCandidates: number, signal?: AbortSignal): Promise<MetadataCandidate[]> {
+    const issues = signal ? await this.client.searchIssues(query, apiKey, signal) : await this.client.searchIssues(query, apiKey);
+    const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey, signal)));
     return enriched.map(mapIssueToCandidate);
   }
 
-  private async enrichWithDetails(issue: ComicVineIssue, apiKey: string): Promise<ComicVineIssue> {
+  private async enrichWithDetails(issue: ComicVineIssue, apiKey: string, signal?: AbortSignal): Promise<ComicVineIssue> {
     if (hasAnyCredits(issue)) return issue;
     this.logger.debug(`ComicVine: issue ${issue.id} has no credits from list endpoint, fetching detail`);
-    const detailed = await this.client.getIssueById(String(issue.id), apiKey);
+    const detailed = signal
+      ? await this.client.getIssueById(String(issue.id), apiKey, signal)
+      : await this.client.getIssueById(String(issue.id), apiKey);
     return detailed ?? issue;
   }
-}
-
-function normalizeMaxCandidates(value: number | undefined): number {
-  if (!Number.isFinite(value) || value == null) return MAX_RESULTS;
-  const rounded = Math.floor(value);
-  if (rounded < 1) return 1;
-  return Math.min(rounded, MAX_RESULTS);
 }

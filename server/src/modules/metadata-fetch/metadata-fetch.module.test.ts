@@ -5,6 +5,7 @@ import { METADATA_PROVIDERS } from './constants';
 import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchModule } from './metadata-fetch.module';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
+import { MetadataFetchRepository } from './metadata-fetch.repository';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { AmazonProvider } from './providers/amazon/amazon.provider';
@@ -33,6 +34,7 @@ describe('MetadataFetchModule', () => {
         HardcoverProvider,
         ComicVineProvider,
         ProviderRegistry,
+        MetadataFetchRepository,
         MetadataFetchService,
         MetadataFetchPipeline,
       ]),

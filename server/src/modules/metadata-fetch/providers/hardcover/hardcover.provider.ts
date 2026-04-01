@@ -23,9 +23,10 @@ export class HardcoverProvider implements IdentifiableProvider {
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.hardcover);
     if (!enabled || !apiKey) return [];
+    const signal = params.signal;
 
     if (params.isbn) {
-      const books = await this.client.searchByIsbn(params.isbn, apiKey);
+      const books = signal ? await this.client.searchByIsbn(params.isbn, apiKey, signal) : await this.client.searchByIsbn(params.isbn, apiKey);
       if (books.length > 0) {
         return books.flatMap(mapBookWithEditions);
       }
@@ -34,22 +35,24 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (!params.title) return [];
 
     if (params.author) {
-      const docs = await this.client.searchBooks(`${params.title} ${params.author}`, apiKey);
+      const docs = signal
+        ? await this.client.searchBooks(`${params.title} ${params.author}`, apiKey, signal)
+        : await this.client.searchBooks(`${params.title} ${params.author}`, apiKey);
       if (docs.length > 0) {
         return docs.map(mapSearchDocument);
       }
       this.logger.debug(`Hardcover: no results for title+author, retrying with title only`);
     }
 
-    const docs = await this.client.searchBooks(params.title, apiKey);
+    const docs = signal ? await this.client.searchBooks(params.title, apiKey, signal) : await this.client.searchBooks(params.title, apiKey);
     return docs.map(mapSearchDocument);
   }
 
-  async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.hardcover);
     if (!enabled || !apiKey) return null;
 
-    const book = await this.client.lookupBySlug(providerId, apiKey);
+    const book = signal ? await this.client.lookupBySlug(providerId, apiKey, signal) : await this.client.lookupBySlug(providerId, apiKey);
     if (!book) return null;
 
     return mapBookWithEditions(book)[0] ?? null;

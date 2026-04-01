@@ -88,7 +88,7 @@ export class MetadataSearchDto {
         .filter((item): item is MetadataProviderKey => typeof item === 'string' && item.length > 0);
     }
 
-    return value as MetadataProviderKey[];
+    return undefined;
   })
   @IsEnum(MetadataProviderKey, { each: true })
   providers?: MetadataProviderKey[];

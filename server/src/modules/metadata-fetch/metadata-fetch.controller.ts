@@ -2,6 +2,8 @@ import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, Permission, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
 import { map, Observable } from 'rxjs';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../common/types/request-user';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { LookupMetadataDto } from './dto/lookup-metadata.dto';
 import { MetadataSearchDto } from './dto/metadata-search.dto';
@@ -13,6 +15,7 @@ import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
 function normalizeSearchTitle(title: string | undefined): string | undefined {
   if (!title) return title;
+  // Normalize comic issue tags (e.g. "#007" -> "#7") before provider search.
   return title.trim().replace(/#0*(\d+)/g, '#$1');
 }
 
@@ -49,8 +52,8 @@ export class MetadataFetchController {
   }
 
   @Sse('stream')
-  async stream(@Query() dto: MetadataSearchDto): Promise<Observable<MessageEvent>> {
-    const existingProviderIds = dto.bookId ? await this.metadataFetchService.getStoredProviderIds(dto.bookId) : {};
+  async stream(@Query() dto: MetadataSearchDto, @CurrentUser() user: RequestUser): Promise<Observable<MessageEvent>> {
+    const existingProviderIds = dto.bookId ? await this.metadataFetchService.getStoredProviderIds(dto.bookId, user) : {};
     const requestedAudiobookProvider = (dto.providers ?? []).some(
       (provider) => provider === MetadataProviderKey.AUDIBLE || provider === MetadataProviderKey.AUDNEXUS,
     );

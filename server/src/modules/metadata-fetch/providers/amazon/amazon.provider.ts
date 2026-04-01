@@ -5,7 +5,9 @@ import { ProviderConfigService } from '../../../metadata-preferences/provider-co
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
+import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { buildRequestSignal, normalizeMaxCandidates, sleep } from '../provider-utils';
 import { extractAsins, parseBookPage } from './amazon.scraper';
 
 const HEADERS: HeadersInit = {
@@ -19,9 +21,6 @@ const HEADERS: HeadersInit = {
   'sec-fetch-mode': 'navigate',
   'sec-fetch-site': 'none',
 };
-
-const MAX_RESULTS = 3;
-const BETWEEN_REQUESTS_MS = 800;
 
 @Injectable()
 export class AmazonProvider implements IdentifiableProvider {
@@ -37,35 +36,37 @@ export class AmazonProvider implements IdentifiableProvider {
     const { enabled, domain, cookie } = await this.providerConfig.getConfig().then((c) => c.amazon);
     if (!enabled) return [];
 
-    const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider);
-    const asins = await this.searchAsins(params, domain, cookie, maxCandidates);
+    const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider, PROVIDER_LIMITS.AMAZON_MAX_RESULTS);
+    const asins = await this.searchAsins(params, domain, cookie, maxCandidates, params.signal);
 
     const results: MetadataCandidate[] = [];
     for (const asin of asins.slice(0, maxCandidates)) {
-      if (results.length > 0) await sleep(BETWEEN_REQUESTS_MS);
-      const candidate = await this.fetchByAsin(asin, domain, cookie);
+      if (results.length > 0) {
+        await sleep(PROVIDER_DELAYS_MS.AMAZON_BETWEEN_REQUESTS, params.signal);
+      }
+      const candidate = await this.fetchByAsin(asin, domain, cookie, params.signal);
       if (candidate) results.push(candidate);
     }
     return results;
   }
 
-  async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled, domain, cookie } = await this.providerConfig.getConfig().then((c) => c.amazon);
     if (!enabled) return null;
-    return this.fetchByAsin(providerId, domain, cookie);
+    return this.fetchByAsin(providerId, domain, cookie, signal);
   }
 
-  private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string, limit: number): Promise<string[]> {
+  private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string, limit: number, signal?: AbortSignal): Promise<string[]> {
     const query = params.isbn?.trim() || [params.title, params.author].filter(Boolean).join(' ');
     if (!query) return [];
     const url = `https://www.${domain}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
-    const html = await this.fetchHtml(url, cookie, 'search', query);
+    const html = await this.fetchHtml(url, cookie, 'search', query, undefined, signal);
     return html ? extractAsins(html, limit) : [];
   }
 
-  private async fetchByAsin(asin: string, domain: string, cookie: string): Promise<MetadataCandidate | null> {
+  private async fetchByAsin(asin: string, domain: string, cookie: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const url = `https://www.${domain}/dp/${asin}`;
-    const html = await this.fetchHtml(url, cookie, 'lookup', undefined, asin);
+    const html = await this.fetchHtml(url, cookie, 'lookup', undefined, asin, signal);
     if (!html) return null;
     const data = parseBookPage(html);
     if (!data.title) return null;
@@ -90,12 +91,19 @@ export class AmazonProvider implements IdentifiableProvider {
     };
   }
 
-  private async fetchHtml(url: string, cookie = '', op: 'search' | 'lookup' = 'search', query?: string, providerId?: string): Promise<string | null> {
+  private async fetchHtml(
+    url: string,
+    cookie = '',
+    op: 'search' | 'lookup' = 'search',
+    query?: string,
+    providerId?: string,
+    signal?: AbortSignal,
+  ): Promise<string | null> {
     const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
     const startedAt = Date.now();
     this.logger.log(`[amazon] [start] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
     try {
-      const res = await fetchWithThrottle(url, { headers, signal: AbortSignal.timeout(15_000) });
+      const res = await fetchWithThrottle(url, { headers, signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.SCRAPE, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[amazon] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
@@ -120,15 +128,4 @@ export class AmazonProvider implements IdentifiableProvider {
       return null;
     }
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function normalizeMaxCandidates(value: number | undefined): number {
-  if (!Number.isFinite(value) || value == null) return MAX_RESULTS;
-  const rounded = Math.floor(value);
-  if (rounded < 1) return 1;
-  return Math.min(rounded, MAX_RESULTS);
 }

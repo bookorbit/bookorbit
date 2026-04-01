@@ -54,7 +54,6 @@ describe('Architecture boundaries', () => {
       'src/modules/kobo/services/kobo-settings.service.ts',
       'src/modules/kobo/services/kobo-sync.service.ts',
       'src/modules/metadata/metadata.service.ts',
-      'src/modules/metadata-fetch/metadata-fetch.service.ts',
       'src/modules/metadata-preferences/metadata-preferences.service.ts',
       'src/modules/metadata-preferences/provider-config.service.ts',
       'src/modules/opds/opds-book.service.ts',

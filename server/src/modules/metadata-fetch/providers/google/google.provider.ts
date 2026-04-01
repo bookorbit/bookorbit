@@ -6,6 +6,8 @@ import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
+import { buildRequestSignal } from '../provider-utils';
 import { mapGoogleVolume } from './google.mapper';
 import { GoogleBooksResponse, GoogleVolumeItem } from './google.types';
 
@@ -26,10 +28,10 @@ export class GoogleProvider implements IdentifiableProvider {
     if (!enabled) return [];
     const query = this.buildQuery(params);
     if (!query) return [];
-    return this.fetchVolumes(query, apiKey);
+    return this.fetchVolumes(query, apiKey, params.signal);
   }
 
-  async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.google);
     if (!enabled) return null;
     const url = this.buildUrl(`/volumes/${providerId}`, {}, apiKey);
@@ -37,7 +39,7 @@ export class GoogleProvider implements IdentifiableProvider {
     this.logger.log(`[google] [start] op=lookup providerId="${providerId}"`);
 
     try {
-      const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[google] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
@@ -70,13 +72,13 @@ export class GoogleProvider implements IdentifiableProvider {
     return parts.length ? parts.join(' ') : null;
   }
 
-  private async fetchVolumes(query: string, apiKey: string): Promise<MetadataCandidate[]> {
+  private async fetchVolumes(query: string, apiKey: string, signal?: AbortSignal): Promise<MetadataCandidate[]> {
     const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' }, apiKey);
     const startedAt = Date.now();
     this.logger.log(`[google] [start] op=search query="${query}"`);
 
     try {
-      const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[google] [fail] op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,

@@ -17,33 +17,46 @@ export class ProviderThrottleTracker {
   private readonly logger = new Logger(ProviderThrottleTracker.name);
   private readonly throttledUntil = new Map<MetadataProviderKey, number>();
   private readonly backoffLevel = new Map<MetadataProviderKey, number>();
+  private readonly cooldownStartedAt = new Map<MetadataProviderKey, number>();
 
   record(key: MetadataProviderKey, retryAfterSeconds?: number): void {
+    this.pruneExpired(Date.now());
+
     const level = this.backoffLevel.get(key) ?? 0;
     const schedule = scheduleFor(key);
     const seconds = retryAfterSeconds ?? schedule[Math.min(level, schedule.length - 1)];
-    const until = Date.now() + seconds * 1000;
+    const now = Date.now();
+    const until = now + seconds * 1000;
     this.throttledUntil.set(key, until);
+    this.cooldownStartedAt.set(key, now);
     this.backoffLevel.set(key, level + 1);
-    this.logger.log(`[${key}] [cooldown] until=${new Date(until).toISOString()} seconds=${seconds} level=${level + 1} - cooldown set`);
+    this.logger.log(
+      `[metadata_fetch.provider_cooldown] [start] provider=${key} backoffLevel=${level + 1} retryAfterSeconds=${seconds} - cooldown started`,
+    );
   }
 
   isThrottled(key: MetadataProviderKey): boolean {
+    this.pruneExpired(Date.now());
     const until = this.throttledUntil.get(key);
     return until !== undefined && Date.now() < until;
   }
 
   clearOnSuccess(key: MetadataProviderKey): void {
+    this.pruneExpired(Date.now());
     const wasThrottled = this.throttledUntil.has(key);
+    const startedAt = this.cooldownStartedAt.get(key);
+    const durationMs = startedAt != null ? Date.now() - startedAt : 0;
     this.throttledUntil.delete(key);
     this.backoffLevel.delete(key);
+    this.cooldownStartedAt.delete(key);
     if (wasThrottled) {
-      this.logger.log(`[${key}] [cooldown] - throttle cleared`);
+      this.logger.log(`[metadata_fetch.provider_cooldown] [end] provider=${key} durationMs=${durationMs} - cooldown cleared`);
     }
   }
 
   hasAnyActive(): boolean {
     const now = Date.now();
+    this.pruneExpired(now);
     for (const until of this.throttledUntil.values()) {
       if (now < until) return true;
     }
@@ -52,6 +65,7 @@ export class ProviderThrottleTracker {
 
   snapshot(keys: MetadataProviderKey[]): ProviderThrottleRuntimeSnapshot {
     const now = Date.now();
+    this.pruneExpired(now);
     const unique = [...new Set(keys)];
     return {
       observedAt: new Date(now).toISOString(),
@@ -69,5 +83,14 @@ export class ProviderThrottleTracker {
       remainingSeconds: throttled ? Math.ceil((until - now) / 1000) : 0,
       backoffLevel: this.backoffLevel.get(key) ?? 0,
     };
+  }
+
+  private pruneExpired(now: number): void {
+    for (const [key, until] of this.throttledUntil.entries()) {
+      if (until > now) continue;
+      this.throttledUntil.delete(key);
+      this.backoffLevel.delete(key);
+      this.cooldownStartedAt.delete(key);
+    }
   }
 }

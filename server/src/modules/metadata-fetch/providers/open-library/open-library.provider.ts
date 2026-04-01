@@ -6,6 +6,8 @@ import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
+import { buildRequestSignal } from '../provider-utils';
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
 import { OpenLibraryDoc, OpenLibrarySearchResponse, OpenLibraryWork } from './open-library.types';
 
@@ -35,7 +37,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     const startedAt = Date.now();
     this.logger.log(`[open-library] [start] op=search`);
     try {
-      const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, params.signal) });
       if (!res.ok) {
         this.logger.warn(`[open-library] [fail] op=search status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`);
         return [];
@@ -57,14 +59,14 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     }
   }
 
-  async lookupById(providerId: string): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.openLibrary);
     if (!enabled) return null;
     const url = `${BASE_URL}/works/${providerId}.json`;
     const startedAt = Date.now();
     this.logger.log(`[open-library] [start] op=lookup providerId="${providerId}"`);
     try {
-      const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[open-library] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
@@ -81,7 +83,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
         return mapped;
       }
 
-      const searchGenres = await this.lookupGenresByWorkId(providerId);
+      const searchGenres = await this.lookupGenresByWorkId(providerId, signal);
       const result = searchGenres?.length ? { ...mapped, genres: searchGenres } : mapped;
       this.logger.log(
         `[open-library] [end] op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
@@ -112,7 +114,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     return query;
   }
 
-  private async lookupGenresByWorkId(providerId: string): Promise<string[] | undefined> {
+  private async lookupGenresByWorkId(providerId: string, signal?: AbortSignal): Promise<string[] | undefined> {
     const query = new URLSearchParams({
       q: providerId,
       limit: '20',
@@ -122,7 +124,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     const startedAt = Date.now();
     this.logger.log(`[open-library] [start] op=lookup-genres providerId="${providerId}"`);
     try {
-      const res = await fetchWithThrottle(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[open-library] [fail] op=lookup-genres providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,

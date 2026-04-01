@@ -7,6 +7,8 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { normalizeAudibleDomain } from '../audible/normalize-audible-domain';
 import { MetadataProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
+import { buildRequestSignal } from '../provider-utils';
 import { mapAudNexusBook } from './audnexus.mapper';
 import { AudNexusBook, AudNexusChaptersResponse } from './audnexus.types';
 
@@ -34,11 +36,12 @@ export class AudnexusProvider implements MetadataProvider {
     if (!config.audnexus.enabled || !params.isAudiobook) return [];
     const audibleDomain = normalizeAudibleDomain(config.audible.domain);
 
-    const audibleAsin = params.existingProviderIds?.[MetadataProviderKey.AUDIBLE] ?? (await this.resolveAsinViaAudible(params, audibleDomain));
+    const audibleAsin =
+      params.existingProviderIds?.[MetadataProviderKey.AUDIBLE] ?? (await this.resolveAsinViaAudible(params, audibleDomain, params.signal));
     if (!audibleAsin) return [];
 
     try {
-      const result = await this.fetchByAsin(audibleAsin);
+      const result = await this.fetchByAsin(audibleAsin, params.signal);
       return result ? [result] : [];
     } catch (err) {
       if (err instanceof ProviderThrottleError) throw err;
@@ -47,7 +50,7 @@ export class AudnexusProvider implements MetadataProvider {
     }
   }
 
-  private async resolveAsinViaAudible(params: MetadataSearchParams, domain: string): Promise<string | null> {
+  private async resolveAsinViaAudible(params: MetadataSearchParams, domain: string, signal?: AbortSignal): Promise<string | null> {
     const query = [params.title, params.author]
       .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
       .join(' ')
@@ -63,7 +66,7 @@ export class AudnexusProvider implements MetadataProvider {
     this.logger.log(`[audnexus] [start] op=resolve-asin method=GET query="${query}"`);
 
     try {
-      const res = await fetchWithThrottle(requestUrl, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchWithThrottle(requestUrl, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
           `[audnexus] [fail] op=resolve-asin method=GET query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
@@ -88,7 +91,7 @@ export class AudnexusProvider implements MetadataProvider {
     }
   }
 
-  private async fetchByAsin(asin: string): Promise<MetadataCandidate | null> {
+  private async fetchByAsin(asin: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const bookUrl = `${BASE_URL}/books/${asin}`;
     const chaptersUrl = `${BASE_URL}/books/${asin}/chapters`;
     const bookStartedAt = Date.now();
@@ -98,9 +101,9 @@ export class AudnexusProvider implements MetadataProvider {
 
     try {
       const [bookRes, chaptersRes] = await Promise.all([
-        fetchWithThrottle(bookUrl, { signal: AbortSignal.timeout(10_000) }),
+        fetchWithThrottle(bookUrl, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) }),
         fetchWithThrottle(chaptersUrl, {
-          signal: AbortSignal.timeout(10_000),
+          signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal),
         }),
       ]);
 

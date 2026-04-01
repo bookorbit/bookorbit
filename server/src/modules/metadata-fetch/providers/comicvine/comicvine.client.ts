@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
+import { PROVIDER_DELAYS_MS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
+import { buildRequestSignal, sanitizeLogError, sleep } from '../provider-utils';
 import { ComicVineApiResponse, ComicVineIssue, ComicVineVolume } from './comicvine.types';
 
 const BASE_URL = 'https://comicvine.gamespot.com/api';
-const REQUEST_TIMEOUT_MS = 15_000;
-const VELOCITY_GUARD_MS = 1_000;
 const HOURLY_WINDOW_MS = 3_600_000;
 const VOLUME_CACHE_TTL_MS = 10 * 60 * 1_000;
 const VOLUME_CACHE_MAX_SIZE = 50;
@@ -28,25 +28,30 @@ class RateLimiter {
   private nextAllowedTime = 0;
   private readonly timestamps: number[] = [];
 
-  async throttle(): Promise<void> {
+  async throttle(signal?: AbortSignal): Promise<void> {
     const now = Date.now();
+    this.pruneExpired(now);
     const scheduled = Math.max(now, this.nextAllowedTime);
-    this.nextAllowedTime = scheduled + VELOCITY_GUARD_MS;
+    this.nextAllowedTime = scheduled + PROVIDER_DELAYS_MS.COMICVINE_VELOCITY_GUARD;
     this.timestamps.push(scheduled);
     const wait = scheduled - now;
     if (wait > 0) {
-      await new Promise<void>((resolve) => setTimeout(resolve, wait));
+      await sleep(wait, signal);
     }
   }
 
   timeUntilWindowResetMs(): number {
     const now = Date.now();
+    this.pruneExpired(now);
+    if (this.timestamps.length === 0) return 0;
+    return Math.max(0, this.timestamps[0] + HOURLY_WINDOW_MS - now);
+  }
+
+  private pruneExpired(now: number): void {
     const windowStart = now - HOURLY_WINDOW_MS;
     while (this.timestamps.length > 0 && this.timestamps[0] < windowStart) {
       this.timestamps.shift();
     }
-    if (this.timestamps.length === 0) return 0;
-    return Math.max(0, this.timestamps[0] + HOURLY_WINDOW_MS - now);
   }
 }
 
@@ -60,7 +65,7 @@ export class ComicVineClient {
     return this.rateLimiter.timeUntilWindowResetMs();
   }
 
-  async searchVolumes(seriesName: string, apiKey: string): Promise<ComicVineVolume[]> {
+  async searchVolumes(seriesName: string, apiKey: string, signal?: AbortSignal): Promise<ComicVineVolume[]> {
     const cacheKey = seriesName.toLowerCase().trim();
     const cached = this.volumeCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
@@ -73,24 +78,24 @@ export class ComicVineClient {
       limit: '20',
     });
 
-    const data = await this.get<ComicVineVolume[]>(url);
+    const data = await this.get<ComicVineVolume[]>(url, signal);
     if (data) {
       this.cacheVolumes(cacheKey, data);
     }
     return data ?? [];
   }
 
-  async searchIssuesInVolume(volumeId: number, issueNumber: string, apiKey: string): Promise<ComicVineIssue[]> {
+  async searchIssuesInVolume(volumeId: number, issueNumber: string, apiKey: string, signal?: AbortSignal): Promise<ComicVineIssue[]> {
     const url = this.buildUrl('/issues/', apiKey, {
       filter: `volume:${volumeId},issue_number:${issueNumber}`,
       field_list: ISSUE_LIST_FIELDS,
       limit: '5',
     });
 
-    return (await this.get<ComicVineIssue[]>(url)) ?? [];
+    return (await this.get<ComicVineIssue[]>(url, signal)) ?? [];
   }
 
-  async searchIssues(query: string, apiKey: string): Promise<ComicVineIssue[]> {
+  async searchIssues(query: string, apiKey: string, signal?: AbortSignal): Promise<ComicVineIssue[]> {
     const url = this.buildUrl('/search/', apiKey, {
       query,
       resources: 'issue',
@@ -98,26 +103,26 @@ export class ComicVineClient {
       limit: '10',
     });
 
-    return (await this.get<ComicVineIssue[]>(url)) ?? [];
+    return (await this.get<ComicVineIssue[]>(url, signal)) ?? [];
   }
 
-  async getIssueById(issueId: string, apiKey: string): Promise<ComicVineIssue | null> {
+  async getIssueById(issueId: string, apiKey: string, signal?: AbortSignal): Promise<ComicVineIssue | null> {
     const url = this.buildUrl(`/issue/4000-${issueId}/`, apiKey, {
       field_list: ISSUE_DETAIL_FIELDS,
     });
 
-    return this.get<ComicVineIssue>(url);
+    return this.get<ComicVineIssue>(url, signal);
   }
 
-  private async get<T>(url: URL): Promise<T | null> {
-    await this.rateLimiter.throttle();
+  private async get<T>(url: URL, signal?: AbortSignal): Promise<T | null> {
+    await this.rateLimiter.throttle(signal);
     const startedAt = Date.now();
     this.logger.log(`[comicvine] [start] method=GET`);
 
     try {
       const res = await fetchWithThrottle(url, {
         headers: { 'User-Agent': USER_AGENT },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.SCRAPE, signal),
       });
 
       if (res.status === 420) {
@@ -141,7 +146,7 @@ export class ComicVineClient {
       return body.results;
     } catch (err) {
       if (err instanceof ProviderThrottleError) throw err;
-      this.logger.warn(`[comicvine] [fail] method=GET durationMs=${Date.now() - startedAt} message="${(err as Error).message}"`);
+      this.logger.warn(`[comicvine] [fail] method=GET durationMs=${Date.now() - startedAt} message="${sanitizeLogError(err)}"`);
       return null;
     }
   }

@@ -1,35 +1,41 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
-import { eq } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { from, merge, Observable, switchMap } from 'rxjs';
 
-import { DB } from '../../db';
-import * as schema from '../../db/schema';
-import { bookMetadata } from '../../db/schema';
+import type { RequestUser } from '../../common/types/request-user';
 import { filterAndRank } from './candidate-relevance';
+import { MetadataFetchRepository, StoredProviderIdsRow } from './metadata-fetch.repository';
 import { ProviderThrottleError } from './provider-throttle.error';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { ProviderRegistry } from './provider-registry';
+import { PROVIDER_TIMEOUT_MS as PROVIDER_TIMEOUTS } from './providers/provider-constants';
 import { isIdentifiable, MetadataProvider } from './providers/metadata-provider';
 import { MetadataSearchParams } from './providers/metadata-search-params';
+import { sanitizeLogError } from './providers/provider-utils';
 
-type Db = NodePgDatabase<typeof schema>;
+interface TimedProviderResult {
+  results: MetadataCandidate[];
+  timedOut: boolean;
+}
 
 @Injectable()
 export class MetadataFetchService {
-  private static readonly PROVIDER_TIMEOUT_MS = 15_000;
+  private static readonly PROVIDER_TIMEOUT_MS = PROVIDER_TIMEOUTS.SCRAPE;
   private readonly logger = new Logger(MetadataFetchService.name);
 
   constructor(
     private readonly registry: ProviderRegistry,
     private readonly throttleTracker: ProviderThrottleTracker,
-    @Inject(DB) private readonly db: Db,
+    private readonly metadataFetchRepository: MetadataFetchRepository,
   ) {}
 
   search(params: MetadataSearchParams, keys?: MetadataProviderKey[]): Observable<MetadataCandidate> {
     const providers = this.registry.select(keys);
-    return merge(...providers.map((p) => from(this.fetchFromProviderWithThrottleHandling(p, params)).pipe(switchMap((results) => from(results)))));
+    return merge(
+      ...providers.map((provider) =>
+        from(this.fetchFromProviderWithThrottleHandling(provider, params)).pipe(switchMap((providerResults) => from(providerResults))),
+      ),
+    );
   }
 
   async lookupById(key: MetadataProviderKey, providerId: string): Promise<MetadataCandidate | null> {
@@ -38,21 +44,23 @@ export class MetadataFetchService {
     return provider.lookupById(providerId);
   }
 
-  async getStoredProviderIds(bookId: number): Promise<Partial<Record<MetadataProviderKey, string>>> {
-    const row = await this.db.query.bookMetadata.findFirst({
-      where: eq(bookMetadata.bookId, bookId),
-      columns: {
-        googleBooksId: true,
-        goodreadsId: true,
-        amazonId: true,
-        hardcoverId: true,
-        openLibraryId: true,
-        itunesId: true,
-        audibleId: true,
-        comicvineId: true,
-      },
-    });
-    if (!row) return {};
+  async getStoredProviderIds(bookId: number, user: RequestUser): Promise<Partial<Record<MetadataProviderKey, string>>> {
+    const row = await this.metadataFetchRepository.findStoredProviderIdsRow(bookId);
+    if (!row) {
+      throw new NotFoundException(`Book ${bookId} not found`);
+    }
+
+    if (!user.isSuperuser) {
+      const hasAccess = await this.metadataFetchRepository.hasLibraryAccess(user.id, row.libraryId);
+      if (!hasAccess) {
+        throw new ForbiddenException(`No access to book ${bookId}`);
+      }
+    }
+
+    return this.mapStoredProviderIds(row);
+  }
+
+  private mapStoredProviderIds(row: StoredProviderIdsRow): Partial<Record<MetadataProviderKey, string>> {
     return {
       [MetadataProviderKey.GOOGLE]: row.googleBooksId ?? undefined,
       [MetadataProviderKey.GOODREADS]: row.goodreadsId ?? undefined,
@@ -65,61 +73,88 @@ export class MetadataFetchService {
     };
   }
 
-  private async fetchFromProviderWithThrottleHandling(p: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+  private async fetchFromProviderWithThrottleHandling(provider: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+    const startedAt = Date.now();
+    this.logger.log(`[metadata_fetch.provider_search] [start] provider=${provider.key} - provider fetch started`);
+
     try {
-      const results = await this.withTimeout(this.fetchFromProvider(p, params));
-      this.throttleTracker.clearOnSuccess(p.key);
-      return results;
-    } catch (err) {
-      if (err instanceof ProviderThrottleError) {
-        const hint = err.retryAfterSeconds != null ? `${err.retryAfterSeconds}s (Retry-After header)` : 'scheduled backoff';
-        this.logger.warn(`[${p.key}] [throttle] hint="${hint}" - provider throttled`);
-        this.throttleTracker.record(p.key, err.retryAfterSeconds);
+      const { results, timedOut } = await this.withTimeout((signal) => this.fetchFromProvider(provider, { ...params, signal }));
+
+      if (timedOut) {
+        this.logger.warn(
+          `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=TimeoutError error="provider search timed out" - provider fetch failed`,
+        );
+        return [];
       }
+
+      this.throttleTracker.clearOnSuccess(provider.key);
+      this.logger.log(
+        `[metadata_fetch.provider_search] [end] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${results.length} - provider fetch completed`,
+      );
+      return results;
+    } catch (error) {
+      if (error instanceof ProviderThrottleError) {
+        this.throttleTracker.record(provider.key, error.retryAfterSeconds);
+        this.logger.warn(
+          `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
+        );
+        return [];
+      }
+
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.warn(
+        `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${sanitizeLogError(error)}" - provider fetch failed`,
+      );
       return [];
     }
   }
 
-  private async fetchFromProvider(p: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
-    const existingId = params.existingProviderIds?.[p.key];
-    if (isIdentifiable(p) && existingId) {
-      return p.lookupById(existingId).then((r) => (r ? [r] : []));
+  private async fetchFromProvider(provider: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
+    const existingProviderId = params.existingProviderIds?.[provider.key];
+    if (isIdentifiable(provider) && existingProviderId) {
+      const lookupResult = await provider.lookupById(existingProviderId, params.signal);
+      return lookupResult ? [lookupResult] : [];
     }
 
-    const primary = filterAndRank(await p.search(params), params);
+    const primary = filterAndRank(await provider.search(params), params);
     const hasIsbn = hasText(params.isbn);
     if (!hasIsbn) return primary;
 
-    if (primary.length > 0) {
-      this.logger.log(`[${p.key}] ISBN search returned ${primary.length} result(s); no fallback`);
-      return primary;
-    }
+    if (primary.length > 0) return primary;
 
     const hasFallbackTerms = hasText(params.title) || hasText(params.author);
-    if (!hasFallbackTerms) {
-      this.logger.log(`[${p.key}] ISBN search returned no results and no title/author available; no fallback`);
-      return [];
-    }
+    if (!hasFallbackTerms) return [];
 
-    this.logger.log(`[${p.key}] ISBN search returned no results; falling back to non-ISBN search`);
     const fallbackParams: MetadataSearchParams = { ...params, isbn: undefined };
-    const fallback = filterAndRank(await p.search(fallbackParams), fallbackParams);
-    this.logger.log(`[${p.key}] Non-ISBN fallback ${fallback.length > 0 ? `returned ${fallback.length} result(s)` : 'returned no results'}`);
-    return fallback;
+    return filterAndRank(await provider.search(fallbackParams), fallbackParams);
   }
 
-  private withTimeout(promise: Promise<MetadataCandidate[]>): Promise<MetadataCandidate[]> {
-    let timer: NodeJS.Timeout;
-    const timeout = new Promise<MetadataCandidate[]>((resolve) => {
-      timer = setTimeout(() => resolve([]), MetadataFetchService.PROVIDER_TIMEOUT_MS);
+  private withTimeout(run: (signal: AbortSignal) => Promise<MetadataCandidate[]>): Promise<TimedProviderResult> {
+    let timer: NodeJS.Timeout | undefined;
+    const controller = new AbortController();
+
+    const timeoutPromise = new Promise<TimedProviderResult>((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve({ results: [], timedOut: true });
+      }, MetadataFetchService.PROVIDER_TIMEOUT_MS);
     });
-    return Promise.race([
-      promise.catch((err: unknown) => {
-        if (err instanceof ProviderThrottleError) throw err;
-        return [] as MetadataCandidate[];
-      }),
-      timeout,
-    ]).finally(() => clearTimeout(timer!));
+
+    const providerPromise = run(controller.signal)
+      .then((results) => ({ results, timedOut: false }))
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return { results: [], timedOut: true };
+        }
+        throw error;
+      });
+
+    return Promise.race([providerPromise, timeoutPromise]).finally(() => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      controller.abort();
+    });
   }
 }
 

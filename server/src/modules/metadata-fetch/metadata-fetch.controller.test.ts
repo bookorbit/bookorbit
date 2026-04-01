@@ -2,6 +2,7 @@ import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot } from '@projectx/
 import type { Mocked } from 'vitest';
 import { firstValueFrom, of, toArray } from 'rxjs';
 
+import type { RequestUser } from '../../common/types/request-user';
 import { LookupMetadataDto } from './dto/lookup-metadata.dto';
 import { MetadataSearchDto } from './dto/metadata-search.dto';
 import { MetadataFetchController } from './metadata-fetch.controller';
@@ -16,6 +17,7 @@ describe('MetadataFetchController', () => {
   let providerConfig: Mocked<ProviderConfigService>;
   let throttleTracker: Mocked<ProviderThrottleTracker>;
   let controller: MetadataFetchController;
+  let user: RequestUser;
 
   beforeEach(() => {
     service = {
@@ -38,6 +40,20 @@ describe('MetadataFetchController', () => {
     } as unknown as Mocked<ProviderThrottleTracker>;
 
     controller = new MetadataFetchController(service, registry, providerConfig, throttleTracker);
+    user = {
+      id: 7,
+      username: 'reader',
+      name: 'Reader',
+      email: null,
+      active: true,
+      isSuperuser: false,
+      isDefaultPassword: false,
+      tokenVersion: 1,
+      settings: {},
+      avatarUrl: null,
+      provisioningMethod: 'local',
+      permissions: [],
+    };
   });
 
   it('returns provider metadata for UI configuration', async () => {
@@ -69,10 +85,10 @@ describe('MetadataFetchController', () => {
       providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
     };
 
-    const stream = await controller.stream(dto);
+    const stream = await controller.stream(dto, user);
     const events = await firstValueFrom(stream.pipe(toArray()));
 
-    expect(service.getStoredProviderIds).toHaveBeenCalledWith(12);
+    expect(service.getStoredProviderIds).toHaveBeenCalledWith(12, user);
     expect(service.search).toHaveBeenCalledWith(
       {
         title: 'Dune',
@@ -93,7 +109,7 @@ describe('MetadataFetchController', () => {
     service.search.mockReturnValue(of({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-2', title: 'Only' }));
 
     const dto: MetadataSearchDto = { title: 'Dune' };
-    const stream = await controller.stream(dto);
+    const stream = await controller.stream(dto, user);
     await firstValueFrom(stream.pipe(toArray()));
 
     expect(service.getStoredProviderIds).not.toHaveBeenCalled();
@@ -116,7 +132,7 @@ describe('MetadataFetchController', () => {
       title: 'All Systems Red',
       providers: [MetadataProviderKey.AUDIBLE, MetadataProviderKey.AUDNEXUS],
     };
-    const stream = await controller.stream(dto);
+    const stream = await controller.stream(dto, user);
     await firstValueFrom(stream.pipe(toArray()));
 
     expect(service.search).toHaveBeenCalledWith(
@@ -136,7 +152,7 @@ describe('MetadataFetchController', () => {
       bookId: 44,
       title: 'Artificial Condition',
     };
-    const stream = await controller.stream(dto);
+    const stream = await controller.stream(dto, user);
     await firstValueFrom(stream.pipe(toArray()));
 
     expect(service.search).toHaveBeenCalledWith(

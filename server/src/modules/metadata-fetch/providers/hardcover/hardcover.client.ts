@@ -2,12 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
+import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
+import { buildRequestSignal, sanitizeLogError, sleep } from '../provider-utils';
 import { HardcoverBookWithEditions, HardcoverBooksResponse, HardcoverSearchDocument, HardcoverSearchResponse } from './hardcover.types';
 
 const GRAPHQL_ENDPOINT = 'https://api.hardcover.app/v1/graphql';
-const RATE_LIMIT_DELAY_MS = 1000;
-const REQUEST_TIMEOUT_MS = 10_000;
-const DEFAULT_SEARCH_LIMIT = 10;
 
 const BOOK_FIELDS = `
   id
@@ -73,13 +72,13 @@ const LOOKUP_BY_SLUG_QUERY = `
 class RateLimiter {
   private nextAllowedTime = 0;
 
-  async throttle(): Promise<void> {
+  async throttle(signal?: AbortSignal): Promise<void> {
     const now = Date.now();
     const scheduled = Math.max(now, this.nextAllowedTime);
-    this.nextAllowedTime = scheduled + RATE_LIMIT_DELAY_MS;
+    this.nextAllowedTime = scheduled + PROVIDER_DELAYS_MS.HARDCOVER_RATE_LIMIT;
     const wait = scheduled - now;
     if (wait > 0) {
-      await new Promise<void>((resolve) => setTimeout(resolve, wait));
+      await sleep(wait, signal);
     }
   }
 }
@@ -89,18 +88,24 @@ export class HardcoverClient {
   private readonly logger = new Logger(HardcoverClient.name);
   private readonly rateLimiter = new RateLimiter();
 
-  async searchByIsbn(isbn: string, apiKey: string): Promise<HardcoverBookWithEditions[]> {
-    const body = await this.post<HardcoverBooksResponse>('search-by-isbn', SEARCH_BY_ISBN_QUERY, { isbn }, apiKey);
+  async searchByIsbn(isbn: string, apiKey: string, signal?: AbortSignal): Promise<HardcoverBookWithEditions[]> {
+    const body = await this.post<HardcoverBooksResponse>('search-by-isbn', SEARCH_BY_ISBN_QUERY, { isbn }, apiKey, signal);
     return body?.data?.books ?? [];
   }
 
-  async searchBooks(query: string, apiKey: string): Promise<HardcoverSearchDocument[]> {
-    const body = await this.post<HardcoverSearchResponse>('search', SEARCH_BOOKS_QUERY, { q: query, limit: DEFAULT_SEARCH_LIMIT }, apiKey);
+  async searchBooks(query: string, apiKey: string, signal?: AbortSignal): Promise<HardcoverSearchDocument[]> {
+    const body = await this.post<HardcoverSearchResponse>(
+      'search',
+      SEARCH_BOOKS_QUERY,
+      { q: query, limit: PROVIDER_LIMITS.DEFAULT_SEARCH_RESULTS },
+      apiKey,
+      signal,
+    );
     return body?.data?.search?.results?.hits?.map((h) => h.document).filter((d): d is HardcoverSearchDocument => d != null) ?? [];
   }
 
-  async lookupBySlug(slug: string, apiKey: string): Promise<HardcoverBookWithEditions | null> {
-    const body = await this.post<HardcoverBooksResponse>('lookup', LOOKUP_BY_SLUG_QUERY, { slug }, apiKey);
+  async lookupBySlug(slug: string, apiKey: string, signal?: AbortSignal): Promise<HardcoverBookWithEditions | null> {
+    const body = await this.post<HardcoverBooksResponse>('lookup', LOOKUP_BY_SLUG_QUERY, { slug }, apiKey, signal);
     return body?.data?.books?.[0] ?? null;
   }
 
@@ -109,8 +114,9 @@ export class HardcoverClient {
     query: string,
     variables: Record<string, unknown>,
     apiKey: string,
+    signal?: AbortSignal,
   ): Promise<T | null> {
-    await this.rateLimiter.throttle();
+    await this.rateLimiter.throttle(signal);
     const startedAt = Date.now();
     this.logger.log(`[hardcover] [start] op=${op} method=POST`);
 
@@ -122,7 +128,7 @@ export class HardcoverClient {
           Authorization: apiKey,
         },
         body: JSON.stringify({ query, variables }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal),
       });
 
       if (!res.ok) {
@@ -140,7 +146,7 @@ export class HardcoverClient {
         this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
-      this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="${(err as Error).message}"`);
+      this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="${sanitizeLogError(err)}"`);
       return null;
     }
   }
