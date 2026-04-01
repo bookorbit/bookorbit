@@ -109,6 +109,7 @@ describe('Email DTO validation', () => {
     expect(valid.size).toBe(50);
 
     expect((await errorsFor(QuerySendLogDto, { page: -1, size: 0 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(QuerySendLogDto, { size: 101 })).length).toBeGreaterThan(0);
   });
 
   it('requires at least one book and integer collections for send requests', async () => {

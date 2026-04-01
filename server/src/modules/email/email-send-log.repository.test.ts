@@ -1,11 +1,10 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
-  lte: vi.fn((left: unknown, right: unknown) => ({ op: 'lte', left, right })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { emailSendLog } from '../../db/schema';
 import { EmailSendLogRepository } from './email-send-log.repository';
@@ -76,25 +75,17 @@ describe('EmailSendLogRepository', () => {
     expect(sql).toHaveBeenCalledWith(expect.any(Array), emailSendLog.createdAt);
   });
 
-  it('findPendingRetries enforces pending status and retry time cutoff', () => {
+  it('findPending scopes to pending status', () => {
     const { db, selectBuilder } = makeDb();
     const repo = new EmailSendLogRepository(db as never);
-    const now = new Date('2026-03-31T12:00:00.000Z');
 
-    void repo.findPendingRetries(now);
+    void repo.findPending();
 
     expect(eq).toHaveBeenCalledWith(emailSendLog.status, 'pending');
-    expect(lte).toHaveBeenCalledWith(emailSendLog.nextRetryAt, now);
-    expect(and).toHaveBeenCalledWith(
-      { op: 'eq', left: emailSendLog.status, right: 'pending' },
-      { op: 'lte', left: emailSendLog.nextRetryAt, right: now },
-    );
     expect(selectBuilder.where).toHaveBeenCalledWith({
-      op: 'and',
-      clauses: [
-        { op: 'eq', left: emailSendLog.status, right: 'pending' },
-        { op: 'lte', left: emailSendLog.nextRetryAt, right: now },
-      ],
+      op: 'eq',
+      left: emailSendLog.status,
+      right: 'pending',
     });
   });
 

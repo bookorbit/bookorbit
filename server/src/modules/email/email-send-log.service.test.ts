@@ -39,7 +39,7 @@ describe('EmailSendLogService', () => {
             findAll: vi.fn().mockResolvedValue([mockLog]),
             findById: vi.fn().mockResolvedValue([mockLog]),
             delete: vi.fn(),
-            findPendingRetries: vi.fn().mockResolvedValue([]),
+            findPending: vi.fn().mockResolvedValue([]),
             markAbandoned: vi.fn(),
           },
         },
@@ -51,16 +51,16 @@ describe('EmailSendLogService', () => {
   });
 
   describe('onApplicationBootstrap', () => {
-    it('should mark stale pending entries as abandoned', async () => {
-      (repo.findPendingRetries as vi.Mock).mockResolvedValue([{ id: 100 }, { id: 101 }]);
+    it('should mark pending entries as abandoned', async () => {
+      (repo.findPending as vi.Mock).mockResolvedValue([{ id: 100 }, { id: 101 }]);
       await service.onApplicationBootstrap();
       expect(repo.markAbandoned).toHaveBeenCalledTimes(2);
       expect(repo.markAbandoned).toHaveBeenCalledWith(100);
       expect(repo.markAbandoned).toHaveBeenCalledWith(101);
     });
 
-    it('should do nothing if no stale pending entries', async () => {
-      (repo.findPendingRetries as vi.Mock).mockResolvedValue([]);
+    it('should do nothing if no pending entries', async () => {
+      (repo.findPending as vi.Mock).mockResolvedValue([]);
       await service.onApplicationBootstrap();
       expect(repo.markAbandoned).not.toHaveBeenCalled();
     });

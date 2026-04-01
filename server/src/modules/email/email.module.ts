@@ -1,6 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
+import { BookModule } from '../book/book.module';
+import { LibraryModule } from '../library/library.module';
 import { EmailAdminLogController } from './email-admin-log.controller';
+import { EmailBookAccessService } from './email-book-access.service';
+import { EmailBookReadRepository } from './email-book-read.repository';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailFileSelector } from './email-file-selector';
 import { EmailPreferencesController } from './email-preferences.controller';
@@ -29,7 +33,7 @@ import { EmailTransportService } from './email-transport.service';
 import { SystemMailService } from './system-mail.service';
 
 @Module({
-  imports: [],
+  imports: [forwardRef(() => BookModule), forwardRef(() => LibraryModule)],
   controllers: [
     EmailProviderController,
     EmailRecipientController,
@@ -41,6 +45,8 @@ import { SystemMailService } from './system-mail.service';
     EmailAdminLogController,
   ],
   providers: [
+    EmailBookReadRepository,
+    EmailBookAccessService,
     EmailEncryptionService,
     EmailTransportService,
     EmailProviderRepository,

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { emailProviders } from '../../db/schema';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailTransportService } from './email-transport.service';
 import { EmailProviderRepository } from './email-provider.repository';
@@ -47,11 +48,19 @@ export class EmailProviderService {
   async update(id: number, dto: UpdateEmailProviderDto, user: RequestUser) {
     await this.getOwned(id, user);
 
-    const patch: Record<string, unknown> = { ...dto };
+    const patch: Partial<typeof emailProviders.$inferInsert> = {};
+    if (dto.name !== undefined) patch.name = dto.name;
+    if (dto.host !== undefined) patch.host = dto.host;
+    if (dto.port !== undefined) patch.port = dto.port;
+    if (dto.username !== undefined) patch.username = dto.username;
+    if (dto.fromName !== undefined) patch.fromName = dto.fromName;
+    if (dto.fromAddress !== undefined) patch.fromAddress = dto.fromAddress;
+    if (dto.auth !== undefined) patch.auth = dto.auth;
+    if (dto.ssl !== undefined) patch.ssl = dto.ssl;
+    if (dto.startTls !== undefined) patch.startTls = dto.startTls;
     if (dto.password !== undefined) {
       patch.passwordEnc = dto.password ? this.encryption.encrypt(dto.password) : null;
     }
-    delete patch.password;
 
     const [updated] = await this.repo.update(id, user.id, patch);
     if (!updated) throw new NotFoundException('Provider not found');

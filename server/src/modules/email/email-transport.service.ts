@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import type { Transporter } from 'nodemailer';
 
 export interface SmtpConfig {
@@ -17,16 +18,18 @@ export class EmailTransportService {
   buildTransporter(config: SmtpConfig): Transporter {
     const secure = config.ssl || config.port === 465;
     const requireTls = !secure && (config.startTls || config.port === 587);
-    const hasAuthCredentials = config.username !== undefined && config.username !== null && config.password !== undefined && config.password !== null;
-
-    return nodemailer.createTransport({
+    const username = config.username ?? undefined;
+    const password = config.password ?? undefined;
+    const auth = config.auth && username !== undefined && password !== undefined ? { user: username, pass: password } : undefined;
+    const options: SMTPTransport.Options = {
       host: config.host,
       port: config.port,
       secure,
       requireTLS: requireTls,
-      ...(config.auth && hasAuthCredentials ? { auth: { user: config.username, pass: config.password } } : {}),
-      tls: { rejectUnauthorized: false },
-    } as nodemailer.TransportOptions);
+      ...(auth ? { auth } : {}),
+    };
+
+    return nodemailer.createTransport(options);
   }
 
   async verifyTransporter(transporter: Transporter): Promise<void> {

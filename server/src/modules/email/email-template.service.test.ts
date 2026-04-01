@@ -3,11 +3,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateRepository } from './email-template.repository';
 import { EmailTemplateContextService } from './email-template-context.service';
+import { EmailBookAccessService } from './email-book-access.service';
 import type { RequestUser } from '../../common/types/request-user';
 
 describe('EmailTemplateService', () => {
   let service: EmailTemplateService;
   let repo: EmailTemplateRepository;
+  let bookAccessService: EmailBookAccessService;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -55,11 +57,16 @@ describe('EmailTemplateService', () => {
           provide: EmailTemplateContextService,
           useValue: { buildForBook: vi.fn() },
         },
+        {
+          provide: EmailBookAccessService,
+          useValue: { assertUserCanAccessBook: vi.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
     service = module.get<EmailTemplateService>(EmailTemplateService);
     repo = module.get<EmailTemplateRepository>(EmailTemplateRepository);
+    bookAccessService = module.get<EmailBookAccessService>(EmailBookAccessService);
   });
 
   describe('findAll', () => {
@@ -148,6 +155,13 @@ describe('EmailTemplateService', () => {
 
       const result = await service.preview(10, 1, 100, mockUser);
       expect(result.subject).toBe('S');
+      expect(bookAccessService.assertUserCanAccessBook).toHaveBeenCalledWith(1, mockUser);
+    });
+
+    it('should fail preview when book access is denied', async () => {
+      (bookAccessService.assertUserCanAccessBook as vi.Mock).mockRejectedValue(new ForbiddenException('No access to this library'));
+
+      await expect(service.preview(10, 1, 100, mockUser)).rejects.toThrow(ForbiddenException);
     });
   });
 

@@ -1,137 +1,104 @@
+import { Logger } from '@nestjs/common';
+
+import { BookEmbeddingSourceData } from './book-embedding.types';
 import { BookEmbedderService } from './book-embedder.service';
 
-function makeMetaChain(metaRow: unknown[] = []) {
-  const chain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(metaRow),
+function makeSourceData(overrides: Partial<BookEmbeddingSourceData> = {}): BookEmbeddingSourceData {
+  return {
+    title: 'The Last Wish',
+    seriesName: 'The Witcher',
+    publisher: 'Orbit',
+    description: 'A monster hunter travels the world',
+    authors: ['Andrzej Sapkowski'],
+    genres: ['Fantasy'],
+    tags: ['Sword & Sorcery'],
+    ...overrides,
   };
-  return chain;
+}
+
+function makeService() {
+  const embedderRepository = {
+    findSourceData: vi.fn(),
+    saveEmbedding: vi.fn(),
+  };
+  const vectorizer = {
+    buildVector: vi.fn(),
+  };
+
+  return {
+    service: new BookEmbedderService(embedderRepository as never, vectorizer as never),
+    embedderRepository,
+    vectorizer,
+  };
 }
 
 describe('BookEmbedderService', () => {
-  const logger = { debug: vi.fn() };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('returns null when book metadata is missing', async () => {
-    const db = {
-      select: vi.fn().mockReturnValue(makeMetaChain([])),
-    };
-
-    const service = new BookEmbedderService(db as never);
+  it('returns null when metadata row does not exist', async () => {
+    const { service, embedderRepository, vectorizer } = makeService();
+    const debugSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    embedderRepository.findSourceData.mockResolvedValue(null);
 
     await expect(service.embedBook(42)).resolves.toBeNull();
-    expect(db.select).toHaveBeenCalledTimes(1);
+
+    expect(embedderRepository.findSourceData).toHaveBeenCalledWith(42);
+    expect(vectorizer.buildVector).not.toHaveBeenCalled();
+    expect(embedderRepository.saveEmbedding).not.toHaveBeenCalled();
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('[book.embedding] [start] bookId=42'));
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('outcome=metadata_missing'));
   });
 
-  it('builds and persists deterministic embedding for metadata + relations', async () => {
-    const metaChain = makeMetaChain([
-      {
-        title: 'The Last Wish',
-        seriesName: 'The Witcher',
-        publisher: 'Orbit',
-        description: 'A monster hunter travels the world',
-      },
-    ]);
+  it('builds and persists embedding when source data exists', async () => {
+    const { service, embedderRepository, vectorizer } = makeService();
+    const debugSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    const sourceData = makeSourceData();
+    const embedding = [0.12, 0.34, 0.56];
 
-    const authorChain = {
-      from: vi.fn().mockReturnThis(),
-      innerJoin: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([{ name: 'Andrzej Sapkowski' }]),
-    };
-    const genreChain = {
-      from: vi.fn().mockReturnThis(),
-      innerJoin: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([{ name: 'Fantasy' }]),
-    };
-    const tagChain = {
-      from: vi.fn().mockReturnThis(),
-      innerJoin: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([{ name: 'Sword & Sorcery' }]),
-    };
+    embedderRepository.findSourceData.mockResolvedValue(sourceData);
+    vectorizer.buildVector.mockReturnValue(embedding);
+    embedderRepository.saveEmbedding.mockResolvedValue(undefined);
 
-    const updateWhere = vi.fn().mockResolvedValue(undefined);
-    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
-    const update = vi.fn().mockReturnValue({ set: updateSet });
+    await expect(service.embedBook(7)).resolves.toEqual(embedding);
 
-    const db = {
-      select: vi.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain).mockReturnValueOnce(genreChain).mockReturnValueOnce(tagChain),
-      update,
-    };
-
-    const service = new BookEmbedderService(db as never);
-    (service as unknown as { logger: typeof logger }).logger = logger as never;
-
-    const embedding = await service.embedBook(7);
-
-    expect(embedding).not.toBeNull();
-    expect(embedding).toHaveLength(256);
-    const norm = Math.sqrt((embedding ?? []).reduce((sum, v) => sum + v * v, 0));
-    expect(norm).toBeCloseTo(1, 10);
-
-    expect(update).toHaveBeenCalledTimes(1);
-    expect(updateSet).toHaveBeenCalledWith({ embedding });
-    expect(updateWhere).toHaveBeenCalledTimes(1);
-    expect(logger.debug).toHaveBeenCalledWith('Embedded book 7');
-
-    const again = service.buildVector({
-      title: 'The Last Wish',
-      seriesName: 'The Witcher',
-      publisher: 'Orbit',
-      description: 'A monster hunter travels the world',
-      authors: ['Andrzej Sapkowski'],
-      genres: ['Fantasy'],
-      tags: ['Sword & Sorcery'],
-    });
-    expect(again).toEqual(embedding);
+    expect(embedderRepository.findSourceData).toHaveBeenCalledWith(7);
+    expect(vectorizer.buildVector).toHaveBeenCalledWith(sourceData);
+    expect(embedderRepository.saveEmbedding).toHaveBeenCalledWith(7, embedding);
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('[book.embedding] [end] bookId=7'));
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('authorCount=1 genreCount=1 tagCount=1'));
   });
 
-  it('filters stopwords/short tokens and keeps zero vector when no usable content', () => {
-    const service = new BookEmbedderService({} as never);
+  it('logs fail and rethrows when reading source data fails', async () => {
+    const { service, embedderRepository, vectorizer } = makeService();
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    embedderRepository.findSourceData.mockRejectedValue(new Error('database "offline"\n'));
 
-    const vec = service.buildVector({
-      title: 'a the of',
-      description: 'it is as to',
-      seriesName: null,
-      publisher: null,
-      authors: [],
-      genres: [],
-      tags: [],
-    });
+    await expect(service.embedBook(9)).rejects.toThrow('database "offline"');
 
-    expect(vec).toHaveLength(256);
-    expect(vec.every((v) => v === 0)).toBe(true);
+    expect(vectorizer.buildVector).not.toHaveBeenCalled();
+    expect(embedderRepository.saveEmbedding).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[book.embedding] [fail] bookId=9'));
+    expect(warnSpy.mock.calls[0][0]).toContain('errorClass=Error');
+    expect(warnSpy.mock.calls[0][0]).toMatch(/error="database\s+offline\s*"/);
+    expect(warnSpy.mock.calls[0][0]).not.toContain('\n');
   });
 
-  it('limits description contribution to first 100 words', () => {
-    const service = new BookEmbedderService({} as never);
+  it('logs fail and rethrows when persistence fails', async () => {
+    const { service, embedderRepository, vectorizer } = makeService();
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const sourceData = makeSourceData({ authors: ['Andrzej Sapkowski', 'A. Author'] });
+    const embedding = [0.3, 0.7];
 
-    const words = Array.from({ length: 130 }, (_, i) => `token${i}`);
-    const longDescription = words.join(' ');
+    embedderRepository.findSourceData.mockResolvedValue(sourceData);
+    vectorizer.buildVector.mockReturnValue(embedding);
+    embedderRepository.saveEmbedding.mockRejectedValue(new Error('write failed'));
 
-    const with130 = service.buildVector({
-      title: null,
-      seriesName: null,
-      publisher: null,
-      authors: [],
-      genres: [],
-      tags: [],
-      description: longDescription,
-    });
+    await expect(service.embedBook(15)).rejects.toThrow('write failed');
 
-    const with100 = service.buildVector({
-      title: null,
-      seriesName: null,
-      publisher: null,
-      authors: [],
-      genres: [],
-      tags: [],
-      description: words.slice(0, 100).join(' '),
-    });
-
-    expect(with130).toEqual(with100);
+    expect(vectorizer.buildVector).toHaveBeenCalledWith(sourceData);
+    expect(embedderRepository.saveEmbedding).toHaveBeenCalledWith(15, embedding);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[book.embedding] [fail] bookId=15'));
   });
 });

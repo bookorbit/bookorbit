@@ -1,9 +1,10 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
+  inArray: vi.fn((left: unknown, values: unknown[]) => ({ op: 'inArray', left, values })),
 }));
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { emailRecipients } from '../../db/schema';
 import { EmailRecipientRepository } from './email-recipient.repository';
@@ -69,6 +70,20 @@ describe('EmailRecipientRepository', () => {
 
     expect(eq).toHaveBeenCalledWith(emailRecipients.id, 99);
     expect(selectBuilder.limit).toHaveBeenCalledWith(1);
+  });
+
+  it('findByIds queries all requested ids in one statement', () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new EmailRecipientRepository(db as never);
+
+    void repo.findByIds([3, 7, 9]);
+
+    expect(inArray).toHaveBeenCalledWith(emailRecipients.id, [3, 7, 9]);
+    expect(selectBuilder.where).toHaveBeenCalledWith({
+      op: 'inArray',
+      left: emailRecipients.id,
+      values: [3, 7, 9],
+    });
   });
 
   it('inserts provided values and returns inserted rows', async () => {

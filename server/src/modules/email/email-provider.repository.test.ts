@@ -1,12 +1,11 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
-  isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
   or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 
 import { emailProviders } from '../../db/schema';
 import { EmailProviderRepository } from './email-provider.repository';
@@ -135,29 +134,6 @@ describe('EmailProviderRepository', () => {
       updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
     });
     expect(updateBuilder.returning).toHaveBeenCalled();
-  });
-
-  it('setShared allows only system providers or already shared entries', () => {
-    const { db, updateBuilder } = makeDb();
-    const repo = new EmailProviderRepository(db as never);
-
-    void repo.setShared(6, true);
-
-    expect(isNull).toHaveBeenCalledWith(emailProviders.userId);
-    expect(or).toHaveBeenCalledWith({ op: 'isNull', value: emailProviders.userId }, { op: 'eq', left: emailProviders.isShared, right: true });
-    expect(updateBuilder.where).toHaveBeenCalledWith({
-      op: 'and',
-      clauses: [
-        { op: 'eq', left: emailProviders.id, right: 6 },
-        {
-          op: 'or',
-          clauses: [
-            { op: 'isNull', value: emailProviders.userId },
-            { op: 'eq', left: emailProviders.isShared, right: true },
-          ],
-        },
-      ],
-    });
   });
 
   it('setSharedByOwner restricts by owner id', () => {

@@ -2,10 +2,12 @@ import { ForbiddenException, Injectable, Logger, NotFoundException, OnApplicatio
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { NewEmailSendLog } from '../../db/schema';
+import { EMAIL_SEND_STATUS_PENDING } from './email-send.constants';
 import { EmailSendLogRepository } from './email-send-log.repository';
 
 export const MAX_SEND_ATTEMPTS = 3;
 export const SEND_RETRY_DELAYS_MS = [30_000, 120_000];
+const EMAIL_SEND_LOG_BOOTSTRAP_EVENT = 'email.send-log.bootstrap-cleanup';
 
 @Injectable()
 export class EmailSendLogService implements OnApplicationBootstrap {
@@ -14,11 +16,11 @@ export class EmailSendLogService implements OnApplicationBootstrap {
   constructor(private readonly repo: EmailSendLogRepository) {}
 
   async onApplicationBootstrap() {
-    await this.abandonStalePending();
+    await this.abandonPendingOnBootstrap();
   }
 
   async create(values: Omit<NewEmailSendLog, 'status' | 'attemptCount'>) {
-    const [entry] = await this.repo.insert({ ...values, status: 'pending', attemptCount: 0 });
+    const [entry] = await this.repo.insert({ ...values, status: EMAIL_SEND_STATUS_PENDING, attemptCount: 0 });
     return entry;
   }
 
@@ -62,10 +64,32 @@ export class EmailSendLogService implements OnApplicationBootstrap {
     return this.findOneOwned(id, user);
   }
 
-  private async abandonStalePending() {
-    const stale = await this.repo.findPendingRetries(new Date());
-    if (stale.length === 0) return;
-    this.logger.warn(`Marking ${stale.length} stale pending send(s) as failed — use resend to retry`);
-    await Promise.all(stale.map((entry) => this.repo.markAbandoned(entry.id)));
+  private async abandonPendingOnBootstrap() {
+    const startedAt = Date.now();
+    this.logger.log(`[${EMAIL_SEND_LOG_BOOTSTRAP_EVENT}] [start] - pending send cleanup started`);
+    try {
+      const pending = await this.repo.findPending();
+      if (pending.length === 0) {
+        this.logger.log(
+          `[${EMAIL_SEND_LOG_BOOTSTRAP_EVENT}] [end] durationMs=${Date.now() - startedAt} abandoned=0 - pending send cleanup completed`,
+        );
+        return;
+      }
+
+      await Promise.all(pending.map((entry) => this.repo.markAbandoned(entry.id)));
+      this.logger.warn(
+        `[${EMAIL_SEND_LOG_BOOTSTRAP_EVENT}] [end] durationMs=${Date.now() - startedAt} abandoned=${pending.length} - pending send cleanup completed`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error && error.name ? error.name : 'Error';
+      const errorMessage = (error instanceof Error ? error.message : String(error))
+        .replace(/[\r\n"]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      this.logger.error(
+        `[${EMAIL_SEND_LOG_BOOTSTRAP_EVENT}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - pending send cleanup failed`,
+      );
+      throw error;
+    }
   }
 }

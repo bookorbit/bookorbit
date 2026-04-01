@@ -83,4 +83,22 @@ describe('EmailTransportService', () => {
       }),
     );
   });
+
+  it('should not disable TLS certificate verification by default', () => {
+    (nodemailer.createTransport as vi.Mock).mockReturnValue({});
+
+    service.buildTransporter({
+      host: 'smtp.test.com',
+      port: 587,
+      username: 'user',
+      password: 'pass',
+      auth: true,
+      ssl: false,
+      startTls: true,
+    });
+
+    const calls = (nodemailer.createTransport as vi.Mock).mock.calls;
+    const callArg = calls[calls.length - 1][0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty('tls');
+  });
 });

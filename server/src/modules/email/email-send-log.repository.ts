@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { emailSendLog } from '../../db/schema';
+import { EMAIL_SEND_STATUS_FAILED, EMAIL_SEND_STATUS_PENDING, EMAIL_SEND_STATUS_SENT } from './email-send.constants';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -39,17 +40,14 @@ export class EmailSendLogRepository {
       .offset(offset);
   }
 
-  findPendingRetries(now: Date) {
-    return this.db
-      .select()
-      .from(emailSendLog)
-      .where(and(eq(emailSendLog.status, 'pending'), lte(emailSendLog.nextRetryAt, now)));
+  findPending() {
+    return this.db.select().from(emailSendLog).where(eq(emailSendLog.status, EMAIL_SEND_STATUS_PENDING));
   }
 
   markSent(id: number) {
     return this.db
       .update(emailSendLog)
-      .set({ status: 'sent', sentAt: sql`now()`, errorMessage: null, updatedAt: sql`now()` })
+      .set({ status: EMAIL_SEND_STATUS_SENT, sentAt: sql`now()`, errorMessage: null, updatedAt: sql`now()` })
       .where(eq(emailSendLog.id, id))
       .returning();
   }
@@ -58,7 +56,7 @@ export class EmailSendLogRepository {
     return this.db
       .update(emailSendLog)
       .set({
-        status: nextRetryAt ? 'pending' : 'failed',
+        status: nextRetryAt ? EMAIL_SEND_STATUS_PENDING : EMAIL_SEND_STATUS_FAILED,
         errorMessage,
         nextRetryAt,
         attemptCount: sql`${emailSendLog.attemptCount} + 1`,
@@ -72,7 +70,7 @@ export class EmailSendLogRepository {
     return this.db
       .update(emailSendLog)
       .set({
-        status: 'failed',
+        status: EMAIL_SEND_STATUS_FAILED,
         errorMessage: 'Server restarted before send completed. Use resend to retry.',
         nextRetryAt: null,
         updatedAt: sql`now()`,

@@ -14,6 +14,7 @@ export interface ResolvedSmtp {
 @Injectable()
 export class EmailProviderResolver {
   private readonly logger = new Logger(EmailProviderResolver.name);
+  private readonly event = 'email.provider.resolve';
 
   constructor(
     private readonly providerService: EmailProviderService,
@@ -23,14 +24,14 @@ export class EmailProviderResolver {
   async resolve(user: RequestUser, requestedProviderId?: number | null): Promise<ResolvedSmtp> {
     if (requestedProviderId !== null && requestedProviderId !== undefined) {
       const provider = await this.providerService.getProviderWithDecryptedPassword(requestedProviderId, user);
-      this.logger.debug(`[email.provider] [resolved] id=${provider.id} host=${provider.host} (requested)`);
+      this.logger.debug(`[${this.event}] [end] userId=${user.id} providerId=${provider.id} source=requested - provider resolved`);
       return this.fromProvider(provider);
     }
 
     const prefs = await this.preferencesService.getForUser(user.id);
     if (prefs?.defaultProviderId !== null && prefs?.defaultProviderId !== undefined) {
       const provider = await this.providerService.getProviderWithDecryptedPassword(prefs.defaultProviderId, user);
-      this.logger.debug(`[email.provider] [resolved] id=${provider.id} host=${provider.host} (default)`);
+      this.logger.debug(`[${this.event}] [end] userId=${user.id} providerId=${provider.id} source=default - provider resolved`);
       return this.fromProvider(provider);
     }
 

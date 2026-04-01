@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -7,6 +7,9 @@ import * as schema from '../../db/schema';
 import { emailRecipientGroupMembers, emailRecipientGroups, emailRecipients } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type EmailRecipientRow = typeof emailRecipients.$inferSelect;
+type EmailGroupMemberRow = { recipient: EmailRecipientRow };
+type EmailGroupMemberByGroupRow = { groupId: number; recipient: EmailRecipientRow };
 
 @Injectable()
 export class EmailRecipientGroupRepository {
@@ -20,12 +23,21 @@ export class EmailRecipientGroupRepository {
     return this.db.select().from(emailRecipientGroups).where(eq(emailRecipientGroups.id, id)).limit(1);
   }
 
-  findMembers(groupId: number) {
+  findMembers(groupId: number): Promise<EmailGroupMemberRow[]> {
     return this.db
       .select({ recipient: emailRecipients })
       .from(emailRecipientGroupMembers)
       .innerJoin(emailRecipients, eq(emailRecipients.id, emailRecipientGroupMembers.recipientId))
       .where(eq(emailRecipientGroupMembers.groupId, groupId));
+  }
+
+  findMembersForGroupIds(groupIds: number[]): Promise<EmailGroupMemberByGroupRow[]> {
+    if (groupIds.length === 0) return Promise.resolve<EmailGroupMemberByGroupRow[]>([]);
+    return this.db
+      .select({ groupId: emailRecipientGroupMembers.groupId, recipient: emailRecipients })
+      .from(emailRecipientGroupMembers)
+      .innerJoin(emailRecipients, eq(emailRecipients.id, emailRecipientGroupMembers.recipientId))
+      .where(inArray(emailRecipientGroupMembers.groupId, groupIds));
   }
 
   insert(values: typeof emailRecipientGroups.$inferInsert) {

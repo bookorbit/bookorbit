@@ -10,9 +10,11 @@ import { EmailTemplateContextService } from './email-template-context.service';
 import { EmailPreferencesService } from './email-preferences.service';
 import { EmailSendLogService } from './email-send-log.service';
 import { EmailTransportService } from './email-transport.service';
+import { EmailBookAccessService } from './email-book-access.service';
 import type { RequestUser } from '../../common/types/request-user';
 import type { SendBookDto } from './dto/send-book.dto';
 import * as fs from 'fs';
+import { KINDLE_CONVERT_SUBJECT } from './email-send.constants';
 
 vi.mock('fs');
 
@@ -24,6 +26,7 @@ describe('EmailSendOrchestrator', () => {
   let preferencesService: EmailPreferencesService;
   let sendLogService: EmailSendLogService;
   let transportService: EmailTransportService;
+  let bookAccessService: EmailBookAccessService;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -70,7 +73,10 @@ describe('EmailSendOrchestrator', () => {
         },
         {
           provide: EmailRecipientService,
-          useValue: { getOwnedById: vi.fn().mockResolvedValue(mockRecipient) },
+          useValue: {
+            getOwnedById: vi.fn().mockResolvedValue(mockRecipient),
+            getOwnedByIds: vi.fn().mockResolvedValue([mockRecipient]),
+          },
         },
         {
           provide: EmailRecipientGroupService,
@@ -101,6 +107,13 @@ describe('EmailSendOrchestrator', () => {
           provide: EmailTransportService,
           useValue: { buildTransporter: vi.fn().mockReturnValue({ sendMail: vi.fn().mockResolvedValue({}) }) },
         },
+        {
+          provide: EmailBookAccessService,
+          useValue: {
+            assertUserCanAccessBook: vi.fn().mockResolvedValue(undefined),
+            assertUserCanAccessBooks: vi.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -111,6 +124,7 @@ describe('EmailSendOrchestrator', () => {
     preferencesService = module.get<EmailPreferencesService>(EmailPreferencesService);
     sendLogService = module.get<EmailSendLogService>(EmailSendLogService);
     transportService = module.get<EmailTransportService>(EmailTransportService);
+    bookAccessService = module.get<EmailBookAccessService>(EmailBookAccessService);
 
     (fs.createReadStream as vi.Mock).mockReturnValue('mock-stream');
   });
@@ -123,6 +137,8 @@ describe('EmailSendOrchestrator', () => {
       expect(result.queued).toBe(1);
       expect(providerResolver.resolve).toHaveBeenCalledWith(mockUser, 300);
       expect(sendLogService.create).toHaveBeenCalled();
+      expect(bookAccessService.assertUserCanAccessBooks).toHaveBeenCalledWith([1], mockUser);
+      expect(recipientService.getOwnedByIds).toHaveBeenCalledWith([10], mockUser);
     });
 
     it('should expand groups and queue emails', async () => {
@@ -131,12 +147,18 @@ describe('EmailSendOrchestrator', () => {
 
       expect(result.queued).toBe(1);
       expect(groupService.expandOwnedGroupToRecipientIds).toHaveBeenCalledWith(5, mockUser);
-      expect(recipientService.getOwnedById).toHaveBeenCalledWith(10, mockUser);
+      expect(recipientService.getOwnedByIds).toHaveBeenCalledWith([10], mockUser);
     });
 
     it('should throw BadRequestException if no recipients', async () => {
       const dto: SendBookDto = { bookIds: [1], recipientIds: [], groupIds: [] };
       await expect(orchestrator.send(dto, mockUser)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should fail if user cannot access requested books', async () => {
+      (bookAccessService.assertUserCanAccessBooks as vi.Mock).mockRejectedValue(new Error('No access to this library'));
+      const dto: SendBookDto = { bookIds: [1], recipientIds: [10] };
+      await expect(orchestrator.send(dto, mockUser)).rejects.toThrow('No access to this library');
     });
   });
 
@@ -147,6 +169,7 @@ describe('EmailSendOrchestrator', () => {
       const result = await orchestrator.quickSend(1, mockUser);
 
       expect(result.queued).toBe(1);
+      expect(bookAccessService.assertUserCanAccessBook).toHaveBeenCalledWith(1, mockUser);
       expect(recipientService.getOwnedById).toHaveBeenCalledWith(10, mockUser);
     });
 
@@ -173,6 +196,7 @@ describe('EmailSendOrchestrator', () => {
       const result = await orchestrator.resend(400, mockUser);
 
       expect(result.queued).toBe(1);
+      expect(bookAccessService.assertUserCanAccessBook).toHaveBeenCalledWith(1, mockUser);
       expect(sendLogService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           toEmail: 'resend@test.com',
@@ -229,7 +253,7 @@ describe('EmailSendOrchestrator', () => {
 
       expect(mockTransporter.sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: 'convert',
+          subject: KINDLE_CONVERT_SUBJECT,
         }),
       );
     });
@@ -243,7 +267,7 @@ describe('EmailSendOrchestrator', () => {
         templateId: 200,
         toEmail: 'resend@test.com',
         toName: 'Resend',
-        subject: 'convert',
+        subject: KINDLE_CONVERT_SUBJECT,
       };
       (sendLogService.getForResend as vi.Mock).mockResolvedValue(existingLog);
 
@@ -251,7 +275,7 @@ describe('EmailSendOrchestrator', () => {
 
       expect(sendLogService.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: 'convert',
+          subject: KINDLE_CONVERT_SUBJECT,
         }),
       );
     });

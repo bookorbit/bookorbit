@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { EmailEncryptionService } from './email-encryption.service';
@@ -8,6 +8,7 @@ import { EmailTransportService } from './email-transport.service';
 @Injectable()
 export class SystemMailService {
   private readonly logger = new Logger(SystemMailService.name);
+  private readonly event = 'system-mail.password-reset';
 
   constructor(
     private readonly repo: EmailProviderRepository,
@@ -22,17 +23,21 @@ export class SystemMailService {
   }
 
   async sendPasswordReset(to: string, name: string, rawToken: string): Promise<void> {
+    const startedAt = Date.now();
     const appUrl = (this.config.get<string>('app.appUrl') ?? '').replace(/\/+$/, '');
     const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+    this.logger.log(`[${this.event}] [start] toEmail=${to} - password reset send started`);
 
     if (this.config.get('app.nodeEnv') !== 'production') {
-      this.logger.log(`[DEV] Password reset URL for ${name}: ${resetUrl}`);
+      this.logger.debug(`[${this.event}] [start] toEmail=${to} - password reset requested in non-production environment`);
     }
 
     const [provider] = await this.repo.findSystemProvider();
     if (!provider) {
-      this.logger.warn('System mail provider not found when sending password reset - provider may have been removed');
-      return;
+      this.logger.error(
+        `[${this.event}] [fail] toEmail=${to} durationMs=${Date.now() - startedAt} errorClass=ServiceUnavailableException error="system mail provider not configured" - password reset send failed`,
+      );
+      throw new ServiceUnavailableException('System mail provider is not configured');
     }
 
     const password = provider.passwordEnc ? this.encryption.decrypt(provider.passwordEnc) : undefined;
@@ -56,10 +61,14 @@ export class SystemMailService {
         text: this.buildResetText(name, resetUrl),
         html: this.buildResetHtml(name, resetUrl),
       });
-      this.logger.log(`[system-mail.password-reset] [success] to=${to}`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[system-mail.password-reset] [fail] to=${to} error="${errorMessage}"`);
+      this.logger.log(`[${this.event}] [end] toEmail=${to} durationMs=${Date.now() - startedAt} - password reset send completed`);
+    } catch (error) {
+      const errorClass = error instanceof Error && error.name ? error.name : 'Error';
+      const errorMessage = this.sanitizeErrorMessage(error instanceof Error ? error.message : String(error));
+      this.logger.error(
+        `[${this.event}] [fail] toEmail=${to} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - password reset send failed`,
+      );
+      throw new ServiceUnavailableException('Password reset email delivery failed');
     }
   }
 
@@ -125,5 +134,12 @@ export class SystemMailService {
   </table>
 </body>
 </html>`;
+  }
+
+  private sanitizeErrorMessage(value: string): string {
+    return value
+      .replace(/[\r\n"]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }

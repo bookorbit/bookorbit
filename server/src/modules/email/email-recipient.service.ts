@@ -50,16 +50,24 @@ export class EmailRecipientService {
     return updated;
   }
 
-  async getById(id: number): Promise<EmailRecipient> {
-    const [recipient] = await this.repo.findById(id);
-    if (!recipient) throw new NotFoundException('Recipient not found');
+  async getOwnedById(id: number, user: RequestUser): Promise<EmailRecipient> {
+    const [recipient] = await this.getOwnedByIds([id], user);
     return recipient;
   }
 
-  async getOwnedById(id: number, user: RequestUser): Promise<EmailRecipient> {
-    const [recipient] = await this.repo.findById(id);
-    if (!recipient) throw new NotFoundException('Recipient not found');
-    if (recipient.userId !== user.id) throw new ForbiddenException('Cannot modify this recipient');
-    return recipient;
+  async getOwnedByIds(ids: number[], user: RequestUser): Promise<EmailRecipient[]> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) return [];
+
+    const recipients = await this.repo.findByIds(uniqueIds);
+    const recipientById = new Map(recipients.map((recipient) => [recipient.id, recipient]));
+    const missingId = uniqueIds.find((id) => !recipientById.has(id));
+    if (missingId !== undefined) throw new NotFoundException('Recipient not found');
+
+    for (const recipient of recipients) {
+      if (recipient.userId !== user.id) throw new ForbiddenException('Cannot modify this recipient');
+    }
+
+    return uniqueIds.map((id) => recipientById.get(id)!);
   }
 }

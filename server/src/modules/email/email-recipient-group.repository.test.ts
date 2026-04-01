@@ -1,10 +1,11 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
+  inArray: vi.fn((left: unknown, values: unknown[]) => ({ op: 'inArray', left, values })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 import { emailRecipientGroupMembers, emailRecipientGroups, emailRecipients } from '../../db/schema';
 import { EmailRecipientGroupRepository } from './email-recipient-group.repository';
@@ -89,6 +90,20 @@ describe('EmailRecipientGroupRepository', () => {
       op: 'eq',
       left: emailRecipientGroupMembers.groupId,
       right: 12,
+    });
+  });
+
+  it('findMembersForGroupIds batches membership lookup by group ids', () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new EmailRecipientGroupRepository(db as never);
+
+    void repo.findMembersForGroupIds([1, 2]);
+
+    expect(inArray).toHaveBeenCalledWith(emailRecipientGroupMembers.groupId, [1, 2]);
+    expect(selectBuilder.where).toHaveBeenCalledWith({
+      op: 'inArray',
+      left: emailRecipientGroupMembers.groupId,
+      values: [1, 2],
     });
   });
 

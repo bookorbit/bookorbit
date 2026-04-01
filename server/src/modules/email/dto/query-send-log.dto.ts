@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsPositive, Min } from 'class-validator';
+import { IsInt, IsOptional, IsPositive, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QuerySendLogDto {
@@ -12,5 +12,6 @@ export class QuerySendLogDto {
   @Type(() => Number)
   @IsInt()
   @IsPositive()
+  @Max(100)
   size?: number = 20;
 }

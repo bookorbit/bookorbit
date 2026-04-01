@@ -1,6 +1,8 @@
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
 import { EmailAdminLogController } from './email-admin-log.controller';
+import { EmailBookAccessService } from './email-book-access.service';
+import { EmailBookReadRepository } from './email-book-read.repository';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailFileSelector } from './email-file-selector';
 import { EmailModule } from './email.module';
@@ -27,6 +29,7 @@ import { EmailTemplateController } from './email-template.controller';
 import { EmailTemplateRepository } from './email-template.repository';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTransportService } from './email-transport.service';
+import { SystemMailService } from './system-mail.service';
 
 describe('EmailModule metadata', () => {
   it('registers all email controllers', () => {
@@ -66,13 +69,16 @@ describe('EmailModule metadata', () => {
         EmailPreferencesRepository,
         EmailPreferencesService,
         EmailProviderResolver,
+        EmailBookReadRepository,
+        EmailBookAccessService,
         EmailFileSelector,
         EmailSendLogRepository,
         EmailSendLogService,
         EmailSendOrchestrator,
+        SystemMailService,
       ]),
     );
 
-    expect(exportsList).toEqual(expect.arrayContaining([EmailSendOrchestrator, EmailTransportService, EmailEncryptionService]));
+    expect(exportsList).toEqual(expect.arrayContaining([EmailSendOrchestrator, EmailTransportService, EmailEncryptionService, SystemMailService]));
   });
 });

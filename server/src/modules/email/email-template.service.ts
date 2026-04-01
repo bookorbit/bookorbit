@@ -4,6 +4,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { EmailTemplateRepository } from './email-template.repository';
 import { EmailTemplateContextService } from './email-template-context.service';
 import { renderTemplate } from './email-template-renderer';
+import { EmailBookAccessService } from './email-book-access.service';
 import { CreateEmailTemplateDto } from './dto/create-email-template.dto';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import type { EmailTemplate } from '../../db/schema';
@@ -13,6 +14,7 @@ export class EmailTemplateService {
   constructor(
     private readonly repo: EmailTemplateRepository,
     private readonly contextService: EmailTemplateContextService,
+    private readonly bookAccessService: EmailBookAccessService,
   ) {}
 
   async findAll(user: RequestUser) {
@@ -73,6 +75,7 @@ export class EmailTemplateService {
 
   async preview(id: number, bookId: number, fileId: number | null, user: RequestUser) {
     const template = await this.getAccessible(id, user);
+    await this.bookAccessService.assertUserCanAccessBook(bookId, user);
     const context = await this.contextService.buildForBook(bookId, fileId, user.name);
     return renderTemplate(template.subject, template.bodyText, context);
   }

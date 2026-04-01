@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, eq, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -48,14 +48,6 @@ export class EmailProviderRepository {
       .update(emailProviders)
       .set({ isDefault: true, updatedAt: sql`now()` })
       .where(and(eq(emailProviders.id, id), eq(emailProviders.userId, userId)))
-      .returning();
-  }
-
-  setShared(id: number, isShared: boolean) {
-    return this.db
-      .update(emailProviders)
-      .set({ isShared, updatedAt: sql`now()` })
-      .where(and(eq(emailProviders.id, id), or(isNull(emailProviders.userId), eq(emailProviders.isShared, true))))
       .returning();
   }
 

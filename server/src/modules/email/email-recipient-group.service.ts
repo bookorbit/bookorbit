@@ -16,12 +16,23 @@ export class EmailRecipientGroupService {
 
   async findAll(user: RequestUser) {
     const groups = await this.repo.findAllForUser(user.id);
-    return Promise.all(
-      groups.map(async (group) => {
-        const memberRows = await this.repo.findMembers(group.id);
-        return { ...group, members: memberRows.map((r) => r.recipient) };
-      }),
-    );
+    if (groups.length === 0) return [];
+
+    const memberRows = await this.repo.findMembersForGroupIds(groups.map((group) => group.id));
+    const membersByGroupId = new Map<number, Array<(typeof memberRows)[number]>>();
+    for (const memberRow of memberRows) {
+      const rows = membersByGroupId.get(memberRow.groupId);
+      if (rows) {
+        rows.push(memberRow);
+      } else {
+        membersByGroupId.set(memberRow.groupId, [memberRow]);
+      }
+    }
+
+    return groups.map((group) => ({
+      ...group,
+      members: (membersByGroupId.get(group.id) ?? []).map((row) => row.recipient),
+    }));
   }
 
   async findOne(id: number, user: RequestUser) {

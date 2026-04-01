@@ -47,8 +47,6 @@ describe('Architecture boundaries', () => {
       'src/modules/book-metadata-fetch/book-metadata-fetch-config.service.ts',
       'src/modules/catalog/catalog.service.ts',
       'src/modules/cover/cover.service.ts',
-      'src/modules/email/email-template-context.service.ts',
-      'src/modules/embedding/book-embedder.service.ts',
       'src/modules/file-write/file-write-settings.service.ts',
       'src/modules/kobo/services/kobo-device.service.ts',
       'src/modules/kobo/services/kobo-download.service.ts',

@@ -38,6 +38,7 @@ describe('EmailRecipientGroupService', () => {
             findAllForUser: vi.fn().mockResolvedValue([mockGroup]),
             findById: vi.fn().mockResolvedValue([mockGroup]),
             findMembers: vi.fn().mockResolvedValue([mockMember]),
+            findMembersForGroupIds: vi.fn().mockResolvedValue([{ groupId: 10, recipient: mockMember.recipient }]),
             insert: vi.fn().mockResolvedValue([mockGroup]),
             update: vi.fn().mockResolvedValue([mockGroup]),
             delete: vi.fn(),
@@ -65,6 +66,7 @@ describe('EmailRecipientGroupService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].members).toHaveLength(1);
       expect(result[0].members[0].name).toBe('R1');
+      expect(repo.findMembersForGroupIds).toHaveBeenCalledWith([10]);
     });
   });
 

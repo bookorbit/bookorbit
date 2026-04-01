@@ -34,6 +34,7 @@ describe('EmailRecipientService', () => {
           useValue: {
             findAllForUser: vi.fn().mockResolvedValue([mockRecipient]),
             findById: vi.fn().mockResolvedValue([mockRecipient]),
+            findByIds: vi.fn().mockResolvedValue([mockRecipient]),
             insert: vi.fn().mockResolvedValue([mockRecipient]),
             update: vi.fn().mockResolvedValue([mockRecipient]),
             delete: vi.fn(),
@@ -95,8 +96,19 @@ describe('EmailRecipientService', () => {
     await expect(service.setDefault(10, mockUser)).rejects.toThrow(NotFoundException);
   });
 
-  it('should get by id', async () => {
-    const result = await service.getById(10);
+  it('should get owned recipients by ids', async () => {
+    const result = await service.getOwnedByIds([10], mockUser);
+    expect(result).toHaveLength(1);
+    expect(repo.findByIds).toHaveBeenCalledWith([10]);
+  });
+
+  it('should throw NotFoundException when one of requested recipients does not exist', async () => {
+    (repo.findByIds as vi.Mock).mockResolvedValue([]);
+    await expect(service.getOwnedByIds([10], mockUser)).rejects.toThrow(NotFoundException);
+  });
+
+  it('should get owned recipient by id', async () => {
+    const result = await service.getOwnedById(10, mockUser);
     expect(result.id).toBe(10);
   });
 });
