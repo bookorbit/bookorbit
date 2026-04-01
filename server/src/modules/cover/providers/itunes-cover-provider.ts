@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CoverSearchResult, type ITunesCoverResolution } from '@projectx/types';
 
 import { ProviderConfigService } from '../../metadata-preferences/provider-config.service';
-import { CoverProvider, CoverSearchParams } from './cover-provider';
+import { CoverProvider, CoverSearchParams, ITUNES_PROVIDER_KEY } from './cover-provider';
 
 type ITunesCoverSearchResult = {
   artworkUrl100?: string;
@@ -15,7 +15,7 @@ type ITunesCoverSearchResponse = {
 
 @Injectable()
 export class ITunesCoverProvider implements CoverProvider {
-  readonly key = 'itunes' as const;
+  readonly key = ITUNES_PROVIDER_KEY;
 
   private readonly logger = new Logger(ITunesCoverProvider.name);
   private static readonly SEARCH_URL = 'https://itunes.apple.com/search';

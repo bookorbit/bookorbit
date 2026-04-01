@@ -6,6 +6,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { CoverService } from './cover.service';
+import { SearchCoversQueryDto } from './dto/search-covers-query.dto';
 import { UploadCoverFromUrlDto } from './dto/upload-cover-from-url.dto';
 
 type MultipartRequest = FastifyRequest & { file: () => Promise<MultipartFile | undefined> };
@@ -16,17 +17,12 @@ export class CoverController {
 
   @Get('cover/search')
   @RequirePermission(Permission.LibraryEditMetadata)
-  async searchCovers(
-    @Query('title') title: string,
-    @Query('author') author?: string,
-    @Query('isAudiobook') isAudiobook?: string,
-    @Query('provider') provider?: string,
-  ) {
+  async searchCovers(@Query() query: SearchCoversQueryDto) {
     return this.coverService.searchCovers({
-      title,
-      author,
-      isAudiobook: isAudiobook === 'true',
-      provider,
+      title: query.title,
+      author: query.author,
+      isAudiobook: query.isAudiobook,
+      provider: query.provider,
     });
   }
 

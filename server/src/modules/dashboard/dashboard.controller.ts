@@ -16,6 +16,6 @@ export class DashboardController {
     @Query('lensId', new DefaultValuePipe(0), ParseIntPipe) lensId: number,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.dashboardService.getScroller(type, user, limit, lensId || undefined);
+    return this.dashboardService.getScroller(type, user, limit, lensId);
   }
 }

@@ -1,8 +1,13 @@
 import { CoverSearchResult } from '@projectx/types';
 
-export const COVER_PROVIDER_KEYS = ['duckduckgo', 'itunes'] as const;
+export const DUCKDUCKGO_PROVIDER_KEY = 'duckduckgo' as const;
+export const ITUNES_PROVIDER_KEY = 'itunes' as const;
+export const COVER_PROVIDER_KEYS = [DUCKDUCKGO_PROVIDER_KEY, ITUNES_PROVIDER_KEY] as const;
+export const COVER_PROVIDER_ALL_KEY = 'all' as const;
+export const DEFAULT_COVER_PROVIDER_KEY = DUCKDUCKGO_PROVIDER_KEY;
+
 export type CoverProviderKey = (typeof COVER_PROVIDER_KEYS)[number];
-export type CoverSearchProvider = CoverProviderKey | 'all';
+export type CoverSearchProvider = CoverProviderKey | typeof COVER_PROVIDER_ALL_KEY;
 
 export interface CoverSearchParams {
   title: string;

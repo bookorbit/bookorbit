@@ -1,20 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CoverSearchResult } from '@projectx/types';
-import { CoverProvider, CoverSearchParams } from './cover-provider';
+import { COVER_PROXY_USER_AGENT } from '../constants';
+import { CoverProvider, CoverSearchParams, DUCKDUCKGO_PROVIDER_KEY } from './cover-provider';
 
 @Injectable()
 export class DuckDuckGoCoverProvider implements CoverProvider {
   private readonly logger = new Logger(DuckDuckGoCoverProvider.name);
-  readonly key = 'duckduckgo';
+  readonly key = DUCKDUCKGO_PROVIDER_KEY;
 
   private static readonly SEARCH_BASE_URL = 'https://duckduckgo.com/?q=';
   private static readonly JSON_BASE_URL = 'https://duckduckgo.com/i.js?o=json&q=';
-  private static readonly SITE_FILTER = '+(site%3Aamazon.com+OR+site%3Agoodreads.com)';
   private static readonly SEARCH_PARAMS_TALL = '&iar=images&iaf=size%3ALarge%2Clayout%3ATall';
   private static readonly SEARCH_PARAMS_SQUARE = '&iar=images&iaf=size%3ALarge%2Clayout%3ASquare';
-
-  private static readonly USER_AGENT =
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
   async search(params: CoverSearchParams): Promise<CoverSearchResult[]> {
     const { title, author, isAudiobook } = params;
@@ -70,7 +67,7 @@ export class DuckDuckGoCoverProvider implements CoverProvider {
 
     const response = await fetch(searchUrl, {
       headers: {
-        'User-Agent': DuckDuckGoCoverProvider.USER_AGENT,
+        'User-Agent': COVER_PROXY_USER_AGENT,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
@@ -92,7 +89,7 @@ export class DuckDuckGoCoverProvider implements CoverProvider {
     const apiUrl = `${DuckDuckGoCoverProvider.JSON_BASE_URL}${encodeURIComponent(query)}${searchParams}&vqd=${vqd}`;
     const apiResponse = await fetch(apiUrl, {
       headers: {
-        'User-Agent': DuckDuckGoCoverProvider.USER_AGENT,
+        'User-Agent': COVER_PROXY_USER_AGENT,
         Accept: 'application/json, text/javascript, */*; q=0.01',
         Referer: searchUrl,
         'x-vqd-4': vqd,

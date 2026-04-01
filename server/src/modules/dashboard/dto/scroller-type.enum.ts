@@ -1,6 +1,5 @@
-export enum ScrollerType {
-  RECENTLY_ADDED = 'recently-added',
-  CONTINUE_READING = 'continue-reading',
-  RANDOM = 'random',
-  LENS = 'lens',
-}
+import { SCROLLER_TYPE } from '@projectx/types';
+import type { ScrollerType as SharedScrollerType } from '@projectx/types';
+
+export const ScrollerType = SCROLLER_TYPE;
+export type ScrollerType = SharedScrollerType;
