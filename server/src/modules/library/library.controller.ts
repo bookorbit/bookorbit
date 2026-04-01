@@ -116,21 +116,26 @@ export class LibraryController {
     const dryRun = dryRunParam === 'true';
 
     let disconnected = false;
+    let streamStarted = false;
     const handleDisconnect = () => {
       disconnected = true;
     };
 
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-
-    reply.raw.on('close', handleDisconnect);
-    reply.raw.on('aborted', handleDisconnect);
+    const ensureStreamStarted = () => {
+      if (streamStarted) return;
+      streamStarted = true;
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+      reply.raw.on('close', handleDisconnect);
+      reply.raw.on('aborted', handleDisconnect);
+    };
 
     const writeEvent = (event: LibraryFileSyncProgressEvent) => {
       if (disconnected || reply.raw.writableEnded || reply.raw.destroyed) return;
+      ensureStreamStarted();
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
@@ -149,12 +154,20 @@ export class LibraryController {
       };
       writeEvent(doneEvent);
 
-      if (!reply.raw.writableEnded && !reply.raw.destroyed) {
+      if (streamStarted && !reply.raw.writableEnded && !reply.raw.destroyed) {
         reply.raw.end();
       }
+    } catch (error) {
+      if (streamStarted && !reply.raw.writableEnded && !reply.raw.destroyed) {
+        reply.raw.end();
+        return;
+      }
+      throw error;
     } finally {
-      reply.raw.off('close', handleDisconnect);
-      reply.raw.off('aborted', handleDisconnect);
+      if (streamStarted) {
+        reply.raw.off('close', handleDisconnect);
+        reply.raw.off('aborted', handleDisconnect);
+      }
     }
   }
 

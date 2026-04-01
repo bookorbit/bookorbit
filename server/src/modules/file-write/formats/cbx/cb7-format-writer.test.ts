@@ -93,8 +93,8 @@ describe('Cb7FormatWriter', () => {
     const result = await writer.write('/book.cb7', { title: 'Dune' }, { fieldMask: new Set(['title']), dryRun: false });
 
     expect(mockBuildComicInfoXml).toHaveBeenCalledWith('<ComicInfo><Title>Old</Title></ComicInfo>', { title: 'Dune' }, new Set(['title']));
-    expect(sz.callMain).toHaveBeenCalledWith(['d', '/cbx-arc-abcdef123', 'ComicInfo.xml', '-y']);
-    expect(sz.callMain).toHaveBeenCalledWith(['a', '/cbx-arc-abcdef123', '/ComicInfo.xml']);
+    expect(sz.callMain).toHaveBeenCalledWith(['d', '/cbx-arc-abcdef123.cb7', 'ComicInfo.xml', '-y']);
+    expect(sz.callMain).toHaveBeenCalledWith(['a', '/cbx-arc-abcdef123.cb7', '/ComicInfo.xml']);
     expect(mockWriteFile).toHaveBeenCalledWith('/.cbx-write-abcdef123', Buffer.from('modified-archive-bytes'));
     expect(mockRename).toHaveBeenCalledWith('/.cbx-write-abcdef123', '/book.cb7');
     expect(result.status).toBe('success');

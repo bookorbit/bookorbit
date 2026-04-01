@@ -13,7 +13,7 @@ function escapeIdentifier(identifier: string): string {
 }
 
 function resolveTargetDatabaseUrl(): URL {
-  const connectionString = process.env.DATABASE_URL ?? process.env.E2E_DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
+  const connectionString = process.env.E2E_DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
   return new URL(connectionString);
 }
 

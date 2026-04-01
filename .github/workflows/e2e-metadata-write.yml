@@ -1,0 +1,48 @@
+name: Metadata Write E2E
+run-name: ${{ format('Metadata Write E2E - {0}', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "server/src/modules/book/**"
+      - "server/src/modules/library/**"
+      - "server/src/modules/file-write/**"
+      - "server/src/modules/metadata/**"
+      - "server/src/modules/app-settings/**"
+      - "server/test/metadata-write.e2e-spec.ts"
+      - "server/test/e2e/metadata-write/**"
+      - "server/src/db/schema/**"
+      - "packages/types/src/file-write.ts"
+      - "scripts/test/**"
+      - "scripts/db/**"
+  pull_request:
+    paths:
+      - "server/src/modules/book/**"
+      - "server/src/modules/library/**"
+      - "server/src/modules/file-write/**"
+      - "server/src/modules/metadata/**"
+      - "server/src/modules/app-settings/**"
+      - "server/test/metadata-write.e2e-spec.ts"
+      - "server/test/e2e/metadata-write/**"
+      - "server/src/db/schema/**"
+      - "packages/types/src/file-write.ts"
+      - "scripts/test/**"
+      - "scripts/db/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  metadata-write-e2e:
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: metadata-write
+      check-name: Server Metadata Write E2E
+      artifact-name: metadata-write-e2e-report
+      job-timeout-minutes: 60

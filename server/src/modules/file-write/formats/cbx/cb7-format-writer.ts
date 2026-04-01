@@ -18,6 +18,7 @@ import { buildComicInfoXml } from './comic-info-builder';
 // The XML path is shared but safe: it is only used within synchronous blocks and
 // is always written before it is added to the archive, with no await in between.
 const VFS_XML_PATH = '/ComicInfo.xml';
+const ENOENT_ERRNO = 44;
 
 @Injectable()
 export class Cb7FormatWriter implements FormatWriter {
@@ -33,7 +34,7 @@ export class Cb7FormatWriter implements FormatWriter {
     }
 
     const uid = randomUUID().replace(/-/g, '');
-    const vfsArchivePath = `/cbx-arc-${uid}`;
+    const vfsArchivePath = `/cbx-arc-${uid}.cb7`;
     const vfsExtractDir = `/cbx-ext-${uid}`;
 
     const sz = await getSevenZip();
@@ -63,14 +64,6 @@ export class Cb7FormatWriter implements FormatWriter {
       const xml = buildComicInfoXml(existingXml, payload, fieldMask);
       const xmlBytes = Buffer.from(xml, 'utf-8');
 
-      try {
-        sz.FS.unlink(VFS_XML_PATH);
-      } catch (error) {
-        if (!isMissingVfsPathError(error)) {
-          throw error;
-        }
-        // Not present - expected on first write
-      }
       const fd2 = sz.FS.open(VFS_XML_PATH, 'w+');
       sz.FS.write(fd2, xmlBytes, 0, xmlBytes.length);
       sz.FS.close(fd2);
@@ -99,6 +92,7 @@ export class Cb7FormatWriter implements FormatWriter {
 function cleanupVfs(vfs: SevenZipFS, archivePath: string, extractDir: string): void {
   unlinkIfExists(vfs, VFS_XML_PATH);
   unlinkIfExists(vfs, archivePath);
+  unlinkIfExists(vfs, `${archivePath}.7z`);
 
   const files = readDirIfExists(vfs, extractDir);
   if (!files) return;
@@ -144,6 +138,9 @@ function isMissingComicInfoError(error: unknown): boolean {
 }
 
 function isMissingVfsPathError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'errno' in error && (error as { errno?: unknown }).errno === ENOENT_ERRNO) {
+    return true;
+  }
   const message = normalizeErrorMessage(error);
   return (
     message.includes('no such file') || message.includes('not found') || message.includes('does not exist') || message.includes('path not found')

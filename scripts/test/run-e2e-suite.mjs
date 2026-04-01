@@ -105,7 +105,7 @@ async function main() {
 
   mkdirSync(resultsDir, { recursive: true });
 
-  const e2eDatabaseUrl = process.env.E2E_DATABASE_URL ?? process.env.DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
+  const e2eDatabaseUrl = process.env.E2E_DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
   if (!isCiEnvironment() && suites.some((suite) => suite.prepareDedicatedDatabase)) {
     console.log("Starting local PostgreSQL (dev compose)...");
     await runCommand("pnpm", ["run", "db:up"]);

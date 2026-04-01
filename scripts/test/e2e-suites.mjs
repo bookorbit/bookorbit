@@ -49,6 +49,14 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "metadata-write": {
+    id: "metadata-write",
+    description: "Metadata write operations suite",
+    vitestTarget: "test/metadata-write.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/metadata-write-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
 });
 
 export function listE2ESuites() {
