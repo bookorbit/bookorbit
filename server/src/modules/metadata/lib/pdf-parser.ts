@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -7,7 +7,7 @@ import { PDFDocument } from 'pdf-lib';
 
 import { extractXmpXml, parseXmp, type XmpParsed } from './pdf-xmp-reader';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface PdfParsed {
   title: string | null;
@@ -52,7 +52,7 @@ async function extractPdfCover(absolutePath: string): Promise<Buffer | null> {
   const tmpDir = await mkdtemp(join(tmpdir(), 'pdf-cover-'));
   try {
     const outPrefix = join(tmpDir, 'cover');
-    await execAsync(`pdftoppm -jpeg -r 150 -f 1 -l 1 "${absolutePath}" "${outPrefix}"`);
+    await execFileAsync('pdftoppm', ['-jpeg', '-r', '150', '-f', '1', '-l', '1', absolutePath, outPrefix]);
     const files = await readdir(tmpDir);
     const coverFile = files.find((f) => f.endsWith('.jpg'));
     if (!coverFile) return null;

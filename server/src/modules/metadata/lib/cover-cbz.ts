@@ -1,15 +1,5 @@
 import { readFile } from 'fs/promises';
-
-const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
-
-function isImage(name: string): boolean {
-  const dot = name.lastIndexOf('.');
-  return dot !== -1 && IMAGE_EXTS.has(name.substring(dot).toLowerCase());
-}
-
-function isHidden(name: string): boolean {
-  return name.split('/').some((part) => part.startsWith('.'));
-}
+import { isArchiveImageFile, isHiddenArchivePath } from './archive-image-utils';
 
 /**
  * Locate the end-of-central-directory record by scanning backwards from the end
@@ -59,7 +49,7 @@ export async function extractCbzCover(absolutePath: string): Promise<Buffer | nu
 
       const fileName = buf.subarray(pos + 46, pos + 46 + fileNameLen).toString('utf-8');
 
-      if (!fileName.endsWith('/') && !isHidden(fileName) && isImage(fileName)) {
+      if (!fileName.endsWith('/') && !isHiddenArchivePath(fileName) && isArchiveImageFile(fileName)) {
         // Skip to actual data by re-reading the LFH header lengths at lfhOffset.
         // The CDR has the correct compressedSize even when data descriptors are used.
         const lfhFileNameLen = buf.readUInt16LE(lfhOffset + 26);

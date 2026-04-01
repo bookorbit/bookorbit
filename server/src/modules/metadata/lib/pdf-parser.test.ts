@@ -5,7 +5,7 @@ vi.mock('fs/promises', () => ({
   rm: vi.fn(),
 }));
 
-vi.mock('child_process', () => ({ exec: vi.fn() }));
+vi.mock('child_process', () => ({ execFile: vi.fn() }));
 
 vi.mock('pdf-lib', () => ({
   PDFDocument: {
@@ -18,14 +18,14 @@ vi.mock('./pdf-xmp-reader', () => ({
   parseXmp: vi.fn(),
 }));
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
 import { PDFDocument } from 'pdf-lib';
 
 import { extractXmpXml, parseXmp } from './pdf-xmp-reader';
 import { parsePdfFile } from './pdf-parser';
 
-const mockExec = exec as unknown as vi.Mock;
+const mockExecFile = execFile as unknown as vi.Mock;
 const mockMkdtemp = mkdtemp as MockedFunction<typeof mkdtemp>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
@@ -35,7 +35,7 @@ const mockExtractXmpXml = extractXmpXml as MockedFunction<typeof extractXmpXml>;
 const mockParseXmp = parseXmp as MockedFunction<typeof parseXmp>;
 
 function mockExecSuccess() {
-  mockExec.mockImplementation((_cmd: string, cb: (err: Error | null, stdout?: string, stderr?: string) => void) => {
+  mockExecFile.mockImplementation((_file: string, _args: string[], cb: (err: Error | null, stdout?: string, stderr?: string) => void) => {
     cb(null, '', '');
   });
 }
@@ -120,7 +120,7 @@ describe('parsePdfFile', () => {
 
   it('returns null coverBuffer when pdftoppm command fails, but still returns metadata', async () => {
     mockExtractXmpXml.mockReturnValue(null);
-    mockExec.mockImplementation((_cmd: string, cb: (err: Error | null) => void) => cb(new Error('pdftoppm missing')));
+    mockExecFile.mockImplementation((_file: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error('pdftoppm missing')));
 
     const parsed = await parsePdfFile('/books/book.pdf');
 

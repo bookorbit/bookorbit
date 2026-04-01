@@ -2,6 +2,7 @@ vi.mock('fs/promises', () => ({
   mkdir: vi.fn(),
   writeFile: vi.fn(),
   readdir: vi.fn().mockResolvedValue([]),
+  rm: vi.fn(),
 }));
 
 vi.mock('./lib/cover', () => ({
@@ -75,9 +76,9 @@ vi.mock('./extractors/audio.extractor', () => ({
   parseAudioDuration: vi.fn().mockImplementation(() => Promise.resolve(null)),
 }));
 
-import { mkdir, readdir, writeFile } from 'fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'fs/promises';
 
-import { authors, bookAuthors, bookMetadata } from '../../db/schema';
+import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
 import { generateThumbnail, imageExt } from './lib/cover';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
@@ -88,6 +89,7 @@ import { MetadataService } from './metadata.service';
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockWriteFile = writeFile as MockedFunction<typeof writeFile>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
+const mockRm = rm as MockedFunction<typeof rm>;
 const mockGenerateThumbnail = generateThumbnail as MockedFunction<typeof generateThumbnail>;
 const mockImageExt = imageExt as MockedFunction<typeof imageExt>;
 const mockParseBookFilename = parseBookFilename as MockedFunction<typeof parseBookFilename>;
@@ -112,12 +114,14 @@ const makeDb = () => {
     onConflictDoNothing: insertOnConflictDoNothing,
   });
 
-  const db = {
+  const db: any = {
     update: vi.fn().mockReturnValue({ set: updateSet }),
     delete: vi.fn().mockReturnValue(deleteBuilder),
     select: vi.fn().mockReturnValue({ from: selectFrom }),
     insert: vi.fn().mockReturnValue({ values: insertValues }),
   };
+  const transaction = vi.fn().mockImplementation(async (callback: (tx: typeof db) => Promise<unknown>) => callback(db));
+  db.transaction = transaction;
 
   return {
     db,
@@ -126,6 +130,7 @@ const makeDb = () => {
     deleteWhere,
     selectLimit,
     insertValues,
+    transaction,
   };
 };
 
@@ -142,6 +147,7 @@ describe('MetadataService', () => {
     mockMkdir.mockResolvedValue(undefined);
     mockWriteFile.mockResolvedValue(undefined);
     mockReaddir.mockResolvedValue([]);
+    mockRm.mockResolvedValue(undefined);
     mockGenerateThumbnail.mockResolvedValue(Buffer.from('thumbnail-bytes'));
     mockImageExt.mockReturnValue('png');
     mockParseBookFilename.mockReturnValue({ title: 'Fallback Title', publishedYear: 2001 });
@@ -172,6 +178,25 @@ describe('MetadataService', () => {
     expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/9/thumbnail.jpg', Buffer.from('thumbnail-bytes'));
     expect(db.update).toHaveBeenCalledWith(bookMetadata);
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ coverSource: 'extracted', updatedAt: expect.any(Date) }));
+  });
+
+  it('saveExtractedCoverBytes removes stale extracted files before writing new cover', async () => {
+    const { db } = makeDb();
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
+    mockReaddir.mockResolvedValue(['cover_extracted.jpg', 'cover_extracted.png']);
+
+    await service.saveExtractedCoverBytes(11, Buffer.from('image-bytes'));
+
+    expect(mockRm).toHaveBeenCalledWith('/books/covers/11/cover_extracted.jpg', { force: true });
+    expect(mockRm).toHaveBeenCalledWith('/books/covers/11/cover_extracted.png', { force: true });
+    expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/11/cover_extracted.png', Buffer.from('image-bytes'));
   });
 
   it('downloadAndSaveCover no-ops on empty payloads and network failures', async () => {
@@ -309,7 +334,7 @@ describe('MetadataService', () => {
   });
 
   it('replaceAuthors normalizes names and deduplicates case-insensitively before db writes', async () => {
-    const { db, deleteWhere } = makeDb();
+    const { db, deleteWhere, transaction } = makeDb();
     const service = new MetadataService(
       db as never,
       config as never,
@@ -358,6 +383,7 @@ describe('MetadataService', () => {
       { name: '   ', sortName: null },
     ]);
 
+    expect(transaction).toHaveBeenCalledTimes(1);
     expect(db.delete).toHaveBeenCalledWith(bookAuthors);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
     expect(db.select).not.toHaveBeenCalled();
@@ -458,6 +484,110 @@ describe('MetadataService', () => {
     await service.replaceAuthors(7, [{ name: 'New Author', sortName: null }]);
 
     expect(metadataEvents.emit).toHaveBeenCalledWith(METADATA_AUTHORS_REPLACED, { bookId: 7, authorIds: [81] });
+  });
+
+  it('replaceGenres runs in transaction and normalizes unique names', async () => {
+    const { db, transaction } = makeDb();
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
+    const insertedGenres: string[] = [];
+    const insertedBookGenres: Array<{ bookId: number; genreId: number }> = [];
+
+    db.select.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    }));
+    db.insert.mockImplementation((table: unknown) => {
+      if (table === genres) {
+        return {
+          values: (row: { name: string }) => {
+            insertedGenres.push(row.name);
+            return {
+              onConflictDoNothing: () => ({
+                returning: () => Promise.resolve([{ id: 77 }]),
+              }),
+            };
+          },
+        };
+      }
+      if (table === bookGenres) {
+        return {
+          values: (row: { bookId: number; genreId: number }) => {
+            insertedBookGenres.push(row);
+            return { onConflictDoNothing: () => Promise.resolve(undefined) };
+          },
+        };
+      }
+      throw new Error('unexpected table in insert');
+    });
+
+    await service.replaceGenres(12, [' Fantasy ', 'Fantasy', '', 'X'.repeat(250)]);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(db.delete).toHaveBeenCalledWith(bookGenres);
+    expect(insertedGenres).toEqual(['Fantasy', 'X'.repeat(200)]);
+    expect(insertedBookGenres).toEqual([
+      { bookId: 12, genreId: 77 },
+      { bookId: 12, genreId: 77 },
+    ]);
+  });
+
+  it('replaceTags runs in transaction and normalizes unique names', async () => {
+    const { db, transaction } = makeDb();
+    const service = new MetadataService(
+      db as never,
+      config as never,
+      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
+      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
+      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
+      embedder as never,
+    );
+    const insertedTags: string[] = [];
+
+    db.select.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    }));
+    db.insert.mockImplementation((table: unknown) => {
+      if (table === tags) {
+        return {
+          values: (row: { name: string }) => {
+            insertedTags.push(row.name);
+            return {
+              onConflictDoNothing: () => ({
+                returning: () => Promise.resolve([{ id: 88 }]),
+              }),
+            };
+          },
+        };
+      }
+      if (table === bookTags) {
+        return {
+          values: () => ({
+            onConflictDoNothing: () => Promise.resolve(undefined),
+          }),
+        };
+      }
+      throw new Error('unexpected table in insert');
+    });
+
+    await service.replaceTags(19, [' Shelf ', 'Shelf', '', 'Y'.repeat(230)]);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(db.delete).toHaveBeenCalledWith(bookTags);
+    expect(insertedTags).toEqual(['Shelf', 'Y'.repeat(200)]);
   });
 
   it('aggregateAudioDuration sums only files that match the selected primary audio format', async () => {

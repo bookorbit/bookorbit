@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { mkdir, readdir, writeFile } from 'fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 import { DB } from '../../db';
@@ -26,6 +26,13 @@ import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-eve
 
 type Db = NodePgDatabase<typeof schema>;
 
+const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] as const;
+const MAX_RELATION_NAME_LENGTH = 200;
+const CUSTOM_COVER_FILE_PREFIX = 'cover_custom.';
+const EXTRACTED_COVER_FILE_PREFIX = 'cover_extracted.';
+const THUMBNAIL_FILE_NAME = 'thumbnail.jpg';
+const EXTRACTED_COVER_SOURCE = 'extracted';
+
 @Injectable()
 export class MetadataService {
   private readonly logger = new Logger(MetadataService.name);
@@ -37,7 +44,7 @@ export class MetadataService {
     private readonly config: ConfigService,
     private readonly scoreService: MetadataScoreService,
     private readonly narratorService: NarratorService,
-    private readonly comicMetadataService: ComicMetadataRepository,
+    private readonly comicMetadataRepository: ComicMetadataRepository,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {
@@ -54,27 +61,56 @@ export class MetadataService {
       ['cbr', new ComicFormatExtractor('cbr')],
       ['cb7', new ComicFormatExtractor('cb7')],
       ['fb2', new Fb2FormatExtractor()],
-      ['m4b', audio],
-      ['mp3', audio],
-      ['m4a', audio],
-      ['opus', audio],
-      ['ogg', audio],
-      ['flac', audio],
     ]);
+
+    for (const format of AUDIO_FORMATS) {
+      this.extractorMap.set(format, audio);
+    }
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
 
   async extractAndSave(bookId: number, absolutePath: string, format: string): Promise<void> {
-    const extractor = this.extractorMap.get(format);
-    if (!extractor) return;
+    const event = 'metadata.extract_and_save';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] bookId=${bookId} format=${format} - metadata extraction started`);
 
-    const data = await extractor.extract(absolutePath);
-    if (!data) return;
+    try {
+      const extractor = this.extractorMap.get(format);
+      if (!extractor) {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} extractorFound=false - metadata extraction skipped`,
+        );
+        return;
+      }
 
-    await Promise.all([this.persistMetadata(bookId, data, format), data.cover ? this.persistCover(bookId, data.cover, true) : Promise.resolve()]);
+      const data = await extractor.extract(absolutePath);
+      if (!data) {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} parsed=false - metadata extraction skipped`,
+        );
+        return;
+      }
 
-    this.scoreService.calculateAndSave(bookId).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${bookId}: ${err.message}`));
+      await Promise.all([this.persistMetadata(bookId, data, format), data.cover ? this.persistCover(bookId, data.cover, true) : Promise.resolve()]);
+
+      this.scoreService.calculateAndSave(bookId).catch((error: Error) => {
+        this.logger.warn(
+          `[metadata.score_calculation] [fail] bookId=${bookId} errorClass=${error.name} error="${error.message.replace(/"/g, '\\"')}" - metadata score calculation failed`,
+        );
+      });
+
+      this.logger.debug(
+        `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} coverExtracted=${data.cover != null} - metadata extraction completed`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata extraction failed`,
+      );
+      throw error;
+    }
   }
 
   // Called when ebook is the winner but audio files are also present.
@@ -100,16 +136,33 @@ export class MetadataService {
   }
 
   async downloadAndSaveCover(url: string, bookId: number): Promise<boolean> {
+    const event = 'metadata.cover_download';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] bookId=${bookId} - cover download started`);
+
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} saved=false status=${res.status} - cover download skipped`,
+        );
+        return false;
+      }
       const buffer = Buffer.from(await res.arrayBuffer());
-      if (buffer.length === 0) return false;
+      if (buffer.length === 0) {
+        this.logger.debug(`[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} saved=false empty=true - cover download skipped`);
+        return false;
+      }
+
       await this.persistCover(bookId, buffer, true);
-      this.logger.debug(`Online cover saved for book ${bookId}`);
+      this.logger.debug(`[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} saved=true - cover download completed`);
       return true;
-    } catch (err) {
-      this.logger.warn(`Cover download failed for book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover download failed`,
+      );
       return false;
     }
   }
@@ -119,14 +172,35 @@ export class MetadataService {
   }
 
   async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {
+    const event = 'metadata.cover_refresh';
+    const startedAt = Date.now();
     const extractor = this.extractorMap.get(format);
-    if (!extractor) return false;
+    if (!extractor) {
+      this.logger.debug(
+        `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=false extractorFound=false - cover refresh skipped`,
+      );
+      return false;
+    }
+
     try {
       const data = await extractor.extract(absolutePath);
-      if (!data?.cover) return false;
+      if (!data?.cover) {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=false coverFound=false - cover refresh skipped`,
+        );
+        return false;
+      }
       await this.persistCover(bookId, data.cover, false);
+      this.logger.debug(
+        `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=true - cover refresh completed`,
+      );
       return true;
-    } catch {
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover refresh failed`,
+      );
       return false;
     }
   }
@@ -143,12 +217,11 @@ export class MetadataService {
   }
 
   async aggregateAudioDuration(bookId: number): Promise<void> {
-    const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'];
     const [primary] = await this.db
       .select({ format: schema.bookFiles.format })
       .from(schema.books)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, AUDIO_FORMATS)));
+      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, [...AUDIO_FORMATS])));
     if (!primary?.format) return;
 
     const rows = await this.db
@@ -165,16 +238,12 @@ export class MetadataService {
   // ── Authors ──────────────────────────────────────────────────────────────────
 
   async replaceAuthors(bookId: number, parsedAuthors: { name: string; sortName: string | null }[]) {
-    await this.db.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
-
     const normalized = parsedAuthors
       .map((author) => ({
         name: author.name.trim(),
         sortName: author.sortName?.trim() || null,
       }))
       .filter((author) => author.name.length > 0);
-
-    if (normalized.length === 0) return;
 
     const seen = new Set<string>();
     const unique = normalized.filter((author) => {
@@ -184,19 +253,27 @@ export class MetadataService {
       return true;
     });
 
-    const linkedAuthorIds: number[] = [];
+    const linkedAuthorIds = await this.db.transaction(async (tx) => {
+      await tx.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
 
-    for (let i = 0; i < unique.length; i++) {
-      const { name, sortName } = unique[i];
+      if (unique.length === 0) return [] as number[];
 
-      let [author] = await this.db.insert(authors).values({ name, sortName }).onConflictDoNothing().returning();
-      if (!author) {
-        [author] = await this.db.select().from(authors).where(eq(authors.name, name)).limit(1);
+      const authorIds: number[] = [];
+      for (let index = 0; index < unique.length; index += 1) {
+        const { name, sortName } = unique[index];
+
+        let [author] = await tx.insert(authors).values({ name, sortName }).onConflictDoNothing().returning();
+        if (!author) {
+          [author] = await tx.select().from(authors).where(eq(authors.name, name)).limit(1);
+        }
+        if (!author) continue;
+
+        await tx.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: index }).onConflictDoNothing();
+        authorIds.push(author.id);
       }
 
-      await this.db.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: i }).onConflictDoNothing();
-      linkedAuthorIds.push(author.id);
-    }
+      return authorIds;
+    });
 
     if (linkedAuthorIds.length > 0) {
       this.metadataEvents?.emit(METADATA_AUTHORS_REPLACED, {
@@ -213,33 +290,43 @@ export class MetadataService {
   }
 
   async replaceGenres(bookId: number, parsedGenres: string[]) {
-    await this.db.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
-    const unique = [...new Set(parsedGenres.map((g) => g.trim().substring(0, 200)).filter(Boolean))];
-    if (unique.length === 0) return;
+    const uniqueGenres = this.normalizeUniqueRelationNames(parsedGenres);
 
-    for (const name of unique) {
-      let [genre] = await this.db.insert(genres).values({ name }).onConflictDoNothing().returning();
-      if (!genre) {
-        [genre] = await this.db.select().from(genres).where(eq(genres.name, name)).limit(1);
+    await this.db.transaction(async (tx) => {
+      await tx.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
+      if (uniqueGenres.length === 0) return;
+
+      for (const genreName of uniqueGenres) {
+        let [genre] = await tx.insert(genres).values({ name: genreName }).onConflictDoNothing().returning();
+        if (!genre) {
+          [genre] = await tx.select().from(genres).where(eq(genres.name, genreName)).limit(1);
+        }
+        if (!genre) continue;
+
+        await tx.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
       }
-      await this.db.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
-    }
+    });
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
 
   async replaceTags(bookId: number, userTags: string[]) {
-    await this.db.delete(bookTags).where(eq(bookTags.bookId, bookId));
-    const unique = [...new Set(userTags.map((t) => t.trim().substring(0, 200)).filter(Boolean))];
-    if (unique.length === 0) return;
+    const uniqueTags = this.normalizeUniqueRelationNames(userTags);
 
-    for (const name of unique) {
-      let [tag] = await this.db.insert(tags).values({ name }).onConflictDoNothing().returning();
-      if (!tag) {
-        [tag] = await this.db.select().from(tags).where(eq(tags.name, name)).limit(1);
+    await this.db.transaction(async (tx) => {
+      await tx.delete(bookTags).where(eq(bookTags.bookId, bookId));
+      if (uniqueTags.length === 0) return;
+
+      for (const tagName of uniqueTags) {
+        let [tag] = await tx.insert(tags).values({ name: tagName }).onConflictDoNothing().returning();
+        if (!tag) {
+          [tag] = await tx.select().from(tags).where(eq(tags.name, tagName)).limit(1);
+        }
+        if (!tag) continue;
+
+        await tx.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
       }
-      await this.db.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
-    }
+    });
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────────
@@ -250,7 +337,11 @@ export class MetadataService {
     } else {
       await this.persistBookMetadata(bookId, data, format);
     }
-    this.embedder?.embedBook(bookId).catch((err: Error) => this.logger.warn(`Embedding failed for book ${bookId}: ${err.message}`));
+    this.embedder?.embedBook(bookId).catch((error: Error) => {
+      this.logger.warn(
+        `[metadata.embedding] [fail] bookId=${bookId} errorClass=${error.name} error="${error.message.replace(/"/g, '\\"')}" - book embedding failed`,
+      );
+    });
   }
 
   private async persistAudioMetadata(bookId: number, data: ParsedBookData): Promise<void> {
@@ -274,7 +365,9 @@ export class MetadataService {
       await this.narratorService.replaceForBook(bookId, data.narrators);
     }
 
-    this.logger.debug(`Audio metadata saved for book ${bookId}: "${data.title}"`);
+    this.logger.debug(
+      `[metadata.persist_audio] [end] bookId=${bookId} title="${(data.title ?? '').replace(/"/g, '\\"')}" - audio metadata persisted`,
+    );
   }
 
   private async persistBookMetadata(bookId: number, data: ParsedBookData, format: string): Promise<void> {
@@ -303,10 +396,12 @@ export class MetadataService {
     }
 
     if (data.comicMetadata) {
-      await this.comicMetadataService.upsert(bookId, data.comicMetadata);
+      await this.comicMetadataRepository.upsert(bookId, data.comicMetadata);
     }
 
-    this.logger.debug(`Metadata saved for book ${bookId}: "${data.title}" (${format})`);
+    this.logger.debug(
+      `[metadata.persist_book] [end] bookId=${bookId} format=${format} title="${(data.title ?? '').replace(/"/g, '\\"')}" - book metadata persisted`,
+    );
   }
 
   // ── Cover ────────────────────────────────────────────────────────────────────
@@ -324,22 +419,29 @@ export class MetadataService {
     await mkdir(dir, { recursive: true });
 
     const files = await readdir(dir).catch(() => [] as string[]);
-    const hasCustom = files.some((f) => f.startsWith('cover_custom.'));
+    const hasCustom = files.some((fileName) => fileName.startsWith(CUSTOM_COVER_FILE_PREFIX));
 
-    await writeFile(join(dir, `cover_extracted.${ext}`), bytes);
+    const staleExtractedFiles = files.filter((fileName) => fileName.startsWith(EXTRACTED_COVER_FILE_PREFIX));
+    await Promise.all(staleExtractedFiles.map((fileName) => rm(join(dir, fileName), { force: true })));
+
+    await writeFile(join(dir, `${EXTRACTED_COVER_FILE_PREFIX}${ext}`), bytes);
 
     if (!hasCustom) {
       const thumbnail = await generateThumbnail(bytes);
-      await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
+      await writeFile(join(dir, THUMBNAIL_FILE_NAME), thumbnail);
     }
 
     if (overwrite) {
-      await this.db.update(bookMetadata).set({ coverSource: 'extracted', updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId));
+      await this.db.update(bookMetadata).set({ coverSource: EXTRACTED_COVER_SOURCE, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId));
     } else {
       await this.db
         .update(bookMetadata)
-        .set({ coverSource: 'extracted' })
+        .set({ coverSource: EXTRACTED_COVER_SOURCE })
         .where(and(eq(bookMetadata.bookId, bookId), isNull(bookMetadata.coverSource)));
     }
+  }
+
+  private normalizeUniqueRelationNames(values: string[]): string[] {
+    return [...new Set(values.map((value) => value.trim().substring(0, MAX_RELATION_NAME_LENGTH)).filter(Boolean))];
   }
 }

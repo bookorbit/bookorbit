@@ -1,16 +1,6 @@
 import { readFile } from 'fs/promises';
 import { createExtractorFromData } from 'node-unrar-js';
-
-const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
-
-function isImage(name: string): boolean {
-  const dot = name.lastIndexOf('.');
-  return dot !== -1 && IMAGE_EXTS.has(name.substring(dot).toLowerCase());
-}
-
-function isHidden(name: string): boolean {
-  return name.split('/').some((p) => p.startsWith('.'));
-}
+import { isArchiveImageFile, isHiddenArchivePath } from './archive-image-utils';
 
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
@@ -25,7 +15,7 @@ export async function extractCbrCover(absolutePath: string): Promise<Buffer | nu
     const listExtractor = await createExtractorFromData({ data: ab });
     const { fileHeaders } = listExtractor.getFileList();
     const images = [...fileHeaders]
-      .filter((h) => !h.flags.directory && isImage(h.name) && !isHidden(h.name))
+      .filter((h) => !h.flags.directory && isArchiveImageFile(h.name) && !isHiddenArchivePath(h.name))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
     if (images.length === 0) return null;

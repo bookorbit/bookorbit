@@ -1,4 +1,3 @@
-vi.mock('fs/promises');
 vi.mock('./cover-epub', () => ({ extractEpubCover: vi.fn() }));
 vi.mock('./cover-cbz', () => ({ extractCbzCover: vi.fn() }));
 vi.mock('./cover-cbr', () => ({ extractCbrCover: vi.fn() }));
@@ -17,7 +16,6 @@ vi.mock('sharp', () => {
   return { __esModule: true, default: mockFn };
 });
 
-import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
 import { extractCb7Cover } from './cover-cb7';
@@ -26,12 +24,7 @@ import { extractCbzCover } from './cover-cbz';
 import { extractEpubCover } from './cover-epub';
 import { extractFb2Cover } from './cover-fb2';
 import { extractMobiCover } from './mobi-parser';
-import { coverDirPath, extractAndSaveCover, extractCover, generateThumbnail, imageExt } from './cover';
-
-const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
-const mockReadFile = readFile as MockedFunction<typeof readFile>;
-const mockReaddir = readdir as MockedFunction<typeof readdir>;
-const mockWriteFile = writeFile as MockedFunction<typeof writeFile>;
+import { coverDirPath, extractCover, generateThumbnail, imageExt } from './cover';
 const mockEpub = extractEpubCover as MockedFunction<typeof extractEpubCover>;
 const mockMobi = extractMobiCover as MockedFunction<typeof extractMobiCover>;
 const mockCbz = extractCbzCover as MockedFunction<typeof extractCbzCover>;
@@ -40,7 +33,6 @@ const mockCb7 = extractCb7Cover as MockedFunction<typeof extractCb7Cover>;
 const mockFb2 = extractFb2Cover as MockedFunction<typeof extractFb2Cover>;
 
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
-const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -51,11 +43,6 @@ beforeEach(() => {
   mockCbr.mockResolvedValue(null);
   mockCb7.mockResolvedValue(null);
   mockFb2.mockResolvedValue(null);
-  // fs mocks
-  mockMkdir.mockResolvedValue(undefined);
-  mockWriteFile.mockResolvedValue(undefined);
-  mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
-  mockReadFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 });
 
 // ── imageExt ──────────────────────────────────────────────────────────────────
@@ -171,63 +158,5 @@ describe('extractCover', () => {
     mockEpub.mockResolvedValue(JPEG_BYTES);
     await extractCover('/book.epub', 'EPUB');
     expect(mockEpub).toHaveBeenCalled();
-  });
-});
-
-// ── extractAndSaveCover ───────────────────────────────────────────────────────
-
-describe('extractAndSaveCover', () => {
-  it('returns null when extractor and sidecar both produce nothing', async () => {
-    mockEpub.mockResolvedValue(null);
-    const result = await extractAndSaveCover('/books/book.epub', 'epub', 1, '/booksPath');
-    expect(result).toBeNull();
-    expect(mockWriteFile).not.toHaveBeenCalled();
-  });
-
-  it('saves extracted cover and returns file path', async () => {
-    mockEpub.mockResolvedValue(JPEG_BYTES);
-    const result = await extractAndSaveCover('/books/book.epub', 'epub', 42, '/booksPath');
-    expect(mockMkdir).toHaveBeenCalledWith(expect.stringContaining('42'), { recursive: true });
-    expect(mockWriteFile).toHaveBeenCalledWith(expect.stringContaining('cover_extracted.jpg'), JPEG_BYTES);
-    expect(result).toContain('cover_extracted.jpg');
-  });
-
-  it('uses png extension for PNG magic bytes', async () => {
-    mockEpub.mockResolvedValue(PNG_BYTES);
-    const result = await extractAndSaveCover('/books/book.epub', 'epub', 1, '/booksPath');
-    expect(result).toContain('cover_extracted.png');
-  });
-
-  it('falls back to sidecar cover when extractor returns null', async () => {
-    mockEpub.mockResolvedValue(null);
-    mockReadFile.mockResolvedValue(PNG_BYTES as unknown as Awaited<ReturnType<typeof readFile>>);
-    const result = await extractAndSaveCover('/books/book.epub', 'epub', 5, '/booksPath');
-    expect(result).toContain('cover_extracted.png');
-    expect(mockWriteFile).toHaveBeenCalledWith(expect.stringContaining('cover_extracted.png'), PNG_BYTES);
-  });
-
-  it('falls back to sidecar when extractor returns empty buffer', async () => {
-    mockEpub.mockResolvedValue(Buffer.alloc(0));
-    mockReadFile.mockResolvedValue(JPEG_BYTES as unknown as Awaited<ReturnType<typeof readFile>>);
-    const result = await extractAndSaveCover('/books/book.epub', 'epub', 5, '/booksPath');
-    expect(result).not.toBeNull();
-  });
-
-  it('generates thumbnail when no custom cover exists', async () => {
-    mockEpub.mockResolvedValue(JPEG_BYTES);
-    mockReaddir.mockResolvedValue(['cover_extracted.jpg'] as unknown as Awaited<ReturnType<typeof readdir>>);
-    await extractAndSaveCover('/books/book.epub', 'epub', 1, '/booksPath');
-    // Two writes: extracted cover + thumbnail
-    expect(mockWriteFile).toHaveBeenCalledTimes(2);
-    expect(mockWriteFile).toHaveBeenCalledWith(expect.stringContaining('thumbnail.jpg'), expect.any(Buffer));
-  });
-
-  it('skips thumbnail when a custom cover file already exists', async () => {
-    mockEpub.mockResolvedValue(JPEG_BYTES);
-    mockReaddir.mockResolvedValue(['cover_custom.jpg'] as unknown as Awaited<ReturnType<typeof readdir>>);
-    await extractAndSaveCover('/books/book.epub', 'epub', 1, '/booksPath');
-    // Only one write: extracted cover; no thumbnail
-    expect(mockWriteFile).toHaveBeenCalledTimes(1);
-    expect(mockWriteFile).not.toHaveBeenCalledWith(expect.stringContaining('thumbnail'), expect.anything());
   });
 });

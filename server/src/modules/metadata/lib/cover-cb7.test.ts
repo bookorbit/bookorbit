@@ -55,4 +55,26 @@ describe('extractCb7Cover', () => {
     mockGetSevenZip.mockRejectedValue(new Error('7z unavailable'));
     await expect(extractCb7Cover('/book.cb7')).resolves.toBeNull();
   });
+
+  it('cleans up VFS artifacts even when extraction command throws', async () => {
+    const fsApi = {
+      open: vi.fn().mockReturnValue(1),
+      write: vi.fn(),
+      close: vi.fn(),
+      mkdir: vi.fn(),
+      readdir: vi.fn().mockReturnValue(['.', '..']),
+      readFile: vi.fn(),
+      unlink: vi.fn(),
+      rmdir: vi.fn(),
+    };
+    const callMain = vi.fn().mockImplementation(() => {
+      throw new Error('extract failed');
+    });
+
+    mockGetSevenZip.mockResolvedValue({ FS: fsApi, callMain } as any);
+
+    await expect(extractCb7Cover('/book.cb7')).resolves.toBeNull();
+    expect(fsApi.rmdir).toHaveBeenCalled();
+    expect(fsApi.unlink).toHaveBeenCalled();
+  });
 });

@@ -113,14 +113,14 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
     }
 
     // Annotation (description)
-    let description2: string | null = null;
+    let annotationDescription: string | null = null;
     const annotRaw = titleInfo['annotation'];
     if (annotRaw != null) {
       const annotStr = annotRaw != null ? extractAnnotationText(annotRaw) : null;
-      if (annotStr) description2 = stripHtml(annotStr) || null;
+      if (annotStr) annotationDescription = stripHtml(annotStr) || null;
     }
 
-    return { title, description: description2, language, publishedYear, seriesName, seriesIndex, authors, genres };
+    return { title, description: annotationDescription, language, publishedYear, seriesName, seriesIndex, authors, genres };
   } catch {
     return null;
   }

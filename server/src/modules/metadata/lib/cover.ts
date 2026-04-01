@@ -1,5 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
-import { basename, dirname, extname, join } from 'path';
+import { join } from 'path';
 import sharp from 'sharp';
 
 import { extractCb7Cover } from './cover-cb7';
@@ -45,44 +44,6 @@ export async function extractCover(absolutePath: string, format: string): Promis
     default:
       return null;
   }
-}
-
-async function readSidecarCover(absolutePath: string): Promise<Buffer | null> {
-  const dir = dirname(absolutePath);
-  const stem = basename(absolutePath, extname(absolutePath));
-  const candidates = ['cover.jpg', 'cover.jpeg', 'cover.png', `${stem}.jpg`, `${stem}.jpeg`, `${stem}.png`];
-  for (const name of candidates) {
-    try {
-      const buf = await readFile(join(dir, name));
-      if (buf.length > 0) return buf;
-    } catch {
-      // not found
-    }
-  }
-  return null;
-}
-
-export async function extractAndSaveCover(absolutePath: string, format: string, bookId: number, booksPath: string): Promise<string | null> {
-  let bytes = await extractCover(absolutePath, format);
-  if (!bytes || bytes.length === 0) bytes = await readSidecarCover(absolutePath);
-  if (!bytes || bytes.length === 0) return null;
-
-  const dir = join(booksPath, 'covers', String(bookId));
-  await mkdir(dir, { recursive: true });
-
-  const ext = imageExt(bytes);
-  const filePath = join(dir, `cover_extracted.${ext}`);
-  await writeFile(filePath, bytes);
-
-  // Only regenerate thumbnail if no custom cover exists (custom takes precedence).
-  const files = await readdir(dir);
-  const hasCustom = files.some((f) => f.startsWith('cover_custom.'));
-  if (!hasCustom) {
-    const thumbnail = await generateThumbnail(bytes);
-    await writeFile(join(dir, 'thumbnail.jpg'), thumbnail);
-  }
-
-  return filePath;
 }
 
 /** Resolve the cover directory for a book on disk. */

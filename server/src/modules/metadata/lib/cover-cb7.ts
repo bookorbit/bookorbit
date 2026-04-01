@@ -1,24 +1,23 @@
 import { readFile } from 'fs/promises';
 import { getSevenZip } from '../../../common/sevenzip';
-
-const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
-
-function isImage(name: string): boolean {
-  const dot = name.lastIndexOf('.');
-  return dot !== -1 && IMAGE_EXTS.has(name.substring(dot).toLowerCase());
-}
+import { isArchiveImageFile } from './archive-image-utils';
+import { cleanupSevenZipArtifacts, createSevenZipTempId, type SevenZipInstance } from './sevenzip-vfs';
 
 export async function extractCb7Cover(absolutePath: string): Promise<Buffer | null> {
+  let sz: SevenZipInstance | null = null;
+  let archivePath: string | null = null;
+  let outDir: string | null = null;
+
   try {
-    const sz = await getSevenZip();
+    sz = await getSevenZip();
     const buf = await readFile(absolutePath);
 
     // Use a unique ID to avoid VFS path collisions between concurrent requests.
-    const id = `cover_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const archPath = `/${id}`;
-    const outDir = `/${id}_out`;
+    const id = createSevenZipTempId('cover');
+    archivePath = `/${id}`;
+    outDir = `/${id}_out`;
 
-    const fd = sz.FS.open(archPath, 'w+');
+    const fd = sz.FS.open(archivePath, 'w+');
     sz.FS.write(fd, buf, 0, buf.length);
     sz.FS.close(fd);
 
@@ -28,27 +27,19 @@ export async function extractCb7Cover(absolutePath: string): Promise<Buffer | nu
       // already exists
     }
 
-    sz.callMain(['e', archPath, `-o${outDir}`, '-y']);
+    sz.callMain(['e', archivePath, `-o${outDir}`, '-y']);
 
     const files = sz.FS.readdir(outDir)
-      .filter((f) => f !== '.' && f !== '..' && isImage(f))
+      .filter((f) => f !== '.' && f !== '..' && isArchiveImageFile(f))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
     const result = files.length > 0 ? Buffer.from(sz.FS.readFile(`${outDir}/${files[0]}`)) : null;
-
-    // Clean up WASM VFS — cover extraction is a one-shot operation.
-    try {
-      for (const f of sz.FS.readdir(outDir).filter((f) => f !== '.' && f !== '..')) {
-        sz.FS.unlink(`${outDir}/${f}`);
-      }
-      sz.FS.rmdir(outDir);
-      sz.FS.unlink(archPath);
-    } catch {
-      // cleanup is best-effort
-    }
-
     return result;
   } catch {
     return null;
+  } finally {
+    if (sz && archivePath && outDir) {
+      cleanupSevenZipArtifacts(sz, archivePath, outDir);
+    }
   }
 }

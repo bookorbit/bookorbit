@@ -23,24 +23,24 @@ export class ComicFormatExtractor implements FormatExtractor {
   constructor(private readonly format: ComicFormat) {}
 
   async extract(absolutePath: string): Promise<ParsedBookData | null> {
-    const [cbx, cover] = await Promise.all([
+    const [comicMetadata, cover] = await Promise.all([
       metadataExtractors[this.format](absolutePath),
       coverExtractors[this.format](absolutePath).catch(() => null),
     ]);
 
     const fb = parseBookFilename(absolutePath);
     return {
-      title: cbx?.title ?? fb.title,
-      description: cbx?.description ?? null,
-      publisher: cbx?.publisher ?? null,
-      publishedYear: cbx?.publishedYear ?? fb.publishedYear ?? null,
-      language: cbx?.language ?? null,
-      seriesName: cbx?.seriesName ?? null,
-      seriesIndex: cbx?.seriesIndex ?? null,
-      authors: cbx?.authors ?? [],
-      genres: cbx?.tags ?? [],
+      title: comicMetadata?.title ?? fb.title,
+      description: comicMetadata?.description ?? null,
+      publisher: comicMetadata?.publisher ?? null,
+      publishedYear: comicMetadata?.publishedYear ?? fb.publishedYear ?? null,
+      language: comicMetadata?.language ?? null,
+      seriesName: comicMetadata?.seriesName ?? null,
+      seriesIndex: comicMetadata?.seriesIndex ?? null,
+      authors: comicMetadata?.authors ?? [],
+      genres: comicMetadata?.tags ?? [],
       cover: cover ?? null,
-      comicMetadata: cbx?.comicMetadata ?? null,
+      comicMetadata: comicMetadata?.comicMetadata ?? null,
     };
   }
 }

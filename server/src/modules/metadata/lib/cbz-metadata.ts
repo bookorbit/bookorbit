@@ -3,6 +3,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { inflateRawSync } from 'zlib';
 import { createExtractorFromData } from 'node-unrar-js';
 import { getSevenZip } from '../../../common/sevenzip';
+import { cleanupSevenZipArtifacts, createSevenZipTempId, type SevenZipInstance } from './sevenzip-vfs';
 
 // ── ZIP binary constants ──────────────────────────────────────────────────────
 
@@ -37,46 +38,78 @@ export interface ParsedCbzMetadata {
 
 // ── ZIP helpers ───────────────────────────────────────────────────────────────
 
-/** Extract a file by name from a ZIP buffer using local file headers (no central directory). */
+function findEocd(buf: Buffer): { offset: number; cdOffset: number; cdSize: number; comment: string | null } | null {
+  const searchFrom = Math.max(0, buf.length - 65557);
+  for (let i = buf.length - 22; i >= searchFrom; i--) {
+    if (buf.readUInt32LE(i) !== EOCD_SIG) continue;
+
+    const commentLen = buf.readUInt16LE(i + 20);
+    const eocdEnd = i + 22 + commentLen;
+    if (eocdEnd !== buf.length) continue;
+
+    const cdSize = buf.readUInt32LE(i + 12);
+    const cdOffset = buf.readUInt32LE(i + 16);
+    const comment = commentLen > 0 ? buf.subarray(i + 22, eocdEnd).toString('utf-8') : null;
+
+    return { offset: i, cdOffset, cdSize, comment };
+  }
+
+  return null;
+}
+
+function isZipBoundsValid(start: number, length: number, totalSize: number): boolean {
+  return start >= 0 && length >= 0 && start + length <= totalSize;
+}
+
+/** Extract a file by name from a ZIP buffer using central directory metadata. */
 function extractZipFile(buf: Buffer, targetName: string): Buffer | null {
-  let pos = 0;
-  while (pos < buf.length - 30) {
-    const sigPos = buf.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]), pos);
-    if (sigPos === -1) break;
+  const eocd = findEocd(buf);
+  if (!eocd) return null;
 
-    const compression = buf.readUInt16LE(sigPos + 8);
-    const compressedSize = buf.readUInt32LE(sigPos + 18);
-    const fileNameLen = buf.readUInt16LE(sigPos + 26);
-    const extraLen = buf.readUInt16LE(sigPos + 28);
+  const cdStart = eocd.cdOffset;
+  const cdEnd = cdStart + eocd.cdSize;
+  if (!isZipBoundsValid(cdStart, eocd.cdSize, buf.length)) return null;
 
-    const dataStart = sigPos + 30 + fileNameLen + extraLen;
-    const fileName = buf.subarray(sigPos + 30, sigPos + 30 + fileNameLen).toString('utf-8');
+  let pos = cdStart;
+  while (pos + 46 <= cdEnd) {
+    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+
+    const compression = buf.readUInt16LE(pos + 10);
+    const compressedSize = buf.readUInt32LE(pos + 20);
+    const fileNameLen = buf.readUInt16LE(pos + 28);
+    const extraLen = buf.readUInt16LE(pos + 30);
+    const commentLen = buf.readUInt16LE(pos + 32);
+    const localHeaderOffset = buf.readUInt32LE(pos + 42);
+
+    if (!isZipBoundsValid(pos + 46, fileNameLen, buf.length)) return null;
+    const fileName = buf.subarray(pos + 46, pos + 46 + fileNameLen).toString('utf-8');
 
     if (fileName.toLowerCase() === targetName.toLowerCase()) {
+      if (!isZipBoundsValid(localHeaderOffset, 30, buf.length)) return null;
+      if (buf.readUInt32LE(localHeaderOffset) !== 0x04034b50) return null;
+
+      const lfhFileNameLen = buf.readUInt16LE(localHeaderOffset + 26);
+      const lfhExtraLen = buf.readUInt16LE(localHeaderOffset + 28);
+      const dataStart = localHeaderOffset + 30 + lfhFileNameLen + lfhExtraLen;
+      if (!isZipBoundsValid(dataStart, compressedSize, buf.length)) return null;
+
       const compressed = buf.subarray(dataStart, dataStart + compressedSize);
       if (compression === 0) return compressed;
       if (compression === 8) return inflateRawSync(compressed);
+      return null;
     }
 
-    pos = dataStart + compressedSize;
-    if (compressedSize === 0) pos = sigPos + 4;
+    pos += 46 + fileNameLen + extraLen + commentLen;
   }
+
   return null;
 }
 
 /** Extract the ZIP comment from the End of Central Directory record. */
 function readZipComment(buf: Buffer): string | null {
-  // Search backwards for EOCD signature (max ZIP comment = 65535 bytes)
-  const searchFrom = Math.max(0, buf.length - 65557);
-  for (let i = buf.length - 22; i >= searchFrom; i--) {
-    if (buf.readUInt32LE(i) === EOCD_SIG) {
-      const commentLen = buf.readUInt16LE(i + 20);
-      if (i + 22 + commentLen === buf.length) {
-        return buf.subarray(i + 22, i + 22 + commentLen).toString('utf-8');
-      }
-    }
-  }
-  return null;
+  const eocd = findEocd(buf);
+  if (!eocd) return null;
+  return eocd.comment;
 }
 
 // ── Parsers ───────────────────────────────────────────────────────────────────
@@ -251,15 +284,19 @@ export async function extractCbrMetadata(absolutePath: string): Promise<ParsedCb
 
 /** Extract ComicInfo.xml metadata from a CB7 (7-Zip) file. */
 export async function extractCb7Metadata(absolutePath: string): Promise<ParsedCbzMetadata | null> {
+  let sz: SevenZipInstance | null = null;
+  let archivePath: string | null = null;
+  let outDir: string | null = null;
+
   try {
-    const sz = await getSevenZip();
+    sz = await getSevenZip();
     const buf = await readFile(absolutePath);
 
-    const id = `meta_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const archPath = `/${id}`;
-    const outDir = `/${id}_out`;
+    const id = createSevenZipTempId('meta');
+    archivePath = `/${id}`;
+    outDir = `/${id}_out`;
 
-    const fd = sz.FS.open(archPath, 'w+');
+    const fd = sz.FS.open(archivePath, 'w+');
     sz.FS.write(fd, buf, 0, buf.length);
     sz.FS.close(fd);
 
@@ -270,7 +307,7 @@ export async function extractCb7Metadata(absolutePath: string): Promise<ParsedCb
     }
 
     // Extract only ComicInfo.xml — avoids decompressing the whole solid block.
-    sz.callMain(['e', archPath, `-o${outDir}`, 'ComicInfo.xml', '-y']);
+    sz.callMain(['e', archivePath, `-o${outDir}`, 'ComicInfo.xml', '-y']);
 
     let result: ParsedCbzMetadata | null = null;
     try {
@@ -280,19 +317,12 @@ export async function extractCb7Metadata(absolutePath: string): Promise<ParsedCb
       // ComicInfo.xml not present — that's fine
     }
 
-    // Clean up WASM VFS.
-    try {
-      for (const f of sz.FS.readdir(outDir).filter((f) => f !== '.' && f !== '..')) {
-        sz.FS.unlink(`${outDir}/${f}`);
-      }
-      sz.FS.rmdir(outDir);
-      sz.FS.unlink(archPath);
-    } catch {
-      // best-effort
-    }
-
     return result;
   } catch {
     return null;
+  } finally {
+    if (sz && archivePath && outDir) {
+      cleanupSevenZipArtifacts(sz, archivePath, outDir);
+    }
   }
 }

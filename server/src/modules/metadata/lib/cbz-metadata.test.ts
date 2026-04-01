@@ -3,59 +3,82 @@ vi.mock('node-unrar-js');
 vi.mock('../../../common/sevenzip');
 
 import { readFile } from 'fs/promises';
-import { extractCbzMetadata } from './cbz-metadata';
+import { getSevenZip } from '../../../common/sevenzip';
+import { extractCb7Metadata, extractCbzMetadata } from './cbz-metadata';
 
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
+const mockGetSevenZip = getSevenZip as MockedFunction<typeof getSevenZip>;
 
 // ── ZIP buffer builder ────────────────────────────────────────────────────────
-// Builds a ZIP buffer with only local file headers (no central directory).
-// extractZipFile scans local headers so this is sufficient.
+// Builds a ZIP buffer with local file headers + central directory + EOCD.
 
-function zipLocalEntry(name: string, content: Buffer): Buffer {
-  const nameBuf = Buffer.from(name, 'utf-8');
-  const header = Buffer.alloc(30 + nameBuf.length);
-  header.writeUInt32LE(0x04034b50, 0); // local file signature
-  header.writeUInt16LE(20, 4); // version needed
-  header.writeUInt16LE(0, 6); // flags
-  header.writeUInt16LE(0, 8); // compression: STORED
-  header.writeUInt16LE(0, 10); // mod time
-  header.writeUInt16LE(0, 12); // mod date
-  header.writeUInt32LE(0, 14); // CRC32 (skipped)
-  header.writeUInt32LE(content.length, 18); // compressed size
-  header.writeUInt32LE(content.length, 22); // uncompressed size
-  header.writeUInt16LE(nameBuf.length, 26); // file name length
-  header.writeUInt16LE(0, 28); // extra field length
-  nameBuf.copy(header, 30);
-  return Buffer.concat([header, content]);
+interface ZipEntry {
+  name: string;
+  data: Buffer;
+  dataDescriptor?: boolean;
 }
 
-function buildZipWithComicInfo(xml: string, comment?: string): Buffer {
+function buildZip(entries: ZipEntry[], eocdComment?: Buffer): Buffer {
+  const lfhChunks: Buffer[] = [];
+  const cdrChunks: Buffer[] = [];
+  let lfhOffset = 0;
+
+  for (const entry of entries) {
+    const nameBuf = Buffer.from(entry.name, 'utf-8');
+    const lfhCompressedSize = entry.dataDescriptor ? 0 : entry.data.length;
+
+    const lfh = Buffer.alloc(30 + nameBuf.length);
+    lfh.writeUInt32LE(0x04034b50, 0);
+    lfh.writeUInt16LE(20, 4);
+    lfh.writeUInt16LE(entry.dataDescriptor ? 0x0008 : 0, 6);
+    lfh.writeUInt16LE(0, 8); // STORED
+    lfh.writeUInt32LE(lfhCompressedSize, 18);
+    lfh.writeUInt32LE(entry.data.length, 22);
+    lfh.writeUInt16LE(nameBuf.length, 26);
+    lfh.writeUInt16LE(0, 28);
+    nameBuf.copy(lfh, 30);
+
+    const lfhBlock = Buffer.concat([lfh, entry.data]);
+    lfhChunks.push(lfhBlock);
+
+    const cdr = Buffer.alloc(46 + nameBuf.length);
+    cdr.writeUInt32LE(0x02014b50, 0);
+    cdr.writeUInt16LE(20, 4);
+    cdr.writeUInt16LE(20, 6);
+    cdr.writeUInt16LE(entry.dataDescriptor ? 0x0008 : 0, 8);
+    cdr.writeUInt16LE(0, 10); // STORED
+    cdr.writeUInt32LE(entry.data.length, 20);
+    cdr.writeUInt32LE(entry.data.length, 24);
+    cdr.writeUInt16LE(nameBuf.length, 28);
+    cdr.writeUInt32LE(lfhOffset, 42);
+    nameBuf.copy(cdr, 46);
+    cdrChunks.push(cdr);
+
+    lfhOffset += lfhBlock.length;
+  }
+
+  const cdData = Buffer.concat(cdrChunks);
+  const comment = eocdComment ?? Buffer.alloc(0);
+  const eocd = Buffer.alloc(22 + comment.length);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(cdData.length, 12);
+  eocd.writeUInt32LE(lfhOffset, 16);
+  eocd.writeUInt16LE(comment.length, 20);
+  comment.copy(eocd, 22);
+
+  return Buffer.concat([...lfhChunks, cdData, eocd]);
+}
+
+function buildZipWithComicInfo(xml: string, comment?: string, options?: { dataDescriptor?: boolean }): Buffer {
   const xmlBuf = Buffer.from(xml, 'utf-8');
-  const entry = zipLocalEntry('ComicInfo.xml', xmlBuf);
-
-  // Append a minimal EOCD so readZipComment can find the comment
-  const commentBuf = comment ? Buffer.from(comment, 'utf-8') : Buffer.alloc(0);
-  const eocd = Buffer.alloc(22 + commentBuf.length, 0);
-  eocd.writeUInt32LE(0x06054b50, 0); // EOCD signature
-  eocd.writeUInt16LE(0, 4); // disk
-  eocd.writeUInt16LE(0, 6); // start disk
-  eocd.writeUInt16LE(1, 8); // entries on disk
-  eocd.writeUInt16LE(1, 10); // total entries
-  eocd.writeUInt32LE(0, 12); // central dir size
-  eocd.writeUInt32LE(entry.length, 16); // central dir offset
-  eocd.writeUInt16LE(commentBuf.length, 20);
-  if (commentBuf.length) commentBuf.copy(eocd, 22);
-
-  return Buffer.concat([entry, eocd]);
+  const commentBuf = comment ? Buffer.from(comment, 'utf-8') : undefined;
+  return buildZip([{ name: 'ComicInfo.xml', data: xmlBuf, dataDescriptor: options?.dataDescriptor }], commentBuf);
 }
 
 function buildZipCommentOnly(comment: string): Buffer {
-  const commentBuf = Buffer.from(comment, 'utf-8');
-  const eocd = Buffer.alloc(22 + commentBuf.length, 0);
-  eocd.writeUInt32LE(0x06054b50, 0);
-  eocd.writeUInt16LE(commentBuf.length, 20);
-  commentBuf.copy(eocd, 22);
-  return eocd;
+  return buildZip([], Buffer.from(comment, 'utf-8'));
 }
 
 beforeEach(() => vi.resetAllMocks());
@@ -143,6 +166,14 @@ describe('extractCbzMetadata', () => {
       expect(r?.publishedYear).toBeNull();
       expect(r?.seriesName).toBeNull();
     });
+
+    it('extracts ComicInfo.xml when local header size is zero (data descriptor mode)', async () => {
+      const xml = `<ComicInfo><Title>Descriptor Comic</Title></ComicInfo>`;
+      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml, undefined, { dataDescriptor: true }) as unknown as Buffer);
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.title).toBe('Descriptor Comic');
+    });
   });
 
   describe('ComicBookInfo/1.0 JSON comment fallback', () => {
@@ -223,5 +254,55 @@ describe('extractCbzMetadata', () => {
       mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
       expect(await extractCbzMetadata('/bad.cbz')).toBeNull();
     });
+  });
+});
+
+describe('extractCb7Metadata', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockReadFile.mockResolvedValue(Buffer.from('7z') as unknown as Buffer);
+  });
+
+  it('parses ComicInfo.xml and cleans up wasm VFS artifacts', async () => {
+    const fsApi = {
+      open: vi.fn().mockReturnValue(1),
+      write: vi.fn(),
+      close: vi.fn(),
+      mkdir: vi.fn(),
+      readFile: vi.fn().mockReturnValue(Uint8Array.from(Buffer.from('<ComicInfo><Title>CB7 Comic</Title></ComicInfo>'))),
+      readdir: vi.fn().mockReturnValue(['.', '..', 'ComicInfo.xml']),
+      unlink: vi.fn(),
+      rmdir: vi.fn(),
+    };
+
+    mockGetSevenZip.mockResolvedValue({ FS: fsApi, callMain: vi.fn() } as any);
+
+    const result = await extractCb7Metadata('/book.cb7');
+
+    expect(result?.title).toBe('CB7 Comic');
+    expect(fsApi.rmdir).toHaveBeenCalled();
+    expect(fsApi.unlink).toHaveBeenCalled();
+  });
+
+  it('cleans up artifacts even when extraction command throws', async () => {
+    const fsApi = {
+      open: vi.fn().mockReturnValue(1),
+      write: vi.fn(),
+      close: vi.fn(),
+      mkdir: vi.fn(),
+      readFile: vi.fn(),
+      readdir: vi.fn().mockReturnValue(['.', '..']),
+      unlink: vi.fn(),
+      rmdir: vi.fn(),
+    };
+    const callMain = vi.fn().mockImplementation(() => {
+      throw new Error('extract failed');
+    });
+
+    mockGetSevenZip.mockResolvedValue({ FS: fsApi, callMain } as any);
+
+    await expect(extractCb7Metadata('/book.cb7')).resolves.toBeNull();
+    expect(fsApi.rmdir).toHaveBeenCalled();
+    expect(fsApi.unlink).toHaveBeenCalled();
   });
 });
