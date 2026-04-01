@@ -13,12 +13,10 @@ describe('FormatWriterRegistry', () => {
     expect(registry.get('unknown')).toBeUndefined();
   });
 
-  it('keeps the last writer when duplicate format keys exist', () => {
+  it('throws when duplicate format keys are registered', () => {
     const first = { format: 'cbz', write: vi.fn() };
     const second = { format: 'CBZ', write: vi.fn() };
 
-    const registry = new FormatWriterRegistry([first, second] as never);
-
-    expect(registry.get('cbz')).toBe(second);
+    expect(() => new FormatWriterRegistry([first, second] as never)).toThrow('Duplicate format writer registered: cbz');
   });
 });

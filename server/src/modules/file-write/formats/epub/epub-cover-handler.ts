@@ -82,7 +82,7 @@ export function locate(opfXml: string, opfDir: string): CoverSlot | null {
     }
   }
 
-  // Strategy 1: meta[name="cover"] → manifest item by id (EPUB2 — what Calibre/readers follow)
+  // Strategy 1: meta[name="cover"] -> manifest item by id (EPUB2 - what Calibre/readers follow)
   const coverMeta = metaMetas.find((m) => attr(m, '@_name').toLowerCase() === 'cover');
   if (coverMeta) {
     const coverId = attr(coverMeta, '@_content');

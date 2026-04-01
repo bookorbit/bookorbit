@@ -18,7 +18,7 @@ export class EpubFormatWriter implements FormatWriter {
 
     const { opfPath, opfDir } = await locateOpf(filePath);
     const opfXml = await EpubZipPatcher.readEntry(filePath, opfPath);
-    const { newOpfXml, fieldsWritten } = buildOpf(opfXml, payload, options);
+    const { newOpfXml, fieldsWritten } = buildOpf(opfXml, payload);
 
     const patches = new Map<string, Buffer>([[opfPath, Buffer.from(newOpfXml)]]);
 

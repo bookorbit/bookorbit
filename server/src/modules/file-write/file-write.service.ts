@@ -4,42 +4,29 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
 import type { WriteResult, GlobalFileWriteSettings } from '@projectx/types';
+import { CBX_FORMATS, FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteSettingsService } from './file-write-settings.service';
 import { FormatWriterRegistry } from './format-writer.registry';
-import type { BookWritePayload, BookWritePayloadKey } from './interfaces/book-write-payload.interface';
+import type { BookWritePayload } from './interfaces/book-write-payload.interface';
 
-const ALL_FIELDS = new Set<BookWritePayloadKey>([
-  'title',
-  'subtitle',
-  'description',
-  'publisher',
-  'publishedYear',
-  'language',
-  'pageCount',
-  'seriesName',
-  'seriesIndex',
-  'isbn10',
-  'isbn13',
-  'rating',
-  'authors',
-  'genres',
-  'tags',
-  'googleBooksId',
-  'goodreadsId',
-  'amazonId',
-  'hardcoverId',
-  'openLibraryId',
-  'itunesId',
-  'coverBytes',
-]);
+const FILE_WRITE_EVENT = 'file_write.write';
+const FILE_WRITE_SCHEDULE_EVENT = 'file_write.schedule';
+const FILE_WRITE_COVER_EVENT = 'file_write.cover_load';
+const UNKNOWN_FORMAT = 'unknown';
+const DEFAULT_WRITE_DEBOUNCE_MS = 3_000;
+const DEFAULT_MAX_CONCURRENT_WRITES = 2;
 
 @Injectable()
 export class FileWriteService implements OnModuleDestroy {
   private readonly logger = new Logger(FileWriteService.name);
   private readonly booksPath: string;
+  private readonly debounceMs: number;
+  private readonly maxConcurrentWrites: number;
   private readonly debounceMap = new Map<number, NodeJS.Timeout>();
+  private readonly writeQueue: Array<() => void> = [];
+  private activeWrites = 0;
 
   constructor(
     private readonly fileWriteRepo: FileWriteRepository,
@@ -49,137 +36,255 @@ export class FileWriteService implements OnModuleDestroy {
     private readonly config: ConfigService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_WRITE_DEBOUNCE_MS);
+    this.maxConcurrentWrites = resolvePositiveInteger(this.config.get('fileWrite.maxConcurrentWrites'), DEFAULT_MAX_CONCURRENT_WRITES);
   }
 
   scheduleWrite(bookId: number, triggeredBy: 'auto' | 'sync', userId?: number): void {
     const existing = this.debounceMap.get(bookId);
     if (existing) clearTimeout(existing);
+
+    this.logger.debug(
+      `[${FILE_WRITE_SCHEDULE_EVENT}] [start] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} debounceMs=${this.debounceMs} - scheduled file write queued`,
+    );
+
     const timer = setTimeout(() => {
       this.debounceMap.delete(bookId);
-      this.logger.debug(`Scheduled write firing for book ${bookId} (${triggeredBy})`);
-      this.writeToFile(bookId, triggeredBy, userId).catch((err: Error) =>
-        this.logger.warn(`Background write failed for book ${bookId}: ${err.message}`),
+      this.logger.debug(
+        `[${FILE_WRITE_SCHEDULE_EVENT}] [end] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} - scheduled file write fired`,
       );
-    }, 3_000);
+      this.writeToFile(bookId, triggeredBy, userId).catch((err: Error) =>
+        this.logger.warn(
+          `[${FILE_WRITE_SCHEDULE_EVENT}] [fail] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} errorClass=${err.name} error="${sanitizeErrorMessage(err.message)}" - scheduled file write failed`,
+        ),
+      );
+    }, this.debounceMs);
     this.debounceMap.set(bookId, timer);
   }
 
   onModuleDestroy(): void {
     for (const timer of this.debounceMap.values()) clearTimeout(timer);
     this.debounceMap.clear();
+    for (const release of this.writeQueue) {
+      release();
+    }
+    this.writeQueue.length = 0;
   }
 
   async writeToFile(bookId: number, triggeredBy: 'auto' | 'sync', userId?: number, dryRun = false): Promise<WriteResult> {
-    const file = await this.fileWriteRepo.findPrimaryFileForBook(bookId);
-    if (!file) {
-      return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no primary file' };
-    }
+    await this.acquireWriteSlot();
 
-    const format = (file.format ?? '').toLowerCase();
-    if (!this.registry.supports(format)) {
-      const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format not supported' };
-      this.logger.debug(`Write skipped for book ${bookId}: format not supported (${format || 'unknown'})`);
-      if (triggeredBy === 'sync') {
-        await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format: format || 'unknown', result, triggeredBy });
-      }
-      return result;
-    }
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${FILE_WRITE_EVENT}] [start] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} - file write started`,
+    );
 
-    const settings = await this.settingsService.resolve(file.libraryId);
-    if (!settings.enabled && !dryRun) {
-      this.logger.debug(`Write skipped for book ${bookId}: file write is disabled`);
-      return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
-    }
-
-    const formatSettings = resolveFormatSettings(settings, format);
-    if (!formatSettings.enabled) {
-      const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format disabled' };
-      this.logger.debug(`Write skipped for book ${bookId}: format disabled (${format})`);
-      if (triggeredBy === 'sync') {
-        await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
-      }
-      return result;
-    }
-
-    const sizeBytes = file.sizeBytes ?? 0;
-    if (sizeBytes > formatSettings.maxFileSizeBytes) {
-      const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'file exceeds size limit' };
-      this.logger.debug(`Write skipped for book ${bookId}: file size ${sizeBytes} exceeds limit ${formatSettings.maxFileSizeBytes}`);
-      if (triggeredBy === 'sync') {
-        await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
-      }
-      return result;
-    }
-
-    const rawPayload = await this.fileWriteRepo.loadPayload(bookId);
-    if (!rawPayload) {
-      return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no metadata' };
-    }
-
-    const payload: BookWritePayload = { ...rawPayload };
-
-    if (settings.writeCover && !dryRun) {
-      payload.coverBytes = await this.loadCoverBytes(bookId);
-    }
-
-    const writer = this.registry.get(format)!;
-
-    let result: WriteResult;
     try {
-      result = await this.lockService.withLock(file.absolutePath, () => writer.write(file.absolutePath, payload, { fieldMask: ALL_FIELDS, dryRun }));
-    } catch (err) {
-      result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason: (err as Error).message };
-      this.logger.warn(`Write failed for book ${bookId}: ${(err as Error).message}`);
-      await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
-      return result;
-    }
+      const file = await this.fileWriteRepo.findPrimaryFileForBook(bookId);
+      if (!file) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no primary file' };
+        this.logWriteEnd(bookId, UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
 
-    await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
-    if (result.status === 'success') {
-      await this.fileWriteRepo.setLastWrittenAt(bookId, new Date());
-      this.logger.log(`Wrote metadata to file for book ${bookId} (${format}, ${result.fieldsWritten.length} fields, ${result.durationMs}ms)`);
+      const format = (file.format ?? '').toLowerCase();
+      if (!this.registry.supports(format)) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format not supported' };
+        if (triggeredBy === 'sync') {
+          await this.fileWriteRepo.insertLog({
+            bookId,
+            bookFileId: file.id,
+            userId: userId ?? null,
+            format: format || UNKNOWN_FORMAT,
+            result,
+            triggeredBy,
+          });
+        }
+        this.logWriteEnd(bookId, format || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      const settings = await this.settingsService.resolveForLibrary(file.libraryId);
+      if (!settings.enabled && !dryRun) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
+        this.logWriteEnd(bookId, format || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      const formatSettings = resolveFormatSettings(settings, format);
+      if (!formatSettings.enabled) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format disabled' };
+        if (triggeredBy === 'sync') {
+          await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+        }
+        this.logWriteEnd(bookId, format, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      const sizeBytes = file.sizeBytes ?? 0;
+      if (sizeBytes > formatSettings.maxFileSizeBytes) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'file exceeds size limit' };
+        if (triggeredBy === 'sync') {
+          await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+        }
+        this.logWriteEnd(bookId, format, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      const rawPayload = await this.fileWriteRepo.loadPayload(bookId);
+      if (!rawPayload) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no metadata' };
+        this.logWriteEnd(bookId, format, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      const payload: BookWritePayload = { ...rawPayload };
+
+      if (settings.writeCover && !dryRun) {
+        payload.coverBytes = await this.loadCoverBytes(bookId);
+      }
+
+      const writer = this.registry.get(format)!;
+
+      let result: WriteResult;
+      try {
+        result = await this.lockService.withLock(file.absolutePath, () =>
+          writer.write(file.absolutePath, payload, { fieldMask: createBookWriteFieldMask(), dryRun }),
+        );
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason };
+        this.logWriteFail(bookId, format, triggeredBy, userId, dryRun, startedAt, error);
+        await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+        return result;
+      }
+
+      await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+      if (result.status === 'success') {
+        await this.fileWriteRepo.setLastWrittenAt(bookId, new Date());
+      }
+      this.logWriteEnd(bookId, format, triggeredBy, userId, dryRun, startedAt, result);
+      return result;
+    } finally {
+      this.releaseWriteSlot();
     }
-    return result;
   }
 
   findWriteLog(bookId: number, limit = 20) {
     return this.fileWriteRepo.findWriteLog(bookId, limit);
   }
 
-  findNonMissingBookFilesByLibrary(libraryId: number) {
-    return this.fileWriteRepo.findNonMissingBookFilesByLibrary(libraryId);
+  findNonMissingPrimaryFilesByLibrary(libraryId: number) {
+    return this.fileWriteRepo.findNonMissingPrimaryFilesByLibrary(libraryId);
   }
 
   resolveSettings(libraryId: number) {
-    return this.settingsService.resolve(libraryId);
+    return this.settingsService.resolveForLibrary(libraryId);
   }
 
   private async loadCoverBytes(bookId: number): Promise<Buffer | null> {
+    const startedAt = Date.now();
     const dir = join(this.booksPath, 'covers', String(bookId));
     try {
       const files = await readdir(dir);
       const cover = files.find((f) => f.startsWith('cover_custom.')) ?? files.find((f) => f.startsWith('cover_extracted.'));
       if (!cover) return null;
       return readFile(join(dir, cover));
-    } catch {
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = sanitizeErrorMessage(error instanceof Error ? error.message : String(error));
+      this.logger.debug(
+        `[${FILE_WRITE_COVER_EVENT}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover bytes unavailable`,
+      );
       return null;
+    }
+  }
+
+  private logWriteEnd(
+    bookId: number,
+    format: string,
+    triggeredBy: 'auto' | 'sync',
+    userId: number | undefined,
+    dryRun: boolean,
+    startedAt: number,
+    result: WriteResult,
+  ): void {
+    const reasonPart = result.reason ? ` reason="${sanitizeErrorMessage(result.reason)}"` : '';
+    this.logger.log(
+      `[${FILE_WRITE_EVENT}] [end] bookId=${bookId} format=${format || UNKNOWN_FORMAT} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} status=${result.status} fieldsWritten=${result.fieldsWritten.length}${reasonPart} - file write completed`,
+    );
+  }
+
+  private logWriteFail(
+    bookId: number,
+    format: string,
+    triggeredBy: 'auto' | 'sync',
+    userId: number | undefined,
+    dryRun: boolean,
+    startedAt: number,
+    error: unknown,
+  ): void {
+    const errorClass = error instanceof Error ? error.name : 'Error';
+    const errorMessage = sanitizeErrorMessage(error instanceof Error ? error.message : String(error));
+    this.logger.warn(
+      `[${FILE_WRITE_EVENT}] [fail] bookId=${bookId} format=${format || UNKNOWN_FORMAT} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - file write failed`,
+    );
+  }
+
+  private async acquireWriteSlot(): Promise<void> {
+    if (this.activeWrites < this.maxConcurrentWrites) {
+      this.activeWrites++;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      this.writeQueue.push(resolve);
+    });
+    this.activeWrites++;
+  }
+
+  private releaseWriteSlot(): void {
+    this.activeWrites = Math.max(this.activeWrites - 1, 0);
+    const next = this.writeQueue.shift();
+    if (next) {
+      next();
     }
   }
 }
 
 function resolveFormatSettings(settings: GlobalFileWriteSettings, format: string): { enabled: boolean; maxFileSizeBytes: number } {
   switch (format) {
-    case 'epub':
+    case FORMAT_EPUB:
       return settings.epub;
-    case 'pdf':
+    case FORMAT_PDF:
       return settings.pdf;
-    case 'cbz':
-    case 'cb7':
+    case FORMAT_CBZ:
+    case FORMAT_CB7:
       return {
-        enabled: settings.cbx.enabled && (settings.cbx.formats as string[]).includes(format),
+        enabled: settings.cbx.enabled && isCbxFormat(format) && settings.cbx.formats.includes(format),
         maxFileSizeBytes: settings.cbx.maxFileSizeBytes,
       };
     default:
       return { enabled: false, maxFileSizeBytes: 0 };
   }
+}
+
+function isCbxFormat(format: string): format is (typeof CBX_FORMATS)[number] {
+  return (CBX_FORMATS as readonly string[]).includes(format);
+}
+
+function resolvePositiveInteger(value: unknown, fallback: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric) || numeric < 1) {
+    return fallback;
+  }
+  return Math.floor(numeric);
+}
+
+function formatUserId(userId: number | undefined): string {
+  return userId == null ? 'null' : String(userId);
+}
+
+function sanitizeErrorMessage(message: string): string {
+  return message.replace(/"/g, '\\"');
 }

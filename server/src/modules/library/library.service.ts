@@ -287,7 +287,7 @@ export class LibraryService {
       }
     }
 
-    const rows = await this.fileWriteService.findNonMissingBookFilesByLibrary(libraryId);
+    const rows = await this.fileWriteService.findNonMissingPrimaryFilesByLibrary(libraryId);
     const onProgress = options.onProgress ?? (() => undefined);
     const isCancelled = options.isCancelled ?? (() => false);
 

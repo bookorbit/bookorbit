@@ -1,4 +1,5 @@
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
+import { EPUB_PROVIDER_IDENTIFIER_PREFIXES } from '../../file-write.constants';
 import { PROJECTX_NS_PREFIX, PROJECTX_NS_URI } from '../shared/projectx-ns';
 
 function escapeXml(value: string): string {
@@ -85,23 +86,11 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
   if (fieldMask.has('rating') && payload.rating != null) {
     lines.push(elem(`${px}:rating`, String(payload.rating)));
   }
-  if (fieldMask.has('goodreadsId') && payload.goodreadsId != null) {
-    lines.push(elem(`${px}:goodreadsId`, normalizeGoodreadsId(payload.goodreadsId)));
-  }
-  if (fieldMask.has('googleBooksId') && payload.googleBooksId != null) {
-    lines.push(elem(`${px}:googleBooksId`, payload.googleBooksId));
-  }
-  if (fieldMask.has('amazonId') && payload.amazonId != null) {
-    lines.push(elem(`${px}:amazonId`, payload.amazonId));
-  }
-  if (fieldMask.has('hardcoverId') && payload.hardcoverId != null) {
-    lines.push(elem(`${px}:hardcoverId`, payload.hardcoverId));
-  }
-  if (fieldMask.has('openLibraryId') && payload.openLibraryId != null) {
-    lines.push(elem(`${px}:openLibraryId`, payload.openLibraryId));
-  }
-  if (fieldMask.has('itunesId') && payload.itunesId != null) {
-    lines.push(elem(`${px}:itunesId`, payload.itunesId));
+  for (const key of PROVIDER_ID_KEYS) {
+    if (!fieldMask.has(key)) continue;
+    const value = payload[key];
+    if (typeof value !== 'string' || value === '') continue;
+    lines.push(elem(`${px}:${key}`, key === 'goodreadsId' ? normalizeGoodreadsId(value) : value));
   }
   if (fieldMask.has('tags') && payload.tags?.length) {
     lines.push(bagElem(`${px}:tags`, payload.tags));
@@ -129,3 +118,6 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
     '<?xpacket end="w"?>',
   ].join('\n');
 }
+
+type ProviderIdKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_PREFIXES;
+const PROVIDER_ID_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_PREFIXES) as ProviderIdKey[];

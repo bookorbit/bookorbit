@@ -1,6 +1,6 @@
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
-import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
+import { EPUB_PROVIDER_IDENTIFIER_PREFIXES } from '../../file-write.constants';
 import { PROJECTX_NS_PREFIX as APP_WRITE_NAMESPACE, PROJECTX_NS_URI as APP_NS_URI } from '../shared/projectx-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 
@@ -264,20 +264,11 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
     }
   }
 
-  // Provider identifiers — plain dc:identifier with urn: text, no scheme/id attributes (matches Booklore)
-  const providerMappings: Array<{ field: keyof BookWritePayload; urnPrefix: string }> = [
-    { field: 'goodreadsId', urnPrefix: 'urn:goodreads:' },
-    { field: 'amazonId', urnPrefix: 'urn:amazon:' },
-    { field: 'hardcoverId', urnPrefix: 'urn:hardcover:' },
-    { field: 'googleBooksId', urnPrefix: 'urn:google:' },
-    { field: 'openLibraryId', urnPrefix: 'urn:openlibrary:' },
-    { field: 'itunesId', urnPrefix: 'urn:itunes:' },
-  ];
-
-  for (const { field, urnPrefix } of providerMappings) {
-    const value = payload[field] as string | null | undefined;
-    if (value != null) {
-      nodes.push(makeTextNode('dc:identifier', `${urnPrefix}${value}`));
+  // Provider identifiers - plain dc:identifier with urn: text, no scheme/id attributes (matches Booklore)
+  for (const field of EPUB_PROVIDER_IDENTIFIER_KEYS) {
+    const value = payload[field];
+    if (typeof value === 'string' && value !== '') {
+      nodes.push(makeTextNode('dc:identifier', `${EPUB_PROVIDER_IDENTIFIER_PREFIXES[field]}${value}`));
     }
   }
 
@@ -339,8 +330,7 @@ function getPkgContentAll(pkgNode: OrderedNode): OrderedNode[] {
   return pkgNode['package'] as OrderedNode[];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function build(opfXml: string, payload: BookWritePayload, _options: FormatWriteOptions): { newOpfXml: string; fieldsWritten: string[] } {
+export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: string; fieldsWritten: string[] } {
   const parsed = writerParser.parse(opfXml) as OrderedNode[];
   const pkgResult = getPackageNode(parsed);
   if (!pkgResult) throw new Error('Cannot find <package> element in OPF');
@@ -371,3 +361,6 @@ export function build(opfXml: string, payload: BookWritePayload, _options: Forma
 
   return { newOpfXml, fieldsWritten: resolveFieldsWritten(payload) };
 }
+
+type EpubProviderIdentifierKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_PREFIXES;
+const EPUB_PROVIDER_IDENTIFIER_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_PREFIXES) as EpubProviderIdentifierKey[];

@@ -15,6 +15,8 @@ const envSchema = z.object({
   SETUP_BOOTSTRAP_TOKEN: z.string().optional(),
   BOOKS_PATH: z.string().default('/data'),
   STAGING_PATH: z.string().optional(),
+  FILE_WRITE_DEBOUNCE_MS: z.coerce.number().int().positive().optional(),
+  FILE_WRITE_MAX_CONCURRENT_WRITES: z.coerce.number().int().positive().optional(),
   CLIENT_URL: z.string().url().optional(),
   APP_URL: z.string().url().default('http://localhost:5173'),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),

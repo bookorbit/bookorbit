@@ -1,9 +1,9 @@
-import * as fs from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 import * as unzipper from 'unzipper';
 import archiver from 'archiver';
+import { replaceFileAtomically } from '../shared/atomic-file-replace';
 
 function isComicInfoEntry(entryPath: string): boolean {
   const normalized = entryPath.replace(/\\/g, '/').toLowerCase();
@@ -41,10 +41,5 @@ export async function writeComicInfoToZip(filePath: string, xmlContent: string):
     void archive.finalize();
   });
 
-  try {
-    await fs.rename(tmpPath, filePath);
-  } catch (err) {
-    await fs.unlink(tmpPath).catch(() => {});
-    throw err;
-  }
+  await replaceFileAtomically(tmpPath, filePath);
 }
