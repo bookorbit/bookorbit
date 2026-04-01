@@ -26,7 +26,7 @@ export class BookMetadataFetchController {
   @Put('config')
   @RequirePermission(Permission.ManageMetadataConfig)
   async updateConfig(@Body() dto: UpdateBookMetadataFetchConfigDto) {
-    await this.configService.setGlobalConfig(dto as unknown as BookMetadataFetchConfig);
+    await this.configService.setGlobalConfig(dto);
     return this.configService.getGlobalConfig();
   }
 
@@ -39,7 +39,7 @@ export class BookMetadataFetchController {
   @Put('config/libraries/:id')
   @RequirePermission(Permission.ManageMetadataConfig)
   async updateLibraryConfig(@Param('id', ParseIntPipe) libraryId: number, @Body() dto: UpdateLibraryBookMetadataFetchConfigDto) {
-    const override = Object.keys(dto).length === 0 ? null : (dto as unknown as BookMetadataFetchConfigOverride);
+    const override: BookMetadataFetchConfigOverride = Object.keys(dto).length === 0 ? null : dto;
     await this.configService.setLibraryOverride(libraryId, override);
     return this.configService.getEffectiveConfig(libraryId);
   }
@@ -99,7 +99,7 @@ export class BookMetadataFetchController {
     const config: BookMetadataFetchConfig = {
       enabled: true,
       triggerOnImport: false,
-      conditions: dto.conditions as BookMetadataFetchConfig['conditions'],
+      conditions: dto.conditions,
     };
     const count = await this.queueRepo.countEligibleBooks(config, dto.libraryId);
     return { count };
@@ -111,8 +111,9 @@ export class BookMetadataFetchController {
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 50,
   ) {
-    const safeLimit = Math.min(limit, 100);
-    const { items, total } = await this.queueRepo.getFailedItems(page, safeLimit);
-    return { items, total, page, limit: safeLimit };
+    const safePage = Math.max(page, 1);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const { items, total } = await this.queueRepo.getFailedItems(safePage, safeLimit);
+    return { items, total, page: safePage, limit: safeLimit };
   }
 }

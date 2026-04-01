@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookmarks } from '../../db/schema';
+import { bookmarks, type BookmarkRow, type NewBookmark } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -16,10 +16,37 @@ export class BookmarkRepository {
     return this.db
       .select()
       .from(bookmarks)
-      .where(and(eq(bookmarks.bookId, bookId), eq(bookmarks.userId, userId)));
+      .where(and(eq(bookmarks.bookId, bookId), eq(bookmarks.userId, userId)))
+      .orderBy(asc(bookmarks.createdAt), asc(bookmarks.id));
   }
 
-  async create(userId: number, bookId: number, data: { cfi?: string; title: string; positionSeconds?: number }) {
+  async findExistingByLocation(userId: number, bookId: number, data: Pick<NewBookmark, 'cfi' | 'positionSeconds'>): Promise<BookmarkRow | null> {
+    if (data.cfi != null) {
+      const [row] = await this.db
+        .select()
+        .from(bookmarks)
+        .where(and(eq(bookmarks.userId, userId), eq(bookmarks.bookId, bookId), eq(bookmarks.cfi, data.cfi)))
+        .orderBy(asc(bookmarks.createdAt), asc(bookmarks.id))
+        .limit(1);
+      return row ?? null;
+    }
+
+    if (data.positionSeconds != null) {
+      const [row] = await this.db
+        .select()
+        .from(bookmarks)
+        .where(
+          and(eq(bookmarks.userId, userId), eq(bookmarks.bookId, bookId), eq(bookmarks.positionSeconds, data.positionSeconds), isNull(bookmarks.cfi)),
+        )
+        .orderBy(asc(bookmarks.createdAt), asc(bookmarks.id))
+        .limit(1);
+      return row ?? null;
+    }
+
+    return null;
+  }
+
+  async create(userId: number, bookId: number, data: Pick<NewBookmark, 'cfi' | 'title' | 'positionSeconds'>) {
     const [row] = await this.db
       .insert(bookmarks)
       .values({ userId, bookId, cfi: data.cfi ?? null, title: data.title, positionSeconds: data.positionSeconds ?? null })

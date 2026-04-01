@@ -1,15 +1,27 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { BookMetadataFetchConfig, BookMetadataFetchFailedItem, BookMetadataFetchReason, BookMetadataFetchStatus } from '@projectx/types';
+import type {
+  BookMetadataFetchConfig,
+  BookMetadataFetchFailedItem,
+  BookMetadataFetchReason,
+  BookMetadataFetchStatus,
+  MetadataField,
+} from '@projectx/types';
+import type { SQL } from 'drizzle-orm';
 import { and, asc, count, eq, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookAuthors, bookGenres, bookMetadata, bookMetadataFetchQueue, books, libraries } from '../../db/schema';
+import { bookAuthors, bookGenres, bookMetadata, bookMetadataFetchQueue, bookNarrators, books, libraries } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
 const PROCESSING_STALE_AFTER_MS = 10 * 60 * 1000;
+const QUEUE_STATUS = {
+  QUEUED: 'queued',
+  PROCESSING: 'processing',
+  FAILED: 'failed',
+} as const;
 
 @Injectable()
 export class BookMetadataFetchQueueRepository {
@@ -25,7 +37,7 @@ export class BookMetadataFetchQueueRepository {
       .values(
         unique.map((bookId) => ({
           bookId,
-          status: 'queued',
+          status: QUEUE_STATUS.QUEUED,
           reason,
           attemptCount: 0,
         })),
@@ -33,13 +45,14 @@ export class BookMetadataFetchQueueRepository {
       .onConflictDoUpdate({
         target: bookMetadataFetchQueue.bookId,
         set: {
-          status: 'queued',
+          status: QUEUE_STATUS.QUEUED,
           reason,
           attemptCount: 0,
           updatedAt: now,
         },
-        // Only reset rows that are not currently being processed
-        setWhere: sql`${bookMetadataFetchQueue.status} <> 'processing'`,
+        // Only re-queue failed rows. Already-queued rows are intentionally ignored
+        // so progress totals only reflect newly scheduled work.
+        setWhere: eq(bookMetadataFetchQueue.status, QUEUE_STATUS.FAILED),
       })
       .returning({ bookId: bookMetadataFetchQueue.bookId });
 
@@ -56,7 +69,7 @@ export class BookMetadataFetchQueueRepository {
       .from(bookMetadataFetchQueue)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookMetadataFetchQueue.bookId))
       .leftJoin(books, eq(books.id, bookMetadataFetchQueue.bookId))
-      .where(eq(bookMetadataFetchQueue.status, 'queued'))
+      .where(eq(bookMetadataFetchQueue.status, QUEUE_STATUS.QUEUED))
       .orderBy(asc(bookMetadataFetchQueue.createdAt), asc(bookMetadataFetchQueue.bookId))
       .limit(limit);
   }
@@ -66,8 +79,13 @@ export class BookMetadataFetchQueueRepository {
     try {
       const updated = await this.db
         .update(bookMetadataFetchQueue)
-        .set({ status: 'processing', lastAttemptAt: now, attemptCount: sql`${bookMetadataFetchQueue.attemptCount} + 1`, updatedAt: now })
-        .where(and(eq(bookMetadataFetchQueue.bookId, bookId), eq(bookMetadataFetchQueue.status, 'queued')))
+        .set({
+          status: QUEUE_STATUS.PROCESSING,
+          lastAttemptAt: now,
+          attemptCount: sql`${bookMetadataFetchQueue.attemptCount} + 1`,
+          updatedAt: now,
+        })
+        .where(and(eq(bookMetadataFetchQueue.bookId, bookId), eq(bookMetadataFetchQueue.status, QUEUE_STATUS.QUEUED)))
         .returning({ bookId: bookMetadataFetchQueue.bookId });
       return updated.length > 0;
     } catch (error) {
@@ -84,14 +102,14 @@ export class BookMetadataFetchQueueRepository {
     const now = new Date();
     await this.db
       .update(bookMetadataFetchQueue)
-      .set({ status: 'failed', lastError: error.slice(0, 2000), lastHttpStatus: httpStatus ?? null, updatedAt: now })
+      .set({ status: QUEUE_STATUS.FAILED, lastError: error.slice(0, 2000), lastHttpStatus: httpStatus ?? null, updatedAt: now })
       .where(eq(bookMetadataFetchQueue.bookId, bookId));
   }
 
   async cancelPending(): Promise<number> {
     const deleted = await this.db
       .delete(bookMetadataFetchQueue)
-      .where(eq(bookMetadataFetchQueue.status, 'queued'))
+      .where(eq(bookMetadataFetchQueue.status, QUEUE_STATUS.QUEUED))
       .returning({ bookId: bookMetadataFetchQueue.bookId });
     return deleted.length;
   }
@@ -100,8 +118,8 @@ export class BookMetadataFetchQueueRepository {
     const now = new Date();
     const updated = await this.db
       .update(bookMetadataFetchQueue)
-      .set({ status: 'queued', reason: 'manual_retry', lastError: null, lastHttpStatus: null, attemptCount: 0, updatedAt: now })
-      .where(eq(bookMetadataFetchQueue.status, 'failed'))
+      .set({ status: QUEUE_STATUS.QUEUED, reason: 'manual_retry', lastError: null, lastHttpStatus: null, attemptCount: 0, updatedAt: now })
+      .where(eq(bookMetadataFetchQueue.status, QUEUE_STATUS.FAILED))
       .returning({ bookId: bookMetadataFetchQueue.bookId });
     return updated.length;
   }
@@ -115,9 +133,9 @@ export class BookMetadataFetchQueueRepository {
     const summary = { queued: 0, processing: 0, failed: 0 };
     for (const row of rows) {
       const value = Number(row.cnt);
-      if (row.status === 'queued') summary.queued = value;
-      else if (row.status === 'processing') summary.processing = value;
-      else if (row.status === 'failed') summary.failed = value;
+      if (row.status === QUEUE_STATUS.QUEUED) summary.queued = value;
+      else if (row.status === QUEUE_STATUS.PROCESSING) summary.processing = value;
+      else if (row.status === QUEUE_STATUS.FAILED) summary.failed = value;
     }
     return summary;
   }
@@ -125,8 +143,8 @@ export class BookMetadataFetchQueueRepository {
   async resetAllProcessingOnBoot(): Promise<number> {
     const updated = await this.db
       .update(bookMetadataFetchQueue)
-      .set({ status: 'queued', updatedAt: new Date() })
-      .where(eq(bookMetadataFetchQueue.status, 'processing'))
+      .set({ status: QUEUE_STATUS.QUEUED, updatedAt: new Date() })
+      .where(eq(bookMetadataFetchQueue.status, QUEUE_STATUS.PROCESSING))
       .returning({ bookId: bookMetadataFetchQueue.bookId });
     return updated.length;
   }
@@ -136,10 +154,10 @@ export class BookMetadataFetchQueueRepository {
     const now = new Date();
     const updated = await this.db
       .update(bookMetadataFetchQueue)
-      .set({ status: 'queued', updatedAt: now })
+      .set({ status: QUEUE_STATUS.QUEUED, updatedAt: now })
       .where(
         and(
-          eq(bookMetadataFetchQueue.status, 'processing'),
+          eq(bookMetadataFetchQueue.status, QUEUE_STATUS.PROCESSING),
           or(isNull(bookMetadataFetchQueue.lastAttemptAt), sql`${bookMetadataFetchQueue.lastAttemptAt} <= ${staleBefore}`),
         ),
       )
@@ -148,73 +166,8 @@ export class BookMetadataFetchQueueRepository {
   }
 
   async fetchEligibleBookIds(config: BookMetadataFetchConfig, libraryId?: number): Promise<number[]> {
-    const { conditions } = config;
-    const conditionClauses: ReturnType<typeof sql>[] = [];
-
-    if (conditions.neverFetched.enabled) {
-      conditionClauses.push(sql`${bookMetadata.lastMetadataFetchAt} IS NULL`);
-    }
-
-    if (conditions.scoreThreshold.enabled) {
-      conditionClauses.push(sql`(${bookMetadata.metadataScore} IS NULL OR ${bookMetadata.metadataScore} < ${conditions.scoreThreshold.threshold})`);
-    }
-
-    if (conditions.missingFields.enabled && conditions.missingFields.fields.length > 0) {
-      const fieldClauses: ReturnType<typeof sql>[] = [];
-      for (const field of conditions.missingFields.fields) {
-        switch (field) {
-          case 'authors':
-            fieldClauses.push(sql`NOT EXISTS (SELECT 1 FROM ${bookAuthors} WHERE ${bookAuthors.bookId} = ${bookMetadata.bookId})`);
-            break;
-          case 'genres':
-            fieldClauses.push(sql`NOT EXISTS (SELECT 1 FROM ${bookGenres} WHERE ${bookGenres.bookId} = ${bookMetadata.bookId})`);
-            break;
-          case 'title':
-            fieldClauses.push(sql`(${bookMetadata.title} IS NULL OR ${bookMetadata.title} = '')`);
-            break;
-          case 'subtitle':
-            fieldClauses.push(sql`(${bookMetadata.subtitle} IS NULL OR ${bookMetadata.subtitle} = '')`);
-            break;
-          case 'description':
-            fieldClauses.push(sql`(${bookMetadata.description} IS NULL OR ${bookMetadata.description} = '')`);
-            break;
-          case 'publisher':
-            fieldClauses.push(sql`(${bookMetadata.publisher} IS NULL OR ${bookMetadata.publisher} = '')`);
-            break;
-          case 'publishedYear':
-            fieldClauses.push(sql`${bookMetadata.publishedYear} IS NULL`);
-            break;
-          case 'language':
-            fieldClauses.push(sql`(${bookMetadata.language} IS NULL OR ${bookMetadata.language} = '')`);
-            break;
-          case 'pageCount':
-            fieldClauses.push(sql`${bookMetadata.pageCount} IS NULL`);
-            break;
-          case 'seriesName':
-            fieldClauses.push(sql`(${bookMetadata.seriesName} IS NULL OR ${bookMetadata.seriesName} = '')`);
-            break;
-          case 'seriesIndex':
-            fieldClauses.push(sql`${bookMetadata.seriesIndex} IS NULL`);
-            break;
-          case 'cover':
-            fieldClauses.push(sql`${bookMetadata.coverSource} IS NULL`);
-            break;
-        }
-      }
-      if (fieldClauses.length > 0) {
-        conditionClauses.push(sql`(${sql.join(fieldClauses, sql` OR `)})`);
-      }
-    }
-
-    if (conditionClauses.length === 0) return [];
-
-    const notAlreadyQueued = sql`NOT EXISTS (SELECT 1 FROM ${bookMetadataFetchQueue} WHERE ${bookMetadataFetchQueue.bookId} = ${bookMetadata.bookId})`;
-    const eligibilityClause = sql`(${sql.join(conditionClauses, sql` OR `)})`;
-
-    const whereClause =
-      libraryId !== undefined
-        ? and(eq(books.status, 'present'), eq(books.libraryId, libraryId), eligibilityClause, notAlreadyQueued)
-        : and(eq(books.status, 'present'), eligibilityClause, notAlreadyQueued);
+    const whereClause = this.buildEligibleBooksWhereClause(config, libraryId);
+    if (!whereClause) return [];
 
     const rows = await this.db
       .select({ bookId: bookMetadata.bookId })
@@ -226,73 +179,8 @@ export class BookMetadataFetchQueueRepository {
   }
 
   async countEligibleBooks(config: BookMetadataFetchConfig, libraryId?: number): Promise<number> {
-    const { conditions } = config;
-    const conditionClauses: ReturnType<typeof sql>[] = [];
-
-    if (conditions.neverFetched.enabled) {
-      conditionClauses.push(sql`${bookMetadata.lastMetadataFetchAt} IS NULL`);
-    }
-
-    if (conditions.scoreThreshold.enabled) {
-      conditionClauses.push(sql`(${bookMetadata.metadataScore} IS NULL OR ${bookMetadata.metadataScore} < ${conditions.scoreThreshold.threshold})`);
-    }
-
-    if (conditions.missingFields.enabled && conditions.missingFields.fields.length > 0) {
-      const fieldClauses: ReturnType<typeof sql>[] = [];
-      for (const field of conditions.missingFields.fields) {
-        switch (field) {
-          case 'authors':
-            fieldClauses.push(sql`NOT EXISTS (SELECT 1 FROM ${bookAuthors} WHERE ${bookAuthors.bookId} = ${bookMetadata.bookId})`);
-            break;
-          case 'genres':
-            fieldClauses.push(sql`NOT EXISTS (SELECT 1 FROM ${bookGenres} WHERE ${bookGenres.bookId} = ${bookMetadata.bookId})`);
-            break;
-          case 'title':
-            fieldClauses.push(sql`(${bookMetadata.title} IS NULL OR ${bookMetadata.title} = '')`);
-            break;
-          case 'subtitle':
-            fieldClauses.push(sql`(${bookMetadata.subtitle} IS NULL OR ${bookMetadata.subtitle} = '')`);
-            break;
-          case 'description':
-            fieldClauses.push(sql`(${bookMetadata.description} IS NULL OR ${bookMetadata.description} = '')`);
-            break;
-          case 'publisher':
-            fieldClauses.push(sql`(${bookMetadata.publisher} IS NULL OR ${bookMetadata.publisher} = '')`);
-            break;
-          case 'publishedYear':
-            fieldClauses.push(sql`${bookMetadata.publishedYear} IS NULL`);
-            break;
-          case 'language':
-            fieldClauses.push(sql`(${bookMetadata.language} IS NULL OR ${bookMetadata.language} = '')`);
-            break;
-          case 'pageCount':
-            fieldClauses.push(sql`${bookMetadata.pageCount} IS NULL`);
-            break;
-          case 'seriesName':
-            fieldClauses.push(sql`(${bookMetadata.seriesName} IS NULL OR ${bookMetadata.seriesName} = '')`);
-            break;
-          case 'seriesIndex':
-            fieldClauses.push(sql`${bookMetadata.seriesIndex} IS NULL`);
-            break;
-          case 'cover':
-            fieldClauses.push(sql`${bookMetadata.coverSource} IS NULL`);
-            break;
-        }
-      }
-      if (fieldClauses.length > 0) {
-        conditionClauses.push(sql`(${sql.join(fieldClauses, sql` OR `)})`);
-      }
-    }
-
-    if (conditionClauses.length === 0) return 0;
-
-    const notAlreadyQueued = sql`NOT EXISTS (SELECT 1 FROM ${bookMetadataFetchQueue} WHERE ${bookMetadataFetchQueue.bookId} = ${bookMetadata.bookId})`;
-    const eligibilityClause = sql`(${sql.join(conditionClauses, sql` OR `)})`;
-
-    const whereClause =
-      libraryId !== undefined
-        ? and(eq(books.status, 'present'), eq(books.libraryId, libraryId), eligibilityClause, notAlreadyQueued)
-        : and(eq(books.status, 'present'), eligibilityClause, notAlreadyQueued);
+    const whereClause = this.buildEligibleBooksWhereClause(config, libraryId);
+    if (!whereClause) return 0;
 
     const rows = await this.db.select({ cnt: count() }).from(bookMetadata).innerJoin(books, eq(books.id, bookMetadata.bookId)).where(whereClause);
 
@@ -334,6 +222,82 @@ export class BookMetadataFetchQueueRepository {
       })),
       total: Number(totalRows[0]?.cnt ?? 0),
     };
+  }
+
+  private buildEligibleBooksWhereClause(config: BookMetadataFetchConfig, libraryId?: number): SQL | null {
+    const eligibilityClause = this.buildEligibilityClause(config);
+    if (!eligibilityClause) return null;
+
+    const notAlreadyQueued = sql`NOT EXISTS (SELECT 1 FROM ${bookMetadataFetchQueue} WHERE ${bookMetadataFetchQueue.bookId} = ${bookMetadata.bookId})`;
+
+    const whereClause =
+      libraryId !== undefined
+        ? and(eq(books.status, 'present'), eq(books.libraryId, libraryId), eligibilityClause, notAlreadyQueued)
+        : and(eq(books.status, 'present'), eligibilityClause, notAlreadyQueued);
+    return whereClause ?? null;
+  }
+
+  private buildEligibilityClause(config: BookMetadataFetchConfig): SQL | null {
+    const { conditions } = config;
+    const conditionClauses: SQL[] = [];
+
+    if (conditions.neverFetched.enabled) {
+      conditionClauses.push(sql`${bookMetadata.lastMetadataFetchAt} IS NULL`);
+    }
+
+    if (conditions.scoreThreshold.enabled) {
+      conditionClauses.push(sql`(${bookMetadata.metadataScore} IS NULL OR ${bookMetadata.metadataScore} < ${conditions.scoreThreshold.threshold})`);
+    }
+
+    if (conditions.missingFields.enabled && conditions.missingFields.fields.length > 0) {
+      const missingFieldClauses = conditions.missingFields.fields
+        .map((field) => this.buildMissingFieldClause(field))
+        .filter((clause): clause is SQL => clause !== null);
+
+      if (missingFieldClauses.length > 0) {
+        conditionClauses.push(sql`(${sql.join(missingFieldClauses, sql` OR `)})`);
+      }
+    }
+
+    if (conditionClauses.length === 0) return null;
+    return sql`(${sql.join(conditionClauses, sql` OR `)})`;
+  }
+
+  private buildMissingFieldClause(field: MetadataField): SQL | null {
+    switch (field) {
+      case 'authors':
+        return sql`NOT EXISTS (SELECT 1 FROM ${bookAuthors} WHERE ${bookAuthors.bookId} = ${bookMetadata.bookId})`;
+      case 'genres':
+        return sql`NOT EXISTS (SELECT 1 FROM ${bookGenres} WHERE ${bookGenres.bookId} = ${bookMetadata.bookId})`;
+      case 'narrators':
+        return sql`NOT EXISTS (SELECT 1 FROM ${bookNarrators} WHERE ${bookNarrators.bookId} = ${bookMetadata.bookId})`;
+      case 'duration':
+        return sql`${bookMetadata.durationSeconds} IS NULL`;
+      case 'abridged':
+        return sql`${bookMetadata.abridged} IS NULL`;
+      case 'cover':
+        return sql`${bookMetadata.coverSource} IS NULL`;
+      case 'title':
+        return sql`(${bookMetadata.title} IS NULL OR ${bookMetadata.title} = '')`;
+      case 'subtitle':
+        return sql`(${bookMetadata.subtitle} IS NULL OR ${bookMetadata.subtitle} = '')`;
+      case 'description':
+        return sql`(${bookMetadata.description} IS NULL OR ${bookMetadata.description} = '')`;
+      case 'publisher':
+        return sql`(${bookMetadata.publisher} IS NULL OR ${bookMetadata.publisher} = '')`;
+      case 'publishedYear':
+        return sql`${bookMetadata.publishedYear} IS NULL`;
+      case 'language':
+        return sql`(${bookMetadata.language} IS NULL OR ${bookMetadata.language} = '')`;
+      case 'pageCount':
+        return sql`${bookMetadata.pageCount} IS NULL`;
+      case 'seriesName':
+        return sql`(${bookMetadata.seriesName} IS NULL OR ${bookMetadata.seriesName} = '')`;
+      case 'seriesIndex':
+        return sql`${bookMetadata.seriesIndex} IS NULL`;
+      default:
+        return null;
+    }
   }
 }
 

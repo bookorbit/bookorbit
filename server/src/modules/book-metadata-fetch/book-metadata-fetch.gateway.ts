@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Permission, type BookMetadataFetchStatusEvent } from '@projectx/types';
@@ -28,14 +28,14 @@ export class BookMetadataFetchGateway implements OnGatewayConnection, OnGatewayD
   async handleConnection(client: Socket): Promise<void> {
     try {
       const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new Error('No token provided');
+      if (!token) throw new UnauthorizedException('No token provided');
 
       const payload = this.jwtService.verify<{ sub: number; ver: number }>(token);
       const user = await this.authService.validateUser(payload.sub, payload.ver);
-      if (!user) throw new Error('User not found or token revoked');
+      if (!user) throw new UnauthorizedException('User not found or token revoked');
 
       this.assertCanViewStatus(user);
-      (client.data as Record<string, unknown>).user = user;
+      (client.data as { user?: RequestUser }).user = user;
       this.logger.debug(`WS connected: user=${user.id} socket=${client.id}`);
 
       const [summary, paused] = await Promise.all([this.queueRepo.getStatusSummary(), this.configService.isPaused()]);
@@ -57,6 +57,6 @@ export class BookMetadataFetchGateway implements OnGatewayConnection, OnGatewayD
   private assertCanViewStatus(user: RequestUser): void {
     if (user.isSuperuser) return;
     if (user.permissions.includes(Permission.ManageMetadataConfig)) return;
-    throw new Error('Missing permission: manage_metadata_config');
+    throw new ForbiddenException('Missing permission: manage_metadata_config');
   }
 }

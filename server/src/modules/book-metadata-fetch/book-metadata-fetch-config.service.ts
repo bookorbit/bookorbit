@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { BookMetadataFetchConfig, BookMetadataFetchConfigOverride, BookMetadataFetchLibraryConfig } from '@projectx/types';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -26,11 +26,13 @@ export const DEFAULT_BOOK_METADATA_FETCH_CONFIG: BookMetadataFetchConfig = {
 
 @Injectable()
 export class BookMetadataFetchConfigService {
+  private readonly logger = new Logger(BookMetadataFetchConfigService.name);
+
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async getGlobalConfig(): Promise<BookMetadataFetchConfig> {
     const row = await this.db.query.appSettings.findFirst({ where: eq(appSettings.key, KEYS.CONFIG) });
-    return parseSafe<BookMetadataFetchConfig>(row?.value, { ...DEFAULT_BOOK_METADATA_FETCH_CONFIG });
+    return this.parseSafe<BookMetadataFetchConfig>(KEYS.CONFIG, row?.value, { ...DEFAULT_BOOK_METADATA_FETCH_CONFIG });
   }
 
   async setGlobalConfig(config: BookMetadataFetchConfig): Promise<void> {
@@ -96,13 +98,18 @@ export class BookMetadataFetchConfigService {
       },
     };
   }
-}
 
-function parseSafe<T>(val: string | undefined, fallback: T): T {
-  if (!val) return fallback;
-  try {
-    return JSON.parse(val) as T;
-  } catch {
-    return fallback;
+  private parseSafe<T>(key: string, value: string | undefined, fallback: T): T {
+    if (!value) return fallback;
+    try {
+      return JSON.parse(value) as T;
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const message = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[book.metadata_fetch.config_parse] [fail] key=${key} errorClass=${errorClass} error="${message}" - failed to parse stored config`,
+      );
+      return fallback;
+    }
   }
 }

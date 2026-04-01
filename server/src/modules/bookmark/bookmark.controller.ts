@@ -11,12 +11,12 @@ export class BookmarkController {
 
   @Get()
   getBookmarks(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
-    return this.bookmarkService.getBookmarks(bookId, user.id);
+    return this.bookmarkService.getBookmarks(bookId, user);
   }
 
   @Post()
   createBookmark(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateBookmarkDto, @CurrentUser() user: RequestUser) {
-    return this.bookmarkService.createBookmark(user.id, bookId, dto);
+    return this.bookmarkService.createBookmark(bookId, user, dto);
   }
 
   @Delete(':bookmarkId')
@@ -26,6 +26,6 @@ export class BookmarkController {
     @Param('bookmarkId', ParseIntPipe) bookmarkId: number,
     @CurrentUser() user: RequestUser,
   ) {
-    await this.bookmarkService.deleteBookmark(bookId, bookmarkId, user.id);
+    await this.bookmarkService.deleteBookmark(bookId, bookmarkId, user);
   }
 }

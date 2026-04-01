@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, Max, Min, ValidateNested } from 'class-validator';
+import type { BookMetadataFetchConditions, BookMetadataFetchConfig, MetadataField } from '@projectx/types';
 
 import { ALL_METADATA_FIELDS } from '@projectx/types';
 
@@ -19,7 +20,7 @@ class MissingFieldsConditionDto {
 
   @IsArray()
   @IsIn(ALL_METADATA_FIELDS, { each: true })
-  fields: string[];
+  fields: MetadataField[];
 }
 
 class NeverFetchedConditionDto {
@@ -27,7 +28,7 @@ class NeverFetchedConditionDto {
   enabled: boolean;
 }
 
-class ConditionsDto {
+class ConditionsDto implements BookMetadataFetchConditions {
   @ValidateNested()
   @Type(() => ScoreConditionDto)
   scoreThreshold: ScoreConditionDto;
@@ -41,7 +42,7 @@ class ConditionsDto {
   neverFetched: NeverFetchedConditionDto;
 }
 
-export class UpdateBookMetadataFetchConfigDto {
+export class UpdateBookMetadataFetchConfigDto implements BookMetadataFetchConfig {
   @IsBoolean()
   enabled: boolean;
 
@@ -57,14 +58,14 @@ export class PreviewCountDto {
   @IsObject()
   @ValidateNested()
   @Type(() => ConditionsDto)
-  conditions: ConditionsDto;
+  conditions: BookMetadataFetchConditions;
 
   @IsOptional()
   @IsInt()
   libraryId?: number;
 }
 
-export class UpdateLibraryBookMetadataFetchConfigDto {
+export class UpdateLibraryBookMetadataFetchConfigDto implements Partial<BookMetadataFetchConfig> {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
@@ -76,5 +77,5 @@ export class UpdateLibraryBookMetadataFetchConfigDto {
   @IsOptional()
   @ValidateNested()
   @Type(() => ConditionsDto)
-  conditions?: ConditionsDto;
+  conditions?: BookMetadataFetchConditions;
 }
