@@ -1,6 +1,55 @@
 import { BadRequestException } from '@nestjs/common';
 
+import { FIELD_OPERATORS, RULE_OPERATORS, type RuleField, type RuleOperator } from '@projectx/types';
+
 import { validateGroupRule, groupRuleSchema } from './group-rule.validator';
+
+/**
+ * Returns a minimal { value, valueTo } pair that satisfies the Zod schema for a
+ * given operator. The validator only checks operator-field compatibility and
+ * value type (string | number | string[] | number[]), not field-level semantics,
+ * so any structurally valid value is sufficient here.
+ *
+ * The exhaustive `never` default ensures TypeScript raises a compile error when a
+ * new operator is added to RuleOperator but not handled in this helper.
+ */
+function validRuleValue(operator: RuleOperator): { value?: unknown; valueTo?: unknown } {
+  switch (operator) {
+    case 'isEmpty':
+    case 'isNotEmpty':
+    case 'isMissing':
+    case 'isPresent':
+    case 'isUnread':
+    case 'isInProgress':
+    case 'isFinished':
+      return {};
+    case 'contains':
+    case 'notContains':
+    case 'startsWith':
+    case 'endsWith':
+    case 'eq':
+    case 'notEq':
+    case 'before':
+    case 'after':
+      return { value: 'test' };
+    case 'gt':
+    case 'gte':
+    case 'lt':
+    case 'lte':
+    case 'withinLast':
+      return { value: 1 };
+    case 'between':
+      return { value: 1, valueTo: 2 };
+    case 'includesAny':
+    case 'includesAll':
+    case 'excludesAll':
+      return { value: ['test'] };
+    default: {
+      const _exhaustive: never = operator;
+      return _exhaustive;
+    }
+  }
+}
 
 describe('validateGroupRule', () => {
   it('returns null for null input', () => {
@@ -189,5 +238,29 @@ describe('groupRuleSchema depth enforcement', () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('field × operator exhaustive validation', () => {
+  it.each(Object.entries(FIELD_OPERATORS) as [RuleField, RuleOperator[]][])('accepts all valid operators for field: %s', (field, operators) => {
+    for (const operator of operators) {
+      const { value, valueTo } = validRuleValue(operator);
+      const rule: Record<string, unknown> = { type: 'rule', field, operator };
+      if (value !== undefined) rule.value = value;
+      if (valueTo !== undefined) rule.valueTo = valueTo;
+
+      expect(
+        () => validateGroupRule({ type: 'group', join: 'AND', rules: [rule] }),
+        `field '${field}' should accept operator '${operator}'`,
+      ).not.toThrow();
+    }
+  });
+
+  it.each(Object.entries(FIELD_OPERATORS) as [RuleField, RuleOperator[]][])('rejects a disallowed operator for field: %s', (field, operators) => {
+    const disallowedOp = RULE_OPERATORS.find((op) => !operators.includes(op));
+    if (!disallowedOp) return;
+
+    const rule = { type: 'rule', field, operator: disallowedOp, value: 'test' };
+    expect(() => validateGroupRule({ type: 'group', join: 'AND', rules: [rule] })).toThrow(BadRequestException);
   });
 });
