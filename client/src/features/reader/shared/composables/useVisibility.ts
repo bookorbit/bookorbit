@@ -5,6 +5,7 @@ export function useVisibility() {
   const footerVisible = ref(false)
 
   let isPinned = false
+  let isVisibilityLocked = false
   let hideTimer: ReturnType<typeof setTimeout> | null = null
 
   const HEADER_TRIGGER = 80
@@ -13,7 +14,7 @@ export function useVisibility() {
   function scheduleHide() {
     if (hideTimer) clearTimeout(hideTimer)
     hideTimer = setTimeout(() => {
-      if (!isPinned) {
+      if (!isPinned && !isVisibilityLocked) {
         headerVisible.value = false
         footerVisible.value = false
       }
@@ -21,6 +22,8 @@ export function useVisibility() {
   }
 
   function onMouseMove(e: MouseEvent) {
+    if (isVisibilityLocked) return
+
     const y = e.clientY
     const height = window.innerHeight
 
@@ -42,6 +45,8 @@ export function useVisibility() {
   }
 
   function handleMiddleTap() {
+    if (isVisibilityLocked) return
+
     isPinned = !isPinned
     headerVisible.value = isPinned
     footerVisible.value = isPinned
@@ -51,6 +56,11 @@ export function useVisibility() {
   }
 
   function showHeader() {
+    if (isVisibilityLocked) {
+      headerVisible.value = true
+      return
+    }
+
     if (!isPinned) {
       headerVisible.value = true
       scheduleHide()
@@ -58,10 +68,29 @@ export function useVisibility() {
   }
 
   function showFooter() {
+    if (isVisibilityLocked) {
+      footerVisible.value = true
+      return
+    }
+
     if (!isPinned) {
       footerVisible.value = true
       scheduleHide()
     }
+  }
+
+  function setVisibilityLock(locked: boolean) {
+    isVisibilityLocked = locked
+
+    if (hideTimer) clearTimeout(hideTimer)
+
+    if (locked || isPinned) {
+      headerVisible.value = true
+      footerVisible.value = true
+      return
+    }
+
+    scheduleHide()
   }
 
   onMounted(() => {
@@ -73,5 +102,5 @@ export function useVisibility() {
     if (hideTimer) clearTimeout(hideTimer)
   })
 
-  return { headerVisible, footerVisible, handleMiddleTap, onMouseMove, showHeader, showFooter }
+  return { headerVisible, footerVisible, handleMiddleTap, onMouseMove, showHeader, showFooter, setVisibilityLock }
 }

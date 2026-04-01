@@ -1,16 +1,42 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { type Component, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings } from 'lucide-vue-next'
+import {
+  AlignJustify,
+  ArrowDownUp,
+  ArrowLeft,
+  ArrowLeftRight,
+  ArrowRight,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Image as ImageIcon,
+  LayoutGrid,
+  Layers,
+  Maximize,
+  ScanLine,
+  Settings,
+} from 'lucide-vue-next'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useCbz } from './composables/useCbz'
 import { useCbzSettings } from './composables/useCbzSettings'
+import type { BgColor, Direction, FitMode, ScrollMode, ViewMode } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
-import CbzSettingsPanel from './components/SettingsPanel.vue'
 import type { CbxReaderSettings } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
@@ -30,6 +56,48 @@ const currentPage = ref(0)
 const currentImageLoaded = ref(false)
 const showSettings = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
+
+// ── Settings options ───────────────────────────────────────────────────────────
+const FIT_OPTIONS: { value: FitMode; label: string; icon: Component }[] = [
+  { value: 'fit-page', label: 'Page Fit', icon: Maximize },
+  { value: 'fit-width', label: 'Page Width', icon: ArrowLeftRight },
+  { value: 'fit-height', label: 'Page Height', icon: ArrowDownUp },
+  { value: 'actual', label: 'Actual Size', icon: ImageIcon },
+]
+const VIEW_OPTIONS: { value: ViewMode; label: string; icon: Component }[] = [
+  { value: 'single', label: 'Single Page', icon: BookOpen },
+  { value: 'two-page', label: 'Two Page', icon: LayoutGrid },
+]
+const SCROLL_OPTIONS: { value: ScrollMode; label: string; icon: Component }[] = [
+  { value: 'paginated', label: 'Paginated', icon: ScanLine },
+  { value: 'infinite', label: 'Infinite Scroll', icon: Layers },
+  { value: 'long-strip', label: 'Long Strip', icon: AlignJustify },
+]
+const DIRECTION_OPTIONS: { value: Direction; label: string; icon: Component }[] = [
+  { value: 'ltr', label: 'Left to Right', icon: ArrowRight },
+  { value: 'rtl', label: 'Right to Left', icon: ArrowLeft },
+]
+const BG_OPTIONS: { value: BgColor; label: string; color: string }[] = [
+  { value: 'black', label: 'Black', color: 'bg-zinc-950' },
+  { value: 'gray', label: 'Gray', color: 'bg-zinc-500' },
+  { value: 'white', label: 'White', color: 'bg-white' },
+]
+
+function setFitMode(v: FitMode) {
+  fitMode.value = v
+}
+function setViewMode(v: ViewMode) {
+  viewMode.value = v
+}
+function setScrollMode(v: ScrollMode) {
+  scrollMode.value = v
+}
+function setDirection(v: Direction) {
+  direction.value = v
+}
+function setBgColor(v: BgColor) {
+  bgColor.value = v
+}
 
 // ── Derived ────────────────────────────────────────────────────────────────────
 // Pages shown in paginated mode (1 or 2), in display order for RTL.
@@ -76,10 +144,6 @@ function prevPage() {
 
 // ── Click zones (left / middle / right) ───────────────────────────────────────
 function handleImageClick(e: MouseEvent) {
-  if (showSettings.value) {
-    showSettings.value = false
-    return
-  }
   const x = e.clientX / window.innerWidth
   if (x < 0.25) {
     if (direction.value === 'rtl') nextPage()
@@ -255,15 +319,98 @@ onUnmounted(() => {
       class="absolute top-0 inset-x-0 z-50 transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
     >
-      <div class="h-12 flex items-center gap-2 px-3 bg-background/90 backdrop-blur-md border-b border-border">
+      <div class="h-12 flex items-center gap-1 px-3 bg-background/90 backdrop-blur-md border-b border-border">
         <button class="viewer-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
-        <div class="flex-1 min-w-0 flex flex-col justify-center">
+        <div class="flex-1 min-w-0 flex flex-col justify-center px-2">
           <span v-if="bookTitle" class="text-sm font-serif text-foreground truncate leading-tight">{{ bookTitle }}</span>
           <span class="text-xs text-muted-foreground tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
         </div>
-        <button class="viewer-btn" :class="showSettings ? '!bg-muted !text-foreground' : ''" @click="showSettings = !showSettings">
-          <Settings :size="15" />
-        </button>
+        <DropdownMenu v-model:open="showSettings">
+          <DropdownMenuTrigger as-child>
+            <button class="viewer-btn" :class="showSettings ? '!bg-muted !text-foreground' : ''">
+              <Settings :size="15" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-52">
+            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Fit Mode</DropdownMenuLabel>
+            <DropdownMenuRadioGroup :model-value="fitMode">
+              <DropdownMenuRadioItem
+                v-for="opt in FIT_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+                class="text-xs gap-2"
+                @select.prevent="setFitMode(opt.value)"
+              >
+                <component :is="opt.icon" :size="13" />
+                {{ opt.label }}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Pages</DropdownMenuLabel>
+            <DropdownMenuRadioGroup :model-value="viewMode">
+              <DropdownMenuRadioItem
+                v-for="opt in VIEW_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+                class="text-xs gap-2"
+                @select.prevent="setViewMode(opt.value)"
+              >
+                <component :is="opt.icon" :size="13" />
+                {{ opt.label }}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Scroll Mode</DropdownMenuLabel>
+            <DropdownMenuRadioGroup :model-value="scrollMode">
+              <DropdownMenuRadioItem
+                v-for="opt in SCROLL_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+                class="text-xs gap-2"
+                @select.prevent="setScrollMode(opt.value)"
+              >
+                <component :is="opt.icon" :size="13" />
+                {{ opt.label }}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Reading Direction</DropdownMenuLabel>
+            <DropdownMenuRadioGroup :model-value="direction">
+              <DropdownMenuRadioItem
+                v-for="opt in DIRECTION_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+                class="text-xs gap-2"
+                @select.prevent="setDirection(opt.value)"
+              >
+                <component :is="opt.icon" :size="13" />
+                {{ opt.label }}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Background</DropdownMenuLabel>
+            <DropdownMenuRadioGroup :model-value="bgColor">
+              <DropdownMenuRadioItem
+                v-for="opt in BG_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+                class="text-xs gap-2"
+                @select.prevent="setBgColor(opt.value)"
+              >
+                <span class="size-3 rounded-full ring-1 ring-border shrink-0" :class="opt.color" />
+                {{ opt.label }}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
 
@@ -372,22 +519,6 @@ onUnmounted(() => {
     <div v-if="error" class="absolute inset-0 flex items-center justify-center z-50 p-8 text-center bg-background">
       <p class="text-sm text-foreground">{{ error }}</p>
     </div>
-
-    <!-- ── Settings panel ────────────────────────────────────────────────────── -->
-    <CbzSettingsPanel
-      v-if="showSettings"
-      :fitMode="fitMode"
-      :viewMode="viewMode"
-      :scrollMode="scrollMode"
-      :direction="direction"
-      :bgColor="bgColor"
-      @close="showSettings = false"
-      @update:fitMode="fitMode = $event"
-      @update:viewMode="viewMode = $event"
-      @update:scrollMode="scrollMode = $event"
-      @update:direction="direction = $event"
-      @update:bgColor="bgColor = $event"
-    />
 
     <!-- Progress bar -->
     <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-30">

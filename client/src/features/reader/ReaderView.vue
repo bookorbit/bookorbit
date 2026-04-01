@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
 import { useReaderProgress } from './shared/composables/useReaderProgress'
@@ -77,7 +77,7 @@ const { onActivity } = useReadingSession(fileId, () => ({
 }))
 
 const visibility = useVisibility()
-const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter } = visibility
+const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter, setVisibilityLock } = visibility
 
 const bookmarks = useBookmarks()
 const annotations = useAnnotations()
@@ -210,6 +210,14 @@ function toggleFullscreen() {
   }
 }
 
+function setSettingsOpen(open: boolean) {
+  showSettings.value = open
+}
+
+watch(showSettings, (open) => {
+  setVisibilityLock(open)
+})
+
 async function handleHighlight(color: string, style: string, note?: string) {
   const annotationCfi = selection.cfi.value
   if (!selection.text.value || !annotationCfi) return
@@ -294,15 +302,20 @@ function closeSearch() {
     <ReaderHeader
       :chapterTitle="chapterTitle"
       :isBookmarked="bookmarks.isCurrentCfiBookmarked.value"
+      :settings-open="showSettings"
       class="transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
       @back="router.back()"
       @toggleSidebar="showSidebar = !showSidebar"
       @toggleSearch="showSearch = !showSearch"
       @toggleBookmark="bookmarks.toggle(bookId, cfi ?? '', chapterTitle)"
-      @toggleSettings="showSettings = !showSettings"
+      @update:settings-open="setSettingsOpen"
       @toggleFullscreen="toggleFullscreen"
-    />
+    >
+      <template #settingsPanel>
+        <ReaderSettingsPanel :state="state" @update="applyUpdate" />
+      </template>
+    </ReaderHeader>
 
     <div class="absolute inset-0">
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-10 bg-background">
@@ -365,8 +378,6 @@ function closeSearch() {
       @navigate="navigateSearch($event)"
       @close="closeSearch"
     />
-
-    <ReaderSettingsPanel v-if="showSettings" :state="state" @update="applyUpdate" @close="showSettings = false" />
 
     <NoteDialog
       v-if="selection.showNoteDialog.value"

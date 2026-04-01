@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, BookOpen, Bookmark, BookmarkCheck, Maximize, Minimize, Search, Settings } from 'lucide-vue-next'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-defineProps<{
+const props = defineProps<{
   chapterTitle: string
   isBookmarked: boolean
+  settingsOpen: boolean
 }>()
 
 const emit = defineEmits<{
@@ -13,7 +15,7 @@ const emit = defineEmits<{
   toggleSidebar: []
   toggleSearch: []
   toggleBookmark: []
-  toggleSettings: []
+  'update:settingsOpen': [open: boolean]
   toggleFullscreen: []
 }>()
 
@@ -21,6 +23,10 @@ const isFullscreen = ref(false)
 
 function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
+}
+
+function onSettingsOpenChange(open: boolean) {
+  emit('update:settingsOpen', open)
 }
 
 onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
@@ -74,15 +80,6 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
 
     <Tooltip>
       <TooltipTrigger as-child>
-        <button class="viewer-btn" @click="emit('toggleSettings')">
-          <Settings :size="18" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>Settings</TooltipContent>
-    </Tooltip>
-
-    <Tooltip>
-      <TooltipTrigger as-child>
         <button class="viewer-btn" @click="emit('toggleFullscreen')">
           <Minimize v-if="isFullscreen" :size="18" />
           <Maximize v-else :size="18" />
@@ -90,5 +87,21 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
       </TooltipTrigger>
       <TooltipContent>{{ isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen' }}</TooltipContent>
     </Tooltip>
+
+    <DropdownMenu :open="props.settingsOpen" @update:open="onSettingsOpenChange">
+      <DropdownMenuTrigger as-child>
+        <button class="viewer-btn" :class="props.settingsOpen ? '!bg-muted !text-foreground' : ''" title="Settings" aria-label="Reader settings">
+          <Settings :size="18" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        side="bottom"
+        :side-offset="10"
+        class="w-[22rem] max-w-[calc(100vw-1rem)] max-h-[min(80vh,38rem)] rounded-xl border-border bg-card p-0 shadow-2xl overflow-hidden"
+      >
+        <slot name="settingsPanel" />
+      </DropdownMenuContent>
+    </DropdownMenu>
   </header>
 </template>
