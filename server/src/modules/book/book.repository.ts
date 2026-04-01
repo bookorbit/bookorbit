@@ -197,6 +197,15 @@ export class BookRepository {
     return { book, authorRows, genreRows, tagRows, fileRows, narratorRows };
   }
 
+  async findCollectionsByBookId(bookId: number, userId: number): Promise<{ id: number; name: string }[]> {
+    return this.db
+      .select({ id: collections.id, name: collections.name })
+      .from(collectionBooks)
+      .innerJoin(collections, and(eq(collections.id, collectionBooks.collectionId), eq(collections.userId, userId)))
+      .where(eq(collectionBooks.bookId, bookId))
+      .orderBy(collections.name);
+  }
+
   async findLibraryIdByBookId(bookId: number): Promise<number | null> {
     const [row] = await this.db.select({ libraryId: books.libraryId }).from(books).where(eq(books.id, bookId)).limit(1);
     return row?.libraryId ?? null;

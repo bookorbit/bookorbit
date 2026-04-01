@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, Headphones, Pencil, Star, Trash2, X } from 'lucide-vue-next'
+import { BookOpen, ExternalLink, Folder, FolderPlus, Headphones, Pencil, Star, Trash2, X } from 'lucide-vue-next'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -45,6 +45,7 @@ watch(
       coverLoaded.value = false
       coverFailed.value = false
       descriptionExpanded.value = false
+      genresExpanded.value = false
       providerIconErrors.value = {}
       fetch(id)
     }
@@ -128,6 +129,7 @@ const providerLinks = computed<ProviderLink[]>(() => {
 })
 
 const descriptionExpanded = ref(false)
+const genresExpanded = ref(false)
 const coverLightboxOpen = ref(false)
 
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
@@ -175,6 +177,10 @@ function openDetails() {
   if (!detail.value) return
   router.push({ name: 'book-detail', params: { bookId: detail.value.id } })
   emit('update:open', false)
+}
+
+function toggleGenres() {
+  genresExpanded.value = !genresExpanded.value
 }
 </script>
 
@@ -331,10 +337,34 @@ function openDetails() {
               </dl>
 
               <!-- Genres -->
-              <div v-if="detail.genres.length" class="flex flex-wrap gap-1.5">
-                <span v-for="genre in detail.genres" :key="genre" class="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                  {{ genre }}
-                </span>
+              <div v-if="detail.genres.length">
+                <div class="flex flex-wrap gap-1.5 overflow-hidden transition-all" :style="genresExpanded ? {} : { maxHeight: '78px' }">
+                  <span v-for="genre in detail.genres" :key="genre" class="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    {{ genre }}
+                  </span>
+                </div>
+                <button
+                  v-if="detail.genres.length > 5"
+                  class="text-xs text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
+                  @click="toggleGenres"
+                >
+                  {{ genresExpanded ? 'Show less' : 'Show more' }}
+                </button>
+              </div>
+
+              <!-- Collections -->
+              <div v-if="detail.collections.length" class="border-t pt-4">
+                <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-2">Collections</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="col in detail.collections"
+                    :key="col.id"
+                    class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                  >
+                    <Folder class="size-2.5 shrink-0" />
+                    {{ col.name }}
+                  </span>
+                </div>
               </div>
 
               <!-- Description -->

@@ -952,10 +952,11 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, readStatus, comicMeta] = await Promise.all([
+    const [result, readStatus, comicMeta, collectionRows] = await Promise.all([
       this.bookRepo.findById(id),
       this.userBookStatusService.findOne(user.id, id),
       this.comicMetadataService.findByBookId(id),
+      this.bookRepo.findCollectionsByBookId(id, user.id),
     ]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
@@ -1034,6 +1035,7 @@ export class BookService {
             storyArcs: comicMeta.storyArcs ?? undefined,
           }
         : null,
+      collections: collectionRows,
     };
   }
 

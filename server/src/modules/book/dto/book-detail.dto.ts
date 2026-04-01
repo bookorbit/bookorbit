@@ -49,4 +49,5 @@ export class BookDetailDto {
   audioMetadata: AudioMetadataDto | null;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
+  collections: { id: number; name: string }[];
 }
