@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { collectionBooks, collections } from '../../db/schema';
+import { books, collectionBooks, collections } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -93,16 +93,45 @@ export class CollectionRepository {
       .returning();
   }
 
-  findBookIds(collectionId: number) {
-    return this.db.select({ bookId: collectionBooks.bookId }).from(collectionBooks).where(eq(collectionBooks.collectionId, collectionId));
+  async findBookIdsPage(collectionId: number, libraryIds: number[], page: number, size: number) {
+    if (libraryIds.length === 0) {
+      return {
+        bookIds: [],
+        total: 0,
+        page,
+        size,
+      };
+    }
+
+    const where = and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds));
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select({ bookId: collectionBooks.bookId })
+        .from(collectionBooks)
+        .innerJoin(books, eq(books.id, collectionBooks.bookId))
+        .where(where)
+        .orderBy(collectionBooks.addedAt, collectionBooks.bookId)
+        .limit(size)
+        .offset(page * size),
+      this.db.select({ total: count() }).from(collectionBooks).innerJoin(books, eq(books.id, collectionBooks.bookId)).where(where),
+    ]);
+
+    return {
+      bookIds: rows.map((row) => row.bookId),
+      total: Number(total),
+      page,
+      size,
+    };
   }
 
   async updateDisplayOrders(userId: number, order: { id: number; displayOrder: number }[]) {
-    for (const item of order) {
-      await this.db
-        .update(collections)
-        .set({ displayOrder: item.displayOrder })
-        .where(and(eq(collections.id, item.id), eq(collections.userId, userId)));
-    }
+    await this.db.transaction(async (tx) => {
+      for (const item of order) {
+        await tx
+          .update(collections)
+          .set({ displayOrder: item.displayOrder, updatedAt: sql`now()` })
+          .where(and(eq(collections.id, item.id), eq(collections.userId, userId)));
+      }
+    });
   }
 }

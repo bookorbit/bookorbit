@@ -24,15 +24,45 @@ import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { CollectionService } from './collection.service';
 
+const BOOK_IDS_QUERY_INVALID_MESSAGE = 'bookIds must be a comma-separated list of positive integers';
+const PAGE_QUERY_INVALID_MESSAGE = 'page must be greater than or equal to 0';
+const SIZE_QUERY_INVALID_MESSAGE = 'size must be between 1 and 100';
+const MAX_PAGE_SIZE = 100;
+
 @Controller('collections')
 export class CollectionController {
   constructor(private readonly collectionService: CollectionService) {}
 
+  private parseBookIdsQuery(bookIdsStr: string): number[] {
+    const parts = bookIdsStr.split(',').map((part) => part.trim());
+    if (parts.length === 0 || parts.some((part) => part.length === 0)) {
+      throw new BadRequestException(BOOK_IDS_QUERY_INVALID_MESSAGE);
+    }
+
+    const parsed = parts.map((part) => Number(part));
+    if (parsed.some((id) => !Number.isInteger(id) || id < 1)) {
+      throw new BadRequestException(BOOK_IDS_QUERY_INVALID_MESSAGE);
+    }
+
+    return [...new Set(parsed)];
+  }
+
+  private validatePageQuery(page: number): void {
+    if (page < 0) {
+      throw new BadRequestException(PAGE_QUERY_INVALID_MESSAGE);
+    }
+  }
+
+  private validateSizeQuery(size: number): void {
+    if (size < 1 || size > MAX_PAGE_SIZE) {
+      throw new BadRequestException(SIZE_QUERY_INVALID_MESSAGE);
+    }
+  }
+
   @Get()
   findAll(@CurrentUser() user: RequestUser, @Query('bookIds') bookIdsStr?: string) {
     if (!bookIdsStr) return this.collectionService.findAll(user);
-    const bookIds = bookIdsStr.split(',').map(Number);
-    if (bookIds.some(isNaN)) throw new BadRequestException('bookIds must be a comma-separated list of integers');
+    const bookIds = this.parseBookIdsQuery(bookIdsStr);
     return this.collectionService.findAll(user, bookIds);
   }
 
@@ -116,6 +146,8 @@ export class CollectionController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
   ) {
+    this.validatePageQuery(page);
+    this.validateSizeQuery(size);
     return this.collectionService.getBooks(id, user, page, size);
   }
 }

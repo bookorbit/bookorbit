@@ -23,8 +23,16 @@ export class BookReadService {
     return this.bookRepo.findCards(opts);
   }
 
+  findCardsByBookIds(bookIds: number[], userId: number) {
+    return this.bookRepo.findCardsByBookIds(bookIds, userId);
+  }
+
   countWhere(where: SQL | undefined): Promise<number> {
     return this.bookRepo.countWhere(where);
+  }
+
+  findLibraryIdsByBookIds(bookIds: number[]) {
+    return this.bookRepo.findLibraryIdsByBookIds(bookIds);
   }
 
   findRecommendationTitlesByBookIds(bookIds: number[]) {

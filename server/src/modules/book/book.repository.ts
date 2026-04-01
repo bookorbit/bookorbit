@@ -125,6 +125,28 @@ export class BookRepository {
     return { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total: Number(total) };
   }
 
+  async findCardsByBookIds(bookIds: number[], userId: number) {
+    if (bookIds.length === 0) {
+      return {
+        rows: [],
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        progressRows: [],
+        statusRows: [],
+        total: 0,
+      };
+    }
+
+    return this.findCards({
+      where: inArray(books.id, bookIds),
+      orderBy: [],
+      limit: bookIds.length,
+      offset: 0,
+      userId,
+    });
+  }
+
   async findById(id: number) {
     const [book] = await this.db
       .select()
@@ -346,6 +368,7 @@ export class BookRepository {
   }
 
   async findLibraryIdsByBookIds(bookIds: number[]): Promise<{ id: number; libraryId: number }[]> {
+    if (bookIds.length === 0) return [];
     return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
   }
 

@@ -1,6 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../common/types/request-user';
+import { SearchCatalogQueryDto } from './dto/search-catalog-query.dto';
 import { CatalogService } from './catalog.service';
 
 @Controller('metadata')
@@ -8,42 +10,42 @@ export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
   @Get('authors')
-  searchAuthors(@Query('q') q = '') {
-    return this.catalogService.searchAuthors(q);
+  searchAuthors(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchAuthors(query.q);
   }
 
   @Get('genres')
-  searchGenres(@Query('q') q = '') {
-    return this.catalogService.searchGenres(q);
+  searchGenres(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchGenres(query.q);
   }
 
   @Get('tags')
-  searchTags(@Query('q') q = '') {
-    return this.catalogService.searchTags(q);
+  searchTags(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchTags(query.q);
   }
 
   @Get('narrators')
-  searchNarrators(@Query('q') q = '') {
-    return this.catalogService.searchNarrators(q);
+  searchNarrators(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchNarrators(query.q);
   }
 
   @Get('publishers')
-  searchPublishers(@Query('q') q = '') {
-    return this.catalogService.searchPublishers(q);
+  searchPublishers(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchPublishers(query.q);
   }
 
   @Get('series')
-  searchSeries(@Query('q') q = '') {
-    return this.catalogService.searchSeries(q);
+  searchSeries(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchSeries(query.q);
   }
 
   @Get('languages')
-  searchLanguages(@Query('q') q = '') {
-    return this.catalogService.searchLanguages(q);
+  searchLanguages(@Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchLanguages(query.q);
   }
 
   @Get('collections')
-  searchCollections(@CurrentUser() user: { id: number }, @Query('q') q = '') {
-    return this.catalogService.searchCollections(user.id, q);
+  searchCollections(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchCollections(user.id, query.q);
   }
 }

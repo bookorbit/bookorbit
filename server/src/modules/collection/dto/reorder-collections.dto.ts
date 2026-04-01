@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, Min, ValidateNested } from 'class-validator';
 
 class CollectionOrderItem {
   @IsInt()
@@ -13,6 +13,7 @@ class CollectionOrderItem {
 
 export class ReorderCollectionsDto {
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CollectionOrderItem)
   order: CollectionOrderItem[];

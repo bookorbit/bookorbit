@@ -1,32 +1,62 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { inArray } from 'drizzle-orm';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BooksPage } from '@projectx/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
-import { books } from '../../db/schema';
 import { BookReadService } from '../book/book-read.service';
+import { LibraryService } from '../library/library.service';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { CollectionRepository } from './collection.repository';
 
+const COLLECTION_NOT_FOUND_MESSAGE = 'Collection not found';
+const COLLECTION_ACCESS_DENIED_MESSAGE = 'No access to this collection';
+const BOOKS_NOT_FOUND_MESSAGE = 'One or more books were not found';
+
 @Injectable()
 export class CollectionService {
+  private readonly logger = new Logger(CollectionService.name);
+
   constructor(
     private readonly collectionRepo: CollectionRepository,
     private readonly bookReadService: BookReadService,
+    private readonly libraryService: LibraryService,
   ) {}
 
-  private isSuperuser(user: RequestUser): boolean {
-    return user.isSuperuser;
+  private assertAccess(ownerId: number, user: RequestUser): void {
+    if (ownerId !== user.id && !user.isSuperuser) {
+      throw new ForbiddenException(COLLECTION_ACCESS_DENIED_MESSAGE);
+    }
   }
 
-  private assertAccess(ownerId: number, user: RequestUser): void {
-    if (ownerId !== user.id && !this.isSuperuser(user)) {
-      throw new ForbiddenException('No access to this collection');
+  private async findCollectionForUserOrThrow(id: number, user: RequestUser) {
+    const [collection] = await this.collectionRepo.findById(id);
+    if (!collection) throw new NotFoundException(COLLECTION_NOT_FOUND_MESSAGE);
+    this.assertAccess(collection.userId, user);
+    return collection;
+  }
+
+  private async assertBookAccess(bookIds: number[], user: RequestUser): Promise<void> {
+    const uniqueBookIds = [...new Set(bookIds)];
+    const rows = await this.bookReadService.findLibraryIdsByBookIds(uniqueBookIds);
+    if (rows.length !== uniqueBookIds.length) {
+      throw new NotFoundException(BOOKS_NOT_FOUND_MESSAGE);
     }
+
+    if (user.isSuperuser) {
+      return;
+    }
+
+    const uniqueLibraryIds = [...new Set(rows.map((row) => row.libraryId))];
+    await Promise.all(uniqueLibraryIds.map((libraryId) => this.libraryService.verifyUserAccess(user.id, libraryId, false)));
+  }
+
+  private buildErrorLogFields(error: unknown): { errorClass: string; errorMessage: string } {
+    const errorClass = error instanceof Error ? error.name : 'Error';
+    const errorMessage = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+    return { errorClass, errorMessage };
   }
 
   findAll(user: RequestUser, bookIds?: number[]) {
@@ -37,10 +67,7 @@ export class CollectionService {
   }
 
   async findOne(id: number, user: RequestUser) {
-    const [collection] = await this.collectionRepo.findById(id);
-    if (!collection) throw new NotFoundException('Collection not found');
-    this.assertAccess(collection.userId, user);
-    return collection;
+    return this.findCollectionForUserOrThrow(id, user);
   }
 
   async create(dto: CreateCollectionDto, user: RequestUser) {
@@ -56,9 +83,7 @@ export class CollectionService {
   }
 
   async update(id: number, dto: UpdateCollectionDto, user: RequestUser) {
-    const [existing] = await this.collectionRepo.findById(id);
-    if (!existing) throw new NotFoundException('Collection not found');
-    this.assertAccess(existing.userId, user);
+    const existing = await this.findCollectionForUserOrThrow(id, user);
 
     const [updated] = await this.collectionRepo.update(id, existing.userId, {
       ...(dto.name !== undefined && { name: dto.name }),
@@ -70,54 +95,105 @@ export class CollectionService {
   }
 
   async remove(id: number, user: RequestUser) {
-    const [existing] = await this.collectionRepo.findById(id);
-    if (!existing) throw new NotFoundException('Collection not found');
-    this.assertAccess(existing.userId, user);
+    const existing = await this.findCollectionForUserOrThrow(id, user);
     await this.collectionRepo.delete(id, existing.userId);
   }
 
   async reorder(dto: ReorderCollectionsDto, user: RequestUser) {
-    await this.collectionRepo.updateDisplayOrders(user.id, dto.order);
+    const event = 'collection.reorder';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} itemCount=${dto.order.length} - reorder collections started`);
+    try {
+      await this.collectionRepo.updateDisplayOrders(user.id, dto.order);
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} durationMs=${Date.now() - startedAt} itemCount=${dto.order.length} - reorder collections completed`,
+      );
+    } catch (error) {
+      const { errorClass, errorMessage } = this.buildErrorLogFields(error);
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - reorder collections failed`,
+      );
+      throw error;
+    }
   }
 
   async addBooks(id: number, dto: CollectionBooksDto, user: RequestUser) {
-    const [existing] = await this.collectionRepo.findById(id);
-    if (!existing) throw new NotFoundException('Collection not found');
-    this.assertAccess(existing.userId, user);
-    await this.collectionRepo.addBooks(id, dto.bookIds);
-    const [updated] = await this.collectionRepo.findById(id);
-    return updated;
+    const event = 'collection.add_books';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] collectionId=${id} userId=${user.id} bookCount=${dto.bookIds.length} - add books started`);
+    try {
+      await this.findCollectionForUserOrThrow(id, user);
+      await this.assertBookAccess(dto.bookIds, user);
+      await this.collectionRepo.addBooks(id, dto.bookIds);
+      const [updated] = await this.collectionRepo.findById(id);
+      this.logger.log(
+        `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} bookCount=${dto.bookIds.length} - add books completed`,
+      );
+      return updated;
+    } catch (error) {
+      const { errorClass, errorMessage } = this.buildErrorLogFields(error);
+      this.logger.warn(
+        `[${event}] [fail] collectionId=${id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - add books failed`,
+      );
+      throw error;
+    }
   }
 
   async removeBooks(id: number, dto: CollectionBooksDto, user: RequestUser) {
-    const [existing] = await this.collectionRepo.findById(id);
-    if (!existing) throw new NotFoundException('Collection not found');
-    this.assertAccess(existing.userId, user);
-    await this.collectionRepo.removeBooks(id, dto.bookIds);
-    const [updated] = await this.collectionRepo.findById(id);
-    return updated;
+    const event = 'collection.remove_books';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] collectionId=${id} userId=${user.id} bookCount=${dto.bookIds.length} - remove books started`);
+    try {
+      await this.findCollectionForUserOrThrow(id, user);
+      await this.collectionRepo.removeBooks(id, dto.bookIds);
+      const [updated] = await this.collectionRepo.findById(id);
+      this.logger.log(
+        `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} bookCount=${dto.bookIds.length} - remove books completed`,
+      );
+      return updated;
+    } catch (error) {
+      const { errorClass, errorMessage } = this.buildErrorLogFields(error);
+      this.logger.warn(
+        `[${event}] [fail] collectionId=${id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - remove books failed`,
+      );
+      throw error;
+    }
   }
 
   async getBooks(id: number, user: RequestUser, page: number, size: number): Promise<BooksPage> {
-    const [existing] = await this.collectionRepo.findById(id);
-    if (!existing) throw new NotFoundException('Collection not found');
-    this.assertAccess(existing.userId, user);
+    const event = 'collection.get_books';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] collectionId=${id} userId=${user.id} page=${page} size=${size} - get collection books started`);
+    try {
+      await this.findCollectionForUserOrThrow(id, user);
+      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size);
+      if (bookPage.bookIds.length === 0) {
+        this.logger.log(
+          `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${bookPage.total} itemCount=0 - get collection books completed`,
+        );
+        return { items: [], total: bookPage.total, page, size };
+      }
 
-    const bookIdRows = await this.collectionRepo.findBookIds(id);
-    if (bookIdRows.length === 0) {
-      return { items: [], total: 0, page, size };
+      const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(
+        bookPage.bookIds,
+        user.id,
+      );
+      const orderMap = new Map(bookPage.bookIds.map((bookId, index) => [bookId, index]));
+      const items = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows).sort(
+        (left, right) => (orderMap.get(left.id) ?? 0) - (orderMap.get(right.id) ?? 0),
+      );
+
+      this.logger.log(
+        `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${bookPage.total} itemCount=${items.length} - get collection books completed`,
+      );
+      return { items, total: bookPage.total, page, size };
+    } catch (error) {
+      const { errorClass, errorMessage } = this.buildErrorLogFields(error);
+      this.logger.warn(
+        `[${event}] [fail] collectionId=${id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - get collection books failed`,
+      );
+      throw error;
     }
-
-    const bookIds = bookIdRows.map((r) => r.bookId);
-    const where = inArray(books.id, bookIds);
-    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
-      where,
-      orderBy: [],
-      limit: size,
-      offset: page * size,
-      userId: user.id,
-    });
-
-    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows), total, page, size };
   }
 }
