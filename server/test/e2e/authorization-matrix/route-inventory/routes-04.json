@@ -1,0 +1,686 @@
+[
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/email/templates/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/email/templates",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "update",
+    "httpMethod": "PUT",
+    "path": "/email/templates/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/email/templates/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "setDefault",
+    "httpMethod": "PATCH",
+    "path": "/email/templates/:id/default",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "preview",
+    "httpMethod": "POST",
+    "path": "/email/templates/:id/preview",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/health/health.controller.ts",
+    "className": "HealthController",
+    "methodName": "check",
+    "httpMethod": "GET",
+    "path": "/",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-auth.controller.ts",
+    "className": "KoboAuthController",
+    "methodName": "authDevice",
+    "httpMethod": "POST",
+    "path": "/kobo/:deviceToken/v1/auth/device",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-auth.controller.ts",
+    "className": "KoboAuthController",
+    "methodName": "authRefresh",
+    "httpMethod": "POST",
+    "path": "/kobo/:deviceToken/v1/auth/refresh",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "thumbnailFull",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/books/:bookId/thumbnail/:width/:height/:quality/:isGreyscale/image.jpg",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "thumbnailSimple",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/books/:bookId/thumbnail/:width/:height/false/image.jpg",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "thumbnailVersioned",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/books/:bookId/:version/thumbnail/:width/:height/false/image.jpg",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "download",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/books/:bookId/download",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "affiliate",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/affiliate",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "remainingBookSeries",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/products/books/series/:seriesId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "productNextRead",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/products/:productId/nextread",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "getTests",
+    "httpMethod": "POST",
+    "path": "/kobo/:deviceToken/v1/analytics/gettests",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "analyticsEvent",
+    "httpMethod": "POST",
+    "path": "/kobo/:deviceToken/v1/analytics/event",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "proxy",
+    "httpMethod": "ALL",
+    "path": "/kobo/:deviceToken/*",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-sync.controller.ts",
+    "className": "KoboSyncController",
+    "methodName": "initialization",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/initialization",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-sync.controller.ts",
+    "className": "KoboSyncController",
+    "methodName": "librarySync",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/library/sync",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-sync.controller.ts",
+    "className": "KoboSyncController",
+    "methodName": "getBookMetadata",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/library/:bookId/metadata",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-sync.controller.ts",
+    "className": "KoboSyncController",
+    "methodName": "deleteFromLibrary",
+    "httpMethod": "DELETE",
+    "path": "/kobo/:deviceToken/v1/library/:bookId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-sync.controller.ts",
+    "className": "KoboSyncController",
+    "methodName": "getReadingState",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/library/:bookId/state",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-sync.controller.ts",
+    "className": "KoboSyncController",
+    "methodName": "updateReadingState",
+    "httpMethod": "PUT",
+    "path": "/kobo/:deviceToken/v1/library/:bookId/state",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "KoboTokenGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "listDevices",
+    "httpMethod": "GET",
+    "path": "/kobo/devices",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "createDevice",
+    "httpMethod": "POST",
+    "path": "/kobo/devices",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "renameDevice",
+    "httpMethod": "PATCH",
+    "path": "/kobo/devices/:id",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "revokeDevice",
+    "httpMethod": "DELETE",
+    "path": "/kobo/devices/:id",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "getSettings",
+    "httpMethod": "GET",
+    "path": "/kobo/settings",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "updateSettings",
+    "httpMethod": "PATCH",
+    "path": "/kobo/settings",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/lenses",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/lenses/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/lenses",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "reorder",
+    "httpMethod": "POST",
+    "path": "/lenses/reorder",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/lenses/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/lenses/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/lens/lens.controller.ts",
+    "className": "LensController",
+    "methodName": "executeLens",
+    "httpMethod": "GET",
+    "path": "/lenses/:id/books",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/libraries",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/libraries/:id",
+    "permissions": [],
+    "libraryAccess": [
+      "'viewer'"
+    ],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "queryBooks",
+    "httpMethod": "POST",
+    "path": "/libraries/:id/books",
+    "permissions": [],
+    "libraryAccess": [
+      "'viewer'"
+    ],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/libraries",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/libraries/:id",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/libraries/:id",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "prescan",
+    "httpMethod": "POST",
+    "path": "/libraries/prescan",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "reorder",
+    "httpMethod": "POST",
+    "path": "/libraries/reorder",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "getStats",
+    "httpMethod": "GET",
+    "path": "/libraries/:id/stats",
+    "permissions": [],
+    "libraryAccess": [
+      "'viewer'"
+    ],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "writeMetadataToFiles",
+    "httpMethod": "POST",
+    "path": "/libraries/:id/write-metadata-to-files",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [
+      "'editor'"
+    ],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "getAccess",
+    "httpMethod": "GET",
+    "path": "/libraries/:libraryId/access",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "grantAccess",
+    "httpMethod": "POST",
+    "path": "/libraries/:libraryId/access",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  }
+]

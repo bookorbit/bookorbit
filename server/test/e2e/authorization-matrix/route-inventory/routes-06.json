@@ -1,0 +1,654 @@
+[
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "getSummary",
+    "httpMethod": "GET",
+    "path": "/staging/summary",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "getStatistics",
+    "httpMethod": "GET",
+    "path": "/staging/statistics",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "getFile",
+    "httpMethod": "GET",
+    "path": "/staging/files/:id",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "getCover",
+    "httpMethod": "GET",
+    "path": "/staging/files/:id/cover",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "upload",
+    "httpMethod": "POST",
+    "path": "/staging/upload",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "updateFile",
+    "httpMethod": "PATCH",
+    "path": "/staging/files/:id",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "discardFile",
+    "httpMethod": "DELETE",
+    "path": "/staging/files/:id",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "bulkDiscard",
+    "httpMethod": "POST",
+    "path": "/staging/files/discard",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "applyFetched",
+    "httpMethod": "POST",
+    "path": "/staging/files/apply-fetched",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "retryFetch",
+    "httpMethod": "POST",
+    "path": "/staging/files/retry-fetch",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "setTarget",
+    "httpMethod": "POST",
+    "path": "/staging/files/set-target",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "selectionSummary",
+    "httpMethod": "POST",
+    "path": "/staging/files/selection-summary",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "bulkEdit",
+    "httpMethod": "POST",
+    "path": "/staging/files/bulk-edit",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "previewNames",
+    "httpMethod": "POST",
+    "path": "/staging/files/preview-names",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "finalize",
+    "httpMethod": "POST",
+    "path": "/staging/finalize",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "rescan",
+    "httpMethod": "POST",
+    "path": "/staging/rescan",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getFormatDistribution",
+    "httpMethod": "GET",
+    "path": "/statistics/format-distribution",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getLanguageDistribution",
+    "httpMethod": "GET",
+    "path": "/statistics/language-distribution",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getBooksAddedOverTime",
+    "httpMethod": "GET",
+    "path": "/statistics/books-added-over-time",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getStorageByFormat",
+    "httpMethod": "GET",
+    "path": "/statistics/storage-by-format",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getMetadataScoreDistribution",
+    "httpMethod": "GET",
+    "path": "/statistics/metadata-score-distribution",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getLibraryMetadataCompleteness",
+    "httpMethod": "GET",
+    "path": "/statistics/library-metadata-completeness",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getFormatShareOverTime",
+    "httpMethod": "GET",
+    "path": "/statistics/format-share-over-time",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getPageCountDistribution",
+    "httpMethod": "GET",
+    "path": "/statistics/page-count-distribution",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getPublicationDecade",
+    "httpMethod": "GET",
+    "path": "/statistics/publication-decade",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getPublicationYearTimeline",
+    "httpMethod": "GET",
+    "path": "/statistics/publication-year-timeline",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getTopAuthors",
+    "httpMethod": "GET",
+    "path": "/statistics/top-authors",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getMetadataCompleteness",
+    "httpMethod": "GET",
+    "path": "/statistics/metadata-completeness",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getGenreDistribution",
+    "httpMethod": "GET",
+    "path": "/statistics/genre-distribution",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getSummary",
+    "httpMethod": "GET",
+    "path": "/statistics/summary",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getGenreCooccurrence",
+    "httpMethod": "GET",
+    "path": "/statistics/genre-cooccurrence",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getMetadataFreshnessGauge",
+    "httpMethod": "GET",
+    "path": "/statistics/metadata-freshness-gauge",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getLibraryIntegrityGauge",
+    "httpMethod": "GET",
+    "path": "/statistics/library-integrity-gauge",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getAcquisitionLagScatter",
+    "httpMethod": "GET",
+    "path": "/statistics/acquisition-lag-scatter",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getLargestBooks",
+    "httpMethod": "GET",
+    "path": "/statistics/largest-books",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/statistics/statistics.controller.ts",
+    "className": "StatisticsController",
+    "methodName": "getTopSeries",
+    "httpMethod": "GET",
+    "path": "/statistics/top-series",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/upload/upload.controller.ts",
+    "className": "UploadController",
+    "methodName": "uploadBook",
+    "httpMethod": "POST",
+    "path": "/libraries/:id/upload",
+    "permissions": [
+      "Permission.LibraryUpload"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/users",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "findAssignable",
+    "httpMethod": "GET",
+    "path": "/users/assignable",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "updateMe",
+    "httpMethod": "PATCH",
+    "path": "/users/me",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "uploadMyAvatar",
+    "httpMethod": "POST",
+    "path": "/users/me/avatar",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "deleteMyAvatar",
+    "httpMethod": "DELETE",
+    "path": "/users/me/avatar",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "findById",
+    "httpMethod": "GET",
+    "path": "/users/:id",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "getAvatar",
+    "httpMethod": "GET",
+    "path": "/users/:id/avatar",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "createUser",
+    "httpMethod": "POST",
+    "path": "/users",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "updateUser",
+    "httpMethod": "PATCH",
+    "path": "/users/:id",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "deleteUser",
+    "httpMethod": "DELETE",
+    "path": "/users/:id",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "setPermissions",
+    "httpMethod": "PUT",
+    "path": "/users/:id/permissions",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "setSuperuser",
+    "httpMethod": "PUT",
+    "path": "/users/:id/superuser",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "getLibraries",
+    "httpMethod": "GET",
+    "path": "/users/:id/libraries",
+    "permissions": [
+      "Permission.ManageUsers"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  }
+]

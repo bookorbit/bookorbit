@@ -59,11 +59,12 @@ export class UserStatisticsRepository {
     return rows.map((r) => r.libraryId);
   }
 
-  private intersectLibraryIds(accessible: number[] | null, requested: number[] | undefined): number[] | null {
-    if (!requested || requested.length === 0) return accessible;
-    if (accessible === null) return requested;
+  private intersectLibraryIds(accessible: number[] | null, requested: number[] | number | undefined): number[] | null {
+    const requestedIds = Array.isArray(requested) ? requested : requested == null ? [] : [requested];
+    if (requestedIds.length === 0) return accessible;
+    if (accessible === null) return requestedIds;
     const set = new Set(accessible);
-    return requested.filter((id) => set.has(id));
+    return requestedIds.filter((id) => set.has(id));
   }
 
   private libraryFilter(libraryIds: number[] | null) {

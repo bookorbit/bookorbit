@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
+import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboReadingStateService } from './kobo-reading-state.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -46,6 +47,7 @@ function encodeSyncToken(snapshotId: number): string {
 export class KoboSyncService {
   constructor(
     @Inject(DB) private readonly db: Db,
+    private readonly bookAccessService: KoboBookAccessService,
     private readonly readingStateService: KoboReadingStateService,
   ) {}
 
@@ -401,6 +403,14 @@ export class KoboSyncService {
   }
 
   private async fetchEligibleBooks(userId: number): Promise<KoboBookEntry[]> {
+    const accessibleLibraryIds = await this.bookAccessService.getAccessibleLibraryIds(userId);
+    const libraryAccessFilter =
+      accessibleLibraryIds === null
+        ? undefined
+        : accessibleLibraryIds.length === 0
+          ? sql`false`
+          : inArray(schema.books.libraryId, accessibleLibraryIds);
+
     const rows = await this.db
       .select({
         bookId: schema.books.id,
@@ -430,7 +440,7 @@ export class KoboSyncService {
           eq(schema.collections.syncToKobo, true),
         ),
       )
-      .where(and(eq(schema.books.status, 'present'), sql`lower(${schema.bookFiles.format}) in ('epub')`))
+      .where(and(eq(schema.books.status, 'present'), sql`lower(${schema.bookFiles.format}) in ('epub')`, libraryAccessFilter))
       .groupBy(
         schema.books.id,
         schema.bookMetadata.title,

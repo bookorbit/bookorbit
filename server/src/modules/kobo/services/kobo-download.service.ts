@@ -4,7 +4,7 @@ import { mkdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 
-import { ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyReply } from 'fastify';
@@ -12,6 +12,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
+import { KoboBookAccessService } from './kobo-book-access.service';
 import { KepubifyBinaryService } from './kepubify-binary.service';
 import { KoboSettingsService } from './kobo-settings.service';
 
@@ -35,6 +36,7 @@ export class KoboDownloadService {
     private readonly config: ConfigService,
     private readonly kepubifyBinaryService: KepubifyBinaryService,
     private readonly settingsService: KoboSettingsService,
+    private readonly bookAccessService: KoboBookAccessService,
   ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
     this.kepubCachePath = join(this.booksPath, '.kepub-cache');
@@ -44,8 +46,7 @@ export class KoboDownloadService {
     const book = await this.db.query.books.findFirst({ where: eq(schema.books.id, bookId) });
     if (!book) throw new NotFoundException('Book not found');
 
-    const accessible = await this.isBookAccessibleToUser(userId, bookId);
-    if (!accessible) throw new ForbiddenException('No access to this book');
+    await this.bookAccessService.assertBookAccessible(userId, bookId);
 
     const file = await this.db.query.bookFiles.findFirst({
       where: and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.id, book.primaryFileId ?? -1)),
@@ -105,23 +106,5 @@ export class KoboDownloadService {
       this.logger.warn(`kepubify conversion failed for book ${bookId}, falling back to EPUB: ${(err as Error).message}`);
       return this.streamFile(sourcePath, fileId, 'epub', reply);
     }
-  }
-
-  private async isBookAccessibleToUser(userId: number, bookId: number): Promise<boolean> {
-    const book = await this.db.query.books.findFirst({ where: eq(schema.books.id, bookId) });
-    if (!book) return false;
-
-    const isSuperuser = await this.checkSuperuser(userId);
-    if (isSuperuser) return true;
-
-    const access = await this.db.query.userLibraryAccess.findFirst({
-      where: and(eq(schema.userLibraryAccess.userId, userId), eq(schema.userLibraryAccess.libraryId, book.libraryId)),
-    });
-    return !!access;
-  }
-
-  private async checkSuperuser(userId: number): Promise<boolean> {
-    const user = await this.db.query.users.findFirst({ where: eq(schema.users.id, userId) });
-    return user?.isSuperuser ?? false;
   }
 }

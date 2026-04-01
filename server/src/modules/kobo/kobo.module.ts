@@ -7,6 +7,7 @@ import { KoboDeviceController } from './kobo-device.controller';
 import { KoboSyncController } from './kobo-sync.controller';
 import { KoboUserController } from './kobo-user.controller';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
+import { KoboBookAccessService } from './services/kobo-book-access.service';
 import { KepubifyBinaryService } from './services/kepubify-binary.service';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboDownloadService } from './services/kobo-download.service';
@@ -24,6 +25,7 @@ import { KoboThumbnailService } from './services/kobo-thumbnail.service';
     KepubifyBinaryService,
     KoboDeviceService,
     KoboSettingsService,
+    KoboBookAccessService,
     KoboSyncService,
     KoboReadingStateService,
     KoboThumbnailService,

@@ -1,0 +1,672 @@
+[
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "updateAccess",
+    "httpMethod": "PATCH",
+    "path": "/libraries/:libraryId/access/:userId",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "revokeAccess",
+    "httpMethod": "DELETE",
+    "path": "/libraries/:libraryId/access/:userId",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-fetch/metadata-fetch.controller.ts",
+    "className": "MetadataFetchController",
+    "methodName": "listProviders",
+    "httpMethod": "GET",
+    "path": "/metadata-fetch/providers",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-fetch/metadata-fetch.controller.ts",
+    "className": "MetadataFetchController",
+    "methodName": "listProviderRuntime",
+    "httpMethod": "GET",
+    "path": "/metadata-fetch/providers/runtime",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-fetch/metadata-fetch.controller.ts",
+    "className": "MetadataFetchController",
+    "methodName": "lookup",
+    "httpMethod": "GET",
+    "path": "/metadata-fetch/lookup",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/metadata-preferences.controller.ts",
+    "className": "MetadataPreferencesController",
+    "methodName": "getGlobal",
+    "httpMethod": "GET",
+    "path": "/metadata-preferences/global",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/metadata-preferences.controller.ts",
+    "className": "MetadataPreferencesController",
+    "methodName": "setGlobal",
+    "httpMethod": "PUT",
+    "path": "/metadata-preferences/global",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/metadata-preferences.controller.ts",
+    "className": "MetadataPreferencesController",
+    "methodName": "getForLibrary",
+    "httpMethod": "GET",
+    "path": "/metadata-preferences/libraries/:id",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/metadata-preferences.controller.ts",
+    "className": "MetadataPreferencesController",
+    "methodName": "setLibraryOverrides",
+    "httpMethod": "PUT",
+    "path": "/metadata-preferences/libraries/:id",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/metadata-preferences.controller.ts",
+    "className": "MetadataPreferencesController",
+    "methodName": "resetGlobal",
+    "httpMethod": "DELETE",
+    "path": "/metadata-preferences/global",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/metadata-preferences.controller.ts",
+    "className": "MetadataPreferencesController",
+    "methodName": "resetLibraryToGlobal",
+    "httpMethod": "DELETE",
+    "path": "/metadata-preferences/libraries/:id",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/provider-config.controller.ts",
+    "className": "ProviderConfigController",
+    "methodName": "getConfig",
+    "httpMethod": "GET",
+    "path": "/metadata-preferences/providers",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-preferences/provider-config.controller.ts",
+    "className": "ProviderConfigController",
+    "methodName": "updateConfig",
+    "httpMethod": "PUT",
+    "path": "/metadata-preferences/providers",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-score/metadata-score.controller.ts",
+    "className": "MetadataScoreController",
+    "methodName": "getWeights",
+    "httpMethod": "GET",
+    "path": "/metadata-score/weights",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-score/metadata-score.controller.ts",
+    "className": "MetadataScoreController",
+    "methodName": "updateWeights",
+    "httpMethod": "PATCH",
+    "path": "/metadata-score/weights",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-score/metadata-score.controller.ts",
+    "className": "MetadataScoreController",
+    "methodName": "recalculate",
+    "httpMethod": "POST",
+    "path": "/metadata-score/recalculate",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-score/metadata-score.controller.ts",
+    "className": "MetadataScoreController",
+    "methodName": "getRecalculationStatus",
+    "httpMethod": "GET",
+    "path": "/metadata-score/recalculate/status",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/opds/opds-user.controller.ts",
+    "className": "OpdsUserController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/opds-users",
+    "permissions": [
+      "Permission.OpdsAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/opds/opds-user.controller.ts",
+    "className": "OpdsUserController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/opds-users",
+    "permissions": [
+      "Permission.OpdsAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/opds/opds-user.controller.ts",
+    "className": "OpdsUserController",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/opds-users/:id",
+    "permissions": [
+      "Permission.OpdsAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/opds/opds-user.controller.ts",
+    "className": "OpdsUserController",
+    "methodName": "delete",
+    "httpMethod": "DELETE",
+    "path": "/opds-users/:id",
+    "permissions": [
+      "Permission.OpdsAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "root",
+    "httpMethod": "GET",
+    "path": "/opds",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "libraries",
+    "httpMethod": "GET",
+    "path": "/opds/libraries",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "collections",
+    "httpMethod": "GET",
+    "path": "/opds/collections",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "lenses",
+    "httpMethod": "GET",
+    "path": "/opds/lenses",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "authors",
+    "httpMethod": "GET",
+    "path": "/opds/authors",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "series",
+    "httpMethod": "GET",
+    "path": "/opds/series",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "catalog",
+    "httpMethod": "GET",
+    "path": "/opds/catalog",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "recent",
+    "httpMethod": "GET",
+    "path": "/opds/recent",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "surprise",
+    "httpMethod": "GET",
+    "path": "/opds/surprise",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "searchDescription",
+    "httpMethod": "GET",
+    "path": "/opds/search.opds",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "cover",
+    "httpMethod": "GET",
+    "path": "/opds/:bookId/cover",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "thumbnail",
+    "httpMethod": "GET",
+    "path": "/opds/:bookId/thumbnail",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/opds/opds.controller.ts",
+    "className": "OpdsController",
+    "methodName": "download",
+    "httpMethod": "GET",
+    "path": "/opds/:bookId/download",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": [
+      "OpdsEnabledGuard, OpdsAuthGuard"
+    ]
+  },
+  {
+    "file": "server/src/modules/path/path.controller.ts",
+    "className": "PathController",
+    "methodName": "listDirectories",
+    "httpMethod": "GET",
+    "path": "/path",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/cbz/cbz.controller.ts",
+    "className": "CbzController",
+    "methodName": "getPageCount",
+    "httpMethod": "GET",
+    "path": "/cbz/files/:fileId/pages",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/cbz/cbz.controller.ts",
+    "className": "CbzController",
+    "methodName": "getPage",
+    "httpMethod": "GET",
+    "path": "/cbz/files/:fileId/pages/:pageIndex",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/epub/epub.controller.ts",
+    "className": "EpubController",
+    "methodName": "getBookInfo",
+    "httpMethod": "GET",
+    "path": "/epub/:bookId/info",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/epub/epub.controller.ts",
+    "className": "EpubController",
+    "methodName": "getFile",
+    "httpMethod": "GET",
+    "path": "/epub/:bookId/file/*",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "getPreference",
+    "httpMethod": "GET",
+    "path": "/reader/preferences/:bookFileId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "upsertPreference",
+    "httpMethod": "PUT",
+    "path": "/reader/preferences/:bookFileId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "deletePreference",
+    "httpMethod": "DELETE",
+    "path": "/reader/preferences/:bookFileId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "getAllDefaults",
+    "httpMethod": "GET",
+    "path": "/reader/defaults",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "upsertDefault",
+    "httpMethod": "PUT",
+    "path": "/reader/defaults/:formatGroup",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "deleteDefault",
+    "httpMethod": "DELETE",
+    "path": "/reader/defaults/:formatGroup",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reading-session/reading-session.controller.ts",
+    "className": "ReadingSessionController",
+    "methodName": "saveSession",
+    "httpMethod": "POST",
+    "path": "/books/files/:fileId/sessions",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/recommendation/recommendation.controller.ts",
+    "className": "RecommendationController",
+    "methodName": "getRecommendations",
+    "httpMethod": "GET",
+    "path": "/books/:id/recommendations",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/scanner/scanner.controller.ts",
+    "className": "ScannerController",
+    "methodName": "scan",
+    "httpMethod": "POST",
+    "path": "/scanner/libraries/:id/scan",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/scanner/scanner.controller.ts",
+    "className": "ScannerController",
+    "methodName": "refreshCovers",
+    "httpMethod": "POST",
+    "path": "/scanner/libraries/:id/refresh-covers",
+    "permissions": [
+      "Permission.ManageLibraries"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/staging/staging.controller.ts",
+    "className": "StagingController",
+    "methodName": "listFiles",
+    "httpMethod": "GET",
+    "path": "/staging/files",
+    "permissions": [
+      "Permission.StagingAccess"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  }
+]

@@ -4,16 +4,22 @@ import { readdir, stat } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { join } from 'path';
 import type { FastifyReply } from 'fastify';
+import { KoboBookAccessService } from './kobo-book-access.service';
 
 @Injectable()
 export class KoboThumbnailService {
   private readonly booksPath: string;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly bookAccessService: KoboBookAccessService,
+  ) {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
   }
 
-  async serveThumbnail(bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
+  async serveThumbnail(userId: number, bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
+    await this.bookAccessService.assertBookAccessible(userId, bookId);
+
     const thumbnailPath = join(this.booksPath, 'covers', String(bookId), 'thumbnail.jpg');
     try {
       const { mtimeMs } = await stat(thumbnailPath);

@@ -57,6 +57,14 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "authorization-matrix": {
+    id: "authorization-matrix",
+    description: "Authorization matrix suite",
+    vitestTarget: "test/authorization-matrix.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/authorization-matrix-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
 });
 
 export function listE2ESuites() {

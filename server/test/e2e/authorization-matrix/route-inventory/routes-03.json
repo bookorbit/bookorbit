@@ -1,0 +1,676 @@
+[
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchSeries",
+    "httpMethod": "GET",
+    "path": "/metadata/series",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchLanguages",
+    "httpMethod": "GET",
+    "path": "/metadata/languages",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchCollections",
+    "httpMethod": "GET",
+    "path": "/metadata/collections",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/collections",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/collections/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/collections",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "reorder",
+    "httpMethod": "POST",
+    "path": "/collections/reorder",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/collections/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/collections/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "addBooks",
+    "httpMethod": "POST",
+    "path": "/collections/:id/books",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "removeBooks",
+    "httpMethod": "DELETE",
+    "path": "/collections/:id/books",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/collection/collection.controller.ts",
+    "className": "CollectionController",
+    "methodName": "getBooks",
+    "httpMethod": "GET",
+    "path": "/collections/:id/books",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/cover/cover.controller.ts",
+    "className": "CoverController",
+    "methodName": "searchCovers",
+    "httpMethod": "GET",
+    "path": "/books/cover/search",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/cover/cover.controller.ts",
+    "className": "CoverController",
+    "methodName": "proxyImage",
+    "httpMethod": "GET",
+    "path": "/books/cover/proxy",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/cover/cover.controller.ts",
+    "className": "CoverController",
+    "methodName": "uploadCover",
+    "httpMethod": "POST",
+    "path": "/books/:id/cover",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/cover/cover.controller.ts",
+    "className": "CoverController",
+    "methodName": "uploadCoverFromUrl",
+    "httpMethod": "POST",
+    "path": "/books/:id/cover/from-url",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/cover/cover.controller.ts",
+    "className": "CoverController",
+    "methodName": "deleteCover",
+    "httpMethod": "DELETE",
+    "path": "/books/:id/cover",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/dashboard/dashboard.controller.ts",
+    "className": "DashboardController",
+    "methodName": "getScroller",
+    "httpMethod": "GET",
+    "path": "/dashboard/scrollers/:type",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-admin-log.controller.ts",
+    "className": "EmailAdminLogController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/email/admin/log",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-preferences.controller.ts",
+    "className": "EmailPreferencesController",
+    "methodName": "findForUser",
+    "httpMethod": "GET",
+    "path": "/email/preferences",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-preferences.controller.ts",
+    "className": "EmailPreferencesController",
+    "methodName": "upsert",
+    "httpMethod": "PUT",
+    "path": "/email/preferences",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/email/providers",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/email/providers/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/email/providers",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "update",
+    "httpMethod": "PUT",
+    "path": "/email/providers/:id",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/email/providers/:id",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "setDefault",
+    "httpMethod": "PATCH",
+    "path": "/email/providers/:id/default",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "toggleShared",
+    "httpMethod": "PATCH",
+    "path": "/email/providers/:id/share",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "testConnection",
+    "httpMethod": "POST",
+    "path": "/email/providers/:id/test",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "setSystemProvider",
+    "httpMethod": "PATCH",
+    "path": "/email/providers/:id/system",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-provider.controller.ts",
+    "className": "EmailProviderController",
+    "methodName": "clearSystemProvider",
+    "httpMethod": "DELETE",
+    "path": "/email/providers/system",
+    "permissions": [
+      "Permission.ManageEmail"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/email/recipient-groups",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/email/recipient-groups/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/email/recipient-groups",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "update",
+    "httpMethod": "PUT",
+    "path": "/email/recipient-groups/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/email/recipient-groups/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "addMember",
+    "httpMethod": "POST",
+    "path": "/email/recipient-groups/:id/members",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient-group.controller.ts",
+    "className": "EmailRecipientGroupController",
+    "methodName": "removeMember",
+    "httpMethod": "DELETE",
+    "path": "/email/recipient-groups/:id/members/:recipientId",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient.controller.ts",
+    "className": "EmailRecipientController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/email/recipients",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient.controller.ts",
+    "className": "EmailRecipientController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/email/recipients/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient.controller.ts",
+    "className": "EmailRecipientController",
+    "methodName": "create",
+    "httpMethod": "POST",
+    "path": "/email/recipients",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient.controller.ts",
+    "className": "EmailRecipientController",
+    "methodName": "update",
+    "httpMethod": "PUT",
+    "path": "/email/recipients/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient.controller.ts",
+    "className": "EmailRecipientController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/email/recipients/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-recipient.controller.ts",
+    "className": "EmailRecipientController",
+    "methodName": "setDefault",
+    "httpMethod": "PATCH",
+    "path": "/email/recipients/:id/default",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-send-log.controller.ts",
+    "className": "EmailSendLogController",
+    "methodName": "findForUser",
+    "httpMethod": "GET",
+    "path": "/email/log",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-send-log.controller.ts",
+    "className": "EmailSendLogController",
+    "methodName": "remove",
+    "httpMethod": "DELETE",
+    "path": "/email/log/:id",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-send-log.controller.ts",
+    "className": "EmailSendLogController",
+    "methodName": "resend",
+    "httpMethod": "POST",
+    "path": "/email/log/:id/resend",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-send.controller.ts",
+    "className": "EmailSendController",
+    "methodName": "send",
+    "httpMethod": "POST",
+    "path": "/email/send",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-send.controller.ts",
+    "className": "EmailSendController",
+    "methodName": "quickSend",
+    "httpMethod": "POST",
+    "path": "/email/send/quick/:bookId",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/email/email-template.controller.ts",
+    "className": "EmailTemplateController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/email/templates",
+    "permissions": [
+      "Permission.EmailSend"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  }
+]

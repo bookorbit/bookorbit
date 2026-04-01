@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
+import { KoboBookAccessService } from './kobo-book-access.service';
 
 type Db = NodePgDatabase<typeof schema>;
 type JsonObj = Record<string, unknown>;
@@ -19,9 +20,14 @@ function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj 
 
 @Injectable()
 export class KoboReadingStateService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly bookAccessService: KoboBookAccessService,
+  ) {}
 
   async upsertState(userId: number, bookId: number, payload: Record<string, unknown>, readingThreshold: number, finishedThreshold: number) {
+    await this.bookAccessService.assertBookAccessible(userId, bookId);
+
     const entitlementId = String(bookId);
     const now = new Date().toISOString();
 
@@ -96,6 +102,8 @@ export class KoboReadingStateService {
   }
 
   async getRawState(userId: number, bookId: number): Promise<unknown> {
+    await this.bookAccessService.assertBookAccessible(userId, bookId);
+
     const row = await this.db.query.koboReadingStates.findFirst({
       where: and(eq(schema.koboReadingStates.userId, userId), eq(schema.koboReadingStates.bookId, bookId)),
     });
@@ -114,6 +122,14 @@ export class KoboReadingStateService {
   }
 
   async getAndMarkStatesNeedingPush(userId: number, readingThreshold: number, finishedThreshold: number): Promise<unknown[]> {
+    const accessibleLibraryIds = await this.bookAccessService.getAccessibleLibraryIds(userId);
+    const libraryAccessFilter =
+      accessibleLibraryIds === null
+        ? undefined
+        : accessibleLibraryIds.length === 0
+          ? sql`false`
+          : inArray(schema.books.libraryId, accessibleLibraryIds);
+
     const rows = await this.db
       .select({
         bookId: schema.books.id,
@@ -126,6 +142,7 @@ export class KoboReadingStateService {
       .where(
         and(
           eq(schema.readingProgress.userId, userId),
+          libraryAccessFilter,
           or(
             isNull(schema.koboReadingStates.progressSyncedAt),
             sql`${schema.readingProgress.updatedAt} > ${schema.koboReadingStates.progressSyncedAt}`,

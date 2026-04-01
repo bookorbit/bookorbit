@@ -28,33 +28,36 @@ export class KoboDeviceController {
   async thumbnailFull(
     @Param('bookId') bookId: string,
     @Headers('if-none-match') ifNoneMatch: string | undefined,
+    @CurrentUser() user: RequestUser,
     @KoboDevice() device: KoboDeviceContext,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    await this.serveThumbnailOrProxy(bookId, ifNoneMatch, device, req, reply);
+    await this.serveThumbnailOrProxy(bookId, ifNoneMatch, user, device, req, reply);
   }
 
   @Get('v1/books/:bookId/thumbnail/:width/:height/false/image.jpg')
   async thumbnailSimple(
     @Param('bookId') bookId: string,
     @Headers('if-none-match') ifNoneMatch: string | undefined,
+    @CurrentUser() user: RequestUser,
     @KoboDevice() device: KoboDeviceContext,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    await this.serveThumbnailOrProxy(bookId, ifNoneMatch, device, req, reply);
+    await this.serveThumbnailOrProxy(bookId, ifNoneMatch, user, device, req, reply);
   }
 
   @Get('v1/books/:bookId/:version/thumbnail/:width/:height/false/image.jpg')
   async thumbnailVersioned(
     @Param('bookId') bookId: string,
     @Headers('if-none-match') ifNoneMatch: string | undefined,
+    @CurrentUser() user: RequestUser,
     @KoboDevice() device: KoboDeviceContext,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    await this.serveThumbnailOrProxy(bookId, ifNoneMatch, device, req, reply);
+    await this.serveThumbnailOrProxy(bookId, ifNoneMatch, user, device, req, reply);
   }
 
   @Get('v1/books/:bookId/download')
@@ -109,12 +112,13 @@ export class KoboDeviceController {
   private async serveThumbnailOrProxy(
     bookId: string,
     ifNoneMatch: string | undefined,
+    user: RequestUser,
     device: KoboDeviceContext,
     req: FastifyRequest,
     reply: FastifyReply,
   ) {
     const id = parseInt(bookId, 10);
     if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
-    await this.thumbnailService.serveThumbnail(id, ifNoneMatch, reply);
+    await this.thumbnailService.serveThumbnail(user.id, id, ifNoneMatch, reply);
   }
 }

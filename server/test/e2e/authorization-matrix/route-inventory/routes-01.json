@@ -1,0 +1,650 @@
+[
+  {
+    "file": "server/src/modules/annotation/annotation.controller.ts",
+    "className": "AnnotationController",
+    "methodName": "getAnnotations",
+    "httpMethod": "GET",
+    "path": "/books/:bookId/annotations",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/annotation/annotation.controller.ts",
+    "className": "AnnotationController",
+    "methodName": "createAnnotation",
+    "httpMethod": "POST",
+    "path": "/books/:bookId/annotations",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/annotation/annotation.controller.ts",
+    "className": "AnnotationController",
+    "methodName": "updateAnnotation",
+    "httpMethod": "PATCH",
+    "path": "/books/:bookId/annotations/:annotationId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/annotation/annotation.controller.ts",
+    "className": "AnnotationController",
+    "methodName": "deleteAnnotation",
+    "httpMethod": "DELETE",
+    "path": "/books/:bookId/annotations/:annotationId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "listSettings",
+    "httpMethod": "GET",
+    "path": "/app-settings",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/app-settings/:key",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "getUploadPattern",
+    "httpMethod": "GET",
+    "path": "/app-settings/upload-pattern",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "setUploadPattern",
+    "httpMethod": "PUT",
+    "path": "/app-settings/upload-pattern",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "getDownloadPattern",
+    "httpMethod": "GET",
+    "path": "/app-settings/download-pattern",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "setDownloadPattern",
+    "httpMethod": "PUT",
+    "path": "/app-settings/download-pattern",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "getOidcPublicConfig",
+    "httpMethod": "GET",
+    "path": "/app-settings/oidc/public",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "getOidcConfig",
+    "httpMethod": "GET",
+    "path": "/app-settings/oidc",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "updateOidcConfig",
+    "httpMethod": "PUT",
+    "path": "/app-settings/oidc",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "testOidcConnection",
+    "httpMethod": "POST",
+    "path": "/app-settings/oidc/test",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "getFileWriteSettings",
+    "httpMethod": "GET",
+    "path": "/app-settings/file-write-settings",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-settings/app-settings.controller.ts",
+    "className": "AppSettingsController",
+    "methodName": "updateFileWriteSettings",
+    "httpMethod": "PUT",
+    "path": "/app-settings/file-write-settings",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/audit/audit.controller.ts",
+    "className": "AuditController",
+    "methodName": "getAuditLogs",
+    "httpMethod": "GET",
+    "path": "/audit-log",
+    "permissions": [
+      "Permission.ViewAuditLog"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "register",
+    "httpMethod": "POST",
+    "path": "/auth/register",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "setupStatus",
+    "httpMethod": "GET",
+    "path": "/auth/setup-status",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "setup",
+    "httpMethod": "POST",
+    "path": "/auth/setup",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "login",
+    "httpMethod": "POST",
+    "path": "/auth/login",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "refresh",
+    "httpMethod": "POST",
+    "path": "/auth/refresh",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "logout",
+    "httpMethod": "POST",
+    "path": "/auth/logout",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "me",
+    "httpMethod": "GET",
+    "path": "/auth/me",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": true,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "getSessions",
+    "httpMethod": "GET",
+    "path": "/auth/sessions",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "revokeSession",
+    "httpMethod": "DELETE",
+    "path": "/auth/sessions/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "forgotPassword",
+    "httpMethod": "POST",
+    "path": "/auth/forgot-password",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "resetPassword",
+    "httpMethod": "POST",
+    "path": "/auth/reset-password",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "changePassword",
+    "httpMethod": "POST",
+    "path": "/auth/change-password",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": true,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "oidcGenerateState",
+    "httpMethod": "POST",
+    "path": "/auth/oidc/state",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "oidcCallback",
+    "httpMethod": "POST",
+    "path": "/auth/oidc/callback",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
+    "methodName": "oidcBackchannelLogout",
+    "httpMethod": "POST",
+    "path": "/auth/oidc/backchannel-logout",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "findAll",
+    "httpMethod": "GET",
+    "path": "/authors",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "findInsights",
+    "httpMethod": "GET",
+    "path": "/authors/insights",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "findDuplicateSuggestions",
+    "httpMethod": "GET",
+    "path": "/authors/suggestions/duplicates",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "listMetadataProviders",
+    "httpMethod": "GET",
+    "path": "/authors/metadata/providers",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "searchMetadata",
+    "httpMethod": "GET",
+    "path": "/authors/metadata/search",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "lookupMetadata",
+    "httpMethod": "GET",
+    "path": "/authors/metadata/lookup",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "bulkRefreshMetadata",
+    "httpMethod": "POST",
+    "path": "/authors/bulk-refresh-metadata",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "getEnrichmentConfig",
+    "httpMethod": "GET",
+    "path": "/authors/enrichment/config",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "setEnrichmentConfig",
+    "httpMethod": "PUT",
+    "path": "/authors/enrichment/config",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "previewCount",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/preview-count",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "enqueueBackfill",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/backfill",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "enqueueBackfillAll",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/backfill-all",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "pauseEnrichment",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/pause",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "resumeEnrichment",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/resume",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "cancelEnrichment",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/cancel",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "retryFailedEnrichment",
+    "httpMethod": "POST",
+    "path": "/authors/enrichment/retry-failed",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "getFailedEnrichment",
+    "httpMethod": "GET",
+    "path": "/authors/enrichment/failed",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "findOne",
+    "httpMethod": "GET",
+    "path": "/authors/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  }
+]

@@ -1,0 +1,656 @@
+[
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "findBooks",
+    "httpMethod": "GET",
+    "path": "/authors/:id/books",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "getThumbnail",
+    "httpMethod": "GET",
+    "path": "/authors/:id/thumbnail",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "getImage",
+    "httpMethod": "GET",
+    "path": "/authors/:id/image",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "refreshEnrichment",
+    "httpMethod": "POST",
+    "path": "/authors/:id/enrichment/refresh",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "update",
+    "httpMethod": "PATCH",
+    "path": "/authors/:id",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "merge",
+    "httpMethod": "POST",
+    "path": "/authors/merge",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "delete",
+    "httpMethod": "DELETE",
+    "path": "/authors",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "embedAll",
+    "httpMethod": "POST",
+    "path": "/books/embed-all",
+    "permissions": [
+      "Permission.ManageAppSettings"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "deleteBooks",
+    "httpMethod": "DELETE",
+    "path": "/books",
+    "permissions": [
+      "Permission.LibraryDeleteBooks"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "searchBooks",
+    "httpMethod": "GET",
+    "path": "/books/search",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "globalQuery",
+    "httpMethod": "POST",
+    "path": "/books/query",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "bulkRefreshMetadata",
+    "httpMethod": "POST",
+    "path": "/books/bulk-refresh-metadata",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "bulkReExtractCover",
+    "httpMethod": "POST",
+    "path": "/books/bulk-re-extract-cover",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "reExtractCover",
+    "httpMethod": "POST",
+    "path": "/books/:id/re-extract-cover",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "exportBooks",
+    "httpMethod": "POST",
+    "path": "/books/export",
+    "permissions": [
+      "Permission.LibraryDownload"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getCover",
+    "httpMethod": "GET",
+    "path": "/books/:id/cover",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getThumbnail",
+    "httpMethod": "GET",
+    "path": "/books/:id/thumbnail",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "serveFile",
+    "httpMethod": "GET",
+    "path": "/books/files/:fileId/serve",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getFileProgress",
+    "httpMethod": "GET",
+    "path": "/books/files/:fileId/progress",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "saveFileProgress",
+    "httpMethod": "POST",
+    "path": "/books/files/:fileId/progress",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getAudioProgress",
+    "httpMethod": "GET",
+    "path": "/books/:id/audio-progress",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "saveAudioProgress",
+    "httpMethod": "PATCH",
+    "path": "/books/:id/audio-progress",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "updateMetadata",
+    "httpMethod": "PATCH",
+    "path": "/books/:id/metadata",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "refreshMetadata",
+    "httpMethod": "POST",
+    "path": "/books/:id/refresh-metadata",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getWriteLog",
+    "httpMethod": "GET",
+    "path": "/books/:id/write-log",
+    "permissions": [
+      "Permission.LibraryEditMetadata"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getKoboState",
+    "httpMethod": "GET",
+    "path": "/books/:id/kobo-state",
+    "permissions": [
+      "Permission.KoboSync"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getBookProgress",
+    "httpMethod": "GET",
+    "path": "/books/:id/progress",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "setReadStatus",
+    "httpMethod": "PATCH",
+    "path": "/books/:id/status",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "getDetail",
+    "httpMethod": "GET",
+    "path": "/books/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "getConfig",
+    "httpMethod": "GET",
+    "path": "/book-metadata-fetch/config",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "updateConfig",
+    "httpMethod": "PUT",
+    "path": "/book-metadata-fetch/config",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "getLibraryConfig",
+    "httpMethod": "GET",
+    "path": "/book-metadata-fetch/config/libraries/:id",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "updateLibraryConfig",
+    "httpMethod": "PUT",
+    "path": "/book-metadata-fetch/config/libraries/:id",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "getStatus",
+    "httpMethod": "GET",
+    "path": "/book-metadata-fetch/status",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "triggerGlobal",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/run",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "triggerForLibrary",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/run/:libraryId",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "pause",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/pause",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "resume",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/resume",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "cancel",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/cancel",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "retryFailed",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/retry-failed",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "previewCount",
+    "httpMethod": "POST",
+    "path": "/book-metadata-fetch/preview-count",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts",
+    "className": "BookMetadataFetchController",
+    "methodName": "getFailedItems",
+    "httpMethod": "GET",
+    "path": "/book-metadata-fetch/failed",
+    "permissions": [
+      "Permission.ManageMetadataConfig"
+    ],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/bookmark/bookmark.controller.ts",
+    "className": "BookmarkController",
+    "methodName": "getBookmarks",
+    "httpMethod": "GET",
+    "path": "/books/:bookId/bookmarks",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/bookmark/bookmark.controller.ts",
+    "className": "BookmarkController",
+    "methodName": "createBookmark",
+    "httpMethod": "POST",
+    "path": "/books/:bookId/bookmarks",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/bookmark/bookmark.controller.ts",
+    "className": "BookmarkController",
+    "methodName": "deleteBookmark",
+    "httpMethod": "DELETE",
+    "path": "/books/:bookId/bookmarks/:bookmarkId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchAuthors",
+    "httpMethod": "GET",
+    "path": "/metadata/authors",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchGenres",
+    "httpMethod": "GET",
+    "path": "/metadata/genres",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchTags",
+    "httpMethod": "GET",
+    "path": "/metadata/tags",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchNarrators",
+    "httpMethod": "GET",
+    "path": "/metadata/narrators",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
+    "methodName": "searchPublishers",
+    "httpMethod": "GET",
+    "path": "/metadata/publishers",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  }
+]
