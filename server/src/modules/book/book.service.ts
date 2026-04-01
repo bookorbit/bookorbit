@@ -29,6 +29,7 @@ import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 export class BookService {
   private readonly logger = new Logger(BookService.name);
   private readonly booksPath: string;
+  private embeddingRun: Promise<void> | null = null;
 
   constructor(
     private readonly bookRepo: BookRepository,
@@ -54,6 +55,19 @@ export class BookService {
 
   private hasPermission(user: RequestUser, permissionName: Permission): boolean {
     return user.isSuperuser || user.permissions.includes(permissionName);
+  }
+
+  private isMissingFilesystemEntry(err: unknown): boolean {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code;
+    return code === 'ENOENT' || code === 'ENOTDIR';
+  }
+
+  private async verifyLibraryAccessForBookIds(bookIds: number[], user: RequestUser): Promise<{ id: number; libraryId: number }[]> {
+    const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
+    const uniqueLibraryIds = [...new Set(rows.map((row) => row.libraryId))];
+    const isSuperuser = this.isSuperuser(user);
+    await Promise.all(uniqueLibraryIds.map((libraryId) => this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser)));
+    return rows;
   }
 
   private collectExistingProviderIds(meta: {
@@ -148,23 +162,40 @@ export class BookService {
   }
 
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
+    const event = 'book.get_cover_path';
     await this.verifyBookAccess(id, user);
     const dir = join(this.booksPath, 'covers', String(id));
     try {
       const files = await readdir(dir);
       const cover = files.find((f) => f.startsWith('cover_custom.')) ?? files.find((f) => f.startsWith('cover_extracted.'));
       return cover ? join(dir, cover) : null;
-    } catch {
-      return null;
+    } catch (err) {
+      if (this.isMissingFilesystemEntry(err)) return null;
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${id} userId=${user.id} path="${dir}" errorClass=${errorClass} error="${errorMessage}" - get cover path failed`,
+      );
+      throw err;
     }
   }
 
   async getThumbnailPath(id: number, user: RequestUser): Promise<string | null> {
+    const event = 'book.get_thumbnail_path';
     await this.verifyBookAccess(id, user);
     const path = join(this.booksPath, 'covers', String(id), 'thumbnail.jpg');
-    return access(path)
-      .then(() => path)
-      .catch(() => null);
+    try {
+      await access(path);
+      return path;
+    } catch (err) {
+      if (this.isMissingFilesystemEntry(err)) return null;
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${id} userId=${user.id} path="${path}" errorClass=${errorClass} error="${errorMessage}" - get thumbnail path failed`,
+      );
+      throw err;
+    }
   }
 
   private formatSeriesIndex(value: number | null): string | null {
@@ -261,7 +292,12 @@ export class BookService {
       const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
       return this.sanitizeFilenameSegment(resolvedName ?? originalFilename, originalFilename);
     } catch (err) {
-      this.logger.warn(`Download filename pattern resolution failed for book ${file.bookId}: ${err instanceof Error ? err.message : String(err)}`);
+      const event = 'book.resolve_download_filename';
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${file.bookId} errorClass=${errorClass} error="${errorMessage}" - download filename pattern resolution failed`,
+      );
       return this.sanitizeFilenameSegment(originalFilename, originalFilename);
     }
   }
@@ -295,23 +331,33 @@ export class BookService {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} deletedBooks=0 deletedFiles=0 - delete books completed`);
         return;
       }
-      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-      const isSuperuser = this.isSuperuser(user);
-      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+      const rows = await this.verifyLibraryAccessForBookIds(bookIds, user);
       const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
       await this.bookRepo.deleteByIds(bookIds);
-      for (const { id: bookId } of rows) {
-        const coverDir = join(this.booksPath, 'covers', String(bookId));
-        rm(coverDir, { recursive: true, force: true }).catch((err: Error) =>
-          this.logger.warn(`Failed to delete cover dir ${coverDir}: ${err.message}`),
+      const deleteTargets = [
+        ...rows.map((row) => ({
+          path: join(this.booksPath, 'covers', String(row.id)),
+          options: { recursive: true, force: true },
+          kind: 'coverDir' as const,
+        })),
+        ...files.map((file) => ({ path: file.absolutePath, options: { force: true }, kind: 'bookFile' as const })),
+      ];
+      const deleteResults = await Promise.allSettled(deleteTargets.map((target) => rm(target.path, target.options)));
+      let failedDeletes = 0;
+      for (let i = 0; i < deleteResults.length; i += 1) {
+        const result = deleteResults[i];
+        if (result?.status !== 'rejected') continue;
+        failedDeletes += 1;
+        const target = deleteTargets[i]!;
+        const reason = result.reason;
+        const errorClass = reason instanceof Error ? reason.name : 'Error';
+        const errorMessage = (reason instanceof Error ? reason.message : String(reason)).replace(/"/g, '\\"');
+        this.logger.warn(
+          `[${event}] [fail] userId=${user.id} path="${target.path}" kind=${target.kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
         );
       }
-      for (const { absolutePath } of files) {
-        rm(absolutePath, { force: true }).catch((err: Error) => this.logger.warn(`Failed to delete book file ${absolutePath}: ${err.message}`));
-      }
       this.logger.log(
-        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${files.length} - delete books completed`,
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${files.length} failedDeletes=${failedDeletes} - delete books completed`,
       );
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -406,9 +452,19 @@ export class BookService {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] - embed all started`);
     try {
+      if (!this.embedder) {
+        this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} queued=0 runStarted=false - embed all completed`);
+        return { queued: 0 };
+      }
+      if (this.embeddingRun) {
+        this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} queued=0 runStarted=false alreadyRunning=true - embed all completed`);
+        return { queued: 0 };
+      }
       const bookIds = await this.bookRepo.findAllIds();
-      void this.runEmbeddings(bookIds);
-      this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} queued=${bookIds.length} - embed all completed`);
+      this.embeddingRun = this.runEmbeddings(bookIds).finally(() => {
+        this.embeddingRun = null;
+      });
+      this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} queued=${bookIds.length} runStarted=true - embed all completed`);
       return { queued: bookIds.length };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -423,24 +479,36 @@ export class BookService {
     const startedAt = Date.now();
     const batch = 10;
     this.logger.log(`[${event}] [start] totalBooks=${bookIds.length} batchSize=${batch} - embeddings run started`);
-    try {
-      for (let i = 0; i < bookIds.length; i += batch) {
-        await Promise.all(
-          bookIds
-            .slice(i, i + batch)
-            .map((id) => this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Failed to embed book ${id}: ${err.message}`))),
+    if (!this.embedder) {
+      this.logger.log(
+        `[${event}] [end] totalBooks=${bookIds.length} durationMs=${Date.now() - startedAt} processed=0 failed=0 - embeddings run completed`,
+      );
+      return;
+    }
+    let processed = 0;
+    let failed = 0;
+    for (let i = 0; i < bookIds.length; i += batch) {
+      const currentBatch = bookIds.slice(i, i + batch);
+      const results = await Promise.allSettled(currentBatch.map((id) => this.embedder!.embedBook(id)));
+      for (let batchIndex = 0; batchIndex < results.length; batchIndex += 1) {
+        const result = results[batchIndex]!;
+        const bookId = currentBatch[batchIndex]!;
+        if (result.status === 'fulfilled') {
+          processed += 1;
+          continue;
+        }
+        failed += 1;
+        const reason = result.reason;
+        const errorClass = reason instanceof Error ? reason.name : 'Error';
+        const errorMessage = (reason instanceof Error ? reason.message : String(reason)).replace(/"/g, '\\"');
+        this.logger.warn(
+          `[${event}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - embedding run item failed`,
         );
       }
-      this.logger.log(
-        `[${event}] [end] totalBooks=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${bookIds.length} - embeddings run completed`,
-      );
-    } catch (err) {
-      const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
-      this.logger.warn(
-        `[${event}] [fail] totalBooks=${bookIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - embeddings run failed`,
-      );
     }
+    this.logger.log(
+      `[${event}] [end] totalBooks=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} failed=${failed} - embeddings run completed`,
+    );
   }
 
   async getProgress(userId: number, fileId: number, user: RequestUser) {
@@ -688,6 +756,7 @@ export class BookService {
     bookIds: number[],
     user: RequestUser,
     onProgress?: (bookId: number) => void,
+    options?: { isCancelled?: () => boolean },
   ): Promise<{ processed: number; failed: number }> {
     const event = 'book.bulk_refresh_metadata';
     const startedAt = Date.now();
@@ -697,26 +766,37 @@ export class BookService {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 failed=0 - bulk refresh metadata completed`);
         return { processed: 0, failed: 0 };
       }
-      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-      const isSuperuser = this.isSuperuser(user);
-      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+      await this.verifyLibraryAccessForBookIds(bookIds, user);
 
       let processed = 0;
       let failed = 0;
+      let callbackInterrupted = false;
+      let cancelled = false;
       for (const id of bookIds) {
+        if (options?.isCancelled?.()) {
+          cancelled = true;
+          break;
+        }
         try {
           await this.refreshMetadata(id, false, user);
           processed++;
-          onProgress?.(id);
         } catch (err) {
-          this.logger.warn(`Bulk metadata refresh failed for book ${id}: ${err instanceof Error ? err.message : String(err)}`);
+          const itemErrorClass = err instanceof Error ? err.name : 'Error';
+          const itemError = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+          this.logger.warn(
+            `[${event}] [fail] bookId=${id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${itemErrorClass} error="${itemError}" - bulk refresh metadata item failed`,
+          );
           failed++;
+        }
+        try {
           onProgress?.(id);
+        } catch {
+          callbackInterrupted = true;
+          break;
         }
       }
       this.logger.log(
-        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} failed=${failed} - bulk refresh metadata completed`,
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} failed=${failed} callbackInterrupted=${callbackInterrupted} cancelled=${cancelled} - bulk refresh metadata completed`,
       );
       return { processed, failed };
     } catch (err) {
@@ -733,6 +813,7 @@ export class BookService {
     bookIds: number[],
     user: RequestUser,
     onProgress?: (bookId: number) => void,
+    options?: { isCancelled?: () => boolean },
   ): Promise<{ processed: number; updated: number }> {
     const event = 'book.bulk_reextract_cover';
     const startedAt = Date.now();
@@ -742,17 +823,20 @@ export class BookService {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 updated=0 - bulk re-extract cover completed`);
         return { processed: 0, updated: 0 };
       }
-      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-      const isSuperuser = this.isSuperuser(user);
-      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+      await this.verifyLibraryAccessForBookIds(bookIds, user);
 
       const files = await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
       const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
 
       let processed = 0;
       let updated = 0;
+      let callbackInterrupted = false;
+      let cancelled = false;
       for (const id of bookIds) {
+        if (options?.isCancelled?.()) {
+          cancelled = true;
+          break;
+        }
         const file = filesByBookId.get(id);
         if (!file) continue;
         processed++;
@@ -760,10 +844,15 @@ export class BookService {
         if (saved) {
           updated++;
         }
-        onProgress?.(id);
+        try {
+          onProgress?.(id);
+        } catch {
+          callbackInterrupted = true;
+          break;
+        }
       }
       this.logger.log(
-        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} - bulk re-extract cover completed`,
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} callbackInterrupted=${callbackInterrupted} cancelled=${cancelled} - bulk re-extract cover completed`,
       );
       return { processed, updated };
     } catch (err) {
@@ -782,10 +871,7 @@ export class BookService {
     this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} allFormats=${allFormats} - get export files started`);
     try {
       if (bookIds.length === 0) throw new BadRequestException('No books selected');
-      const rows = await this.bookRepo.findLibraryIdsByBookIds(bookIds);
-      const uniqueLibraryIds = [...new Set(rows.map((r) => r.libraryId))];
-      const isSuperuser = this.isSuperuser(user);
-      await Promise.all(uniqueLibraryIds.map((libId) => this.libraryService.verifyUserAccess(user.id, libId, isSuperuser)));
+      await this.verifyLibraryAccessForBookIds(bookIds, user);
 
       const files = allFormats ? await this.bookRepo.findAllFilesByBookIds(bookIds) : await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
       const [pattern, metadataRows] = await Promise.all([

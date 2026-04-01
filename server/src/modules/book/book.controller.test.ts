@@ -12,6 +12,8 @@ vi.mock('archiver', () => ({
   default: vi.fn(() => ({
     pipe: vi.fn(),
     file: vi.fn(),
+    on: vi.fn().mockReturnThis(),
+    abort: vi.fn(),
     finalize: vi.fn().mockResolvedValue(undefined),
   })),
 }));
@@ -54,13 +56,28 @@ function makeUser(): RequestUser {
 
 function makeReply() {
   const headers: Record<string, unknown> = {};
+  const listeners = new Map<string, Set<() => void>>();
   const raw = {
+    destroyed: false,
+    writableEnded: false,
     setHeader: vi.fn((key: string, value: unknown) => {
       headers[key] = value;
     }),
     writeHead: vi.fn(),
     write: vi.fn(),
-    end: vi.fn(),
+    end: vi.fn(() => {
+      raw.writableEnded = true;
+    }),
+    on: vi.fn((event: string, listener: () => void) => {
+      const set = listeners.get(event) ?? new Set<() => void>();
+      set.add(listener);
+      listeners.set(event, set);
+      return raw;
+    }),
+    off: vi.fn((event: string, listener: () => void) => {
+      listeners.get(event)?.delete(listener);
+      return raw;
+    }),
   };
 
   const reply = {
@@ -79,7 +96,16 @@ function makeReply() {
   reply.type.mockImplementation(() => reply as never);
   reply.send.mockImplementation(() => reply as never);
 
-  return { reply: reply as never, raw, headers };
+  return {
+    reply: reply as never,
+    raw,
+    headers,
+    emitRawEvent: (event: string) => {
+      for (const listener of listeners.get(event) ?? []) {
+        listener();
+      }
+    },
+  };
 }
 
 function makeController() {
@@ -219,10 +245,13 @@ describe('BookController', () => {
   it('streams server-sent events for bulk metadata refresh progress', async () => {
     const { controller, bookService } = makeController();
     const { reply, raw } = makeReply();
-    bookService.bulkRefreshMetadata.mockImplementation((_bookIds: number[], _user: RequestUser, onProgress: (bookId: number) => void) => {
-      onProgress(9);
-      return Promise.resolve({ processed: 1, failed: 0 });
-    });
+    bookService.bulkRefreshMetadata.mockImplementation(
+      (_bookIds: number[], _user: RequestUser, onProgress: (bookId: number) => void, options?: { isCancelled?: () => boolean }) => {
+        expect(options?.isCancelled?.()).toBe(false);
+        onProgress(9);
+        return Promise.resolve({ processed: 1, failed: 0 });
+      },
+    );
 
     await controller.bulkRefreshMetadata({ bookIds: [9] }, makeUser(), reply);
 
@@ -234,6 +263,22 @@ describe('BookController', () => {
     expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 9 })}\n\n`);
     expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, processed: 1, failed: 0 })}\n\n`);
     expect(raw.end).toHaveBeenCalled();
+  });
+
+  it('stops sending SSE done event when client disconnects', async () => {
+    const { controller, bookService } = makeController();
+    const { reply, raw, emitRawEvent } = makeReply();
+    bookService.bulkRefreshMetadata.mockImplementation((_bookIds: number[], _user: RequestUser, onProgress: (bookId: number) => void) => {
+      onProgress(9);
+      emitRawEvent('close');
+      return Promise.resolve({ processed: 1, failed: 0 });
+    });
+
+    await controller.bulkRefreshMetadata({ bookIds: [9] }, makeUser(), reply);
+
+    expect(raw.write).toHaveBeenCalledTimes(1);
+    expect(raw.write).toHaveBeenCalledWith(`data: ${JSON.stringify({ bookId: 9 })}\n\n`);
+    expect(raw.end).not.toHaveBeenCalled();
   });
 
   it('archives exported files into a zip stream', async () => {
@@ -257,6 +302,26 @@ describe('BookController', () => {
     expect(archive.file).toHaveBeenCalledWith('/books/a.epub', { name: 'A.epub' });
     expect(archive.file).toHaveBeenCalledWith('/books/b.epub', { name: 'B.epub' });
     expect(archive.finalize).toHaveBeenCalled();
+  });
+
+  it('aborts archive export and swallows finalize errors after client disconnect', async () => {
+    const { controller, bookService } = makeController();
+    const { reply, emitRawEvent } = makeReply();
+    bookService.getExportFiles.mockResolvedValue([{ absolutePath: '/books/a.epub', zipPath: 'A.epub' }]);
+    const archive = {
+      pipe: vi.fn(),
+      file: vi.fn(),
+      on: vi.fn().mockReturnThis(),
+      abort: vi.fn(),
+      finalize: vi.fn().mockImplementation(() => {
+        emitRawEvent('close');
+        return Promise.reject(new Error('stream closed'));
+      }),
+    };
+    (archiver as unknown as vi.Mock).mockReturnValueOnce(archive);
+
+    await expect(controller.exportBooks({ bookIds: [1], allFormats: false }, makeUser(), reply)).resolves.toBeUndefined();
+    expect(archive.abort).toHaveBeenCalled();
   });
 
   it('delegates book-level progress endpoint to service with current user id', async () => {

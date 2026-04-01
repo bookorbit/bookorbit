@@ -127,16 +127,22 @@ export class BookController {
     },
   })
   async bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    const result = await this.bookService.bulkRefreshMetadata(dto.bookIds, user, (bookId) => {
-      reply.raw.write(`data: ${JSON.stringify({ bookId })}\n\n`);
-    });
-    reply.raw.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
-    reply.raw.end();
+    const stream = this.createSseStream(reply);
+    try {
+      const result = await this.bookService.bulkRefreshMetadata(
+        dto.bookIds,
+        user,
+        (bookId) => {
+          stream.send({ bookId });
+        },
+        { isCancelled: stream.isClosed },
+      );
+      if (!stream.isClosed()) {
+        stream.send({ done: true, ...result });
+      }
+    } finally {
+      stream.close();
+    }
   }
 
   @Post('bulk-re-extract-cover')
@@ -150,16 +156,22 @@ export class BookController {
     },
   })
   async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    const result = await this.bookService.bulkReExtractCover(dto.bookIds, user, (bookId) => {
-      reply.raw.write(`data: ${JSON.stringify({ bookId })}\n\n`);
-    });
-    reply.raw.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
-    reply.raw.end();
+    const stream = this.createSseStream(reply);
+    try {
+      const result = await this.bookService.bulkReExtractCover(
+        dto.bookIds,
+        user,
+        (bookId) => {
+          stream.send({ bookId });
+        },
+        { isCancelled: stream.isClosed },
+      );
+      if (!stream.isClosed()) {
+        stream.send({ done: true, ...result });
+      }
+    } finally {
+      stream.close();
+    }
   }
 
   @Post(':id/re-extract-cover')
@@ -173,13 +185,33 @@ export class BookController {
   async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const files = await this.bookService.getExportFiles(dto.bookIds, user, dto.allFormats ?? false);
     const archive = archiver('zip', { zlib: { level: 0 } });
+    let clientDisconnected = false;
+    const handleDisconnect = () => {
+      clientDisconnected = true;
+      archive.abort();
+    };
+    reply.raw.on('close', handleDisconnect);
+    reply.raw.on('aborted', handleDisconnect);
     reply.raw.setHeader('Content-Type', 'application/zip');
     reply.raw.setHeader('Content-Disposition', 'attachment; filename="books.zip"');
-    archive.pipe(reply.raw);
-    for (const file of files) {
-      archive.file(file.absolutePath, { name: file.zipPath });
+    const archiveFailure = new Promise<never>((_, reject) => {
+      archive.on('warning', reject);
+      archive.on('error', reject);
+    });
+    try {
+      archive.pipe(reply.raw);
+      for (const file of files) {
+        archive.file(file.absolutePath, { name: file.zipPath });
+      }
+      await Promise.race([archive.finalize(), archiveFailure]);
+    } catch (err) {
+      if (!clientDisconnected) {
+        throw err;
+      }
+    } finally {
+      reply.raw.off('close', handleDisconnect);
+      reply.raw.off('aborted', handleDisconnect);
     }
-    await archive.finalize();
   }
 
   @Get(':id/cover')
@@ -352,5 +384,42 @@ export class BookController {
   @Get(':id')
   getDetail(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getDetail(id, user);
+  }
+
+  private createSseStream(reply: FastifyReply): {
+    send: (event: object) => void;
+    isClosed: () => boolean;
+    close: () => void;
+  } {
+    let disconnected = false;
+    const markDisconnected = () => {
+      disconnected = true;
+    };
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+    reply.raw.on('close', markDisconnected);
+    reply.raw.on('aborted', markDisconnected);
+
+    const isClosed = () => disconnected || reply.raw.destroyed || reply.raw.writableEnded;
+    const send = (event: object) => {
+      if (isClosed()) {
+        throw new Error('SSE stream closed');
+      }
+      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    const close = () => {
+      reply.raw.off('close', markDisconnected);
+      reply.raw.off('aborted', markDisconnected);
+      if (!isClosed()) {
+        reply.raw.end();
+      }
+    };
+
+    return { send, isClosed, close };
   }
 }

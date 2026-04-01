@@ -282,9 +282,18 @@ describe('BookService', () => {
     it('returns null cover path when cover directory cannot be read', async () => {
       const { service, bookRepo } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      mockReaddir.mockRejectedValue(new Error('missing'));
+      const missingError = Object.assign(new Error('missing'), { code: 'ENOENT' });
+      mockReaddir.mockRejectedValue(missingError);
 
       await expect(service.getCoverPath(9, makeUser())).resolves.toBeNull();
+    });
+
+    it('throws when cover directory lookup fails for non-missing errors', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      mockReaddir.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
+
+      await expect(service.getCoverPath(9, makeUser())).rejects.toThrow('permission denied');
     });
 
     it('returns thumbnail path only when file is accessible', async () => {
@@ -294,8 +303,16 @@ describe('BookService', () => {
 
       await expect(service.getThumbnailPath(9, makeUser())).resolves.toBe('/tmp/books/covers/9/thumbnail.jpg');
 
-      mockAccess.mockRejectedValue(new Error('nope'));
+      mockAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
       await expect(service.getThumbnailPath(9, makeUser())).resolves.toBeNull();
+    });
+
+    it('throws when thumbnail access fails for non-missing errors', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      mockAccess.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
+
+      await expect(service.getThumbnailPath(9, makeUser())).rejects.toThrow('permission denied');
     });
 
     it('returns file info with unknown format fallback', async () => {
@@ -711,6 +728,68 @@ describe('BookService', () => {
       expect(onProgress).toHaveBeenNthCalledWith(2, 2);
     });
 
+    it('stops bulk cover extraction when progress callback throws', async () => {
+      const { service, bookRepo, metadataService } = makeService();
+      const user = makeUser();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([
+        { bookId: 1, absolutePath: '/books/1.epub', format: 'epub' },
+        { bookId: 2, absolutePath: '/books/2.epub', format: 'epub' },
+      ]);
+      metadataService.refreshCoverForBook.mockResolvedValue(true);
+
+      const onProgress = vi
+        .fn()
+        .mockImplementationOnce(() => {
+          throw new Error('stream closed');
+        })
+        .mockImplementation(() => undefined);
+
+      const result = await service.bulkReExtractCover([1, 2], user, onProgress);
+
+      expect(result).toEqual({ processed: 1, updated: 1 });
+      expect(metadataService.refreshCoverForBook).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops bulk metadata refresh when cancelled', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
+      const onProgress = vi.fn();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+
+      const result = await service.bulkRefreshMetadata([1, 2, 3], user, onProgress, {
+        isCancelled: () => refreshSpy.mock.calls.length > 0,
+      });
+
+      expect(result).toEqual({ processed: 1, failed: 0 });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+      expect(onProgress).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops bulk metadata refresh when progress callback throws', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+
+      const onProgress = vi
+        .fn()
+        .mockImplementationOnce(() => {
+          throw new Error('stream closed');
+        })
+        .mockImplementation(() => undefined);
+
+      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
+
+      expect(result).toEqual({ processed: 1, failed: 0 });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+      expect(onProgress).toHaveBeenCalledTimes(1);
+    });
+
     it('deleteBooks verifies access, removes book files, and removes cover directories without failing on rm errors', async () => {
       const { service, bookRepo, libraryService } = makeService();
       const user = makeUser();
@@ -728,7 +807,6 @@ describe('BookService', () => {
       mockRm.mockRejectedValue(new Error('cannot delete'));
 
       await service.deleteBooks([3, 4], user);
-      await Promise.resolve();
 
       expect(libraryService.verifyUserAccess).toHaveBeenCalledTimes(2);
       expect(bookRepo.deleteByIds).toHaveBeenCalledWith([3, 4]);
@@ -737,6 +815,25 @@ describe('BookService', () => {
       expect(mockRm).toHaveBeenCalledWith('/tmp/library/book3.epub', { force: true });
       expect(mockRm).toHaveBeenCalledWith('/tmp/library/book4.pdf', { force: true });
       expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('returns queued=0 when embed-all is already running', async () => {
+      const { service, bookRepo, embedder } = makeService();
+      let resolveEmbed: (() => void) | null = null;
+
+      bookRepo.findAllIds.mockResolvedValue([11]);
+      embedder.embedBook.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveEmbed = resolve;
+          }),
+      );
+
+      await expect(service.embedAll()).resolves.toEqual({ queued: 1 });
+      await expect(service.embedAll()).resolves.toEqual({ queued: 0 });
+
+      resolveEmbed?.();
+      await Promise.resolve();
     });
   });
 
