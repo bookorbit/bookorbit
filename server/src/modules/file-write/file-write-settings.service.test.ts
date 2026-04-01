@@ -81,13 +81,13 @@ describe('FileWriteSettingsService', () => {
     expect(db.__chains.insertChain.onConflictDoUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it('resolve currently delegates to global settings', async () => {
+  it('resolveForLibrary currently delegates to global settings', async () => {
     const db = makeDb();
     db.__chains.findFirst.mockResolvedValue({ value: JSON.stringify({ enabled: true }) });
 
     const service = new FileWriteSettingsService(db as never);
 
-    const result = await service.resolve(999);
+    const result = await service.resolveForLibrary(999);
     expect(result.enabled).toBe(true);
   });
 });

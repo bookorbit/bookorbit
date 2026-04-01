@@ -1,7 +1,7 @@
-import * as fs from 'fs/promises';
 import { createWriteStream } from 'fs';
 import * as unzipper from 'unzipper';
 import archiver from 'archiver';
+import { replaceFileAtomically } from '../shared/atomic-file-replace';
 
 export async function readEntry(filePath: string, entryPath: string): Promise<string> {
   const zip = await unzipper.Open.file(filePath);
@@ -39,10 +39,5 @@ export async function patch(filePath: string, patches: Map<string, Buffer>): Pro
     void archive.finalize();
   });
 
-  try {
-    await fs.rename(tmpPath, filePath);
-  } catch (err) {
-    await fs.unlink(tmpPath).catch(() => {});
-    throw err;
-  }
+  await replaceFileAtomically(tmpPath, filePath);
 }

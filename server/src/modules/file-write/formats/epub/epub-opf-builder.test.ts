@@ -24,7 +24,7 @@ describe('epub-opf-builder', () => {
   it('throws on unsupported package version', () => {
     const opf = `<package version="1.0"><metadata></metadata></package>`;
 
-    expect(() => build(opf, { title: 'Book' }, { fieldMask: new Set(['title']), dryRun: false })).toThrow('Unsupported EPUB version: "1.0"');
+    expect(() => build(opf, { title: 'Book' })).toThrow('Unsupported EPUB version: "1.0"');
   });
 
   it('rewrites metadata for EPUB3, preserves UID, and appends required namespace prefix', () => {
@@ -40,19 +40,15 @@ describe('epub-opf-builder', () => {
       </package>
     `;
 
-    const result = build(
-      opf,
-      {
-        title: 'New Title',
-        subtitle: 'Sub',
-        authors: [{ name: 'Frank Herbert', sortName: 'Herbert, Frank' }],
-        genres: ['Sci-Fi'],
-        seriesName: 'Dune',
-        seriesIndex: 1,
-        tags: ['Classic'],
-      },
-      { fieldMask: new Set(['title']), dryRun: false },
-    );
+    const result = build(opf, {
+      title: 'New Title',
+      subtitle: 'Sub',
+      authors: [{ name: 'Frank Herbert', sortName: 'Herbert, Frank' }],
+      genres: ['Sci-Fi'],
+      seriesName: 'Dune',
+      seriesIndex: 1,
+      tags: ['Classic'],
+    });
 
     expect(result.newOpfXml).toContain('projectx: https://projectx.app/metadata/1.0/');
     expect(result.newOpfXml).toContain('urn:uuid:abc');
@@ -76,7 +72,7 @@ describe('epub-opf-builder', () => {
       </package>
     `;
 
-    const result = build(opf, { title: 'Replacement' }, { fieldMask: new Set(['title']), dryRun: false });
+    const result = build(opf, { title: 'Replacement' });
 
     expect(result.newOpfXml).toContain('<opf:metadata>');
     expect(result.newOpfXml).toContain('Replacement');

@@ -1,6 +1,7 @@
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
+import { COMIC_INFO_MANAGED_NOTES_KEYS, COMIC_INFO_PROVIDER_ID_KEYS, COMIC_INFO_PROVIDER_WEB_URL_BUILDERS } from '../../file-write.constants';
 
 type ComicInfoObject = Record<string, unknown>;
 
@@ -23,7 +24,10 @@ function parseComicInfoXml(xml: string): ComicInfoObject {
   try {
     const parsed = PARSER.parse(xml) as { ComicInfo?: ComicInfoObject };
     return parsed.ComicInfo ?? {};
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
     return {};
   }
 }
@@ -45,7 +49,7 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   if (fieldMask.has('rating') && payload.rating != null) info['CommunityRating'] = formatRating(payload.rating);
   if (fieldMask.has('isbn13') && payload.isbn13 != null) info['GTIN'] = payload.isbn13;
 
-  const hasProviderSelection = PROVIDER_ID_KEYS.some((key) => fieldMask.has(key));
+  const hasProviderSelection = COMIC_INFO_PROVIDER_ID_KEYS.some((key) => fieldMask.has(key));
   if (hasProviderSelection) {
     const webUrl = resolveWebUrl(payload, fieldMask);
     if (webUrl != null) {
@@ -55,7 +59,7 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
     }
   }
 
-  const hasManagedNotesSelection = MANAGED_NOTES_KEYS.some((key) => fieldMask.has(key));
+  const hasManagedNotesSelection = COMIC_INFO_MANAGED_NOTES_KEYS.some((key) => fieldMask.has(key));
   if (hasManagedNotesSelection) {
     const existingNotes = typeof info['Notes'] === 'string' ? info['Notes'] : null;
     const notes = buildNotes(existingNotes, payload, fieldMask);
@@ -95,22 +99,20 @@ function formatRating(val: number): string {
   return Math.min(5.0, Math.max(0.0, val / 2.0)).toFixed(1);
 }
 
-const PROVIDER_ID_KEYS: BookWritePayloadKey[] = ['goodreadsId', 'amazonId', 'hardcoverId', 'googleBooksId', 'openLibraryId'];
-const MANAGED_NOTES_KEYS: BookWritePayloadKey[] = ['subtitle', 'isbn10', 'goodreadsId', 'amazonId', 'hardcoverId', 'googleBooksId', 'openLibraryId'];
-
 function resolveWebUrl(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
-  if (fieldMask.has('goodreadsId') && payload.goodreadsId) return `https://www.goodreads.com/book/show/${payload.goodreadsId}`;
-  if (fieldMask.has('amazonId') && payload.amazonId) return `https://www.amazon.com/dp/${payload.amazonId}`;
-  if (fieldMask.has('hardcoverId') && payload.hardcoverId) return `https://hardcover.app/books/${payload.hardcoverId}`;
-  if (fieldMask.has('googleBooksId') && payload.googleBooksId) return `https://books.google.com/books?id=${payload.googleBooksId}`;
-  if (fieldMask.has('openLibraryId') && payload.openLibraryId) return `https://openlibrary.org/works/${payload.openLibraryId}`;
+  for (const key of COMIC_INFO_PROVIDER_ID_KEYS) {
+    if (!fieldMask.has(key)) continue;
+    const value = payload[key];
+    if (typeof value !== 'string' || value === '') continue;
+    return COMIC_INFO_PROVIDER_WEB_URL_BUILDERS[key](value);
+  }
   return null;
 }
 
 function buildNotes(existing: string | null, payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
   const lines: string[] = [];
   const existingManaged = new Map<string, string>();
-  const managedKeys = new Set(MANAGED_NOTES_KEYS.map((k) => String(k)));
+  const managedKeys = new Set(COMIC_INFO_MANAGED_NOTES_KEYS.map((k) => String(k)));
 
   if (existing) {
     for (const line of existing.split('\n')) {
@@ -131,15 +133,7 @@ function buildNotes(existing: string | null, payload: BookWritePayload, fieldMas
     }
   }
 
-  const ids: [BookWritePayloadKey, string | null | undefined][] = [
-    ['subtitle', payload.subtitle],
-    ['isbn10', payload.isbn10],
-    ['goodreadsId', payload.goodreadsId],
-    ['amazonId', payload.amazonId],
-    ['hardcoverId', payload.hardcoverId],
-    ['googleBooksId', payload.googleBooksId],
-    ['openLibraryId', payload.openLibraryId],
-  ];
+  const ids: [BookWritePayloadKey, string | null][] = COMIC_INFO_MANAGED_NOTES_KEYS.map((key) => [key, resolveManagedTextField(payload, key)]);
 
   for (const [key, val] of ids) {
     if (fieldMask.has(key)) {
@@ -154,4 +148,9 @@ function buildNotes(existing: string | null, payload: BookWritePayload, fieldMas
   }
 
   return lines.length > 0 ? lines.join('\n') : null;
+}
+
+function resolveManagedTextField(payload: BookWritePayload, key: BookWritePayloadKey): string | null {
+  const value = payload[key];
+  return typeof value === 'string' ? value : null;
 }

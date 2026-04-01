@@ -66,12 +66,14 @@ describe('FileWriteRepository', () => {
     const genreChain = {
       from: vi.fn().mockReturnThis(),
       innerJoin: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([{ name: 'Sci-Fi' }]),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue([{ name: 'Sci-Fi' }]),
     };
     const tagChain = {
       from: vi.fn().mockReturnThis(),
       innerJoin: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([{ name: 'Classic' }]),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue([{ name: 'Classic' }]),
     };
 
     const db = {
@@ -132,7 +134,7 @@ describe('FileWriteRepository', () => {
           id: 8,
           format: 'epub',
           status: 'success',
-          fieldsWritten: null,
+          fieldsWritten: ['title', 123, 'genres'],
           triggeredBy: 'auto',
           writtenAt: rowDate,
           durationMs: 20,
@@ -149,7 +151,7 @@ describe('FileWriteRepository', () => {
         id: 8,
         format: 'epub',
         status: 'success',
-        fieldsWritten: [],
+        fieldsWritten: ['title', 'genres'],
         triggeredBy: 'auto',
         writtenAt: rowDate.toISOString(),
         durationMs: 20,

@@ -21,6 +21,19 @@ export const storageConfig = registerAs('storage', () => ({
   stagingPath: process.env.STAGING_PATH,
 }));
 
+export const fileWriteConfig = registerAs('fileWrite', () => ({
+  debounceMs: parsePositiveInteger(process.env.FILE_WRITE_DEBOUNCE_MS, 3_000),
+  maxConcurrentWrites: parsePositiveInteger(process.env.FILE_WRITE_MAX_CONCURRENT_WRITES, 2),
+}));
+
 export const emailConfig = registerAs('email', () => ({
   encryptionKey: process.env.EMAIL_ENCRYPTION_KEY ?? '',
 }));
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}

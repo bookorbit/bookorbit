@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { readFile, rename, unlink, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { PDFDocument, PDFName } from 'pdf-lib';
@@ -8,6 +8,7 @@ import type { WriteResult } from '@projectx/types';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';
 import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
+import { replaceFileAtomically } from '../shared/atomic-file-replace';
 import { PROJECTX_NS_PREFIX } from '../shared/projectx-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 import { buildXmp } from './pdf-xmp-builder';
@@ -34,13 +35,8 @@ export class PdfFormatWriter implements FormatWriter {
     const savedBytes = await pdfDoc.save();
 
     const tempPath = join(dirname(filePath), `.tmp-${randomUUID()}.pdf`);
-    try {
-      await writeFile(tempPath, savedBytes);
-      await rename(tempPath, filePath);
-    } catch (err) {
-      await unlink(tempPath).catch(() => {});
-      throw err;
-    }
+    await writeFile(tempPath, savedBytes);
+    await replaceFileAtomically(tempPath, filePath);
 
     return { status: 'success', fieldsWritten, durationMs: Date.now() - start };
   }

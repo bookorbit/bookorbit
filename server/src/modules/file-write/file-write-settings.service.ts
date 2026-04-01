@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -13,11 +13,12 @@ type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class FileWriteSettingsService {
+  private readonly logger = new Logger(FileWriteSettingsService.name);
+
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  // libraryId reserved for Phase 2 per-library overrides
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async resolve(_libraryId: number): Promise<GlobalFileWriteSettings> {
+  async resolveForLibrary(libraryId: number): Promise<GlobalFileWriteSettings> {
+    void libraryId;
     return this.getGlobal();
   }
 
@@ -29,7 +30,12 @@ export class FileWriteSettingsService {
     try {
       const stored = JSON.parse(row.value) as Partial<GlobalFileWriteSettings>;
       return mergeSettings(DEFAULT_FILE_WRITE_SETTINGS, stored);
-    } catch {
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[file_write.settings] [fail] key=${FILE_WRITE_SETTINGS_KEY} errorClass=${errorClass} error="${errorMessage}" - failed to parse file write settings, using defaults`,
+      );
       return { ...DEFAULT_FILE_WRITE_SETTINGS };
     }
   }

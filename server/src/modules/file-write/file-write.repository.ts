@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, ne } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { WriteResult, WriteLogEntry } from '@projectx/types';
@@ -29,7 +29,7 @@ export class FileWriteRepository {
     return row ?? null;
   }
 
-  async findNonMissingBookFilesByLibrary(libraryId: number) {
+  async findNonMissingPrimaryFilesByLibrary(libraryId: number) {
     return this.db
       .select({
         bookId: books.id,
@@ -58,8 +58,14 @@ export class FileWriteRepository {
         .select({ name: genres.name })
         .from(bookGenres)
         .innerJoin(genres, eq(genres.id, bookGenres.genreId))
-        .where(eq(bookGenres.bookId, bookId)),
-      this.db.select({ name: tags.name }).from(bookTags).innerJoin(tags, eq(tags.id, bookTags.tagId)).where(eq(bookTags.bookId, bookId)),
+        .where(eq(bookGenres.bookId, bookId))
+        .orderBy(asc(genres.name)),
+      this.db
+        .select({ name: tags.name })
+        .from(bookTags)
+        .innerJoin(tags, eq(tags.id, bookTags.tagId))
+        .where(eq(bookTags.bookId, bookId))
+        .orderBy(asc(tags.name)),
     ]);
 
     return {
@@ -119,11 +125,18 @@ export class FileWriteRepository {
       id: r.id,
       format: r.format,
       status: r.status,
-      fieldsWritten: (r.fieldsWritten as string[]) ?? [],
+      fieldsWritten: normalizeFieldsWritten(r.fieldsWritten),
       triggeredBy: r.triggeredBy,
       writtenAt: r.writtenAt.toISOString(),
       durationMs: r.durationMs,
       errorMessage: r.errorMessage,
     }));
   }
+}
+
+function normalizeFieldsWritten(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === 'string');
 }

@@ -57,7 +57,7 @@ describe('LibraryService', () => {
   const fileWatcherService = { startWatcher: vi.fn(), stopWatcher: vi.fn() };
   const fileWriteService = {
     resolveSettings: vi.fn(),
-    findNonMissingBookFilesByLibrary: vi.fn(),
+    findNonMissingPrimaryFilesByLibrary: vi.fn(),
     writeToFile: vi.fn(),
   };
 
@@ -283,7 +283,7 @@ describe('LibraryService', () => {
 
   it('writeMetadataToFiles emits progress and returns summary counters', async () => {
     fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
-    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
+    fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
     fileWriteService.writeToFile
       .mockResolvedValueOnce({ status: 'success', fieldsWritten: [], durationMs: 1 })
       .mockResolvedValueOnce({ status: 'failed', fieldsWritten: [], durationMs: 1, reason: 'write failed' })
@@ -300,7 +300,7 @@ describe('LibraryService', () => {
 
   it('writeMetadataToFiles stops when cancellation is requested', async () => {
     fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
-    fileWriteService.findNonMissingBookFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }]);
+    fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }]);
     fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
 
     let isCancelled = false;
