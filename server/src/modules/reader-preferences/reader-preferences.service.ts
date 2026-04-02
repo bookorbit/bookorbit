@@ -43,6 +43,9 @@ const CBX_SETTINGS_SCHEMA = z
     viewMode: z.enum(['single', 'two-page']),
     scrollMode: z.enum(['paginated', 'infinite', 'long-strip']),
     direction: z.enum(['ltr', 'rtl']),
+    spreadAlignment: z.enum(['normal', 'shifted']),
+    forceTwoPage: z.boolean(),
+    widePageSingletonMode: z.enum(['auto', 'disable']),
     bgColor: z.enum(['black', 'gray', 'white']),
   })
   .strict();

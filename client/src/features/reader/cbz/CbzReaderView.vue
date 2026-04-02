@@ -8,35 +8,41 @@ import {
   ArrowLeftRight,
   ArrowRight,
   BookOpen,
+  Circle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   Image as ImageIcon,
-  LayoutGrid,
+  Info,
   Layers,
+  LayoutGrid,
   Maximize,
+  Moon,
   ScanLine,
   Settings,
+  Sun,
 } from 'lucide-vue-next'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useCbz } from './composables/useCbz'
 import { useCbzSettings } from './composables/useCbzSettings'
-import type { BgColor, Direction, FitMode, ScrollMode, ViewMode } from './composables/useCbzSettings'
+import type { BgColor, Direction, FitMode, ScrollMode, SpreadAlignment, ViewMode, WidePageSingletonMode } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import type { CbxReaderSettings } from '@projectx/types'
+import { DEFAULT_WIDE_PAGE_RATIO_THRESHOLD, createCbzSpreadLayout } from './lib/spread-layout'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+
+const TWO_PAGE_BREAKPOINT = 900
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
@@ -49,13 +55,21 @@ const { onActivity } = useReadingSession(props.fileId, () => ({
   pageNumber: progress.pageNumber.value,
 }))
 const { pageCount, bookTitle, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
-const { fitMode, viewMode, scrollMode, direction, bgColor, bgValue, isTwoPage, imgFitClass } = useCbzSettings()
+const { fitMode, viewMode, scrollMode, direction, spreadAlignment, forceTwoPage, widePageSingletonMode, bgColor, bgValue, imgFitClass } =
+  useCbzSettings()
 const bookSettings = useReaderSettings(props.fileId, 'cbz')
 
 const currentPage = ref(0)
-const currentImageLoaded = ref(false)
 const showSettings = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
+const viewportWidth = ref(0)
+const currentImageLoaded = ref(false)
+const pendingImageLoads = ref(0)
+const loadedImageCount = ref(0)
+const pageRatios = ref<number[]>([])
+const highlightForceTwoPage = ref(false)
+const forceTwoPageToggleButton = ref<HTMLButtonElement | null>(null)
+let forceToggleHighlightTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(showSettings, (open) => setVisibilityLock(open))
 
@@ -67,22 +81,30 @@ const FIT_OPTIONS: { value: FitMode; label: string; icon: Component }[] = [
   { value: 'actual', label: 'Actual Size', icon: ImageIcon },
 ]
 const VIEW_OPTIONS: { value: ViewMode; label: string; icon: Component }[] = [
-  { value: 'single', label: 'Single Page', icon: BookOpen },
-  { value: 'two-page', label: 'Two Page', icon: LayoutGrid },
+  { value: 'single', label: 'Single', icon: BookOpen },
+  { value: 'two-page', label: 'Two-page', icon: LayoutGrid },
 ]
 const SCROLL_OPTIONS: { value: ScrollMode; label: string; icon: Component }[] = [
   { value: 'paginated', label: 'Paginated', icon: ScanLine },
-  { value: 'infinite', label: 'Infinite Scroll', icon: Layers },
-  { value: 'long-strip', label: 'Long Strip', icon: AlignJustify },
+  { value: 'infinite', label: 'Infinite', icon: Layers },
+  { value: 'long-strip', label: 'Long strip', icon: AlignJustify },
 ]
 const DIRECTION_OPTIONS: { value: Direction; label: string; icon: Component }[] = [
-  { value: 'ltr', label: 'Left to Right', icon: ArrowRight },
-  { value: 'rtl', label: 'Right to Left', icon: ArrowLeft },
+  { value: 'ltr', label: 'L to R', icon: ArrowRight },
+  { value: 'rtl', label: 'R to L', icon: ArrowLeft },
 ]
-const BG_OPTIONS: { value: BgColor; label: string; color: string }[] = [
-  { value: 'black', label: 'Black', color: 'bg-zinc-950' },
-  { value: 'gray', label: 'Gray', color: 'bg-zinc-500' },
-  { value: 'white', label: 'White', color: 'bg-white' },
+const SPREAD_ALIGNMENT_OPTIONS: { value: SpreadAlignment; label: string; icon: Component }[] = [
+  { value: 'normal', label: 'Normal', icon: LayoutGrid },
+  { value: 'shifted', label: 'Shifted', icon: BookOpen },
+]
+const WIDE_PAGE_OPTIONS: { value: WidePageSingletonMode; label: string; icon: Component }[] = [
+  { value: 'auto', label: 'Auto singleton', icon: ImageIcon },
+  { value: 'disable', label: 'Keep in spreads', icon: LayoutGrid },
+]
+const BG_OPTIONS: { value: BgColor; label: string; icon: Component }[] = [
+  { value: 'black', label: 'Black', icon: Moon },
+  { value: 'gray', label: 'Gray', icon: Circle },
+  { value: 'white', label: 'White', icon: Sun },
 ]
 
 function setFitMode(v: FitMode) {
@@ -97,51 +119,214 @@ function setScrollMode(v: ScrollMode) {
 function setDirection(v: Direction) {
   direction.value = v
 }
+function setSpreadAlignment(v: SpreadAlignment) {
+  spreadAlignment.value = v
+}
+function setWidePageMode(v: WidePageSingletonMode) {
+  widePageSingletonMode.value = v
+}
+function setForceTwoPage(v: boolean) {
+  forceTwoPage.value = v
+}
+function toggleForceTwoPage() {
+  setForceTwoPage(!forceTwoPage.value)
+}
 function setBgColor(v: BgColor) {
   bgColor.value = v
 }
 
-// ── Derived ────────────────────────────────────────────────────────────────────
-// Pages shown in paginated mode (1 or 2), in display order for RTL.
-const visiblePages = computed(() => {
-  if (!isTwoPage.value) return [currentPage.value]
-  const a = currentPage.value
-  const b = a + 1
-  if (direction.value === 'ltr') return b < pageCount.value ? [a, b] : [a]
-  return b < pageCount.value ? [b, a] : [a] // RTL: second page on left
+function applySettings(s: CbxReaderSettings) {
+  fitMode.value = s.fitMode
+  viewMode.value = s.viewMode
+  scrollMode.value = s.scrollMode
+  direction.value = s.direction
+  spreadAlignment.value = s.spreadAlignment
+  forceTwoPage.value = s.forceTwoPage
+  widePageSingletonMode.value = s.widePageSingletonMode
+  bgColor.value = s.bgColor
+}
+
+function resetBookViewSettings() {
+  bookSettings.resetBookSettings()
+  applySettings(bookSettings.effective.value as CbxReaderSettings)
+  if (scrollMode.value === 'paginated' && isTwoPageEffective.value) {
+    currentPage.value = spreadLayout.value.anchorForPage(currentPage.value)
+  }
+}
+
+function confirmResetBookViewSettings() {
+  if (!confirm('Reset view settings for this book to your global defaults?')) return
+  resetBookViewSettings()
+}
+
+function focusForceTwoPageFromHint() {
+  nextTick(() => {
+    forceTwoPageToggleButton.value?.focus()
+    highlightForceTwoPage.value = true
+    if (forceToggleHighlightTimer) clearTimeout(forceToggleHighlightTimer)
+    forceToggleHighlightTimer = setTimeout(() => {
+      highlightForceTwoPage.value = false
+    }, 1400)
+  })
+}
+
+// ── Layout engine ──────────────────────────────────────────────────────────────
+const isTwoPagePreferred = computed(() => viewMode.value === 'two-page' && scrollMode.value === 'paginated')
+const isTwoPageEffective = computed(() => isTwoPagePreferred.value && (forceTwoPage.value || viewportWidth.value >= TWO_PAGE_BREAKPOINT))
+
+const spreadLayout = computed(() =>
+  createCbzSpreadLayout({
+    pageCount: pageCount.value,
+    isTwoPageEffective: isTwoPageEffective.value,
+    direction: direction.value,
+    spreadAlignment: spreadAlignment.value,
+    widePageSingletonMode: widePageSingletonMode.value,
+    isWidePage: (page) => (pageRatios.value[page] ?? 0) >= DEFAULT_WIDE_PAGE_RATIO_THRESHOLD,
+  }),
+)
+
+const currentSpread = computed(() => spreadLayout.value.spreadForPage(currentPage.value))
+
+const renderSpread = computed(() => currentSpread.value?.kind === 'spread')
+const renderSinglePage = computed(() => (currentSpread.value?.kind === 'single' ? currentSpread.value.singlePage : null))
+const renderLeftPage = computed(() => (currentSpread.value?.kind === 'spread' ? currentSpread.value.leftPage : null))
+const renderRightPage = computed(() => (currentSpread.value?.kind === 'spread' ? currentSpread.value.rightPage : null))
+const renderKey = computed(() => {
+  const spread = currentSpread.value
+  if (!spread) return 'none'
+  if (spread.kind === 'single') return `single:${spread.singlePage ?? -1}`
+  return `spread:${spread.leftPage ?? 'blank'}:${spread.rightPage ?? 'blank'}`
+})
+
+const showSpreadAlignmentControl = computed(() => isTwoPageEffective.value)
+const showAutoFallbackBadge = computed(() => isTwoPagePreferred.value && !isTwoPageEffective.value)
+const showSpreadAlignmentHint = computed(() => isTwoPagePreferred.value && !isTwoPageEffective.value)
+
+const pageLabel = computed(() => {
+  const spread = currentSpread.value
+  if (!spread || pageCount.value <= 0) return '0 / 0'
+  const start = spread.pages[0]
+  if (start === undefined) return `0 / ${pageCount.value}`
+  if (spread.pages.length === 2) {
+    const end = spread.pages[1]
+    if (end !== undefined) return `${start + 1}-${end + 1} / ${pageCount.value}`
+  }
+  return `${start + 1} / ${pageCount.value}`
+})
+
+const progressPageIndex = computed(() => {
+  const spread = currentSpread.value
+  if (!spread || spread.pages.length === 0) return currentPage.value
+  return spread.pages[spread.pages.length - 1] ?? currentPage.value
+})
+
+const progressPercent = computed(() => {
+  if (pageCount.value <= 0) return 0
+  return ((Math.max(0, Math.min(progressPageIndex.value, pageCount.value - 1)) + 1) / pageCount.value) * 100
+})
+
+const canGoPrev = computed(() => {
+  if (pageCount.value <= 0) return false
+  if (isTwoPageEffective.value) return spreadLayout.value.prevAnchor(currentPage.value) !== currentPage.value
+  return currentPage.value > 0
+})
+
+const canGoNext = computed(() => {
+  if (pageCount.value <= 0) return false
+  if (isTwoPageEffective.value) return spreadLayout.value.nextAnchor(currentPage.value) !== currentPage.value
+  return currentPage.value < pageCount.value - 1
+})
+
+watch(renderKey, () => {
+  const spread = currentSpread.value
+  const expected = spread?.pages.length ?? 0
+  pendingImageLoads.value = expected
+  loadedImageCount.value = 0
+  currentImageLoaded.value = expected === 0
 })
 
 // ── Preloading ─────────────────────────────────────────────────────────────────
 const preloadCache = new Map<number, HTMLImageElement>()
 
+function setPageRatio(pageIndex: number, width: number, height: number) {
+  if (pageIndex < 0 || pageIndex >= pageCount.value || height <= 0 || width <= 0) return
+  const ratio = width / height
+  if (pageRatios.value[pageIndex] === ratio) return
+  const next = [...pageRatios.value]
+  next[pageIndex] = ratio
+  pageRatios.value = next
+}
+
 function preload(n: number) {
   if (n < 0 || n >= pageCount.value || preloadCache.has(n)) return
   const img = new Image()
+  img.onload = () => setPageRatio(n, img.naturalWidth, img.naturalHeight)
   img.src = pageUrl(n)
   preloadCache.set(n, img)
 }
 
-function schedulePreload(center: number) {
-  for (let i = center - 2; i <= center + 4; i++) preload(i)
-  for (const [k] of preloadCache) {
-    if (Math.abs(k - center) > 8) preloadCache.delete(k)
+function schedulePreload(anchorPage: number) {
+  const layout = spreadLayout.value
+  const centerSpreadIndex = layout.spreadIndexForPage(anchorPage)
+  const pagesToPreload = new Set<number>()
+
+  for (const offset of [-1, 0, 1, 2]) {
+    const spread = layout.spreads[centerSpreadIndex + offset]
+    if (!spread) continue
+    for (const page of spread.pages) pagesToPreload.add(page)
   }
+
+  for (const page of pagesToPreload) preload(page)
+
+  for (const [page] of preloadCache) {
+    if (Math.abs(page - anchorPage) > 12) preloadCache.delete(page)
+  }
+}
+
+function onPaginatedImageLoad(pageIndex: number, e: Event) {
+  const target = e.target
+  if (!(target instanceof HTMLImageElement)) return
+  setPageRatio(pageIndex, target.naturalWidth, target.naturalHeight)
+
+  loadedImageCount.value += 1
+  if (loadedImageCount.value >= pendingImageLoads.value) {
+    currentImageLoaded.value = true
+  }
+}
+
+function onStripImageLoad(pageIndex: number, e: Event) {
+  const target = e.target
+  if (!(target instanceof HTMLImageElement)) return
+  setPageRatio(pageIndex, target.naturalWidth, target.naturalHeight)
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function goToPage(n: number) {
-  const target = Math.max(0, Math.min(n, pageCount.value - 1))
+  if (pageCount.value <= 0) return
+
+  const clamped = Math.max(0, Math.min(n, pageCount.value - 1))
+  const target = isTwoPageEffective.value ? spreadLayout.value.anchorForPage(clamped) : clamped
   if (target === currentPage.value) return
+
   currentPage.value = target
-  currentImageLoaded.value = false
 }
 
 function nextPage() {
-  goToPage(currentPage.value + (isTwoPage.value ? 2 : 1))
+  if (pageCount.value <= 0) return
+  if (isTwoPageEffective.value) {
+    goToPage(spreadLayout.value.nextAnchor(currentPage.value))
+    return
+  }
+  goToPage(currentPage.value + 1)
 }
 
 function prevPage() {
-  goToPage(currentPage.value - (isTwoPage.value ? 2 : 1))
+  if (pageCount.value <= 0) return
+  if (isTwoPageEffective.value) {
+    goToPage(spreadLayout.value.prevAnchor(currentPage.value))
+    return
+  }
+  goToPage(currentPage.value - 1)
 }
 
 // ── Click zones (left / middle / right) ───────────────────────────────────────
@@ -182,8 +367,6 @@ function onTouchEnd(e: TouchEvent) {
 }
 
 // ── Wheel (paginated mode only) ────────────────────────────────────────────────
-// Note: this handler is only attached on the paginated view div (v-if), so it is
-// never active during infinite/long-strip modes — no need to guard with scrollMode check.
 function onWheel(e: WheelEvent) {
   e.preventDefault()
   if (e.deltaY > 0) nextPage()
@@ -194,6 +377,7 @@ function onWheel(e: WheelEvent) {
 function onKeyDown(e: KeyboardEvent) {
   if ((e.target as HTMLElement).tagName === 'INPUT') return
   const isRtl = direction.value === 'rtl'
+
   switch (e.key) {
     case 'ArrowRight':
     case 'PageDown':
@@ -213,9 +397,11 @@ function onKeyDown(e: KeyboardEvent) {
       else nextPage()
       break
     case 'Home':
+      e.preventDefault()
       goToPage(0)
       break
     case 'End':
+      e.preventDefault()
       goToPage(pageCount.value - 1)
       break
     case 'Escape':
@@ -230,6 +416,7 @@ let io: IntersectionObserver | null = null
 function setupScrollObserver() {
   io?.disconnect()
   if (!scrollContainer.value) return
+
   io = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -240,8 +427,9 @@ function setupScrollObserver() {
     },
     { root: scrollContainer.value, threshold: 0.5 },
   )
+
   nextTick(() => {
-    scrollContainer.value?.querySelectorAll('[data-page]').forEach((el) => io!.observe(el))
+    scrollContainer.value?.querySelectorAll('[data-page]').forEach((el) => io?.observe(el))
   })
 }
 
@@ -253,6 +441,18 @@ watch(scrollMode, async (mode) => {
   } else {
     io?.disconnect()
   }
+})
+
+watch(spreadLayout, (layout) => {
+  if (scrollMode.value !== 'paginated' || !isTwoPageEffective.value || pageCount.value <= 0) return
+  const anchored = layout.anchorForPage(currentPage.value)
+  if (anchored !== currentPage.value) currentPage.value = anchored
+})
+
+watch([scrollMode, isTwoPageEffective], ([mode, twoPage]) => {
+  if (mode !== 'paginated' || !twoPage || pageCount.value <= 0) return
+  const anchored = spreadLayout.value.anchorForPage(currentPage.value)
+  if (anchored !== currentPage.value) currentPage.value = anchored
 })
 
 // ── Slider ticks (max 20, evenly spaced) ──────────────────────────────────────
@@ -271,46 +471,56 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 watch(currentPage, (page) => {
   schedulePreload(page)
   onActivity()
+
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     progress.pageNumber.value = page + 1
-    progress.percentage.value = pageCount.value ? ((page + 1) / pageCount.value) * 100 : 0
+    progress.percentage.value = progressPercent.value
     progress.save()
   }, 2000)
 })
 
+function onResize() {
+  viewportWidth.value = window.innerWidth
+}
+
 // ── Mount / unmount ────────────────────────────────────────────────────────────
 onMounted(async () => {
+  viewportWidth.value = window.innerWidth
+  window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeyDown)
+
   await progress.load()
   await bookSettings.load()
 
-  // Seed refs from effective (hardcoded fallback → format defaults → per-book delta)
-  const s = bookSettings.effective.value as CbxReaderSettings
-  fitMode.value = s.fitMode
-  viewMode.value = s.viewMode
-  scrollMode.value = s.scrollMode
-  direction.value = s.direction
-  bgColor.value = s.bgColor
+  applySettings(bookSettings.effective.value as CbxReaderSettings)
 
-  // Register per-field watches AFTER seeding so the assignments above don't trigger saves.
-  // Each watch sends only the one changed field to keep the delta minimal.
   watch(fitMode, (v) => bookSettings.updateBookSettings({ fitMode: v }))
   watch(viewMode, (v) => bookSettings.updateBookSettings({ viewMode: v }))
   watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v }))
   watch(direction, (v) => bookSettings.updateBookSettings({ direction: v }))
+  watch(spreadAlignment, (v) => bookSettings.updateBookSettings({ spreadAlignment: v }))
+  watch(forceTwoPage, (v) => bookSettings.updateBookSettings({ forceTwoPage: v }))
+  watch(widePageSingletonMode, (v) => bookSettings.updateBookSettings({ widePageSingletonMode: v }))
   watch(bgColor, (v) => bookSettings.updateBookSettings({ bgColor: v }))
 
   await load()
   const saved = progress.pageNumber.value
   if (saved && saved > 1) currentPage.value = Math.min(saved - 1, pageCount.value - 1)
+
+  if (scrollMode.value === 'paginated' && isTwoPageEffective.value) {
+    currentPage.value = spreadLayout.value.anchorForPage(currentPage.value)
+  }
+
   schedulePreload(currentPage.value)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
   io?.disconnect()
   if (saveTimer) clearTimeout(saveTimer)
+  if (forceToggleHighlightTimer) clearTimeout(forceToggleHighlightTimer)
 })
 </script>
 
@@ -325,7 +535,7 @@ onUnmounted(() => {
         <button class="viewer-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
         <div class="flex-1 min-w-0 flex flex-col justify-center px-2">
           <span v-if="bookTitle" class="text-sm font-serif text-foreground truncate leading-tight">{{ bookTitle }}</span>
-          <span class="text-xs text-muted-foreground tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
+          <span class="text-xs text-muted-foreground tabular-nums">{{ pageLabel }}</span>
         </div>
         <DropdownMenu v-model:open="showSettings">
           <DropdownMenuTrigger as-child>
@@ -333,84 +543,181 @@ onUnmounted(() => {
               <Settings :size="15" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-52">
-            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Fit Mode</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="fitMode">
-              <DropdownMenuRadioItem
-                v-for="opt in FIT_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-                class="text-xs gap-2"
-                @select.prevent="setFitMode(opt.value)"
+          <DropdownMenuContent align="end" class="w-80 p-2">
+            <DropdownMenuLabel class="text-muted-foreground text-xs px-1 py-1">Reader Settings</DropdownMenuLabel>
+
+            <div class="px-1 py-1.5 space-y-1.5">
+              <p class="text-[11px] text-muted-foreground">Fit mode</p>
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  v-for="opt in FIT_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-[11px] transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    fitMode === opt.value ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setFitMode(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="px-1 py-1.5 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <p class="text-[11px] text-muted-foreground">Page view</p>
+                <span
+                  v-if="showAutoFallbackBadge"
+                  class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                >
+                  <Info :size="11" />
+                  Auto-fallback active
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  v-for="opt in VIEW_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-xs transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    viewMode === opt.value ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setViewMode(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="px-1 py-1.5 space-y-1.5">
+              <p class="text-[11px] text-muted-foreground">Reading direction</p>
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  v-for="opt in DIRECTION_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-xs transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    direction === opt.value
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setDirection(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="px-1 py-1.5 space-y-1.5">
+              <p class="text-[11px] text-muted-foreground">Background</p>
+              <div class="grid grid-cols-3 gap-1">
+                <button
+                  v-for="opt in BG_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-xs transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    bgColor === opt.value ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setBgColor(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="showSpreadAlignmentControl" class="px-1 py-1.5 space-y-1.5">
+              <p class="text-[11px] text-muted-foreground">Spread alignment</p>
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  v-for="opt in SPREAD_ALIGNMENT_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-xs transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    spreadAlignment === opt.value
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setSpreadAlignment(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <DropdownMenuItem v-if="showSpreadAlignmentHint" class="text-xs mt-1" @select.prevent="focusForceTwoPageFromHint">
+              <Info :size="13" />
+              Spread alignment unavailable in auto-fallback
+              <span class="ml-auto text-[10px] text-muted-foreground">Focus toggle below</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator class="my-1" />
+
+            <div class="px-1 py-1.5 space-y-1.5">
+              <p class="text-[11px] text-muted-foreground">Scroll mode</p>
+              <div class="grid grid-cols-3 gap-1">
+                <button
+                  v-for="opt in SCROLL_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-[11px] transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    scrollMode === opt.value
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setScrollMode(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="px-1 py-1.5 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-muted-foreground">Force two-page (Bypass mobile fallback)</p>
+              </div>
+              <button
+                ref="forceTwoPageToggleButton"
+                class="h-7 px-3 rounded-md border text-xs transition-colors"
+                :class="[
+                  forceTwoPage ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground',
+                  highlightForceTwoPage ? 'ring-2 ring-primary/50' : '',
+                ]"
+                @click.stop="toggleForceTwoPage"
               >
-                <component :is="opt.icon" :size="13" />
-                {{ opt.label }}
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
+                {{ forceTwoPage ? 'On' : 'Off' }}
+              </button>
+            </div>
 
-            <DropdownMenuSeparator />
+            <div class="px-1 py-1.5 space-y-1.5">
+              <p class="text-[11px] text-muted-foreground">Wide pages</p>
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  v-for="opt in WIDE_PAGE_OPTIONS"
+                  :key="opt.value"
+                  class="h-7 px-2 rounded-md border text-[11px] transition-colors flex items-center justify-center gap-1"
+                  :class="
+                    widePageSingletonMode === opt.value
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setWidePageMode(opt.value)"
+                >
+                  <component :is="opt.icon" :size="11" />
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
 
-            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Pages</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="viewMode">
-              <DropdownMenuRadioItem
-                v-for="opt in VIEW_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-                class="text-xs gap-2"
-                @select.prevent="setViewMode(opt.value)"
-              >
-                <component :is="opt.icon" :size="13" />
-                {{ opt.label }}
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Scroll Mode</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="scrollMode">
-              <DropdownMenuRadioItem
-                v-for="opt in SCROLL_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-                class="text-xs gap-2"
-                @select.prevent="setScrollMode(opt.value)"
-              >
-                <component :is="opt.icon" :size="13" />
-                {{ opt.label }}
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Reading Direction</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="direction">
-              <DropdownMenuRadioItem
-                v-for="opt in DIRECTION_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-                class="text-xs gap-2"
-                @select.prevent="setDirection(opt.value)"
-              >
-                <component :is="opt.icon" :size="13" />
-                {{ opt.label }}
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuLabel class="text-muted-foreground text-xs px-2 py-1">Background</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="bgColor">
-              <DropdownMenuRadioItem
-                v-for="opt in BG_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-                class="text-xs gap-2"
-                @select.prevent="setBgColor(opt.value)"
-              >
-                <span class="size-3 rounded-full ring-1 ring-border shrink-0" :class="opt.color" />
-                {{ opt.label }}
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator class="my-1" />
+            <DropdownMenuItem class="text-xs text-destructive focus:text-destructive" @select.prevent="confirmResetBookViewSettings">
+              Reset book view settings
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -429,19 +736,38 @@ onUnmounted(() => {
         <div class="w-8 h-8 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
       </div>
 
-      <div
-        class="flex items-center justify-center h-full w-full"
-        :class="isTwoPage ? 'gap-0.5' : ''"
-        :style="isTwoPage && direction === 'rtl' ? { flexDirection: 'row-reverse' } : {}"
-      >
+      <div class="flex items-center justify-center h-full w-full gap-0.5 px-1">
+        <template v-if="renderSpread">
+          <div class="h-full w-1/2 flex items-center justify-center">
+            <img
+              v-if="renderLeftPage !== null"
+              :src="pageUrl(renderLeftPage)"
+              :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+              :style="{ maxWidth: '100%', maxHeight: '100%' }"
+              draggable="false"
+              @load="onPaginatedImageLoad(renderLeftPage, $event)"
+            />
+            <div v-else class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
+          </div>
+          <div class="h-full w-1/2 flex items-center justify-center">
+            <img
+              v-if="renderRightPage !== null"
+              :src="pageUrl(renderRightPage)"
+              :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+              :style="{ maxWidth: '100%', maxHeight: '100%' }"
+              draggable="false"
+              @load="onPaginatedImageLoad(renderRightPage, $event)"
+            />
+            <div v-else class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
+          </div>
+        </template>
+
         <img
-          v-for="pg in visiblePages"
-          :key="pg"
-          :src="pageUrl(pg)"
+          v-else-if="renderSinglePage !== null"
+          :src="pageUrl(renderSinglePage)"
           :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
-          :style="isTwoPage ? { maxWidth: '50%', maxHeight: '100%' } : {}"
           draggable="false"
-          @load="currentImageLoaded = true"
+          @load="onPaginatedImageLoad(renderSinglePage, $event)"
         />
       </div>
     </div>
@@ -462,6 +788,7 @@ onUnmounted(() => {
           :class="scrollMode === 'long-strip' ? 'w-full block' : 'max-w-full'"
           loading="lazy"
           draggable="false"
+          @load="onStripImageLoad(i - 1, $event)"
         />
       </div>
     </div>
@@ -478,7 +805,7 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>First page</TooltipContent>
         </Tooltip>
-        <button class="viewer-btn" :disabled="currentPage === 0" @click="prevPage"><ChevronLeft :size="16" /></button>
+        <button class="viewer-btn" :disabled="!canGoPrev" @click="prevPage"><ChevronLeft :size="16" /></button>
 
         <div class="flex-1 flex flex-col justify-center gap-0.5">
           <input
@@ -496,7 +823,7 @@ onUnmounted(() => {
           </datalist>
         </div>
 
-        <button class="viewer-btn" :disabled="currentPage >= pageCount - 1" @click="nextPage"><ChevronRight :size="16" /></button>
+        <button class="viewer-btn" :disabled="!canGoNext" @click="nextPage"><ChevronRight :size="16" /></button>
         <Tooltip>
           <TooltipTrigger as-child>
             <button class="viewer-btn" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
@@ -524,7 +851,7 @@ onUnmounted(() => {
 
     <!-- Progress bar -->
     <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-30">
-      <div class="h-full bg-primary/60 transition-all duration-300" :style="{ width: `${((currentPage + 1) / pageCount) * 100}%` }" />
+      <div class="h-full bg-primary/60 transition-all duration-300" :style="{ width: `${progressPercent}%` }" />
     </div>
   </div>
 </template>

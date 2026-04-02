@@ -67,6 +67,9 @@ export interface CbxReaderSettings {
   viewMode: "single" | "two-page";
   scrollMode: "paginated" | "infinite" | "long-strip";
   direction: "ltr" | "rtl";
+  spreadAlignment: "normal" | "shifted";
+  forceTwoPage: boolean;
+  widePageSingletonMode: "auto" | "disable";
   bgColor: "black" | "gray" | "white";
 }
 
@@ -115,6 +118,9 @@ export const CBX_READER_DEFAULTS: CbxReaderSettings = {
   viewMode: "single",
   scrollMode: "paginated",
   direction: "ltr",
+  spreadAlignment: "normal",
+  forceTwoPage: false,
+  widePageSingletonMode: "auto",
   bgColor: "black",
 };
 

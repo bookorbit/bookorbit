@@ -32,6 +32,17 @@ const validPdfDefaults = {
   rotation: 0,
 } as const;
 
+const validCbxDefaults = {
+  fitMode: 'fit-page',
+  viewMode: 'single',
+  scrollMode: 'paginated',
+  direction: 'ltr',
+  spreadAlignment: 'normal',
+  forceTwoPage: false,
+  widePageSingletonMode: 'auto',
+  bgColor: 'black',
+} as const;
+
 const mockRepo = {
   findPreference: vi.fn<(...args: [number, number]) => Promise<{ settings: Record<string, unknown> } | null>>(),
   upsertPreference: vi.fn<(...args: [number, number, Record<string, unknown>]) => Promise<void>>(),
@@ -135,6 +146,12 @@ describe('ReaderPreferencesService', () => {
     expect(mockRepo.upsertDefault).toHaveBeenCalledWith(3, 'pdf', validPdfDefaults);
   });
 
+  it('validates full cbx default payloads including spread settings', async () => {
+    await service.upsertDefault(3, 'cbx', validCbxDefaults);
+
+    expect(mockRepo.upsertDefault).toHaveBeenCalledWith(3, 'cbx', validCbxDefaults);
+  });
+
   it('rejects default writes for invalid format groups', async () => {
     await expect(service.upsertDefault(3, 'video', validPdfDefaults)).rejects.toThrow(BadRequestException);
     expect(mockRepo.upsertDefault).not.toHaveBeenCalled();
@@ -142,6 +159,19 @@ describe('ReaderPreferencesService', () => {
 
   it('rejects partial payloads for defaults', async () => {
     await expect(service.upsertDefault(3, 'pdf', { zoomMode: 'fit-page' })).rejects.toThrow(BadRequestException);
+    expect(mockRepo.upsertDefault).not.toHaveBeenCalled();
+  });
+
+  it('rejects cbx defaults that omit required spread settings', async () => {
+    await expect(
+      service.upsertDefault(3, 'cbx', {
+        fitMode: 'fit-page',
+        viewMode: 'single',
+        scrollMode: 'paginated',
+        direction: 'ltr',
+        bgColor: 'black',
+      }),
+    ).rejects.toThrow(BadRequestException);
     expect(mockRepo.upsertDefault).not.toHaveBeenCalled();
   });
 

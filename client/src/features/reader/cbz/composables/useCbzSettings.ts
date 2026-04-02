@@ -4,6 +4,8 @@ export type FitMode = 'fit-page' | 'fit-width' | 'fit-height' | 'actual'
 export type ViewMode = 'single' | 'two-page'
 export type ScrollMode = 'paginated' | 'infinite' | 'long-strip'
 export type Direction = 'ltr' | 'rtl'
+export type SpreadAlignment = 'normal' | 'shifted'
+export type WidePageSingletonMode = 'auto' | 'disable'
 export type BgColor = 'black' | 'gray' | 'white'
 
 export function useCbzSettings() {
@@ -11,6 +13,9 @@ export function useCbzSettings() {
   const viewMode = ref<ViewMode>('single')
   const scrollMode = ref<ScrollMode>('paginated')
   const direction = ref<Direction>('ltr')
+  const spreadAlignment = ref<SpreadAlignment>('normal')
+  const forceTwoPage = ref(false)
+  const widePageSingletonMode = ref<WidePageSingletonMode>('auto')
   const bgColor = ref<BgColor>('black')
 
   const bgValue = computed(() => {
@@ -34,5 +39,17 @@ export function useCbzSettings() {
     }
   })
 
-  return { fitMode, viewMode, scrollMode, direction, bgColor, bgValue, isTwoPage, imgFitClass }
+  return {
+    fitMode,
+    viewMode,
+    scrollMode,
+    direction,
+    spreadAlignment,
+    forceTwoPage,
+    widePageSingletonMode,
+    bgColor,
+    bgValue,
+    isTwoPage,
+    imgFitClass,
+  }
 }
