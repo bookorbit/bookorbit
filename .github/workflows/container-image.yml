@@ -2,6 +2,7 @@ name: Container Image
 run-name: ${{ github.event_name == 'workflow_run' && format('Image - {0} ({1})', github.event.workflow_run.head_commit.message, github.event.workflow_run.head_branch) || format('Image - {0}', github.ref_name) }}
 
 on:
+  # Break-glass: bypasses CI/E2E gate. Use only when CI is broken and a hotfix image is urgently needed.
   workflow_dispatch:
   workflow_run:
     workflows: ["CI"]
@@ -85,7 +86,7 @@ jobs:
           set -euo pipefail
           echo "Checking CI status for commit ${COMMIT_SHA}..."
           success_count=$(gh api --paginate \
-            "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${COMMIT_SHA}&status=completed" \
+            "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${COMMIT_SHA}&status=completed&event=push&branch=main" \
             --jq '[.workflow_runs[] | select(.conclusion == "success")] | length' \
             | awk '{sum += $1} END {print sum}')
           if [[ "${success_count:-0}" -lt 1 ]]; then

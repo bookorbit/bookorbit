@@ -3,6 +3,8 @@ const TEST_RESULTS_DIR = "../test-results/server";
 export const E2E_SUITES = Object.freeze({
   "app-smoke": {
     id: "app-smoke",
+    name: "App Smoke",
+    timeout: 30,
     description: "App smoke suite",
     vitestTarget: "test/app-smoke.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/app-smoke-e2e-junit.xml`,
@@ -11,6 +13,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "scanner-scenarios": {
     id: "scanner-scenarios",
+    name: "Scanner Scenarios",
+    timeout: 45,
     description: "Scanner scenario matrix",
     vitestTarget: "test/scanner-scenarios.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/scanner-scenarios-e2e-junit.xml`,
@@ -19,6 +23,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "scanner-file-operations": {
     id: "scanner-file-operations",
+    name: "Scanner File Operations",
+    timeout: 60,
     description: "Scanner file operation matrix",
     vitestTarget: "test/scanner-file-operations.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/scanner-file-operations-e2e-junit.xml`,
@@ -27,6 +33,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "auth-session-security": {
     id: "auth-session-security",
+    name: "Auth Session Security",
+    timeout: 50,
     description: "Auth session security suite",
     vitestTarget: "test/auth-session-security.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/auth-session-security-e2e-junit.xml`,
@@ -35,6 +43,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "auth-recovery-oidc-logout": {
     id: "auth-recovery-oidc-logout",
+    name: "Auth Recovery OIDC Logout",
+    timeout: 50,
     description: "Auth recovery and OIDC logout suite",
     vitestTarget: "test/auth-recovery-oidc-logout.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/auth-recovery-oidc-logout-e2e-junit.xml`,
@@ -43,6 +53,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "staging-ingest-finalize": {
     id: "staging-ingest-finalize",
+    name: "Staging Ingest Finalize",
+    timeout: 45,
     description: "Staging ingest and finalize suite",
     vitestTarget: "test/staging-ingest-finalize.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/staging-ingest-finalize-e2e-junit.xml`,
@@ -51,6 +63,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "metadata-write": {
     id: "metadata-write",
+    name: "Metadata Write",
+    timeout: 60,
     description: "Metadata write operations suite",
     vitestTarget: "test/metadata-write.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/metadata-write-e2e-junit.xml`,
@@ -59,6 +73,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "authorization-matrix": {
     id: "authorization-matrix",
+    name: "Authorization Matrix",
+    timeout: 60,
     description: "Authorization matrix suite",
     vitestTarget: "test/authorization-matrix.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/authorization-matrix-e2e-junit.xml`,
@@ -67,6 +83,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "opds-auth-catalog": {
     id: "opds-auth-catalog",
+    name: "OPDS Auth Catalog",
+    timeout: 45,
     description: "OPDS auth and catalog suite",
     vitestTarget: "test/opds-auth-catalog.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/opds-auth-catalog-e2e-junit.xml`,
@@ -75,6 +93,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "email-lifecycle": {
     id: "email-lifecycle",
+    name: "Email Lifecycle",
+    timeout: 45,
     description: "Email lifecycle suite",
     vitestTarget: "test/email-lifecycle.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/email-lifecycle-e2e-junit.xml`,
@@ -83,6 +103,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "reader-state-isolation": {
     id: "reader-state-isolation",
+    name: "Reader State Isolation",
+    timeout: 45,
     description: "Reader state isolation suite",
     vitestTarget: "test/reader-state-isolation.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/reader-state-isolation-e2e-junit.xml`,
@@ -91,6 +113,8 @@ export const E2E_SUITES = Object.freeze({
   },
   "users-admin-lifecycle": {
     id: "users-admin-lifecycle",
+    name: "Users Admin Lifecycle",
+    timeout: 50,
     description: "Users admin lifecycle suite",
     vitestTarget: "test/users-admin-lifecycle.e2e-spec.ts",
     junitOutput: `${TEST_RESULTS_DIR}/users-admin-lifecycle-e2e-junit.xml`,

@@ -216,3 +216,243 @@ jobs:
           echo "dependency-review=${{ needs.dependency-review.result }}"
           echo "detect-changes=${{ needs.detect-changes.result }}"
           echo "checks=${{ needs.checks.result }}"
+
+  e2e-setup:
+    name: Detect E2E Suites
+    runs-on: ubuntu-latest
+    needs: [quality-gate]
+    if: needs.quality-gate.result == 'success'
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect path changes per suite
+        id: changes
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
+        with:
+          filters: |
+            workflow-changed:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/e2e.yml'
+              - '.github/workflows/e2e-runner.yml'
+              - 'Dockerfile'
+              - 'docker-compose*.yml'
+              - 'docker/**'
+            app-smoke:
+              - 'server/src/**'
+              - 'server/test/app-smoke.e2e-spec.ts'
+              - 'server/src/db/schema/**'
+              - 'packages/types/src/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+            auth-session-security:
+              - 'server/src/modules/auth/**'
+              - 'server/src/modules/user/**'
+              - 'server/src/modules/role/**'
+              - 'server/src/common/guards/**'
+              - 'server/src/common/decorators/**'
+              - 'server/src/common/types/**'
+              - 'server/src/db/schema/**'
+              - 'server/test/auth-session-security.e2e-spec.ts'
+              - 'server/test/e2e/app-harness.ts'
+              - 'packages/types/src/auth.ts'
+              - 'packages/types/src/permissions.ts'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+            auth-recovery-oidc-logout:
+              - 'server/src/modules/auth/**'
+              - 'server/src/modules/user/**'
+              - 'server/src/modules/email/**'
+              - 'server/src/modules/metadata/**'
+              - 'server/src/db/schema/**'
+              - 'server/test/auth-recovery-oidc-logout.e2e-spec.ts'
+              - 'server/test/e2e/app-harness.ts'
+              - 'packages/types/src/auth.ts'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+            authorization-matrix:
+              - 'server/src/**'
+              - 'server/test/authorization-matrix.e2e-spec.ts'
+              - 'server/test/e2e/authorization-matrix/**'
+              - 'packages/types/src/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+            email-lifecycle:
+              - 'server/src/modules/email/**'
+              - 'server/src/modules/book/**'
+              - 'server/src/modules/library/**'
+              - 'server/src/modules/auth/**'
+              - 'server/src/modules/cover/**'
+              - 'server/src/modules/scanner/**'
+              - 'server/src/modules/seed/**'
+              - 'server/src/db/schema/**'
+              - 'packages/types/src/**'
+              - 'server/test/email-lifecycle.e2e-spec.ts'
+              - 'server/test/e2e/email/**'
+              - 'server/test/e2e/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - 'client/src/features/email/**'
+              - 'client/src/router/index.ts'
+              - 'client/src/features/settings/SettingsHeader.vue'
+              - 'client/src/views/HomeView.vue'
+              - 'client/src/views/CollectionView.vue'
+              - 'client/src/views/LensView.vue'
+              - 'client/src/features/book/components/BookCoverCard.vue'
+              - 'client/src/features/book/components/BookListRow.vue'
+            metadata-write:
+              - 'server/src/modules/book/**'
+              - 'server/src/modules/library/**'
+              - 'server/src/modules/file-write/**'
+              - 'server/src/modules/metadata/**'
+              - 'server/src/modules/app-settings/**'
+              - 'server/test/metadata-write.e2e-spec.ts'
+              - 'server/test/e2e/metadata-write/**'
+              - 'server/src/db/schema/**'
+              - 'packages/types/src/file-write.ts'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+            opds-auth-catalog:
+              - 'server/src/modules/opds/**'
+              - 'server/src/modules/book/**'
+              - 'server/src/modules/library/**'
+              - 'server/src/modules/collection/**'
+              - 'server/src/modules/lens/**'
+              - 'server/src/modules/user/**'
+              - 'server/src/modules/auth/**'
+              - 'server/src/modules/app-settings/**'
+              - 'server/test/opds-auth-catalog.e2e-spec.ts'
+              - 'server/test/e2e/opds/**'
+              - 'server/test/e2e/**'
+              - 'server/src/db/schema/**'
+              - 'packages/types/src/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+            reader-state-isolation:
+              - 'server/src/modules/bookmark/**'
+              - 'server/src/modules/annotation/**'
+              - 'server/src/modules/reader-preferences/**'
+              - 'server/src/modules/reading-session/**'
+              - 'server/src/modules/book/**'
+              - 'server/src/modules/library/**'
+              - 'server/src/modules/scanner/**'
+              - 'server/src/modules/user-book-status/**'
+              - 'server/src/scripts/db-prepare-e2e.ts'
+              - 'server/test/reader-state-isolation.e2e-spec.ts'
+              - 'server/test/e2e/reader-state-isolation/**'
+              - 'server/src/db/schema/**'
+              - 'packages/types/src/reader-settings.ts'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+            scanner-file-operations:
+              - 'server/src/modules/scanner/**'
+              - 'server/test/scanner-file-operations.e2e-spec.ts'
+              - 'server/test/e2e/scanner/**'
+              - 'server/src/db/schema/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+            scanner-scenarios:
+              - 'server/src/modules/scanner/**'
+              - 'server/test/scanner-scenarios.e2e-spec.ts'
+              - 'server/test/e2e/scanner/**'
+              - 'server/src/db/schema/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+            staging-ingest-finalize:
+              - 'server/src/modules/staging/**'
+              - 'server/src/modules/upload/**'
+              - 'server/src/modules/metadata/**'
+              - 'server/test/staging-ingest-finalize.e2e-spec.ts'
+              - 'server/test/e2e/staging/**'
+              - 'server/src/db/schema/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+            users-admin-lifecycle:
+              - 'server/src/modules/user/**'
+              - 'server/src/modules/auth/**'
+              - 'server/src/common/guards/**'
+              - 'server/src/common/decorators/**'
+              - 'server/src/common/types/**'
+              - 'server/src/db/schema/**'
+              - 'server/test/users-admin-lifecycle.e2e-spec.ts'
+              - 'server/test/e2e/users-admin-lifecycle/**'
+              - 'packages/types/src/auth.ts'
+              - 'packages/types/src/permissions.ts'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build suite matrix
+        id: build-matrix
+        shell: bash
+        run: |
+          SUITES_DEF=$(node scripts/test/list-suites-json.mjs)
+
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            MATRIX="$SUITES_DEF"
+          elif [ "${{ steps.changes.outputs.workflow-changed }}" == "true" ]; then
+            MATRIX="$SUITES_DEF"
+          else
+            CHANGED='${{ steps.changes.outputs.changes }}'
+            if [ -z "$CHANGED" ] || [ "$CHANGED" == "[]" ]; then
+              MATRIX="[]"
+            else
+              MATRIX=$(echo "$SUITES_DEF" | jq --argjson changed "$CHANGED" \
+                '[.[] | select(.id as $id | $changed | index($id) != null)]')
+            fi
+          fi
+
+          echo "matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: [e2e-setup]
+    if: needs.e2e-setup.outputs.matrix != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.e2e-setup.outputs.matrix) }}
+    permissions:
+      contents: read
+      checks: write
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: ${{ matrix.suite.id }}
+      check-name: "E2E - ${{ matrix.suite.name }}"
+      artifact-name: "e2e-${{ matrix.suite.id }}-report"
+      job-timeout-minutes: ${{ matrix.suite.timeout }}
+
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [quality-gate, e2e-setup, e2e]
+    timeout-minutes: 5
+    if: always()
+    steps:
+      - name: Fail if any job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI jobs failed or were cancelled."
+          exit 1
+
+      - name: CI complete
+        run: |
+          echo "quality-gate=${{ needs.quality-gate.result }}"
+          echo "e2e-setup=${{ needs.e2e-setup.result }}"
+          echo "e2e=${{ needs.e2e.result }}"

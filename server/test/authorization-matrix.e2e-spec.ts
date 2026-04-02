@@ -440,7 +440,7 @@ describe('Authorization matrix (e2e)', () => {
         const message = extractMessage(response);
         if (response.statusCode === 403 && message.includes('Missing permission:')) {
           failures.push({
-            route: `${permission} -> ${probe.method} ${probe.path}`,
+            route: `${String(permission)} -> ${probe.method} ${probe.path}`,
             status: response.statusCode,
             reason: 'permission allow-path still denied by PermissionGuard',
             message,

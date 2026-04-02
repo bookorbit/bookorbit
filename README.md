@@ -1,8 +1,8 @@
 # ProjectX
 
-A book and library management app with Kobo device support. Multi-user, self-hostable.
+[![CI](https://github.com/neonsolstice/projectx/actions/workflows/ci.yml/badge.svg)](https://github.com/neonsolstice/projectx/actions/workflows/ci.yml)
 
-**Tech stack:** NestJS 11 (Fastify) + Vue 3 + PostgreSQL + Drizzle ORM
+A self-hostable book and library management app with Kobo device support. Organize your epub, pdf, and cbz collections, track reading progress, and sync with your Kobo.
 
 ---
 

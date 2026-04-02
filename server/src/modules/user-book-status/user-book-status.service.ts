@@ -87,14 +87,14 @@ export class UserBookStatusService {
 
   private toReadStatus(value: string): ReadStatus {
     if (!isReadStatus(value)) {
-      throw new InternalServerErrorException(`Invalid read status value: ${value}`);
+      throw new InternalServerErrorException(`Invalid read status value: ${String(value)}`);
     }
     return value;
   }
 
   private toReadStatusSource(value: string): 'auto' | 'manual' {
     if (!isReadStatusSource(value)) {
-      throw new InternalServerErrorException(`Invalid read status source value: ${value}`);
+      throw new InternalServerErrorException(`Invalid read status source value: ${String(value)}`);
     }
     return value;
   }

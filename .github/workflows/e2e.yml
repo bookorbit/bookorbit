@@ -1,0 +1,57 @@
+name: E2E (Manual)
+run-name: E2E (dispatch) - ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      vitest-args:
+        description: 'Optional vitest args forwarded to all suites (e.g. --testNamePattern="some test")'
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  setup:
+    name: Build Suite Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build matrix
+        id: build
+        shell: bash
+        run: echo "matrix=$(node scripts/test/list-suites-json.mjs)" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: ${{ matrix.suite.id }}
+      check-name: "E2E - ${{ matrix.suite.name }}"
+      artifact-name: "e2e-${{ matrix.suite.id }}-report"
+      job-timeout-minutes: ${{ matrix.suite.timeout }}
+      vitest-args: ${{ inputs.vitest-args || '' }}
