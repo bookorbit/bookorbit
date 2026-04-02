@@ -141,6 +141,13 @@ export class AuthorEnrichmentExecutorService {
       }
     }
 
+    const now = new Date();
+    const hasPhoto = !!(await this.authorImageStorage.getThumbnailPath(author.id));
+    await this.authorsRepo.updateAuthorById(author.id, {
+      lastEnrichedAt: now,
+      hasPhoto,
+    });
+
     return {
       kind: 'done',
       provider: metadata.provider,

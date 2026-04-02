@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { X, Sparkles, ChevronRight } from 'lucide-vue-next'
+import { X, Sparkles } from 'lucide-vue-next'
 import { isAudioFormat } from '@projectx/types'
 import type { BookDetail, MetadataCandidate, MetadataSource } from '@projectx/types'
 import { useMetadataSearch } from '../../../composables/useMetadataSearch'
@@ -57,10 +57,18 @@ const {
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
+const drawerTitle = computed(() => (view.value === 'search' ? 'Search Metadata' : 'Compare Metadata'))
+const drawerSubtitle = computed(() =>
+  view.value === 'search' ? 'Find the best provider match for this book.' : 'Review differences and apply only what you want.',
+)
 
 onMounted(() => {
   loadProviders()
 })
+
+function handleClose() {
+  emit('close')
+}
 
 function handleSearch(params: { title: string; author: string; isbn: string }) {
   const isAudiobook = props.book.files.some((f) => f.format != null && isAudioFormat(f.format))
@@ -88,7 +96,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
   <Teleport to="body">
     <div class="fixed inset-0 z-50 flex">
       <!-- Backdrop -->
-      <div class="hidden sm:block flex-1 bg-black/50 backdrop-blur-sm" @click="$emit('close')" />
+      <div class="hidden sm:block flex-1 bg-black/50 backdrop-blur-sm" @click="handleClose" />
 
       <!-- Drawer panel -->
       <div class="relative flex flex-col w-full sm:w-3/4 sm:max-w-4xl h-full bg-background sm:border-l border-border shadow-2xl overflow-hidden">
@@ -101,7 +109,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
         <!-- Close button -->
         <button
           class="absolute top-3 right-3 z-10 size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all hover:scale-110"
-          @click="$emit('close')"
+          @click="handleClose"
         >
           <X class="size-4" />
         </button>
@@ -111,9 +119,10 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
           <div class="size-7 rounded-lg bg-primary/10 flex items-center justify-center ring-1 ring-primary/20 shrink-0">
             <Sparkles class="size-3.5 text-primary" />
           </div>
-          <p class="text-sm font-semibold shrink-0">Search Metadata</p>
-          <ChevronRight class="size-3.5 text-border shrink-0 hidden sm:block" />
-          <p class="text-xs text-muted-foreground truncate hidden sm:block">{{ book.title }}</p>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold">{{ drawerTitle }}</p>
+            <p class="text-xs text-muted-foreground line-clamp-1">{{ drawerSubtitle }}</p>
+          </div>
 
           <!-- Step indicator -->
           <div class="ml-auto flex items-center gap-1 shrink-0">

@@ -206,13 +206,18 @@ export class AuthorsRepository {
       name: string;
       sortName: string | null;
       description: string | null;
+      hasPhoto: boolean;
+      lastEnrichedAt: Date | null;
     }>,
   ) {
-    const [updated] = await this.db
-      .update(authors)
-      .set(values)
-      .where(eq(authors.id, authorId))
-      .returning({ id: authors.id, name: authors.name, sortName: authors.sortName, description: authors.description });
+    const [updated] = await this.db.update(authors).set(values).where(eq(authors.id, authorId)).returning({
+      id: authors.id,
+      name: authors.name,
+      sortName: authors.sortName,
+      description: authors.description,
+      hasPhoto: authors.hasPhoto,
+      lastEnrichedAt: authors.lastEnrichedAt,
+    });
     return updated ?? null;
   }
 

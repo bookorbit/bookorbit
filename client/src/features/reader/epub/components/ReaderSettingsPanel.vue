@@ -39,7 +39,7 @@ const fontFamilies = [
 
 const stepperButtonClass = 'size-8 rounded-lg border border-border text-lg font-light text-foreground transition-colors hover:bg-muted'
 const stepperGroupClass = 'flex min-w-[11rem] items-center justify-end gap-2'
-const stepperValueClass = 'w-[4.75rem] text-center text-sm font-mono font-medium tabular-nums text-foreground'
+const stepperValueClass = 'w-[4rem] text-center text-sm font-mono font-medium tabular-nums text-foreground'
 
 function step(field: keyof ReaderState, delta: number, min: number, max: number, precision = 0) {
   const current = props.state[field] as number
@@ -93,7 +93,7 @@ onMounted(() => {
         <button
           v-for="tab in tabs"
           :key="tab.id"
-          class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
+          class="flex h-8.5 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
           :class="
             activeTab === tab.id
               ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
@@ -107,7 +107,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div ref="contentRef" class="overflow-y-auto px-4 py-4 space-y-6" @scroll="onContentScroll">
+    <div ref="contentRef" class="overflow-y-auto p-5.5 space-y-6" @scroll="onContentScroll">
       <template v-if="activeTab === 'appearance'">
         <div class="space-y-6">
           <div>
@@ -283,7 +283,7 @@ onMounted(() => {
             <div class="flex items-center justify-between gap-4">
               <div class="space-y-1 pr-3">
                 <p class="text-sm font-medium leading-tight">Max width</p>
-                <p class="text-xs leading-tight text-muted-foreground">Range: 400-1600px</p>
+                <p class="text-xs leading-tight text-muted-foreground">Range: 400-1600</p>
               </div>
               <div :class="stepperGroupClass">
                 <button :class="stepperButtonClass" @click="step('maxInlineSize', -40, 400, 1600)">−</button>

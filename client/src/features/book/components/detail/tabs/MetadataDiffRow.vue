@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { ArrowLeft, RotateCcw, CheckCircle2, X, ZoomIn, Layers } from 'lucide-vue-next'
 import type { MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
 import type { DiffField, DiffFieldKey } from '../../../composables/useMetadataDiff'
@@ -21,11 +21,40 @@ const emit = defineEmits<{
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const lightboxSrc = ref<string | null>(null)
+const isCurrentExpanded = ref(false)
+const isCandidateExpanded = ref(false)
 
 const pickedProviderLabel = computed(() => {
   if (!props.field.pickedProvider) return ''
   return props.field.providerValues.find((pv) => pv.provider === props.field.pickedProvider)?.label ?? props.field.pickedProvider
 })
+
+const CLAMPABLE_TEXT_FIELDS = new Set<DiffFieldKey>([
+  'title',
+  'subtitle',
+  'authors',
+  'description',
+  'genres',
+  'narrators',
+  'comicPencillers',
+  'comicInkers',
+  'comicColorists',
+  'comicLetterers',
+  'comicCoverArtists',
+  'comicCharacters',
+  'comicTeams',
+  'comicLocations',
+  'comicStoryArcs',
+])
+
+const canClampCurrent = computed(
+  () => CLAMPABLE_TEXT_FIELDS.has(props.field.key) && props.field.currentDisplay.length > 160 && props.field.key !== 'sourceUrl',
+)
+const canClampCandidate = computed(
+  () => CLAMPABLE_TEXT_FIELDS.has(props.field.key) && props.field.candidateDisplay.length > 160 && props.field.key !== 'sourceUrl',
+)
+const currentTextClass = computed(() => (canClampCurrent.value && !isCurrentExpanded.value ? 'line-clamp-5' : ''))
+const candidateTextClass = computed(() => (canClampCandidate.value && !isCandidateExpanded.value ? 'line-clamp-5' : ''))
 
 function handleToggle() {
   emit('toggle', props.field.key)
@@ -34,6 +63,22 @@ function handleToggle() {
 function handlePickFromProvider(provider: MetadataProviderKey) {
   emit('pickFromProvider', props.field.key, provider)
 }
+
+function toggleCurrentExpanded() {
+  isCurrentExpanded.value = !isCurrentExpanded.value
+}
+
+function toggleCandidateExpanded() {
+  isCandidateExpanded.value = !isCandidateExpanded.value
+}
+
+watch(
+  () => [props.field.key, props.field.currentDisplay, props.field.candidateDisplay],
+  () => {
+    isCurrentExpanded.value = false
+    isCandidateExpanded.value = false
+  },
+)
 </script>
 
 <template>
@@ -176,9 +221,15 @@ function handlePickFromProvider(provider: MetadataProviderKey) {
         :class="!field.hasDiff ? 'bg-muted/30 opacity-50' : field.isPicked ? 'bg-muted/30 opacity-40' : 'bg-background ring-1 ring-border'"
       >
         <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">Current</p>
-        <p class="wrap-break-word leading-snug text-sm w-full" :class="!field.currentDisplay ? 'text-muted-foreground/60 italic' : 'text-foreground'">
+        <p
+          class="wrap-break-word leading-snug text-sm w-full"
+          :class="[!field.currentDisplay ? 'text-muted-foreground/60 italic' : 'text-foreground', currentTextClass]"
+        >
           {{ field.currentDisplay || 'empty' }}
         </p>
+        <button v-if="canClampCurrent" class="mt-1 text-[10px] font-medium text-primary hover:underline" @click="toggleCurrentExpanded">
+          {{ isCurrentExpanded ? 'Show less' : 'Show more' }}
+        </button>
         <!-- Badge when value is picked from a different provider than the active tab -->
         <span
           v-if="field.isPicked && !field.pickedFromActive && field.pickedProvider"
@@ -262,10 +313,17 @@ function handlePickFromProvider(provider: MetadataProviderKey) {
         <p
           v-else
           class="wrap-break-word leading-snug text-sm w-full"
-          :class="field.isPicked && field.pickedFromActive ? 'text-primary font-medium' : 'text-muted-foreground'"
+          :class="[field.isPicked && field.pickedFromActive ? 'text-primary font-medium' : 'text-muted-foreground', candidateTextClass]"
         >
           {{ field.candidateDisplay }}
         </p>
+        <button
+          v-if="canClampCandidate && field.key !== 'sourceUrl'"
+          class="mt-1 text-[10px] font-medium text-primary hover:underline"
+          @click="toggleCandidateExpanded"
+        >
+          {{ isCandidateExpanded ? 'Show less' : 'Show more' }}
+        </button>
       </div>
     </div>
   </div>

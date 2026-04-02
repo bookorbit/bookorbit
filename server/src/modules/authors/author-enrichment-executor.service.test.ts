@@ -16,6 +16,7 @@ describe('AuthorEnrichmentExecutorService', () => {
 
   const imageStorage = {
     saveFromUrl: vi.fn(),
+    getThumbnailPath: vi.fn(),
   };
 
   let service: AuthorEnrichmentExecutorService;
@@ -23,6 +24,7 @@ describe('AuthorEnrichmentExecutorService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     service = new AuthorEnrichmentExecutorService(authorsRepo as never, metadataFetch as never, imageStorage as never);
+    imageStorage.getThumbnailPath.mockResolvedValue(null);
     authorsRepo.findByIdForEnrichment.mockResolvedValue({
       id: 5,
       name: 'Jane Doe',

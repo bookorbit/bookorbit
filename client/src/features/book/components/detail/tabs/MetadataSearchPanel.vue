@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, inject, reactive, ref } from 'vue'
-import { Search, BookOpen, Loader2 } from 'lucide-vue-next'
+import { computed, inject, reactive, ref, watch } from 'vue'
+import { Search, BookOpen, Loader2, PencilLine } from 'lucide-vue-next'
 import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
 import MetadataResultCard from './MetadataResultCard.vue'
 import { providerActivePillStyle } from '../../../lib/metadata-fetch'
@@ -30,18 +30,55 @@ const form = reactive({
   author: props.searchDefaults.author ?? '',
   isbn: props.searchDefaults.isbn ?? '',
 })
+const isFormCollapsed = ref(false)
 
 const canSearch = computed(() => !!(form.title.trim() || form.isbn.trim()))
+const searchSummary = computed(() => {
+  const parts = [form.title.trim(), form.author.trim(), form.isbn.trim()].filter(Boolean)
+  return parts.length ? parts.join(' - ') : 'Untitled query'
+})
+
+watch(
+  () => props.hasSearched,
+  (hasSearched) => {
+    if (hasSearched && !props.isStreaming) {
+      isFormCollapsed.value = true
+    }
+  },
+  { immediate: true },
+)
 
 function runSearch() {
-  if (canSearch.value) emit('search', { ...form })
+  if (!canSearch.value) return
+  isFormCollapsed.value = true
+  emit('search', {
+    title: form.title.trim(),
+    author: form.author.trim(),
+    isbn: form.isbn.trim(),
+  })
+}
+
+function expandSearchForm() {
+  isFormCollapsed.value = false
+}
+
+function handleClearFilter() {
+  emit('clearFilter')
+}
+
+function handleToggleProvider(provider: MetadataProviderKey) {
+  emit('toggleProvider', provider)
+}
+
+function handleSelectCandidate(candidate: MetadataCandidate) {
+  emit('select', candidate)
 }
 </script>
 
 <template>
   <div class="flex flex-col h-full">
     <!-- Search form card -->
-    <div class="px-4 pt-4 pb-3 shrink-0">
+    <div v-if="!isFormCollapsed" class="px-4 pt-4 pb-3 shrink-0">
       <div class="rounded-xl border border-border bg-card p-3 space-y-2 shadow-sm">
         <div class="flex gap-2">
           <div class="relative flex-1">
@@ -80,6 +117,24 @@ function runSearch() {
         </div>
       </div>
     </div>
+    <div v-else class="px-4 pt-4 pb-3 shrink-0">
+      <div class="rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm">
+        <div class="flex items-center gap-2">
+          <Search class="size-3.5 text-muted-foreground shrink-0" />
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Active query</p>
+            <p class="text-sm font-medium text-foreground truncate">{{ searchSummary }}</p>
+          </div>
+          <button
+            class="h-7 px-2.5 rounded-lg border border-border bg-background text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
+            @click="expandSearchForm"
+          >
+            <PencilLine class="size-3.5" />
+            Edit
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Provider filter pills -->
     <div v-if="providers.length" class="flex items-center gap-1.5 px-4 pb-3 flex-wrap shrink-0">
@@ -90,7 +145,7 @@ function runSearch() {
             ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
             : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
         "
-        @click="$emit('clearFilter')"
+        @click="handleClearFilter"
       >
         All
       </button>
@@ -104,7 +159,7 @@ function runSearch() {
             : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
         "
         :style="selectedProviders.includes(p.key) || !selectedProviders.length ? providerActivePillStyle(p.key) : {}"
-        @click="$emit('toggleProvider', p.key)"
+        @click="handleToggleProvider(p.key)"
       >
         {{ p.label }}
         <span
@@ -120,9 +175,9 @@ function runSearch() {
     <!-- Results (scrollable) -->
     <div class="flex-1 overflow-y-auto px-4 pb-4">
       <!-- Skeleton grid while loading with no results yet -->
-      <div v-if="isStreaming && !filteredResults.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div v-if="isStreaming && !filteredResults.length" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div v-for="n in 8" :key="n" class="rounded-xl border border-border/40 bg-card overflow-hidden animate-pulse flex gap-3 p-2.5">
-          <div class="rounded-lg bg-muted shrink-0" :style="{ width: '64px', aspectRatio: coverAspectRatio }" />
+          <div class="rounded-lg bg-muted shrink-0" :style="{ width: '88px', aspectRatio: coverAspectRatio }" />
           <div class="flex-1 flex flex-col justify-center gap-2 py-1">
             <div class="h-3 bg-muted rounded-md w-full" />
             <div class="h-2.5 bg-muted rounded-md w-3/4" />
@@ -148,13 +203,13 @@ function runSearch() {
       </div>
 
       <!-- Results grid -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <MetadataResultCard
           v-for="(candidate, i) in filteredResults"
           :key="`${candidate.provider}-${candidate.providerId}-${i}`"
           :candidate="candidate"
           :providers="providers"
-          @select="$emit('select', $event)"
+          @select="handleSelectCandidate"
         />
       </div>
     </div>
