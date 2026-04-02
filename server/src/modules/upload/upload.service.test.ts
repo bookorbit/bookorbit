@@ -9,7 +9,7 @@ vi.mock('../metadata/lib/mobi-parser', () => ({ parseMobiFile: vi.fn() }));
 vi.mock('../metadata/lib/pdf-parser', () => ({ parsePdfFile: vi.fn() }));
 
 import { access as fsAccess } from 'fs/promises';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 
 import { UploadService } from './upload.service';
@@ -57,6 +57,10 @@ describe('UploadService', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     service = new UploadService(db as any, appSettings as any, libraryService as any, validator as any, storage as any, processor as any);
 
     validator.sanitizeFilename.mockReturnValue('book.epub');

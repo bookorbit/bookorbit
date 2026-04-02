@@ -1,6 +1,11 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
+vi.mock('bcryptjs', () => ({
+  hash: vi.fn((value: string) => Promise.resolve(`mock-hash:${value}`)),
+  compare: vi.fn((plain: string, hashed: string) => Promise.resolve(hashed === `mock-hash:${plain}`)),
+}));
+
 import { DB } from '../../../db';
 import { OpdsUserService } from '../opds-user.service';
 

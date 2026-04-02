@@ -10,7 +10,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   };
 });
 
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';
@@ -152,6 +152,10 @@ function awaitScan(repo: ReturnType<typeof makeRepo>): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+  vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+  vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   mockFindCandidates.mockResolvedValue([]);
   mockFindLooseCandidates.mockResolvedValue([]);
   mockBuildSingleCandidate.mockResolvedValue(null);

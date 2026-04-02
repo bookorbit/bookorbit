@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 import type { Mocked } from 'vitest';
 import { firstValueFrom, toArray } from 'rxjs';
@@ -39,6 +39,11 @@ describe('MetadataFetchService', () => {
   let service: MetadataFetchService;
 
   beforeEach(() => {
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
     registry = {
       all: vi.fn(),
       select: vi.fn(),

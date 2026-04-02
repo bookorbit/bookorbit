@@ -1,5 +1,10 @@
 import { BadRequestException, ConflictException, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 
+vi.mock('bcryptjs', () => ({
+  hash: vi.fn((value: string) => Promise.resolve(`mock-hash:${value}`)),
+  compare: vi.fn((plain: string, hashed: string) => Promise.resolve(hashed === `mock-hash:${plain}`)),
+}));
+
 import { AuthService } from './auth.service';
 
 function makeDb(overrides?: Record<string, unknown>) {

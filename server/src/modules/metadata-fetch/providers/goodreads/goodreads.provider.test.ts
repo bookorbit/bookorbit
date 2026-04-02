@@ -164,6 +164,8 @@ describe('GoodreadsProvider', () => {
     });
 
     it('should use slug-based scoring in extractBookIds', async () => {
+      const BETWEEN_REQUESTS_MS = 600;
+      vi.useFakeTimers();
       const searchHtml = `
         <a href="/book/show/1.The_Great_Gatsby?from_srp=true">B1</a>
         <a href="/book/show/2.Something_Else?from_srp=true">B2</a>
@@ -179,7 +181,14 @@ describe('GoodreadsProvider', () => {
         .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(searchHtml) })
         .mockResolvedValue({ ok: true, text: () => Promise.resolve(bookHtml) });
 
-      await provider.search({ title: 'The Great Gatsby' });
+      const searchPromise = provider.search({ title: 'The Great Gatsby' });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(BETWEEN_REQUESTS_MS);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(BETWEEN_REQUESTS_MS);
+      await vi.advanceTimersByTimeAsync(0);
+      await searchPromise;
       expect(global.fetch).toHaveBeenCalledTimes(4); // 1 search + 3 book lookups
     });
   });

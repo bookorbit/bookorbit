@@ -1,6 +1,7 @@
 import { FileEventProcessorService } from './file-event-processor.service';
 import type { Mocked, MockedFunction } from 'vitest';
 import { ScannerRepository } from './scanner.repository';
+import { Logger } from '@nestjs/common';
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
@@ -69,6 +70,10 @@ function makeFileStat(overrides: Partial<{ ino: number; size: number; mtime: Dat
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+  vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+  vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   mockRepo.markBooksAsMissing.mockResolvedValue(undefined);
   mockRepo.markBooksAsPresent.mockResolvedValue(undefined);
   mockRepo.createBookFile.mockResolvedValue({} as any);

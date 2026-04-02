@@ -4,14 +4,25 @@ import { tmpdir } from 'os';
 
 import { findBookCandidates, buildSingleBookCandidate } from './walk';
 
+let suiteRoot: string;
 let root: string;
+let caseId = 0;
+
+beforeAll(async () => {
+  suiteRoot = await mkdtemp(join(tmpdir(), 'scanner-walk-suite-'));
+});
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'scanner-walk-'));
+  root = join(suiteRoot, `case-${caseId++}`);
+  await mkdir(root, { recursive: true });
 });
 
 afterEach(async () => {
   await rm(root, { recursive: true, force: true });
+});
+
+afterAll(async () => {
+  await rm(suiteRoot, { recursive: true, force: true });
 });
 
 // Helpers

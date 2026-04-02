@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as fetchWithThrottleModule from '../../fetch-with-throttle';
 import { HardcoverClient } from './hardcover.client';
@@ -8,8 +8,13 @@ vi.mock('../../fetch-with-throttle', () => ({
 }));
 
 describe('HardcoverClient', () => {
-  const client = new HardcoverClient();
+  let client: HardcoverClient;
   const apiKey = 'test-api-key';
+
+  beforeEach(() => {
+    client = new HardcoverClient();
+    vi.clearAllMocks();
+  });
 
   it('passes the apiKey directly to the Authorization header', async () => {
     const mockFetch = vi.mocked(fetchWithThrottleModule.fetchWithThrottle);
