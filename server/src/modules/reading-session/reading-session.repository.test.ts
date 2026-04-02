@@ -97,7 +97,7 @@ describe('ReadingSessionRepository', () => {
   });
 
   it('persists session and upserts daily stats when insert succeeds', async () => {
-    const { repo, sessionValues, dailyValues, dailyConflictUpdate } = makeDbHarness({ fileLibraryId: 3, insertedIds: [{ id: 99 }] });
+    const { repo, sessionValues, sessionConflict, dailyValues, dailyConflictUpdate } = makeDbHarness({ fileLibraryId: 3, insertedIds: [{ id: 99 }] });
 
     const result = await repo.saveSession(
       2,
@@ -121,6 +121,7 @@ describe('ReadingSessionRepository', () => {
         endProgress: 42.5,
       }),
     );
+    expect(sessionConflict).toHaveBeenCalledWith({ target: [readingSessions.userId, readingSessions.sessionId] });
     expect(dailyValues).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 2,

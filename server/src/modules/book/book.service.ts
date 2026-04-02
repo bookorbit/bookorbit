@@ -583,6 +583,10 @@ export class BookService {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(userId, libraryId, this.isSuperuser(user));
+    const currentFile = await this.verifyFileAccess(dto.currentFileId, user);
+    if (currentFile.bookId !== bookId) {
+      throw new BadRequestException(`currentFileId ${dto.currentFileId} does not belong to book ${bookId}`);
+    }
     await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
     this.libraryService
       .findOne(libraryId)

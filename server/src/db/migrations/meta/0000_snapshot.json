@@ -1,5 +1,5 @@
 {
-  "id": "c08571cb-9e94-4d9f-a4b0-ac8bf63c3abf",
+  "id": "e4d220e7-8190-4aac-b2df-a9f4b8f8aa8c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3142,9 +3142,15 @@
         }
       },
       "indexes": {
-        "rs_session_id_uidx": {
-          "name": "rs_session_id_uidx",
+        "rs_user_session_id_uidx": {
+          "name": "rs_user_session_id_uidx",
           "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "session_id",
               "isExpression": false,

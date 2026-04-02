@@ -742,7 +742,7 @@ CREATE INDEX "bookmarks_user_id_idx" ON "bookmarks" USING btree ("user_id");--> 
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint
 CREATE UNIQUE INDEX "rp_user_file_idx" ON "reader_preferences" USING btree ("user_id","book_file_id");--> statement-breakpoint
 CREATE INDEX "reading_progress_user_id_idx" ON "reading_progress" USING btree ("user_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "rs_session_id_uidx" ON "reading_sessions" USING btree ("session_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "rs_user_session_id_uidx" ON "reading_sessions" USING btree ("user_id","session_id");--> statement-breakpoint
 CREATE INDEX "rs_user_started_at_idx" ON "reading_sessions" USING btree ("user_id","started_at");--> statement-breakpoint
 CREATE INDEX "rs_book_file_started_at_idx" ON "reading_sessions" USING btree ("book_file_id","started_at");--> statement-breakpoint
 CREATE INDEX "rs_user_book_file_idx" ON "reading_sessions" USING btree ("user_id","book_file_id");--> statement-breakpoint

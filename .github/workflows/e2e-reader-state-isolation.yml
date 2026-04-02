@@ -1,0 +1,56 @@
+name: Reader State Isolation E2E
+run-name: ${{ format('Reader State Isolation E2E - {0}', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "server/src/modules/bookmark/**"
+      - "server/src/modules/annotation/**"
+      - "server/src/modules/reader-preferences/**"
+      - "server/src/modules/reading-session/**"
+      - "server/src/modules/book/**"
+      - "server/src/modules/library/**"
+      - "server/src/modules/scanner/**"
+      - "server/src/modules/user-book-status/**"
+      - "server/src/scripts/db-prepare-e2e.ts"
+      - "server/test/reader-state-isolation.e2e-spec.ts"
+      - "server/test/e2e/reader-state-isolation/**"
+      - "server/src/db/schema/**"
+      - "packages/types/src/reader-settings.ts"
+      - "scripts/test/**"
+      - "scripts/db/**"
+  pull_request:
+    paths:
+      - "server/src/modules/bookmark/**"
+      - "server/src/modules/annotation/**"
+      - "server/src/modules/reader-preferences/**"
+      - "server/src/modules/reading-session/**"
+      - "server/src/modules/book/**"
+      - "server/src/modules/library/**"
+      - "server/src/modules/scanner/**"
+      - "server/src/modules/user-book-status/**"
+      - "server/src/scripts/db-prepare-e2e.ts"
+      - "server/test/reader-state-isolation.e2e-spec.ts"
+      - "server/test/e2e/reader-state-isolation/**"
+      - "server/src/db/schema/**"
+      - "packages/types/src/reader-settings.ts"
+      - "scripts/test/**"
+      - "scripts/db/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  reader-state-isolation-e2e:
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: reader-state-isolation
+      check-name: Server Reader State Isolation E2E
+      artifact-name: reader-state-isolation-e2e-report
+      job-timeout-minutes: 45

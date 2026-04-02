@@ -52,7 +52,7 @@ export class ReadingSessionRepository {
       const inserted = await tx
         .insert(readingSessions)
         .values({ userId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress })
-        .onConflictDoNothing({ target: [readingSessions.sessionId] })
+        .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
 
       if (inserted.length === 0) {

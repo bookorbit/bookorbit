@@ -79,7 +79,7 @@ export const readingSessions = pgTable(
     endProgress: real('end_progress'),
   },
   (t) => [
-    uniqueIndex('rs_session_id_uidx').on(t.sessionId),
+    uniqueIndex('rs_user_session_id_uidx').on(t.userId, t.sessionId),
     index('rs_user_started_at_idx').on(t.userId, t.startedAt),
     index('rs_book_file_started_at_idx').on(t.bookFileId, t.startedAt),
     index('rs_user_book_file_idx').on(t.userId, t.bookFileId),

@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import { access, readdir, rm, stat } from 'fs/promises';
 
@@ -953,6 +953,100 @@ describe('BookService', () => {
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
 
       expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null);
+    });
+  });
+
+  describe('saveAudioProgress', () => {
+    it('writes audio progress when current file belongs to the target book', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 21 });
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      bookRepo.findFileById.mockResolvedValue({
+        id: 7,
+        absolutePath: '/books/audiobook-1.mp3',
+        format: 'mp3',
+        bookId: 10,
+        libraryId: 1,
+      });
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue(null);
+
+      await service.saveAudioProgress(
+        user.id,
+        10,
+        {
+          percentage: 33,
+          currentFileId: 7,
+          positionSeconds: 120,
+        },
+        user,
+      );
+
+      expect(bookRepo.upsertAudioProgress).toHaveBeenCalledWith(user.id, 10, 7, 120, 33);
+    });
+
+    it('throws BadRequestException when current file belongs to a different book', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 21 });
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      bookRepo.findFileById.mockResolvedValue({
+        id: 8,
+        absolutePath: '/books/audiobook-2.mp3',
+        format: 'mp3',
+        bookId: 99,
+        libraryId: 1,
+      });
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+
+      await expect(
+        service.saveAudioProgress(
+          user.id,
+          10,
+          {
+            percentage: 40,
+            currentFileId: 8,
+            positionSeconds: 90,
+          },
+          user,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(bookRepo.upsertAudioProgress).not.toHaveBeenCalled();
+    });
+
+    it('propagates ForbiddenException when current file is in an inaccessible library', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 21 });
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      bookRepo.findFileById.mockResolvedValue({
+        id: 9,
+        absolutePath: '/books/secret.mp3',
+        format: 'mp3',
+        bookId: 10,
+        libraryId: 2,
+      });
+      libraryService.verifyUserAccess.mockImplementation((_userId: number, libraryId: number) => {
+        if (libraryId === 2) {
+          return Promise.reject(new ForbiddenException());
+        }
+        return Promise.resolve();
+      });
+
+      await expect(
+        service.saveAudioProgress(
+          user.id,
+          10,
+          {
+            percentage: 20,
+            currentFileId: 9,
+            positionSeconds: 44,
+          },
+          user,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(bookRepo.upsertAudioProgress).not.toHaveBeenCalled();
     });
   });
 });

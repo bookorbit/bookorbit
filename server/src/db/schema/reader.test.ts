@@ -41,7 +41,7 @@ describe('reader schema', () => {
     const indexNames = config.indexes.map((idx) => idx.config.name);
     const fkMap = fkByColumn(readingSessions);
 
-    expect(uniqueIndexes.some((idx) => idx.config.name === 'rs_session_id_uidx')).toBe(true);
+    expect(uniqueIndexes.some((idx) => idx.config.name === 'rs_user_session_id_uidx')).toBe(true);
     expect(indexNames).toContain('rs_user_started_at_idx');
     expect(indexNames).toContain('rs_book_file_started_at_idx');
     expect(indexNames).toContain('rs_user_book_file_idx');
