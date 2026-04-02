@@ -122,10 +122,12 @@ pnpm run test:e2e -- staging-ingest-finalize  # staging ingest/finalize e2e suit
 pnpm run test:e2e -- opds-auth-catalog # OPDS auth/catalog e2e suite (dedicated projectx_e2e DB)
 pnpm run test:e2e -- reader-state-isolation # reader state isolation e2e suite (dedicated projectx_e2e DB)
 pnpm run test:e2e -- email-lifecycle   # email lifecycle e2e suite (dedicated projectx_e2e DB)
+pnpm run test:e2e -- users-admin-lifecycle # users admin lifecycle e2e suite (dedicated projectx_e2e DB)
 pnpm run test:e2e:all                  # alias for "pnpm run test:e2e -- all"
 pnpm run test:e2e:opds-auth-catalog    # alias for "pnpm run test:e2e -- opds-auth-catalog"
 pnpm run test:e2e:reader-state-isolation # alias for "pnpm run test:e2e -- reader-state-isolation"
 pnpm run test:e2e:email-lifecycle      # alias for "pnpm run test:e2e -- email-lifecycle"
+pnpm run test:e2e:users-admin-lifecycle # alias for "pnpm run test:e2e -- users-admin-lifecycle"
 pnpm run test:e2e:list                 # list all supported e2e suite ids
 ```
 
@@ -197,6 +199,14 @@ pnpm run test:e2e -- scanner --testNamePattern=book-per-folder-disc-folder-flatt
   - `email-lifecycle-e2e-junit.xml`
   - `email-lifecycle-e2e-scenarios.json`
 
+### Users admin lifecycle e2e details
+
+- `pnpm run test:e2e -- users-admin-lifecycle` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
+- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
+- Results are written to `test-results/server/`:
+  - `users-admin-lifecycle-e2e-junit.xml`
+  - `users-admin-lifecycle-e2e-scenarios.json`
+
 ### E2E in CI (how to trigger)
 
 All suite workflows call the reusable `E2E Runner (reusable)` workflow, which runs:
@@ -213,11 +223,12 @@ pnpm run test:e2e -- <suite-id>
 | OPDS Auth Catalog E2E       | `opds-auth-catalog`       | `workflow_dispatch`, `push` (opds-related paths), `pull_request` (same paths)         |
 | Reader State Isolation E2E  | `reader-state-isolation`  | `workflow_dispatch`, `push` (reader-state-related paths), `pull_request` (same paths) |
 | Email Lifecycle E2E         | `email-lifecycle`         | `workflow_dispatch`, `push` (email-related paths), `pull_request` (same paths)        |
+| Users Admin Lifecycle E2E   | `users-admin-lifecycle`   | `workflow_dispatch`, `push` (users/auth-related paths), `pull_request` (same paths)   |
 
 Manual trigger steps:
 
 1. Open GitHub Actions.
-2. Select **Scanner E2E**, **Scanner File Ops E2E**, **Staging Ingest Finalize E2E**, **OPDS Auth Catalog E2E**, **Reader State Isolation E2E**, or **Email Lifecycle E2E**.
+2. Select **Scanner E2E**, **Scanner File Ops E2E**, **Staging Ingest Finalize E2E**, **OPDS Auth Catalog E2E**, **Reader State Isolation E2E**, **Email Lifecycle E2E**, or **Users Admin Lifecycle E2E**.
 3. Click **Run workflow**.
 
 Each run uploads `test-results/server/` as an artifact and publishes JUnit annotations from `test-results/server/*-e2e-junit.xml`.

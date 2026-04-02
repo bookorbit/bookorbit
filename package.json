@@ -30,6 +30,7 @@
     "test:e2e:metadata-write:concurrency": "node ./scripts/test/run-e2e-suite.mjs metadata-write --testNamePattern=\"concurrency hardening\"",
     "test:e2e:reader-state-isolation": "node ./scripts/test/run-e2e-suite.mjs reader-state-isolation",
     "test:e2e:email-lifecycle": "node ./scripts/test/run-e2e-suite.mjs email-lifecycle",
+    "test:e2e:users-admin-lifecycle": "node ./scripts/test/run-e2e-suite.mjs users-admin-lifecycle",
     "test:e2e:list": "node ./scripts/test/run-e2e-suite.mjs --list",
     "coverage": "pnpm run coverage:server && pnpm run coverage:client",
     "coverage:server": "pnpm --filter server test:cov",

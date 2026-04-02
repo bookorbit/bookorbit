@@ -154,12 +154,18 @@ function onSaved(newResetUrl?: string) {
                   <TooltipTrigger as-child>
                     <button
                       @click="handleResetPassword(user.id)"
+                      :disabled="user.provisioningMethod === 'oidc'"
                       class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      :class="
+                        user.provisioningMethod === 'oidc' ? 'cursor-not-allowed opacity-50 hover:text-muted-foreground hover:bg-transparent' : ''
+                      "
                     >
                       <KeyRound :size="14" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Reset password</TooltipContent>
+                  <TooltipContent>
+                    {{ user.provisioningMethod === 'oidc' ? 'OIDC users reset passwords in their identity provider' : 'Reset password' }}
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger as-child>

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { Permission } from '@projectx/types';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
@@ -13,7 +14,7 @@ async function hasErrors(dto: object): Promise<boolean> {
 }
 
 describe('User DTO validation', () => {
-  it('CreateUserDto requires email and enforces username minimum length and string permission names', async () => {
+  it('CreateUserDto requires email, enforces username minimum length, and validates permission enums', async () => {
     const bad = plainToInstance(CreateUserDto, { username: 'ab', name: 'n', permissionNames: [1, 2] });
     expect(await hasErrors(bad)).toBe(true);
 
@@ -21,14 +22,14 @@ describe('User DTO validation', () => {
       username: 'alice',
       name: 'Alice',
       email: 'alice@example.com',
-      permissionNames: ['library_download'],
+      permissionNames: [Permission.LibraryDownload],
     });
     expect(await hasErrors(good)).toBe(false);
   });
 
-  it('SetPermissionsDto requires an array of strings', async () => {
+  it('SetPermissionsDto requires an array of permission enums', async () => {
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [1, 2] }))).toBe(true);
-    expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: ['library_download'] }))).toBe(false);
+    expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [Permission.LibraryDownload] }))).toBe(false);
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [] }))).toBe(false);
   });
 

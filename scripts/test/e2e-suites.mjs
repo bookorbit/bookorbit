@@ -89,6 +89,14 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "users-admin-lifecycle": {
+    id: "users-admin-lifecycle",
+    description: "Users admin lifecycle suite",
+    vitestTarget: "test/users-admin-lifecycle.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/users-admin-lifecycle-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
 });
 
 export function listE2ESuites() {

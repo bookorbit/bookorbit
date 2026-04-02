@@ -124,6 +124,7 @@ describe('UserRepository', () => {
         active: true,
         isSuperuser: false,
         isDefaultPassword: false,
+        provisioningMethod: 'local',
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         permissionName: 'library_download',
       },
@@ -135,6 +136,7 @@ describe('UserRepository', () => {
         active: true,
         isSuperuser: false,
         isDefaultPassword: false,
+        provisioningMethod: 'local',
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         permissionName: 'kobo_sync',
       },
@@ -152,6 +154,7 @@ describe('UserRepository', () => {
     expect(result.users[0]).toMatchObject({
       id: 10,
       username: 'alice',
+      provisioningMethod: 'local',
       permissions: ['library_download', 'kobo_sync'],
     });
   });
@@ -246,6 +249,14 @@ describe('UserRepository', () => {
     select.mockReturnValue({ from });
 
     await expect(repo.countOtherSuperusers(7)).resolves.toBe(3);
+  });
+
+  it('findExistingLibraryIds returns known IDs only', async () => {
+    const where = vi.fn().mockResolvedValue([{ id: 3 }, { id: 7 }]);
+    const from = vi.fn().mockReturnValue({ where });
+    select.mockReturnValue({ from });
+
+    await expect(repo.findExistingLibraryIds([3, 7, 9])).resolves.toEqual([3, 7]);
   });
 
   it('generateResetToken revokes previous active tokens and inserts a new hashed token in one transaction', async () => {

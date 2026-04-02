@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -83,12 +83,15 @@ export class UserService {
       isDefaultPassword: true,
     });
 
-    if (dto.permissionNames?.length) {
-      await this.userRepo.setPermissions(user.id, dto.permissionNames as Permission[]);
+    const permissionNames = this.uniquePermissions(dto.permissionNames ?? []);
+    if (permissionNames.length > 0) {
+      await this.userRepo.setPermissions(user.id, permissionNames);
     }
 
-    if (dto.libraryIds?.length) {
-      await this.userRepo.assignViewerLibraries(user.id, dto.libraryIds);
+    const libraryIds = this.uniqueIds(dto.libraryIds ?? []);
+    if (libraryIds.length > 0) {
+      await this.assertKnownLibraryIds(libraryIds);
+      await this.userRepo.assignViewerLibraries(user.id, libraryIds);
     }
 
     const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
@@ -110,6 +113,10 @@ export class UserService {
       throw new ForbiddenException('Only administrators can edit administrator accounts');
     }
 
+    if (dto.email !== undefined && dto.email !== null) {
+      await this.assertEmailAvailable(dto.email, id);
+    }
+
     if (dto.active === false && target.isSuperuser) {
       const otherSuperusers = await this.userRepo.countOtherSuperusers(id);
       if (otherSuperusers === 0) {
@@ -123,6 +130,9 @@ export class UserService {
   }
 
   async updateMe(userId: number, dto: UpdateMeDto) {
+    if (dto.email !== undefined && dto.email !== null) {
+      await this.assertEmailAvailable(dto.email, userId);
+    }
     const user = await this.userRepo.update(userId, dto);
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -133,6 +143,7 @@ export class UserService {
       throw new ConflictException('You cannot delete your own account');
     }
     const [target, otherSuperusers] = await Promise.all([this.userRepo.findByIdWithPermissions(id), this.userRepo.countOtherSuperusers(id)]);
+    if (!target) throw new NotFoundException('User not found');
     if (target?.isSuperuser) {
       if (!requestingUser.isSuperuser) throw new ForbiddenException('Only administrators can delete administrator accounts');
       if (otherSuperusers === 0) throw new ConflictException('Cannot delete the last administrator');
@@ -155,7 +166,8 @@ export class UserService {
       throw new ForbiddenException('Only administrators can modify administrator permissions');
     }
 
-    await this.userRepo.setPermissions(targetUserId, dto.permissionNames as Permission[]);
+    const permissionNames = this.uniquePermissions(dto.permissionNames);
+    await this.userRepo.setPermissions(targetUserId, permissionNames);
   }
 
   async setSuperuser(targetUserId: number, isSuperuser: boolean, requestingUser: RequestUser) {
@@ -165,7 +177,9 @@ export class UserService {
     if (targetUserId === requestingUser.id) {
       throw new ConflictException('You cannot change your own superuser status');
     }
-    if (!isSuperuser) {
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
+    if (!isSuperuser && target.isSuperuser) {
       const otherSuperusers = await this.userRepo.countOtherSuperusers(targetUserId);
       if (otherSuperusers === 0) {
         throw new ConflictException('Cannot remove the last administrator');
@@ -175,6 +189,8 @@ export class UserService {
   }
 
   async getLibraryIds(userId: number): Promise<number[]> {
+    const user = await this.userRepo.findByIdWithPermissions(userId);
+    if (!user) throw new NotFoundException('User not found');
     return this.userRepo.findLibraryIdsByUserId(userId);
   }
 
@@ -185,7 +201,9 @@ export class UserService {
       throw new ForbiddenException('Only administrators can edit administrator accounts');
     }
 
-    await this.userRepo.replaceViewerLibraries(targetUserId, libraryIds);
+    const normalizedLibraryIds = this.uniqueIds(libraryIds);
+    await this.assertKnownLibraryIds(normalizedLibraryIds);
+    await this.userRepo.replaceViewerLibraries(targetUserId, normalizedLibraryIds);
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {
@@ -194,8 +212,36 @@ export class UserService {
     if (target.isSuperuser && !requestingUser.isSuperuser) {
       throw new ForbiddenException('Only administrators can reset administrator passwords');
     }
+    if (target.provisioningMethod === 'oidc') {
+      throw new BadRequestException('OIDC accounts cannot reset their password here');
+    }
     const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
     const rawToken = await this.userRepo.generateResetToken(targetUserId);
     return { resetUrl: `${appUrl}/reset-password?token=${rawToken}` };
+  }
+
+  private uniquePermissions(permissionNames: Permission[]): Permission[] {
+    return Array.from(new Set(permissionNames));
+  }
+
+  private uniqueIds(ids: number[]): number[] {
+    return Array.from(new Set(ids));
+  }
+
+  private async assertEmailAvailable(email: string, targetUserId: number): Promise<void> {
+    const existing = await this.userRepo.findByEmail(email);
+    if (existing && existing.id !== targetUserId) {
+      throw new ConflictException('Email already in use');
+    }
+  }
+
+  private async assertKnownLibraryIds(libraryIds: number[]): Promise<void> {
+    if (libraryIds.length === 0) return;
+    const existingIds = await this.userRepo.findExistingLibraryIds(libraryIds);
+    const existingSet = new Set(existingIds);
+    const missing = libraryIds.filter((id) => !existingSet.has(id));
+    if (missing.length > 0) {
+      throw new BadRequestException(`Unknown library IDs: ${missing.join(', ')}`);
+    }
   }
 }

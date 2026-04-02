@@ -36,6 +36,7 @@ export class UserRepository {
         active: schema.users.active,
         isSuperuser: schema.users.isSuperuser,
         isDefaultPassword: schema.users.isDefaultPassword,
+        provisioningMethod: schema.users.provisioningMethod,
         createdAt: schema.users.createdAt,
         permissionName: schema.userPermissions.permissionName,
       })
@@ -52,6 +53,7 @@ export class UserRepository {
       active: boolean;
       isSuperuser: boolean;
       isDefaultPassword: boolean;
+      provisioningMethod: string;
       createdAt: Date;
       permissions: Permission[];
     };
@@ -67,6 +69,7 @@ export class UserRepository {
           active: row.active,
           isSuperuser: row.isSuperuser,
           isDefaultPassword: row.isDefaultPassword,
+          provisioningMethod: row.provisioningMethod,
           createdAt: row.createdAt,
           permissions: [],
         });
@@ -289,6 +292,12 @@ export class UserRepository {
       .from(schema.userLibraryAccess)
       .where(eq(schema.userLibraryAccess.userId, userId));
     return rows.map((r) => r.libraryId);
+  }
+
+  async findExistingLibraryIds(libraryIds: number[]): Promise<number[]> {
+    if (libraryIds.length === 0) return [];
+    const rows = await this.db.select({ id: schema.libraries.id }).from(schema.libraries).where(inArray(schema.libraries.id, libraryIds));
+    return rows.map((r) => r.id);
   }
 
   async replaceViewerLibraries(userId: number, libraryIds: number[]): Promise<void> {

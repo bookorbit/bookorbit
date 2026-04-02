@@ -1,0 +1,52 @@
+name: Users Admin Lifecycle E2E
+run-name: ${{ format('Users Admin Lifecycle E2E - {0}', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "server/src/modules/user/**"
+      - "server/src/modules/auth/**"
+      - "server/src/common/guards/**"
+      - "server/src/common/decorators/**"
+      - "server/src/common/types/**"
+      - "server/src/db/schema/**"
+      - "server/test/users-admin-lifecycle.e2e-spec.ts"
+      - "server/test/e2e/users-admin-lifecycle/**"
+      - "packages/types/src/auth.ts"
+      - "packages/types/src/permissions.ts"
+      - "scripts/test/**"
+      - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
+  pull_request:
+    paths:
+      - "server/src/modules/user/**"
+      - "server/src/modules/auth/**"
+      - "server/src/common/guards/**"
+      - "server/src/common/decorators/**"
+      - "server/src/common/types/**"
+      - "server/src/db/schema/**"
+      - "server/test/users-admin-lifecycle.e2e-spec.ts"
+      - "server/test/e2e/users-admin-lifecycle/**"
+      - "packages/types/src/auth.ts"
+      - "packages/types/src/permissions.ts"
+      - "scripts/test/**"
+      - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  users-admin-lifecycle-e2e:
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: users-admin-lifecycle
+      check-name: Server Users Admin Lifecycle E2E
+      artifact-name: users-admin-lifecycle-e2e-report
+      job-timeout-minutes: 50

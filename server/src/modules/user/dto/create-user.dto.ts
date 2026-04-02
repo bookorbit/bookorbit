@@ -1,4 +1,5 @@
-import { IsArray, IsEmail, IsInt, IsOptional, IsString, MinLength } from 'class-validator';
+import { Permission } from '@projectx/types';
+import { IsArray, IsEmail, IsEnum, IsInt, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -13,9 +14,9 @@ export class CreateUserDto {
   email: string;
 
   @IsArray()
-  @IsString({ each: true })
+  @IsEnum(Permission, { each: true })
   @IsOptional()
-  permissionNames?: string[];
+  permissionNames?: Permission[];
 
   @IsArray()
   @IsInt({ each: true })
