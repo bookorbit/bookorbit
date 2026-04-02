@@ -26,7 +26,6 @@ export function usePdfRenderer(
   startRenderPageFn: StartRenderPageFn,
   getTextContentFn: GetTextContentFn,
   scale: ComputedRef<number>,
-  rotation: Ref<0 | 90 | 180 | 270>,
   totalPages: Ref<number>,
   onDimUpdate: OnDimUpdateFn,
 ) {
@@ -80,7 +79,7 @@ export function usePdfRenderer(
     const result = await getTextContentFn(pageNum)
     if (!result) return
     const { content, viewport } = result
-    const scaledVp = viewport.clone({ scale: scale.value, rotation: rotation.value })
+    const scaledVp = viewport.clone({ scale: scale.value, rotation: 0 })
     container.innerHTML = ''
     container.style.width = `${scaledVp.width}px`
     container.style.height = `${scaledVp.height}px`

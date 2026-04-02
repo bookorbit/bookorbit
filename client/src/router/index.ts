@@ -208,11 +208,9 @@ export const routes: RouteRecordRaw[] = [
         name: 'book-detail',
         component: () => import('@/views/BookDetailView.vue'),
         meta: { title: (to) => fallbackById('Book', numericParam(to, 'bookId')) },
-        beforeEnter: (to, _from, next) => {
+        beforeEnter: (to) => {
           if (!to.query.tab) {
-            next({ ...to, query: { ...to.query, tab: 'details' } })
-          } else {
-            next()
+            return { ...to, query: { ...to.query, tab: 'details' } }
           }
         },
       },

@@ -35,6 +35,12 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 const MAX_CACHE = 50;
+const OPTIONAL_META_INF_FILES = [
+  'META-INF/encryption.xml',
+  'META-INF/com.apple.ibooks.display-options.xml',
+  'META-INF/com.kobobooks.display-options.xml',
+  'META-INF/calibre_bookmarks.txt',
+] as const;
 
 interface CacheEntry {
   info: EpubBookInfo;
@@ -265,7 +271,9 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
     }
   }
 
-  return { containerPath: opfPath, rootPath, spine, manifest, toc, metadata, coverPath };
+  const optionalFiles = OPTIONAL_META_INF_FILES.filter((path) => findInZip(zip.files, path));
+
+  return { containerPath: opfPath, rootPath, spine, manifest, optionalFiles, toc, metadata, coverPath };
 }
 
 @Injectable()

@@ -84,13 +84,19 @@ export function useVisibility() {
 
     if (hideTimer) clearTimeout(hideTimer)
 
-    if (locked || isPinned) {
+    if (locked) {
+      headerVisible.value = true
+      return
+    }
+
+    if (isPinned) {
       headerVisible.value = true
       footerVisible.value = true
       return
     }
 
-    scheduleHide()
+    headerVisible.value = false
+    footerVisible.value = false
   }
 
   onMounted(() => {

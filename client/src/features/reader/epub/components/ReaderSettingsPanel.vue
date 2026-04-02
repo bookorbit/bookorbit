@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
-import { LayoutGrid, Moon, Palette, Sun, Type } from 'lucide-vue-next'
+import { BookOpen, LayoutGrid, Moon, Palette, ScrollText, Sun, Type } from 'lucide-vue-next'
 import type { ReaderState } from '../composables/useReaderState'
 import { themes } from '../constants/themes'
 
@@ -112,20 +112,32 @@ onMounted(() => {
         <div class="space-y-6">
           <div>
             <p class="mb-2 text-[13px] font-medium text-foreground/90">Mode</p>
-            <button
-              class="flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors"
-              :class="state.isDark ? 'border-primary bg-primary/10' : 'border-border hover:border-muted-foreground/30'"
-              @click="emit('update', { isDark: !state.isDark })"
-            >
-              <component :is="state.isDark ? Moon : Sun" :size="20" />
-              <span class="text-sm font-medium">{{ state.isDark ? 'Dark mode' : 'Light mode' }}</span>
-              <div class="relative ml-auto h-6 w-10 rounded-full transition-colors" :class="state.isDark ? 'bg-primary' : 'bg-muted'">
-                <div
-                  class="absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
-                  :class="state.isDark ? 'translate-x-5' : 'translate-x-1'"
-                />
-              </div>
-            </button>
+            <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted/55 p-1">
+              <button
+                class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
+                :class="
+                  !state.isDark
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/70'
+                "
+                @click="emit('update', { isDark: false })"
+              >
+                <Sun :size="15" />
+                <span>Light</span>
+              </button>
+              <button
+                class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
+                :class="
+                  state.isDark
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/70'
+                "
+                @click="emit('update', { isDark: true })"
+              >
+                <Moon :size="15" />
+                <span>Dark</span>
+              </button>
+            </div>
           </div>
 
           <div class="h-px bg-border/70" />
@@ -213,19 +225,30 @@ onMounted(() => {
               <p class="text-sm font-medium leading-tight">Reading flow</p>
               <p class="text-xs leading-tight text-muted-foreground">Switch between paged and continuous scrolling.</p>
             </div>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted/55 p-1">
               <button
-                v-for="f in ['paginated', 'scrolled'] as const"
-                :key="f"
-                class="rounded-xl border-2 py-2.5 text-sm font-medium capitalize transition-colors"
+                class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
                 :class="
-                  state.flow === f
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border text-foreground hover:border-muted-foreground/40 hover:bg-muted'
+                  state.flow === 'paginated'
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/70'
                 "
-                @click="emit('update', { flow: f })"
+                @click="emit('update', { flow: 'paginated' })"
               >
-                {{ f }}
+                <BookOpen :size="15" />
+                <span>Paginated</span>
+              </button>
+              <button
+                class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
+                :class="
+                  state.flow === 'scrolled'
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/70'
+                "
+                @click="emit('update', { flow: 'scrolled' })"
+              >
+                <ScrollText :size="15" />
+                <span>Scrolled</span>
               </button>
             </div>
           </div>

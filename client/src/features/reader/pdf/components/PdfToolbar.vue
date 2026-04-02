@@ -19,8 +19,6 @@ import {
   MousePointer,
   PanelLeft,
   Plus,
-  RotateCcw,
-  RotateCw,
   Search,
   ScanLine,
   WrapText,
@@ -53,7 +51,6 @@ const props = defineProps<{
   scale: number
   spread: 'none' | 'odd' | 'even'
   scrollMode: ScrollMode
-  rotation: 0 | 90 | 180 | 270
   isFullscreen: boolean
   showSidebar: boolean
   showFind: boolean
@@ -74,8 +71,6 @@ const emit = defineEmits<{
   zoomIn: []
   applyZoomPreset: [value: string]
   toggleFullscreen: []
-  rotateCw: []
-  rotateCcw: []
   'update:spread': [v: 'none' | 'odd' | 'even']
   'update:scrollMode': [v: ScrollMode]
   'update:cursorTool': [v: 'select' | 'hand']
@@ -264,13 +259,6 @@ function handleApplyZoomPreset(value: AcceptableValue) {
         <DropdownMenuGroup>
           <DropdownMenuItem class="text-xs gap-2" @click="emit('firstPage')"> <ChevronFirst :size="13" /> First Page </DropdownMenuItem>
           <DropdownMenuItem class="text-xs gap-2" @click="emit('lastPage')"> <ChevronLast :size="13" /> Last Page </DropdownMenuItem>
-        </DropdownMenuGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuItem class="text-xs gap-2" @click="emit('rotateCw')"> <RotateCw :size="13" /> Rotate Clockwise </DropdownMenuItem>
-          <DropdownMenuItem class="text-xs gap-2" @click="emit('rotateCcw')"> <RotateCcw :size="13" /> Rotate Counterclockwise </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />

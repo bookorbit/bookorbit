@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight } from 'lucide-vue-next'
 import type { OutlineItem } from '../composables/usePdfOutline'
+import PdfOutlineTree from './OutlineTree.vue'
 
 defineProps<{
   items: OutlineItem[]

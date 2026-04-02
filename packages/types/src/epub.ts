@@ -24,6 +24,7 @@ export interface EpubBookInfo {
   rootPath: string;
   spine: EpubSpineItem[];
   manifest: EpubManifestItem[];
+  optionalFiles?: string[];
   toc: EpubTocItem | null;
   metadata: Record<string, unknown>;
   coverPath: string | null;

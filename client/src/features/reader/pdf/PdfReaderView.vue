@@ -40,29 +40,17 @@ function measure() {
   containerH.value = scrollRef.value.clientHeight
 }
 
-// ── Page dims + rotation ──────────────────────────────────────────────────────
+// ── Page dims ─────────────────────────────────────────────────────────────────
 const pageDims = ref<PageDim[]>([])
-const rotation = ref<0 | 90 | 180 | 270>(0)
-
-const effectiveDims = computed(() =>
-  pageDims.value.map((d) => (rotation.value === 90 || rotation.value === 270 ? { width: d.height, height: d.width } : d)),
-)
-
-function rotateCw() {
-  rotation.value = ((rotation.value + 90) % 360) as 0 | 90 | 180 | 270
-}
-function rotateCcw() {
-  rotation.value = ((rotation.value + 270) % 360) as 0 | 90 | 180 | 270
-}
 
 // ── Spread ────────────────────────────────────────────────────────────────────
 const spread = ref<'none' | 'odd' | 'even'>('none')
 
 // ── Composables ───────────────────────────────────────────────────────────────
-const zoom = usePdfZoom(containerW, containerH, effectiveDims, spread)
+const zoom = usePdfZoom(containerW, containerH, pageDims, spread)
 const { scale, zoomMode, customScale, zoomLabel, adjustZoom, applyZoomPreset } = zoom
 
-const layout = usePdfLayout(scrollRef, totalPages, effectiveDims, scale, containerH, spread)
+const layout = usePdfLayout(scrollRef, totalPages, pageDims, scale, containerH, spread)
 const { scrollMode, currentPage, pageInput, pageRows, rowHeights, goToPage, onScroll } = layout
 
 function onDimUpdate(pageNum: number, dim: PageDim) {
@@ -71,7 +59,7 @@ function onDimUpdate(pageNum: number, dim: PageDim) {
   pageDims.value = pageDims.value.map((d, i) => (i === pageNum - 1 ? dim : d))
 }
 
-const renderer = usePdfRenderer(startRenderPage, getTextContent, scale, rotation, totalPages, onDimUpdate)
+const renderer = usePdfRenderer(startRenderPage, getTextContent, scale, totalPages, onDimUpdate)
 const { canvasMap, textLayerMap, invalidate, setupIO, reset, destroy } = renderer
 
 // ── Find ──────────────────────────────────────────────────────────────────────
@@ -103,6 +91,18 @@ const cursorTool = ref<'select' | 'hand'>('select')
 let isDragging = false
 let lastX = 0
 let lastY = 0
+let pendingDx = 0
+let pendingDy = 0
+let rafId: number | null = null
+
+function flushScroll() {
+  rafId = null
+  if (pendingDx !== 0 || pendingDy !== 0) {
+    scrollRef.value?.scrollBy({ left: -pendingDx, top: -pendingDy })
+    pendingDx = 0
+    pendingDy = 0
+  }
+}
 
 function onScrollMouseDown(e: MouseEvent) {
   if (cursorTool.value !== 'hand') return
@@ -112,14 +112,19 @@ function onScrollMouseDown(e: MouseEvent) {
 }
 function onScrollMouseMove(e: MouseEvent) {
   if (!isDragging || cursorTool.value !== 'hand') return
-  const dx = e.clientX - lastX
-  const dy = e.clientY - lastY
-  scrollRef.value?.scrollBy({ left: -dx, top: -dy })
+  pendingDx += e.clientX - lastX
+  pendingDy += e.clientY - lastY
   lastX = e.clientX
   lastY = e.clientY
+  if (rafId === null) rafId = requestAnimationFrame(flushScroll)
 }
 function onScrollMouseUp() {
   isDragging = false
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+    flushScroll()
+  }
 }
 
 // ── Fullscreen ────────────────────────────────────────────────────────────────
@@ -131,12 +136,14 @@ function toggleFullscreen() {
 }
 
 // ── Invalidation ──────────────────────────────────────────────────────────────
-watch([scale, rotation], invalidate)
+watch(scale, invalidate)
 
 watch([spread, scrollMode], async () => {
+  const page = currentPage.value
   invalidate()
   await nextTick()
   if (scrollRef.value) setupIO(scrollRef.value)
+  goToPage(page, 'instant')
 })
 
 // ── Progress ──────────────────────────────────────────────────────────────────
@@ -207,10 +214,12 @@ function onFindWholeWord(v: boolean) {
 }
 
 // ── Mount / unmount ───────────────────────────────────────────────────────────
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(async () => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('mouseup', onScrollMouseUp)
-  window.addEventListener('mousemove', onScrollMouseMove)
+  window.addEventListener('mousemove', onScrollMouseMove, { passive: true })
 
   document.addEventListener('fullscreenchange', () => {
     isFullscreen.value = !!document.fullscreenElement
@@ -226,13 +235,11 @@ onMounted(async () => {
   spread.value = ps.spread
   zoomMode.value = ps.zoomMode
   customScale.value = ps.customScale
-  rotation.value = (ps as PdfReaderSettings & { rotation?: 0 | 90 | 180 | 270 }).rotation ?? 0
 
   watch(spread, (v) => bookSettings.updateBookSettings({ spread: v }))
   watch(zoomMode, (v) => bookSettings.updateBookSettings({ zoomMode: v }))
   watch(customScale, (v) => bookSettings.updateBookSettings({ customScale: v }))
   watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v } as Parameters<typeof bookSettings.updateBookSettings>[0]))
-  watch(rotation, (v) => bookSettings.updateBookSettings({ rotation: v } as Parameters<typeof bookSettings.updateBookSettings>[0]))
 
   await load(props.fileId)
   if (!pdfDoc.value) return
@@ -246,7 +253,7 @@ onMounted(async () => {
 
   await outline.load()
 
-  let ro: ResizeObserver | null = new ResizeObserver(async () => {
+  resizeObserver = new ResizeObserver(async () => {
     measure()
     invalidate()
     await nextTick()
@@ -254,14 +261,9 @@ onMounted(async () => {
   })
 
   if (scrollRef.value) {
-    ro.observe(scrollRef.value)
+    resizeObserver.observe(scrollRef.value)
     setupIO(scrollRef.value)
   }
-
-  onUnmounted(() => {
-    ro?.disconnect()
-    ro = null
-  })
 
   if (progress.pageNumber.value && progress.pageNumber.value > 1) {
     await nextTick()
@@ -273,6 +275,9 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('mouseup', onScrollMouseUp)
   window.removeEventListener('mousemove', onScrollMouseMove)
+  if (rafId !== null) cancelAnimationFrame(rafId)
+  resizeObserver?.disconnect()
+  resizeObserver = null
   destroy()
   if (saveTimer) clearTimeout(saveTimer)
 })
@@ -291,7 +296,6 @@ onUnmounted(() => {
       :scale="scale"
       :spread="spread"
       :scroll-mode="scrollMode"
-      :rotation="rotation"
       :is-fullscreen="isFullscreen"
       :show-sidebar="showSidebar"
       :show-find="showFind"
@@ -309,8 +313,6 @@ onUnmounted(() => {
       @zoom-in="adjustZoom(0.1)"
       @apply-zoom-preset="applyZoomPreset"
       @toggle-fullscreen="toggleFullscreen"
-      @rotate-cw="rotateCw()"
-      @rotate-ccw="rotateCcw()"
       @update:spread="spread = $event"
       @update:scroll-mode="scrollMode = $event"
       @update:cursor-tool="cursorTool = $event"
@@ -390,8 +392,8 @@ onUnmounted(() => {
                 :key="pageNum"
                 class="relative bg-white shadow-xl overflow-hidden"
                 :style="{
-                  width: `${Math.round((effectiveDims[pageNum - 1]?.width ?? 595) * scale)}px`,
-                  height: `${Math.round((effectiveDims[pageNum - 1]?.height ?? 842) * scale)}px`,
+                  width: `${Math.round((pageDims[pageNum - 1]?.width ?? 595) * scale)}px`,
+                  height: `${Math.round((pageDims[pageNum - 1]?.height ?? 842) * scale)}px`,
                 }"
               >
                 <canvas
@@ -424,8 +426,8 @@ onUnmounted(() => {
               :data-pages="`${pageNum}`"
               class="relative bg-white shadow-xl overflow-hidden shrink-0"
               :style="{
-                width: `${Math.round((effectiveDims[pageNum - 1]?.width ?? 595) * scale)}px`,
-                height: `${Math.round((effectiveDims[pageNum - 1]?.height ?? 842) * scale)}px`,
+                width: `${Math.round((pageDims[pageNum - 1]?.width ?? 595) * scale)}px`,
+                height: `${Math.round((pageDims[pageNum - 1]?.height ?? 842) * scale)}px`,
               }"
             >
               <canvas

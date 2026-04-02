@@ -18,6 +18,9 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     'META-INF/calibre_bookmarks.txt',
   ])
   const isOptionalTextPath = (name) => OPTIONAL_TEXT_FILES.has(name) || /(^|\/)toc\.ncx$/i.test(name)
+  const hasOptionalFileIndex = Array.isArray(bookInfo?.optionalFiles)
+  const optionalFiles = hasOptionalFileIndex ? new Set(bookInfo.optionalFiles) : null
+  const shouldSkipOptionalFetch = (name) => hasOptionalFileIndex && OPTIONAL_TEXT_FILES.has(name) && !optionalFiles.has(name)
 
   // Build a map of file paths to their manifest info for quick lookup
   const manifestMap = new Map(bookInfo.manifest.map((item) => [item.href, item]))
@@ -51,6 +54,7 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
    */
   const loadText = async (name) => {
     if (!name) return null
+    if (shouldSkipOptionalFetch(name)) return null
     try {
       const url = getFileUrl(name)
       const response = await fetch(url, getFetchOptions())

@@ -42,7 +42,7 @@ const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()
 
 const progress = useReaderProgress(props.bookId, props.fileId)
-const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter } = useVisibility()
+const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter, setVisibilityLock } = useVisibility()
 
 const { onActivity } = useReadingSession(props.fileId, () => ({
   percentage: progress.percentage.value,
@@ -56,6 +56,8 @@ const currentPage = ref(0)
 const currentImageLoaded = ref(false)
 const showSettings = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
+
+watch(showSettings, (open) => setVisibilityLock(open))
 
 // ── Settings options ───────────────────────────────────────────────────────────
 const FIT_OPTIONS: { value: FitMode; label: string; icon: Component }[] = [
