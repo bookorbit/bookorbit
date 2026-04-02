@@ -2,7 +2,7 @@ import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@ne
 import type { ConfigService } from '@nestjs/config';
 import { Permission } from '@projectx/types';
 
-import { OpdsAuthGuard } from '../opds-auth.guard';
+import { createCoverToken, OpdsAuthGuard } from '../opds-auth.guard';
 import type { OpdsRequestUser } from '../opds-auth.guard';
 import type { OpdsUserService } from '../opds-user.service';
 import type { UserService } from '../../user/user.service';
@@ -10,10 +10,10 @@ import type { PermissionService } from '../../../common/services/permission.serv
 
 const TEST_SECRET = 'test-jwt-secret';
 
-function mockContext(authHeader?: string, tokenParam?: string) {
+function mockContext(authHeader?: string, tokenParam?: string, url = '/api/v1/opds/libraries') {
   const query: Record<string, string> = {};
   if (tokenParam) query.t = tokenParam;
-  const request: Record<string, unknown> = { headers: { authorization: authHeader }, query };
+  const request: Record<string, unknown> = { headers: { authorization: authHeader }, query, url };
   const reply = { header: vi.fn() };
   return {
     request,
@@ -123,6 +123,23 @@ describe('OpdsAuthGuard', () => {
     const guard = makeGuard({ userHas: false });
     const { context } = mockContext(basicHeader('reader', 'pass'));
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects token auth on non-image routes with Basic challenge', async () => {
+    const guard = makeGuard();
+    const token = createCoverToken(1, TEST_SECRET);
+    const { context, reply } = mockContext(undefined, token, '/api/v1/opds/libraries');
+    await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+  });
+
+  it('accepts token auth on image routes', async () => {
+    const guard = makeGuard();
+    const token = createCoverToken(1, TEST_SECRET);
+    const { context, request } = mockContext(undefined, token, '/api/v1/opds/42/cover');
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect((request.opdsUser as OpdsRequestUser).userId).toBe(1);
   });
 
   it('attaches opdsUser to request on success', async () => {

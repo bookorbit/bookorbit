@@ -596,12 +596,12 @@ describe('Authorization matrix (e2e)', () => {
     it('rejects invalid OPDS token auth', async () => {
       const response = await ctx.app.inject({
         method: 'GET',
-        url: '/api/v1/opds/libraries?t=invalid-token',
+        url: `/api/v1/opds/${bookA.bookId}/cover?t=invalid-token`,
       });
       expectError(response, 401, 'Invalid token');
     });
 
-    it('allows OPDS token auth when token and permission are valid', async () => {
+    it('rejects OPDS token auth on non-image routes', async () => {
       const config = ctx.app.get(ConfigService);
       const jwtSecret = config.getOrThrow<string>('auth.jwtSecret');
       const token = createCoverToken(personas.opdsOwner.userId, jwtSecret);
@@ -610,8 +610,21 @@ describe('Authorization matrix (e2e)', () => {
         method: 'GET',
         url: `/api/v1/opds/libraries?t=${token}`,
       });
+      expectError(response, 401, 'Basic authentication required');
+      expect(response.headers['www-authenticate']).toContain('Basic realm=');
+    });
+
+    it('allows OPDS token auth on image routes when token and permission are valid', async () => {
+      const config = ctx.app.get(ConfigService);
+      const jwtSecret = config.getOrThrow<string>('auth.jwtSecret');
+      const token = createCoverToken(personas.opdsOwner.userId, jwtSecret);
+
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/opds/${bookA.bookId}/cover?t=${token}`,
+      });
       expect(response.statusCode).toBe(200);
-      expect(response.headers['content-type']).toContain('application/atom+xml');
+      expect(response.headers['content-type']).toContain('image/jpeg');
     });
   });
 

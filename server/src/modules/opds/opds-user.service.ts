@@ -10,6 +10,17 @@ import { UpdateOpdsUserDto } from './dto/update-opds-user.dto';
 
 type Db = NodePgDatabase<typeof schema>;
 
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const directCode = (error as { code?: unknown }).code;
+  if (directCode === '23505') return true;
+
+  if (!(error instanceof Error)) return false;
+  const causeCode = (error.cause as { code?: unknown } | undefined)?.code;
+  return causeCode === '23505';
+}
+
 @Injectable()
 export class OpdsUserService {
   constructor(@Inject(DB) private readonly db: Db) {}
@@ -48,7 +59,7 @@ export class OpdsUserService {
         });
       return created;
     } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && (err as { code: string }).code === '23505') {
+      if (isUniqueViolation(err)) {
         throw new ConflictException('An OPDS user with this username already exists');
       }
       throw err;

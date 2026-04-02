@@ -119,7 +119,9 @@ pnpm run test:e2e -- smoke             # e2e smoke suite (default DB)
 pnpm run test:e2e -- scanner           # scanner e2e suite (dedicated projectx_e2e DB)
 pnpm run test:e2e -- scanner-file-ops  # scanner file operation e2e suite (dedicated projectx_e2e DB)
 pnpm run test:e2e -- staging-ingest-finalize  # staging ingest/finalize e2e suite (dedicated projectx_e2e DB)
+pnpm run test:e2e -- opds-auth-catalog # OPDS auth/catalog e2e suite (dedicated projectx_e2e DB)
 pnpm run test:e2e:all                  # alias for "pnpm run test:e2e -- all"
+pnpm run test:e2e:opds-auth-catalog    # alias for "pnpm run test:e2e -- opds-auth-catalog"
 pnpm run test:e2e:list                 # list all supported e2e suite ids
 ```
 
@@ -167,9 +169,17 @@ pnpm run test:e2e -- scanner --testNamePattern=book-per-folder-disc-folder-flatt
   - `staging-ingest-finalize-e2e-junit.xml`
   - `staging-ingest-finalize-e2e-scenarios.json`
 
+### OPDS auth/catalog e2e details
+
+- `pnpm run test:e2e -- opds-auth-catalog` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
+- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
+- Results are written to `test-results/server/`:
+  - `opds-auth-catalog-e2e-junit.xml`
+  - `opds-auth-catalog-e2e-scenarios.json`
+
 ### E2E in CI (how to trigger)
 
-Both workflows call the reusable `E2E Runner (reusable)` workflow, which runs:
+All suite workflows call the reusable `E2E Runner (reusable)` workflow, which runs:
 
 ```bash
 pnpm run test:e2e -- <suite-id>
@@ -180,11 +190,12 @@ pnpm run test:e2e -- <suite-id>
 | Scanner E2E                 | `scanner`                 | `workflow_dispatch`, `push` (scanner-related paths), `pull_request` (same paths) |
 | Scanner File Ops E2E        | `scanner-file-ops`        | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request`      |
 | Staging Ingest Finalize E2E | `staging-ingest-finalize` | `workflow_dispatch`, `push` (staging-related paths), `pull_request` (same paths) |
+| OPDS Auth Catalog E2E       | `opds-auth-catalog`       | `workflow_dispatch`, `push` (opds-related paths), `pull_request` (same paths)    |
 
 Manual trigger steps:
 
 1. Open GitHub Actions.
-2. Select **Scanner E2E**, **Scanner File Ops E2E**, or **Staging Ingest Finalize E2E**.
+2. Select **Scanner E2E**, **Scanner File Ops E2E**, **Staging Ingest Finalize E2E**, or **OPDS Auth Catalog E2E**.
 3. Click **Run workflow**.
 
 Each run uploads `test-results/server/` as an artifact and publishes JUnit annotations from `test-results/server/*-e2e-junit.xml`.

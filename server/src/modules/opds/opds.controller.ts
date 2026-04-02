@@ -1,4 +1,16 @@
-import { Controller, DefaultValuePipe, Get, Headers, NotFoundException, Param, ParseIntPipe, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  Headers,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
@@ -86,9 +98,13 @@ export class OpdsController {
     const clampedPage = Math.max(page, 1);
 
     const filters: Record<string, string | number> = {};
-    if (libraryIdStr) filters.libraryId = parseInt(libraryIdStr, 10);
-    if (collectionIdStr) filters.collectionId = parseInt(collectionIdStr, 10);
-    if (lensIdStr) filters.lensId = parseInt(lensIdStr, 10);
+    const libraryId = this.parseOptionalPositiveInt('libraryId', libraryIdStr);
+    const collectionId = this.parseOptionalPositiveInt('collectionId', collectionIdStr);
+    const lensId = this.parseOptionalPositiveInt('lensId', lensIdStr);
+
+    if (libraryId !== undefined) filters.libraryId = libraryId;
+    if (collectionId !== undefined) filters.collectionId = collectionId;
+    if (lensId !== undefined) filters.lensId = lensId;
     if (author) filters.author = author;
     if (series) filters.series = series;
     if (q) filters.q = q;
@@ -253,5 +269,18 @@ export class OpdsController {
 
   private sendXml(reply: FastifyReply, xml: string, mimeType: string) {
     reply.type(`${mimeType}; charset=utf-8`).send(xml);
+  }
+
+  private parseOptionalPositiveInt(name: string, value?: string): number | undefined {
+    if (value === undefined) return undefined;
+    if (!/^\d+$/.test(value)) {
+      throw new BadRequestException(`${name} must be a positive integer`);
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException(`${name} must be a positive integer`);
+    }
+    return parsed;
   }
 }

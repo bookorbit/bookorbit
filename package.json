@@ -25,6 +25,7 @@
     "test:e2e": "node ./scripts/test/run-e2e-suite.mjs",
     "test:e2e:all": "node ./scripts/test/run-e2e-suite.mjs all",
     "test:e2e:metadata-write": "node ./scripts/test/run-e2e-suite.mjs metadata-write",
+    "test:e2e:opds-auth-catalog": "node ./scripts/test/run-e2e-suite.mjs opds-auth-catalog",
     "test:e2e:metadata-write:atomicity": "node ./scripts/test/run-e2e-suite.mjs metadata-write --testNamePattern=\"atomicity failpoints\"",
     "test:e2e:metadata-write:concurrency": "node ./scripts/test/run-e2e-suite.mjs metadata-write --testNamePattern=\"concurrency hardening\"",
     "test:e2e:list": "node ./scripts/test/run-e2e-suite.mjs --list",

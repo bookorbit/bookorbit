@@ -106,6 +106,17 @@ export class OpdsBookService {
       throw new ForbiddenException('No access to this library');
     }
 
+    if (filters?.collectionId) {
+      const [collection] = await this.db
+        .select({ userId: collections.userId })
+        .from(collections)
+        .where(eq(collections.id, filters.collectionId))
+        .limit(1);
+      if (!collection || collection.userId !== userId) {
+        throw new ForbiddenException('No access to this collection');
+      }
+    }
+
     if (filters?.lensId) {
       return this.getBooksByLens(userId, filters.lensId, accessibleIds, sortOrder, page, size);
     }

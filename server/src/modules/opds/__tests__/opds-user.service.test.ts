@@ -83,6 +83,17 @@ describe('OpdsUserService', () => {
       await expect(service.create(5, { username: 'duplicate', password: 'password123' })).rejects.toThrow(ConflictException);
     });
 
+    it('throws ConflictException when duplicate violation is wrapped by DrizzleQueryError', async () => {
+      const wrapped = new Error('failed query', {
+        cause: { code: '23505' },
+      });
+      mockValues.mockReturnValue({
+        returning: vi.fn().mockRejectedValue(wrapped),
+      });
+
+      await expect(service.create(5, { username: 'duplicate', password: 'password123' })).rejects.toThrow(ConflictException);
+    });
+
     it('rethrows non-unique-violation errors', async () => {
       const genericError = new Error('connection lost');
       mockValues.mockReturnValue({

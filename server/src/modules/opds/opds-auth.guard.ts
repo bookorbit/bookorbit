@@ -23,6 +23,16 @@ export function createCoverToken(userId: number, secret: string): string {
   return `${userId}.${sig}`;
 }
 
+function stripQuery(url: string): string {
+  const queryIndex = url.indexOf('?');
+  if (queryIndex === -1) return url;
+  return url.slice(0, queryIndex);
+}
+
+function isTokenImagePath(requestPath: string): boolean {
+  return /(?:^|\/)(?:api\/v1\/)?opds\/\d+\/(cover|thumbnail)$/.test(requestPath.replace(/^\//, ''));
+}
+
 function parseCoverToken(token: string, secret: string): number | null {
   const dot = token.indexOf('.');
   if (dot === -1) return null;
@@ -46,8 +56,15 @@ export class OpdsAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<FastifyRequest>();
     const reply = context.switchToHttp().getResponse<FastifyReply>();
 
-    const tokenParam = (request.query as Record<string, string | undefined>).t;
+    const tokenQuery = (request.query as Record<string, string | string[] | undefined>).t;
+    const tokenParam = Array.isArray(tokenQuery) ? tokenQuery[0] : tokenQuery;
     if (tokenParam) {
+      const requestPath = stripQuery(request.url ?? '');
+      if (!isTokenImagePath(requestPath)) {
+        reply.header('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+        throw new UnauthorizedException('Basic authentication required');
+      }
+
       const secret = this.config.get<string>('auth.jwtSecret')!;
       const userId = parseCoverToken(tokenParam, secret);
       if (!userId) throw new UnauthorizedException('Invalid token');

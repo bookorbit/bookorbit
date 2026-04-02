@@ -65,6 +65,14 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "opds-auth-catalog": {
+    id: "opds-auth-catalog",
+    description: "OPDS auth and catalog suite",
+    vitestTarget: "test/opds-auth-catalog.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/opds-auth-catalog-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
 });
 
 export function listE2ESuites() {
