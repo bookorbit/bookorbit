@@ -114,21 +114,21 @@ Opens Drizzle Studio in your browser for browsing and editing tables directly.
 pnpm run test              # all tests (server + client)
 pnpm run test:server       # server unit tests only
 pnpm run test:client       # client unit tests only
-pnpm run test:e2e -- all               # run all e2e suites sequentially
-pnpm run test:e2e -- smoke             # e2e smoke suite (default DB)
-pnpm run test:e2e -- scanner           # scanner e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e -- scanner-file-ops  # scanner file operation e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e -- staging-ingest-finalize  # staging ingest/finalize e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e -- opds-auth-catalog # OPDS auth/catalog e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e -- reader-state-isolation # reader state isolation e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e -- email-lifecycle   # email lifecycle e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e -- users-admin-lifecycle # users admin lifecycle e2e suite (dedicated projectx_e2e DB)
-pnpm run test:e2e:all                  # alias for "pnpm run test:e2e -- all"
-pnpm run test:e2e:opds-auth-catalog    # alias for "pnpm run test:e2e -- opds-auth-catalog"
-pnpm run test:e2e:reader-state-isolation # alias for "pnpm run test:e2e -- reader-state-isolation"
-pnpm run test:e2e:email-lifecycle      # alias for "pnpm run test:e2e -- email-lifecycle"
-pnpm run test:e2e:users-admin-lifecycle # alias for "pnpm run test:e2e -- users-admin-lifecycle"
-pnpm run test:e2e:list                 # list all supported e2e suite ids
+pnpm run e2e:run -- all                      # run all e2e suites sequentially
+pnpm run e2e:run -- app-smoke                # app smoke suite (default DB)
+pnpm run e2e:run -- scanner-scenarios        # scanner scenario suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- scanner-file-operations  # scanner file operation suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- auth-session-security    # auth session security suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- auth-recovery-oidc-logout # auth recovery and OIDC logout suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- staging-ingest-finalize  # staging ingest/finalize suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- metadata-write           # metadata write suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- authorization-matrix     # authorization matrix suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- opds-auth-catalog        # OPDS auth/catalog suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- reader-state-isolation   # reader state isolation suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- email-lifecycle          # email lifecycle suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- users-admin-lifecycle    # users admin lifecycle suite (dedicated projectx_e2e DB)
+pnpm run e2e:all                             # shortcut for running all suites
+pnpm run e2e:list                            # list supported suite ids
 ```
 
 Watch mode while working on a specific area:
@@ -140,95 +140,63 @@ cd server && pnpm test:watch
 Run a focused scanner scenario:
 
 ```bash
-pnpm run test:e2e -- scanner --testNamePattern=book-per-folder-disc-folder-flattening
+pnpm run e2e:run -- scanner-scenarios --testNamePattern=book-per-folder-disc-folder-flattening
 ```
 
 ### E2E runner architecture
 
 - All suite metadata lives in `scripts/test/e2e-suites.mjs` (suite id, spec file, JUnit output, DB prep mode).
-- Local and CI use the same command: `pnpm run test:e2e -- <suite-id>`.
-- Use `all` as a composite suite id to run every configured suite in order.
-- Dedicated-db suites auto-start local PostgreSQL when `CI != true`, then reset and migrate the e2e database through `pnpm run db:prepare:e2e`.
+- Local and CI use the same command: `pnpm run e2e:run -- <suite-id>`.
+- Use `all` as a composite suite id to run every configured suite in order, or use `pnpm run e2e:all`.
+- Dedicated-db suites auto-start local PostgreSQL when `CI != true`, then reset and migrate the e2e database through `pnpm run e2e:db:prepare`.
 - JUnit outputs are written to `test-results/server/`.
 
-### Scanner e2e details
+### E2E suite details
 
-- `pnpm run test:e2e -- scanner` prepares and migrates a dedicated e2e database (`projectx_e2e`) on each run.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `scanner-e2e-junit.xml`
-  - `scanner-e2e-scenarios.json`
+All suites write JUnit XML to `test-results/server/`. Dedicated-db suites also auto-start PostgreSQL locally (when needed) and use the `projectx_e2e` database.
 
-### Scanner file operation e2e details
-
-- `pnpm run test:e2e -- scanner-file-ops` prepares and migrates the same dedicated e2e database (`projectx_e2e`) before running.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `scanner-file-ops-e2e-junit.xml`
-  - `scanner-file-ops-e2e-scenarios.json`
-
-### Staging ingest/finalize e2e details
-
-- `pnpm run test:e2e -- staging-ingest-finalize` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `staging-ingest-finalize-e2e-junit.xml`
-  - `staging-ingest-finalize-e2e-scenarios.json`
-
-### OPDS auth/catalog e2e details
-
-- `pnpm run test:e2e -- opds-auth-catalog` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `opds-auth-catalog-e2e-junit.xml`
-  - `opds-auth-catalog-e2e-scenarios.json`
-
-### Reader state isolation e2e details
-
-- `pnpm run test:e2e -- reader-state-isolation` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `reader-state-isolation-e2e-junit.xml`
-  - `reader-state-isolation-e2e-scenarios.json`
-
-### Email lifecycle e2e details
-
-- `pnpm run test:e2e -- email-lifecycle` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `email-lifecycle-e2e-junit.xml`
-  - `email-lifecycle-e2e-scenarios.json`
-
-### Users admin lifecycle e2e details
-
-- `pnpm run test:e2e -- users-admin-lifecycle` prepares and migrates the dedicated e2e database (`projectx_e2e`) before running.
-- Local runs auto-start PostgreSQL with `docker-compose.dev.yml` if needed.
-- Results are written to `test-results/server/`:
-  - `users-admin-lifecycle-e2e-junit.xml`
-  - `users-admin-lifecycle-e2e-scenarios.json`
+| Suite id                    | DB mode      | JUnit output                              | Extra artifacts                              |
+| --------------------------- | ------------ | ----------------------------------------- | -------------------------------------------- |
+| `app-smoke`                 | default-db   | `app-smoke-e2e-junit.xml`                 | none                                         |
+| `scanner-scenarios`         | dedicated-db | `scanner-scenarios-e2e-junit.xml`         | `scanner-scenarios-e2e-scenarios.json`       |
+| `scanner-file-operations`   | dedicated-db | `scanner-file-operations-e2e-junit.xml`   | `scanner-file-operations-e2e-scenarios.json` |
+| `auth-session-security`     | dedicated-db | `auth-session-security-e2e-junit.xml`     | none                                         |
+| `auth-recovery-oidc-logout` | dedicated-db | `auth-recovery-oidc-logout-e2e-junit.xml` | none                                         |
+| `staging-ingest-finalize`   | dedicated-db | `staging-ingest-finalize-e2e-junit.xml`   | `staging-ingest-finalize-e2e-scenarios.json` |
+| `metadata-write`            | dedicated-db | `metadata-write-e2e-junit.xml`            | `metadata-write-e2e-scenarios.json`          |
+| `authorization-matrix`      | dedicated-db | `authorization-matrix-e2e-junit.xml`      | none                                         |
+| `opds-auth-catalog`         | dedicated-db | `opds-auth-catalog-e2e-junit.xml`         | `opds-auth-catalog-e2e-scenarios.json`       |
+| `reader-state-isolation`    | dedicated-db | `reader-state-isolation-e2e-junit.xml`    | `reader-state-isolation-e2e-scenarios.json`  |
+| `email-lifecycle`           | dedicated-db | `email-lifecycle-e2e-junit.xml`           | `email-lifecycle-e2e-scenarios.json`         |
+| `users-admin-lifecycle`     | dedicated-db | `users-admin-lifecycle-e2e-junit.xml`     | `users-admin-lifecycle-e2e-scenarios.json`   |
 
 ### E2E in CI (how to trigger)
 
 All suite workflows call the reusable `E2E Runner (reusable)` workflow, which runs:
 
 ```bash
-pnpm run test:e2e -- <suite-id>
+pnpm run e2e:run -- <suite-id>
 ```
 
-| Workflow                    | Suite id                  | Triggered by                                                                          |
-| --------------------------- | ------------------------- | ------------------------------------------------------------------------------------- |
-| Scanner E2E                 | `scanner`                 | `workflow_dispatch`, `push` (scanner-related paths), `pull_request` (same paths)      |
-| Scanner File Ops E2E        | `scanner-file-ops`        | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request`           |
-| Staging Ingest Finalize E2E | `staging-ingest-finalize` | `workflow_dispatch`, `push` (staging-related paths), `pull_request` (same paths)      |
-| OPDS Auth Catalog E2E       | `opds-auth-catalog`       | `workflow_dispatch`, `push` (opds-related paths), `pull_request` (same paths)         |
-| Reader State Isolation E2E  | `reader-state-isolation`  | `workflow_dispatch`, `push` (reader-state-related paths), `pull_request` (same paths) |
-| Email Lifecycle E2E         | `email-lifecycle`         | `workflow_dispatch`, `push` (email-related paths), `pull_request` (same paths)        |
-| Users Admin Lifecycle E2E   | `users-admin-lifecycle`   | `workflow_dispatch`, `push` (users/auth-related paths), `pull_request` (same paths)   |
+| Workflow name                     | Suite id                    | Triggered by                                                                |
+| --------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `E2E - App Smoke`                 | `app-smoke`                 | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Scanner Scenarios`         | `scanner-scenarios`         | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Scanner File Operations`   | `scanner-file-operations`   | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request` |
+| `E2E - Auth Session Security`     | `auth-session-security`     | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Auth Recovery OIDC Logout` | `auth-recovery-oidc-logout` | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Staging Ingest Finalize`   | `staging-ingest-finalize`   | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Metadata Write`            | `metadata-write`            | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Authorization Matrix`      | `authorization-matrix`      | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - OPDS Auth Catalog`         | `opds-auth-catalog`         | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Reader State Isolation`    | `reader-state-isolation`    | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Email Lifecycle`           | `email-lifecycle`           | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Users Admin Lifecycle`     | `users-admin-lifecycle`     | `workflow_dispatch`, `push`, `pull_request`                                 |
 
 Manual trigger steps:
 
 1. Open GitHub Actions.
-2. Select **Scanner E2E**, **Scanner File Ops E2E**, **Staging Ingest Finalize E2E**, **OPDS Auth Catalog E2E**, **Reader State Isolation E2E**, **Email Lifecycle E2E**, or **Users Admin Lifecycle E2E**.
+2. Select any `E2E - ...` workflow for the suite you want to run.
 3. Click **Run workflow**.
 
 Each run uploads `test-results/server/` as an artifact and publishes JUnit annotations from `test-results/server/*-e2e-junit.xml`.
@@ -241,7 +209,7 @@ Run before pushing:
 
 ```bash
 pnpm run verify:fast       # lint + typecheck + tests (same as pre-push hook)
-pnpm run verify            # above + e2e smoke (run before opening a PR)
+pnpm run verify            # above + e2e app-smoke suite (run before opening a PR)
 ```
 
 Individual checks:

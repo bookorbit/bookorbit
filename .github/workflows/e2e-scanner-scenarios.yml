@@ -1,24 +1,26 @@
-name: Scanner E2E
-run-name: ${{ format('Scanner E2E - {0}', github.ref_name) }}
+name: E2E - Scanner Scenarios
+run-name: ${{ format('E2E - Scanner Scenarios - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
   push:
     paths:
       - "server/src/modules/scanner/**"
-      - "server/test/scanner*"
-      - "server/test/e2e/**"
+      - "server/test/scanner-scenarios.e2e-spec.ts"
+      - "server/test/e2e/scanner/**"
       - "server/src/db/schema/**"
       - "scripts/test/**"
       - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
   pull_request:
     paths:
       - "server/src/modules/scanner/**"
-      - "server/test/scanner*"
-      - "server/test/e2e/**"
+      - "server/test/scanner-scenarios.e2e-spec.ts"
+      - "server/test/e2e/scanner/**"
       - "server/src/db/schema/**"
       - "scripts/test/**"
       - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,10 +31,10 @@ permissions:
   checks: write
 
 jobs:
-  scanner-e2e:
+  scanner-scenarios:
     uses: ./.github/workflows/e2e-runner.yml
     with:
-      suite-id: scanner
-      check-name: Server Scanner E2E
-      artifact-name: scanner-e2e-report
+      suite-id: scanner-scenarios
+      check-name: E2E - Scanner Scenarios
+      artifact-name: e2e-scanner-scenarios-report
       job-timeout-minutes: 45

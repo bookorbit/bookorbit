@@ -1,5 +1,5 @@
-name: Scanner File Ops E2E
-run-name: ${{ format('Scanner File Ops E2E - {0}', github.ref_name) }}
+name: E2E - Scanner File Operations
+run-name: ${{ format('E2E - Scanner File Operations - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
@@ -8,19 +8,21 @@ on:
   push:
     paths:
       - "server/src/modules/scanner/**"
-      - "server/test/scanner*"
-      - "server/test/e2e/**"
+      - "server/test/scanner-file-operations.e2e-spec.ts"
+      - "server/test/e2e/scanner/**"
       - "server/src/db/schema/**"
       - "scripts/test/**"
       - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
   pull_request:
     paths:
       - "server/src/modules/scanner/**"
-      - "server/test/scanner*"
-      - "server/test/e2e/**"
+      - "server/test/scanner-file-operations.e2e-spec.ts"
+      - "server/test/e2e/scanner/**"
       - "server/src/db/schema/**"
       - "scripts/test/**"
       - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,10 +33,10 @@ permissions:
   checks: write
 
 jobs:
-  scanner-file-ops-e2e:
+  scanner-file-operations:
     uses: ./.github/workflows/e2e-runner.yml
     with:
-      suite-id: scanner-file-ops
-      check-name: Server Scanner File Ops E2E
-      artifact-name: scanner-file-ops-e2e-report
+      suite-id: scanner-file-operations
+      check-name: E2E - Scanner File Operations
+      artifact-name: e2e-scanner-file-operations-report
       job-timeout-minutes: 60

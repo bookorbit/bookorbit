@@ -1,5 +1,5 @@
-name: Email Lifecycle E2E
-run-name: ${{ format('Email Lifecycle E2E - {0}', github.ref_name) }}
+name: E2E - Email Lifecycle
+run-name: ${{ format('E2E - Email Lifecycle - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
@@ -61,10 +61,10 @@ permissions:
   checks: write
 
 jobs:
-  email-lifecycle-e2e:
+  email-lifecycle:
     uses: ./.github/workflows/e2e-runner.yml
     with:
       suite-id: email-lifecycle
-      check-name: Server Email Lifecycle E2E
-      artifact-name: email-lifecycle-e2e-report
+      check-name: E2E - Email Lifecycle
+      artifact-name: e2e-email-lifecycle-report
       job-timeout-minutes: 45

@@ -1,5 +1,5 @@
-name: Staging Ingest Finalize E2E
-run-name: ${{ format('Staging Ingest Finalize E2E - {0}', github.ref_name) }}
+name: E2E - Staging Ingest Finalize
+run-name: ${{ format('E2E - Staging Ingest Finalize - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
@@ -33,10 +33,10 @@ permissions:
   checks: write
 
 jobs:
-  staging-ingest-finalize-e2e:
+  staging-ingest-finalize:
     uses: ./.github/workflows/e2e-runner.yml
     with:
       suite-id: staging-ingest-finalize
-      check-name: Server Staging Ingest Finalize E2E
-      artifact-name: staging-ingest-finalize-e2e-report
+      check-name: E2E - Staging Ingest Finalize
+      artifact-name: e2e-staging-ingest-finalize-report
       job-timeout-minutes: 45

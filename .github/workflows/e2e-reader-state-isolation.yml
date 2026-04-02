@@ -1,5 +1,5 @@
-name: Reader State Isolation E2E
-run-name: ${{ format('Reader State Isolation E2E - {0}', github.ref_name) }}
+name: E2E - Reader State Isolation
+run-name: ${{ format('E2E - Reader State Isolation - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
@@ -47,10 +47,10 @@ permissions:
   checks: write
 
 jobs:
-  reader-state-isolation-e2e:
+  reader-state-isolation:
     uses: ./.github/workflows/e2e-runner.yml
     with:
       suite-id: reader-state-isolation
-      check-name: Server Reader State Isolation E2E
-      artifact-name: reader-state-isolation-e2e-report
+      check-name: E2E - Reader State Isolation
+      artifact-name: e2e-reader-state-isolation-report
       job-timeout-minutes: 45

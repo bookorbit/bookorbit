@@ -16,9 +16,9 @@
     "start:prod": "node dist/main",
     "db:generate": "drizzle-kit generate --name",
     "db:migrate": "drizzle-kit migrate",
-    "db:migrate:e2e": "DATABASE_URL=postgres://projectx:projectx@localhost:5432/projectx_e2e pnpm db:migrate",
+    "e2e:db:migrate": "DATABASE_URL=postgres://projectx:projectx@localhost:5432/projectx_e2e pnpm db:migrate",
     "db:migrate:runtime": "node dist/scripts/migrate.js",
-    "db:prepare:e2e": "tsx src/scripts/db-prepare-e2e.ts",
+    "e2e:db:prepare": "tsx src/scripts/db-prepare-e2e.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/scripts/db-seed.ts",
     "pretype-check": "pnpm --filter @projectx/types build",
@@ -26,10 +26,10 @@
     "lint": "pnpm run lint:check",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "vitest run --exclude test/scanner.e2e-spec.ts --exclude test/scanner-file-ops.e2e-spec.ts",
+    "test": "vitest run --exclude test/scanner-scenarios.e2e-spec.ts --exclude test/scanner-file-operations.e2e-spec.ts",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:e2e": "vitest run test/app.e2e-spec.ts"
+    "e2e:run": "vitest run test/app-smoke.e2e-spec.ts"
   },
   "dependencies": {
     "7z-wasm": "^1.2.0",
@@ -84,10 +84,10 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^10.0.1",
-    "@nestjs/cli": "^11.0.16",
-    "@nestjs/schematics": "^11.0.9",
+    "@nestjs/cli": "^11.0.17",
+    "@nestjs/schematics": "^11.0.10",
     "@nestjs/testing": "^11.1.17",
-    "@swc/cli": "^0.8.0",
+    "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.21",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
@@ -112,7 +112,7 @@
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.2",
+    "typescript-eslint": "^8.58.0",
     "vitest": "^4.1.2"
   }
 }

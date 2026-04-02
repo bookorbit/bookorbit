@@ -118,9 +118,9 @@ pnpm verify     # run all checks before pushing
 Other useful commands:
 
 ```bash
-pnpm quick              # faster checks while coding
+pnpm verify:fast        # lint + typecheck + tests (pre-push gate)
 pnpm db:reset           # wipe and reseed local database
-pnpm doctor             # environment health check
+pnpm e2e:list           # list available e2e suite ids
 ```
 
 ---
@@ -205,9 +205,9 @@ Use a **draft PR** early if you want feedback on direction before the work is do
 The project has two automatic gates you should be aware of:
 
 - **pre-commit:** runs `lint-staged` on your staged files. ESLint and Prettier are applied automatically. You do not need to format or lint manually before committing.
-- **pre-push:** runs `pnpm quick` (lint + typecheck + tests). If this fails, the push is blocked. Fix the errors before pushing.
+- **pre-push:** runs `pnpm verify:fast` (lint + typecheck + tests). If this fails, the push is blocked. Fix the errors before pushing.
 
-`pnpm quick` is a fast check but does not include the e2e smoke suite. Before opening a PR, run the full gate:
+`pnpm verify:fast` is a fast check but does not include the `app-smoke` e2e suite. Before opening a PR, run the full gate:
 
 ```bash
 pnpm verify
@@ -216,7 +216,7 @@ pnpm verify
 Before marking your PR ready for review:
 
 - [ ] Linked to an approved issue
-- [ ] `pnpm verify` passes locally (includes e2e smoke, stricter than pre-push)
+- [ ] `pnpm verify` passes locally (includes `app-smoke`, stricter than pre-push)
 - [ ] You ran the full stack and manually verified the change works
 - [ ] UI changes include a screenshot or screen recording
 - [ ] Tests are included per the expectations above

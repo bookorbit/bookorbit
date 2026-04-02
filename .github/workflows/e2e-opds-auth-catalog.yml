@@ -1,5 +1,5 @@
-name: OPDS Auth Catalog E2E
-run-name: ${{ format('OPDS Auth Catalog E2E - {0}', github.ref_name) }}
+name: E2E - OPDS Auth Catalog
+run-name: ${{ format('E2E - OPDS Auth Catalog - {0}', github.ref_name) }}
 
 on:
   workflow_dispatch:
@@ -47,10 +47,10 @@ permissions:
   checks: write
 
 jobs:
-  opds-auth-catalog-e2e:
+  opds-auth-catalog:
     uses: ./.github/workflows/e2e-runner.yml
     with:
       suite-id: opds-auth-catalog
-      check-name: Server OPDS Auth Catalog E2E
-      artifact-name: opds-auth-catalog-e2e-report
+      check-name: E2E - OPDS Auth Catalog
+      artifact-name: e2e-opds-auth-catalog-report
       job-timeout-minutes: 45

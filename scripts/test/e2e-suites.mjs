@@ -1,27 +1,27 @@
 const TEST_RESULTS_DIR = "../test-results/server";
 
 export const E2E_SUITES = Object.freeze({
-  smoke: {
-    id: "smoke",
-    description: "Server smoke suite",
-    vitestTarget: "test/app.e2e-spec.ts",
-    junitOutput: `${TEST_RESULTS_DIR}/smoke-e2e-junit.xml`,
+  "app-smoke": {
+    id: "app-smoke",
+    description: "App smoke suite",
+    vitestTarget: "test/app-smoke.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/app-smoke-e2e-junit.xml`,
     prepareDedicatedDatabase: false,
     useDedicatedDatabase: false,
   },
-  scanner: {
-    id: "scanner",
+  "scanner-scenarios": {
+    id: "scanner-scenarios",
     description: "Scanner scenario matrix",
-    vitestTarget: "test/scanner.e2e-spec.ts",
-    junitOutput: `${TEST_RESULTS_DIR}/scanner-e2e-junit.xml`,
+    vitestTarget: "test/scanner-scenarios.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/scanner-scenarios-e2e-junit.xml`,
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
-  "scanner-file-ops": {
-    id: "scanner-file-ops",
+  "scanner-file-operations": {
+    id: "scanner-file-operations",
     description: "Scanner file operation matrix",
-    vitestTarget: "test/scanner-file-ops.e2e-spec.ts",
-    junitOutput: `${TEST_RESULTS_DIR}/scanner-file-ops-e2e-junit.xml`,
+    vitestTarget: "test/scanner-file-operations.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/scanner-file-operations-e2e-junit.xml`,
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },

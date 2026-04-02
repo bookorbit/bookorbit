@@ -1,0 +1,42 @@
+name: E2E - Authorization Matrix
+run-name: ${{ format('E2E - Authorization Matrix - {0}', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "server/src/**"
+      - "server/src/db/schema/**"
+      - "server/test/authorization-matrix.e2e-spec.ts"
+      - "server/test/e2e/authorization-matrix/**"
+      - "packages/types/src/**"
+      - "scripts/test/**"
+      - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
+  pull_request:
+    paths:
+      - "server/src/**"
+      - "server/src/db/schema/**"
+      - "server/test/authorization-matrix.e2e-spec.ts"
+      - "server/test/e2e/authorization-matrix/**"
+      - "packages/types/src/**"
+      - "scripts/test/**"
+      - "scripts/db/**"
+      - ".github/workflows/e2e-runner.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  authorization-matrix:
+    uses: ./.github/workflows/e2e-runner.yml
+    with:
+      suite-id: authorization-matrix
+      check-name: E2E - Authorization Matrix
+      artifact-name: e2e-authorization-matrix-report
+      job-timeout-minutes: 60

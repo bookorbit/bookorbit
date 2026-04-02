@@ -28,17 +28,17 @@ function trimLeadingSeparator(args) {
 function printUsage() {
   const usage = [
     "Usage:",
-    "  pnpm run test:e2e -- <suite-id> [vitest args...]",
+    "  pnpm run e2e:run -- <suite-id> [vitest args...]",
     "",
     "Examples:",
-    "  pnpm run test:e2e -- smoke",
-    "  pnpm run test:e2e -- all",
-    "  pnpm run test:e2e -- metadata-write",
-    "  pnpm run test:e2e -- metadata-write --testNamePattern=\"concurrency hardening\"",
-    "  pnpm run test:e2e -- metadata-write --shard=1/2",
-    "  pnpm run test:e2e -- scanner --testNamePattern=book-per-folder-disc-folder-flattening",
-    "  pnpm run test:e2e -- --list",
-    "  pnpm run test:e2e:list",
+    "  pnpm run e2e:run -- app-smoke",
+    "  pnpm run e2e:run -- all",
+    "  pnpm run e2e:run -- metadata-write",
+    '  pnpm run e2e:run -- metadata-write --testNamePattern="concurrency hardening"',
+    "  pnpm run e2e:run -- metadata-write --shard=1/2",
+    "  pnpm run e2e:run -- scanner-scenarios --testNamePattern=book-per-folder-disc-folder-flattening",
+    "  pnpm run e2e:run -- --list",
+    "  pnpm run e2e:list",
   ];
   console.log(usage.join("\n"));
 }
@@ -122,7 +122,7 @@ async function main() {
 
     if (suite.prepareDedicatedDatabase) {
       console.log(`Resetting and migrating dedicated e2e database for suite ${suite.id}...`);
-      await runCommand("pnpm", ["run", "db:prepare:e2e"], { E2E_DATABASE_URL: e2eDatabaseUrl });
+      await runCommand("pnpm", ["run", "e2e:db:prepare"], { E2E_DATABASE_URL: e2eDatabaseUrl });
     }
 
     const junitOutput = process.env.JUNIT_OUTPUT ?? suite.junitOutput;

@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       suite-id:
-        description: "E2E suite id from scripts/test/e2e-suites.mjs (e.g. scanner)"
+        description: "E2E suite id from scripts/test/e2e-suites.mjs (e.g. scanner-scenarios)"
         required: true
         type: string
       check-name:
@@ -72,9 +72,9 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ inputs.vitest-args }}" ]; then
-            pnpm run test:e2e -- ${{ inputs.suite-id }} ${{ inputs.vitest-args }}
+            pnpm run e2e:run -- ${{ inputs.suite-id }} ${{ inputs.vitest-args }}
           else
-            pnpm run test:e2e -- ${{ inputs.suite-id }}
+            pnpm run e2e:run -- ${{ inputs.suite-id }}
           fi
 
       - name: Publish test report annotations
