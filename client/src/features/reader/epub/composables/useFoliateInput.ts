@@ -106,6 +106,9 @@ export function useFoliateInput(
     if (clickedDocs.has(doc)) return
     clickedDocs.add(doc)
 
+    // Keep keyboard navigation active when focus moves into the EPUB iframe.
+    doc.addEventListener('keydown', handleKeydown)
+
     doc.addEventListener(
       'mousedown',
       () => {
