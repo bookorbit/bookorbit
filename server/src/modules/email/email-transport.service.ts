@@ -8,6 +8,8 @@ export interface SmtpConfig {
   port: number;
   username?: string | null;
   password?: string | null;
+  fromName?: string | null;
+  fromAddress?: string | null;
   auth: boolean;
   ssl: boolean;
   startTls: boolean;

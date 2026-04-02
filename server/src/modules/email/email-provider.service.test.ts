@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailProviderService } from './email-provider.service';
 import { EmailProviderRepository } from './email-provider.repository';
@@ -96,6 +96,12 @@ describe('EmailProviderService', () => {
       expect(encryption.encrypt).toHaveBeenCalledWith('new-password');
       expect(repo.insert).toHaveBeenCalled();
     });
+
+    it('should map duplicate provider names to ConflictException', async () => {
+      (repo.insert as vi.Mock).mockRejectedValue({ code: '23505' });
+      const dto = { name: 'New SMTP', host: 'new.test.com', port: 465, password: 'new-password', auth: true, ssl: true, startTls: false };
+      await expect(service.create(dto, mockUser)).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('findOne', () => {
@@ -118,6 +124,11 @@ describe('EmailProviderService', () => {
     it('should throw NotFoundException if update fails', async () => {
       (repo.update as vi.Mock).mockResolvedValue([]);
       await expect(service.update(10, {}, mockUser)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should map duplicate provider names to ConflictException', async () => {
+      (repo.update as vi.Mock).mockRejectedValue({ code: '23505' });
+      await expect(service.update(10, { name: 'duplicate' }, mockUser)).rejects.toThrow(ConflictException);
     });
   });
 

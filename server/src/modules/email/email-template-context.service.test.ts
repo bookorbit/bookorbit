@@ -51,9 +51,12 @@ describe('EmailTemplateContextService', () => {
 
     expect(context.title).toBe('Book Title');
     expect(context.author).toBe('A1, A2');
+    expect(context.authors).toBe('A1, A2');
+    expect(context.series).toBe('S');
+    expect(context.seriesName).toBe('S');
     expect(context.tags).toBe('T1');
     expect(context.fileSize).toBe('1.0 MB');
-    expect(context.coverUrl).toBe('http://localhost/api/books/1/cover');
+    expect(context.coverUrl).toBe('http://localhost/api/v1/books/1/cover');
   });
 
   it('should throw NotFoundException if book not found', async () => {

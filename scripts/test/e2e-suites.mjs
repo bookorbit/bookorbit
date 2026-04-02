@@ -73,6 +73,14 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "email-lifecycle": {
+    id: "email-lifecycle",
+    description: "Email lifecycle suite",
+    vitestTarget: "test/email-lifecycle.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/email-lifecycle-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
   "reader-state-isolation": {
     id: "reader-state-isolation",
     description: "Reader state isolation suite",

@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateRepository } from './email-template.repository';
@@ -90,6 +90,11 @@ describe('EmailTemplateService', () => {
       expect(repo.insert).toHaveBeenCalledWith(expect.objectContaining({ name: 'New', userId: 1 }));
       expect(result.id).toBe(10);
     });
+
+    it('should map duplicate template names to ConflictException', async () => {
+      (repo.insert as vi.Mock).mockRejectedValue({ code: '23505' });
+      await expect(service.create({ name: 'New', subject: 'S', bodyText: 'B' }, mockUser)).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('update', () => {
@@ -110,6 +115,11 @@ describe('EmailTemplateService', () => {
       (repo.updateById as vi.Mock).mockResolvedValue([{ ...mockSystemTemplate, name: 'New' }]);
       const result = await service.update(20, { name: 'New' }, mockAdmin);
       expect(result.name).toBe('New');
+    });
+
+    it('should map duplicate template names to ConflictException on update', async () => {
+      (repo.update as vi.Mock).mockRejectedValue({ code: '23505' });
+      await expect(service.update(10, { name: 'New' }, mockUser)).rejects.toThrow(ConflictException);
     });
   });
 

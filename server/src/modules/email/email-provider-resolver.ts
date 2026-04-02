@@ -45,6 +45,8 @@ export class EmailProviderResolver {
         port: provider.port,
         username: provider.username,
         password: provider.plainPassword,
+        fromName: provider.fromName,
+        fromAddress: provider.fromAddress,
         auth: provider.auth,
         ssl: provider.ssl,
         startTls: provider.startTls,

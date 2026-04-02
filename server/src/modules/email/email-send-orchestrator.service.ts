@@ -59,7 +59,8 @@ export class EmailSendOrchestrator {
     try {
       await this.bookAccessService.assertUserCanAccessBooks(dto.bookIds, user);
 
-      const tasks = await this.buildTasks(dto, user);
+      const preferences = await this.preferencesService.getForUser(user.id);
+      const tasks = await this.buildTasks(dto, user, preferences?.defaultTemplateId ?? null);
       if (tasks.length === 0) throw new BadRequestException('No recipients specified');
 
       const resolved = await this.providerResolver.resolve(user, dto.providerId);
@@ -177,7 +178,7 @@ export class EmailSendOrchestrator {
     }
   }
 
-  private async buildTasks(dto: SendBookDto, user: RequestUser): Promise<Omit<SendTask, 'bookId'>[]> {
+  private async buildTasks(dto: SendBookDto, user: RequestUser, defaultTemplateId: number | null): Promise<Omit<SendTask, 'bookId'>[]> {
     const recipientIds = new Set<number>(dto.recipientIds ?? []);
 
     if (dto.groupIds?.length) {
@@ -197,7 +198,7 @@ export class EmailSendOrchestrator {
       recipientName: recipient.name,
       deviceType: recipient.deviceType,
       preferredFormat: recipient.preferredFormat,
-      effectiveTemplateId: recipient.defaultTemplateId ?? dto.templateId ?? null,
+      effectiveTemplateId: dto.templateId ?? recipient.defaultTemplateId ?? defaultTemplateId,
     }));
   }
 
@@ -240,8 +241,10 @@ export class EmailSendOrchestrator {
     try {
       const transporter = this.transportService.buildTransporter(smtpConfig);
       const effectiveSubject = task.deviceType === 'kindle' ? KINDLE_CONVERT_SUBJECT : subject;
+      const from = this.buildFromHeader(smtpConfig.fromName, smtpConfig.fromAddress);
 
       await transporter.sendMail({
+        ...(from ? { from } : {}),
         to: task.recipientEmail,
         subject: effectiveSubject,
         text: bodyText,
@@ -266,7 +269,10 @@ export class EmailSendOrchestrator {
         this.logger.warn(
           `[${EMAIL_DISPATCH_EVENT}] [fail] logId=${logId} attempt=${attempt} willRetry=true retryDelayMs=${delayMs} errorClass=${errorClass} error="${errorMessage}" - dispatch failed`,
         );
-        setTimeout(() => void this.dispatchSend(logId, smtpConfig, task, file, subject, bodyText, attemptCount + 1), delayMs);
+        const retryTimer = setTimeout(() => void this.dispatchSend(logId, smtpConfig, task, file, subject, bodyText, attemptCount + 1), delayMs);
+        if (typeof retryTimer.unref === 'function') {
+          retryTimer.unref();
+        }
       } else {
         this.logger.error(
           `[${EMAIL_DISPATCH_EVENT}] [fail] logId=${logId} toEmail=${task.recipientEmail} attempt=${attempt} willRetry=false errorClass=${errorClass} error="${errorMessage}" - dispatch failed`,
@@ -284,6 +290,16 @@ export class EmailSendOrchestrator {
           ?.replace(/\.[^.]+$/, '') ?? 'book')
       : 'book';
     return `${base}${ext}`;
+  }
+
+  private buildFromHeader(fromName: string | null | undefined, fromAddress: string | null | undefined): string | undefined {
+    const normalizedAddress = fromAddress?.trim();
+    if (!normalizedAddress) return undefined;
+
+    const normalizedName = fromName?.trim();
+    if (!normalizedName) return normalizedAddress;
+
+    return `${normalizedName} <${normalizedAddress}>`;
   }
 
   private getErrorClass(error: unknown): string {

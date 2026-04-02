@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientGroupRepository } from './email-recipient-group.repository';
@@ -6,6 +6,7 @@ import { EmailRecipientRepository } from './email-recipient.repository';
 import { CreateEmailRecipientGroupDto } from './dto/create-email-recipient-group.dto';
 import { UpdateEmailRecipientGroupDto } from './dto/update-email-recipient-group.dto';
 import type { EmailRecipientGroup } from '../../db/schema';
+import { isUniqueViolation } from './email-db-error.util';
 
 @Injectable()
 export class EmailRecipientGroupService {
@@ -42,19 +43,33 @@ export class EmailRecipientGroupService {
   }
 
   async create(dto: CreateEmailRecipientGroupDto, user: RequestUser) {
-    const [created] = await this.repo.insert({
-      userId: user.id,
-      name: dto.name,
-      defaultTemplateId: dto.defaultTemplateId ?? null,
-    });
-    return { ...created, members: [] };
+    try {
+      const [created] = await this.repo.insert({
+        userId: user.id,
+        name: dto.name,
+        defaultTemplateId: dto.defaultTemplateId ?? null,
+      });
+      return { ...created, members: [] };
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email recipient group with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async update(id: number, dto: UpdateEmailRecipientGroupDto, user: RequestUser) {
     await this.getOwned(id, user);
-    const [updated] = await this.repo.update(id, user.id, dto);
-    if (!updated) throw new NotFoundException('Group not found');
-    return updated;
+    try {
+      const [updated] = await this.repo.update(id, user.id, dto);
+      if (!updated) throw new NotFoundException('Group not found');
+      return updated;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email recipient group with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async remove(id: number, user: RequestUser) {

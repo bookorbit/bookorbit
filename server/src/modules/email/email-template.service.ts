@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailTemplateRepository } from './email-template.repository';
@@ -8,6 +8,7 @@ import { EmailBookAccessService } from './email-book-access.service';
 import { CreateEmailTemplateDto } from './dto/create-email-template.dto';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import type { EmailTemplate } from '../../db/schema';
+import { isUniqueViolation } from './email-db-error.util';
 
 @Injectable()
 export class EmailTemplateService {
@@ -29,13 +30,20 @@ export class EmailTemplateService {
   }
 
   async create(dto: CreateEmailTemplateDto, user: RequestUser) {
-    const [created] = await this.repo.insert({
-      userId: user.id,
-      name: dto.name,
-      subject: dto.subject,
-      bodyText: dto.bodyText,
-    });
-    return created;
+    try {
+      const [created] = await this.repo.insert({
+        userId: user.id,
+        name: dto.name,
+        subject: dto.subject,
+        bodyText: dto.bodyText,
+      });
+      return created;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email template with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async update(id: number, dto: UpdateEmailTemplateDto, user: RequestUser) {
@@ -45,9 +53,16 @@ export class EmailTemplateService {
     if (template.isSystem && !isSuperuser) throw new ForbiddenException('Only administrators can modify system templates');
     if (!template.isSystem && template.userId !== user.id) throw new ForbiddenException('Cannot modify this template');
 
-    const [updated] = template.isSystem ? await this.repo.updateById(id, dto) : await this.repo.update(id, user.id, dto);
-    if (!updated) throw new NotFoundException('Template not found');
-    return updated;
+    try {
+      const [updated] = template.isSystem ? await this.repo.updateById(id, dto) : await this.repo.update(id, user.id, dto);
+      if (!updated) throw new NotFoundException('Template not found');
+      return updated;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email template with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async remove(id: number, user: RequestUser) {

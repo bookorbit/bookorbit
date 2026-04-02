@@ -28,13 +28,17 @@ export class EmailTemplateContextService {
     const selectedFile: BookFile | null = fileId !== null ? file : null;
 
     const appUrl = (this.config.get<string>('app.appUrl') ?? '').replace(/\/+$/, '');
-    const coverUrl = meta ? `${appUrl}/api/books/${bookId}/cover` : '';
+    const coverUrl = meta ? `${appUrl}/api/v1/books/${bookId}/cover` : '';
+    const authors = authorRows.map((a) => a.name).join(', ');
+    const seriesName = meta?.seriesName ?? '';
 
     return {
       title: meta?.title ?? '',
       subtitle: meta?.subtitle ?? '',
-      author: authorRows.map((a) => a.name).join(', '),
-      series: meta?.seriesName ?? '',
+      author: authors,
+      authors,
+      series: seriesName,
+      seriesName,
       seriesIndex: meta?.seriesIndex ?? null,
       format: selectedFile?.format?.toUpperCase() ?? '',
       fileSize: formatFileSize(selectedFile?.sizeBytes ?? null),

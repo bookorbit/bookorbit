@@ -27,6 +27,7 @@ describe('EmailSendOrchestrator', () => {
   let sendLogService: EmailSendLogService;
   let transportService: EmailTransportService;
   let bookAccessService: EmailBookAccessService;
+  let templateService: EmailTemplateService;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -53,7 +54,10 @@ describe('EmailSendOrchestrator', () => {
   };
   const mockFile = { id: 100, absolutePath: '/path/to/book.mobi', format: 'MOBI', relPath: 'Books/book.mobi' };
   const mockTemplate = { id: 200, subject: 'Subject {{title}}', bodyText: 'Body' };
-  const mockProvider = { config: { host: 'smtp.test.com' }, providerId: 300 };
+  const mockProvider = {
+    config: { host: 'smtp.test.com', fromName: 'ProjectX Bot', fromAddress: 'bot@example.com' },
+    providerId: 300,
+  };
   const mockLogEntry = { id: 400 };
 
   beforeEach(async () => {
@@ -125,6 +129,7 @@ describe('EmailSendOrchestrator', () => {
     sendLogService = module.get<EmailSendLogService>(EmailSendLogService);
     transportService = module.get<EmailTransportService>(EmailTransportService);
     bookAccessService = module.get<EmailBookAccessService>(EmailBookAccessService);
+    templateService = module.get<EmailTemplateService>(EmailTemplateService);
 
     (fs.createReadStream as vi.Mock).mockReturnValue('mock-stream');
   });
@@ -159,6 +164,36 @@ describe('EmailSendOrchestrator', () => {
       (bookAccessService.assertUserCanAccessBooks as vi.Mock).mockRejectedValue(new Error('No access to this library'));
       const dto: SendBookDto = { bookIds: [1], recipientIds: [10] };
       await expect(orchestrator.send(dto, mockUser)).rejects.toThrow('No access to this library');
+    });
+
+    it('should prefer explicit templateId over recipient default template', async () => {
+      (recipientService.getOwnedByIds as vi.Mock).mockResolvedValue([{ ...mockRecipient, defaultTemplateId: 999 }]);
+
+      await orchestrator.send(
+        {
+          bookIds: [1],
+          recipientIds: [10],
+          templateId: 123,
+        },
+        mockUser,
+      );
+
+      expect(templateService.resolveTemplate).toHaveBeenCalledWith(123, mockUser);
+    });
+
+    it('should fall back to user preference defaultTemplateId when recipient and request templates are missing', async () => {
+      (preferencesService.getForUser as vi.Mock).mockResolvedValue({ defaultTemplateId: 777 });
+      (recipientService.getOwnedByIds as vi.Mock).mockResolvedValue([{ ...mockRecipient, defaultTemplateId: null }]);
+
+      await orchestrator.send(
+        {
+          bookIds: [1],
+          recipientIds: [10],
+        },
+        mockUser,
+      );
+
+      expect(templateService.resolveTemplate).toHaveBeenCalledWith(777, mockUser);
     });
   });
 
@@ -254,6 +289,19 @@ describe('EmailSendOrchestrator', () => {
       expect(mockTransporter.sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
           subject: KINDLE_CONVERT_SUBJECT,
+        }),
+      );
+    });
+
+    it('should include from header when provider sender fields are configured', async () => {
+      const task = { recipientEmail: 'test@test.com' } as any;
+      const file = { absolutePath: '/test.mobi', relPath: 'test.mobi' } as any;
+
+      await (orchestrator as any).dispatchSend(400, { fromName: 'ProjectX Bot', fromAddress: 'bot@example.com' }, task, file, 'Subject', 'Body', 0);
+
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          from: 'ProjectX Bot <bot@example.com>',
         }),
       );
     });

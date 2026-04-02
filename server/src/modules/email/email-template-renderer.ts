@@ -2,7 +2,9 @@ export interface TemplateContext {
   title?: string | null;
   subtitle?: string | null;
   author?: string | null;
+  authors?: string | null;
   series?: string | null;
+  seriesName?: string | null;
   seriesIndex?: number | null;
   format?: string | null;
   fileSize?: string | null;

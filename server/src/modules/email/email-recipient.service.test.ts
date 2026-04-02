@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailRecipientService } from './email-recipient.service';
 import { EmailRecipientRepository } from './email-recipient.repository';
@@ -67,6 +67,11 @@ describe('EmailRecipientService', () => {
     expect(result.id).toBe(10);
   });
 
+  it('should map duplicate recipient emails to ConflictException on create', async () => {
+    (repo.insert as vi.Mock).mockRejectedValue({ code: '23505' });
+    await expect(service.create({ name: 'New', email: 'new@test.com' }, mockUser)).rejects.toThrow(ConflictException);
+  });
+
   it('should update a recipient', async () => {
     const dto = { name: 'Updated' };
     const result = await service.update(10, dto, mockUser);
@@ -89,6 +94,11 @@ describe('EmailRecipientService', () => {
   it('should throw NotFoundException on update if not exists', async () => {
     (repo.update as vi.Mock).mockResolvedValue([]);
     await expect(service.update(10, { name: 'U' }, mockUser)).rejects.toThrow(NotFoundException);
+  });
+
+  it('should map duplicate recipient emails to ConflictException on update', async () => {
+    (repo.update as vi.Mock).mockRejectedValue({ code: '23505' });
+    await expect(service.update(10, { email: 'duplicate@test.com' }, mockUser)).rejects.toThrow(ConflictException);
   });
 
   it('should throw NotFoundException on setDefault if not exists', async () => {

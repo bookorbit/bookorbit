@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { emailProviders } from '../../db/schema';
@@ -8,6 +8,7 @@ import { EmailProviderRepository } from './email-provider.repository';
 import { CreateEmailProviderDto } from './dto/create-email-provider.dto';
 import { UpdateEmailProviderDto } from './dto/update-email-provider.dto';
 import type { EmailProvider } from '../../db/schema';
+import { isUniqueViolation } from './email-db-error.util';
 
 @Injectable()
 export class EmailProviderService {
@@ -29,20 +30,27 @@ export class EmailProviderService {
 
   async create(dto: CreateEmailProviderDto, user: RequestUser) {
     const passwordEnc = dto.password ? this.encryption.encrypt(dto.password) : null;
-    const [created] = await this.repo.insert({
-      userId: user.id,
-      name: dto.name,
-      host: dto.host,
-      port: dto.port,
-      username: dto.username ?? null,
-      passwordEnc,
-      fromName: dto.fromName ?? null,
-      fromAddress: dto.fromAddress ?? null,
-      auth: dto.auth,
-      ssl: dto.ssl,
-      startTls: dto.startTls,
-    });
-    return this.sanitize(created);
+    try {
+      const [created] = await this.repo.insert({
+        userId: user.id,
+        name: dto.name,
+        host: dto.host,
+        port: dto.port,
+        username: dto.username ?? null,
+        passwordEnc,
+        fromName: dto.fromName ?? null,
+        fromAddress: dto.fromAddress ?? null,
+        auth: dto.auth,
+        ssl: dto.ssl,
+        startTls: dto.startTls,
+      });
+      return this.sanitize(created);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email provider with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async update(id: number, dto: UpdateEmailProviderDto, user: RequestUser) {
@@ -62,9 +70,16 @@ export class EmailProviderService {
       patch.passwordEnc = dto.password ? this.encryption.encrypt(dto.password) : null;
     }
 
-    const [updated] = await this.repo.update(id, user.id, patch);
-    if (!updated) throw new NotFoundException('Provider not found');
-    return this.sanitize(updated);
+    try {
+      const [updated] = await this.repo.update(id, user.id, patch);
+      if (!updated) throw new NotFoundException('Provider not found');
+      return this.sanitize(updated);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email provider with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async remove(id: number, user: RequestUser) {

@@ -1,10 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientRepository } from './email-recipient.repository';
 import { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
 import { UpdateEmailRecipientDto } from './dto/update-email-recipient.dto';
 import type { EmailRecipient } from '../../db/schema';
+import { isUniqueViolation } from './email-db-error.util';
 
 @Injectable()
 export class EmailRecipientService {
@@ -19,22 +20,36 @@ export class EmailRecipientService {
   }
 
   async create(dto: CreateEmailRecipientDto, user: RequestUser) {
-    const [created] = await this.repo.insert({
-      userId: user.id,
-      name: dto.name,
-      email: dto.email,
-      deviceType: dto.deviceType ?? null,
-      preferredFormat: dto.preferredFormat ?? null,
-      defaultTemplateId: dto.defaultTemplateId ?? null,
-    });
-    return created;
+    try {
+      const [created] = await this.repo.insert({
+        userId: user.id,
+        name: dto.name,
+        email: dto.email,
+        deviceType: dto.deviceType ?? null,
+        preferredFormat: dto.preferredFormat ?? null,
+        defaultTemplateId: dto.defaultTemplateId ?? null,
+      });
+      return created;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email recipient with this email already exists');
+      }
+      throw error;
+    }
   }
 
   async update(id: number, dto: UpdateEmailRecipientDto, user: RequestUser) {
     await this.getOwnedById(id, user);
-    const [updated] = await this.repo.update(id, user.id, dto);
-    if (!updated) throw new NotFoundException('Recipient not found');
-    return updated;
+    try {
+      const [updated] = await this.repo.update(id, user.id, dto);
+      if (!updated) throw new NotFoundException('Recipient not found');
+      return updated;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An email recipient with this email already exists');
+      }
+      throw error;
+    }
   }
 
   async remove(id: number, user: RequestUser) {

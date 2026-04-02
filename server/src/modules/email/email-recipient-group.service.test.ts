@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailRecipientGroupService } from './email-recipient-group.service';
 import { EmailRecipientGroupRepository } from './email-recipient-group.repository';
@@ -85,6 +85,11 @@ describe('EmailRecipientGroupService', () => {
       expect(repo.insert).toHaveBeenCalledWith(expect.objectContaining({ name: 'New Group' }));
       expect(result.id).toBe(10);
     });
+
+    it('should map duplicate group names to ConflictException', async () => {
+      (repo.insert as vi.Mock).mockRejectedValue({ code: '23505' });
+      await expect(service.create({ name: 'New Group' }, mockUser)).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('update', () => {
@@ -93,6 +98,11 @@ describe('EmailRecipientGroupService', () => {
       const result = await service.update(10, dto, mockUser);
       expect(repo.update).toHaveBeenCalledWith(10, 1, dto);
       expect(result.id).toBe(10);
+    });
+
+    it('should map duplicate group names to ConflictException', async () => {
+      (repo.update as vi.Mock).mockRejectedValue({ code: '23505' });
+      await expect(service.update(10, { name: 'Updated' }, mockUser)).rejects.toThrow(ConflictException);
     });
   });
 
