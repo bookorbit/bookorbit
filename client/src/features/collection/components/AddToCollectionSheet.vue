@@ -102,6 +102,11 @@ function handleDone() {
   if (addedIds.value.size > 0) emit('done')
   emit('update:open', false)
 }
+
+function handlePointerDownOutside(e: Event) {
+  const target = (e as CustomEvent).detail?.originalEvent?.target as Element | null
+  if (target?.closest('[data-icon-picker-panel]')) e.preventDefault()
+}
 </script>
 
 <template>
@@ -109,6 +114,7 @@ function handleDone() {
     <SheetContent
       side="bottom"
       class="max-h-[80vh] overflow-y-auto sm:inset-x-auto sm:right-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg sm:rounded-t-lg"
+      @pointer-down-outside="handlePointerDownOutside"
     >
       <SheetHeader>
         <SheetTitle class="flex items-center gap-2">

@@ -76,6 +76,7 @@ function positionPanel() {
     left: `${left}px`,
     width: `${width}px`,
     zIndex: '200',
+    pointerEvents: 'auto',
   }
 }
 
@@ -143,7 +144,13 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
   <!-- Floating panel (teleported to avoid overflow clipping) -->
   <Teleport to="body">
     <Transition name="icon-picker-drop">
-      <div v-if="open" ref="panelRef" :style="panelStyle" class="flex flex-col rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
+      <div
+        v-if="open"
+        ref="panelRef"
+        :style="panelStyle"
+        data-icon-picker-panel
+        class="flex flex-col rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
+      >
         <!-- Search bar -->
         <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
           <Search :size="13" class="text-muted-foreground shrink-0" />
