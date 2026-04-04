@@ -1,8 +1,20 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { BookOpen, FileText, Wand2, Pencil, X } from 'lucide-vue-next'
+import { BookOpen, FileText, Wand2, Pencil, X, ArrowRight } from 'lucide-vue-next'
 import type { BookBucketFile, BookBucketMetadata } from '@projectx/types'
-import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+  HoverCardContent,
+  HoverCardPortal,
+  HoverCardRoot,
+  HoverCardTrigger,
+} from 'reka-ui'
 import { formatBytes } from '@/lib/formatting'
 import BookBucketStatusBadge from './BookBucketStatusBadge.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -131,6 +143,26 @@ onMounted(() => {
   void fetchLibraries()
 })
 
+function statusBorderClass(file: BookBucketFile): string {
+  switch (file.status) {
+    case 'pending':
+      return 'border-l-2 border-l-amber-500/50'
+    case 'extracting':
+    case 'fetching':
+      return 'border-l-2 border-l-blue-500/50'
+    case 'ready':
+      return 'border-l-2 border-l-emerald-500/50'
+    case 'error':
+      return 'border-l-2 border-l-red-500/50'
+    default:
+      return 'border-l-2 border-l-transparent'
+  }
+}
+
+function isTargetUnassigned(file: BookBucketFile): boolean {
+  return file.targetLibraryId == null || file.targetFolderId == null
+}
+
 function joinTargetPath(folderPath: string, fileName: string): string {
   const base = folderPath.replace(/[\\/]+$/, '')
   const separator = base.includes('\\') ? '\\' : '/'
@@ -193,109 +225,151 @@ function targetSummary(file: BookBucketFile): string {
       <button
         v-for="file in items"
         :key="file.id"
-        class="flex items-center gap-3 px-4 py-3.5 w-full text-left hover:bg-muted/50 transition-colors cursor-pointer"
+        class="group flex items-stretch gap-3 px-4 w-full text-left hover:bg-muted/70 transition-colors cursor-pointer"
+        :class="statusBorderClass(file)"
         @click="$emit('open', file)"
       >
         <input
           type="checkbox"
           :checked="isSelected(file.id)"
-          class="size-3.5 rounded border-input accent-primary shrink-0"
+          class="size-3.5 rounded border-input accent-primary shrink-0 self-center"
           @click.stop
           @change.stop="$emit('select', file.id)"
         />
 
-        <div class="w-12 shrink-0 flex justify-center">
-          <div
-            class="relative size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden cursor-zoom-in ring-1 ring-border"
-            @click.stop="openCoverLightbox(currentCoverUrl(file), `${displayTitle(file)} current cover`, currentCoverLightboxFallback())"
-          >
-            <img
-              :src="currentCoverUrl(file)"
-              alt=""
-              class="size-full object-cover"
-              @load="($event.target as HTMLImageElement).style.display = ''"
-              @error="onCurrentCoverError"
-            />
-            <BookOpen class="size-4 text-muted-foreground absolute" />
+        <HoverCardRoot :open-delay="250" :close-delay="100">
+          <HoverCardTrigger as-child>
+            <div class="flex items-center gap-1 self-center py-1.5">
+              <div class="w-12 shrink-0 flex justify-center">
+                <div
+                  class="relative w-8 h-12 rounded-md bg-muted flex items-center justify-center overflow-hidden cursor-zoom-in ring-1 ring-border"
+                  @click.stop="openCoverLightbox(currentCoverUrl(file), `${displayTitle(file)} current cover`, currentCoverLightboxFallback())"
+                >
+                  <img
+                    :src="currentCoverUrl(file)"
+                    alt=""
+                    class="size-full object-cover"
+                    @load="($event.target as HTMLImageElement).style.display = ''"
+                    @error="onCurrentCoverError"
+                  />
+                  <BookOpen class="size-4 text-muted-foreground absolute" />
+                </div>
+              </div>
+
+              <div class="w-12 shrink-0 flex justify-center">
+                <div
+                  v-if="newCoverUrl(file)"
+                  class="relative w-8 h-12 rounded-md bg-amber-500/5 border border-amber-500/30 flex items-center justify-center overflow-hidden cursor-zoom-in"
+                  @click.stop="openCoverLightbox(newCoverUrl(file)!, `${displayTitle(file)} new cover`)"
+                >
+                  <img
+                    :src="newCoverUrl(file)!"
+                    alt=""
+                    class="size-full object-cover"
+                    @load="($event.target as HTMLImageElement).style.display = ''"
+                    @error="onFetchedCoverError"
+                  />
+                  <span
+                    v-if="metadataState(file) === 'edited'"
+                    class="absolute bottom-0.5 right-0.5 flex items-center justify-center size-3.5 rounded-full bg-emerald-500 text-white"
+                  >
+                    <Pencil class="size-2" />
+                  </span>
+                  <span v-else class="absolute bottom-0.5 right-0.5 flex items-center justify-center size-3.5 rounded-full bg-amber-500 text-white">
+                    <Wand2 class="size-2" />
+                  </span>
+                </div>
+                <div v-else class="relative w-8 h-12 rounded-md border border-dashed border-border/70 bg-muted/30 flex items-center justify-center">
+                  <span
+                    v-if="metadataState(file) === 'fetched'"
+                    class="flex items-center justify-center size-3.5 rounded-full bg-amber-500 text-white"
+                  >
+                    <Wand2 class="size-2" />
+                  </span>
+                  <span
+                    v-else-if="metadataState(file) === 'edited'"
+                    class="flex items-center justify-center size-3.5 rounded-full bg-emerald-500 text-white"
+                  >
+                    <Pencil class="size-2" />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </HoverCardTrigger>
+          <HoverCardPortal>
+            <HoverCardContent side="top" align="start" :side-offset="8" class="z-50 rounded-xl border border-border bg-popover p-3 shadow-xl">
+              <div class="flex items-center gap-3">
+                <div class="flex flex-col items-center gap-1.5">
+                  <div class="relative w-36 h-54 rounded-lg bg-muted overflow-hidden ring-1 ring-border flex items-center justify-center">
+                    <img :src="currentCoverUrl(file)" alt="" class="size-full object-cover" @error="onCurrentCoverError" />
+                    <BookOpen class="size-5 text-muted-foreground absolute" />
+                  </div>
+                  <span class="text-[10px] font-medium text-muted-foreground">Current</span>
+                </div>
+                <template v-if="newCoverUrl(file)">
+                  <ArrowRight class="size-4 text-muted-foreground shrink-0" />
+                  <div class="flex flex-col items-center gap-1.5">
+                    <div
+                      class="relative w-36 h-54 rounded-lg bg-amber-500/5 border border-amber-500/30 overflow-hidden flex items-center justify-center"
+                    >
+                      <img :src="newCoverUrl(file)!" alt="" class="size-full object-cover" @error="onFetchedCoverError" />
+                    </div>
+                    <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400">New</span>
+                  </div>
+                </template>
+              </div>
+            </HoverCardContent>
+          </HoverCardPortal>
+        </HoverCardRoot>
+
+        <div class="flex-1 flex items-center gap-3 py-2 min-w-0">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate">{{ displayTitle(file) }}</p>
+            <div class="flex items-center gap-1.5 min-w-0">
+              <p v-if="displayAuthor(file)" class="text-xs text-muted-foreground truncate">{{ displayAuthor(file) }}</p>
+              <p v-else class="text-xs text-muted-foreground truncate">{{ file.fileName }}</p>
+            </div>
+            <p class="mt-0.5 text-[11px] truncate" :class="isTargetUnassigned(file) ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'">
+              {{ targetSummary(file) }}
+            </p>
           </div>
-        </div>
 
-        <div class="w-12 shrink-0 flex justify-center">
-          <div
-            v-if="newCoverUrl(file)"
-            class="relative size-12 rounded-lg bg-amber-500/5 border border-amber-500/30 flex items-center justify-center overflow-hidden cursor-zoom-in"
-            @click.stop="openCoverLightbox(newCoverUrl(file)!, `${displayTitle(file)} new cover`)"
-          >
-            <img
-              :src="newCoverUrl(file)!"
-              alt=""
-              class="size-full object-cover"
-              @load="($event.target as HTMLImageElement).style.display = ''"
-              @error="onFetchedCoverError($event)"
-            />
-            <Wand2 class="size-3 text-amber-500 absolute" />
-          </div>
-          <div v-else class="size-12 rounded-lg border border-dashed border-border/70 bg-muted/30" />
-        </div>
-
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium truncate">{{ displayTitle(file) }}</p>
-          <div class="flex items-center gap-1.5 min-w-0">
-            <p v-if="displayAuthor(file)" class="text-xs text-muted-foreground truncate">{{ displayAuthor(file) }}</p>
-            <p v-else class="text-xs text-muted-foreground truncate">{{ file.fileName }}</p>
-            <span
-              v-if="metadataState(file) === 'fetched'"
-              class="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-px text-[10px] font-medium"
-            >
-              <Wand2 class="size-2.5" />
-              Fetched
-            </span>
-            <span
-              v-else-if="metadataState(file) === 'edited'"
-              class="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-px text-[10px] font-medium"
-            >
-              <Pencil class="size-2.5" />
-              Edited
-            </span>
-          </div>
-          <p class="mt-0.5 text-[11px] text-muted-foreground truncate">{{ targetSummary(file) }}</p>
-        </div>
-
-        <span class="text-xs text-muted-foreground w-16 text-right shrink-0 hidden sm:block tabular-nums">
-          {{ formatBytes(file.fileSize) }}
-        </span>
-
-        <span class="text-xs text-muted-foreground w-12 text-center shrink-0 uppercase hidden sm:block">
-          {{ file.format ?? '-' }}
-        </span>
-
-        <div class="w-14 flex justify-center shrink-0 hidden sm:flex">
-          <span
-            v-if="file.confidence !== null && file.confidence !== undefined"
-            class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-            :class="confidenceBadgeClass(file)"
-          >
-            {{ file.confidence }}%
+          <span class="text-xs text-muted-foreground w-16 text-right shrink-0 hidden sm:block tabular-nums">
+            {{ formatBytes(file.fileSize) }}
           </span>
-          <span v-else class="text-xs text-muted-foreground/60">-</span>
-        </div>
 
-        <div class="w-7 flex justify-center shrink-0">
-          <Tooltip v-if="file.fetchedMetadata">
-            <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center size-6 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
-                @click.stop="$emit('applyFetched', file.id)"
-              >
-                <Wand2 class="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Apply fetched metadata</TooltipContent>
-          </Tooltip>
-        </div>
+          <span class="text-xs text-muted-foreground w-12 text-center shrink-0 uppercase hidden sm:block">
+            {{ file.format ?? '-' }}
+          </span>
 
-        <div class="w-16 flex justify-center shrink-0">
-          <BookBucketStatusBadge :status="file.status" />
+          <div class="w-14 flex justify-center shrink-0 hidden sm:flex">
+            <span
+              v-if="file.confidence !== null && file.confidence !== undefined"
+              class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :class="confidenceBadgeClass(file)"
+            >
+              {{ file.confidence }}%
+            </span>
+            <span v-else class="text-xs text-muted-foreground/60">-</span>
+          </div>
+
+          <div class="w-7 flex justify-center shrink-0">
+            <Tooltip v-if="file.fetchedMetadata">
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center justify-center size-6 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
+                  @click.stop="$emit('applyFetched', file.id)"
+                >
+                  <Wand2 class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Apply fetched metadata</TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div class="w-16 flex justify-center shrink-0">
+            <BookBucketStatusBadge :status="file.status" />
+          </div>
         </div>
       </button>
     </div>
