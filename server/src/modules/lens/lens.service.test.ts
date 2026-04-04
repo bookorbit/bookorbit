@@ -280,7 +280,7 @@ describe('LensService', () => {
     const result = await service.executeLens(5, makeUser({ id: 12 }), 1, 25);
 
     expect(queryBuilder.buildWhere).toHaveBeenCalledWith(lens.filter, { accessibleLibraryIds: [9], userId: 12 });
-    expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }]);
+    expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 12);
     expect(bookReadService.findCards).toHaveBeenCalledWith({
       where: 'where',
       orderBy: ['orderBy'],

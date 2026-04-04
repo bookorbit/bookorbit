@@ -71,6 +71,16 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "metadata-lock": {
+    id: "metadata-lock",
+    name: "Metadata Lock",
+    timeout: 60,
+    description: "Metadata lock end-to-end suite",
+    vitestTarget: "test/metadata-lock.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/metadata-lock-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
   "authorization-matrix": {
     id: "authorization-matrix",
     name: "Authorization Matrix",

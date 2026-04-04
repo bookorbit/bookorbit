@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Check, ChevronDown, FolderPlus, Headphones, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { BookOpen, Check, ChevronDown, FolderPlus, Headphones, Lock, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
+import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MetadataScoreBadge from '@/features/metadata-score/components/MetadataScoreBadge.vue'
@@ -219,6 +220,14 @@ onBeforeUnmount(() => {
 })
 
 const { hasPermission } = usePermissions()
+const { load: loadLocks, isLocked } = useMetadataLocks()
+watch(
+  () => props.book,
+  (b) => loadLocks(b),
+  { immediate: true },
+)
+
+const isRatingLocked = computed(() => isLocked('rating'))
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
 
@@ -873,23 +882,43 @@ watch(
       </div>
 
       <div class="mt-3 flex items-center gap-1" @mouseleave="hoverRating = null">
-        <template v-if="canEditMetadata">
-          <Tooltip v-for="star in ratingStars" :key="star">
+        <div class="flex items-center gap-1">
+          <template v-if="canEditMetadata">
+            <Tooltip v-for="star in ratingStars" :key="star">
+              <TooltipTrigger as-child>
+                <button
+                  type="button"
+                  class="p-0.5 transition-colors"
+                  :class="isRatingLocked ? 'pointer-events-none' : 'disabled:opacity-50'"
+                  :disabled="isRatingLocked"
+                  @mouseenter="hoverRating = star"
+                  @click="setRating(star)"
+                >
+                  <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{{ isRatingLocked ? 'Rating is locked' : `Rate ${star}` }}</TooltipContent>
+            </Tooltip>
+          </template>
+          <template v-else>
+            <Star
+              v-for="star in ratingStars"
+              :key="star"
+              class="size-3.5"
+              :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
+            />
+          </template>
+        </div>
+
+        <template v-if="isRatingLocked">
+          <Tooltip>
             <TooltipTrigger as-child>
-              <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
-                <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
-              </button>
+              <div class="ml-1 p-1 rounded-full bg-primary/10 text-primary">
+                <Lock class="size-3" />
+              </div>
             </TooltipTrigger>
-            <TooltipContent>Rate {{ star }}</TooltipContent>
+            <TooltipContent>Rating is locked</TooltipContent>
           </Tooltip>
-        </template>
-        <template v-else>
-          <Star
-            v-for="star in ratingStars"
-            :key="star"
-            class="size-3.5"
-            :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
-          />
         </template>
 
         <div class="w-px h-3.5 bg-border mx-1.5" />

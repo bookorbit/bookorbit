@@ -29,6 +29,7 @@ export enum AuditAction {
 
   BookUpload = "book.upload",
   BookMetadataUpdate = "book.metadata.update",
+  BookMetadataLocksUpdate = "book.metadata.locks.update",
   BookDelete = "book.delete",
   BookBulkMetadataRefresh = "book.bulk.metadata_refresh",
   BookBulkDelete = "book.bulk.delete",

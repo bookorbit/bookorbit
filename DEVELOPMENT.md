@@ -122,6 +122,7 @@ pnpm run e2e:run -- auth-session-security    # auth session security suite (dedi
 pnpm run e2e:run -- auth-recovery-oidc-logout # auth recovery and OIDC logout suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- book-bucket-ingest-finalize  # Book Bucket ingest/finalize suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- metadata-write           # metadata write suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- metadata-lock            # metadata lock suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- authorization-matrix     # authorization matrix suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- opds-auth-catalog        # OPDS auth/catalog suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- reader-state-isolation   # reader state isolation suite (dedicated projectx_e2e DB)
@@ -164,6 +165,7 @@ All suites write JUnit XML to `test-results/server/`. Dedicated-db suites also a
 | `auth-recovery-oidc-logout`   | dedicated-db | `auth-recovery-oidc-logout-e2e-junit.xml`   | none                                             |
 | `book-bucket-ingest-finalize` | dedicated-db | `book-bucket-ingest-finalize-e2e-junit.xml` | `book-bucket-ingest-finalize-e2e-scenarios.json` |
 | `metadata-write`              | dedicated-db | `metadata-write-e2e-junit.xml`              | `metadata-write-e2e-scenarios.json`              |
+| `metadata-lock`               | dedicated-db | `metadata-lock-e2e-junit.xml`               | none                                             |
 | `authorization-matrix`        | dedicated-db | `authorization-matrix-e2e-junit.xml`        | none                                             |
 | `opds-auth-catalog`           | dedicated-db | `opds-auth-catalog-e2e-junit.xml`           | `opds-auth-catalog-e2e-scenarios.json`           |
 | `reader-state-isolation`      | dedicated-db | `reader-state-isolation-e2e-junit.xml`      | `reader-state-isolation-e2e-scenarios.json`      |
@@ -187,6 +189,7 @@ pnpm run e2e:run -- <suite-id>
 | `E2E - Auth Recovery OIDC Logout`   | `auth-recovery-oidc-logout`   | `workflow_dispatch`, `push`, `pull_request`                                 |
 | `E2E - Book Bucket Ingest Finalize` | `book-bucket-ingest-finalize` | `workflow_dispatch`, `push`, `pull_request`                                 |
 | `E2E - Metadata Write`              | `metadata-write`              | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Metadata Lock`               | `metadata-lock`               | `workflow_dispatch`, `push`, `pull_request`                                 |
 | `E2E - Authorization Matrix`        | `authorization-matrix`        | `workflow_dispatch`, `push`, `pull_request`                                 |
 | `E2E - OPDS Auth Catalog`           | `opds-auth-catalog`           | `workflow_dispatch`, `push`, `pull_request`                                 |
 | `E2E - Reader State Isolation`      | `reader-state-isolation`      | `workflow_dispatch`, `push`, `pull_request`                                 |

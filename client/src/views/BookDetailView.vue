@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, provide, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail, BookMetadataLockField } from '@projectx/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'
@@ -69,6 +69,10 @@ function onMetadataSaved(updated: BookDetail) {
   detail.value = updated
 }
 
+function onLocksChanged(lockedFields: BookMetadataLockField[]) {
+  if (detail.value) detail.value.lockedFields = lockedFields
+}
+
 function onCoverChanged(source: 'extracted' | 'custom' | null) {
   if (detail.value) detail.value = { ...detail.value, coverSource: source }
 }
@@ -82,6 +86,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
         v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
         :book="detail"
         @saved="onMetadataSaved"
+        @locks-changed="onLocksChanged"
         @cover-changed="onCoverChanged"
       />
       <FilesTab v-else-if="tab === 'files'" :book="detail" />

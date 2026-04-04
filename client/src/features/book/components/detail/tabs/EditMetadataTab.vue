@@ -1,22 +1,66 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ChevronDown, Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail, BookMetadataLockField } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
+import MetadataFieldLabel from './MetadataFieldLabel.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
+import { type MetadataRefreshPreview, useRefreshMetadata } from '../../../composables/useRefreshMetadata'
+import { useMetadataLocks } from '../../../composables/useMetadataLocks'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
 import { useNarratorSearch } from '../../../composables/useNarratorSearch'
 import { useGenreSearch, useTagSearch } from '../../../composables/useTagSearch'
-import { useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 
 const props = defineProps<{ book: BookDetail }>()
-const emit = defineEmits<{ saved: [BookDetail]; coverChanged: ['extracted' | 'custom' | null] }>()
+const emit = defineEmits<{
+  saved: [BookDetail]
+  locksChanged: [BookMetadataLockField[]]
+  coverChanged: ['extracted' | 'custom' | null]
+}>()
+
+const DIRECT_PATCH_FIELDS = [
+  'title',
+  'subtitle',
+  'description',
+  'authors',
+  'genres',
+  'publisher',
+  'publishedYear',
+  'language',
+  'pageCount',
+  'seriesName',
+  'seriesIndex',
+  'isbn10',
+  'isbn13',
+  'googleBooksId',
+  'goodreadsId',
+  'amazonId',
+  'hardcoverId',
+  'openLibraryId',
+  'itunesId',
+  'audibleId',
+  'comicvineId',
+] as const
+
+const COMIC_FIELD_MAP = {
+  issueNumber: 'comicIssueNumber',
+  volumeName: 'comicVolumeName',
+  storyArcs: 'comicStoryArcs',
+  pencillers: 'comicPencillers',
+  inkers: 'comicInkers',
+  colorists: 'comicColorists',
+  letterers: 'comicLetterers',
+  coverArtists: 'comicCoverArtists',
+  characters: 'comicCharacters',
+  teams: 'comicTeams',
+  locations: 'comicLocations',
+} as const
 
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
@@ -24,6 +68,18 @@ const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMA
 const comicSectionOpen = ref(true)
 
 const { form, saving, error, isDirty, load, reset, save } = useMetadataEditor()
+const {
+  lockedFields,
+  updating: updatingLocks,
+  error: lockError,
+  areAllLocked,
+  load: loadLocks,
+  isLocked,
+  isUpdating: isUpdatingLock,
+  toggle,
+  lockAll,
+  unlockAll,
+} = useMetadataLocks()
 const { search: searchAuthors } = useAuthorSearch()
 const { search: searchNarrators } = useNarratorSearch()
 const { search: searchGenres } = useGenreSearch()
@@ -64,11 +120,17 @@ function setFloatField(field: 'seriesIndex', e: Event) {
   form[field] = isNaN(n) ? null : n
 }
 
-onMounted(() => load(props.book))
 watch(
-  () => props.book.id,
-  () => load(props.book),
+  () => props.book,
+  (book) => {
+    load(book)
+    loadLocks(book)
+  },
+  { immediate: true },
 )
+
+const combinedError = computed(() => lockError.value ?? error.value)
+const hasLockedFields = computed(() => lockedFields.value.length > 0)
 
 async function submit() {
   if (coverPanel.value?.hasPending) {
@@ -86,30 +148,140 @@ function setRating(star: number) {
   form.rating = form.rating === star ? null : star
 }
 
+function clearRating() {
+  form.rating = null
+}
+
 function toggleComicSection() {
   comicSectionOpen.value = !comicSectionOpen.value
 }
 
-function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverUrl?: string }) {
-  const { comicMetadata, ...rest } = formPatch
-  Object.assign(form, rest)
-  if (comicMetadata) {
-    if (comicMetadata.issueNumber !== undefined) form.comicIssueNumber = comicMetadata.issueNumber
-    if (comicMetadata.volumeName !== undefined) form.comicVolumeName = comicMetadata.volumeName
-    if (comicMetadata.storyArcs !== undefined) form.comicStoryArcs = comicMetadata.storyArcs
-    if (comicMetadata.pencillers !== undefined) form.comicPencillers = comicMetadata.pencillers
-    if (comicMetadata.inkers !== undefined) form.comicInkers = comicMetadata.inkers
-    if (comicMetadata.colorists !== undefined) form.comicColorists = comicMetadata.colorists
-    if (comicMetadata.letterers !== undefined) form.comicLetterers = comicMetadata.letterers
-    if (comicMetadata.coverArtists !== undefined) form.comicCoverArtists = comicMetadata.coverArtists
-    if (comicMetadata.characters !== undefined) form.comicCharacters = comicMetadata.characters
-    if (comicMetadata.teams !== undefined) form.comicTeams = comicMetadata.teams
-    if (comicMetadata.locations !== undefined) form.comicLocations = comicMetadata.locations
+function trackLockedField(field: BookMetadataLockField, skippedFields: BookMetadataLockField[]) {
+  if (!skippedFields.includes(field)) {
+    skippedFields.push(field)
   }
-  if (coverUrl) coverPanel.value?.setUrl(coverUrl)
+}
+
+function applyDirectPatchField(field: (typeof DIRECT_PATCH_FIELDS)[number], value: unknown, skippedFields: BookMetadataLockField[]): boolean {
+  if (value === undefined) return false
+  if (isLocked(field)) {
+    trackLockedField(field, skippedFields)
+    return false
+  }
+  form[field] = value as never
+  return true
+}
+
+function applyComicPatch(formPatch: MetadataPatch, skippedFields: BookMetadataLockField[]): number {
+  if (!formPatch.comicMetadata) return 0
+  let updated = 0
+  for (const [comicKey, formKey] of Object.entries(COMIC_FIELD_MAP) as [
+    keyof typeof COMIC_FIELD_MAP,
+    (typeof COMIC_FIELD_MAP)[keyof typeof COMIC_FIELD_MAP],
+  ][]) {
+    const value = formPatch.comicMetadata[comicKey]
+    if (value === undefined) continue
+    if (isLocked(formKey)) {
+      trackLockedField(formKey, skippedFields)
+      continue
+    }
+    form[formKey] = value as never
+    updated++
+  }
+  return updated
+}
+
+function applyAudioPatch(formPatch: MetadataPatch, skippedFields: BookMetadataLockField[]): number {
+  let updated = 0
+  if (formPatch.narrators !== undefined) {
+    if (isLocked('narrators')) {
+      trackLockedField('narrators', skippedFields)
+    } else {
+      form.narrators = formPatch.narrators
+      updated++
+    }
+  }
+  if (formPatch.durationSeconds !== undefined) {
+    if (isLocked('durationSeconds')) {
+      trackLockedField('durationSeconds', skippedFields)
+    } else {
+      form.durationSeconds = formPatch.durationSeconds
+      updated++
+    }
+  }
+  if (formPatch.abridged !== undefined) {
+    if (isLocked('abridged')) {
+      trackLockedField('abridged', skippedFields)
+    } else {
+      form.abridged = formPatch.abridged
+      updated++
+    }
+  }
+  return updated
+}
+
+function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined): { skippedFields: BookMetadataLockField[]; updatedCount: number } {
+  const skippedFields: BookMetadataLockField[] = []
+  let updatedCount = 0
+  for (const field of DIRECT_PATCH_FIELDS) {
+    if (applyDirectPatchField(field, formPatch[field], skippedFields)) updatedCount++
+  }
+  updatedCount += applyComicPatch(formPatch, skippedFields)
+  updatedCount += applyAudioPatch(formPatch, skippedFields)
+
+  if (coverUrl) {
+    if (isLocked('cover')) {
+      trackLockedField('cover', skippedFields)
+    } else {
+      coverPanel.value?.setUrl(coverUrl)
+      updatedCount++
+    }
+  }
+
+  return { skippedFields, updatedCount }
+}
+
+function showApplyResult(skippedFields: BookMetadataLockField[], updatedCount: number) {
+  if (skippedFields.length === 0) return
+  const skippedPart = `Skipped ${skippedFields.length} locked field${skippedFields.length === 1 ? '' : 's'}`
+  const updatedPart = `updated ${updatedCount} field${updatedCount === 1 ? '' : 's'}`
+  toast.info(`${skippedPart}, ${updatedPart}`)
+}
+
+function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverUrl?: string }) {
+  const { skippedFields, updatedCount } = applyPatchToForm(formPatch, coverUrl)
+  showApplyResult(skippedFields, updatedCount)
 }
 
 const { refreshing: autoFilling, previewRefresh } = useRefreshMetadata()
+
+function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
+  return {
+    title: preview.title,
+    subtitle: preview.subtitle,
+    description: preview.description,
+    authors: preview.authors,
+    genres: preview.genres,
+    publisher: preview.publisher,
+    publishedYear: preview.publishedYear,
+    language: preview.language,
+    pageCount: preview.pageCount,
+    seriesName: preview.seriesName,
+    seriesIndex: preview.seriesIndex,
+    googleBooksId: preview.googleBooksId,
+    goodreadsId: preview.goodreadsId,
+    amazonId: preview.amazonId,
+    hardcoverId: preview.hardcoverId,
+    openLibraryId: preview.openLibraryId,
+    itunesId: preview.itunesId,
+    audibleId: preview.audibleId,
+    comicvineId: preview.comicvineId,
+    comicMetadata: preview.comicMetadata,
+    narrators: preview.audioMetadata?.narrators,
+    durationSeconds: preview.audioMetadata?.durationSeconds ?? undefined,
+    abridged: preview.audioMetadata?.abridged ?? undefined,
+  }
+}
 
 async function autoFill() {
   const preview = await previewRefresh(props.book.id)
@@ -120,44 +292,31 @@ async function autoFill() {
     return
   }
 
-  if (preview.title != null) form.title = preview.title
-  if (preview.subtitle != null) form.subtitle = preview.subtitle
-  if (preview.description != null) form.description = preview.description
-  if (preview.authors?.length) form.authors = preview.authors
-  if (preview.genres?.length) form.genres = preview.genres
-  if (preview.publisher != null) form.publisher = preview.publisher
-  if (preview.publishedYear != null) form.publishedYear = preview.publishedYear
-  if (preview.language != null) form.language = preview.language
-  if (preview.pageCount != null) form.pageCount = preview.pageCount
-  if (preview.seriesName != null) form.seriesName = preview.seriesName
-  if (preview.seriesIndex != null) form.seriesIndex = preview.seriesIndex
-  if (preview.googleBooksId != null) form.googleBooksId = preview.googleBooksId
-  if (preview.goodreadsId != null) form.goodreadsId = preview.goodreadsId
-  if (preview.amazonId != null) form.amazonId = preview.amazonId
-  if (preview.hardcoverId != null) form.hardcoverId = preview.hardcoverId
-  if (preview.openLibraryId != null) form.openLibraryId = preview.openLibraryId
-  if (preview.itunesId != null) form.itunesId = preview.itunesId
-  if (preview.audibleId != null) form.audibleId = preview.audibleId
-  if (preview.comicvineId != null) form.comicvineId = preview.comicvineId
-  if (preview.comicMetadata) {
-    if (preview.comicMetadata.issueNumber !== undefined) form.comicIssueNumber = preview.comicMetadata.issueNumber
-    if (preview.comicMetadata.volumeName !== undefined) form.comicVolumeName = preview.comicMetadata.volumeName
-    if (preview.comicMetadata.storyArcs !== undefined) form.comicStoryArcs = preview.comicMetadata.storyArcs
-    if (preview.comicMetadata.pencillers !== undefined) form.comicPencillers = preview.comicMetadata.pencillers
-    if (preview.comicMetadata.inkers !== undefined) form.comicInkers = preview.comicMetadata.inkers
-    if (preview.comicMetadata.colorists !== undefined) form.comicColorists = preview.comicMetadata.colorists
-    if (preview.comicMetadata.letterers !== undefined) form.comicLetterers = preview.comicMetadata.letterers
-    if (preview.comicMetadata.coverArtists !== undefined) form.comicCoverArtists = preview.comicMetadata.coverArtists
-    if (preview.comicMetadata.characters !== undefined) form.comicCharacters = preview.comicMetadata.characters
-    if (preview.comicMetadata.teams !== undefined) form.comicTeams = preview.comicMetadata.teams
-    if (preview.comicMetadata.locations !== undefined) form.comicLocations = preview.comicMetadata.locations
-  }
-  if (preview.audioMetadata) {
-    if (preview.audioMetadata.narrators !== undefined) form.narrators = preview.audioMetadata.narrators
-    if (preview.audioMetadata.durationSeconds !== undefined) form.durationSeconds = preview.audioMetadata.durationSeconds
-    if (preview.audioMetadata.abridged !== undefined) form.abridged = !!preview.audioMetadata.abridged
-  }
-  if (preview.coverUrl) coverPanel.value?.setUrl(preview.coverUrl)
+  const { skippedFields, updatedCount } = applyPatchToForm(buildPreviewPatch(preview), preview.coverUrl)
+  showApplyResult(skippedFields, updatedCount)
+}
+
+async function handleLockToggle(field: BookMetadataLockField) {
+  const updated = await toggle(props.book.id, field)
+  if (updated) emit('locksChanged', updated.lockedFields)
+}
+
+function handleCoverLockToggle() {
+  handleLockToggle('cover')
+}
+
+async function handleLockAll() {
+  const updated = await lockAll(props.book.id)
+  if (updated) emit('locksChanged', updated.lockedFields)
+}
+
+async function handleUnlockAll() {
+  const updated = await unlockAll(props.book.id)
+  if (updated) emit('locksChanged', updated.lockedFields)
+}
+
+function handleCoverChanged(source: 'extracted' | 'custom' | null) {
+  emit('coverChanged', source)
 }
 </script>
 
@@ -165,30 +324,22 @@ async function autoFill() {
   <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
     <!-- Left: Cover panel -->
     <div class="w-full lg:w-48 lg:shrink-0 lg:sticky lg:top-6">
-      <CoverEditorPanel ref="coverPanel" :book="props.book" @cover-changed="(src) => emit('coverChanged', src)" />
+      <CoverEditorPanel
+        ref="coverPanel"
+        :book="props.book"
+        :locked="isLocked('cover')"
+        @cover-changed="handleCoverChanged"
+        @toggle-lock="handleCoverLockToggle"
+      />
     </div>
 
     <!-- Right: Form -->
     <div class="flex-1 min-w-0 space-y-3">
       <!-- Action bar -->
       <div class="flex items-center justify-between min-h-8">
-        <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
+        <p v-if="combinedError" class="text-sm text-destructive">{{ combinedError }}</p>
         <span v-else />
-        <div class="flex gap-2">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
-                :disabled="autoFilling"
-                @click="autoFill"
-              >
-                <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
-                <RefreshCw v-else class="size-3.5" />
-                Auto-fill
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ autoFilling ? 'Fetching metadata...' : 'Auto-fill fields using your metadata preferences' }}</TooltipContent>
-          </Tooltip>
+        <div class="flex items-center gap-2">
           <button
             class="search-online-btn flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
             @click="searchOpen = true"
@@ -196,6 +347,43 @@ async function autoFill() {
             <Sparkles class="size-3.5" />
             Search online
           </button>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
+                :disabled="autoFilling || areAllLocked"
+                @click="autoFill"
+              >
+                <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
+                <RefreshCw v-else class="size-3.5" />
+                Auto-fill
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{
+              autoFilling ? 'Fetching metadata...' : areAllLocked ? 'All fields are locked' : 'Auto-fill fields using your metadata preferences'
+            }}</TooltipContent>
+          </Tooltip>
+
+          <div class="w-px h-4 bg-border mx-0.5" />
+
+          <button
+            class="h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+            :disabled="updatingLocks || areAllLocked"
+            @click="handleLockAll"
+          >
+            Lock all
+          </button>
+          <button
+            class="h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+            :disabled="updatingLocks || !hasLockedFields"
+            @click="handleUnlockAll"
+          >
+            Unlock all
+          </button>
+
+          <div class="w-px h-4 bg-border mx-0.5" />
+
           <button
             class="h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
             :disabled="!isDirty || saving"
@@ -215,52 +403,85 @@ async function autoFill() {
 
       <!-- Title + Subtitle -->
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div class="sm:col-span-3 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
+        <MetadataFieldLabel
+          class="sm:col-span-3"
+          label="Title"
+          field="title"
+          :locked="isLocked('title')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.title"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('title')"
           />
-        </div>
-        <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Subtitle</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel label="Subtitle" field="subtitle" :locked="isLocked('subtitle')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
           <input
             v-model="form.subtitle"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('subtitle')"
           />
-        </div>
+        </MetadataFieldLabel>
       </div>
 
       <!-- Authors | Narrators (audio only) -->
       <div class="grid gap-3" :class="isPrimaryAudio ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'">
-        <div class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Authors</label>
-          <ChipInput v-model="form.authors" :search-fn="searchAuthors" />
-        </div>
-        <div v-if="isPrimaryAudio" class="space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Narrators</label>
-          <ChipInput v-model="form.narrators" :search-fn="searchNarrators" />
-        </div>
+        <MetadataFieldLabel label="Authors" field="authors" :locked="isLocked('authors')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
+          <ChipInput v-model="form.authors" :search-fn="searchAuthors" :disabled="isLocked('authors')" control-class="pr-10" />
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          v-if="isPrimaryAudio"
+          label="Narrators"
+          field="narrators"
+          :locked="isLocked('narrators')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
+          <ChipInput v-model="form.narrators" :search-fn="searchNarrators" :disabled="isLocked('narrators')" control-class="pr-10" />
+        </MetadataFieldLabel>
       </div>
 
       <!-- Genres -->
-      <div class="space-y-1">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Genres</label>
-        <ChipInput v-model="form.genres" :search-fn="searchGenres" />
-      </div>
+      <MetadataFieldLabel label="Genres" field="genres" :locked="isLocked('genres')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
+        <ChipInput v-model="form.genres" :search-fn="searchGenres" :disabled="isLocked('genres')" control-class="pr-10" />
+      </MetadataFieldLabel>
 
       <!-- Tags | Rating -->
       <div class="flex items-start gap-3">
-        <div class="flex-1 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</label>
-          <ChipInput v-model="form.tags" :search-fn="searchTags" />
-        </div>
-        <div class="space-y-1 shrink-0">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rating</label>
-          <div class="flex items-center gap-0.5 h-8" @mouseleave="hoverRating = null">
+        <MetadataFieldLabel
+          class="flex-1"
+          label="Tags"
+          field="tags"
+          :locked="isLocked('tags')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
+          <ChipInput v-model="form.tags" :search-fn="searchTags" :disabled="isLocked('tags')" control-class="pr-10" />
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="shrink-0"
+          label="Rating"
+          field="rating"
+          :locked="isLocked('rating')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
+          <div
+            class="flex min-h-10 items-center gap-0.5 rounded-lg border border-input bg-background px-2 py-2 pr-10"
+            :class="isLocked('rating') ? 'opacity-50 cursor-not-allowed' : ''"
+            @mouseleave="hoverRating = null"
+          >
             <Tooltip v-for="star in 5" :key="star">
               <TooltipTrigger as-child>
-                <button type="button" class="p-0.5 transition-colors" @mouseenter="hoverRating = star" @click="setRating(star)">
+                <button
+                  type="button"
+                  class="p-0.5 transition-colors disabled:opacity-50"
+                  :disabled="isLocked('rating')"
+                  @mouseenter="hoverRating = star"
+                  @click="setRating(star)"
+                >
                   <Star class="size-4" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
                 </button>
               </TooltipTrigger>
@@ -270,119 +491,202 @@ async function autoFill() {
               v-if="form.rating"
               type="button"
               class="ml-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              @click="form.rating = null"
+              :disabled="isLocked('rating')"
+              @click="clearRating"
             >
               Clear
             </button>
           </div>
-        </div>
+        </MetadataFieldLabel>
       </div>
 
       <!-- Series | Index | Publisher -->
       <div class="flex flex-wrap gap-3">
-        <div class="flex-1 min-w-35 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Series</label>
+        <MetadataFieldLabel
+          class="flex-1 min-w-35"
+          label="Series"
+          field="seriesName"
+          :locked="isLocked('seriesName')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.seriesName"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('seriesName')"
           />
-        </div>
-        <div class="w-16 shrink-0 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Index</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="w-28 shrink-0"
+          label="Index"
+          field="seriesIndex"
+          :locked="isLocked('seriesIndex')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             :value="form.seriesIndex ?? ''"
             type="number"
             step="0.1"
             min="0"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('seriesIndex')"
             @input="setFloatField('seriesIndex', $event)"
           />
-        </div>
-        <div class="flex-1 min-w-30 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Publisher</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="flex-1 min-w-30"
+          label="Publisher"
+          field="publisher"
+          :locked="isLocked('publisher')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.publisher"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('publisher')"
           />
-        </div>
+        </MetadataFieldLabel>
       </div>
 
       <!-- Year | Language | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
       <div class="flex flex-wrap gap-3">
-        <div class="w-20 shrink-0 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Year</label>
+        <MetadataFieldLabel
+          class="w-28 shrink-0"
+          label="Year"
+          field="publishedYear"
+          :locked="isLocked('publishedYear')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             :value="form.publishedYear ?? ''"
             type="number"
             min="1"
             max="2100"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('publishedYear')"
             @input="setIntField('publishedYear', $event)"
           />
-        </div>
-        <div class="w-32 shrink-0 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Language</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="w-32 shrink-0"
+          label="Language"
+          field="language"
+          :locked="isLocked('language')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.language"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             maxlength="10"
+            :disabled="isLocked('language')"
           />
-        </div>
-        <div class="w-24 shrink-0 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Page Count</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="w-28 shrink-0"
+          label="Page Count"
+          field="pageCount"
+          :locked="isLocked('pageCount')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             :value="form.pageCount ?? ''"
             type="number"
             min="1"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('pageCount')"
             @input="setIntField('pageCount', $event)"
           />
-        </div>
-        <div class="flex-1 min-w-22.5 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ISBN-13</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="flex-1 min-w-22.5"
+          label="ISBN-13"
+          field="isbn13"
+          :locked="isLocked('isbn13')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.isbn13"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             maxlength="13"
+            :disabled="isLocked('isbn13')"
           />
-        </div>
-        <div class="flex-1 min-w-21.25 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ISBN-10</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="flex-1 min-w-21.25"
+          label="ISBN-10"
+          field="isbn10"
+          :locked="isLocked('isbn10')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.isbn10"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             maxlength="10"
+            :disabled="isLocked('isbn10')"
           />
-        </div>
-        <div v-if="isPrimaryAudio" class="w-24 shrink-0 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Duration (s)</label>
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          v-if="isPrimaryAudio"
+          class="w-24 shrink-0"
+          label="Duration (s)"
+          field="durationSeconds"
+          :locked="isLocked('durationSeconds')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             :value="form.durationSeconds ?? ''"
             type="number"
             min="1"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('durationSeconds')"
             @input="setIntField('durationSeconds', $event)"
           />
-        </div>
-        <div v-if="isPrimaryAudio" class="w-20 shrink-0 space-y-1">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Abridged</label>
-          <div class="flex items-center h-8">
-            <input id="abridged-check" v-model="form.abridged" type="checkbox" class="h-4 w-4 rounded border-input accent-primary" />
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          v-if="isPrimaryAudio"
+          class="w-20 shrink-0"
+          label="Abridged"
+          field="abridged"
+          :locked="isLocked('abridged')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
+          <div
+            class="flex h-8 items-center rounded-lg border border-input bg-background px-3 pr-10"
+            :class="isLocked('abridged') ? 'opacity-50 cursor-not-allowed' : ''"
+          >
+            <input
+              id="abridged-check"
+              v-model="form.abridged"
+              type="checkbox"
+              class="h-4 w-4 rounded border-input accent-primary"
+              :disabled="isLocked('abridged')"
+            />
             <label for="abridged-check" class="ml-2 text-sm text-foreground select-none">Abridged</label>
           </div>
-        </div>
+        </MetadataFieldLabel>
       </div>
 
       <!-- Provider IDs -->
       <div class="space-y-1">
         <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Provider IDs</label>
         <div class="rounded-lg border border-border bg-muted/30 p-3 flex gap-3 overflow-x-auto">
-          <div v-for="{ field, label } in providerIdFields" :key="field" class="space-y-1 min-w-30 flex-1">
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ label }}</label>
-            <input
-              v-model="form[field]"
-              class="w-full h-8 rounded-md border border-input bg-background px-2.5 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
-            />
+          <div v-for="{ field, label } in providerIdFields" :key="field" class="min-w-30 flex-1">
+            <MetadataFieldLabel :label="label" :field="field" :locked="isLocked(field)" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
+              <input
+                v-model="form[field]"
+                class="w-full h-8 rounded-md border border-input bg-background px-2.5 pr-10 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isLocked(field)"
+              />
+            </MetadataFieldLabel>
           </div>
         </div>
       </div>
@@ -400,85 +704,174 @@ async function autoFill() {
         <div v-if="comicSectionOpen" class="p-3 space-y-3">
           <!-- Issue Number | Volume -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Issue Number</label>
+            <MetadataFieldLabel
+              label="Issue Number"
+              field="comicIssueNumber"
+              :locked="isLocked('comicIssueNumber')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
               <input
                 v-model="form.comicIssueNumber"
-                class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+                class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isLocked('comicIssueNumber')"
               />
-            </div>
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Volume</label>
+            </MetadataFieldLabel>
+            <MetadataFieldLabel
+              label="Volume"
+              field="comicVolumeName"
+              :locked="isLocked('comicVolumeName')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
               <input
                 v-model="form.comicVolumeName"
-                class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+                class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isLocked('comicVolumeName')"
               />
-            </div>
+            </MetadataFieldLabel>
           </div>
           <!-- Story Arcs -->
-          <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Story Arcs</label>
-            <ChipInput v-model="form.comicStoryArcs" :search-fn="searchComicMetadata" />
-          </div>
+          <MetadataFieldLabel
+            label="Story Arcs"
+            field="comicStoryArcs"
+            :locked="isLocked('comicStoryArcs')"
+            :is-updating="isUpdatingLock"
+            @toggle="handleLockToggle"
+          >
+            <ChipInput v-model="form.comicStoryArcs" :search-fn="searchComicMetadata" :disabled="isLocked('comicStoryArcs')" control-class="pr-10" />
+          </MetadataFieldLabel>
           <!-- Pencillers | Inkers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pencillers</label>
-              <ChipInput v-model="form.comicPencillers" :search-fn="searchComicMetadata" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Inkers</label>
-              <ChipInput v-model="form.comicInkers" :search-fn="searchComicMetadata" />
-            </div>
+            <MetadataFieldLabel
+              label="Pencillers"
+              field="comicPencillers"
+              :locked="isLocked('comicPencillers')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
+              <ChipInput
+                v-model="form.comicPencillers"
+                :search-fn="searchComicMetadata"
+                :disabled="isLocked('comicPencillers')"
+                control-class="pr-10"
+              />
+            </MetadataFieldLabel>
+            <MetadataFieldLabel
+              label="Inkers"
+              field="comicInkers"
+              :locked="isLocked('comicInkers')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
+              <ChipInput v-model="form.comicInkers" :search-fn="searchComicMetadata" :disabled="isLocked('comicInkers')" control-class="pr-10" />
+            </MetadataFieldLabel>
           </div>
           <!-- Colorists | Letterers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Colorists</label>
-              <ChipInput v-model="form.comicColorists" :search-fn="searchComicMetadata" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Letterers</label>
-              <ChipInput v-model="form.comicLetterers" :search-fn="searchComicMetadata" />
-            </div>
+            <MetadataFieldLabel
+              label="Colorists"
+              field="comicColorists"
+              :locked="isLocked('comicColorists')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
+              <ChipInput
+                v-model="form.comicColorists"
+                :search-fn="searchComicMetadata"
+                :disabled="isLocked('comicColorists')"
+                control-class="pr-10"
+              />
+            </MetadataFieldLabel>
+            <MetadataFieldLabel
+              label="Letterers"
+              field="comicLetterers"
+              :locked="isLocked('comicLetterers')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
+              <ChipInput
+                v-model="form.comicLetterers"
+                :search-fn="searchComicMetadata"
+                :disabled="isLocked('comicLetterers')"
+                control-class="pr-10"
+              />
+            </MetadataFieldLabel>
           </div>
           <!-- Cover Artists -->
-          <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cover Artists</label>
-            <ChipInput v-model="form.comicCoverArtists" :search-fn="searchComicMetadata" />
-          </div>
+          <MetadataFieldLabel
+            label="Cover Artists"
+            field="comicCoverArtists"
+            :locked="isLocked('comicCoverArtists')"
+            :is-updating="isUpdatingLock"
+            @toggle="handleLockToggle"
+          >
+            <ChipInput
+              v-model="form.comicCoverArtists"
+              :search-fn="searchComicMetadata"
+              :disabled="isLocked('comicCoverArtists')"
+              control-class="pr-10"
+            />
+          </MetadataFieldLabel>
           <!-- Characters | Teams -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Characters</label>
-              <ChipInput v-model="form.comicCharacters" :search-fn="searchComicMetadata" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Teams</label>
-              <ChipInput v-model="form.comicTeams" :search-fn="searchComicMetadata" />
-            </div>
+            <MetadataFieldLabel
+              label="Characters"
+              field="comicCharacters"
+              :locked="isLocked('comicCharacters')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
+              <ChipInput
+                v-model="form.comicCharacters"
+                :search-fn="searchComicMetadata"
+                :disabled="isLocked('comicCharacters')"
+                control-class="pr-10"
+              />
+            </MetadataFieldLabel>
+            <MetadataFieldLabel
+              label="Teams"
+              field="comicTeams"
+              :locked="isLocked('comicTeams')"
+              :is-updating="isUpdatingLock"
+              @toggle="handleLockToggle"
+            >
+              <ChipInput v-model="form.comicTeams" :search-fn="searchComicMetadata" :disabled="isLocked('comicTeams')" control-class="pr-10" />
+            </MetadataFieldLabel>
           </div>
           <!-- Locations -->
-          <div class="space-y-1">
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Locations</label>
-            <ChipInput v-model="form.comicLocations" :search-fn="searchComicMetadata" />
-          </div>
+          <MetadataFieldLabel
+            label="Locations"
+            field="comicLocations"
+            :locked="isLocked('comicLocations')"
+            :is-updating="isUpdatingLock"
+            @toggle="handleLockToggle"
+          >
+            <ChipInput v-model="form.comicLocations" :search-fn="searchComicMetadata" :disabled="isLocked('comicLocations')" control-class="pr-10" />
+          </MetadataFieldLabel>
         </div>
       </div>
 
       <!-- Description -->
-      <div class="space-y-1">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+      <MetadataFieldLabel
+        label="Description"
+        field="description"
+        :locked="isLocked('description')"
+        :is-updating="isUpdatingLock"
+        multiline
+        @toggle="handleLockToggle"
+      >
         <textarea
           v-model="form.description"
           rows="6"
-          class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow resize-y"
+          class="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="isLocked('description')"
         />
-      </div>
+      </MetadataFieldLabel>
     </div>
   </div>
 
-  <MetadataSearchDrawer v-if="searchOpen" :book="props.book" @close="searchOpen = false" @apply="handleApply" />
+  <MetadataSearchDrawer v-if="searchOpen" :book="props.book" :locked-fields="lockedFields" @close="searchOpen = false" @apply="handleApply" />
 </template>
 
 <style scoped>

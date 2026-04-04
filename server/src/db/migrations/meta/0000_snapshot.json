@@ -1,5 +1,5 @@
 {
-  "id": "80aac49c-358c-485a-822e-4e4181816d4d",
+  "id": "72e849a9-b27e-4b5f-877b-08d05168e0bb",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2667,6 +2667,13 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "locked_fields": {
+          "name": "locked_fields",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
         },
         "updated_at": {
           "name": "updated_at",

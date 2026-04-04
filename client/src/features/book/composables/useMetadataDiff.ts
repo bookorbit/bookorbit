@@ -1,5 +1,13 @@
 import { computed, reactive, toValue, type MaybeRefOrGetter } from 'vue'
-import type { ComicMetadataFields, MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, MetadataSource, ProviderIds } from '@projectx/types'
+import type {
+  BookMetadataLockField,
+  ComicMetadataFields,
+  MetadataCandidate,
+  MetadataProviderInfo,
+  MetadataProviderKey,
+  MetadataSource,
+  ProviderIds,
+} from '@projectx/types'
 import { getProviderLabel } from '../lib/metadata-fetch'
 
 type ComicDiffFieldKey =
@@ -56,6 +64,7 @@ export interface DiffField {
   pickedProvider: MetadataProviderKey | null
   pickedDisplay: string
   isCover: boolean
+  isLocked: boolean
   isCopyable: boolean
   providerValues: ProviderFieldValue[]
 }
@@ -198,8 +207,16 @@ export function useMetadataDiff(
   providerInfos: MaybeRefOrGetter<MetadataProviderInfo[]>,
   currentCoverUrl?: string,
   providerIds?: MaybeRefOrGetter<ProviderIds | undefined>,
+  lockedFields?: MaybeRefOrGetter<readonly BookMetadataLockField[] | undefined>,
 ) {
   const pickedSources = reactive(new Map<DiffFieldKey, MetadataProviderKey>())
+  const lockedFieldSet = computed(() => new Set(toValue(lockedFields) ?? []))
+
+  function resolveLockField(key: DiffFieldKey): BookMetadataLockField | null {
+    if (key === 'coverUrl') return 'cover'
+    if (key === 'sourceUrl') return null
+    return key
+  }
 
   function getBookValue(key: DiffFieldKey): string {
     if (isComicDiffFieldKey(key)) return ''
@@ -251,6 +268,7 @@ export function useMetadataDiff(
     const pickedFromActive = isPicked && pickedProvider === ap
     const pickedCandidate = isPicked ? allCandidates.find((c) => c.provider === pickedProvider) : null
     const pickedDisplay = pickedCandidate ? getCandidateValueFrom(pickedCandidate, key) : ''
+    const lockField = resolveLockField(key)
 
     return {
       key,
@@ -264,6 +282,7 @@ export function useMetadataDiff(
       pickedProvider,
       pickedDisplay,
       isCover: key === 'coverUrl',
+      isLocked: lockField ? lockedFieldSet.value.has(lockField) : false,
       isCopyable: true,
       providerValues: buildProviderValues(key),
     }
@@ -310,6 +329,7 @@ export function useMetadataDiff(
         pickedProvider: pickedFromActive ? pickedProvider : null,
         pickedDisplay: pickedFromActive ? pickedDisplay : '',
         isCover: false,
+        isLocked: lockedFieldSet.value.has(providerIdKey),
         isCopyable: true,
         providerValues: [],
       })
@@ -328,6 +348,7 @@ export function useMetadataDiff(
         pickedProvider: null,
         pickedDisplay: '',
         isCover: false,
+        isLocked: false,
         isCopyable: false,
         providerValues: [],
       })
@@ -337,6 +358,8 @@ export function useMetadataDiff(
   })
 
   function toggleField(key: DiffFieldKey) {
+    const lockField = resolveLockField(key)
+    if (lockField && lockedFieldSet.value.has(lockField)) return
     const ap = toValue(activeProvider)
     if (pickedSources.get(key) === ap) {
       pickedSources.delete(key)
@@ -346,6 +369,8 @@ export function useMetadataDiff(
   }
 
   function pickFieldFromProvider(key: DiffFieldKey, provider: MetadataProviderKey) {
+    const lockField = resolveLockField(key)
+    if (lockField && lockedFieldSet.value.has(lockField)) return
     if (pickedSources.get(key) === provider) {
       pickedSources.delete(key)
     } else {
@@ -356,14 +381,14 @@ export function useMetadataDiff(
   function copyAll() {
     const ap = toValue(activeProvider)
     for (const f of fields.value) {
-      if (f.isCopyable) pickedSources.set(f.key, ap)
+      if (f.isCopyable && !f.isLocked) pickedSources.set(f.key, ap)
     }
   }
 
   function copyMissing() {
     const ap = toValue(activeProvider)
     for (const f of fields.value) {
-      if (f.isCopyable && !f.bookValue && !f.isPicked) pickedSources.set(f.key, ap)
+      if (f.isCopyable && !f.isLocked && !f.bookValue && !f.isPicked) pickedSources.set(f.key, ap)
     }
   }
 
@@ -374,6 +399,8 @@ export function useMetadataDiff(
     const allCandidates = toValue(candidates)
 
     for (const [key, providerKey] of pickedSources) {
+      const lockField = resolveLockField(key)
+      if (lockField && lockedFieldSet.value.has(lockField)) continue
       const candidate = allCandidates.find((c) => c.provider === providerKey)
       if (!candidate) continue
 

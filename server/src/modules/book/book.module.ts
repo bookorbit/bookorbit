@@ -4,6 +4,7 @@ import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
+import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
@@ -18,6 +19,7 @@ import { BookService } from './book.service';
 @Module({
   imports: [
     forwardRef(() => LibraryModule),
+    BookMetadataLockModule,
     MetadataModule,
     EmbeddingModule,
     MetadataFetchModule,

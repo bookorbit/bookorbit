@@ -12,6 +12,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata } from '../../db/schema';
 import { BookReadService } from '../book/book-read.service';
+import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { LibraryService } from '../library/library.service';
 import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover';
 import {
@@ -46,6 +47,7 @@ export class CoverService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly bookReadService: BookReadService,
+    private readonly bookMetadataLockService: BookMetadataLockService,
     private readonly libraryService: LibraryService,
     private readonly config: ConfigService,
     private readonly providerRegistry: CoverProviderRegistry,
@@ -107,6 +109,7 @@ export class CoverService {
     try {
       if (!mimeType.startsWith('image/')) throw new BadRequestException('File must be an image');
       await this.verifyAccess(bookId, user);
+      await this.bookMetadataLockService.assertFieldsUnlocked(bookId, ['cover']);
       await this.saveCustomCover(bookId, buffer);
       await this.setCoverSource(bookId, 'custom');
       this.logger.log(
@@ -128,6 +131,7 @@ export class CoverService {
 
     try {
       await this.verifyAccess(bookId, user);
+      await this.bookMetadataLockService.assertFieldsUnlocked(bookId, ['cover']);
       const { buffer } = await this.fetchRemoteImage(url);
       await this.saveCustomCover(bookId, buffer);
       await this.setCoverSource(bookId, 'custom');
@@ -148,6 +152,7 @@ export class CoverService {
 
     try {
       await this.verifyAccess(bookId, user);
+      await this.bookMetadataLockService.assertFieldsUnlocked(bookId, ['cover']);
       const dir = coverDirPath(this.booksPath, bookId);
       await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 

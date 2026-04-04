@@ -2,6 +2,7 @@ export * from "./audit";
 export * from "./auth";
 export * from "./permissions";
 export * from "./metadata-preferences";
+export * from "./metadata-lock";
 export * from "./dashboard";
 export * from "./book";
 export * from "./audiobook";

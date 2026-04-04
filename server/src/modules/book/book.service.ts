@@ -17,6 +17,7 @@ import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-
 import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
+import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
@@ -56,6 +57,7 @@ export class BookService {
     private readonly userBookStatusService: UserBookStatusService,
     private readonly narratorService: NarratorService,
     private readonly comicMetadataService: ComicMetadataRepository,
+    private readonly bookMetadataLockService: BookMetadataLockService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {
@@ -388,32 +390,33 @@ export class BookService {
     this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} - metadata update started`);
     try {
       await this.verifyBookAccess(id, user);
+      await this.bookMetadataLockService.assertManualUpdateAllowed(id, dto);
 
       const scalarFields: Parameters<BookRepository['updateMetadataFields']>[1] = {};
-      if ('title' in dto) scalarFields.title = dto.title ?? null;
-      if ('subtitle' in dto) scalarFields.subtitle = dto.subtitle ?? null;
-      if ('description' in dto) scalarFields.description = dto.description ?? null;
-      if ('publisher' in dto) scalarFields.publisher = dto.publisher ?? null;
-      if ('publishedYear' in dto) scalarFields.publishedYear = dto.publishedYear ?? null;
-      if ('language' in dto) scalarFields.language = dto.language ?? null;
-      if ('pageCount' in dto) scalarFields.pageCount = dto.pageCount ?? null;
-      if ('seriesName' in dto) scalarFields.seriesName = dto.seriesName ?? null;
-      if ('seriesIndex' in dto) scalarFields.seriesIndex = dto.seriesIndex ?? null;
-      if ('isbn10' in dto) scalarFields.isbn10 = dto.isbn10 ?? null;
-      if ('isbn13' in dto) scalarFields.isbn13 = dto.isbn13 ?? null;
-      if ('rating' in dto) scalarFields.rating = dto.rating ?? null;
-      if ('googleBooksId' in dto) scalarFields.googleBooksId = dto.googleBooksId ?? null;
-      if ('goodreadsId' in dto) scalarFields.goodreadsId = dto.goodreadsId ?? null;
-      if ('amazonId' in dto) scalarFields.amazonId = dto.amazonId ?? null;
-      if ('hardcoverId' in dto) scalarFields.hardcoverId = dto.hardcoverId ?? null;
-      if ('openLibraryId' in dto) scalarFields.openLibraryId = dto.openLibraryId ?? null;
-      if ('itunesId' in dto) scalarFields.itunesId = dto.itunesId ?? null;
-      if ('audibleId' in dto) scalarFields.audibleId = dto.audibleId ?? null;
-      if ('comicvineId' in dto) scalarFields.comicvineId = dto.comicvineId ?? null;
+      if (dto.title !== undefined) scalarFields.title = dto.title ?? null;
+      if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
+      if (dto.description !== undefined) scalarFields.description = dto.description ?? null;
+      if (dto.publisher !== undefined) scalarFields.publisher = dto.publisher ?? null;
+      if (dto.publishedYear !== undefined) scalarFields.publishedYear = dto.publishedYear ?? null;
+      if (dto.language !== undefined) scalarFields.language = dto.language ?? null;
+      if (dto.pageCount !== undefined) scalarFields.pageCount = dto.pageCount ?? null;
+      if (dto.seriesName !== undefined) scalarFields.seriesName = dto.seriesName ?? null;
+      if (dto.seriesIndex !== undefined) scalarFields.seriesIndex = dto.seriesIndex ?? null;
+      if (dto.isbn10 !== undefined) scalarFields.isbn10 = dto.isbn10 ?? null;
+      if (dto.isbn13 !== undefined) scalarFields.isbn13 = dto.isbn13 ?? null;
+      if (dto.rating !== undefined) scalarFields.rating = dto.rating ?? null;
+      if (dto.googleBooksId !== undefined) scalarFields.googleBooksId = dto.googleBooksId ?? null;
+      if (dto.goodreadsId !== undefined) scalarFields.goodreadsId = dto.goodreadsId ?? null;
+      if (dto.amazonId !== undefined) scalarFields.amazonId = dto.amazonId ?? null;
+      if (dto.hardcoverId !== undefined) scalarFields.hardcoverId = dto.hardcoverId ?? null;
+      if (dto.openLibraryId !== undefined) scalarFields.openLibraryId = dto.openLibraryId ?? null;
+      if (dto.itunesId !== undefined) scalarFields.itunesId = dto.itunesId ?? null;
+      if (dto.audibleId !== undefined) scalarFields.audibleId = dto.audibleId ?? null;
+      if (dto.comicvineId !== undefined) scalarFields.comicvineId = dto.comicvineId ?? null;
       if (dto.audioMetadata) {
-        if ('durationSeconds' in dto.audioMetadata) scalarFields.durationSeconds = dto.audioMetadata.durationSeconds ?? null;
-        if ('abridged' in dto.audioMetadata) scalarFields.abridged = dto.audioMetadata.abridged ?? false;
-        if ('chapters' in dto.audioMetadata) scalarFields.chapters = dto.audioMetadata.chapters ?? null;
+        if (dto.audioMetadata.durationSeconds !== undefined) scalarFields.durationSeconds = dto.audioMetadata.durationSeconds ?? null;
+        if (dto.audioMetadata.abridged !== undefined) scalarFields.abridged = dto.audioMetadata.abridged ?? false;
+        if (dto.audioMetadata.chapters !== undefined) scalarFields.chapters = dto.audioMetadata.chapters ?? null;
       }
 
       const scalarFieldCount = Object.keys(scalarFields).length;
@@ -471,6 +474,28 @@ export class BookService {
       const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
       this.logger.warn(
         `[${event}] [fail] bookId=${id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata update failed`,
+      );
+      throw err;
+    }
+  }
+
+  async updateMetadataLocks(id: number, lockedFields: string[], user: RequestUser): Promise<BookDetailDto> {
+    const event = 'book.update_metadata_locks';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} - metadata lock update started`);
+    try {
+      await this.verifyBookAccess(id, user);
+      const normalizedLockedFields = await this.bookMetadataLockService.replaceLockedFields(id, lockedFields);
+      const detail = await this.getDetail(id, user);
+      this.logger.log(
+        `[${event}] [end] bookId=${id} durationMs=${Date.now() - startedAt} lockedFields=${normalizedLockedFields.length} - metadata lock update completed`,
+      );
+      return detail;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] bookId=${id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata lock update failed`,
       );
       throw err;
     }
@@ -747,7 +772,13 @@ export class BookService {
         return previewResult;
       }
 
-      const r = resolved as Record<string, unknown>;
+      const {
+        resolved: filteredResolved,
+        providerIds: filteredProviderIds,
+        skippedFields,
+      } = await this.bookMetadataLockService.filterResolvedMetadata(id, resolved, resolvedProviderIds);
+
+      const r = filteredResolved as Record<string, unknown>;
       const dto: UpdateBookMetadataDto = {};
       if (r.title !== undefined) dto.title = r.title as string | null;
       if (r.subtitle !== undefined) dto.subtitle = r.subtitle as string | null;
@@ -768,7 +799,7 @@ export class BookService {
         if (r.chapters !== undefined) dto.audioMetadata.chapters = r.chapters as NonNullable<typeof dto.audioMetadata.chapters>;
       }
       if (r.comicMetadata !== undefined) dto.comicMetadata = r.comicMetadata as UpdateBookMetadataDto['comicMetadata'];
-      this.applyResolvedProviderIds(dto, resolvedProviderIds);
+      this.applyResolvedProviderIds(dto, filteredProviderIds);
 
       const updatedFields = Object.keys(dto).length;
       let detail: BookDetailDto | undefined;
@@ -781,15 +812,15 @@ export class BookService {
       await this.bookRepo.updateMetadataFields(id, { lastMetadataFetchAt: new Date(), updatedAt: new Date() });
 
       let coverDownloaded = false;
-      if (resolved.coverUrl) {
-        await this.metadataService.downloadAndSaveCover(resolved.coverUrl, id);
+      if (filteredResolved.coverUrl) {
+        await this.metadataService.downloadAndSaveCover(filteredResolved.coverUrl, id);
         detail = await this.getDetail(id, user);
         coverDownloaded = true;
       }
 
       const result = detail ?? (await this.getDetail(id, user));
       this.logger.log(
-        `[${event}] [end] bookId=${id} preview=false durationMs=${Date.now() - startedAt} updatedFields=${updatedFields} coverDownloaded=${coverDownloaded} - refresh metadata completed`,
+        `[${event}] [end] bookId=${id} preview=false durationMs=${Date.now() - startedAt} updatedFields=${updatedFields} skippedLockedFields=${skippedFields.join('|') || 'none'} coverDownloaded=${coverDownloaded} - refresh metadata completed`,
       );
       return result;
     } catch (err) {
@@ -875,11 +906,15 @@ export class BookService {
       }
       await this.verifyLibraryAccessForBookIds(bookIds, user);
 
-      const files = await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
+      const [files, coverLockedBookIds] = await Promise.all([
+        this.bookRepo.findPrimaryFilesByBookIds(bookIds),
+        this.bookMetadataLockService.getCoverLockedBookIds(bookIds),
+      ]);
       const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
 
       let processed = 0;
       let updated = 0;
+      let skipped = 0;
       let callbackInterrupted = false;
       let cancelled = false;
       for (const id of bookIds) {
@@ -889,6 +924,10 @@ export class BookService {
         }
         const file = filesByBookId.get(id);
         if (!file) continue;
+        if (coverLockedBookIds.has(id)) {
+          skipped++;
+          continue;
+        }
         processed++;
         const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
         if (saved) {
@@ -902,7 +941,7 @@ export class BookService {
         }
       }
       this.logger.log(
-        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} callbackInterrupted=${callbackInterrupted} cancelled=${cancelled} - bulk re-extract cover completed`,
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} skippedLocked=${skipped} callbackInterrupted=${callbackInterrupted} cancelled=${cancelled} - bulk re-extract cover completed`,
       );
       return { processed, updated };
     } catch (err) {
@@ -989,6 +1028,7 @@ export class BookService {
       seriesIndex: meta?.seriesIndex ?? null,
       rating: meta?.rating ?? null,
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
+      lockedFields: this.bookMetadataLockService.normalizeLockedFields(meta?.lockedFields),
       providerIds: {
         [MetadataProviderKey.GOOGLE]: meta?.googleBooksId ?? null,
         [MetadataProviderKey.GOODREADS]: meta?.goodreadsId ?? null,

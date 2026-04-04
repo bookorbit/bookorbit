@@ -2,14 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { X, Sparkles } from 'lucide-vue-next'
 import { isAudioFormat } from '@projectx/types'
-import type { BookDetail, MetadataCandidate, MetadataSource } from '@projectx/types'
+import type { BookDetail, BookMetadataLockField, MetadataCandidate, MetadataSource } from '@projectx/types'
 import { useMetadataSearch } from '../../../composables/useMetadataSearch'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import MetadataSearchPanel from './MetadataSearchPanel.vue'
 import MetadataDiffPanel from './MetadataDiffPanel.vue'
 
-const props = defineProps<{ book: BookDetail }>()
+const props = defineProps<{ book: BookDetail; lockedFields: BookMetadataLockField[] }>()
 const emit = defineEmits<{
   close: []
   apply: [{ formPatch: MetadataPatch; coverUrl?: string }]
@@ -156,6 +156,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             :providers="providers"
             :current-cover-url="bookCoverUrl"
             :provider-ids="book.providerIds"
+            :locked-fields="props.lockedFields"
             :filtered-results="filteredResults"
             back-label="Results"
             @back="backToSearch"

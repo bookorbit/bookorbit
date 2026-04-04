@@ -35,6 +35,7 @@ import { SearchBooksDto } from './dto/search-books.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import type { BookQuery } from '@projectx/types';
+import { UpdateBookMetadataLocksDto } from '../book-metadata-lock/dto/update-book-metadata-locks.dto';
 
 function stripLoneSurrogates(value: string): string {
   let out = '';
@@ -342,6 +343,18 @@ export class BookController {
   })
   updateMetadata(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataDto, @CurrentUser() user: RequestUser) {
     return this.bookService.updateMetadata(id, dto, user);
+  }
+
+  @Patch(':id/metadata-locks')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookMetadataLocksUpdate,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated metadata locks for book #${req.params['id']}`,
+  })
+  updateMetadataLocks(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataLocksDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.updateMetadataLocks(id, dto.lockedFields, user);
   }
 
   @Post(':id/refresh-metadata')

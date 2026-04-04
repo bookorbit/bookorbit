@@ -328,6 +328,7 @@ CREATE TABLE "book_metadata" (
 	"audible_id" varchar(20),
 	"comicvine_id" varchar(50),
 	"chapters" jsonb,
+	"locked_fields" text[] DEFAULT '{}'::text[] NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

@@ -1,4 +1,4 @@
-import type { AudiobookChapter, ComicMetadataFields, NarratorRef, ProviderIds, UserBookStatus } from '@projectx/types';
+import type { AudiobookChapter, BookMetadataLockField, ComicMetadataFields, NarratorRef, ProviderIds, UserBookStatus } from '@projectx/types';
 
 export class BookFileDto {
   id: number;
@@ -49,5 +49,6 @@ export class BookDetailDto {
   audioMetadata: AudioMetadataDto | null;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
+  lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
 }

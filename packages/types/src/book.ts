@@ -1,4 +1,5 @@
 import type { MetadataProviderKey } from "./metadata-fetch";
+import type { BookMetadataLockField } from "./metadata-lock";
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
 import type { ComicMetadataFields } from "./metadata-fetch";
 
@@ -95,6 +96,7 @@ export type BookDetail = {
   audioMetadata: AudioMetadata | null;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
+  lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
 };
 

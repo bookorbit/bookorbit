@@ -8,11 +8,12 @@ import { join } from 'path';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
+import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { ComicMetadataRepository } from './comic-metadata.repository';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
-import { isAudioFormat } from '@projectx/types';
+import { type ComicMetadataFields, isAudioFormat } from '@projectx/types';
 import { parseAudioDuration } from './extractors/audio.extractor';
 import { AudioFormatExtractor } from './extractors/audio-format.extractor';
 import { ComicFormatExtractor } from './extractors/comic-format.extractor';
@@ -51,6 +52,7 @@ export class MetadataService {
     private readonly scoreService: MetadataScoreService,
     private readonly narratorService: NarratorService,
     private readonly comicMetadataRepository: ComicMetadataRepository,
+    private readonly bookMetadataLockService: BookMetadataLockService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {
@@ -128,14 +130,23 @@ export class MetadataService {
     const data = await extractor.extract(absolutePath);
     if (!data) return;
 
+    const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
+      audioMetadata: {
+        narrators: data.narrators,
+        chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
+      },
+    });
+
     const updates: Promise<unknown>[] = [];
 
-    if (data.chapters && data.chapters.length > 0) {
-      updates.push(this.db.update(bookMetadata).set({ chapters: data.chapters, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)));
+    if (filtered.audioMetadata?.chapters !== undefined) {
+      updates.push(
+        this.db.update(bookMetadata).set({ chapters: filtered.audioMetadata.chapters, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)),
+      );
     }
 
-    if (data.narrators && data.narrators.length > 0) {
-      updates.push(this.narratorService.replaceForBook(bookId, data.narrators));
+    if (filtered.audioMetadata?.narrators !== undefined) {
+      updates.push(this.narratorService.replaceForBook(bookId, filtered.audioMetadata.narrators));
     }
 
     await Promise.all(updates);
@@ -147,6 +158,10 @@ export class MetadataService {
     this.logger.debug(`[${event}] [start] bookId=${bookId} - cover download started`);
 
     try {
+      if (await this.bookMetadataLockService.isFieldLocked(bookId, 'cover')) {
+        this.logger.debug(`[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} saved=false locked=true - cover download skipped`);
+        return false;
+      }
       const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
         this.logger.debug(
@@ -189,6 +204,12 @@ export class MetadataService {
     }
 
     try {
+      if (await this.bookMetadataLockService.isFieldLocked(bookId, 'cover')) {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=false locked=true - cover refresh skipped`,
+        );
+        return false;
+      }
       const data = await extractor.extract(absolutePath);
       if (!data?.cover) {
         this.logger.debug(
@@ -223,6 +244,7 @@ export class MetadataService {
   }
 
   async aggregateAudioDuration(bookId: number): Promise<void> {
+    if (await this.bookMetadataLockService.isFieldLocked(bookId, 'durationSeconds')) return;
     const [primary] = await this.db
       .select({ format: schema.bookFiles.format })
       .from(schema.books)
@@ -284,6 +306,10 @@ export class MetadataService {
 
   async replaceNarrators(bookId: number, narratorNames: { name: string; sortName: string | null }[]) {
     await this.narratorService.replaceForBook(bookId, narratorNames);
+  }
+
+  async upsertComicMetadata(bookId: number, fields: ComicMetadataFields) {
+    await this.comicMetadataRepository.upsert(bookId, fields);
   }
 
   async replaceGenres(bookId: number, parsedGenres: string[], options: RelationMutationOptions = {}) {
@@ -386,24 +412,39 @@ export class MetadataService {
   }
 
   private async persistAudioMetadata(bookId: number, data: ParsedBookData): Promise<void> {
-    await this.db
-      .update(bookMetadata)
-      .set({
-        title: data.title,
-        description: data.description,
-        publisher: data.publisher,
-        publishedYear: data.publishedYear,
-        language: data.language,
+    const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
+      title: data.title,
+      description: data.description,
+      publisher: data.publisher,
+      publishedYear: data.publishedYear,
+      language: data.language,
+      authors: data.authors.map((author) => author.name),
+      audioMetadata: {
         durationSeconds: data.durationSeconds ?? null,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(bookMetadata.bookId, bookId));
+        narrators: data.narrators,
+      },
+    });
 
-    await this.replaceAuthors(bookId, data.authors);
+    const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
+    if (filtered.title !== undefined) scalarFields.title = filtered.title;
+    if (filtered.description !== undefined) scalarFields.description = filtered.description;
+    if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
+    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = filtered.publishedYear;
+    if (filtered.language !== undefined) scalarFields.language = filtered.language;
+    if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
+    if (filtered.audioMetadata?.chapters !== undefined) scalarFields.chapters = filtered.audioMetadata.chapters;
+    if (Object.keys(scalarFields).length > 0) {
+      scalarFields.updatedAt = new Date();
+      await this.db.update(bookMetadata).set(scalarFields).where(eq(bookMetadata.bookId, bookId));
+    }
 
-    if (data.narrators && data.narrators.length > 0) {
-      await this.narratorService.replaceForBook(bookId, data.narrators);
+    if (filtered.authors !== undefined) {
+      await this.replaceAuthors(bookId, data.authors);
+    }
+
+    if (filtered.audioMetadata?.narrators !== undefined) {
+      await this.narratorService.replaceForBook(bookId, filtered.audioMetadata.narrators);
     }
 
     this.logger.debug(
@@ -412,32 +453,49 @@ export class MetadataService {
   }
 
   private async persistBookMetadata(bookId: number, data: ParsedBookData, format: string): Promise<void> {
-    await this.db
-      .update(bookMetadata)
-      .set({
-        title: data.title,
-        subtitle: data.subtitle,
-        description: data.description,
-        isbn10: data.isbn10 ? data.isbn10.replace(/[^0-9Xx]/g, '') : data.isbn10,
-        isbn13: data.isbn13 ? data.isbn13.replace(/[^0-9]/g, '') : data.isbn13,
-        publisher: data.publisher,
-        publishedYear: data.publishedYear,
-        language: data.language,
-        seriesName: data.seriesName,
-        seriesIndex: data.seriesIndex,
-        updatedAt: new Date(),
-      })
-      .where(eq(bookMetadata.bookId, bookId));
+    const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
+      title: data.title,
+      subtitle: data.subtitle,
+      description: data.description,
+      isbn10: data.isbn10 ? data.isbn10.replace(/[^0-9Xx]/g, '') : data.isbn10,
+      isbn13: data.isbn13 ? data.isbn13.replace(/[^0-9]/g, '') : data.isbn13,
+      publisher: data.publisher,
+      publishedYear: data.publishedYear,
+      language: data.language,
+      seriesName: data.seriesName,
+      seriesIndex: data.seriesIndex,
+      authors: data.authors.map((author) => author.name),
+      genres: data.genres,
+      pageCount: data.pageCount,
+      comicMetadata: data.comicMetadata ?? undefined,
+    });
 
-    await this.replaceAuthors(bookId, data.authors);
-    await this.replaceGenres(bookId, data.genres);
-
-    if (data.pageCount != null) {
-      await this.db.update(bookMetadata).set({ pageCount: data.pageCount }).where(eq(bookMetadata.bookId, bookId));
+    const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
+    if (filtered.title !== undefined) scalarFields.title = filtered.title;
+    if (filtered.subtitle !== undefined) scalarFields.subtitle = filtered.subtitle;
+    if (filtered.description !== undefined) scalarFields.description = filtered.description;
+    if (filtered.isbn10 !== undefined) scalarFields.isbn10 = filtered.isbn10;
+    if (filtered.isbn13 !== undefined) scalarFields.isbn13 = filtered.isbn13;
+    if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
+    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = filtered.publishedYear;
+    if (filtered.language !== undefined) scalarFields.language = filtered.language;
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
+    if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
+    if (filtered.pageCount !== undefined) scalarFields.pageCount = filtered.pageCount;
+    if (Object.keys(scalarFields).length > 0) {
+      scalarFields.updatedAt = new Date();
+      await this.db.update(bookMetadata).set(scalarFields).where(eq(bookMetadata.bookId, bookId));
     }
 
-    if (data.comicMetadata) {
-      await this.comicMetadataRepository.upsert(bookId, data.comicMetadata);
+    if (filtered.authors !== undefined) {
+      await this.replaceAuthors(bookId, data.authors);
+    }
+    if (filtered.genres !== undefined) {
+      await this.replaceGenres(bookId, filtered.genres);
+    }
+
+    if (filtered.comicMetadata) {
+      await this.comicMetadataRepository.upsert(bookId, filtered.comicMetadata);
     }
 
     this.logger.debug(
@@ -455,6 +513,7 @@ export class MetadataService {
    * (used for audio primary files and manually uploaded covers).
    */
   private async persistCover(bookId: number, bytes: Buffer, overwrite: boolean): Promise<void> {
+    if (await this.bookMetadataLockService.isFieldLocked(bookId, 'cover')) return;
     const ext = imageExt(bytes);
     const dir = join(this.booksPath, 'covers', String(bookId));
     await mkdir(dir, { recursive: true });

@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ArrowLeft, CopyCheck, Copy, CheckCheck, Eye, EyeOff, Info } from 'lucide-vue-next'
-import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, MetadataSource, ProviderIds } from '@projectx/types'
+import type {
+  BookMetadataLockField,
+  MetadataCandidate,
+  MetadataProviderInfo,
+  MetadataProviderKey,
+  MetadataSource,
+  ProviderIds,
+} from '@projectx/types'
 import { useMetadataDiff, type DiffFieldKey, type MetadataPatch } from '../../../composables/useMetadataDiff'
 import { getProviderColor, getProviderLabel, hideOnError, providerActivePillStyle } from '../../../lib/metadata-fetch'
 import MetadataDiffRow from './MetadataDiffRow.vue'
@@ -16,6 +23,7 @@ const props = defineProps<{
   backLabel?: string
   currentCoverUrl?: string
   providerIds?: ProviderIds
+  lockedFields?: BookMetadataLockField[]
 }>()
 
 const emit = defineEmits<{
@@ -85,6 +93,7 @@ const { fields, picksPerProvider, toggleField, pickFieldFromProvider, clearPicks
     computed(() => props.providers),
     props.currentCoverUrl,
     computed(() => props.providerIds),
+    computed(() => props.lockedFields ?? []),
   )
 
 const activeProviderLabel = computed(() => getProviderLabel(activeProvider.value, props.providers))

@@ -8,6 +8,7 @@ import { MetadataService } from '../metadata/metadata.service';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import { ProviderThrottleTracker } from '../metadata-fetch/provider-throttle.tracker';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
+import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchEligibilityService } from './book-metadata-fetch-eligibility.service';
 import { BookMetadataFetchGateway } from './book-metadata-fetch.gateway';
@@ -32,6 +33,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     private readonly pipeline: MetadataFetchPipeline,
     private readonly metadataService: MetadataService,
     private readonly scoreService: MetadataScoreService,
+    private readonly bookMetadataLockService: BookMetadataLockService,
     private readonly session: BookMetadataFetchSessionService,
     private readonly throttleTracker: ProviderThrottleTracker,
     @Optional() private readonly gateway?: BookMetadataFetchGateway,
@@ -249,48 +251,60 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     existingGenreRows: { name: string }[],
     existingNarratorRows: { name: string }[],
   ): Promise<void> {
+    const {
+      resolved: filteredResolved,
+      providerIds: filteredProviderIds,
+      skippedFields,
+    } = await this.bookMetadataLockService.filterResolvedMetadata(bookId, resolved, providerIds);
+    if (skippedFields.length > 0) {
+      this.logger.debug(
+        `[book.metadata_fetch.persist] [end] bookId=${bookId} skippedLockedFields=${skippedFields.join('|')} - metadata fetch skipped locked fields`,
+      );
+    }
+
     const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
 
-    const title = this.asNullableString(resolved.title);
+    const title = this.asNullableString(filteredResolved.title);
     if (title !== undefined) scalarFields.title = title;
-    const subtitle = this.asNullableString(resolved.subtitle);
+    const subtitle = this.asNullableString(filteredResolved.subtitle);
     if (subtitle !== undefined) scalarFields.subtitle = subtitle;
-    const description = this.asNullableString(resolved.description);
+    const description = this.asNullableString(filteredResolved.description);
     if (description !== undefined) scalarFields.description = description;
-    const publisher = this.asNullableString(resolved.publisher);
+    const publisher = this.asNullableString(filteredResolved.publisher);
     if (publisher !== undefined) scalarFields.publisher = publisher;
-    const publishedYear = this.asNullableNumber(resolved.publishedYear);
+    const publishedYear = this.asNullableNumber(filteredResolved.publishedYear);
     if (publishedYear !== undefined) scalarFields.publishedYear = publishedYear;
-    const language = this.asNullableString(resolved.language);
+    const language = this.asNullableString(filteredResolved.language);
     if (language !== undefined) scalarFields.language = language;
-    const pageCount = this.asNullableNumber(resolved.pageCount);
+    const pageCount = this.asNullableNumber(filteredResolved.pageCount);
     if (pageCount !== undefined) scalarFields.pageCount = pageCount;
-    const seriesName = this.asNullableString(resolved.seriesName);
+    const seriesName = this.asNullableString(filteredResolved.seriesName);
     if (seriesName !== undefined) scalarFields.seriesName = seriesName;
-    const seriesIndex = this.asNullableNumber(resolved.seriesIndex);
+    const seriesIndex = this.asNullableNumber(filteredResolved.seriesIndex);
     if (seriesIndex !== undefined) scalarFields.seriesIndex = seriesIndex;
 
-    if (providerIds[MetadataProviderKey.GOOGLE]) scalarFields.googleBooksId = providerIds[MetadataProviderKey.GOOGLE];
-    if (providerIds[MetadataProviderKey.GOODREADS]) scalarFields.goodreadsId = providerIds[MetadataProviderKey.GOODREADS];
-    if (providerIds[MetadataProviderKey.AMAZON]) scalarFields.amazonId = providerIds[MetadataProviderKey.AMAZON];
-    if (providerIds[MetadataProviderKey.HARDCOVER]) scalarFields.hardcoverId = providerIds[MetadataProviderKey.HARDCOVER];
-    if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) scalarFields.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
-    if (providerIds[MetadataProviderKey.ITUNES]) scalarFields.itunesId = providerIds[MetadataProviderKey.ITUNES];
-    if (providerIds[MetadataProviderKey.AUDIBLE]) scalarFields.audibleId = providerIds[MetadataProviderKey.AUDIBLE];
+    if (filteredProviderIds[MetadataProviderKey.GOOGLE]) scalarFields.googleBooksId = filteredProviderIds[MetadataProviderKey.GOOGLE];
+    if (filteredProviderIds[MetadataProviderKey.GOODREADS]) scalarFields.goodreadsId = filteredProviderIds[MetadataProviderKey.GOODREADS];
+    if (filteredProviderIds[MetadataProviderKey.AMAZON]) scalarFields.amazonId = filteredProviderIds[MetadataProviderKey.AMAZON];
+    if (filteredProviderIds[MetadataProviderKey.HARDCOVER]) scalarFields.hardcoverId = filteredProviderIds[MetadataProviderKey.HARDCOVER];
+    if (filteredProviderIds[MetadataProviderKey.OPEN_LIBRARY]) scalarFields.openLibraryId = filteredProviderIds[MetadataProviderKey.OPEN_LIBRARY];
+    if (filteredProviderIds[MetadataProviderKey.ITUNES]) scalarFields.itunesId = filteredProviderIds[MetadataProviderKey.ITUNES];
+    if (filteredProviderIds[MetadataProviderKey.AUDIBLE]) scalarFields.audibleId = filteredProviderIds[MetadataProviderKey.AUDIBLE];
+    if (filteredProviderIds[MetadataProviderKey.COMICVINE]) scalarFields.comicvineId = filteredProviderIds[MetadataProviderKey.COMICVINE];
 
-    const duration = this.asNullableNumber(resolved.duration);
+    const duration = this.asNullableNumber(filteredResolved.duration);
     if (duration !== undefined) scalarFields.durationSeconds = duration;
     // Only overwrite abridged when the provider gives a definitive boolean - never let null
     // overwrite an existing true value.
-    const abridged = this.asBoolean(resolved.abridged);
+    const abridged = this.asBoolean(filteredResolved.abridged);
     if (abridged !== undefined) scalarFields.abridged = abridged;
-    if (resolved.chapters !== undefined) scalarFields.chapters = resolved.chapters;
+    if (filteredResolved.chapters !== undefined) scalarFields.chapters = filteredResolved.chapters;
 
     scalarFields.lastMetadataFetchAt = new Date();
     scalarFields.updatedAt = new Date();
     await this.bookReadService.updateMetadataFields(bookId, scalarFields);
 
-    const resolvedAuthors = this.asStringArray(resolved.authors);
+    const resolvedAuthors = this.asStringArray(filteredResolved.authors);
     if (resolvedAuthors !== undefined) {
       const names = resolvedAuthors;
       if (names.length > 0 || existingAuthorRows.length > 0) {
@@ -301,7 +315,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       }
     }
 
-    const resolvedGenres = this.asStringArray(resolved.genres);
+    const resolvedGenres = this.asStringArray(filteredResolved.genres);
     if (resolvedGenres !== undefined) {
       const names = resolvedGenres;
       if (names.length > 0 || existingGenreRows.length > 0) {
@@ -309,7 +323,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       }
     }
 
-    const resolvedNarrators = this.asStringArray(resolved.narrators);
+    const resolvedNarrators = this.asStringArray(filteredResolved.narrators);
     if (resolvedNarrators !== undefined) {
       const names = resolvedNarrators;
       if (names.length > 0 || existingNarratorRows.length > 0) {
@@ -320,8 +334,12 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       }
     }
 
-    if (resolved.coverUrl) {
-      await this.metadataService.downloadAndSaveCover(resolved.coverUrl, bookId);
+    if (filteredResolved.comicMetadata !== undefined) {
+      await this.metadataService.upsertComicMetadata(bookId, filteredResolved.comicMetadata);
+    }
+
+    if (filteredResolved.coverUrl) {
+      await this.metadataService.downloadAndSaveCover(filteredResolved.coverUrl, bookId);
     }
   }
 

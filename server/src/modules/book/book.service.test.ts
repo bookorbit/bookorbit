@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import { access, readdir, rm, stat } from 'fs/promises';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { MetadataProviderKey } from '@projectx/types';
+import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { BookService } from './book.service';
 
 vi.mock('fs/promises', async () => {
@@ -104,6 +105,21 @@ function makeService() {
     upsert: vi.fn().mockResolvedValue(undefined),
     findByBookId: vi.fn().mockResolvedValue(null),
   };
+  const bookMetadataLockService = {
+    normalizeLockedFields: vi.fn().mockImplementation((fields: string[] | null | undefined) => fields ?? []),
+    isFieldLocked: vi.fn().mockResolvedValue(false),
+    assertManualUpdateAllowed: vi.fn().mockResolvedValue(undefined),
+    filterResolvedMetadata: vi.fn().mockImplementation((_bookId: number, resolved: unknown, providerIds: unknown) =>
+      Promise.resolve({
+        resolved,
+        providerIds,
+        skippedFields: [],
+      }),
+    ),
+    assertFieldsUnlocked: vi.fn().mockResolvedValue(undefined),
+    getCoverLockedBookIds: vi.fn().mockResolvedValue(new Set()),
+    replaceLockedFields: vi.fn().mockResolvedValue([]),
+  };
   const userBookStatusService = {
     autoUpdate: vi.fn().mockResolvedValue(undefined),
     setManual: vi.fn().mockResolvedValue(undefined),
@@ -125,6 +141,7 @@ function makeService() {
     userBookStatusService as never,
     narratorService as never,
     comicMetadataService as never,
+    bookMetadataLockService as never,
     embedder as never,
     fileWriteService as never,
   );
@@ -143,6 +160,7 @@ function makeService() {
     fileWriteService,
     narratorService,
     comicMetadataService,
+    bookMetadataLockService,
   };
 }
 
@@ -632,6 +650,38 @@ describe('BookService', () => {
       );
     });
 
+    it('refreshMetadata skips locked automated fields and cover mutations', async () => {
+      const { service, bookRepo, pipeline, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: { title: 'Resolved', authors: ['A'], coverUrl: 'https://img/c.jpg' },
+        sources: {},
+        providerIds: {
+          [MetadataProviderKey.GOOGLE]: 'g-id',
+        },
+      });
+      bookMetadataLockService.filterResolvedMetadata.mockResolvedValue({
+        resolved: { authors: ['A'] },
+        providerIds: {},
+        skippedFields: ['title', 'cover', 'googleBooksId'],
+      });
+
+      const updateSpy = vi.spyOn(service, 'updateMetadata').mockResolvedValue({ id: 1 } as never);
+
+      await service.refreshMetadata(1, false, user);
+
+      expect(updateSpy).toHaveBeenCalledWith(1, { authors: ['A'] }, user);
+      expect(metadataService.downloadAndSaveCover).not.toHaveBeenCalled();
+    });
+
     it('updateMetadata writes scalar fields, collections, schedules file write, and triggers embedding', async () => {
       const { service, bookRepo, metadataService, embedder, fileWriteService } = makeService();
       const user = makeUser();
@@ -675,6 +725,60 @@ describe('BookService', () => {
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(5, 'auto', user.id);
       expect(embedder.embedBook).toHaveBeenCalledWith(5);
       expect(detailSpy).toHaveBeenCalledWith(5, user);
+    });
+
+    it('updateMetadata rejects manual writes to locked fields', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      const error = new ConflictException('Metadata fields are locked: title');
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookMetadataLockService.assertManualUpdateAllowed.mockRejectedValue(error);
+
+      await expect(service.updateMetadata(5, { title: 'Locked Title' }, user)).rejects.toThrow(error);
+
+      expect(bookRepo.withTransaction).not.toHaveBeenCalled();
+    });
+
+    it('updateMetadata does not clear omitted scalar fields on transformed dto instances', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const dto = new UpdateBookMetadataDto();
+      dto.publisher = 'Allowed Publisher';
+
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, dto, user);
+
+      expect(bookRepo.updateMetadataFields).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          publisher: 'Allowed Publisher',
+          updatedAt: expect.any(Date),
+        }),
+        expect.anything(),
+      );
+      expect(bookRepo.updateMetadataFields).not.toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          title: null,
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('updateMetadataLocks replaces lock state and returns updated detail', async () => {
+      const { service, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      const detailSpy = vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5, lockedFields: ['title'] } as never);
+      bookMetadataLockService.replaceLockedFields.mockResolvedValue(['title']);
+
+      const result = await service.updateMetadataLocks(5, ['title', 'title'], user);
+
+      expect(bookMetadataLockService.replaceLockedFields).toHaveBeenCalledWith(5, ['title', 'title']);
+      expect(detailSpy).toHaveBeenCalledWith(5, user);
+      expect(result).toEqual({ id: 5, lockedFields: ['title'] });
     });
   });
 
@@ -770,6 +874,22 @@ describe('BookService', () => {
 
       expect(result).toEqual({ processed: 1, updated: 1 });
       expect(metadataService.refreshCoverForBook).toHaveBeenCalledTimes(1);
+    });
+
+    it('bulkReExtractCover skips locked cover mutations', async () => {
+      const { service, bookRepo, bookMetadataLockService, metadataService } = makeService();
+      const user = makeUser();
+      const onProgress = vi.fn();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/1.epub', format: 'epub' }]);
+      bookMetadataLockService.getCoverLockedBookIds.mockResolvedValue(new Set([1]));
+
+      await expect(service.bulkReExtractCover([1], user, onProgress)).resolves.toEqual({ processed: 0, updated: 0 });
+
+      expect(bookMetadataLockService.getCoverLockedBookIds).toHaveBeenCalledWith([1]);
+      expect(metadataService.refreshCoverForBook).not.toHaveBeenCalled();
+      expect(onProgress).not.toHaveBeenCalled();
     });
 
     it('stops bulk metadata refresh when cancelled', async () => {

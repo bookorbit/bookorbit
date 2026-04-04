@@ -155,16 +155,25 @@ describe('MetadataService', () => {
     mockParsePdfFile.mockResolvedValue(null);
   });
 
-  it('downloadAndSaveCover writes cover/thumbnail and updates metadata when download is valid', async () => {
-    const { db, updateSet } = makeDb();
-    const service = new MetadataService(
+  function makeService(db: unknown, metadataEvents?: unknown) {
+    return new MetadataService(
       db as never,
       config as never,
       { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
       { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
       { upsert: vi.fn().mockResolvedValue(undefined) } as never,
+      {
+        isFieldLocked: vi.fn().mockResolvedValue(false),
+        filterAutomatedBookUpdate: vi.fn().mockImplementation((_bookId: number, dto: unknown) => Promise.resolve({ dto, skippedFields: [] })),
+      } as never,
       embedder as never,
+      metadataEvents as never,
     );
+  }
+
+  it('downloadAndSaveCover writes cover/thumbnail and updates metadata when download is valid', async () => {
+    const { db, updateSet } = makeDb();
+    const service = makeService(db);
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -182,14 +191,7 @@ describe('MetadataService', () => {
 
   it('saveExtractedCoverBytes removes stale extracted files before writing new cover', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     mockReaddir.mockResolvedValue(['cover_extracted.jpg', 'cover_extracted.png']);
 
     await service.saveExtractedCoverBytes(11, Buffer.from('image-bytes'));
@@ -201,14 +203,7 @@ describe('MetadataService', () => {
 
   it('downloadAndSaveCover no-ops on empty payloads and network failures', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -226,14 +221,7 @@ describe('MetadataService', () => {
 
   it('refreshCoverForBook returns false and avoids db writes when extractor reports no cover', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     // extractEpubCover is mocked to return null by default; parsePdfFile returns null → no cover
     await expect(service.refreshCoverForBook(7, '/book.epub', 'epub')).resolves.toBe(false);
     expect(db.update).not.toHaveBeenCalled();
@@ -242,28 +230,14 @@ describe('MetadataService', () => {
   it('extractAndSave propagates extractor errors', async () => {
     const { db } = makeDb();
     mockParsePdfFile.mockRejectedValue(new Error('bad metadata'));
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
 
     await expect(service.extractAndSave(15, '/books/a.pdf', 'pdf')).rejects.toThrow('bad metadata');
   });
 
   it('extractAndSave(pdf) persists fallback title/year, page count, and extracted cover bytes', async () => {
     const { db, updateSet } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
     const replaceGenresSpy = vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
 
@@ -288,13 +262,13 @@ describe('MetadataService', () => {
 
     await service.extractAndSave(22, '/tmp/book.pdf', 'pdf');
 
-    expect(updateSet).toHaveBeenCalledWith({ pageCount: 321 });
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Title From Filename',
         publishedYear: 1999,
         subtitle: 'Subtitle',
         description: 'Description',
+        pageCount: 321,
         updatedAt: expect.any(Date),
       }),
     );
@@ -306,14 +280,7 @@ describe('MetadataService', () => {
 
   it('extractAndSave(mobi) ignores malformed publishedDate values from providers', async () => {
     const { db, updateSet } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
     vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
 
@@ -335,14 +302,7 @@ describe('MetadataService', () => {
 
   it('replaceAuthors normalizes names and deduplicates case-insensitively before db writes', async () => {
     const { db, deleteWhere, transaction } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
     const insertedBookAuthors: Array<{ bookId: number; authorId: number; displayOrder: number }> = [];
 
@@ -393,14 +353,7 @@ describe('MetadataService', () => {
 
   it('replaceAuthors reuses existing authors and only inserts join rows', async () => {
     const { db } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
     const insertedBookAuthors: Array<{ bookId: number; authorId: number; displayOrder: number }> = [];
 
@@ -444,15 +397,7 @@ describe('MetadataService', () => {
   it('replaceAuthors emits author replaced event with linked author ids', async () => {
     const { db } = makeDb();
     const metadataEvents = { emit: vi.fn() };
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-      metadataEvents as never,
-    );
+    const service = makeService(db, metadataEvents);
 
     db.select.mockImplementation(() => ({
       from: () => ({
@@ -488,14 +433,7 @@ describe('MetadataService', () => {
 
   it('replaceGenres runs in transaction and normalizes unique names', async () => {
     const { db, transaction } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     const insertedGenres: string[] = [];
     const insertedBookGenres: Array<{ bookId: number; genreId: number }> = [];
 
@@ -543,14 +481,7 @@ describe('MetadataService', () => {
 
   it('replaceTags runs in transaction and normalizes unique names', async () => {
     const { db, transaction } = makeDb();
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
     const insertedTags: string[] = [];
 
     db.select.mockImplementation(() => ({
@@ -606,14 +537,7 @@ describe('MetadataService', () => {
       update: vi.fn().mockReturnValue({ set: updateSet }),
     };
 
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
 
     await service.aggregateAudioDuration(42);
 
@@ -632,14 +556,7 @@ describe('MetadataService', () => {
       update: vi.fn(),
     };
 
-    const service = new MetadataService(
-      db as never,
-      config as never,
-      { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-      { replaceForBook: vi.fn().mockResolvedValue(undefined) } as never,
-      { upsert: vi.fn().mockResolvedValue(undefined) } as never,
-      embedder as never,
-    );
+    const service = makeService(db);
 
     await service.aggregateAudioDuration(99);
 

@@ -6,6 +6,8 @@ const props = defineProps<{
   modelValue: string[]
   placeholder?: string
   searchFn: (q: string) => Promise<string[]>
+  disabled?: boolean
+  controlClass?: string
 }>()
 
 const emit = defineEmits<{ 'update:modelValue': [string[]] }>()
@@ -16,6 +18,7 @@ const showDropdown = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout>
 
 async function onInput() {
+  if (props.disabled) return
   clearTimeout(debounceTimer)
   if (!query.value.trim()) {
     results.value = []
@@ -30,6 +33,7 @@ async function onInput() {
 }
 
 function addItem(item: string) {
+  if (props.disabled) return
   const trimmed = item.trim()
   if (trimmed && !props.modelValue.includes(trimmed)) {
     emit('update:modelValue', [...props.modelValue, trimmed])
@@ -40,6 +44,7 @@ function addItem(item: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (props.disabled) return
   if (e.key === 'Enter' && query.value.trim()) {
     e.preventDefault()
     addItem(query.value)
@@ -49,6 +54,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function removeItem(item: string) {
+  if (props.disabled) return
   emit(
     'update:modelValue',
     props.modelValue.filter((v) => v !== item),
@@ -68,17 +74,24 @@ onUnmounted(() => clearTimeout(debounceTimer))
   <div class="relative">
     <div
       class="min-h-10 flex flex-wrap gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:ring-1 focus-within:ring-ring transition-shadow"
+      :class="[props.disabled ? 'cursor-not-allowed opacity-60' : '', props.controlClass]"
     >
       <span v-for="item in modelValue" :key="item" class="flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full text-xs">
         {{ item }}
-        <button type="button" class="text-muted-foreground hover:text-foreground transition-colors" @click="removeItem(item)">
+        <button
+          type="button"
+          class="text-muted-foreground hover:text-foreground transition-colors disabled:pointer-events-none"
+          :disabled="props.disabled"
+          @click="removeItem(item)"
+        >
           <X class="size-3" />
         </button>
       </span>
       <input
         v-model="query"
-        class="flex-1 min-w-24 bg-transparent outline-none placeholder:text-muted-foreground"
+        class="flex-1 min-w-24 bg-transparent outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         :placeholder="modelValue.length === 0 ? placeholder : ''"
+        :disabled="props.disabled"
         @input="onInput"
         @keydown="onKeydown"
         @blur="onBlur"

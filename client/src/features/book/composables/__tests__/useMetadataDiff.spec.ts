@@ -173,4 +173,25 @@ describe('useMetadataDiff', () => {
       ]),
     )
   })
+
+  it('marks locked fields and prevents them from being picked', () => {
+    const candidates = ref([mockCandidate1])
+    const activeProvider = ref<MetadataProviderKey>('google')
+    const lockedFields = ref(['title'] as const)
+    const { fields, toggleField, buildPatch } = useMetadataDiff(
+      mockCurrent,
+      candidates,
+      activeProvider,
+      providers,
+      undefined,
+      undefined,
+      lockedFields,
+    )
+
+    toggleField('title')
+
+    expect(fields.value.find((f) => f.key === 'title')?.isLocked).toBe(true)
+    expect(fields.value.find((f) => f.key === 'title')?.isPicked).toBe(false)
+    expect(buildPatch().formPatch.title).toBeUndefined()
+  })
 })

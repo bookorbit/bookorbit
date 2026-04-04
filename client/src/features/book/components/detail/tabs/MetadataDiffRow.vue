@@ -84,7 +84,12 @@ watch(
 <template>
   <!-- Cover row -->
   <div v-if="field.isCover" class="py-3.5 border-b border-border/40">
-    <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2.5">{{ field.label }}</p>
+    <div class="mb-2.5 flex items-center gap-2">
+      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ field.label }}</p>
+      <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
+        Locked
+      </span>
+    </div>
     <div class="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
       <!-- Current cover -->
       <div
@@ -136,6 +141,7 @@ watch(
               ? 'bg-primary text-primary-foreground shadow-primary/30'
               : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'
           "
+          :disabled="field.isLocked"
           @click="handleToggle"
         >
           <RotateCcw v-if="field.isPicked && field.pickedFromActive" class="size-3.5" />
@@ -143,7 +149,7 @@ watch(
           <ArrowLeft v-else class="size-3.5" />
         </button>
 
-        <Popover v-if="field.isCopyable && field.providerValues.length >= 2">
+        <Popover v-if="field.isCopyable && field.providerValues.length >= 2 && !field.isLocked">
           <PopoverTrigger as-child>
             <button
               class="size-5 rounded-full flex items-center justify-center transition-all hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -212,7 +218,12 @@ watch(
 
   <!-- Text row -->
   <div v-else class="py-2.5 border-b border-border/40">
-    <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">{{ field.label }}</p>
+    <div class="mb-1.5 flex items-center gap-2">
+      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ field.label }}</p>
+      <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
+        Locked
+      </span>
+    </div>
 
     <div class="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-1.5 sm:items-stretch">
       <!-- Current value -->
@@ -250,6 +261,7 @@ watch(
               ? 'bg-primary text-primary-foreground shadow-primary/30'
               : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'
           "
+          :disabled="field.isLocked"
           @click="handleToggle"
         >
           <RotateCcw v-if="field.isPicked && field.pickedFromActive" class="size-3.5" />
@@ -261,7 +273,7 @@ watch(
         </div>
         <div v-else class="size-8 shrink-0" />
 
-        <Popover v-if="field.isCopyable && field.providerValues.length >= 2">
+        <Popover v-if="field.isCopyable && field.providerValues.length >= 2 && !field.isLocked">
           <PopoverTrigger as-child>
             <button
               class="size-5 rounded-full flex items-center justify-center transition-all hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"

@@ -1,6 +1,7 @@
 import { type LookupAddress, lookup } from 'dns/promises';
 import type { CoverSearchResult } from '@projectx/types';
 
+import type { RequestUser } from '../../common/types/request-user';
 import { COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER_AGENT } from './constants';
 import { CoverService } from './cover.service';
 import type { CoverProviderRegistry } from './provider-registry';
@@ -55,8 +56,33 @@ function makeRedirectResponse(location: string, status = 302): Response {
   });
 }
 
-function createService(providerRegistry: CoverProviderRegistry): CoverService {
-  return new CoverService({} as never, {} as never, {} as never, { get: vi.fn().mockReturnValue('/tmp/books') } as never, providerRegistry);
+function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
+  return {
+    id: 1,
+    username: 'tester',
+    name: 'Tester',
+    email: null,
+    active: true,
+    isSuperuser: false,
+    isDefaultPassword: false,
+    tokenVersion: 1,
+    settings: {},
+    avatarUrl: null,
+    provisioningMethod: 'local',
+    permissions: [],
+    ...overrides,
+  };
+}
+
+function createService(providerRegistry: CoverProviderRegistry, options?: { assertFieldsUnlocked?: ReturnType<typeof vi.fn> }): CoverService {
+  return new CoverService(
+    {} as never,
+    { findLibraryIdByBookId: vi.fn().mockResolvedValue(7) } as never,
+    { assertFieldsUnlocked: options?.assertFieldsUnlocked ?? vi.fn().mockResolvedValue(undefined) } as never,
+    { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
+    { get: vi.fn().mockReturnValue('/tmp/books') } as never,
+    providerRegistry,
+  );
 }
 
 describe('CoverService', () => {
@@ -273,6 +299,36 @@ describe('CoverService', () => {
       lookupMock.mockRejectedValueOnce(new Error('dns failure'));
 
       await expect(service.proxyImage('https://missing.example.com/cover.jpg')).rejects.toThrow('Unable to resolve URL host');
+    });
+  });
+
+  describe('manual cover mutations', () => {
+    it('blocks upload when cover is locked', async () => {
+      const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
+      const service = createService({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry, { assertFieldsUnlocked });
+
+      await expect(service.uploadCover(12, Buffer.from('img'), 'image/png', makeUser())).rejects.toThrow('locked');
+
+      expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
+    });
+
+    it('blocks URL upload when cover is locked', async () => {
+      const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
+      const service = createService({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry, { assertFieldsUnlocked });
+
+      await expect(service.uploadCoverFromUrl(12, 'https://example.com/cover.jpg', makeUser())).rejects.toThrow('locked');
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
+    });
+
+    it('blocks delete when cover is locked', async () => {
+      const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
+      const service = createService({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry, { assertFieldsUnlocked });
+
+      await expect(service.deleteCover(12, makeUser())).rejects.toThrow('locked');
+
+      expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
     });
   });
 });

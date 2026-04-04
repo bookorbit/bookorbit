@@ -2,6 +2,52 @@ import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { FORMAT_TO_GROUP, type BookDetail } from '@projectx/types'
 
+const ROOT_FIELDS = [
+  'title',
+  'subtitle',
+  'description',
+  'publisher',
+  'publishedYear',
+  'language',
+  'pageCount',
+  'seriesName',
+  'seriesIndex',
+  'isbn10',
+  'isbn13',
+  'rating',
+  'authors',
+  'genres',
+  'tags',
+  'googleBooksId',
+  'goodreadsId',
+  'amazonId',
+  'hardcoverId',
+  'openLibraryId',
+  'itunesId',
+  'audibleId',
+  'comicvineId',
+] as const
+
+const COMIC_FIELDS = {
+  issueNumber: 'comicIssueNumber',
+  volumeName: 'comicVolumeName',
+  storyArcs: 'comicStoryArcs',
+  pencillers: 'comicPencillers',
+  inkers: 'comicInkers',
+  colorists: 'comicColorists',
+  letterers: 'comicLetterers',
+  coverArtists: 'comicCoverArtists',
+  characters: 'comicCharacters',
+  teams: 'comicTeams',
+  locations: 'comicLocations',
+} as const
+
+const AUDIO_FIELDS = {
+  narrators: 'narrators',
+  durationSeconds: 'durationSeconds',
+  abridged: 'abridged',
+} as const
+
 export function useMetadataEditor() {
   const saving = ref(false)
   const error = ref<string | null>(null)
@@ -102,47 +148,34 @@ export function useMetadataEditor() {
   }
 
   function buildPayload() {
-    const {
-      comicIssueNumber,
-      comicVolumeName,
-      comicStoryArcs,
-      comicPencillers,
-      comicInkers,
-      comicColorists,
-      comicLetterers,
-      comicCoverArtists,
-      comicCharacters,
-      comicTeams,
-      comicLocations,
-      narrators,
-      durationSeconds,
-      abridged,
-      ...rest
-    } = form
-    const payload = {
-      ...rest,
-      comicMetadata: {
-        issueNumber: comicIssueNumber ?? undefined,
-        volumeName: comicVolumeName ?? undefined,
-        storyArcs: comicStoryArcs,
-        pencillers: comicPencillers,
-        inkers: comicInkers,
-        colorists: comicColorists,
-        letterers: comicLetterers,
-        coverArtists: comicCoverArtists,
-        characters: comicCharacters,
-        teams: comicTeams,
-        locations: comicLocations,
-      },
+    const previous = JSON.parse(snapshot.value) as typeof form
+    const payload: Record<string, unknown> = {}
+
+    for (const field of ROOT_FIELDS) {
+      if (JSON.stringify(form[field]) !== JSON.stringify(previous[field])) {
+        payload[field] = form[field]
+      }
     }
+
+    const comicMetadata: Record<string, unknown> = {}
+    for (const [payloadKey, formKey] of Object.entries(COMIC_FIELDS)) {
+      if (JSON.stringify(form[formKey]) !== JSON.stringify(previous[formKey])) {
+        comicMetadata[payloadKey] = form[formKey]
+      }
+    }
+    if (Object.keys(comicMetadata).length > 0) {
+      payload.comicMetadata = comicMetadata
+    }
+
     if (includeAudioMetadata.value) {
-      return {
-        ...payload,
-        audioMetadata: {
-          narrators,
-          durationSeconds,
-          abridged,
-        },
+      const audioMetadata: Record<string, unknown> = {}
+      for (const [payloadKey, formKey] of Object.entries(AUDIO_FIELDS)) {
+        if (JSON.stringify(form[formKey]) !== JSON.stringify(previous[formKey])) {
+          audioMetadata[payloadKey] = form[formKey]
+        }
+      }
+      if (Object.keys(audioMetadata).length > 0) {
+        payload.audioMetadata = audioMetadata
       }
     }
     return payload

@@ -51,6 +51,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     audioMetadata: null,
     formatPriority: [],
     comicMetadata: null,
+    lockedFields: [],
     collections: [],
     ...overrides,
   }
@@ -97,8 +98,9 @@ describe('useMetadataEditor', () => {
     })
     apiMock.mockResolvedValue({ ok: true, json: async () => book })
 
-    const { load, save } = useMetadataEditor()
+    const { form, load, save } = useMetadataEditor()
     load(book)
+    form.narrators = ['Narrator Two']
     await save(book.id)
 
     const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
@@ -106,9 +108,23 @@ describe('useMetadataEditor', () => {
       audioMetadata?: { narrators?: string[]; durationSeconds?: number | null; abridged?: boolean }
     }
     expect(payload.audioMetadata).toEqual({
-      narrators: ['Narrator One'],
-      durationSeconds: 3600,
-      abridged: false,
+      narrators: ['Narrator Two'],
+    })
+  })
+
+  it('sends only changed fields in the metadata payload', async () => {
+    const book = makeBook({ title: 'Original Title', publisher: 'Original Publisher' })
+    apiMock.mockResolvedValue({ ok: true, json: async () => book })
+
+    const { form, load, save } = useMetadataEditor()
+    load(book)
+    form.publisher = 'Updated Publisher'
+    await save(book.id)
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    const payload = JSON.parse(String(req.body)) as Record<string, unknown>
+    expect(payload).toEqual({
+      publisher: 'Updated Publisher',
     })
   })
 })

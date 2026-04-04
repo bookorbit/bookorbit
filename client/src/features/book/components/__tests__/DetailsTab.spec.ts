@@ -88,6 +88,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     audioMetadata: null,
     formatPriority: [],
     comicMetadata: null,
+    lockedFields: [],
     collections: [],
     ...overrides,
   }
