@@ -29,6 +29,7 @@ import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useBookBucketSummary } from '@/features/book-bucket/composables/useBookBucketSummary'
 import UserAvatar from '@/components/UserAvatar.vue'
+import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -177,6 +178,18 @@ function highlightSegments(text: string | null, query: string) {
   return parts.map((part) => ({ text: part, match: part.toLowerCase() === lower }))
 }
 
+function sortFormats(formats: string[]): string[] {
+  return [...formats].sort((a, b) => {
+    const aIndex = (DEFAULT_FORMAT_PRIORITY as readonly string[]).indexOf(a.toLowerCase())
+    const bIndex = (DEFAULT_FORMAT_PRIORITY as readonly string[]).indexOf(b.toLowerCase())
+
+    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b)
+    if (aIndex === -1) return 1
+    if (bIndex === -1) return -1
+    return aIndex - bIndex
+  })
+}
+
 function formatBadgeClass(fmt: string): string {
   switch (fmt.toLowerCase()) {
     case 'epub':
@@ -271,7 +284,7 @@ function formatBadgeClass(fmt: string): string {
               </span>
               <div v-if="result.formats.length" class="flex gap-1">
                 <span
-                  v-for="fmt in result.formats"
+                  v-for="fmt in sortFormats(result.formats)"
                   :key="fmt"
                   :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
                 >
@@ -376,7 +389,7 @@ function formatBadgeClass(fmt: string): string {
               </span>
               <div v-if="result.formats.length" class="flex gap-1">
                 <span
-                  v-for="fmt in result.formats"
+                  v-for="fmt in sortFormats(result.formats)"
                   :key="fmt"
                   :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
                 >

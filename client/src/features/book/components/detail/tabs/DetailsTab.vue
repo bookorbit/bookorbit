@@ -668,7 +668,7 @@ watch(
 
   <div class="flex flex-col md:flex-row gap-8">
     <!-- Left column: cover + actions -->
-    <div class="md:w-56 shrink-0 md:sticky md:top-4 md:self-start">
+    <div class="md:w-56 shrink-0 md:sticky md:top-0 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
           class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
@@ -713,7 +713,7 @@ watch(
               :disabled="!primaryFile"
               @click="openBook"
             >
-              <Headphones v-if="isPrimaryAudio" class="size-4" />
+              <BookOpen v-if="isPrimaryAudio" class="size-4" />
               <BookOpen v-else class="size-4" />
               {{ isPrimaryAudio ? 'Listen' : 'Read' }}
             </button>
@@ -843,7 +843,7 @@ watch(
     <!-- Right column -->
     <div class="flex-1 min-w-0">
       <!-- Identity block -->
-      <div class="flex items-center flex-wrap gap-x-3 gap-y-2">
+      <div class="flex items-center flex-wrap gap-x-3 gap-y-2 -mt-1">
         <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
         <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
           <PopoverTrigger as-child>
