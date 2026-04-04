@@ -1,6 +1,7 @@
 export * from './audit';
 export * from './auth';
 export * from './comic-metadata';
+export * from './migration';
 export * from './libraries';
 export * from './books';
 export * from './collections';

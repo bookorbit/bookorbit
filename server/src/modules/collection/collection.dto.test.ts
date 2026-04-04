@@ -14,10 +14,12 @@ async function errorsFor<T extends object>(dtoClass: new () => T, value: Record<
 
 describe('Collection DTO validation', () => {
   describe('CreateCollectionDto', () => {
-    it('accepts valid payloads and rejects empty names', async () => {
+    it('accepts valid payloads and rejects empty names or missing icons', async () => {
       expect((await errorsFor(CreateCollectionDto, { name: 'Favorites', icon: '⭐', description: 'Best books', syncToKobo: true })).length).toBe(0);
       expect((await errorsFor(CreateCollectionDto, { name: '' })).length).toBeGreaterThan(0);
       expect((await errorsFor(CreateCollectionDto, {})).length).toBeGreaterThan(0);
+      expect((await errorsFor(CreateCollectionDto, { name: 'Favorites' })).length).toBeGreaterThan(0);
+      expect((await errorsFor(CreateCollectionDto, { name: 'Favorites', icon: '   ' })).length).toBeGreaterThan(0);
     });
 
     it('enforces field lengths', async () => {

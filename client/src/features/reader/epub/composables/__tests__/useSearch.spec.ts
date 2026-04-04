@@ -4,10 +4,10 @@ import { useSearch, type FoliateView } from '../useSearch'
 describe('useSearch', () => {
   it('returns early for empty query and does not call foliate search', async () => {
     const view: FoliateView = {
-      search: vi.fn(async function* () {
+      search: vi.fn<(opts: { query: string }) => AsyncGenerator<Record<string, unknown>, void, unknown>>(async function* () {
         yield {}
       }),
-      clearSearch: vi.fn(),
+      clearSearch: vi.fn<() => void>(),
     }
 
     const store = useSearch()
@@ -33,7 +33,7 @@ describe('useSearch', () => {
           subitems: [{ cfi: 'epubcfi(/6/8)', excerpt: { pre: '', match: 'hit', post: '' } }],
         }
       },
-      clearSearch: vi.fn(),
+      clearSearch: vi.fn<() => void>(),
     }
 
     const store = useSearch()
@@ -62,7 +62,7 @@ describe('useSearch', () => {
   })
 
   it('clear resets local search state and clears foliate highlights', () => {
-    const clearSearch = vi.fn()
+    const clearSearch = vi.fn<() => void>()
     const view: FoliateView = {
       search: async function* () {
         yield {}

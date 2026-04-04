@@ -1,1 +1,7 @@
+# Load nvm/pnpm if not in PATH (needed for GUI clients like Sourcetree)
+export PATH="$PATH:/usr/local/bin"
+export PNPM_HOME="$HOME/Library/pnpm"
+export PATH="$PNPM_HOME:$PATH"
+[ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
+
 pnpm exec lint-staged

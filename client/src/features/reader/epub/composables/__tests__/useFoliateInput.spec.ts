@@ -32,15 +32,15 @@ describe('useFoliateInput', () => {
   })
 
   it('navigates with document keyboard shortcuts', () => {
-    const prev = vi.fn()
-    const next = vi.fn()
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
     const view: ViewLike = {
       prev,
       next,
       getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
     }
 
-    const input = useFoliateInput(() => view, undefined, vi.fn(), vi.fn())
+    const input = useFoliateInput(() => view, undefined, vi.fn<() => void>(), vi.fn<() => void>())
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
@@ -54,15 +54,15 @@ describe('useFoliateInput', () => {
   })
 
   it('ignores keyboard navigation while typing in editable inputs', () => {
-    const prev = vi.fn()
-    const next = vi.fn()
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
     const view: ViewLike = {
       prev,
       next,
       getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
     }
 
-    const input = useFoliateInput(() => view, undefined, vi.fn(), vi.fn())
+    const input = useFoliateInput(() => view, undefined, vi.fn<() => void>(), vi.fn<() => void>())
 
     const textInput = document.createElement('input')
     document.body.appendChild(textInput)
@@ -78,15 +78,15 @@ describe('useFoliateInput', () => {
   })
 
   it('handles keyboard navigation from iframe document after attachIframeClicks', () => {
-    const prev = vi.fn()
-    const next = vi.fn()
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
     const view: ViewLike = {
       prev,
       next,
       getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
     }
 
-    const input = useFoliateInput(() => view, undefined, vi.fn(), vi.fn())
+    const input = useFoliateInput(() => view, undefined, vi.fn<() => void>(), vi.fn<() => void>())
     const doc = makeDocTarget()
 
     input.attachIframeClicks(doc)
@@ -103,16 +103,16 @@ describe('useFoliateInput', () => {
   it('routes click-zone window messages to prev/next/middle actions', () => {
     vi.useFakeTimers()
 
-    const prev = vi.fn()
-    const next = vi.fn()
-    const onMiddleTap = vi.fn()
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
+    const onMiddleTap = vi.fn<() => void>()
     const view: ViewLike = {
       prev,
       next,
       getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
     }
 
-    const input = useFoliateInput(() => view, onMiddleTap, vi.fn(), vi.fn())
+    const input = useFoliateInput(() => view, onMiddleTap, vi.fn<() => void>(), vi.fn<() => void>())
     const doc = makeDocTarget()
     input.attachIframeClicks(doc)
 
@@ -155,14 +155,14 @@ describe('useFoliateInput', () => {
   })
 
   it('stops responding to document keydown after cleanup', () => {
-    const next = vi.fn()
+    const next = vi.fn<() => void>()
     const view: ViewLike = {
-      prev: vi.fn(),
+      prev: vi.fn<() => void>(),
       next,
       getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
     }
 
-    const input = useFoliateInput(() => view, undefined, vi.fn(), vi.fn())
+    const input = useFoliateInput(() => view, undefined, vi.fn<() => void>(), vi.fn<() => void>())
     input.cleanup()
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))

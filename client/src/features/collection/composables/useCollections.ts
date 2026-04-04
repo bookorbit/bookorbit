@@ -28,11 +28,11 @@ export function useCollections() {
     return res.json()
   }
 
-  async function createCollection(name: string, icon?: string, description?: string): Promise<Collection> {
+  async function createCollection(name: string, icon: string, description?: string): Promise<Collection> {
     const res = await api('/api/v1/collections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, icon: icon || undefined, description }),
+      body: JSON.stringify({ name, icon, description }),
     })
     if (!res.ok) throw new Error('Failed to create collection')
     const created: Collection = await res.json()
@@ -85,6 +85,14 @@ export function useCollections() {
     if (!res.ok) throw new Error('Failed to reorder collections')
   }
 
+  async function deleteCollection(id: number): Promise<void> {
+    const res = await api(`/api/v1/collections/${id}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error('Failed to delete collection')
+    collections.value = collections.value.filter((collection) => collection.id !== id)
+  }
+
   return {
     collections,
     fetchCollections,
@@ -94,5 +102,6 @@ export function useCollections() {
     addBooksToCollection,
     removeBooksFromCollection,
     reorderCollections,
+    deleteCollection,
   }
 }

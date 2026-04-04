@@ -12,6 +12,7 @@ import { lenses } from './lenses';
 import { koboSyncSettings, koboLibrarySnapshots, koboReadingStates } from './kobo';
 import { emailRecipients, emailRecipientGroups } from './email-recipients';
 import { readerDefaultPreferences, readerPreferences, readingProgress, annotations, userReadingDailyStats } from './reader';
+import { migrationSources, migrationProfiles, migrationPlanArtifacts, migrationRuns, migrationRunMetrics } from './migration';
 
 describe('Database Schema Logic', () => {
   beforeAll(() => {
@@ -96,5 +97,10 @@ describe('Database Schema Logic', () => {
     testOnUpdate('annotations.updatedAt', annotations.updatedAt);
     testOnUpdate('readerDefaultPreferences.updatedAt', readerDefaultPreferences.updatedAt);
     testOnUpdate('readerPreferences.updatedAt', readerPreferences.updatedAt);
+    testOnUpdate('migrationSources.updatedAt', migrationSources.updatedAt);
+    testOnUpdate('migrationProfiles.updatedAt', migrationProfiles.updatedAt);
+    testOnUpdate('migrationPlanArtifacts.updatedAt', migrationPlanArtifacts.updatedAt);
+    testOnUpdate('migrationRuns.updatedAt', migrationRuns.updatedAt);
+    testOnUpdate('migrationRunMetrics.updatedAt', migrationRunMetrics.updatedAt);
   });
 });

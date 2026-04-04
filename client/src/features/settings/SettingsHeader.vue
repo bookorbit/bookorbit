@@ -52,6 +52,9 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
   }
+  if (su || perms.includes('manage_app_settings')) {
+    result.push({ label: 'Migration', routeName: 'settings-admin-migration' })
+  }
 
   result.push({ label: 'Account', routeName: 'settings-account' })
 

@@ -6,14 +6,15 @@ import IconPicker from '@/components/IconPicker.vue'
 import type { Collection } from '@projectx/types'
 
 const props = defineProps<{ open: boolean; collection: Collection }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; deleted: [id: number] }>()
 
-const { updateCollection } = useCollections()
+const { updateCollection, deleteCollection } = useCollections()
 
 const name = ref('')
 const icon = ref('')
 const syncToKobo = ref(false)
 const saving = ref(false)
+const deleting = ref(false)
 const error = ref<string | null>(null)
 
 watch(
@@ -39,6 +40,21 @@ async function submit() {
     error.value = 'Failed to update collection'
   } finally {
     saving.value = false
+  }
+}
+
+async function handleDelete() {
+  if (!confirm(`Delete collection "${props.collection.name}"? This cannot be undone.`)) return
+  deleting.value = true
+  error.value = null
+  try {
+    await deleteCollection(props.collection.id)
+    emit('deleted', props.collection.id)
+    emit('close')
+  } catch {
+    error.value = 'Failed to delete collection'
+  } finally {
+    deleting.value = false
   }
 }
 </script>
@@ -91,7 +107,16 @@ async function submit() {
 
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
 
-          <div class="flex justify-end gap-2 mt-1">
+          <div class="flex items-center justify-between gap-2 mt-1">
+            <button
+              type="button"
+              :disabled="saving || deleting"
+              class="h-9 px-4 rounded-md border border-destructive/30 bg-destructive/10 text-sm font-medium text-destructive hover:bg-destructive/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="handleDelete"
+            >
+              {{ deleting ? 'Deleting...' : 'Delete collection' }}
+            </button>
+
             <button
               type="button"
               @click="emit('close')"
@@ -101,7 +126,7 @@ async function submit() {
             </button>
             <button
               type="submit"
-              :disabled="!name.trim() || saving"
+              :disabled="!name.trim() || saving || deleting"
               class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ saving ? 'Saving...' : 'Save' }}

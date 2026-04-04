@@ -3,6 +3,7 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn((left: unknown, right: unknown) => ({ type: 'eq', left, right })),
   ilike: vi.fn((left: unknown, pattern: string) => ({ type: 'ilike', left, pattern })),
   isNotNull: vi.fn((value: unknown) => ({ type: 'isNotNull', value })),
+  sql: vi.fn((parts: TemplateStringsArray, ...values: unknown[]) => ({ type: 'sql', parts, values })),
 }));
 
 import { and, eq, ilike, isNotNull } from 'drizzle-orm';

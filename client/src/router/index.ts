@@ -153,6 +153,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: 'Maintenance' },
           },
           {
+            path: 'admin/migration',
+            name: 'settings-admin-migration',
+            component: () => import('@/features/settings/MigrationSettings.vue'),
+            meta: { maxWidth: 'max-w-7xl', title: 'Migration' },
+          },
+          {
             path: 'admin/audit-log',
             name: 'settings-admin-audit-log',
             component: () => import('@/features/audit/AuditLogPage.vue'),

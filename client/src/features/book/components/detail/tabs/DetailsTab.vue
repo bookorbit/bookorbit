@@ -605,7 +605,8 @@ async function loadSupplemental() {
       audiobookProgress.value = null
     }
 
-    collections.value = collectionsRes.ok ? ((await collectionsRes.json()) as CollectionMembership[]) : []
+    const fetchedCollections = collectionsRes.ok ? ((await collectionsRes.json()) as CollectionMembership[]) : []
+    collections.value = fetchedCollections.filter((collection) => (collection.memberCount ?? 0) > 0)
 
     if (canViewKobo.value) {
       const fallbackSyncCollections = collections.value.filter((c) => c.syncToKobo && (c.memberCount ?? 0) > 0).map((c) => c.name)

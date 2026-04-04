@@ -42,15 +42,16 @@ function measure() {
 
 // ── Page dims ─────────────────────────────────────────────────────────────────
 const pageDims = ref<PageDim[]>([])
+const effectiveDims = computed(() => pageDims.value)
 
 // ── Spread ────────────────────────────────────────────────────────────────────
 const spread = ref<'none' | 'odd' | 'even'>('none')
 
 // ── Composables ───────────────────────────────────────────────────────────────
-const zoom = usePdfZoom(containerW, containerH, pageDims, spread)
+const zoom = usePdfZoom(containerW, containerH, effectiveDims, spread)
 const { scale, zoomMode, customScale, zoomLabel, adjustZoom, applyZoomPreset } = zoom
 
-const layout = usePdfLayout(scrollRef, totalPages, pageDims, scale, containerH, spread)
+const layout = usePdfLayout(scrollRef, totalPages, effectiveDims, scale, containerH, spread)
 const { scrollMode, currentPage, pageInput, pageRows, rowHeights, goToPage, onScroll } = layout
 
 function onDimUpdate(pageNum: number, dim: PageDim) {

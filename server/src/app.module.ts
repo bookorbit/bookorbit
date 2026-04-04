@@ -50,6 +50,7 @@ import { UserStatisticsModule } from './modules/user-statistics/user-statistics.
 import { ReadingSessionModule } from './modules/reading-session/reading-session.module';
 import { UserBookStatusModule } from './modules/user-book-status/user-book-status.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { MigrationModule } from './modules/migration/migration.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { AuditModule } from './modules/audit/audit.module';
     ReadingSessionModule,
     UserBookStatusModule,
     AuditModule,
+    MigrationModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },

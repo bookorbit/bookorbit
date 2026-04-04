@@ -74,7 +74,7 @@ export class CollectionService {
     const [inserted] = await this.collectionRepo.insert({
       userId: user.id,
       name: dto.name,
-      icon: dto.icon?.trim() || null,
+      icon: dto.icon.trim(),
       description: dto.description ?? null,
       syncToKobo: dto.syncToKobo ?? false,
     });

@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCollections } from '../composables/useCollections'
+import IconPicker from '@/components/IconPicker.vue'
 import type { Collection } from '@projectx/types'
 
 const props = defineProps<{
@@ -23,6 +24,7 @@ const { fetchCollectionsWithMembership, createCollection, addBooksToCollection }
 const localCollections = ref<Collection[]>([])
 const addedIds = ref<Set<number>>(new Set())
 const newName = ref('')
+const newIcon = ref('')
 const creating = ref(false)
 const addingTo = ref<number | null>(null)
 
@@ -52,11 +54,13 @@ function partialCount(collection: Collection): number {
 
 async function handleCreate() {
   const name = newName.value.trim()
-  if (!name) return
+  const icon = newIcon.value.trim()
+  if (!name || !icon) return
   creating.value = true
   try {
-    const collection = await createCollection(name)
+    const collection = await createCollection(name, icon)
     newName.value = ''
+    newIcon.value = ''
     localCollections.value = [...localCollections.value, collection]
     try {
       await addBooksToCollection(collection.id, props.bookIds)
@@ -119,9 +123,10 @@ function handleDone() {
         <!-- Create new collection -->
         <div class="space-y-2">
           <p class="text-xs font-medium text-foreground uppercase tracking-wider">New Collection</p>
-          <div class="flex gap-2">
+          <div class="space-y-2">
             <Input v-model="newName" placeholder="Collection name" class="flex-1" @keydown.enter="handleCreate" />
-            <Button :disabled="!newName.trim() || creating" size="sm" @click="handleCreate">
+            <IconPicker v-model="newIcon" placeholder="Choose an icon..." />
+            <Button :disabled="!newName.trim() || !newIcon.trim() || creating" size="sm" class="w-full" @click="handleCreate">
               <Loader2 v-if="creating" :size="14" class="animate-spin mr-1" />
               <Plus v-else :size="14" class="mr-1" />
               Create

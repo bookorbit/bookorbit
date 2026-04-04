@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 beforeEach(() => {
@@ -13,6 +13,7 @@ beforeEach(() => {
 })
 import DetailsTab from '../detail/tabs/DetailsTab.vue'
 import type { BookDetail } from '@projectx/types'
+import { api } from '@/lib/api'
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
@@ -92,6 +93,13 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   }
 }
 
+function makeApiResponse(data: unknown, ok = true): Response {
+  return {
+    ok,
+    json: async () => data,
+  } as Response
+}
+
 describe('DetailsTab — missing state', () => {
   it('renders the amber warning banner', () => {
     const wrapper = mount(DetailsTab, {
@@ -145,5 +153,28 @@ describe('DetailsTab — present state', () => {
     expect(wrapper.find('a[title="Open in Amazon"]').exists()).toBe(true)
     expect(wrapper.find('a[title="Open in Goodreads"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Info Links')
+  })
+
+  it('renders only collections that already contain the book', async () => {
+    vi.mocked(api).mockImplementation(async (input) => {
+      if (input === '/api/v1/collections?bookIds=1') {
+        return makeApiResponse([
+          { id: 10, name: 'Favorites', syncToKobo: false, memberCount: 1 },
+          { id: 11, name: 'Want to Read', syncToKobo: true, memberCount: 0 },
+        ])
+      }
+
+      return makeApiResponse({}, false)
+    })
+
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook({ id: 1 }) },
+      global: globalStubs,
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Favorites')
+    expect(wrapper.text()).not.toContain('Want to Read')
   })
 })

@@ -97,6 +97,75 @@ CREATE TABLE "comic_metadata" (
 	CONSTRAINT "comic_metadata_book_id_unique" UNIQUE("book_id")
 );
 --> statement-breakpoint
+CREATE TABLE "migration_plan_artifacts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"source_id" integer NOT NULL,
+	"profile_id" integer NOT NULL,
+	"source_snapshot_hash" varchar(128) NOT NULL,
+	"profile_hash" varchar(128) NOT NULL,
+	"plan_hash" varchar(128) NOT NULL,
+	"plan" jsonb NOT NULL,
+	"summary" jsonb NOT NULL,
+	"created_by_user_id" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "migration_profiles" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"source_id" integer NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
+	"user_mappings" jsonb NOT NULL,
+	"path_mappings" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"scope" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_by_user_id" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "migration_run_metrics" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"run_id" integer NOT NULL,
+	"stage" varchar(64) NOT NULL,
+	"entity_type" varchar(64) NOT NULL,
+	"processed" integer DEFAULT 0 NOT NULL,
+	"imported" integer DEFAULT 0 NOT NULL,
+	"skipped" integer DEFAULT 0 NOT NULL,
+	"unresolved" integer DEFAULT 0 NOT NULL,
+	"failed" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "migration_runs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"source_id" integer NOT NULL,
+	"profile_id" integer NOT NULL,
+	"plan_artifact_id" integer,
+	"target_key" varchar(100) DEFAULT 'projectx' NOT NULL,
+	"state" varchar(32) DEFAULT 'draft' NOT NULL,
+	"current_stage" varchar(64),
+	"triggered_by_user_id" integer,
+	"started_at" timestamp,
+	"ended_at" timestamp,
+	"error_message" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "migration_sources" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"type" varchar(50) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"connection_config" jsonb NOT NULL,
+	"capabilities" jsonb,
+	"last_validated_at" timestamp,
+	"created_by_user_id" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "libraries" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -642,6 +711,17 @@ ALTER TABLE "user_library_access" ADD CONSTRAINT "user_library_access_user_id_us
 ALTER TABLE "user_library_access" ADD CONSTRAINT "user_library_access_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comic_metadata" ADD CONSTRAINT "comic_metadata_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_plan_artifacts" ADD CONSTRAINT "migration_plan_artifacts_source_id_migration_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."migration_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_plan_artifacts" ADD CONSTRAINT "migration_plan_artifacts_profile_id_migration_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."migration_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_plan_artifacts" ADD CONSTRAINT "migration_plan_artifacts_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_profiles" ADD CONSTRAINT "migration_profiles_source_id_migration_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."migration_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_profiles" ADD CONSTRAINT "migration_profiles_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_run_metrics" ADD CONSTRAINT "migration_run_metrics_run_id_migration_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."migration_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_runs" ADD CONSTRAINT "migration_runs_source_id_migration_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."migration_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_runs" ADD CONSTRAINT "migration_runs_profile_id_migration_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."migration_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_runs" ADD CONSTRAINT "migration_runs_plan_artifact_id_migration_plan_artifacts_id_fk" FOREIGN KEY ("plan_artifact_id") REFERENCES "public"."migration_plan_artifacts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_runs" ADD CONSTRAINT "migration_runs_triggered_by_user_id_users_id_fk" FOREIGN KEY ("triggered_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "migration_sources" ADD CONSTRAINT "migration_sources_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "library_folders" ADD CONSTRAINT "library_folders_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_files" ADD CONSTRAINT "book_files_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_files" ADD CONSTRAINT "book_files_library_folder_id_library_folders_id_fk" FOREIGN KEY ("library_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -720,6 +800,16 @@ CREATE INDEX "idx_audit_ip" ON "audit_log" USING btree ("ip");--> statement-brea
 CREATE INDEX "idx_audit_created_at" ON "audit_log" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "migration_plan_artifacts_plan_hash_uidx" ON "migration_plan_artifacts" USING btree ("plan_hash");--> statement-breakpoint
+CREATE INDEX "migration_plan_artifacts_source_id_idx" ON "migration_plan_artifacts" USING btree ("source_id");--> statement-breakpoint
+CREATE INDEX "migration_plan_artifacts_profile_id_idx" ON "migration_plan_artifacts" USING btree ("profile_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "migration_profiles_source_name_version_uidx" ON "migration_profiles" USING btree ("source_id","name","version");--> statement-breakpoint
+CREATE INDEX "migration_profiles_source_id_idx" ON "migration_profiles" USING btree ("source_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "migration_run_metrics_run_stage_entity_uidx" ON "migration_run_metrics" USING btree ("run_id","stage","entity_type");--> statement-breakpoint
+CREATE INDEX "migration_run_metrics_run_id_idx" ON "migration_run_metrics" USING btree ("run_id");--> statement-breakpoint
+CREATE INDEX "migration_runs_source_target_state_idx" ON "migration_runs" USING btree ("source_id","target_key","state");--> statement-breakpoint
+CREATE INDEX "migration_runs_state_idx" ON "migration_runs" USING btree ("state");--> statement-breakpoint
+CREATE UNIQUE INDEX "migration_sources_type_name_uidx" ON "migration_sources" USING btree ("type","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "books_library_id_folder_path_idx" ON "books" USING btree ("library_id","folder_path");--> statement-breakpoint
 CREATE INDEX "books_primary_file_id_idx" ON "books" USING btree ("primary_file_id");--> statement-breakpoint
 CREATE INDEX "author_enrichment_queue_status_next_attempt_idx" ON "author_enrichment_queue" USING btree ("status","next_attempt_at");--> statement-breakpoint

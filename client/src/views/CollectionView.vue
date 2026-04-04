@@ -116,6 +116,20 @@ async function handleRemoveFromCollection() {
   }
 }
 
+function handleCollectionDeleted(deletedId: number) {
+  editCollectionOpen.value = false
+  collectionNotFound.value = false
+
+  const nextCollection = collections.value.find((item) => item.id !== deletedId)
+  if (nextCollection) {
+    router.replace({ name: 'collection', params: { id: nextCollection.id } })
+  } else {
+    router.replace({ name: 'dashboard' })
+  }
+
+  toast.success('Collection deleted')
+}
+
 function handleEditSelected() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
@@ -199,7 +213,13 @@ watch(
     @done="exitSelectionMode"
   />
 
-  <EditCollectionDialog v-if="collection" :open="editCollectionOpen" :collection="collection" @close="editCollectionOpen = false" />
+  <EditCollectionDialog
+    v-if="collection"
+    :open="editCollectionOpen"
+    :collection="collection"
+    @close="editCollectionOpen = false"
+    @deleted="handleCollectionDeleted"
+  />
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 

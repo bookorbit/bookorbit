@@ -82,7 +82,7 @@ describe('useFoliateSelection', () => {
 
     const getView = () => null
     const foliateSelection = useFoliateSelection(getView)
-    const onSelected = vi.fn()
+    const onSelected = vi.fn<(detail: unknown) => void>()
     foliateSelection.setHandler(onSelected)
 
     const collapsed = {
@@ -126,7 +126,7 @@ describe('useFoliateSelection', () => {
       getCFI: () => 'epubcfi(/6/10)',
     }))
 
-    const onSelected = vi.fn()
+    const onSelected = vi.fn<(detail: unknown) => void>()
     foliateSelection.setHandler(onSelected)
 
     const doc = makeDoc({ selection })
