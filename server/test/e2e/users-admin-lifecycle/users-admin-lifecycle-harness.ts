@@ -14,7 +14,7 @@ import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { StagingWatcherService } from '../../../src/modules/staging/staging-watcher.service';
+import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
 import { seedLibrary } from '../app-harness';
 import { createUsersAdminLifecycleFixtureRoot, type UsersAdminLifecycleFixtureRoot } from './users-admin-lifecycle-fixture-builder';
 
@@ -30,7 +30,7 @@ const MAX_MULTIPART_BYTES = 20 * 1024 * 1024;
 
 interface EnvSnapshot {
   booksPath: string | undefined;
-  stagingPath: string | undefined;
+  bookBucketPath: string | undefined;
 }
 
 export interface UsersAdminLifecycleE2EContext {
@@ -68,11 +68,11 @@ export async function createUsersAdminLifecycleE2EContext(): Promise<UsersAdminL
   const fixture = await createUsersAdminLifecycleFixtureRoot();
   const envSnapshot: EnvSnapshot = {
     booksPath: process.env.BOOKS_PATH,
-    stagingPath: process.env.STAGING_PATH,
+    bookBucketPath: process.env.BOOK_BUCKET_PATH,
   };
 
   process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.STAGING_PATH = fixture.stagingPath;
+  process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
 
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
@@ -95,7 +95,7 @@ export async function createUsersAdminLifecycleE2EContext(): Promise<UsersAdminL
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopStagingWatcher(app);
+  await stopBookBucketWatcher(app);
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
@@ -245,8 +245,8 @@ export async function setUserActive(ctx: UsersAdminLifecycleE2EContext, userId: 
   await ctx.db.update(schema.users).set({ active }).where(eq(schema.users.id, userId));
 }
 
-async function stopStagingWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(StagingWatcherService);
+async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookBucketWatcherService);
   await watcher.onModuleDestroy();
 }
 
@@ -320,6 +320,6 @@ function restoreEnv(snapshot: EnvSnapshot): void {
   if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
   else process.env.BOOKS_PATH = snapshot.booksPath;
 
-  if (snapshot.stagingPath === undefined) delete process.env.STAGING_PATH;
-  else process.env.STAGING_PATH = snapshot.stagingPath;
+  if (snapshot.bookBucketPath === undefined) delete process.env.BOOK_BUCKET_PATH;
+  else process.env.BOOK_BUCKET_PATH = snapshot.bookBucketPath;
 }

@@ -574,7 +574,7 @@ CREATE TABLE "kobo_sync_settings" (
 	CONSTRAINT "kobo_sync_settings_user_id_unique" UNIQUE("user_id")
 );
 --> statement-breakpoint
-CREATE TABLE "staging_files" (
+CREATE TABLE "book_bucket_files" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"file_name" varchar(500) NOT NULL,
 	"absolute_path" text NOT NULL,
@@ -593,7 +593,7 @@ CREATE TABLE "staging_files" (
 	"metadata_edited_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "staging_files_absolute_path_unique" UNIQUE("absolute_path")
+	CONSTRAINT "book_bucket_files_absolute_path_unique" UNIQUE("absolute_path")
 );
 --> statement-breakpoint
 CREATE TABLE "file_write_log" (
@@ -771,8 +771,8 @@ ALTER TABLE "kobo_reading_states" ADD CONSTRAINT "kobo_reading_states_book_id_bo
 ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_snapshot_id_kobo_library_snapshots_id_fk" FOREIGN KEY ("snapshot_id") REFERENCES "public"."kobo_library_snapshots"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_sync_settings" ADD CONSTRAINT "kobo_sync_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "staging_files" ADD CONSTRAINT "staging_files_target_library_id_libraries_id_fk" FOREIGN KEY ("target_library_id") REFERENCES "public"."libraries"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "staging_files" ADD CONSTRAINT "staging_files_target_folder_id_library_folders_id_fk" FOREIGN KEY ("target_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_bucket_files" ADD CONSTRAINT "book_bucket_files_target_library_id_libraries_id_fk" FOREIGN KEY ("target_library_id") REFERENCES "public"."libraries"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_bucket_files" ADD CONSTRAINT "book_bucket_files_target_folder_id_library_folders_id_fk" FOREIGN KEY ("target_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -843,6 +843,6 @@ CREATE INDEX "urds_user_library_day_idx" ON "user_reading_daily_stats" USING btr
 CREATE INDEX "oidc_sessions_user_id_idx" ON "oidc_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_subject_issuer_idx" ON "oidc_sessions" USING btree ("oidc_subject","oidc_issuer");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_session_id");--> statement-breakpoint
-CREATE INDEX "staging_files_status_idx" ON "staging_files" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "book_bucket_files_status_idx" ON "book_bucket_files" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "fwl_book_id_idx" ON "file_write_log" USING btree ("book_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_system_name_unique" ON "email_templates" USING btree ("name") WHERE "email_templates"."user_id" is null;

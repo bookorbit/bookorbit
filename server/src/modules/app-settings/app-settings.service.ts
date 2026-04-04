@@ -8,7 +8,7 @@ import {
   DEFAULT_METADATA_SCORE_WEIGHTS,
   type GlobalFileWriteSettings,
   type MetadataScoreWeights,
-  type StagingAutoFinalizeMetadataMode,
+  type BookBucketAutoFinalizeMetadataMode,
 } from '@projectx/types';
 
 import { APP_SETTING_KEYS, DEFAULT_OIDC_CONFIG, type OidcFullConfig } from '../../common/constants/app-settings.constants';
@@ -53,8 +53,8 @@ export class AppSettingsService {
     return setting;
   }
 
-  async isStagingAutoFetchEnabled(): Promise<boolean> {
-    const row = await this.repo.findByKey(APP_SETTING_KEYS.STAGING_AUTO_FETCH_METADATA);
+  async isBookBucketAutoFetchEnabled(): Promise<boolean> {
+    const row = await this.repo.findByKey(APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FETCH_METADATA);
     return parseBooleanSetting(row?.value, true);
   }
 
@@ -147,29 +147,29 @@ export class AppSettingsService {
     threshold: number;
     libraryId: number | null;
     folderId: number | null;
-    metadataMode: StagingAutoFinalizeMetadataMode;
+    metadataMode: BookBucketAutoFinalizeMetadataMode;
   }> {
     const keys = [
-      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_ENABLED,
-      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_THRESHOLD,
-      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_LIBRARY_ID,
-      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_FOLDER_ID,
-      APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_METADATA_MODE,
+      APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_ENABLED,
+      APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_THRESHOLD,
+      APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_LIBRARY_ID,
+      APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_FOLDER_ID,
+      APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_METADATA_MODE,
     ];
     const rows = await this.repo.findMany(keys);
     const map = new Map(rows.map((r) => [r.key, r.value]));
 
-    const libVal = map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_LIBRARY_ID);
-    const folderVal = map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_FOLDER_ID);
+    const libVal = map.get(APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_LIBRARY_ID);
+    const folderVal = map.get(APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_FOLDER_ID);
     const libId = libVal ? parseInt(libVal, 10) : null;
     const folderId = folderVal ? parseInt(folderVal, 10) : null;
 
     return {
-      enabled: parseBooleanSetting(map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_ENABLED), false),
-      threshold: parseInt(map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_THRESHOLD) ?? '85', 10),
+      enabled: parseBooleanSetting(map.get(APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_ENABLED), false),
+      threshold: parseInt(map.get(APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_THRESHOLD) ?? '85', 10),
       libraryId: libId && !isNaN(libId) ? libId : null,
       folderId: folderId && !isNaN(folderId) ? folderId : null,
-      metadataMode: parseAutoFinalizeMetadataMode(map.get(APP_SETTING_KEYS.STAGING_AUTO_FINALIZE_METADATA_MODE)),
+      metadataMode: parseAutoFinalizeMetadataMode(map.get(APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_METADATA_MODE)),
     };
   }
 
@@ -205,7 +205,7 @@ export class AppSettingsService {
   }
 }
 
-function parseAutoFinalizeMetadataMode(value: string | undefined): StagingAutoFinalizeMetadataMode {
+function parseAutoFinalizeMetadataMode(value: string | undefined): BookBucketAutoFinalizeMetadataMode {
   if (value === 'fetched_only' || value === 'embedded_only') return value;
   return 'safe_merge';
 }

@@ -13,7 +13,7 @@ export * from './reader';
 export * from './oidc';
 export * from './opds';
 export * from './kobo';
-export * from './staging';
+export * from './book-bucket';
 export * from './file-write';
 export * from './email-templates';
 export * from './email-providers';

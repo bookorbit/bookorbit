@@ -27,7 +27,7 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   },
   {
     label: 'Devices & Access',
-    permissions: [Permission.KoboSync, Permission.OpdsAccess, Permission.StagingAccess],
+    permissions: [Permission.KoboSync, Permission.OpdsAccess, Permission.BookBucketAccess],
   },
   {
     label: 'Email',

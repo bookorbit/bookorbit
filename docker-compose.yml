@@ -39,7 +39,7 @@ services:
         condition: service_healthy
     volumes:
       - ./books:/books
-      - ./staging:/staging
+      - ./book-bucket:/book-bucket
       - ./data:/data
     read_only: true
     tmpfs:

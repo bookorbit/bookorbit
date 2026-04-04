@@ -14,7 +14,7 @@ import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { StagingWatcherService } from '../../../src/modules/staging/staging-watcher.service';
+import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
 import { waitForScanCompletion } from '../app-harness';
 import { createEmailFixtureRoot, type EmailFixtureRoot } from './email-fixture-builder';
 
@@ -33,7 +33,7 @@ function sleep(ms: number): Promise<void> {
 
 interface EnvSnapshot {
   booksPath: string | undefined;
-  stagingPath: string | undefined;
+  bookBucketPath: string | undefined;
   appUrl: string | undefined;
 }
 
@@ -330,12 +330,12 @@ export async function createEmailE2EContext(): Promise<EmailE2EContext> {
   const fixture = await createEmailFixtureRoot();
   const envSnapshot: EnvSnapshot = {
     booksPath: process.env.BOOKS_PATH,
-    stagingPath: process.env.STAGING_PATH,
+    bookBucketPath: process.env.BOOK_BUCKET_PATH,
     appUrl: process.env.APP_URL,
   };
 
   process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.STAGING_PATH = fixture.stagingPath;
+  process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
   process.env.APP_URL = 'http://localhost:4173';
 
   const smtpSink = new InProcessSmtpSink();
@@ -361,7 +361,7 @@ export async function createEmailE2EContext(): Promise<EmailE2EContext> {
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopStagingWatcher(app);
+  await stopBookBucketWatcher(app);
 
   const db = app.get<Db>(DB);
   const admin = await getAdminSession(app, db);
@@ -662,8 +662,8 @@ function makeMetadataNoopMock(): Pick<
   };
 }
 
-async function stopStagingWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(StagingWatcherService);
+async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookBucketWatcherService);
   await watcher.onModuleDestroy();
 }
 
@@ -748,8 +748,8 @@ function restoreEnv(snapshot: EnvSnapshot): void {
   if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
   else process.env.BOOKS_PATH = snapshot.booksPath;
 
-  if (snapshot.stagingPath === undefined) delete process.env.STAGING_PATH;
-  else process.env.STAGING_PATH = snapshot.stagingPath;
+  if (snapshot.bookBucketPath === undefined) delete process.env.BOOK_BUCKET_PATH;
+  else process.env.BOOK_BUCKET_PATH = snapshot.bookBucketPath;
 
   if (snapshot.appUrl === undefined) delete process.env.APP_URL;
   else process.env.APP_URL = snapshot.appUrl;

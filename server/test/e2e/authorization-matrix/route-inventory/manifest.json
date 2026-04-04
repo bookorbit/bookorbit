@@ -5,7 +5,7 @@
     "Permission.ManageMetadataConfig": 32,
     "Permission.EmailSend": 30,
     "Permission.LibraryEditMetadata": 17,
-    "Permission.StagingAccess": 17,
+    "Permission.BookBucketAccess": 17,
     "Permission.ManageAppSettings": 16,
     "Permission.ManageLibraries": 13,
     "Permission.ManageUsers": 10,
@@ -21,13 +21,5 @@
     "'viewer'": 3,
     "'editor'": 1
   },
-  "routeChunks": [
-    "routes-01.json",
-    "routes-02.json",
-    "routes-03.json",
-    "routes-04.json",
-    "routes-05.json",
-    "routes-06.json",
-    "routes-07.json"
-  ]
+  "routeChunks": ["routes-01.json", "routes-02.json", "routes-03.json", "routes-04.json", "routes-05.json", "routes-06.json", "routes-07.json"]
 }

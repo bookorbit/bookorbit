@@ -66,25 +66,25 @@ describe('AppSettingsService', () => {
     });
   });
 
-  describe('isStagingAutoFetchEnabled', () => {
+  describe('isBookBucketAutoFetchEnabled', () => {
     it('returns true by default when setting is absent', async () => {
       repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.isStagingAutoFetchEnabled()).toBe(true);
+      expect(await service.isBookBucketAutoFetchEnabled()).toBe(true);
     });
 
     it('returns false when value is "false"', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'false' } as never);
-      expect(await service.isStagingAutoFetchEnabled()).toBe(false);
+      repo.findByKey.mockResolvedValue({ key: 'book_bucket_auto_fetch_metadata', value: 'false' } as never);
+      expect(await service.isBookBucketAutoFetchEnabled()).toBe(false);
     });
 
     it('returns true when value is "true"', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'true' } as never);
-      expect(await service.isStagingAutoFetchEnabled()).toBe(true);
+      repo.findByKey.mockResolvedValue({ key: 'book_bucket_auto_fetch_metadata', value: 'true' } as never);
+      expect(await service.isBookBucketAutoFetchEnabled()).toBe(true);
     });
 
     it('returns true when value is unrecognised', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'staging_auto_fetch_metadata', value: 'yes' } as never);
-      expect(await service.isStagingAutoFetchEnabled()).toBe(true);
+      repo.findByKey.mockResolvedValue({ key: 'book_bucket_auto_fetch_metadata', value: 'yes' } as never);
+      expect(await service.isBookBucketAutoFetchEnabled()).toBe(true);
     });
   });
 
@@ -285,11 +285,11 @@ describe('AppSettingsService', () => {
 
     it('parses stored values correctly', async () => {
       repo.findMany.mockResolvedValue([
-        { key: 'staging_auto_finalize_enabled', value: 'true' },
-        { key: 'staging_auto_finalize_threshold', value: '90' },
-        { key: 'staging_auto_finalize_library_id', value: '5' },
-        { key: 'staging_auto_finalize_folder_id', value: '12' },
-        { key: 'staging_auto_finalize_metadata_mode', value: 'fetched_only' },
+        { key: 'book_bucket_auto_finalize_enabled', value: 'true' },
+        { key: 'book_bucket_auto_finalize_threshold', value: '90' },
+        { key: 'book_bucket_auto_finalize_library_id', value: '5' },
+        { key: 'book_bucket_auto_finalize_folder_id', value: '12' },
+        { key: 'book_bucket_auto_finalize_metadata_mode', value: 'fetched_only' },
       ] as never);
 
       const result = await service.getAutoFinalizeSettings();
@@ -302,8 +302,8 @@ describe('AppSettingsService', () => {
 
     it('returns null for library/folder when values are not valid numbers', async () => {
       repo.findMany.mockResolvedValue([
-        { key: 'staging_auto_finalize_library_id', value: 'abc' },
-        { key: 'staging_auto_finalize_folder_id', value: '' },
+        { key: 'book_bucket_auto_finalize_library_id', value: 'abc' },
+        { key: 'book_bucket_auto_finalize_folder_id', value: '' },
       ] as never);
 
       const result = await service.getAutoFinalizeSettings();
@@ -313,14 +313,14 @@ describe('AppSettingsService', () => {
     });
 
     it('falls back to safe_merge when metadata mode is invalid', async () => {
-      repo.findMany.mockResolvedValue([{ key: 'staging_auto_finalize_metadata_mode', value: 'invalid_mode' }] as never);
+      repo.findMany.mockResolvedValue([{ key: 'book_bucket_auto_finalize_metadata_mode', value: 'invalid_mode' }] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.metadataMode).toBe('safe_merge');
     });
 
     it('accepts embedded_only as a valid metadata mode', async () => {
-      repo.findMany.mockResolvedValue([{ key: 'staging_auto_finalize_metadata_mode', value: 'embedded_only' }] as never);
+      repo.findMany.mockResolvedValue([{ key: 'book_bucket_auto_finalize_metadata_mode', value: 'embedded_only' }] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.metadataMode).toBe('embedded_only');

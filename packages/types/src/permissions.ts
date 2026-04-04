@@ -8,7 +8,7 @@ export enum Permission {
   // Devices & Access
   KoboSync = "kobo_sync",
   OpdsAccess = "opds_access",
-  StagingAccess = "staging_access",
+  BookBucketAccess = "book_bucket_access",
 
   // Email
   EmailSend = "email_send",
@@ -29,7 +29,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.LibraryDeleteBooks]: "Delete books",
   [Permission.KoboSync]: "Kobo sync",
   [Permission.OpdsAccess]: "OPDS access",
-  [Permission.StagingAccess]: "Staging / bookdrop",
+  [Permission.BookBucketAccess]: "Book Bucket",
   [Permission.EmailSend]: "Send by email",
   [Permission.ManageEmail]: "Manage email",
   [Permission.ManageLibraries]: "Manage libraries",

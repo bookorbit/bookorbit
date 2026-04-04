@@ -44,7 +44,7 @@ COPY --from=server-builder --chown=node:node /deploy ./
 COPY --from=client-builder --chown=node:node /app/client/dist ./public
 COPY --from=server-builder --chown=node:node /app/server/entrypoint.sh ./entrypoint.sh
 
-RUN chmod +x /app/entrypoint.sh && mkdir -p /books /staging /data /tmp && chown -R node:node /books /staging /data /tmp
+RUN chmod +x /app/entrypoint.sh && mkdir -p /books /book-bucket /data /tmp && chown -R node:node /books /book-bucket /data /tmp
 
 USER node
 

@@ -3,13 +3,24 @@ export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
 // Formats the reader can actually open. Used to show/hide Read/Open buttons.
 export const READER_OPENABLE_FORMATS = new Set([
   // epub reader (foliate)
-  "epub", "mobi", "azw3", "azw", "fb2",
+  "epub",
+  "mobi",
+  "azw3",
+  "azw",
+  "fb2",
   // pdf reader
   "pdf",
   // comic reader
-  "cbz", "cbr", "cb7",
+  "cbz",
+  "cbr",
+  "cb7",
   // audio reader
-  "m4b", "mp3", "m4a", "opus", "ogg", "flac",
+  "m4b",
+  "mp3",
+  "m4a",
+  "opus",
+  "ogg",
+  "flac",
 ]);
 
 export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {

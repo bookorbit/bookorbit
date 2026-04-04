@@ -1,223 +1,191 @@
 [
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "getSummary",
     "httpMethod": "GET",
-    "path": "/staging/summary",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/summary",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "getStatistics",
     "httpMethod": "GET",
-    "path": "/staging/statistics",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/statistics",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "getFile",
     "httpMethod": "GET",
-    "path": "/staging/files/:id",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/:id",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "getCover",
     "httpMethod": "GET",
-    "path": "/staging/files/:id/cover",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/:id/cover",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "upload",
     "httpMethod": "POST",
-    "path": "/staging/upload",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/upload",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "updateFile",
     "httpMethod": "PATCH",
-    "path": "/staging/files/:id",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/:id",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "discardFile",
     "httpMethod": "DELETE",
-    "path": "/staging/files/:id",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/:id",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "bulkDiscard",
     "httpMethod": "POST",
-    "path": "/staging/files/discard",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/discard",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "applyFetched",
     "httpMethod": "POST",
-    "path": "/staging/files/apply-fetched",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/apply-fetched",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "retryFetch",
     "httpMethod": "POST",
-    "path": "/staging/files/retry-fetch",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/retry-fetch",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "setTarget",
     "httpMethod": "POST",
-    "path": "/staging/files/set-target",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/set-target",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "selectionSummary",
     "httpMethod": "POST",
-    "path": "/staging/files/selection-summary",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/selection-summary",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "bulkEdit",
     "httpMethod": "POST",
-    "path": "/staging/files/bulk-edit",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/bulk-edit",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "previewNames",
     "httpMethod": "POST",
-    "path": "/staging/files/preview-names",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/files/preview-names",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "finalize",
     "httpMethod": "POST",
-    "path": "/staging/finalize",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/finalize",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   },
   {
-    "file": "server/src/modules/staging/staging.controller.ts",
-    "className": "StagingController",
+    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
+    "className": "BookBucketController",
     "methodName": "rescan",
     "httpMethod": "POST",
-    "path": "/staging/rescan",
-    "permissions": [
-      "Permission.StagingAccess"
-    ],
+    "path": "/book-bucket/rescan",
+    "permissions": ["Permission.BookBucketAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -469,9 +437,7 @@
     "methodName": "uploadBook",
     "httpMethod": "POST",
     "path": "/libraries/:id/upload",
-    "permissions": [
-      "Permission.LibraryUpload"
-    ],
+    "permissions": ["Permission.LibraryUpload"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -483,9 +449,7 @@
     "methodName": "findAll",
     "httpMethod": "GET",
     "path": "/users",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -497,9 +461,7 @@
     "methodName": "findAssignable",
     "httpMethod": "GET",
     "path": "/users/assignable",
-    "permissions": [
-      "Permission.ManageLibraries"
-    ],
+    "permissions": ["Permission.ManageLibraries"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -547,9 +509,7 @@
     "methodName": "findById",
     "httpMethod": "GET",
     "path": "/users/:id",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -573,9 +533,7 @@
     "methodName": "createUser",
     "httpMethod": "POST",
     "path": "/users",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -587,9 +545,7 @@
     "methodName": "updateUser",
     "httpMethod": "PATCH",
     "path": "/users/:id",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -601,9 +557,7 @@
     "methodName": "deleteUser",
     "httpMethod": "DELETE",
     "path": "/users/:id",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -615,9 +569,7 @@
     "methodName": "setPermissions",
     "httpMethod": "PUT",
     "path": "/users/:id/permissions",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -629,9 +581,7 @@
     "methodName": "setSuperuser",
     "httpMethod": "PUT",
     "path": "/users/:id/superuser",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -643,9 +593,7 @@
     "methodName": "getLibraries",
     "httpMethod": "GET",
     "path": "/users/:id/libraries",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,

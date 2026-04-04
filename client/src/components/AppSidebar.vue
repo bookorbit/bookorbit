@@ -179,7 +179,7 @@ onUnmounted(() => stopUploadCompletedListener())
     </SidebarHeader>
 
     <SidebarContent>
-      <!-- Dashboard / Staging / Authors -->
+      <!-- Dashboard / Book Bucket / Authors -->
       <SidebarGroup>
         <SidebarGroupContent>
           <SidebarMenu>

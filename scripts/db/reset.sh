@@ -27,8 +27,8 @@ pnpm run db:seed
 
 echo "Cleaning generated local data (covers, authors)..."
 rm -rf "$ROOT_DIR/local/data/covers" && mkdir -p "$ROOT_DIR/local/data/covers"
-rm -rf "$ROOT_DIR/local/data/staging/covers" && mkdir -p "$ROOT_DIR/local/data/staging/covers"
+rm -rf "$ROOT_DIR/local/data/book-bucket/covers" && mkdir -p "$ROOT_DIR/local/data/book-bucket/covers"
 rm -rf "$ROOT_DIR/local/data/authors" && mkdir -p "$ROOT_DIR/local/data/authors"
-rm -rf "$ROOT_DIR/local/data/staging/authors" && mkdir -p "$ROOT_DIR/local/data/staging/authors"
+rm -rf "$ROOT_DIR/local/data/book-bucket/authors" && mkdir -p "$ROOT_DIR/local/data/book-bucket/authors"
 
 echo "Database reset complete."

@@ -1,7 +1,7 @@
 import { bookMetadata } from './metadata';
 import { users, appSettings } from './auth';
 import { opdsUsers } from './opds';
-import { stagingFiles } from './staging';
+import { bookBucketFiles } from './book-bucket';
 import { libraries } from './libraries';
 import { books, bookFiles } from './books';
 import { emailProviders } from './email-providers';
@@ -77,7 +77,7 @@ describe('Database Schema Logic', () => {
     testOnUpdate('users.updatedAt', users.updatedAt);
     testOnUpdate('appSettings.updatedAt', appSettings.updatedAt);
     testOnUpdate('opdsUsers.updatedAt', opdsUsers.updatedAt);
-    testOnUpdate('stagingFiles.updatedAt', stagingFiles.updatedAt);
+    testOnUpdate('bookBucketFiles.updatedAt', bookBucketFiles.updatedAt);
     testOnUpdate('libraries.updatedAt', libraries.updatedAt);
     testOnUpdate('books.updatedAt', books.updatedAt);
     testOnUpdate('bookFiles.updatedAt', bookFiles.updatedAt);

@@ -7,13 +7,13 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { mkdir, stat } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Permission, StagingMetadata } from '@projectx/types';
+import type { Permission, BookBucketMetadata } from '@projectx/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { StagingWatcherService } from '../../../src/modules/staging/staging-watcher.service';
+import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
 import { seedLibrary, waitForScanCompletion } from '../app-harness';
 import {
   buildFb2Fixture,
@@ -33,7 +33,7 @@ const ADMIN_SETUP_DTO = {
 
 interface EnvSnapshot {
   booksPath: string | undefined;
-  stagingPath: string | undefined;
+  bookBucketPath: string | undefined;
 }
 
 export interface AuthorizationMatrixE2EContext {
@@ -66,14 +66,14 @@ export interface LocatedBookFile {
   format: string | null;
 }
 
-export interface CreateStagingRowInput {
+export interface CreateBookBucketRowInput {
   fileName?: string;
   content?: string | Buffer;
-  status?: typeof schema.stagingFiles.$inferInsert.status;
+  status?: typeof schema.bookBucketFiles.$inferInsert.status;
   format?: string;
-  embeddedMetadata?: StagingMetadata | null;
-  selectedMetadata?: StagingMetadata | null;
-  fetchedMetadata?: StagingMetadata | null;
+  embeddedMetadata?: BookBucketMetadata | null;
+  selectedMetadata?: BookBucketMetadata | null;
+  fetchedMetadata?: BookBucketMetadata | null;
   targetLibraryId?: number | null;
   targetFolderId?: number | null;
   confidence?: number | null;
@@ -99,11 +99,11 @@ export async function createAuthorizationMatrixE2EContext(): Promise<Authorizati
   const fixture = await createAuthorizationFixtureRoot();
   const envSnapshot: EnvSnapshot = {
     booksPath: process.env.BOOKS_PATH,
-    stagingPath: process.env.STAGING_PATH,
+    bookBucketPath: process.env.BOOK_BUCKET_PATH,
   };
 
   process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.STAGING_PATH = fixture.stagingPath;
+  process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
 
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
@@ -119,12 +119,12 @@ export async function createAuthorizationMatrixE2EContext(): Promise<Authorizati
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopStagingWatcher(app);
+  await stopBookBucketWatcher(app);
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
-  await setSettingValue(db, 'staging_auto_fetch_metadata', 'false');
-  await setSettingValue(db, 'staging_auto_finalize_enabled', 'false');
+  await setSettingValue(db, 'book_bucket_auto_fetch_metadata', 'false');
+  await setSettingValue(db, 'book_bucket_auto_finalize_enabled', 'false');
   await setSettingValue(db, 'opds_enabled', 'true');
 
   return {
@@ -309,18 +309,18 @@ export async function createBookCoverArtifacts(
   await writeFixtureFile(ctx.fixture.booksPath, `covers/${bookId}/thumbnail.jpg`, thumbnailContent);
 }
 
-export async function createStagingRow(
+export async function createBookBucketRow(
   ctx: AuthorizationMatrixE2EContext,
-  input: CreateStagingRowInput = {},
-): Promise<typeof schema.stagingFiles.$inferSelect> {
-  const fileName = input.fileName ?? `authz-staging-${randomUUID()}.fb2`;
+  input: CreateBookBucketRowInput = {},
+): Promise<typeof schema.bookBucketFiles.$inferSelect> {
+  const fileName = input.fileName ?? `authz-book-bucket-${randomUUID()}.fb2`;
   const content = input.content ?? buildFb2Fixture({ title: `Authorization Matrix ${randomUUID()}`, authors: ['Fixture Author'] });
   const format = input.format ?? fileName.split('.').pop()?.toLowerCase() ?? 'fb2';
-  const absolutePath = await writeFixtureFile(ctx.fixture.booksPath, `staging/${fileName}`, content);
+  const absolutePath = await writeFixtureFile(ctx.fixture.booksPath, `book-bucket/${fileName}`, content);
   const fileStat = await stat(absolutePath);
 
   const [row] = await ctx.db
-    .insert(schema.stagingFiles)
+    .insert(schema.bookBucketFiles)
     .values({
       fileName,
       absolutePath,
@@ -455,8 +455,8 @@ function makeMetadataNoopMock(): Pick<
   };
 }
 
-async function stopStagingWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(StagingWatcherService);
+async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookBucketWatcherService);
   await watcher.onModuleDestroy();
 }
 
@@ -525,6 +525,6 @@ function restoreEnv(snapshot: EnvSnapshot): void {
   if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
   else process.env.BOOKS_PATH = snapshot.booksPath;
 
-  if (snapshot.stagingPath === undefined) delete process.env.STAGING_PATH;
-  else process.env.STAGING_PATH = snapshot.stagingPath;
+  if (snapshot.bookBucketPath === undefined) delete process.env.BOOK_BUCKET_PATH;
+  else process.env.BOOK_BUCKET_PATH = snapshot.bookBucketPath;
 }

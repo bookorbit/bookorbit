@@ -11,7 +11,7 @@ function makeService(): jest.Mocked<AppSettingsService> {
     listSettings: vi.fn().mockResolvedValue([]),
     getValue: vi.fn(),
     update: vi.fn(),
-    isStagingAutoFetchEnabled: vi.fn(),
+    isBookBucketAutoFetchEnabled: vi.fn(),
     getAuthorsAutoEnrichmentWriteMode: vi.fn(),
     isAuthorsProviderAudnexusEnabled: vi.fn(),
     getOidcConfig: vi.fn(),

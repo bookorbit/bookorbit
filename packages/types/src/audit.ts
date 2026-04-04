@@ -44,7 +44,7 @@ export enum AuditAction {
   LensUpdate = "lens.update",
   LensDelete = "lens.delete",
 
-  StagingFinalize = "staging.finalize",
+  BookBucketFinalize = "book_bucket.finalize",
 
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
@@ -89,7 +89,7 @@ export enum AuditResource {
   Book = "book",
   Collection = "collection",
   Lens = "lens",
-  StagingFile = "staging_file",
+  BookBucketFile = "book_bucket_file",
   Author = "author",
   AppSettings = "app_settings",
   KoboDevice = "kobo_device",

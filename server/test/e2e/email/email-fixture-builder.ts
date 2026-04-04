@@ -7,7 +7,7 @@ export { createEpubFixture } from '../metadata-write/metadata-write-fixture-buil
 export interface EmailFixtureRoot {
   rootPath: string;
   booksPath: string;
-  stagingPath: string;
+  bookBucketPath: string;
   cleanup: () => Promise<void>;
 }
 
@@ -20,13 +20,13 @@ function assertRelativePath(path: string): void {
 export async function createEmailFixtureRoot(prefix = 'email-lifecycle-e2e-'): Promise<EmailFixtureRoot> {
   const rootPath = await mkdtemp(join(tmpdir(), prefix));
   const booksPath = join(rootPath, 'books');
-  const stagingPath = join(booksPath, 'staging');
-  await mkdir(stagingPath, { recursive: true });
+  const bookBucketPath = join(booksPath, 'book-bucket');
+  await mkdir(bookBucketPath, { recursive: true });
 
   return {
     rootPath,
     booksPath,
-    stagingPath,
+    bookBucketPath,
     cleanup: async () => {
       await rm(rootPath, { recursive: true, force: true });
     },

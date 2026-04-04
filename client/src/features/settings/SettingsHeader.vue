@@ -28,8 +28,8 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('manage_metadata_config')) {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
   }
-  if (su || perms.includes('staging_access')) {
-    result.push({ label: 'Staging', routeName: 'settings-admin-staging' })
+  if (su || perms.includes('book_bucket_access')) {
+    result.push({ label: 'Book Bucket', routeName: 'settings-admin-book-bucket' })
   }
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'File Naming', routeName: 'settings-admin-file-naming' })

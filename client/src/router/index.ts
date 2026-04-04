@@ -141,10 +141,10 @@ export const routes: RouteRecordRaw[] = [
             meta: { maxWidth: 'max-w-6xl', title: 'File Naming' },
           },
           {
-            path: 'admin/staging',
-            name: 'settings-admin-staging',
-            component: () => import('@/features/settings/StagingSettings.vue'),
-            meta: { title: 'Staging Settings' },
+            path: 'admin/book-bucket',
+            name: 'settings-admin-book-bucket',
+            component: () => import('@/features/settings/BookBucketSettings.vue'),
+            meta: { title: 'Book Bucket Settings' },
           },
           {
             path: 'admin/maintenance',
@@ -168,10 +168,10 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
-        path: '/staging',
-        name: 'staging',
-        component: () => import('@/views/StagingView.vue'),
-        meta: { title: 'Staging' },
+        path: '/book-bucket',
+        name: 'book-bucket',
+        component: () => import('@/views/BookBucketView.vue'),
+        meta: { title: 'Book Bucket' },
       },
       {
         path: '/statistics',

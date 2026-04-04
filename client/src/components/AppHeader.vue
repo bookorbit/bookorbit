@@ -27,7 +27,7 @@ import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
-import { useStagingSummary } from '@/features/staging/composables/useStagingSummary'
+import { useBookBucketSummary } from '@/features/book-bucket/composables/useBookBucketSummary'
 import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
@@ -36,13 +36,13 @@ const { user, logout } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
-const { summary: stagingSummary, fetchSummary: fetchStagingSummary, subscribe: subscribeStagingSummary } = useStagingSummary()
+const { summary: bookBucketSummary, fetchSummary: fetchBookBucketSummary, subscribe: subscribeBookBucketSummary } = useBookBucketSummary()
 
-const isStagingActive = computed(() => route.name === 'staging')
+const isBookBucketActive = computed(() => route.name === 'book-bucket')
 const isStatisticsActive = computed(() => route.name === 'statistics')
 
-function navigateToStaging() {
-  router.push({ name: 'staging' })
+function navigateToBookBucket() {
+  router.push({ name: 'book-bucket' })
 }
 
 function navigateToStatistics() {
@@ -140,9 +140,9 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
-  if (hasPermission('staging_access')) {
-    fetchStagingSummary()
-    subscribeStagingSummary()
+  if (hasPermission('book_bucket_access')) {
+    fetchBookBucketSummary()
+    subscribeBookBucketSummary()
   }
 })
 
@@ -405,32 +405,32 @@ function formatBadgeClass(fmt: string): string {
           <TooltipContent>Search</TooltipContent>
         </Tooltip>
 
-        <!-- Group 1: Content (Staging, Statistics, Upload) -->
+        <!-- Group 1: Content (Book Bucket, Statistics, Upload) -->
         <div class="hidden md:flex items-center gap-2.5">
-          <!-- Staging button -->
-          <Tooltip v-if="hasPermission('staging_access')">
+          <!-- Book Bucket button -->
+          <Tooltip v-if="hasPermission('book_bucket_access')">
             <TooltipTrigger as-child>
               <Button
                 variant="ghost"
                 size="icon"
                 class="relative h-8 w-8 rounded-xl border transition-colors"
                 :class="
-                  isStagingActive
+                  isBookBucketActive
                     ? 'border-primary/80 bg-primary/8 text-primary'
                     : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground'
                 "
-                @click="navigateToStaging"
+                @click="navigateToBookBucket"
               >
                 <PackageOpen :size="15" />
                 <span
-                  v-if="stagingSummary.total > 0"
+                  v-if="bookBucketSummary.total > 0"
                   class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
                 >
-                  {{ stagingSummary.total }}
+                  {{ bookBucketSummary.total }}
                 </span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Staging</TooltipContent>
+            <TooltipContent>Book Bucket</TooltipContent>
           </Tooltip>
 
           <!-- Statistics button -->

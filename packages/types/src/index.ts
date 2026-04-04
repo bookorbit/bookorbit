@@ -16,7 +16,7 @@ export * from "./reader-settings";
 export * from "./scanner";
 export * from "./opds";
 export * from "./kobo";
-export * from "./staging";
+export * from "./book-bucket";
 export * from "./file-write";
 export * from "./epub";
 export * from "./author";

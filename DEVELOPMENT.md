@@ -120,7 +120,7 @@ pnpm run e2e:run -- scanner-scenarios        # scanner scenario suite (dedicated
 pnpm run e2e:run -- scanner-file-operations  # scanner file operation suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- auth-session-security    # auth session security suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- auth-recovery-oidc-logout # auth recovery and OIDC logout suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- staging-ingest-finalize  # staging ingest/finalize suite (dedicated projectx_e2e DB)
+pnpm run e2e:run -- book-bucket-ingest-finalize  # Book Bucket ingest/finalize suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- metadata-write           # metadata write suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- authorization-matrix     # authorization matrix suite (dedicated projectx_e2e DB)
 pnpm run e2e:run -- opds-auth-catalog        # OPDS auth/catalog suite (dedicated projectx_e2e DB)
@@ -155,20 +155,20 @@ pnpm run e2e:run -- scanner-scenarios --testNamePattern=book-per-folder-disc-fol
 
 All suites write JUnit XML to `test-results/server/`. Dedicated-db suites also auto-start PostgreSQL locally (when needed) and use the `projectx_e2e` database.
 
-| Suite id                    | DB mode      | JUnit output                              | Extra artifacts                              |
-| --------------------------- | ------------ | ----------------------------------------- | -------------------------------------------- |
-| `app-smoke`                 | default-db   | `app-smoke-e2e-junit.xml`                 | none                                         |
-| `scanner-scenarios`         | dedicated-db | `scanner-scenarios-e2e-junit.xml`         | `scanner-scenarios-e2e-scenarios.json`       |
-| `scanner-file-operations`   | dedicated-db | `scanner-file-operations-e2e-junit.xml`   | `scanner-file-operations-e2e-scenarios.json` |
-| `auth-session-security`     | dedicated-db | `auth-session-security-e2e-junit.xml`     | none                                         |
-| `auth-recovery-oidc-logout` | dedicated-db | `auth-recovery-oidc-logout-e2e-junit.xml` | none                                         |
-| `staging-ingest-finalize`   | dedicated-db | `staging-ingest-finalize-e2e-junit.xml`   | `staging-ingest-finalize-e2e-scenarios.json` |
-| `metadata-write`            | dedicated-db | `metadata-write-e2e-junit.xml`            | `metadata-write-e2e-scenarios.json`          |
-| `authorization-matrix`      | dedicated-db | `authorization-matrix-e2e-junit.xml`      | none                                         |
-| `opds-auth-catalog`         | dedicated-db | `opds-auth-catalog-e2e-junit.xml`         | `opds-auth-catalog-e2e-scenarios.json`       |
-| `reader-state-isolation`    | dedicated-db | `reader-state-isolation-e2e-junit.xml`    | `reader-state-isolation-e2e-scenarios.json`  |
-| `email-lifecycle`           | dedicated-db | `email-lifecycle-e2e-junit.xml`           | `email-lifecycle-e2e-scenarios.json`         |
-| `users-admin-lifecycle`     | dedicated-db | `users-admin-lifecycle-e2e-junit.xml`     | `users-admin-lifecycle-e2e-scenarios.json`   |
+| Suite id                      | DB mode      | JUnit output                                | Extra artifacts                                  |
+| ----------------------------- | ------------ | ------------------------------------------- | ------------------------------------------------ |
+| `app-smoke`                   | default-db   | `app-smoke-e2e-junit.xml`                   | none                                             |
+| `scanner-scenarios`           | dedicated-db | `scanner-scenarios-e2e-junit.xml`           | `scanner-scenarios-e2e-scenarios.json`           |
+| `scanner-file-operations`     | dedicated-db | `scanner-file-operations-e2e-junit.xml`     | `scanner-file-operations-e2e-scenarios.json`     |
+| `auth-session-security`       | dedicated-db | `auth-session-security-e2e-junit.xml`       | none                                             |
+| `auth-recovery-oidc-logout`   | dedicated-db | `auth-recovery-oidc-logout-e2e-junit.xml`   | none                                             |
+| `book-bucket-ingest-finalize` | dedicated-db | `book-bucket-ingest-finalize-e2e-junit.xml` | `book-bucket-ingest-finalize-e2e-scenarios.json` |
+| `metadata-write`              | dedicated-db | `metadata-write-e2e-junit.xml`              | `metadata-write-e2e-scenarios.json`              |
+| `authorization-matrix`        | dedicated-db | `authorization-matrix-e2e-junit.xml`        | none                                             |
+| `opds-auth-catalog`           | dedicated-db | `opds-auth-catalog-e2e-junit.xml`           | `opds-auth-catalog-e2e-scenarios.json`           |
+| `reader-state-isolation`      | dedicated-db | `reader-state-isolation-e2e-junit.xml`      | `reader-state-isolation-e2e-scenarios.json`      |
+| `email-lifecycle`             | dedicated-db | `email-lifecycle-e2e-junit.xml`             | `email-lifecycle-e2e-scenarios.json`             |
+| `users-admin-lifecycle`       | dedicated-db | `users-admin-lifecycle-e2e-junit.xml`       | `users-admin-lifecycle-e2e-scenarios.json`       |
 
 ### E2E in CI (how to trigger)
 
@@ -178,20 +178,20 @@ All suite workflows call the reusable `E2E Runner (reusable)` workflow, which ru
 pnpm run e2e:run -- <suite-id>
 ```
 
-| Workflow name                     | Suite id                    | Triggered by                                                                |
-| --------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
-| `E2E - App Smoke`                 | `app-smoke`                 | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Scanner Scenarios`         | `scanner-scenarios`         | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Scanner File Operations`   | `scanner-file-operations`   | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request` |
-| `E2E - Auth Session Security`     | `auth-session-security`     | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Auth Recovery OIDC Logout` | `auth-recovery-oidc-logout` | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Staging Ingest Finalize`   | `staging-ingest-finalize`   | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Metadata Write`            | `metadata-write`            | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Authorization Matrix`      | `authorization-matrix`      | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - OPDS Auth Catalog`         | `opds-auth-catalog`         | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Reader State Isolation`    | `reader-state-isolation`    | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Email Lifecycle`           | `email-lifecycle`           | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Users Admin Lifecycle`     | `users-admin-lifecycle`     | `workflow_dispatch`, `push`, `pull_request`                                 |
+| Workflow name                       | Suite id                      | Triggered by                                                                |
+| ----------------------------------- | ----------------------------- | --------------------------------------------------------------------------- |
+| `E2E - App Smoke`                   | `app-smoke`                   | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Scanner Scenarios`           | `scanner-scenarios`           | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Scanner File Operations`     | `scanner-file-operations`     | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request` |
+| `E2E - Auth Session Security`       | `auth-session-security`       | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Auth Recovery OIDC Logout`   | `auth-recovery-oidc-logout`   | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Book Bucket Ingest Finalize` | `book-bucket-ingest-finalize` | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Metadata Write`              | `metadata-write`              | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Authorization Matrix`        | `authorization-matrix`        | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - OPDS Auth Catalog`           | `opds-auth-catalog`           | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Reader State Isolation`      | `reader-state-isolation`      | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Email Lifecycle`             | `email-lifecycle`             | `workflow_dispatch`, `push`, `pull_request`                                 |
+| `E2E - Users Admin Lifecycle`       | `users-admin-lifecycle`       | `workflow_dispatch`, `push`, `pull_request`                                 |
 
 Manual trigger steps:
 

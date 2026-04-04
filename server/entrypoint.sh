@@ -6,7 +6,7 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 export BOOKS_PATH="${BOOKS_PATH:-/data}"
-export STAGING_PATH="${STAGING_PATH:-/staging}"
+export BOOK_BUCKET_PATH="${BOOK_BUCKET_PATH:-/book-bucket}"
 
 node dist/scripts/migrate.js
 exec node dist/main.js

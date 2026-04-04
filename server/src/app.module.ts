@@ -39,7 +39,7 @@ import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { EmailModule } from './modules/email/email.module';
 import { EpubModule } from './modules/reader/epub/epub.module';
-import { StagingModule } from './modules/staging/staging.module';
+import { BookBucketModule } from './modules/book-bucket/book-bucket.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthorsModule } from './modules/authors/authors.module';
@@ -92,7 +92,7 @@ import { MigrationModule } from './modules/migration/migration.module';
     CbzModule,
     ReaderPreferencesModule,
     EpubModule,
-    StagingModule,
+    BookBucketModule,
     EmailModule,
     MetadataScoreModule,
     StatisticsModule,

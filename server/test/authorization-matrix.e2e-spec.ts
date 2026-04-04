@@ -18,7 +18,7 @@ import {
   createLibraryWithFolder,
   createOpdsUser,
   createReadingSession,
-  createStagingRow,
+  createBookBucketRow,
   createUserAndLogin,
   grantLibraryAccess,
   locateBookByAbsolutePath,
@@ -85,7 +85,7 @@ interface Personas {
   koboActive: TestUserSession;
   koboDisabled: TestUserSession;
   koboRevoked: TestUserSession;
-  stagingUser: TestUserSession;
+  bookBucketUser: TestUserSession;
   uploadUser: TestUserSession;
   ownerUser: TestUserSession;
   otherUser: TestUserSession;
@@ -172,7 +172,7 @@ describe('Authorization matrix (e2e)', () => {
       koboActive: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboDisabled: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboRevoked: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
-      stagingUser: await createUserAndLogin(ctx, { permissions: [Permission.StagingAccess] }),
+      bookBucketUser: await createUserAndLogin(ctx, { permissions: [Permission.BookBucketAccess] }),
       uploadUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
@@ -183,7 +183,7 @@ describe('Authorization matrix (e2e)', () => {
       grantLibraryAccess(ctx, personas.allPermsUser.userId, libraryA.libraryId, 'owner'),
       grantLibraryAccess(ctx, personas.allPermsUser.userId, libraryB.libraryId, 'owner'),
       grantLibraryAccess(ctx, personas.metadataEditor.userId, libraryA.libraryId, 'viewer'),
-      grantLibraryAccess(ctx, personas.stagingUser.userId, libraryA.libraryId, 'viewer'),
+      grantLibraryAccess(ctx, personas.bookBucketUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.ownerUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsOwner.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsIntruder.userId, libraryA.libraryId, 'viewer'),
@@ -370,9 +370,9 @@ describe('Authorization matrix (e2e)', () => {
           path: '/opds-users',
           token: 'allPerms',
         },
-        [Permission.StagingAccess]: {
+        [Permission.BookBucketAccess]: {
           method: 'GET',
-          path: '/staging/summary',
+          path: '/book-bucket/summary',
           token: 'allPerms',
         },
         [Permission.EmailSend]: {
@@ -916,14 +916,14 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('service authz - library scoped data and mixed batch semantics', () => {
-    it('returns mixed-result finalize envelope for staging authorization failures', async () => {
-      const accessibleRow = await createStagingRow(ctx, {
+    it('returns mixed-result finalize envelope for Book Bucket authorization failures', async () => {
+      const accessibleRow = await createBookBucketRow(ctx, {
         fileName: `authz-finalize-ok-${randomUUID()}.fb2`,
         targetLibraryId: libraryA.libraryId,
         targetFolderId: libraryA.libraryFolderId,
         status: 'ready',
       });
-      const inaccessibleRow = await createStagingRow(ctx, {
+      const inaccessibleRow = await createBookBucketRow(ctx, {
         fileName: `authz-finalize-denied-${randomUUID()}.fb2`,
         targetLibraryId: libraryB.libraryId,
         targetFolderId: libraryB.libraryFolderId,
@@ -932,8 +932,8 @@ describe('Authorization matrix (e2e)', () => {
 
       const response = await ctx.app.inject({
         method: 'POST',
-        url: '/api/v1/staging/finalize',
-        headers: authHeader(personas.stagingUser.accessToken),
+        url: '/api/v1/book-bucket/finalize',
+        headers: authHeader(personas.bookBucketUser.accessToken),
         payload: {
           fileIds: [accessibleRow.id, inaccessibleRow.id],
         },
