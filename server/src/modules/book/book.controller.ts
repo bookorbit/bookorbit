@@ -228,13 +228,13 @@ export class BookController {
     const { mtimeMs } = await stat(coverPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
     if (ifNoneMatch === etag) {
-      reply.status(304).send();
+      reply.status(304).header('Cache-Control', 'private, max-age=86400').header('ETag', etag).send();
       return;
     }
 
     const ext = coverPath.split('.').pop()?.toLowerCase();
     const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
-    reply.header('Cache-Control', 'no-cache');
+    reply.header('Cache-Control', 'private, max-age=86400');
     reply.header('ETag', etag);
     reply.type(contentType);
     reply.send(createReadStream(coverPath));
@@ -253,11 +253,11 @@ export class BookController {
     const { mtimeMs } = await stat(thumbnailPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
     if (ifNoneMatch === etag) {
-      reply.status(304).send();
+      reply.status(304).header('Cache-Control', 'private, max-age=86400').header('ETag', etag).send();
       return;
     }
 
-    reply.header('Cache-Control', 'no-cache');
+    reply.header('Cache-Control', 'private, max-age=86400');
     reply.header('ETag', etag);
     reply.type('image/jpeg');
     reply.send(createReadStream(thumbnailPath));
