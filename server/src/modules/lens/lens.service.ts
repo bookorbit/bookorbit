@@ -114,7 +114,7 @@ export class LensService {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
 
     const where = this.queryBuilder.buildWhere(lens.filter, { accessibleLibraryIds, userId: user.id });
-    const orderBy = this.queryBuilder.buildOrderBy(lens.defaultSort ?? []);
+    const orderBy = this.queryBuilder.buildOrderBy(lens.defaultSort ?? [], user.id);
     const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
       where,
       orderBy,

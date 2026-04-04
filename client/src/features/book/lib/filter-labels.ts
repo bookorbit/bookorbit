@@ -10,6 +10,12 @@ export const SORT_FIELD_LABELS: Record<SortField, string> = {
   publishedYear: 'Published Year',
   pageCount: 'Page Count',
   rating: 'Rating',
+  publisher: 'Publisher',
+  fileSize: 'File Size',
+  readProgress: 'Read Progress',
+  lastReadAt: 'Last Read',
+  finishedAt: 'Date Finished',
+  random: 'Random',
 }
 
 export const FIELD_LABELS: Record<RuleField, string> = {

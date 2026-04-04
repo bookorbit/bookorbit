@@ -110,9 +110,9 @@ export type GroupRule = {
   rules: (Rule | GroupRule)[];
 };
 
-export type SortField = "author" | "title" | "series" | "seriesIndex" | "addedAt" | "updatedAt" | "publishedYear" | "pageCount" | "rating";
+export type SortField = "author" | "title" | "series" | "seriesIndex" | "addedAt" | "updatedAt" | "publishedYear" | "pageCount" | "rating" | "publisher" | "fileSize" | "readProgress" | "lastReadAt" | "finishedAt" | "random";
 
-export const SORT_FIELDS: SortField[] = ["author", "title", "series", "seriesIndex", "addedAt", "updatedAt", "publishedYear", "pageCount", "rating"];
+export const SORT_FIELDS: SortField[] = ["author", "title", "series", "seriesIndex", "addedAt", "updatedAt", "publishedYear", "pageCount", "rating", "publisher", "fileSize", "readProgress", "lastReadAt", "finishedAt", "random"];
 
 export type SortSpec = {
   field: SortField;

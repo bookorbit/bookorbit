@@ -31,6 +31,7 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   publishedYear: bookMetadata.publishedYear,
   pageCount: bookMetadata.pageCount,
   rating: bookMetadata.rating,
+  publisher: bookMetadata.publisher,
 };
 
 @Injectable()
@@ -58,7 +59,7 @@ export class BookQueryBuilder {
     return and(...clauses);
   }
 
-  buildOrderBy(sort: SortSpec[]): SQL[] {
+  buildOrderBy(sort: SortSpec[], userId?: number): SQL[] {
     if (sort.length === 0) return [sql`${bookMetadata.title} ASC NULLS LAST`];
     const result: SQL[] = [];
     for (const { field, dir } of sort) {
@@ -70,6 +71,25 @@ export class BookQueryBuilder {
             `(SELECT a.sort_name FROM book_authors ba INNER JOIN authors a ON ba.author_id = a.id WHERE ba.book_id = books.id ORDER BY ba.display_order LIMIT 1) ${D} NULLS LAST`,
           ),
         );
+      } else if (field === 'fileSize') {
+        result.push(sql.raw(`(SELECT bf.size_bytes FROM book_files bf WHERE bf.id = books.primary_file_id) ${D} NULLS LAST`));
+      } else if (field === 'readProgress') {
+        if (userId === undefined) throw new BadRequestException('readProgress sort requires an authenticated user');
+        result.push(
+          sql`(SELECT rp.percentage FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId} ORDER BY rp.percentage DESC LIMIT 1) ${sql.raw(D)} NULLS LAST`,
+        );
+      } else if (field === 'lastReadAt') {
+        if (userId === undefined) throw new BadRequestException('lastReadAt sort requires an authenticated user');
+        result.push(
+          sql`(SELECT rp.updated_at FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId} ORDER BY rp.updated_at DESC LIMIT 1) ${sql.raw(D)} NULLS LAST`,
+        );
+      } else if (field === 'finishedAt') {
+        if (userId === undefined) throw new BadRequestException('finishedAt sort requires an authenticated user');
+        result.push(
+          sql`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = books.id AND ubs.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
+        );
+      } else if (field === 'random') {
+        result.push(sql.raw('RANDOM()'));
       } else {
         const col = SORT_FIELD_MAP[field];
         if (!col) continue;

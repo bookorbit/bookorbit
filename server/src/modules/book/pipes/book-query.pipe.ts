@@ -5,7 +5,23 @@ import type { BookQuery } from '@projectx/types';
 
 import { groupRuleSchema } from '../utils/group-rule.validator';
 
-const SORT_FIELDS = ['author', 'title', 'series', 'seriesIndex', 'addedAt', 'updatedAt', 'publishedYear', 'pageCount', 'rating'] as const;
+const SORT_FIELDS = [
+  'author',
+  'title',
+  'series',
+  'seriesIndex',
+  'addedAt',
+  'updatedAt',
+  'publishedYear',
+  'pageCount',
+  'rating',
+  'publisher',
+  'fileSize',
+  'readProgress',
+  'lastReadAt',
+  'finishedAt',
+  'random',
+] as const;
 
 const bookQuerySchema = z.object({
   filter: groupRuleSchema(5).optional(),
