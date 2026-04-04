@@ -83,7 +83,7 @@ async function handleDelete() {
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground"> Icon <span class="text-muted-foreground font-normal">(optional)</span> </label>
+            <label class="text-sm font-medium text-foreground"> Icon </label>
             <IconPicker v-model="icon" placeholder="Choose an icon..." />
           </div>
 

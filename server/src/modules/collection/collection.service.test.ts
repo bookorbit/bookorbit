@@ -121,6 +121,38 @@ describe('CollectionService', () => {
     });
   });
 
+  describe('update', () => {
+    it('returns the hydrated collection so derived counts remain available', async () => {
+      const { service, collectionRepo } = makeService();
+      const existing = makeCollection({ bookCount: 3 });
+      const hydrated = makeCollection({ name: 'Updated Favorites', icon: 'FolderHeart', syncToKobo: true, bookCount: 3 });
+      collectionRepo.findById.mockResolvedValueOnce([existing]).mockResolvedValueOnce([hydrated]);
+      collectionRepo.update.mockResolvedValue([
+        {
+          id: existing.id,
+          userId: existing.userId,
+          name: 'Updated Favorites',
+          icon: 'FolderHeart',
+          description: existing.description,
+          syncToKobo: true,
+          displayOrder: existing.displayOrder,
+          createdAt: existing.createdAt,
+          updatedAt: existing.updatedAt,
+        },
+      ]);
+
+      const result = await service.update(existing.id, { name: 'Updated Favorites', icon: 'FolderHeart', syncToKobo: true }, makeUser());
+
+      expect(collectionRepo.update).toHaveBeenCalledWith(existing.id, existing.userId, {
+        name: 'Updated Favorites',
+        icon: 'FolderHeart',
+        syncToKobo: true,
+      });
+      expect(collectionRepo.findById).toHaveBeenCalledTimes(2);
+      expect(result).toEqual(hydrated);
+    });
+  });
+
   describe('addBooks', () => {
     it('verifies collection ownership and library access before adding books', async () => {
       const { service, collectionRepo, bookReadService, libraryService } = makeService();

@@ -85,12 +85,14 @@ export class CollectionService {
   async update(id: number, dto: UpdateCollectionDto, user: RequestUser) {
     const existing = await this.findCollectionForUserOrThrow(id, user);
 
-    const [updated] = await this.collectionRepo.update(id, existing.userId, {
+    await this.collectionRepo.update(id, existing.userId, {
       ...(dto.name !== undefined && { name: dto.name }),
       ...(dto.icon !== undefined && { icon: dto.icon.trim() || null }),
       ...(dto.description !== undefined && { description: dto.description }),
       ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
     });
+
+    const [updated] = await this.collectionRepo.findById(id);
     return updated;
   }
 
