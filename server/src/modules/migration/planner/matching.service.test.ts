@@ -16,6 +16,27 @@ describe('applyPathMappings', () => {
     const mapped = applyPathMappings('/other/path/file.epub', [{ sourcePrefix: '/mnt/books', targetPrefix: '/library' }]);
     expect(mapped).toBe('/other/path/file.epub');
   });
+
+  it('returns null when filePath is null', () => {
+    expect(applyPathMappings(null, [{ sourcePrefix: '/mnt', targetPrefix: '/lib' }])).toBeNull();
+  });
+
+  it('handles empty mappings list', () => {
+    expect(applyPathMappings('/mnt/books/file.epub', [])).toBe('/mnt/books/file.epub');
+  });
+
+  it('strips trailing slash from prefixes', () => {
+    const mapped = applyPathMappings('/mnt/books/file.epub', [{ sourcePrefix: '/mnt/books/', targetPrefix: '/library/' }]);
+    expect(mapped).toBe('/library/file.epub');
+  });
+
+  it('skips mappings with empty prefixes', () => {
+    const mapped = applyPathMappings('/mnt/books/file.epub', [
+      { sourcePrefix: '', targetPrefix: '/library' },
+      { sourcePrefix: '/mnt/books', targetPrefix: '/target' },
+    ]);
+    expect(mapped).toBe('/target/file.epub');
+  });
 });
 
 describe('deriveUnresolvedReason', () => {
@@ -28,5 +49,9 @@ describe('deriveUnresolvedReason', () => {
 
   it('returns insufficient_source_data when no strategy could be attempted', () => {
     expect(deriveUnresolvedReason([])).toBe('insufficient_source_data');
+  });
+
+  it('returns title_author even if earlier strategies are missing', () => {
+    expect(deriveUnresolvedReason(['title_author'])).toBe('no_title_author_match');
   });
 });

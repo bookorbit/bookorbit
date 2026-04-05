@@ -1,82 +1,26 @@
 import { api } from '@/lib/api'
+import type {
+  MigrationRunState as SharedMigrationRunState,
+  MigrationSourceApi,
+  MigrationSourceCapabilities as SharedMigrationSourceCapabilities,
+  MigrationProfileApi,
+  MigrationPlanArtifactApi,
+  MigrationPlanSummary,
+  MigrationRunApi,
+  MigrationRunMetricApi,
+} from '@projectx/types'
 
-export type MigrationRunState = 'draft' | 'preflight_failed' | 'dry_run_ready' | 'running' | 'failed' | 'completed'
+export type MigrationRunState = SharedMigrationRunState
+export type MigrationSourceCapabilities = SharedMigrationSourceCapabilities
+export type MigrationSource = MigrationSourceApi
+export type MigrationProfile = MigrationProfileApi
+export type MigrationPlanArtifact = MigrationPlanArtifactApi & { summary: MigrationPlanSummary }
+export type MigrationRun = MigrationRunApi
 
-export interface MigrationSourceCapabilities {
-  sourceType: string
-  sourceVersion: string | null
-  missingTables: string[]
-  warnings: string[]
-  counts: Record<string, number>
-}
-
-export interface MigrationSource {
-  id: number
-  type: string
-  name: string
-  connectionConfig: Record<string, unknown>
-  capabilities: MigrationSourceCapabilities | null
-  lastValidatedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MigrationProfile {
-  id: number
-  sourceId: number
-  name: string
-  userMappings: Array<{ sourceUserId: string; targetUserId: number }>
-  pathMappings: Array<{ sourcePrefix: string; targetPrefix: string }>
-  scope: Record<string, unknown>
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MigrationPlanArtifact {
-  id: number
-  sourceId: number
-  profileId: number
-  plan: Record<string, unknown>
-  summary: {
-    generatedAt?: string
-    status?: string
-    matchedBooks?: number
-    unresolvedBooks?: number
-    duplicateBookMatches?: number
-    unresolvedByReason?: Record<string, number>
-    mappedUsers?: number
-    perUserPreview?: Array<{ sourceUserId: string; targetUserId: number; username: string; counts: Record<string, number> }>
-  }
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MigrationRun {
-  id: number
-  sourceId: number
-  profileId: number
-  planArtifactId: number | null
-  state: MigrationRunState
-  currentStage: string | null
-  startedAt: string | null
-  endedAt: string | null
-  errorMessage: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MigrationRunMetric {
+export interface MigrationRunMetric extends MigrationRunMetricApi {
   id: number
   runId: number
-  stage: string
-  entityType: string
-  processed: number
-  imported: number
-  skipped: number
-  unresolved: number
-  failed: number
   createdAt: string
-  updatedAt: string
 }
 
 export interface MigrationRunProgress {
@@ -95,7 +39,7 @@ export interface MigrationRunReport {
   run: MigrationRun
   metrics: MigrationRunMetric[]
   plan: Record<string, unknown> | null
-  summary: MigrationPlanArtifact['summary'] | null
+  summary: MigrationPlanSummary | null
 }
 
 export interface MigrationWorkflowState {
@@ -111,6 +55,8 @@ export interface MigrationWorkflowState {
 export interface PathMappingValidation {
   sourceId: number
   validatedAt: string
+  pathMappingsHash: string
+  persistedProfileId: number | null
   summary: {
     totalSourceBooks: number
     booksWithFilePath: number
@@ -243,6 +189,14 @@ export function createDryRunPlan(payload: { profileId: number; scopeOverride?: R
   }).then((res) => expectJson<MigrationPlanArtifact>(res, 'Failed to run dry-run plan'))
 }
 
+export function resolveDuplicateMatches(artifactId: number, resolutions: Array<{ targetBookId: number; selectedSourceBookId: string }>) {
+  return api(`/api/v1/migration/plans/${artifactId}/resolve-duplicates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolutions }),
+  }).then((res) => expectJson<MigrationPlanArtifact>(res, 'Failed to resolve duplicate matches'))
+}
+
 export function startLiveRun(payload: { planArtifactId: number; targetKey?: string }) {
   return api('/api/v1/migration/runs/live', {
     method: 'POST',
@@ -259,8 +213,28 @@ export function getRunReport(runId: number) {
   return api(`/api/v1/migration/runs/${runId}/report`).then((res) => expectJson<MigrationRunReport>(res, 'Failed to load migration run report'))
 }
 
-export function exportRunReport(runId: number, format: 'json' | 'csv') {
-  return api(`/api/v1/migration/runs/${runId}/report/export?format=${format}`).then((res) =>
-    expectJson<{ format: 'json' | 'csv'; fileName: string; contentType: string; content: string }>(res, 'Failed to export migration report'),
+export async function exportRunReport(runId: number, format: 'json' | 'csv') {
+  const res = await api(`/api/v1/migration/runs/${runId}/report/export?format=${format}`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(body || 'Failed to export migration report')
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const fileNameMatch = disposition.match(/filename="?([^"]+)"?/)
+  const fileName = fileNameMatch?.[1] ?? `migration-run-${runId}-report.${format}`
+  const contentType = res.headers.get('Content-Type') ?? (format === 'csv' ? 'text/csv' : 'application/json')
+  const content = await res.text()
+  return { format, fileName, contentType, content }
+}
+
+export function cancelRun(runId: number) {
+  return api(`/api/v1/migration/runs/${runId}/cancel`, { method: 'POST' }).then((res) =>
+    expectJson<MigrationRun>(res, 'Failed to cancel migration run'),
+  )
+}
+
+export function retryRun(runId: number) {
+  return api(`/api/v1/migration/runs/${runId}/retry`, { method: 'POST' }).then((res) =>
+    expectJson<MigrationRun>(res, 'Failed to retry migration run'),
   )
 }

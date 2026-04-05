@@ -134,6 +134,20 @@ export interface SourceShelfBook {
   sourceBookId: string;
 }
 
+export interface SourceExportDomains {
+  metadata: boolean;
+  authors: boolean;
+  narrators: boolean;
+  genres: boolean;
+  tags: boolean;
+  userBookStatuses: boolean;
+  readingProgress: boolean;
+  bookmarks: boolean;
+  annotations: boolean;
+  shelves: boolean;
+  covers: boolean;
+}
+
 export interface SourceExportData {
   users: SourceUser[];
   books: SourceBook[];
@@ -143,6 +157,7 @@ export interface SourceExportData {
   annotations: SourceAnnotation[];
   shelves: SourceShelf[];
   shelfBooks: SourceShelfBook[];
+  availableDomains?: SourceExportDomains;
 }
 
 export interface SourceAdapter<TConnectionConfig = unknown> {

@@ -81,6 +81,16 @@ export const E2E_SUITES = Object.freeze({
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
   },
+  "migration-booklore": {
+    id: "migration-booklore",
+    name: "Migration Booklore",
+    timeout: 70,
+    description: "Booklore migration end-to-end suite",
+    vitestTarget: "test/migration-booklore.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/migration-booklore-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+  },
   "authorization-matrix": {
     id: "authorization-matrix",
     name: "Authorization Matrix",

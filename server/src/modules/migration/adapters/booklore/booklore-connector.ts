@@ -3,8 +3,11 @@ import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2';
 
 import type { BookloreConnectionConfig } from './booklore-connection-config';
+import { isBookloreMigrationTableName } from './booklore-tables';
 
 type Row = RowDataPacket & Record<string, unknown>;
+
+const CONNECT_TIMEOUT_MS = 10_000;
 
 @Injectable()
 export class BookloreConnector {
@@ -17,6 +20,7 @@ export class BookloreConnector {
       database: config.database,
       ssl: config.ssl ? {} : undefined,
       supportBigNumbers: true,
+      connectTimeout: CONNECT_TIMEOUT_MS,
     });
 
     try {
@@ -52,6 +56,9 @@ export class BookloreConnector {
   }
 
   async countRows(conn: mysql.Connection, tableName: string): Promise<number> {
+    if (!isBookloreMigrationTableName(tableName)) {
+      throw new Error(`Table "${tableName}" is not in the allowed migration table list`);
+    }
     const [rows] = await conn.query<Row[]>(`SELECT COUNT(*) AS count FROM \`${tableName}\``);
     const value = rows[0]?.count;
     const count = typeof value === 'number' ? value : Number(value ?? 0);

@@ -57,7 +57,6 @@ describe('Architecture boundaries', () => {
       'src/modules/metadata/metadata.service.ts',
       'src/modules/metadata-preferences/metadata-preferences.service.ts',
       'src/modules/metadata-preferences/provider-config.service.ts',
-      'src/modules/migration/executor/migration-executor.service.ts',
       'src/modules/migration/planner/matching.service.ts',
       'src/modules/opds/opds-book.service.ts',
       'src/modules/opds/opds-user.service.ts',

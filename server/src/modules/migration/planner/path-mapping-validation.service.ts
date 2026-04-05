@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { SourceBook } from '../adapters/source-adapter.types';
 import { MigrationRepository } from '../migration.repository';
+import { pathMatchesPrefix } from './matching.service';
 import type { PathMapping } from './planner.types';
 
 interface MappedPathRow {
@@ -118,7 +119,7 @@ export class PathMappingValidationService {
 
 function findMatchingMapping(sourcePath: string, mappings: PathMapping[]): { index: number; mapping: PathMapping } | null {
   for (const [index, mapping] of mappings.entries()) {
-    if (sourcePath.startsWith(mapping.sourcePrefix)) {
+    if (pathMatchesPrefix(sourcePath, mapping.sourcePrefix)) {
       return { index, mapping };
     }
   }

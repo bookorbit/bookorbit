@@ -1,5 +1,5 @@
 {
-  "id": "72e849a9-b27e-4b5f-877b-08d05168e0bb",
+  "id": "d56006ae-b874-42cc-be23-62c2537e2dd8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -785,6 +785,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "source_data": {
+          "name": "source_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "summary": {
           "name": "summary",
           "type": "jsonb",
@@ -1345,7 +1351,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "migration_runs_state_chk": {
+          "name": "migration_runs_state_chk",
+          "value": "\"state\" IN ('draft', 'preflight_failed', 'dry_run_ready', 'running', 'failed', 'completed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.migration_sources": {
@@ -1427,6 +1438,21 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "migration_sources_created_by_user_id_idx": {
+          "name": "migration_sources_created_by_user_id_idx",
+          "columns": [
+            {
+              "expression": "created_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

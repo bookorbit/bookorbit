@@ -1,9 +1,13 @@
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
 import { MigrationController } from './migration.controller';
+import { MigrationProgressGateway } from './migration-progress.gateway';
 import { MigrationModule } from './migration.module';
 import { MigrationRepository } from './migration.repository';
+import { MigrationSourceService } from './migration-source.service';
+import { MigrationProfileService } from './migration-profile.service';
 import { MigrationService } from './migration.service';
+import { MigrationEncryptionService } from './core/migration-encryption.service';
 import { SourceAdapterRegistry } from './adapters/source-adapter.registry';
 import { MigrationPlannerService } from './planner/planner.service';
 import { PathMappingValidationService } from './planner/path-mapping-validation.service';
@@ -20,12 +24,16 @@ describe('MigrationModule', () => {
     expect(providers).toEqual(
       expect.arrayContaining([
         MigrationRepository,
+        MigrationEncryptionService,
         SourceAdapterRegistry,
         MigrationPlannerService,
         PathMappingValidationService,
         MigrationExecutorService,
         MigrationReportingService,
+        MigrationSourceService,
+        MigrationProfileService,
         MigrationService,
+        MigrationProgressGateway,
       ]),
     );
     expect(exports).toEqual(expect.arrayContaining([MigrationRepository, MigrationService]));

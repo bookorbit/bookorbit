@@ -7,6 +7,7 @@ import type {
   SourceBook,
   SourceBookmark,
   SourceContributor,
+  SourceExportDomains,
   SourceExportData,
   SourceShelf,
   SourceShelfBook,
@@ -18,35 +19,37 @@ import type {
 } from '../source-adapter.types';
 import type { BookloreConnectionConfig } from './booklore-connection-config';
 import { BookloreConnector } from './booklore-connector';
+import { BOOKLORE_TABLES } from './booklore-tables';
 
 const TABLE_CANDIDATES = {
-  users: ['users'],
-  book: ['book', 'books'],
-  bookFile: ['book_file', 'book_files'],
-  bookMetadata: ['book_metadata'],
-  libraryPath: ['library_path', 'library_paths'],
-  authors: ['author', 'authors'],
-  authorMapping: ['book_metadata_author_mapping', 'book_author_mapping'],
-  userBookProgress: ['user_book_progress'],
-  userBookFileProgress: ['user_book_file_progress'],
-  bookmarks: ['book_marks', 'bookmarks'],
-  annotations: ['annotations'],
-  pdfAnnotations: ['pdf_annotations'],
-  shelves: ['shelf', 'shelves'],
-  shelfBooks: ['book_shelf_mapping', 'shelf_book_mapping'],
-  categories: ['category', 'categories', 'genre', 'genres'],
-  categoryMapping: ['book_metadata_category_mapping', 'book_category_mapping', 'book_genre_mapping'],
-  tags: ['tag', 'tags'],
-  tagMapping: ['book_metadata_tag_mapping', 'book_tag_mapping'],
-  bookNotes: ['book_notes'],
-  bookNotesV2: ['book_notes_v2'],
-  epubViewerPreference: ['epub_viewer_preference'],
-  pdfViewerPreference: ['pdf_viewer_preference'],
-  cbxViewerPreference: ['cbx_viewer_preference'],
-  newPdfViewerPreference: ['new_pdf_viewer_preference'],
-  koboUserSettings: ['kobo_user_settings'],
-  koboReadingState: ['kobo_reading_state'],
-  comicMetadata: ['comic_metadata'],
+  users: [BOOKLORE_TABLES.users],
+  book: [BOOKLORE_TABLES.book],
+  bookFile: [BOOKLORE_TABLES.bookFile],
+  bookMetadata: [BOOKLORE_TABLES.bookMetadata],
+  libraryPath: [BOOKLORE_TABLES.libraryPath],
+  authors: [BOOKLORE_TABLES.author],
+  authorMapping: [BOOKLORE_TABLES.bookMetadataAuthorMapping],
+  userBookProgress: [BOOKLORE_TABLES.userBookProgress],
+  userBookFileProgress: [BOOKLORE_TABLES.userBookFileProgress],
+  bookmarks: [BOOKLORE_TABLES.bookMarks],
+  annotations: [BOOKLORE_TABLES.annotations],
+  pdfAnnotations: [BOOKLORE_TABLES.pdfAnnotations],
+  shelves: [BOOKLORE_TABLES.shelf],
+  shelfBooks: [BOOKLORE_TABLES.bookShelfMapping],
+  categories: [BOOKLORE_TABLES.category],
+  categoryMapping: [BOOKLORE_TABLES.bookMetadataCategoryMapping],
+  tags: [BOOKLORE_TABLES.tag],
+  tagMapping: [BOOKLORE_TABLES.bookMetadataTagMapping],
+  bookNotes: [BOOKLORE_TABLES.bookNotes],
+  bookNotesV2: [BOOKLORE_TABLES.bookNotesV2],
+  epubViewerPreference: [BOOKLORE_TABLES.epubViewerPreference],
+  ebookViewerPreference: [BOOKLORE_TABLES.ebookViewerPreference],
+  pdfViewerPreference: [BOOKLORE_TABLES.pdfViewerPreference],
+  cbxViewerPreference: [BOOKLORE_TABLES.cbxViewerPreference],
+  newPdfViewerPreference: [BOOKLORE_TABLES.newPdfViewerPreference],
+  koboUserSettings: [BOOKLORE_TABLES.koboUserSettings],
+  koboReadingState: [BOOKLORE_TABLES.koboReadingState],
+  comicMetadata: [BOOKLORE_TABLES.comicMetadata],
 } as const;
 
 interface TableResolution {
@@ -71,6 +74,7 @@ interface TableResolution {
   bookNotes: string | null;
   bookNotesV2: string | null;
   epubViewerPreference: string | null;
+  ebookViewerPreference: string | null;
   pdfViewerPreference: string | null;
   cbxViewerPreference: string | null;
   newPdfViewerPreference: string | null;
@@ -141,6 +145,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
       await this.attachTagsToBooks(conn, books, resolved.tags, resolved.tagMapping);
 
       return {
+        availableDomains: this.buildAvailableDomains(resolved, config),
         users,
         books,
         userBookStatuses,
@@ -153,14 +158,31 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     });
   }
 
+  private buildAvailableDomains(resolved: TableResolution, config: BookloreConnectionConfig): SourceExportDomains {
+    return {
+      metadata: !!resolved.bookMetadata,
+      authors: !!resolved.authors && !!resolved.authorMapping,
+      narrators: !!resolved.bookMetadata,
+      genres: !!resolved.categories && !!resolved.categoryMapping,
+      tags: !!resolved.tags && !!resolved.tagMapping,
+      userBookStatuses: !!resolved.userBookProgress,
+      readingProgress: !!resolved.userBookFileProgress,
+      bookmarks: !!resolved.bookmarks,
+      annotations: !!resolved.annotations,
+      shelves: !!resolved.shelves && !!resolved.shelfBooks,
+      covers: !!config.mediaRootPath,
+    };
+  }
+
   async fetchPathPrefixes(config: BookloreConnectionConfig): Promise<string[]> {
     return this.connector.withConnection(config, async (conn) => {
       const tables = await this.connector.listTables(conn);
-      if (!tables.has('library_path')) return [];
+      const libraryPathTable = resolveTables(tables).libraryPath;
+      if (!libraryPathTable) return [];
 
       const rows = await this.connector.queryRows(
         conn,
-        'SELECT DISTINCT CAST(`path` AS CHAR) AS path FROM `library_path` WHERE `path` IS NOT NULL ORDER BY `path`',
+        `SELECT DISTINCT CAST(\`path\` AS CHAR) AS path FROM \`${libraryPathTable}\` WHERE \`path\` IS NOT NULL ORDER BY \`path\``,
       );
 
       return rows.map((row) => asString(row.path)).filter((p): p is string => p !== null);
@@ -193,19 +215,26 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     if (!resolved.authors || !resolved.authorMapping) warnings.push('author mapping tables not found; author migration disabled');
     if (!resolved.userBookProgress) warnings.push('user_book_progress table not found; status migration disabled');
     if (!resolved.userBookFileProgress) warnings.push('user_book_file_progress table not found; file progress migration disabled');
-    if (!resolved.bookmarks) warnings.push('book_marks/bookmarks table not found; bookmark migration disabled');
+    if (!resolved.bookmarks) warnings.push('book_marks table not found; bookmark migration disabled');
     if (!resolved.annotations) warnings.push('annotations table not found; annotation migration disabled');
     if (!resolved.shelves || !resolved.shelfBooks) warnings.push('shelf mapping tables not found; shelf-to-collection migration disabled');
-    if (!resolved.categories || !resolved.categoryMapping) warnings.push('category/genre tables not found; genre migration disabled');
+    if (!resolved.categories || !resolved.categoryMapping) warnings.push('category mapping tables not found; genre migration disabled');
     if (!resolved.tags || !resolved.tagMapping) warnings.push('tag tables not found; tag migration disabled');
     if (resolved.pdfAnnotations) warnings.push('pdf_annotations table detected; PDF annotation migration is deferred');
     if (resolved.bookNotes || resolved.bookNotesV2) warnings.push('Booklore notes tables detected; notes migration is deferred');
     if (resolved.koboUserSettings || resolved.koboReadingState) warnings.push('Booklore Kobo tables detected; Kobo migration is deferred');
     if (resolved.comicMetadata) warnings.push('comic_metadata table detected; comic metadata migration is deferred');
-    if (resolved.epubViewerPreference || resolved.pdfViewerPreference || resolved.cbxViewerPreference || resolved.newPdfViewerPreference) {
+    if (
+      resolved.epubViewerPreference ||
+      resolved.ebookViewerPreference ||
+      resolved.pdfViewerPreference ||
+      resolved.cbxViewerPreference ||
+      resolved.newPdfViewerPreference
+    ) {
       warnings.push('Booklore viewer preference tables detected; reader preference migration is deferred');
     }
     if (!config.mediaRootPath) warnings.push('mediaRootPath not configured; book cover/thumbnail import disabled');
+    if (!config.password) warnings.push('No password set; connection may fail if the database requires authentication');
 
     return warnings;
   }
@@ -248,6 +277,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     const bookColumns = await this.connector.listColumns(conn, bookTable);
     const bookIdCol = requiredColumn(bookColumns, ['id', 'book_id']);
     const bookLibraryPathIdCol = firstColumn(bookColumns, ['library_path_id', 'librarypath_id']);
+    const bookDeletedCol = firstColumn(bookColumns, ['deleted']);
 
     let metadataColumns: Set<string> | null = null;
     let metadataJoinCol: string | null = null;
@@ -302,6 +332,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     const currentHashCol = fileColumns ? firstColumn(fileColumns, ['current_hash', 'hash', 'file_hash', 'sha256']) : null;
     const initialHashCol = fileColumns ? firstColumn(fileColumns, ['initial_hash']) : null;
     const fileDurationSecondsCol = fileColumns ? firstColumn(fileColumns, ['duration_seconds', 'duration']) : null;
+    const fileIsBookCol = fileColumns ? firstColumn(fileColumns, ['is_book']) : null;
 
     const presentFields: string[] = (
       [
@@ -323,7 +354,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
         ['hardcoverId', hardcoverIdCol],
         ['audibleId', audibleIdCol],
         ['comicvineId', comicvineIdCol],
-        ['durationSeconds', durationSecondsCol],
+        ['durationSeconds', durationSecondsCol ?? fileDurationSecondsCol],
         ['abridged', abridgedCol],
       ] as Array<[string, string | null]>
     )
@@ -370,17 +401,27 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
       joins.push(`LEFT JOIN \`${metadataTable}\` m ON m.\`${metadataJoinCol}\` = b.\`${bookIdCol}\``);
     }
     if (bookFileTable && fileJoinCol) {
-      joins.push(`LEFT JOIN \`${bookFileTable}\` f ON f.\`${fileJoinCol}\` = b.\`${bookIdCol}\``);
+      const contentFilter = fileIsBookCol ? ` AND f.\`${fileIsBookCol}\` = 1` : '';
+      joins.push(`LEFT JOIN \`${bookFileTable}\` f ON f.\`${fileJoinCol}\` = b.\`${bookIdCol}\`${contentFilter}`);
     }
     if (resolved.libraryPath && bookLibraryPathIdCol && libraryPathIdCol && libraryPathValueCol) {
       joins.push(`LEFT JOIN \`${resolved.libraryPath}\` lp ON lp.\`${libraryPathIdCol}\` = b.\`${bookLibraryPathIdCol}\``);
     }
 
+    const whereParts: string[] = [];
+    if (bookDeletedCol) {
+      whereParts.push(`(b.\`${bookDeletedCol}\` = 0 OR b.\`${bookDeletedCol}\` IS NULL)`);
+    }
+    const whereSql = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const orderParts = [`b.\`${bookIdCol}\``];
+    if (fileIdCol) orderParts.push(`f.\`${fileIdCol}\``);
+
     const sqlText = `
       SELECT ${selectParts.join(',\n')}
       FROM \`${bookTable}\` b
       ${joins.join('\n')}
-      ORDER BY b.\`${bookIdCol}\`
+      ${whereSql}
+      ORDER BY ${orderParts.join(', ')}
     `;
 
     const rows = await this.connector.queryRows(conn, sqlText);
@@ -534,15 +575,16 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     if (!userCol || !bookCol) return [];
 
     const statusCol = firstColumn(cols, ['status', 'read_status']);
-    const pctCol = firstColumn(cols, [
+    const pctCols = columnsInOrder(cols, [
       'percentage',
       'progress_percent',
-      'progress',
       'percent_complete',
-      'epub_progress',
-      'pdf_progress',
-      'cbx_progress',
-      'koreader_progress',
+      'epub_progress_percent',
+      'pdf_progress_percent',
+      'cbx_progress_percent',
+      'koreader_progress_percent',
+      'kobo_progress_percent',
+      'progress',
     ]);
     const startedAtCol = firstColumn(cols, ['started_at', 'start_date', 'date_started']);
     const finishedAtCol = firstColumn(cols, ['finished_at', 'finish_date', 'completed_at', 'date_finished']);
@@ -553,7 +595,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
         CAST(p.\`${userCol}\` AS CHAR) AS sourceUserId,
         CAST(p.\`${bookCol}\` AS CHAR) AS sourceBookId,
         ${sqlString('p', statusCol, 'status')},
-        ${sqlNumber('p', pctCol, 'percentage')},
+        ${sqlCoalesceNumber('p', pctCols, 'percentage')},
         ${sqlDate('p', startedAtCol, 'startedAt')},
         ${sqlDate('p', finishedAtCol, 'finishedAt')},
         ${sqlDate('p', updatedAtCol, 'updatedAt')}
@@ -918,6 +960,7 @@ function resolveTables(tables: Set<string>): TableResolution {
     bookNotes: resolveTable(tables, TABLE_CANDIDATES.bookNotes),
     bookNotesV2: resolveTable(tables, TABLE_CANDIDATES.bookNotesV2),
     epubViewerPreference: resolveTable(tables, TABLE_CANDIDATES.epubViewerPreference),
+    ebookViewerPreference: resolveTable(tables, TABLE_CANDIDATES.ebookViewerPreference),
     pdfViewerPreference: resolveTable(tables, TABLE_CANDIDATES.pdfViewerPreference),
     cbxViewerPreference: resolveTable(tables, TABLE_CANDIDATES.cbxViewerPreference),
     newPdfViewerPreference: resolveTable(tables, TABLE_CANDIDATES.newPdfViewerPreference),
@@ -949,6 +992,10 @@ function firstColumn(columns: Set<string>, candidates: string[]): string | null 
   return null;
 }
 
+function columnsInOrder(columns: Set<string>, candidates: string[]): string[] {
+  return candidates.filter((candidate) => columns.has(candidate.toLowerCase()));
+}
+
 function sqlString(alias: string, column: string | null, outName: string): string {
   if (!column) return `NULL AS ${outName}`;
   return `CAST(${alias}.\`${column}\` AS CHAR) AS ${outName}`;
@@ -957,6 +1004,12 @@ function sqlString(alias: string, column: string | null, outName: string): strin
 function sqlNumber(alias: string, column: string | null, outName: string): string {
   if (!column) return `NULL AS ${outName}`;
   return `${alias}.\`${column}\` AS ${outName}`;
+}
+
+function sqlCoalesceNumber(alias: string, columns: string[], outName: string): string {
+  if (columns.length === 0) return `NULL AS ${outName}`;
+  if (columns.length === 1) return sqlNumber(alias, columns[0], outName);
+  return `COALESCE(${columns.map((column) => `${alias}.\`${column}\``).join(', ')}) AS ${outName}`;
 }
 
 function sqlDate(alias: string, column: string | null, outName: string): string {

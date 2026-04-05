@@ -25,3 +25,4 @@ export * from "./metadata-score";
 export * from "./book-metadata-fetch";
 export * from "./statistics";
 export * from "./user-statistics";
+export * from "./migration";

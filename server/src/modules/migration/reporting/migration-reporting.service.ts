@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { MigrationRepository } from '../migration.repository';
+import { sanitizeRunForApi } from '../core/api-sanitizers';
 
 @Injectable()
 export class MigrationReportingService {
@@ -101,22 +102,6 @@ export class MigrationReportingService {
       content: toCsv(rows),
     };
   }
-}
-
-function sanitizeRunForApi(run: Awaited<ReturnType<MigrationRepository['listRuns']>>[number]) {
-  return {
-    id: run.id,
-    sourceId: run.sourceId,
-    profileId: run.profileId,
-    planArtifactId: run.planArtifactId,
-    state: run.state,
-    currentStage: run.currentStage,
-    startedAt: run.startedAt,
-    endedAt: run.endedAt,
-    errorMessage: run.errorMessage,
-    createdAt: run.createdAt,
-    updatedAt: run.updatedAt,
-  };
 }
 
 function toCsv(rows: Record<string, string | number | null>[]): string {

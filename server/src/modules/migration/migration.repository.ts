@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -93,21 +93,39 @@ export class MigrationRepository {
       .orderBy(desc(schema.migrationProfiles.id));
   }
 
-  async createProfile(
-    values: Pick<schema.NewMigrationProfile, 'sourceId' | 'name' | 'version' | 'userMappings' | 'pathMappings' | 'scope' | 'createdByUserId'>,
-  ) {
-    const [row] = await this.db.insert(schema.migrationProfiles).values(values).returning();
-    return row;
+  async createProfile(values: Pick<schema.NewMigrationProfile, 'sourceId' | 'name' | 'userMappings' | 'pathMappings' | 'scope' | 'createdByUserId'>) {
+    return this.db.transaction(async (tx) => {
+      const [versionRow] = await tx.select({ maxVersion: sql<number>`COALESCE(MAX(version), 0)` }).from(
+        tx
+          .select({ version: schema.migrationProfiles.version })
+          .from(schema.migrationProfiles)
+          .where(and(eq(schema.migrationProfiles.sourceId, values.sourceId), eq(schema.migrationProfiles.name, values.name)))
+          .for('update')
+          .as('locked'),
+      );
+
+      const nextVersion = (versionRow?.maxVersion ?? 0) + 1;
+      const [row] = await tx
+        .insert(schema.migrationProfiles)
+        .values({ ...values, version: nextVersion })
+        .returning();
+      return row;
+    });
   }
 
   findProfileById(id: number) {
     return this.db.query.migrationProfiles.findFirst({ where: eq(schema.migrationProfiles.id, id) });
   }
 
+  async updateProfileScope(id: number, scope: unknown) {
+    const [row] = await this.db.update(schema.migrationProfiles).set({ scope }).where(eq(schema.migrationProfiles.id, id)).returning();
+    return row ?? null;
+  }
+
   async createPlanArtifact(
     values: Pick<
       schema.NewMigrationPlanArtifact,
-      'sourceId' | 'profileId' | 'sourceSnapshotHash' | 'profileHash' | 'planHash' | 'plan' | 'summary' | 'createdByUserId'
+      'sourceId' | 'profileId' | 'sourceSnapshotHash' | 'profileHash' | 'planHash' | 'plan' | 'sourceData' | 'summary' | 'createdByUserId'
     >,
   ) {
     const [row] = await this.db.insert(schema.migrationPlanArtifacts).values(values).returning();
@@ -129,9 +147,34 @@ export class MigrationRepository {
     return this.db.query.migrationPlanArtifacts.findFirst({ where: eq(schema.migrationPlanArtifacts.id, id) });
   }
 
+  async updatePlanArtifact(id: number, values: { plan: unknown; sourceData?: unknown; summary: unknown }) {
+    const [row] = await this.db
+      .update(schema.migrationPlanArtifacts)
+      .set({ plan: values.plan, sourceData: values.sourceData, summary: values.summary })
+      .where(eq(schema.migrationPlanArtifacts.id, id))
+      .returning();
+    return row;
+  }
+
   async purgeRunState(sourceId: number): Promise<void> {
-    await this.db.delete(schema.migrationRuns).where(eq(schema.migrationRuns.sourceId, sourceId));
-    await this.db.delete(schema.migrationPlanArtifacts).where(eq(schema.migrationPlanArtifacts.sourceId, sourceId));
+    await this.db
+      .delete(schema.migrationRuns)
+      .where(and(eq(schema.migrationRuns.sourceId, sourceId), sql`${schema.migrationRuns.state} != 'completed'`));
+
+    const completedRuns = await this.db
+      .select({ planArtifactId: schema.migrationRuns.planArtifactId })
+      .from(schema.migrationRuns)
+      .where(and(eq(schema.migrationRuns.sourceId, sourceId), eq(schema.migrationRuns.state, 'completed')));
+    const retainedArtifactIds = completedRuns.map((row) => row.planArtifactId).filter((id): id is number => id != null);
+
+    if (retainedArtifactIds.length === 0) {
+      await this.db.delete(schema.migrationPlanArtifacts).where(eq(schema.migrationPlanArtifacts.sourceId, sourceId));
+      return;
+    }
+
+    await this.db
+      .delete(schema.migrationPlanArtifacts)
+      .where(and(eq(schema.migrationPlanArtifacts.sourceId, sourceId), notInArray(schema.migrationPlanArtifacts.id, retainedArtifactIds)));
   }
 
   async findBookTitlesByIds(ids: number[]): Promise<Map<number, string | null>> {
@@ -151,24 +194,20 @@ export class MigrationRepository {
   ): Promise<{ run: typeof schema.migrationRuns.$inferSelect | null; activeRun: typeof schema.migrationRuns.$inferSelect | null }> {
     const targetKey = values.targetKey ?? 'projectx';
     return this.db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${buildRunLockKey(values.sourceId, targetKey)}))`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${buildRunLockKey()}))`);
 
       const [activeRun] = await tx
         .select()
         .from(schema.migrationRuns)
-        .where(
-          and(
-            eq(schema.migrationRuns.sourceId, values.sourceId),
-            eq(schema.migrationRuns.targetKey, targetKey),
-            inArray(schema.migrationRuns.state, ACTIVE_RUN_STATES),
-          ),
-        )
+        .where(inArray(schema.migrationRuns.state, ACTIVE_RUN_STATES))
         .orderBy(desc(schema.migrationRuns.id))
         .limit(1);
 
       if (activeRun) return { run: null, activeRun };
 
-      await tx.delete(schema.migrationRuns).where(eq(schema.migrationRuns.sourceId, values.sourceId));
+      await tx
+        .delete(schema.migrationRuns)
+        .where(and(eq(schema.migrationRuns.sourceId, values.sourceId), sql`${schema.migrationRuns.state} != 'completed'`));
 
       const [run] = await tx
         .insert(schema.migrationRuns)
@@ -202,54 +241,52 @@ export class MigrationRepository {
     return row ?? null;
   }
 
-  async incrementRunMetric(
+  async setRunMetric(
     runId: number,
     stage: string,
     entityType: string,
-    delta: Partial<Pick<typeof schema.migrationRunMetrics.$inferInsert, 'processed' | 'imported' | 'skipped' | 'unresolved' | 'failed'>>,
+    values: Partial<Pick<typeof schema.migrationRunMetrics.$inferInsert, 'processed' | 'imported' | 'skipped' | 'unresolved' | 'failed'>>,
   ) {
-    const [existing] = await this.db
-      .select()
-      .from(schema.migrationRunMetrics)
-      .where(
-        and(
-          eq(schema.migrationRunMetrics.runId, runId),
-          eq(schema.migrationRunMetrics.stage, stage),
-          eq(schema.migrationRunMetrics.entityType, entityType),
-        ),
-      )
-      .limit(1);
-
-    if (!existing) {
-      const [inserted] = await this.db
-        .insert(schema.migrationRunMetrics)
-        .values({
-          runId,
-          stage,
-          entityType,
-          processed: delta.processed ?? 0,
-          imported: delta.imported ?? 0,
-          skipped: delta.skipped ?? 0,
-          unresolved: delta.unresolved ?? 0,
-          failed: delta.failed ?? 0,
-        })
-        .returning();
-      return inserted;
-    }
-
-    const [updated] = await this.db
-      .update(schema.migrationRunMetrics)
-      .set({
-        processed: existing.processed + (delta.processed ?? 0),
-        imported: existing.imported + (delta.imported ?? 0),
-        skipped: existing.skipped + (delta.skipped ?? 0),
-        unresolved: existing.unresolved + (delta.unresolved ?? 0),
-        failed: existing.failed + (delta.failed ?? 0),
-        updatedAt: sql`now()`,
+    const [row] = await this.db
+      .insert(schema.migrationRunMetrics)
+      .values({
+        runId,
+        stage,
+        entityType,
+        processed: values.processed ?? 0,
+        imported: values.imported ?? 0,
+        skipped: values.skipped ?? 0,
+        unresolved: values.unresolved ?? 0,
+        failed: values.failed ?? 0,
       })
-      .where(eq(schema.migrationRunMetrics.id, existing.id))
+      .onConflictDoUpdate({
+        target: [schema.migrationRunMetrics.runId, schema.migrationRunMetrics.stage, schema.migrationRunMetrics.entityType],
+        set: {
+          processed: sql`excluded.processed`,
+          imported: sql`excluded.imported`,
+          skipped: sql`excluded.skipped`,
+          unresolved: sql`excluded.unresolved`,
+          failed: sql`excluded.failed`,
+          updatedAt: sql`now()`,
+        },
+      })
       .returning();
-    return updated;
+    return row;
+  }
+
+  async clearStageMetrics(runId: number, stage: string): Promise<void> {
+    await this.db
+      .delete(schema.migrationRunMetrics)
+      .where(and(eq(schema.migrationRunMetrics.runId, runId), eq(schema.migrationRunMetrics.stage, stage)));
+  }
+
+  async hasStageMetrics(runId: number, stage: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: schema.migrationRunMetrics.id })
+      .from(schema.migrationRunMetrics)
+      .where(and(eq(schema.migrationRunMetrics.runId, runId), eq(schema.migrationRunMetrics.stage, stage)))
+      .limit(1);
+    return rows.length > 0;
   }
 
   listRunMetrics(runId: number) {
@@ -261,6 +298,6 @@ export class MigrationRepository {
   }
 }
 
-function buildRunLockKey(sourceId: number, targetKey: string): string {
-  return `migration-run-lock:${sourceId}:${targetKey}`;
+function buildRunLockKey(): string {
+  return 'migration-run-lock:global';
 }

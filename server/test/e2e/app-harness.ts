@@ -3,11 +3,13 @@ import { expect } from 'vitest';
 import fastifyCookie from '@fastify/cookie';
 import { count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
 
 import { AppModule } from '../../src/app.module';
+import { GlobalExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { DB } from '../../src/db';
 import * as schema from '../../src/db/schema';
 import { books, bookFiles, libraries, libraryFolders, scanJobs } from '../../src/db/schema';
@@ -76,6 +78,14 @@ export async function createE2EContext(): Promise<E2EContext> {
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

@@ -4,7 +4,9 @@ import { join } from 'path';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 
-import { MigrationExecutorService } from './migration-executor.service';
+import { SharedOverlaysImporter } from './shared-overlays.importer';
+import { CoverImporter } from './cover.importer';
+import { UserStateImporter } from './user-state.importer';
 
 async function createSampleImageBytes(): Promise<Buffer> {
   return sharp({
@@ -19,35 +21,84 @@ async function createSampleImageBytes(): Promise<Buffer> {
     .toBuffer();
 }
 
-function createDbMock(existingRows: unknown[][] = [[]]) {
-  const limit = vi.fn(() => Promise.resolve(existingRows.shift() ?? []));
-  const where = vi.fn(() => ({ limit }));
-  const from = vi.fn(() => ({ where }));
-  const select = vi.fn(() => ({ from }));
-
-  const onConflictDoUpdate = vi.fn(() => Promise.resolve(undefined));
-  const values = vi.fn(() => ({ onConflictDoUpdate }));
-  const insert = vi.fn(() => ({ values }));
-  const deleteWhere = vi.fn(() => Promise.resolve(undefined));
-  const deleteMock = vi.fn(() => ({ where: deleteWhere }));
-
-  return {
-    db: { select, insert, delete: deleteMock },
-    mocks: { limit, where, from, select, onConflictDoUpdate, values, insert, deleteWhere, deleteMock },
-  };
-}
-
 function createRepoMock() {
   return {
-    incrementRunMetric: vi.fn(() => Promise.resolve(undefined)),
+    setRunMetric: vi.fn(() => Promise.resolve(undefined)),
   };
 }
 
-describe('MigrationExecutorService audiobook progress import', () => {
+function createImportRepoMock() {
+  const repo = {
+    // Single-row methods (kept for backward compat)
+    upsertBookMetadata: vi.fn(() => Promise.resolve()),
+    deleteBookAuthors: vi.fn(() => Promise.resolve()),
+    upsertAuthor: vi.fn(),
+    insertBookAuthor: vi.fn(() => Promise.resolve()),
+    deleteBookNarrators: vi.fn(() => Promise.resolve()),
+    upsertNarrator: vi.fn(),
+    insertBookNarrator: vi.fn(() => Promise.resolve()),
+    deleteBookGenres: vi.fn(() => Promise.resolve()),
+    upsertGenre: vi.fn(),
+    insertBookGenre: vi.fn(() => Promise.resolve()),
+    deleteBookTags: vi.fn(() => Promise.resolve()),
+    upsertTag: vi.fn(),
+    insertBookTag: vi.fn(() => Promise.resolve()),
+    markCoverAsCustom: vi.fn(() => Promise.resolve()),
+    clearUserBookStatuses: vi.fn(() => Promise.resolve()),
+    upsertUserBookStatus: vi.fn(() => Promise.resolve()),
+    clearReadingProgress: vi.fn(() => Promise.resolve()),
+    upsertReadingProgress: vi.fn(() => Promise.resolve()),
+    clearAudiobookProgress: vi.fn(() => Promise.resolve()),
+    upsertAudiobookProgress: vi.fn(() => Promise.resolve()),
+    clearBookmarks: vi.fn(() => Promise.resolve()),
+    insertBookmark: vi.fn(() => Promise.resolve()),
+    clearAnnotations: vi.fn(() => Promise.resolve()),
+    insertAnnotation: vi.fn(() => Promise.resolve()),
+    fetchExistingCollections: vi.fn(() => Promise.resolve([])),
+    insertCollection: vi.fn(),
+    clearCollectionBooks: vi.fn(() => Promise.resolve()),
+    upsertCollectionBook: vi.fn(),
+    fetchTargetBookPrimaryFiles: vi.fn(() =>
+      Promise.resolve({
+        primaryFilesByBookId: new Map<number, number>(),
+        audiobookPrimaryFilesByBookId: new Map<number, number>(),
+      }),
+    ),
+    fetchTargetBookFiles: vi.fn(() => Promise.resolve(new Map())),
+    // Batch methods
+    batchUpsertBookMetadata: vi.fn(() => Promise.resolve()),
+    batchDeleteBookAuthors: vi.fn(() => Promise.resolve()),
+    batchUpsertAuthors: vi.fn(() => Promise.resolve(new Map<string, number>())),
+    batchInsertBookAuthors: vi.fn(() => Promise.resolve()),
+    batchDeleteBookNarrators: vi.fn(() => Promise.resolve()),
+    batchUpsertNarrators: vi.fn(() => Promise.resolve(new Map<string, number>())),
+    batchInsertBookNarrators: vi.fn(() => Promise.resolve()),
+    batchDeleteBookGenres: vi.fn(() => Promise.resolve()),
+    batchUpsertGenres: vi.fn(() => Promise.resolve(new Map<string, number>())),
+    batchInsertBookGenres: vi.fn(() => Promise.resolve()),
+    batchDeleteBookTags: vi.fn(() => Promise.resolve()),
+    batchUpsertTags: vi.fn(() => Promise.resolve(new Map<string, number>())),
+    batchInsertBookTags: vi.fn(() => Promise.resolve()),
+    batchUpsertUserBookStatuses: vi.fn(() => Promise.resolve()),
+    batchUpsertReadingProgress: vi.fn(() => Promise.resolve()),
+    batchUpsertAudiobookProgress: vi.fn(() => Promise.resolve()),
+    batchInsertBookmarks: vi.fn(() => Promise.resolve()),
+    batchInsertAnnotations: vi.fn(() => Promise.resolve()),
+    batchInsertCollectionBooks: vi.fn(() => Promise.resolve()),
+  };
+  return {
+    ...repo,
+    withTransaction: vi.fn((handler: (repo: typeof repo) => Promise<unknown>) => handler(repo)),
+  };
+}
+
+describe('UserStateImporter audiobook progress import', () => {
   it('imports only rows mapped to target audio books', async () => {
     const repo = createRepoMock();
-    const { db, mocks } = createDbMock([[]]);
-    const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue('/tmp/books') } as never);
+    const importRepo = createImportRepoMock();
+    importRepo.upsertAudiobookProgress.mockResolvedValue(undefined);
+
+    const importer = new UserStateImporter(repo as never, importRepo as never);
 
     const planned = {
       execution: {
@@ -76,7 +127,7 @@ describe('MigrationExecutorService audiobook progress import', () => {
       },
     };
 
-    await (service as any).importAudiobookProgress(
+    await (importer as any).importAudiobookProgress(
       77,
       planned,
       new Map([['u1', 10]]),
@@ -89,8 +140,10 @@ describe('MigrationExecutorService audiobook progress import', () => {
       async () => {},
     );
 
-    expect(mocks.insert).toHaveBeenCalledTimes(1);
-    expect(mocks.values).toHaveBeenCalledWith(
+    expect(importRepo.batchUpsertAudiobookProgress).toHaveBeenCalledTimes(1);
+    const batchArg = (importRepo.batchUpsertAudiobookProgress.mock.calls as unknown[][])[0][0] as Array<Record<string, unknown>>;
+    expect(batchArg).toHaveLength(1);
+    expect(batchArg[0]).toEqual(
       expect.objectContaining({
         userId: 10,
         bookId: 101,
@@ -99,7 +152,7 @@ describe('MigrationExecutorService audiobook progress import', () => {
         positionSeconds: 120.5,
       }),
     );
-    expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+    expect(repo.setRunMetric).toHaveBeenCalledWith(
       77,
       'user_state',
       'audiobook_progress',
@@ -115,8 +168,10 @@ describe('MigrationExecutorService audiobook progress import', () => {
 
   it('overwrites target audiobook progress even when the target is newer', async () => {
     const repo = createRepoMock();
-    const { db, mocks } = createDbMock([[{ updatedAt: new Date('2025-01-02T00:00:00.000Z') }]]);
-    const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue('/tmp/books') } as never);
+    const importRepo = createImportRepoMock();
+    importRepo.upsertAudiobookProgress.mockResolvedValue(undefined);
+
+    const importer = new UserStateImporter(repo as never, importRepo as never);
 
     const planned = {
       execution: {
@@ -136,7 +191,7 @@ describe('MigrationExecutorService audiobook progress import', () => {
       },
     };
 
-    await (service as any).importAudiobookProgress(
+    await (importer as any).importAudiobookProgress(
       88,
       planned,
       new Map([['u1', 10]]),
@@ -146,8 +201,8 @@ describe('MigrationExecutorService audiobook progress import', () => {
       async () => {},
     );
 
-    expect(mocks.insert).toHaveBeenCalledTimes(1);
-    expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+    expect(importRepo.batchUpsertAudiobookProgress).toHaveBeenCalledTimes(1);
+    expect(repo.setRunMetric).toHaveBeenCalledWith(
       88,
       'user_state',
       'audiobook_progress',
@@ -161,30 +216,18 @@ describe('MigrationExecutorService audiobook progress import', () => {
   });
 });
 
-describe('MigrationExecutorService author import', () => {
+describe('SharedOverlaysImporter author import', () => {
   it('replaces target book authors from source author names', async () => {
     const repo = createRepoMock();
-    const deleteWhere = vi.fn(() => Promise.resolve(undefined));
-    const deleteFrom = vi.fn(() => ({ where: deleteWhere }));
-    const deleteMock = vi.fn(() => ({ where: deleteWhere }));
+    const importRepo = createImportRepoMock();
+    importRepo.batchUpsertAuthors.mockResolvedValueOnce(
+      new Map([
+        ['Ada Lovelace', 101],
+        ['Grace Hopper', 102],
+      ]),
+    );
 
-    const onConflictDoNothing = vi.fn(() => Promise.resolve(undefined));
-    const bookAuthorValues = vi.fn(() => ({ onConflictDoNothing }));
-    const authorReturning = vi
-      .fn()
-      .mockResolvedValueOnce([{ id: 101 }])
-      .mockResolvedValueOnce([{ id: 102 }]);
-    const authorOnConflictDoUpdate = vi.fn(() => ({ returning: authorReturning }));
-    const authorValues = vi.fn(() => ({ onConflictDoUpdate: authorOnConflictDoUpdate }));
-    const insert = vi
-      .fn()
-      .mockReturnValueOnce({ values: authorValues })
-      .mockReturnValueOnce({ values: bookAuthorValues })
-      .mockReturnValueOnce({ values: authorValues })
-      .mockReturnValueOnce({ values: bookAuthorValues });
-
-    const db = { delete: deleteMock, insert };
-    const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue('/tmp/books') } as never);
+    const importer = new SharedOverlaysImporter(repo as never, importRepo as never);
 
     const planned = {
       execution: {
@@ -195,25 +238,27 @@ describe('MigrationExecutorService author import', () => {
       },
     };
 
-    await (service as any).importAuthors(91, planned);
+    await (importer as any).importAuthors(91, planned);
 
-    expect(deleteMock).toHaveBeenCalledTimes(1);
-    expect(authorValues).toHaveBeenNthCalledWith(1, { name: 'Ada Lovelace', sortName: 'Ada Lovelace' });
-    expect(authorValues).toHaveBeenNthCalledWith(2, { name: 'Grace Hopper', sortName: 'Grace Hopper' });
-    expect(bookAuthorValues).toHaveBeenNthCalledWith(1, { bookId: 901, authorId: 101, displayOrder: 0 });
-    expect(bookAuthorValues).toHaveBeenNthCalledWith(2, { bookId: 901, authorId: 102, displayOrder: 1 });
-    expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+    expect(importRepo.batchDeleteBookAuthors).toHaveBeenCalledWith([901]);
+    expect(importRepo.batchUpsertAuthors).toHaveBeenCalledWith([
+      { name: 'Ada Lovelace', sortName: 'Ada Lovelace' },
+      { name: 'Grace Hopper', sortName: 'Grace Hopper' },
+    ]);
+    expect(importRepo.batchInsertBookAuthors).toHaveBeenCalledWith([
+      { bookId: 901, authorId: 101, displayOrder: 0 },
+      { bookId: 901, authorId: 102, displayOrder: 1 },
+    ]);
+    expect(repo.setRunMetric).toHaveBeenCalledWith(
       91,
       'shared_overlays',
       'book_authors',
       expect.objectContaining({ processed: 1, imported: 2, skipped: 0, unresolved: 0 }),
     );
-
-    expect(deleteFrom).not.toHaveBeenCalled();
   });
 });
 
-describe('MigrationExecutorService book cover import', () => {
+describe('CoverImporter book cover import', () => {
   it('copies source cover and thumbnail into target cover directory and marks cover source custom', async () => {
     const sourceRoot = await mkdtemp(join(tmpdir(), 'migration-source-media-'));
     const booksPath = await mkdtemp(join(tmpdir(), 'migration-target-books-'));
@@ -226,8 +271,8 @@ describe('MigrationExecutorService book cover import', () => {
       await writeFile(join(sourceDir, 'thumbnail.jpg'), sourceThumbnailBytes);
 
       const repo = createRepoMock();
-      const { db, mocks } = createDbMock();
-      const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue(booksPath) } as never);
+      const importRepo = createImportRepoMock();
+      const importer = new CoverImporter(repo as never, importRepo as never);
 
       const planned = {
         execution: {
@@ -235,7 +280,7 @@ describe('MigrationExecutorService book cover import', () => {
         },
       };
 
-      await (service as any).importBookCovers(52, planned, sourceRoot, async () => {});
+      await importer.import(52, planned as never, booksPath, sourceRoot, async () => {});
 
       const targetDir = join(booksPath, 'covers', '901');
       const targetFiles = await readdir(targetDir);
@@ -248,10 +293,10 @@ describe('MigrationExecutorService book cover import', () => {
       expect(copiedCoverBytes.equals(sourceCoverBytes)).toBe(true);
       expect(copiedThumbnailBytes.equals(sourceThumbnailBytes)).toBe(true);
 
-      expect(mocks.values).toHaveBeenCalledWith(expect.objectContaining({ bookId: 901, coverSource: 'custom' }));
-      expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+      expect(importRepo.markCoverAsCustom).toHaveBeenCalledWith(901);
+      expect(repo.setRunMetric).toHaveBeenCalledWith(
         52,
-        'shared_overlays',
+        'book_covers',
         'book_covers',
         expect.objectContaining({ processed: 1, imported: 1, unresolved: 0, failed: 0 }),
       );
@@ -270,8 +315,8 @@ describe('MigrationExecutorService book cover import', () => {
       await writeFile(join(sourceDir, 'cover.jpg'), await createSampleImageBytes());
 
       const repo = createRepoMock();
-      const { db } = createDbMock();
-      const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue(booksPath) } as never);
+      const importRepo = createImportRepoMock();
+      const importer = new CoverImporter(repo as never, importRepo as never);
 
       const planned = {
         execution: {
@@ -279,13 +324,13 @@ describe('MigrationExecutorService book cover import', () => {
         },
       };
 
-      await (service as any).importBookCovers(53, planned, sourceRoot, async () => {});
+      await importer.import(53, planned as never, booksPath, sourceRoot, async () => {});
 
       const generatedThumbnail = await readFile(join(booksPath, 'covers', '902', 'thumbnail.jpg'));
       expect(generatedThumbnail.length).toBeGreaterThan(0);
-      expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+      expect(repo.setRunMetric).toHaveBeenCalledWith(
         53,
-        'shared_overlays',
+        'book_covers',
         'book_covers',
         expect.objectContaining({ processed: 1, imported: 1, unresolved: 0, failed: 0 }),
       );
@@ -297,8 +342,8 @@ describe('MigrationExecutorService book cover import', () => {
 
   it('skips book cover stage when source media root is not configured', async () => {
     const repo = createRepoMock();
-    const { db, mocks } = createDbMock();
-    const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue('/tmp/books') } as never);
+    const importRepo = createImportRepoMock();
+    const importer = new CoverImporter(repo as never, importRepo as never);
 
     const planned = {
       execution: {
@@ -306,38 +351,26 @@ describe('MigrationExecutorService book cover import', () => {
       },
     };
 
-    await (service as any).importBookCovers(54, planned, null, async () => {});
+    await importer.import(54, planned as never, '/tmp/books', null, async () => {});
 
-    expect(mocks.insert).not.toHaveBeenCalled();
-    expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+    expect(importRepo.markCoverAsCustom).not.toHaveBeenCalled();
+    expect(repo.setRunMetric).toHaveBeenCalledWith(
       54,
-      'shared_overlays',
+      'book_covers',
       'book_covers',
       expect.objectContaining({ processed: 1, skipped: 1, imported: 0 }),
     );
   });
 });
 
-describe('MigrationExecutorService collection import', () => {
+describe('UserStateImporter collection import', () => {
   it('skips shelf-book rows that do not belong to the shelf owner', async () => {
     const repo = createRepoMock();
-    const selectWhere = vi.fn(() => Promise.resolve([]));
-    const selectFrom = vi.fn(() => ({ where: selectWhere }));
-    const select = vi.fn(() => ({ from: selectFrom }));
+    const importRepo = createImportRepoMock();
+    importRepo.insertCollection.mockResolvedValue({ id: 701 });
+    importRepo.upsertCollectionBook.mockResolvedValue(true);
 
-    const collectionReturning = vi.fn().mockResolvedValue([{ id: 701 }]);
-    const collectionValues = vi.fn(() => ({ returning: collectionReturning }));
-
-    const collectionBookReturning = vi.fn().mockResolvedValue([{ collectionId: 701 }]);
-    const onConflictDoNothing = vi.fn(() => ({ returning: collectionBookReturning }));
-    const collectionBookValues = vi.fn(() => ({ onConflictDoNothing }));
-
-    const insert = vi.fn().mockReturnValueOnce({ values: collectionValues }).mockReturnValue({ values: collectionBookValues });
-    const deleteWhere = vi.fn(() => Promise.resolve(undefined));
-    const deleteMock = vi.fn(() => ({ where: deleteWhere }));
-
-    const db = { select, insert, delete: deleteMock };
-    const service = new MigrationExecutorService(repo as never, {} as never, db as never, { get: vi.fn().mockReturnValue('/tmp/books') } as never);
+    const importer = new UserStateImporter(repo as never, importRepo as never);
 
     const planned = {
       execution: {
@@ -351,7 +384,7 @@ describe('MigrationExecutorService collection import', () => {
       },
     };
 
-    await (service as any).importCollections(
+    await (importer as any).importCollections(
       78,
       planned,
       new Map([['u1', 10]]),
@@ -362,10 +395,9 @@ describe('MigrationExecutorService collection import', () => {
       async () => {},
     );
 
-    expect(insert).toHaveBeenCalledTimes(2);
-    expect(collectionBookValues).toHaveBeenCalledTimes(1);
-    expect(collectionBookValues).toHaveBeenCalledWith({ collectionId: 701, bookId: 101 });
-    expect(repo.incrementRunMetric).toHaveBeenCalledWith(
+    expect(importRepo.insertCollection).toHaveBeenCalledTimes(1);
+    expect(importRepo.batchInsertCollectionBooks).toHaveBeenCalledWith([{ collectionId: 701, bookId: 101 }]);
+    expect(repo.setRunMetric).toHaveBeenCalledWith(
       78,
       'user_state',
       'collections',
