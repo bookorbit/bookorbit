@@ -105,6 +105,7 @@ CREATE TABLE "migration_plan_artifacts" (
 	"profile_hash" varchar(128) NOT NULL,
 	"plan_hash" varchar(128) NOT NULL,
 	"plan" jsonb NOT NULL,
+	"source_data" jsonb,
 	"summary" jsonb NOT NULL,
 	"created_by_user_id" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -151,7 +152,8 @@ CREATE TABLE "migration_runs" (
 	"ended_at" timestamp,
 	"error_message" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "migration_runs_state_chk" CHECK ("state" IN ('draft', 'preflight_failed', 'dry_run_ready', 'running', 'failed', 'completed'))
 );
 --> statement-breakpoint
 CREATE TABLE "migration_sources" (
@@ -811,6 +813,7 @@ CREATE INDEX "migration_run_metrics_run_id_idx" ON "migration_run_metrics" USING
 CREATE INDEX "migration_runs_source_target_state_idx" ON "migration_runs" USING btree ("source_id","target_key","state");--> statement-breakpoint
 CREATE INDEX "migration_runs_state_idx" ON "migration_runs" USING btree ("state");--> statement-breakpoint
 CREATE UNIQUE INDEX "migration_sources_type_name_uidx" ON "migration_sources" USING btree ("type","name");--> statement-breakpoint
+CREATE INDEX "migration_sources_created_by_user_id_idx" ON "migration_sources" USING btree ("created_by_user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "books_library_id_folder_path_idx" ON "books" USING btree ("library_id","folder_path");--> statement-breakpoint
 CREATE INDEX "books_primary_file_id_idx" ON "books" USING btree ("primary_file_id");--> statement-breakpoint
 CREATE INDEX "author_enrichment_queue_status_next_attempt_idx" ON "author_enrichment_queue" USING btree ("status","next_attempt_at");--> statement-breakpoint

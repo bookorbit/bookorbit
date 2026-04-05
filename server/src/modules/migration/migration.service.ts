@@ -1,267 +1,48 @@
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 
+import type { MigrationSource, MigrationProfile, MigrationPlanArtifact, MigrationRun } from '../../db/schema';
 import { CreateDryRunPlanDto } from './dto/create-dry-run-plan.dto';
-import { CreateMigrationProfileDto } from './dto/create-migration-profile.dto';
-import { CreateMigrationSourceDto } from './dto/create-migration-source.dto';
+import type { ResolveDuplicateMatchesDto } from './dto/resolve-duplicate-matches.dto';
 import { StartLiveRunDto } from './dto/start-live-run.dto';
-import { TestMigrationSourceDto } from './dto/test-migration-source.dto';
-import { ValidatePathMappingsDto } from './dto/validate-path-mappings.dto';
-import { buildPlanHash, buildProfileHash, buildSourceSnapshotHash } from './core/plan-hash';
+import { buildPathMappingsHash, buildPlanHash, buildProfileHash, buildSourceSnapshotHash } from './core/plan-hash';
+import { asInteger, asRecord, asString } from './core/coerce';
+import {
+  type ApiMigrationRun,
+  sanitizeSourceForApi,
+  sanitizeProfileForApi,
+  sanitizePlanArtifactForApi,
+  sanitizeRunForApi,
+} from './core/api-sanitizers';
+import { MigrationEncryptionService } from './core/migration-encryption.service';
 import { MigrationRepository } from './migration.repository';
-import { SourceAdapterRegistry } from './adapters/source-adapter.registry';
-import { MigrationPlannerService } from './planner/planner.service';
+import { buildUserPreview, MigrationPlannerService } from './planner/planner.service';
+import type { SourceExportData } from './adapters/source-adapter.types';
+import type { MatchStrategy, PlannedBookMatch } from './planner/planner.types';
 import { MigrationExecutorService } from './executor/migration-executor.service';
 import { MigrationReportingService } from './reporting/migration-reporting.service';
-import { parseBookloreConnectionConfig } from './adapters/booklore/booklore-connection-config';
-import { PathMappingValidationService } from './planner/path-mapping-validation.service';
+
+export type { ApiMigrationSource, ApiMigrationProfile, ApiMigrationPlanArtifact, ApiMigrationRun } from './core/api-sanitizers';
 
 const ACTIVE_LIVE_STATES = new Set(['running']);
 
-type MigrationSourceRow = Awaited<ReturnType<MigrationRepository['listSources']>>[number];
-type MigrationProfileRow = Awaited<ReturnType<MigrationRepository['listProfiles']>>[number];
-type MigrationPlanArtifactRow = Awaited<ReturnType<MigrationRepository['listPlanArtifacts']>>[number];
-type MigrationRunRow = Awaited<ReturnType<MigrationRepository['listRuns']>>[number];
-
-export interface ApiMigrationSource {
-  id: number;
-  type: string;
-  name: string;
-  connectionConfig: unknown;
-  capabilities: MigrationSourceRow['capabilities'];
-  lastValidatedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ApiMigrationProfile {
-  id: number;
-  sourceId: number;
-  name: string;
-  userMappings: MigrationProfileRow['userMappings'];
-  pathMappings: MigrationProfileRow['pathMappings'];
-  scope: MigrationProfileRow['scope'];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ApiMigrationPlanArtifact {
-  id: number;
-  sourceId: number;
-  profileId: number;
-  plan: MigrationPlanArtifactRow['plan'];
-  summary: MigrationPlanArtifactRow['summary'];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ApiMigrationRun {
-  id: number;
-  sourceId: number;
-  profileId: number;
-  planArtifactId: number | null;
-  state: MigrationRunRow['state'];
-  currentStage: string | null;
-  startedAt: Date | null;
-  endedAt: Date | null;
-  errorMessage: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 interface WorkflowStateBundle {
-  source: MigrationSourceRow;
-  profile: MigrationProfileRow | null;
-  plan: MigrationPlanArtifactRow | null;
-  run: MigrationRunRow | null;
+  source: MigrationSource;
+  profile: MigrationProfile | null;
+  plan: MigrationPlanArtifact | null;
+  run: MigrationRun | null;
 }
 
 @Injectable()
 export class MigrationService {
+  private readonly logger = new Logger(MigrationService.name);
+
   constructor(
     private readonly repo: MigrationRepository,
-    private readonly adapterRegistry: SourceAdapterRegistry,
     private readonly planner: MigrationPlannerService,
     private readonly executor: MigrationExecutorService,
     private readonly reporting: MigrationReportingService,
-    private readonly pathValidator: PathMappingValidationService,
+    private readonly encryption: MigrationEncryptionService,
   ) {}
-
-  listSupportedSourceTypes() {
-    return this.adapterRegistry.listTypes();
-  }
-
-  async testSource(dto: TestMigrationSourceDto) {
-    const adapter = this.adapterRegistry.get(dto.type);
-    return adapter.validate(parseConnectionConfig(dto.type, dto.connectionConfig));
-  }
-
-  async validateSourceById(sourceId: number) {
-    const source = await this.repo.findSourceById(sourceId);
-    if (!source) throw new NotFoundException(`Migration source not found: ${sourceId}`);
-
-    const adapter = this.adapterRegistry.get(source.type);
-    const result = await adapter.validate(parseConnectionConfig(source.type, source.connectionConfig));
-
-    await this.repo.updateSourceValidation(source.id, {
-      capabilities: {
-        sourceType: result.sourceType,
-        sourceVersion: result.sourceVersion,
-        warnings: result.warnings,
-        counts: result.counts,
-        missingTables: result.missingTables,
-      },
-      lastValidatedAt: new Date(),
-    });
-    await this.repo.purgeRunState(source.id);
-
-    return result;
-  }
-
-  async createSource(dto: CreateMigrationSourceDto, userId: number) {
-    await this.assertNoGlobalActiveRun();
-
-    const adapter = this.adapterRegistry.get(dto.type);
-    const validation = await adapter.validate(parseConnectionConfig(dto.type, dto.connectionConfig));
-    const payload = {
-      type: dto.type.trim().toLowerCase(),
-      name: dto.name.trim(),
-      connectionConfig: dto.connectionConfig,
-      capabilities: {
-        sourceType: validation.sourceType,
-        sourceVersion: validation.sourceVersion,
-        warnings: validation.warnings,
-        counts: validation.counts,
-        missingTables: validation.missingTables,
-      },
-      createdByUserId: userId,
-    } as const;
-
-    const state = await this.getWorkflowState();
-    const sources = await this.repo.listSources();
-
-    const source = state.active?.source
-      ? await this.repo.updateSource(state.active.source.id, {
-          ...payload,
-          name: buildUniqueSourceName(payload.name, payload.type, sources, state.active.source.id),
-        })
-      : await this.repo.createSource({
-          ...payload,
-          name: buildUniqueSourceName(payload.name, payload.type, sources),
-        });
-
-    if (!source) throw new InternalServerErrorException('Failed to save migration source');
-    await this.repo.purgeRunState(source.id);
-    return sanitizeSourceForApi(source);
-  }
-
-  listTargetUsers() {
-    return this.repo.listTargetUsersForMapping();
-  }
-
-  async createProfile(dto: CreateMigrationProfileDto, userId: number) {
-    await this.assertNoGlobalActiveRun();
-
-    const source = await this.repo.findSourceById(dto.sourceId);
-    if (!source) throw new NotFoundException(`Migration source not found: ${dto.sourceId}`);
-
-    const targetUsers = await this.repo.listTargetUsersForMapping();
-    const knownTargetUserIds = new Set(targetUsers.map((row) => row.id));
-    const requestedTargetUserIds = [...new Set(dto.userMappings.map((row) => row.targetUserId))];
-    const unknownTargetUserIds = requestedTargetUserIds.filter((targetUserId) => !knownTargetUserIds.has(targetUserId));
-    if (unknownTargetUserIds.length > 0) {
-      throw new BadRequestException(`Invalid target user IDs in mapping: ${unknownTargetUserIds.join(', ')}`);
-    }
-
-    const payload = {
-      sourceId: dto.sourceId,
-      name: dto.name.trim(),
-      userMappings: dto.userMappings,
-      pathMappings: dto.pathMappings ?? [],
-      scope: dto.scope ?? {},
-      createdByUserId: userId,
-    } as const;
-
-    const existingProfiles = await this.repo.listProfiles(dto.sourceId);
-    const profile = await this.repo.createProfile({
-      ...payload,
-      version: (existingProfiles[0]?.version ?? 0) + 1,
-    });
-    if (!profile) throw new InternalServerErrorException('Failed to save migration profile');
-    await this.repo.purgeRunState(dto.sourceId);
-    return sanitizeProfileForApi(profile);
-  }
-
-  async suggestUserMappings(sourceId: number) {
-    const source = await this.repo.findSourceById(sourceId);
-    if (!source) throw new NotFoundException(`Migration source not found: ${sourceId}`);
-
-    const adapter = this.adapterRegistry.get(source.type);
-    const sourceData = await adapter.exportData(parseConnectionConfig(source.type, source.connectionConfig));
-    const targetUsers = await this.repo.listTargetUsersForMapping();
-
-    const suggestions = sourceData.users.map((sourceUser) => {
-      const candidates = targetUsers
-        .map((targetUser) => {
-          const score = scoreUserMapping(sourceUser, targetUser);
-          return {
-            targetUserId: targetUser.id,
-            username: targetUser.username,
-            name: targetUser.name,
-            email: targetUser.email,
-            score,
-            confidence: confidenceLabel(score),
-          };
-        })
-        .filter((candidate) => candidate.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
-
-      return {
-        sourceUserId: sourceUser.sourceUserId,
-        username: sourceUser.username,
-        name: sourceUser.name,
-        email: sourceUser.email,
-        suggestedTargetUserId: candidates[0]?.targetUserId ?? null,
-        confidence: candidates[0]?.confidence ?? null,
-        candidates,
-      };
-    });
-
-    return {
-      sourceId,
-      generatedAt: new Date().toISOString(),
-      suggestions,
-    };
-  }
-
-  async getSourcePathPrefixes(sourceId: number): Promise<{ prefixes: string[] }> {
-    const source = await this.repo.findSourceById(sourceId);
-    if (!source) throw new NotFoundException(`Migration source not found: ${sourceId}`);
-    const adapter = this.adapterRegistry.get(source.type);
-    if (!adapter.fetchPathPrefixes) return { prefixes: [] };
-    const prefixes = await adapter.fetchPathPrefixes(parseConnectionConfig(source.type, source.connectionConfig));
-    return { prefixes };
-  }
-
-  async validatePathMappings(sourceId: number, dto: ValidatePathMappingsDto) {
-    const source = await this.repo.findSourceById(sourceId);
-    if (!source) throw new NotFoundException(`Migration source not found: ${sourceId}`);
-
-    const adapter = this.adapterRegistry.get(source.type);
-    const sourceData = await adapter.exportData(parseConnectionConfig(source.type, source.connectionConfig));
-
-    const validation = await this.pathValidator.validate({
-      sourceBooks: sourceData.books,
-      pathMappings: dto.pathMappings,
-      sampleLimit: dto.sampleLimit,
-    });
-
-    return {
-      sourceId,
-      validatedAt: new Date().toISOString(),
-      ...validation,
-    };
-  }
 
   async createDryRunPlan(dto: CreateDryRunPlanDto, userId: number) {
     await this.assertNoGlobalActiveRun();
@@ -275,7 +56,7 @@ export class MigrationService {
     await this.repo.purgeRunState(source.id);
 
     const planned = await this.planner.buildPlan({
-      source,
+      source: this.withDecryptedConfig(source),
       profile,
       scopeOverride: dto.scopeOverride,
     });
@@ -283,6 +64,8 @@ export class MigrationService {
     const sourceSnapshotHash = buildSourceSnapshotHash(planned.plan.snapshot);
     const profileHash = buildProfileHash(profile);
     const planHash = buildPlanHash({ sourceSnapshotHash, profileHash, plan: planned.plan });
+    const planSizeBytes = jsonByteLength(planned.plan);
+    const sourceDataSizeBytes = jsonByteLength(planned.execution.sourceData);
 
     const summary = {
       generatedAt: planned.plan.generatedAt,
@@ -296,6 +79,11 @@ export class MigrationService {
       }, {}),
       mappedUsers: planned.plan.userPreview.length,
       perUserPreview: planned.plan.userPreview,
+      artifactSizeBytes: {
+        plan: planSizeBytes,
+        sourceData: sourceDataSizeBytes,
+        total: planSizeBytes + sourceDataSizeBytes,
+      },
     };
 
     const artifact = await this.repo.createPlanArtifact({
@@ -305,10 +93,100 @@ export class MigrationService {
       profileHash,
       planHash,
       plan: planned.plan,
+      sourceData: planned.execution.sourceData,
       summary,
       createdByUserId: userId,
     });
     return sanitizePlanArtifactForApi(artifact);
+  }
+
+  async resolveDuplicateMatches(artifactId: number, dto: ResolveDuplicateMatchesDto) {
+    const artifact = await this.repo.findPlanArtifactById(artifactId);
+    if (!artifact) throw new NotFoundException(`Migration plan artifact not found: ${artifactId}`);
+
+    const plan = asRecord(artifact.plan);
+    const duplicates: Array<{
+      targetBookId: number;
+      matches?: PlannedBookMatch[];
+      sourceBookIds: string[];
+      strategies: MatchStrategy[];
+      reason: string;
+    }> = Array.isArray(plan.duplicateBookMatches) ? plan.duplicateBookMatches : [];
+
+    if (duplicates.length === 0) {
+      throw new BadRequestException('No duplicate matches to resolve.');
+    }
+
+    const dupMap = new Map(duplicates.map((d) => [d.targetBookId, d]));
+    const matchedBooks: PlannedBookMatch[] = Array.isArray(plan.matchedBooks) ? ([...plan.matchedBooks] as PlannedBookMatch[]) : [];
+    const unresolvedBooks: unknown[] = Array.isArray(plan.unresolvedBooks) ? [...plan.unresolvedBooks] : [];
+    const sourceData = artifact.sourceData as SourceExportData | null;
+    const sourceBooksById = new Map(sourceData?.books.map((book) => [book.sourceBookId, book]) ?? []);
+    const resolved = new Set<number>();
+
+    for (const resolution of dto.resolutions) {
+      const dup = dupMap.get(resolution.targetBookId);
+      if (!dup) {
+        throw new BadRequestException(`No duplicate match found for target book ${resolution.targetBookId}.`);
+      }
+      const dupMatches = normalizeDuplicateMatches(dup);
+      if (!dupMatches.some((match) => match.sourceBookId === resolution.selectedSourceBookId)) {
+        throw new BadRequestException(
+          `Source book ${resolution.selectedSourceBookId} is not in the duplicate group for target book ${resolution.targetBookId}.`,
+        );
+      }
+
+      const winnerStrategy = dupMatches.find((match) => match.sourceBookId === resolution.selectedSourceBookId)?.strategy ?? 'title_author';
+      matchedBooks.push({
+        sourceBookId: resolution.selectedSourceBookId,
+        targetBookId: resolution.targetBookId,
+        strategy: winnerStrategy,
+      });
+
+      for (const duplicateMatch of dupMatches) {
+        if (duplicateMatch.sourceBookId !== resolution.selectedSourceBookId) {
+          unresolvedBooks.push({
+            sourceBookId: duplicateMatch.sourceBookId,
+            title: sourceBooksById.get(duplicateMatch.sourceBookId)?.title ?? null,
+            reason: 'duplicate_target_match',
+          });
+        }
+      }
+
+      resolved.add(resolution.targetBookId);
+    }
+
+    const remainingDuplicates = duplicates.filter((d) => !resolved.has(d.targetBookId));
+    if (remainingDuplicates.length > 0) {
+      throw new BadRequestException(`All duplicate groups must be resolved. Missing: ${remainingDuplicates.map((d) => d.targetBookId).join(', ')}`);
+    }
+
+    const userMappings = parsePlanUserMappings(plan.userMappings);
+    const matchedBookIds = new Set(matchedBooks.map((entry) => entry.sourceBookId));
+    const userPreview = sourceData ? buildUserPreview(sourceData, userMappings, matchedBookIds) : plan.userPreview;
+    const unresolvedByReason = summarizeUnresolvedByReason(unresolvedBooks);
+
+    const updatedPlan = { ...plan, matchedBooks, unresolvedBooks, duplicateBookMatches: [], userPreview };
+    const summary = asRecord(artifact.summary);
+    const updatedSummary = {
+      ...summary,
+      status: 'ready_for_live_run',
+      matchedBooks: matchedBooks.length,
+      unresolvedBooks: unresolvedBooks.length,
+      duplicateBookMatches: 0,
+      unresolvedByReason,
+      perUserPreview: userPreview,
+      mappedUsers: Array.isArray(userPreview) ? userPreview.length : summary.mappedUsers,
+    };
+
+    const updated = await this.repo.updatePlanArtifact(artifact.id, {
+      plan: updatedPlan,
+      sourceData: artifact.sourceData,
+      summary: updatedSummary,
+    });
+
+    this.logger.log(`[plan.resolve_duplicates] [end] artifactId=${artifactId} resolved=${resolved.size} - duplicates resolved`);
+    return sanitizePlanArtifactForApi(updated);
   }
 
   async startLiveRun(dto: StartLiveRunDto, userId: number) {
@@ -327,6 +205,11 @@ export class MigrationService {
     if (!source.lastValidatedAt) {
       throw new BadRequestException('Validate source before starting migration.');
     }
+    const sourceCapabilities = asRecord(source.capabilities);
+    if (sourceCapabilities.ok === false) {
+      const missingTables = Array.isArray(sourceCapabilities.missingTables) ? sourceCapabilities.missingTables.join(', ') : 'unknown';
+      throw new BadRequestException(`Source validation is not successful. Missing required tables: ${missingTables || 'unknown'}`);
+    }
 
     const profile = await this.repo.findProfileById(artifact.profileId);
     if (!profile) throw new NotFoundException(`Migration profile not found: ${artifact.profileId}`);
@@ -338,11 +221,22 @@ export class MigrationService {
       throw new BadRequestException('Save user mappings before starting migration.');
     }
 
+    const targetUserIds = profileMappings.map((m) => asInteger(asRecord(m).targetUserId)).filter((id): id is number => id !== null);
+    if (targetUserIds.length > 0) {
+      const existingUsers = await this.repo.listTargetUsersForMapping();
+      const existingIds = new Set(existingUsers.map((u) => u.id));
+      const missing = targetUserIds.filter((id) => !existingIds.has(id));
+      if (missing.length > 0) {
+        throw new BadRequestException(`Target users no longer exist: ${missing.join(', ')}. Update user mappings.`);
+      }
+    }
+
     const scope = asRecord(profile.scope);
     const preflightScope = asRecord(scope.preflight);
     const pathValidatedAt = asString(preflightScope.pathValidatedAt);
+    const pathMappingsHash = asString(preflightScope.pathMappingsHash);
     const pathMappings = Array.isArray(profile.pathMappings) ? profile.pathMappings : [];
-    if (pathMappings.length > 0 && !pathValidatedAt) {
+    if (pathMappings.length > 0 && (!pathValidatedAt || pathMappingsHash !== buildPathMappingsHash(pathMappings))) {
       throw new BadRequestException('Validate path mappings before starting migration.');
     }
 
@@ -364,7 +258,7 @@ export class MigrationService {
     });
     if (!run && activeRun) {
       throw new ConflictException(
-        `Another migration run is active for source=${artifact.sourceId} target=${targetKey} (runId=${activeRun.id}, state=${activeRun.state})`,
+        `Another migration run is active (runId=${activeRun.id}, source=${activeRun.sourceId}, target=${activeRun.targetKey}, state=${activeRun.state})`,
       );
     }
     if (!run) {
@@ -373,6 +267,49 @@ export class MigrationService {
 
     this.executor.start(run.id);
     return sanitizeRunForApi(run);
+  }
+
+  async cancelRun(runId: number): Promise<ApiMigrationRun> {
+    const run = await this.repo.findRunById(runId);
+    if (!run) throw new NotFoundException(`Migration run not found: ${runId}`);
+    if (run.state !== 'running') {
+      throw new BadRequestException(`Cannot cancel run in state "${run.state}" - only running migrations can be cancelled`);
+    }
+    const updated = await this.repo.updateRunState(runId, 'failed', {
+      currentStage: 'cancelled',
+      endedAt: new Date(),
+      errorMessage: 'Migration cancelled by user',
+    });
+    if (!updated) throw new InternalServerErrorException('Failed to cancel migration run');
+    return sanitizeRunForApi(updated);
+  }
+
+  async retryFailedRun(runId: number): Promise<ApiMigrationRun> {
+    await this.assertNoGlobalActiveRun();
+
+    const run = await this.repo.findRunById(runId);
+    if (!run) throw new NotFoundException(`Migration run not found: ${runId}`);
+    if (run.state !== 'failed') {
+      throw new BadRequestException(`Cannot retry run in state "${run.state}" - only failed migrations can be retried`);
+    }
+    if (!run.planArtifactId) {
+      throw new BadRequestException('Run is missing a plan artifact. Create a new dry-run plan.');
+    }
+
+    const source = await this.repo.findSourceById(run.sourceId);
+    if (!source) throw new NotFoundException(`Migration source no longer exists: ${run.sourceId}`);
+
+    const artifact = await this.repo.findPlanArtifactById(run.planArtifactId);
+    if (!artifact) throw new NotFoundException(`Plan artifact no longer exists: ${run.planArtifactId}`);
+
+    const updated = await this.repo.updateRunState(runId, 'running', {
+      endedAt: null,
+      errorMessage: null,
+    });
+    if (!updated) throw new InternalServerErrorException('Failed to reset migration run for retry');
+
+    this.executor.start(updated.id);
+    return sanitizeRunForApi(updated);
   }
 
   getRunProgress(runId: number) {
@@ -403,7 +340,7 @@ export class MigrationService {
     return {
       active: activeBundle
         ? {
-            source: sanitizeSourceForApi(activeBundle.source),
+            source: sanitizeSourceForApi(this.withDecryptedConfig(activeBundle.source)),
             profile: activeBundle.profile ? sanitizeProfileForApi(activeBundle.profile) : null,
             plan: activeBundle.plan ? sanitizePlanArtifactForApi(activeBundle.plan) : null,
             run: activeBundle.run ? sanitizeRunForApi(activeBundle.run) : null,
@@ -414,10 +351,10 @@ export class MigrationService {
   }
 
   private resolveActiveBundle(
-    source: MigrationSourceRow | null,
-    profiles: Awaited<ReturnType<MigrationRepository['listProfiles']>>,
-    plans: Awaited<ReturnType<MigrationRepository['listPlanArtifacts']>>,
-    runs: Awaited<ReturnType<MigrationRepository['listRuns']>>,
+    source: MigrationSource | null,
+    profiles: MigrationProfile[],
+    plans: MigrationPlanArtifact[],
+    runs: MigrationRun[],
   ): WorkflowStateBundle | null {
     if (!source) return null;
     const profile = profiles.find((row) => row.sourceId === source.id) ?? null;
@@ -434,140 +371,58 @@ export class MigrationService {
     if (!active) return;
     throw new ConflictException(`Another migration run is active (runId=${active.id}, state=${active.state}).`);
   }
+
+  private withDecryptedConfig(source: MigrationSource): MigrationSource {
+    return { ...source, connectionConfig: this.encryption.decryptConfig(source.connectionConfig) };
+  }
 }
 
-function parseConnectionConfig(type: string, raw: unknown): unknown {
-  if (type === 'booklore') {
-    return parseBookloreConnectionConfig(raw);
+function normalizeDuplicateMatches(duplicate: {
+  targetBookId: number;
+  matches?: PlannedBookMatch[];
+  sourceBookIds: string[];
+  strategies: MatchStrategy[];
+}): PlannedBookMatch[] {
+  if (Array.isArray(duplicate.matches) && duplicate.matches.length > 0) {
+    return duplicate.matches.filter((match) => match.sourceBookId && Number.isFinite(match.targetBookId));
   }
-  return asRecord(raw);
+
+  return duplicate.sourceBookIds.map((sourceBookId, index) => ({
+    sourceBookId,
+    targetBookId: duplicate.targetBookId,
+    strategy: duplicate.strategies[index] ?? duplicate.strategies[0] ?? 'title_author',
+  }));
+}
+
+function parsePlanUserMappings(raw: unknown): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!Array.isArray(raw)) return out;
+
+  for (const item of raw) {
+    const row = asRecord(item);
+    const sourceUserId = asString(row.sourceUserId);
+    const targetUserId = asInteger(row.targetUserId);
+    if (sourceUserId && targetUserId != null) out.set(sourceUserId, targetUserId);
+  }
+
+  return out;
+}
+
+function summarizeUnresolvedByReason(rows: unknown[]): Record<string, number> {
+  return rows.reduce<Record<string, number>>((acc, row) => {
+    const reason = asString(asRecord(row).reason);
+    if (reason) acc[reason] = (acc[reason] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
+function jsonByteLength(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8');
 }
 
 function normalizeTargetKey(value: string | undefined): string {
   const normalized = value?.trim();
   return normalized ? normalized : 'projectx';
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return value as Record<string, unknown>;
-}
-
-function asString(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function scoreUserMapping(
-  sourceUser: { username: string; email: string | null; name: string | null },
-  targetUser: { username: string; email: string | null; name: string },
-): number {
-  const sUsername = sourceUser.username.trim().toLowerCase();
-  const tUsername = targetUser.username.trim().toLowerCase();
-  const sEmail = sourceUser.email?.trim().toLowerCase() ?? null;
-  const tEmail = targetUser.email?.trim().toLowerCase() ?? null;
-  const sName = sourceUser.name?.trim().toLowerCase() ?? null;
-  const tName = targetUser.name.trim().toLowerCase();
-
-  if (sEmail && tEmail && sEmail === tEmail) return 100;
-  if (sUsername && tUsername && sUsername === tUsername) return 95;
-  if (sName && tName && sName === tName) return 85;
-  if (sUsername && tUsername && (sUsername.includes(tUsername) || tUsername.includes(sUsername))) return 70;
-  if (sName && tName && (sName.includes(tName) || tName.includes(sName))) return 60;
-  return 0;
-}
-
-function confidenceLabel(score: number): 'high' | 'medium' | 'low' {
-  if (score >= 90) return 'high';
-  if (score >= 70) return 'medium';
-  return 'low';
-}
-
-function sanitizeSourceForApi(source: MigrationSourceRow): ApiMigrationSource {
-  return {
-    id: source.id,
-    type: source.type,
-    name: source.name,
-    connectionConfig: redactConnectionConfig(source.type, source.connectionConfig),
-    capabilities: source.capabilities,
-    lastValidatedAt: source.lastValidatedAt,
-    createdAt: source.createdAt,
-    updatedAt: source.updatedAt,
-  };
-}
-
-function sanitizeProfileForApi(profile: MigrationProfileRow): ApiMigrationProfile {
-  return {
-    id: profile.id,
-    sourceId: profile.sourceId,
-    name: profile.name,
-    userMappings: profile.userMappings,
-    pathMappings: profile.pathMappings,
-    scope: profile.scope,
-    createdAt: profile.createdAt,
-    updatedAt: profile.updatedAt,
-  };
-}
-
-function sanitizePlanArtifactForApi(artifact: MigrationPlanArtifactRow): ApiMigrationPlanArtifact {
-  return {
-    id: artifact.id,
-    sourceId: artifact.sourceId,
-    profileId: artifact.profileId,
-    plan: artifact.plan,
-    summary: artifact.summary,
-    createdAt: artifact.createdAt,
-    updatedAt: artifact.updatedAt,
-  };
-}
-
-function sanitizeRunForApi(run: MigrationRunRow): ApiMigrationRun {
-  return {
-    id: run.id,
-    sourceId: run.sourceId,
-    profileId: run.profileId,
-    planArtifactId: run.planArtifactId,
-    state: run.state,
-    currentStage: run.currentStage,
-    startedAt: run.startedAt,
-    endedAt: run.endedAt,
-    errorMessage: run.errorMessage,
-    createdAt: run.createdAt,
-    updatedAt: run.updatedAt,
-  };
-}
-
-function redactConnectionConfig(type: string, raw: unknown): unknown {
-  const config = asRecord(raw);
-  if (type !== 'booklore') return config;
-
-  return {
-    ...config,
-    password: typeof config.password === 'string' && config.password.length > 0 ? '********' : '',
-  };
-}
-
-function buildUniqueSourceName(
-  desiredName: string,
-  sourceType: string,
-  sources: Array<{ id: number; type: string; name: string }>,
-  ignoreId?: number,
-): string {
-  const trimmed = desiredName.trim();
-  const safeBase = trimmed.length > 0 ? trimmed : 'Booklore Import';
-  const names = new Set(sources.filter((row) => row.type === sourceType && row.id !== ignoreId).map((row) => row.name.toLowerCase()));
-
-  if (!names.has(safeBase.toLowerCase())) return safeBase;
-
-  let counter = 2;
-  while (counter < 10_000) {
-    const candidate = `${safeBase} ${counter}`;
-    if (!names.has(candidate.toLowerCase())) return candidate;
-    counter += 1;
-  }
-
-  return `${safeBase} ${Date.now()}`;
 }
 
 function latestDate(...dates: Date[]): Date {

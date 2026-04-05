@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { check, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 import { users } from './auth';
@@ -19,7 +19,10 @@ export const migrationSources = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [uniqueIndex('migration_sources_type_name_uidx').on(t.type, t.name)],
+  (t) => [
+    uniqueIndex('migration_sources_type_name_uidx').on(t.type, t.name),
+    index('migration_sources_created_by_user_id_idx').on(t.createdByUserId),
+  ],
 );
 
 export const migrationProfiles = pgTable(
@@ -65,6 +68,7 @@ export const migrationPlanArtifacts = pgTable(
     profileHash: varchar('profile_hash', { length: 128 }).notNull(),
     planHash: varchar('plan_hash', { length: 128 }).notNull(),
     plan: jsonb('plan').notNull(),
+    sourceData: jsonb('source_data'),
     summary: jsonb('summary').notNull(),
     createdByUserId: integer('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -104,7 +108,11 @@ export const migrationRuns = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [index('migration_runs_source_target_state_idx').on(t.sourceId, t.targetKey, t.state), index('migration_runs_state_idx').on(t.state)],
+  (t) => [
+    index('migration_runs_source_target_state_idx').on(t.sourceId, t.targetKey, t.state),
+    index('migration_runs_state_idx').on(t.state),
+    check('migration_runs_state_chk', sql`"state" IN ('draft', 'preflight_failed', 'dry_run_ready', 'running', 'failed', 'completed')`),
+  ],
 );
 
 export const migrationRunMetrics = pgTable(

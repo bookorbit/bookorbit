@@ -340,6 +340,14 @@ jobs:
               - 'scripts/test/**'
               - 'scripts/db/**'
               - '.github/workflows/e2e-runner.yml'
+            migration-booklore:
+              - 'server/src/modules/migration/**'
+              - 'server/test/migration-booklore.e2e-spec.ts'
+              - 'server/test/e2e/migration-booklore/**'
+              - 'server/src/db/schema/**'
+              - 'scripts/test/**'
+              - 'scripts/db/**'
+              - '.github/workflows/e2e-runner.yml'
             opds-auth-catalog:
               - 'server/src/modules/opds/**'
               - 'server/src/modules/book/**'

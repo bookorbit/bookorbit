@@ -17,7 +17,12 @@ export type UnresolvedReasonCode =
   | 'no_isbn_match'
   | 'no_file_hash_match'
   | 'no_file_path_match'
-  | 'no_title_author_match';
+  | 'no_title_author_match'
+  | 'ambiguous_isbn_match'
+  | 'ambiguous_file_hash_match'
+  | 'ambiguous_file_path_match'
+  | 'ambiguous_title_author_match'
+  | 'duplicate_target_match';
 
 export interface PlannedBookMatch {
   sourceBookId: string;
@@ -27,6 +32,7 @@ export interface PlannedBookMatch {
 
 export interface PlannedDuplicateBookMatch {
   targetBookId: number;
+  matches: PlannedBookMatch[];
   sourceBookIds: string[];
   strategies: MatchStrategy[];
   reason: 'duplicate_target_match';

@@ -3,7 +3,8 @@ import { Injectable } from '@nestjs/common';
 import type { MigrationProfile, MigrationSource } from '../../../db/schema';
 import { SourceAdapterRegistry } from '../adapters/source-adapter.registry';
 import type { SourceExportData } from '../adapters/source-adapter.types';
-import { parseBookloreConnectionConfig } from '../adapters/booklore/booklore-connection-config';
+import { parseConnectionConfig } from '../core/connection-config';
+import { asRecord, asString, asNumber } from '../core/coerce';
 import { MatchingService } from './matching.service';
 import type {
   PathMapping,
@@ -88,8 +89,9 @@ function splitDuplicateMatches(matches: PlannedBookMatch[]): {
     duplicateTargetIds.add(targetBookId);
     duplicateBookMatches.push({
       targetBookId,
+      matches: rows,
       sourceBookIds: rows.map((row) => row.sourceBookId),
-      strategies: [...new Set(rows.map((row) => row.strategy))],
+      strategies: rows.map((row) => row.strategy),
       reason: 'duplicate_target_match',
     });
   }
@@ -100,13 +102,6 @@ function splitDuplicateMatches(matches: PlannedBookMatch[]): {
   };
 }
 
-function parseConnectionConfig(type: string, raw: unknown): unknown {
-  if (type === 'booklore') {
-    return parseBookloreConnectionConfig(raw);
-  }
-  return asRecord(raw);
-}
-
 function parseUserMappings(raw: unknown): UserMapping[] {
   if (!Array.isArray(raw)) return [];
 
@@ -114,8 +109,8 @@ function parseUserMappings(raw: unknown): UserMapping[] {
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
 
-    const sourceUserId = toString((item as Record<string, unknown>).sourceUserId ?? (item as Record<string, unknown>).source_user_id);
-    const targetUserId = toNumber((item as Record<string, unknown>).targetUserId ?? (item as Record<string, unknown>).target_user_id);
+    const sourceUserId = asString((item as Record<string, unknown>).sourceUserId ?? (item as Record<string, unknown>).source_user_id);
+    const targetUserId = asNumber((item as Record<string, unknown>).targetUserId ?? (item as Record<string, unknown>).target_user_id);
     if (!sourceUserId || !targetUserId) continue;
 
     out.push({ sourceUserId, targetUserId });
@@ -131,8 +126,8 @@ function parsePathMappings(raw: unknown): PathMapping[] {
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
 
-    const sourcePrefix = toString((item as Record<string, unknown>).sourcePrefix ?? (item as Record<string, unknown>).source_prefix);
-    const targetPrefix = toString((item as Record<string, unknown>).targetPrefix ?? (item as Record<string, unknown>).target_prefix);
+    const sourcePrefix = asString((item as Record<string, unknown>).sourcePrefix ?? (item as Record<string, unknown>).source_prefix);
+    const targetPrefix = asString((item as Record<string, unknown>).targetPrefix ?? (item as Record<string, unknown>).target_prefix);
     if (!sourcePrefix || !targetPrefix) continue;
 
     out.push({ sourcePrefix, targetPrefix });
@@ -141,7 +136,7 @@ function parsePathMappings(raw: unknown): PathMapping[] {
   return out;
 }
 
-function buildUserPreview(sourceData: SourceExportData, mappedUsers: Map<string, number>, matchedBookIds: Set<string>): PlannedUserPreview[] {
+export function buildUserPreview(sourceData: SourceExportData, mappedUsers: Map<string, number>, matchedBookIds: Set<string>): PlannedUserPreview[] {
   const usersById = new Map(sourceData.users.map((user) => [user.sourceUserId, user]));
   const countsBySourceUser = new Map<string, { statuses: number; fileProgress: number; bookmarks: number; annotations: number; shelves: number }>();
 
@@ -184,24 +179,4 @@ function buildUserPreview(sourceData: SourceExportData, mappedUsers: Map<string,
       counts,
     };
   });
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return value as Record<string, unknown>;
-}
-
-function toString(value: unknown): string | null {
-  if (value == null) return null;
-  const str =
-    typeof value === 'string' ? value : typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint' ? String(value) : null;
-  if (str == null) return null;
-  const trimmed = str.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function toNumber(value: unknown): number | null {
-  if (value == null) return null;
-  const num = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(num) ? num : null;
 }

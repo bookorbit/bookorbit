@@ -26,6 +26,10 @@ export function buildSourceSnapshotHash(snapshot: unknown): string {
   return sha256Hex(sanitized);
 }
 
+export function buildPathMappingsHash(pathMappings: unknown): string {
+  return sha256Hex(pathMappings);
+}
+
 function sanitizePlanForHash(plan: unknown): unknown {
   if (!isRecord(plan)) return plan;
 

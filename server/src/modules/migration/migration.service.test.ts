@@ -1,7 +1,13 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MigrationService } from './migration.service';
+
+const noopEncryption = {
+  encryptConfig: (c: Record<string, unknown>) => c,
+  decryptConfig: (c: unknown) => c as Record<string, unknown>,
+  isConfigured: () => false,
+} as never;
 
 function createService(overrides: Partial<Record<string, unknown>> = {}): MigrationService {
   const repo = {
@@ -29,7 +35,6 @@ function createService(overrides: Partial<Record<string, unknown>> = {}): Migrat
       ]),
     ),
     listProfiles: vi.fn(() => Promise.resolve([])),
-    createProfile: vi.fn(),
     findProfileById: vi.fn(() =>
       Promise.resolve({
         id: 2,
@@ -45,6 +50,9 @@ function createService(overrides: Partial<Record<string, unknown>> = {}): Migrat
       }),
     ),
     listRuns: vi.fn(() => Promise.resolve([])),
+    listSources: vi.fn(() => Promise.resolve([])),
+    findRunById: vi.fn(),
+    updateRunState: vi.fn(),
     findPlanArtifactById: vi.fn(() =>
       Promise.resolve({
         id: 100,
@@ -81,36 +89,20 @@ function createService(overrides: Partial<Record<string, unknown>> = {}): Migrat
       }),
     ),
     purgeRunState: vi.fn(() => Promise.resolve()),
+    listPlanArtifacts: vi.fn(() => Promise.resolve([])),
     ...overrides,
   };
 
   return new MigrationService(
     repo as never,
-    { listTypes: vi.fn(), get: vi.fn() } as never,
     { buildPlan: vi.fn() } as never,
     { start: vi.fn() } as never,
     { getRunProgress: vi.fn(), getRunReport: vi.fn(), exportRunReport: vi.fn() } as never,
-    { validate: vi.fn() } as never,
+    noopEncryption,
   );
 }
 
 describe('MigrationService', () => {
-  it('rejects profile creation when target user mapping IDs are invalid', async () => {
-    const service = createService();
-
-    await expect(
-      service.createProfile(
-        {
-          sourceId: 1,
-          name: 'Profile',
-          userMappings: [{ sourceUserId: 'src-user', targetUserId: 999 }],
-          pathMappings: [],
-        },
-        1,
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
   it('rejects live run start when another active run exists for the same source and target', async () => {
     const service = createService();
 
@@ -166,6 +158,7 @@ describe('MigrationService', () => {
       planArtifactId: 100,
       state: 'running',
       currentStage: 'init',
+      targetKey: 'projectx',
       startedAt: run.startedAt,
       endedAt: null,
       errorMessage: null,
@@ -195,57 +188,461 @@ describe('MigrationService', () => {
     await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('creates a new profile version instead of overwriting the current one', async () => {
-    const createProfile = vi.fn(() =>
-      Promise.resolve({
-        id: 3,
+  describe('cancelRun', () => {
+    it('cancels a running migration', async () => {
+      const updatedRun = {
+        id: 77,
         sourceId: 1,
-        name: 'Booklore Migration',
-        version: 4,
-        userMappings: [{ sourceUserId: 'src-user', targetUserId: 10 }],
-        pathMappings: [],
-        scope: {},
-        createdByUserId: 1,
+        profileId: 2,
+        planArtifactId: 100,
+        targetKey: 'projectx',
+        state: 'failed',
+        currentStage: 'cancelled',
+        triggeredByUserId: 1,
+        startedAt: new Date(),
+        endedAt: new Date(),
+        errorMessage: 'Migration cancelled by user',
         createdAt: new Date(),
         updatedAt: new Date(),
-      }),
-    );
-    const service = createService({
-      listProfiles: vi.fn(() =>
-        Promise.resolve([
-          {
-            id: 2,
+      };
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
             sourceId: 1,
-            name: 'Booklore Migration',
-            version: 3,
-            userMappings: [{ sourceUserId: 'src-user', targetUserId: 10 }],
-            pathMappings: [],
-            scope: {},
-            createdByUserId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'projectx',
+            state: 'running',
+            currentStage: 'shared_overlays',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: null,
+            errorMessage: null,
             createdAt: new Date(),
             updatedAt: new Date(),
-          },
-        ]),
-      ),
-      createProfile,
+          }),
+        ),
+        updateRunState: vi.fn(() => Promise.resolve(updatedRun)),
+      });
+
+      const result = await service.cancelRun(77);
+      expect(result.state).toBe('failed');
+      expect(result.currentStage).toBe('cancelled');
+      expect(result.errorMessage).toBe('Migration cancelled by user');
     });
 
-    await service.createProfile(
-      {
-        sourceId: 1,
-        name: 'Booklore Migration',
-        userMappings: [{ sourceUserId: 'src-user', targetUserId: 10 }],
-        pathMappings: [],
-      },
-      1,
-    );
+    it('throws NotFoundException for missing run', async () => {
+      const service = createService({
+        findRunById: vi.fn(() => Promise.resolve(undefined)),
+      });
 
-    expect(createProfile).toHaveBeenCalledWith(
-      expect.objectContaining({
+      await expect(service.cancelRun(999)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws BadRequestException for non-running run', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'completed',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'projectx',
+            currentStage: 'completed',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.cancelRun(77)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws InternalServerErrorException when update fails', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'running',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'projectx',
+            currentStage: 'init',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: null,
+            errorMessage: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        updateRunState: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.cancelRun(77)).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+  });
+
+  it('rejects live run start when duplicate book matches exist', async () => {
+    const service = createService({
+      findPlanArtifactById: vi.fn(() =>
+        Promise.resolve({
+          id: 100,
+          sourceId: 1,
+          profileId: 2,
+          sourceSnapshotHash: 'a',
+          profileHash: 'b',
+          planHash: 'd',
+          plan: { duplicateBookMatches: [{ targetBookId: 1, sourceBookIds: ['a', 'b'] }] },
+          summary: {},
+          createdByUserId: 1,
+          createdAt: new Date(Date.now() + 1000),
+          updatedAt: new Date(),
+        }),
+      ),
+    });
+
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects live run when source has never been validated', async () => {
+    const service = createService({
+      findSourceById: vi.fn(() =>
+        Promise.resolve({
+          id: 1,
+          type: 'booklore',
+          name: 'Booklore',
+          connectionConfig: {},
+          capabilities: null,
+          lastValidatedAt: null,
+          createdByUserId: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      findPlanArtifactById: vi.fn(() =>
+        Promise.resolve({
+          id: 100,
+          sourceId: 1,
+          profileId: 2,
+          plan: {},
+          summary: {},
+          createdByUserId: 1,
+          createdAt: new Date(Date.now() + 1000),
+          updatedAt: new Date(),
+        }),
+      ),
+    });
+
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects live run when dry-run plan is stale', async () => {
+    const now = new Date();
+    const service = createService({
+      findSourceById: vi.fn(() =>
+        Promise.resolve({
+          id: 1,
+          type: 'booklore',
+          name: 'Booklore',
+          connectionConfig: {},
+          capabilities: null,
+          lastValidatedAt: now,
+          createdByUserId: 1,
+          createdAt: now,
+          updatedAt: new Date(now.getTime() + 5000),
+        }),
+      ),
+      findPlanArtifactById: vi.fn(() =>
+        Promise.resolve({
+          id: 100,
+          sourceId: 1,
+          profileId: 2,
+          plan: {},
+          summary: {},
+          createdByUserId: 1,
+          createdAt: new Date(now.getTime() - 10000),
+          updatedAt: now,
+        }),
+      ),
+    });
+
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects live run when target users no longer exist', async () => {
+    const service = createService({
+      findPlanArtifactById: vi.fn(() =>
+        Promise.resolve({
+          id: 100,
+          sourceId: 1,
+          profileId: 2,
+          plan: {},
+          summary: {},
+          createdByUserId: 1,
+          createdAt: new Date(Date.now() + 1000),
+          updatedAt: new Date(),
+        }),
+      ),
+      findProfileById: vi.fn(() =>
+        Promise.resolve({
+          id: 2,
+          sourceId: 1,
+          name: 'Booklore Migration',
+          version: 1,
+          userMappings: [{ sourceUserId: 'src-user', targetUserId: 999 }],
+          pathMappings: [],
+          scope: { preflight: { pathValidatedAt: new Date().toISOString() } },
+          createdByUserId: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      listTargetUsersForMapping: vi.fn(() =>
+        Promise.resolve([{ id: 10, username: 'target-user', name: 'Target User', email: 'target@example.com' }]),
+      ),
+    });
+
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toThrow('Target users no longer exist');
+  });
+
+  describe('retryFailedRun', () => {
+    it('retries a failed run by resetting state to running', async () => {
+      const startFn = vi.fn();
+      const updatedRun = {
+        id: 77,
         sourceId: 1,
-        name: 'Booklore Migration',
-        version: 4,
-      }),
-    );
+        profileId: 2,
+        planArtifactId: 100,
+        targetKey: 'projectx',
+        state: 'running',
+        currentStage: 'user_state',
+        triggeredByUserId: 1,
+        startedAt: new Date(),
+        endedAt: null,
+        errorMessage: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'projectx',
+            state: 'failed',
+            currentStage: 'user_state',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: 'Connection lost',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        updateRunState: vi.fn(() => Promise.resolve(updatedRun)),
+      });
+
+      (service as any).executor = { start: startFn };
+
+      const result = await service.retryFailedRun(77);
+      expect(result.state).toBe('running');
+      expect(result.errorMessage).toBeNull();
+      expect(startFn).toHaveBeenCalledWith(77);
+    });
+
+    it('throws NotFoundException for missing run', async () => {
+      const service = createService({
+        findRunById: vi.fn(() => Promise.resolve(undefined)),
+      });
+
+      await expect(service.retryFailedRun(999)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws BadRequestException for non-failed run', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'running',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'projectx',
+            currentStage: 'shared_overlays',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: null,
+            errorMessage: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.retryFailedRun(77)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws ConflictException when another run is already active', async () => {
+      const service = createService({
+        listRuns: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 88,
+              state: 'running',
+              sourceId: 1,
+              profileId: 2,
+            },
+          ]),
+        ),
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'failed',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'projectx',
+            currentStage: 'user_state',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: 'error',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.retryFailedRun(77)).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('resolveDuplicateMatches', () => {
+    const duplicatePlanArtifact = {
+      id: 100,
+      sourceId: 1,
+      profileId: 2,
+      sourceSnapshotHash: 'a',
+      profileHash: 'b',
+      planHash: 'd',
+      plan: {
+        matchedBooks: [{ sourceBookId: 'sb1', targetBookId: 1, strategy: 'isbn' }],
+        unresolvedBooks: [{ sourceBookId: 'sb99', title: null, reason: 'no_isbn_match' }],
+        duplicateBookMatches: [
+          { targetBookId: 5, sourceBookIds: ['sb10', 'sb11'], strategies: ['isbn', 'title_author'], reason: 'duplicate_target_match' },
+          {
+            targetBookId: 6,
+            sourceBookIds: ['sb20', 'sb21', 'sb22'],
+            strategies: ['file_hash', 'file_hash', 'title_author'],
+            reason: 'duplicate_target_match',
+          },
+        ],
+      },
+      sourceData: null,
+      summary: {
+        status: 'blocked',
+        matchedBooks: 1,
+        unresolvedBooks: 1,
+        duplicateBookMatches: 2,
+      },
+      createdByUserId: 1,
+      createdAt: new Date(Date.now() + 1000),
+      updatedAt: new Date(),
+    };
+
+    it('resolves duplicate matches by moving selected to matched and others to unresolved', async () => {
+      const updateFn = vi.fn((id: number, vals: { plan: unknown; summary: unknown }) => {
+        return Promise.resolve({ ...duplicatePlanArtifact, id, plan: vals.plan, summary: vals.summary });
+      });
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve({ ...duplicatePlanArtifact })),
+        updatePlanArtifact: updateFn,
+      });
+
+      const result = await service.resolveDuplicateMatches(100, {
+        resolutions: [
+          { targetBookId: 5, selectedSourceBookId: 'sb10' },
+          { targetBookId: 6, selectedSourceBookId: 'sb22' },
+        ],
+      });
+
+      expect(updateFn).toHaveBeenCalledOnce();
+      const updatedPlan = (updateFn.mock.calls as unknown[][])[0][1] as { plan: Record<string, unknown>; summary: Record<string, unknown> };
+      const plan = updatedPlan.plan as Record<string, unknown>;
+      const matchedBooks = plan.matchedBooks as Array<{ sourceBookId: string; targetBookId: number }>;
+      const unresolvedBooks = plan.unresolvedBooks as Array<{ sourceBookId: string }>;
+      const duplicateBookMatches = plan.duplicateBookMatches as unknown[];
+
+      expect(matchedBooks).toHaveLength(3);
+      expect(matchedBooks.find((m) => m.sourceBookId === 'sb10' && m.targetBookId === 5)).toBeTruthy();
+      expect(matchedBooks.find((m) => m.sourceBookId === 'sb22' && m.targetBookId === 6)).toBeTruthy();
+
+      expect(unresolvedBooks).toHaveLength(4);
+      expect(unresolvedBooks.find((u) => u.sourceBookId === 'sb11')).toBeTruthy();
+      expect(unresolvedBooks.find((u) => u.sourceBookId === 'sb20')).toBeTruthy();
+      expect(unresolvedBooks.find((u) => u.sourceBookId === 'sb21')).toBeTruthy();
+
+      expect(duplicateBookMatches).toHaveLength(0);
+      expect(result.summary?.status).toBe('ready_for_live_run');
+      expect(result.summary?.duplicateBookMatches).toBe(0);
+    });
+
+    it('throws NotFoundException for missing artifact', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve(undefined)),
+      });
+      await expect(service.resolveDuplicateMatches(999, { resolutions: [{ targetBookId: 1, selectedSourceBookId: 'sb1' }] })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('throws BadRequestException when no duplicates exist', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            ...duplicatePlanArtifact,
+            plan: { ...duplicatePlanArtifact.plan, duplicateBookMatches: [] },
+          }),
+        ),
+      });
+      await expect(service.resolveDuplicateMatches(100, { resolutions: [{ targetBookId: 5, selectedSourceBookId: 'sb10' }] })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('throws BadRequestException when selected source book is not in the group', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve({ ...duplicatePlanArtifact })),
+      });
+      await expect(
+        service.resolveDuplicateMatches(100, {
+          resolutions: [
+            { targetBookId: 5, selectedSourceBookId: 'sb99' },
+            { targetBookId: 6, selectedSourceBookId: 'sb22' },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException when not all groups are resolved', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve({ ...duplicatePlanArtifact })),
+      });
+      await expect(
+        service.resolveDuplicateMatches(100, {
+          resolutions: [{ targetBookId: 5, selectedSourceBookId: 'sb10' }],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

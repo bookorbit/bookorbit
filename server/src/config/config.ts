@@ -30,6 +30,10 @@ export const emailConfig = registerAs('email', () => ({
   encryptionKey: process.env.EMAIL_ENCRYPTION_KEY ?? '',
 }));
 
+export const migrationConfig = registerAs('migration', () => ({
+  encryptionKey: process.env.MIGRATION_ENCRYPTION_KEY ?? '',
+}));
+
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1) {
