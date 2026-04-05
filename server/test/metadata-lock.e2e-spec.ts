@@ -343,6 +343,7 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
     const lock = await patchLocks(initial.bookId, ['title']);
     expect(lock.statusCode).toBe(200);
 
+    // Filesystem timestamp resolution is 1s on many OSes; wait so the new file gets a newer mtime.
     await pause(1_100);
     await createEpubWithCoverFixture(library.folderPath, epubRelPath, {
       title: 'Scanner EPUB Winner',

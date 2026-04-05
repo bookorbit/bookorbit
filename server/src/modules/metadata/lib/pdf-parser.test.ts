@@ -118,6 +118,16 @@ describe('parsePdfFile', () => {
     );
   });
 
+  it('can skip cover extraction when only metadata is needed', async () => {
+    mockExtractXmpXml.mockReturnValue(null);
+
+    const parsed = await parsePdfFile('/books/book.pdf', { extractCover: false });
+
+    expect(parsed).toEqual(expect.objectContaining({ title: 'Info Title', coverBuffer: null }));
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockReadFile).toHaveBeenCalledTimes(1);
+  });
+
   it('returns null coverBuffer when pdftoppm command fails, but still returns metadata', async () => {
     mockExtractXmpXml.mockReturnValue(null);
     mockExecFile.mockImplementation((_file: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error('pdftoppm missing')));

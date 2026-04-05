@@ -280,6 +280,9 @@ export class LibraryService {
     dryRun: boolean,
     options: LibraryMetadataWriteStreamOptions = {},
   ): Promise<LibraryMetadataWriteSummary> {
+    const [library] = await this.libraryRepo.findById(libraryId);
+    if (!library) throw new NotFoundException('Library not found');
+
     if (!dryRun) {
       const settings = await this.fileWriteService.resolveSettings(libraryId);
       if (!settings.enabled) {

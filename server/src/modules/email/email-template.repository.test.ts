@@ -127,16 +127,16 @@ describe('EmailTemplateRepository', () => {
     });
 
     void repo.setDefault(22, 4);
-    expect(updateBuilder.set).toHaveBeenLastCalledWith({
-      isDefault: true,
-      updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
-    });
+    expect(updateBuilder.set).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isDefault: expect.objectContaining({ op: 'sql', text: 'case when  =  then true else false end' }),
+        updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
+      }),
+    );
     expect(updateBuilder.where).toHaveBeenLastCalledWith({
-      op: 'and',
-      clauses: [
-        { op: 'eq', left: emailTemplates.id, right: 22 },
-        { op: 'eq', left: emailTemplates.userId, right: 4 },
-      ],
+      op: 'eq',
+      left: emailTemplates.userId,
+      right: 4,
     });
 
     void repo.delete(22, 4);

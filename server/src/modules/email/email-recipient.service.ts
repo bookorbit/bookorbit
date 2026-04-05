@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientRepository } from './email-recipient.repository';
+import { EmailTemplateService } from './email-template.service';
 import { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
 import { UpdateEmailRecipientDto } from './dto/update-email-recipient.dto';
 import type { EmailRecipient } from '../../db/schema';
@@ -9,7 +10,10 @@ import { isUniqueViolation } from './email-db-error.util';
 
 @Injectable()
 export class EmailRecipientService {
-  constructor(private readonly repo: EmailRecipientRepository) {}
+  constructor(
+    private readonly repo: EmailRecipientRepository,
+    private readonly templateService: EmailTemplateService,
+  ) {}
 
   findAll(user: RequestUser) {
     return this.repo.findAllForUser(user.id);
@@ -20,6 +24,7 @@ export class EmailRecipientService {
   }
 
   async create(dto: CreateEmailRecipientDto, user: RequestUser) {
+    await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [created] = await this.repo.insert({
         userId: user.id,
@@ -40,6 +45,7 @@ export class EmailRecipientService {
 
   async update(id: number, dto: UpdateEmailRecipientDto, user: RequestUser) {
     await this.getOwnedById(id, user);
+    await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [updated] = await this.repo.update(id, user.id, dto);
       if (!updated) throw new NotFoundException('Recipient not found');
@@ -59,8 +65,7 @@ export class EmailRecipientService {
 
   async setDefault(id: number, user: RequestUser) {
     await this.getOwnedById(id, user);
-    await this.repo.clearDefault(user.id);
-    const [updated] = await this.repo.setDefault(id, user.id);
+    const updated = (await this.repo.setDefault(id, user.id)).find((recipient) => recipient.id === id);
     if (!updated) throw new NotFoundException('Recipient not found');
     return updated;
   }
@@ -84,5 +89,10 @@ export class EmailRecipientService {
     }
 
     return uniqueIds.map((id) => recipientById.get(id)!);
+  }
+
+  private async validateDefaultTemplate(templateId: number | null | undefined, user: RequestUser): Promise<void> {
+    if (templateId === null || templateId === undefined) return;
+    await this.templateService.findOne(templateId, user);
   }
 }

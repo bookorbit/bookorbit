@@ -804,7 +804,10 @@ describe('Authorization matrix (e2e)', () => {
         method: 'POST',
         url: '/api/v1/collections',
         headers: authHeader(personas.ownerUser.accessToken),
-        payload: { name: `authz-collection-${randomUUID()}` },
+        payload: {
+          name: `authz-collection-${randomUUID()}`,
+          icon: 'FolderOpen',
+        },
       });
       expect(createdCollection.statusCode).toBe(201);
       const collectionId = (createdCollection.json() as { id: number }).id;

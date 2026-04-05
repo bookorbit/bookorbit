@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -39,7 +39,11 @@ function parseCoverToken(token: string, secret: string): number | null {
   const userId = parseInt(token.slice(0, dot), 10);
   if (isNaN(userId) || userId <= 0) return null;
   const expected = createCoverToken(userId, secret);
-  if (token !== expected) return null;
+  const tokenBuffer = Buffer.from(token);
+  const expectedBuffer = Buffer.from(expected);
+  if (tokenBuffer.length !== expectedBuffer.length || !timingSafeEqual(tokenBuffer, expectedBuffer)) {
+    return null;
+  }
   return userId;
 }
 

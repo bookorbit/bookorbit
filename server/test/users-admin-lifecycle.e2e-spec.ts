@@ -264,7 +264,7 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       });
       expect(readAfterPermissionUpdate.statusCode).toBe(200);
       const afterPermissionUpdateBody = readAfterPermissionUpdate.json() as { permissions: Permission[] };
-      expect(afterPermissionUpdateBody.permissions).toEqual([PermissionEnum.LibraryDownload, PermissionEnum.KoboSync]);
+      expect(afterPermissionUpdateBody.permissions.toSorted()).toEqual([PermissionEnum.LibraryDownload, PermissionEnum.KoboSync].toSorted());
 
       const invalidPermissionUpdate = await ctx.app.inject({
         method: 'PUT',
@@ -309,6 +309,66 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
         headers: authHeader(manageUsersAdmin.accessToken),
       });
       expectError(readAfterDelete, 404, 'User not found');
+    });
+
+    it('rejects duplicate username on create', async () => {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/users',
+        headers: authHeader(manageUsersAdmin.accessToken),
+        payload: {
+          username: regularA.username,
+          name: 'Duplicate Username User',
+          email: `dup-username-${randomUUID().slice(0, 8)}@example.com`,
+        },
+      });
+      expectError(response, 409, 'Username already taken');
+    });
+
+    it('returns 401 for unauthenticated requests to admin routes', async () => {
+      const cases: Array<{
+        method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+        url: string;
+        payload?: Record<string, unknown>;
+      }> = [
+        { method: 'GET', url: '/api/v1/users' },
+        { method: 'POST', url: '/api/v1/users', payload: { username: 'noauth', name: 'No Auth', email: 'noauth@test.com' } },
+        { method: 'GET', url: `/api/v1/users/${regularA.userId}` },
+        { method: 'PATCH', url: `/api/v1/users/${regularA.userId}`, payload: { name: 'hacked' } },
+        { method: 'DELETE', url: `/api/v1/users/${regularA.userId}` },
+      ];
+
+      for (const entry of cases) {
+        const response = await ctx.app.inject({
+          method: entry.method,
+          url: entry.url,
+          ...(entry.payload ? { payload: entry.payload } : {}),
+        });
+        expect(response.statusCode).toBe(401);
+      }
+    });
+    it('returns 403 for authenticated users lacking manage_users permission', async () => {
+      const cases: Array<{
+        method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+        url: string;
+        payload?: Record<string, unknown>;
+      }> = [
+        { method: 'GET', url: '/api/v1/users' },
+        { method: 'POST', url: '/api/v1/users', payload: { username: 'noperm', name: 'No Perm', email: 'noperm@test.com' } },
+        { method: 'GET', url: `/api/v1/users/${regularA.userId}` },
+        { method: 'PATCH', url: `/api/v1/users/${regularA.userId}`, payload: { name: 'hacked' } },
+        { method: 'DELETE', url: `/api/v1/users/${regularA.userId}` },
+      ];
+
+      for (const entry of cases) {
+        const response = await ctx.app.inject({
+          method: entry.method,
+          url: entry.url,
+          headers: authHeader(regularB.accessToken),
+          ...(entry.payload ? { payload: entry.payload } : {}),
+        });
+        expectError(response, 403, 'Missing permission: manage_users');
+      }
     });
   });
 
@@ -420,6 +480,16 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       });
       expect(readAfterDemote.statusCode).toBe(200);
       expect((readAfterDemote.json() as { isSuperuser: boolean }).isSuperuser).toBe(false);
+    });
+
+    it('blocks self-superuser toggle by a superuser', async () => {
+      const selfToggle = await ctx.app.inject({
+        method: 'PUT',
+        url: `/api/v1/users/${superuserTarget.userId}/superuser`,
+        headers: authHeader(superuserTarget.accessToken),
+        payload: { isSuperuser: false },
+      });
+      expectError(selfToggle, 409, 'You cannot change your own superuser status');
     });
   });
 
@@ -569,7 +639,7 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
         url: `/api/v1/users/${created.id}/reset-password`,
         headers: authHeader(manageUsersAdmin.accessToken),
       });
-      expect([200, 201]).toContain(secondResetResponse.statusCode);
+      expect(secondResetResponse.statusCode).toBe(201);
       const secondToken = parseTokenFromResetUrl((secondResetResponse.json() as { resetUrl: string }).resetUrl);
 
       const reuseFirstToken = await ctx.app.inject({
@@ -653,6 +723,18 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
         headers: authHeader(newAccessToken),
       });
       expect(sessionsAfterChange.statusCode).toBe(200);
+    });
+
+    it('rejects login for inactive users', async () => {
+      const inactiveLogin = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: {
+          username: inactiveAssignable.username,
+          password: inactiveAssignable.password,
+        },
+      });
+      expect(inactiveLogin.statusCode).toBe(401);
     });
   });
 

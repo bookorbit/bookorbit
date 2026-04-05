@@ -225,7 +225,7 @@ export class FileEventProcessorService {
     if (!match || match.file.absolutePath === newAbsolutePath) return { type: 'noop' };
 
     const { file, libraryId: rowLibraryId, folderPath: oldFolderPath, libraryFolderPath } = match;
-    const newFolderPath = oldFolderPath === file.absolutePath ? newAbsolutePath : dirname(newAbsolutePath);
+    const newFolderPath = dirname(newAbsolutePath) === libraryFolderPath ? newAbsolutePath : dirname(newAbsolutePath);
     if (newFolderPath !== oldFolderPath) {
       const targetBooks = await this.scannerRepo.findBooksByFolderPath(newFolderPath, rowLibraryId);
       const hasFolderCollision = targetBooks.some((book) => book.id !== file.bookId && book.folderPath === newFolderPath);

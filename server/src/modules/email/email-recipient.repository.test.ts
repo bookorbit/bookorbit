@@ -142,7 +142,13 @@ describe('EmailRecipientRepository', () => {
     void repo.setDefault(11, 3);
 
     expect(db.update).toHaveBeenCalledWith(emailRecipients);
-    expect(updateBuilder.set).toHaveBeenCalledWith({ isDefault: true });
+    expect(updateBuilder.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isDefault: expect.objectContaining({ op: 'sql', parts: expect.any(Array), values: [emailRecipients.id, 11] }),
+        updatedAt: expect.objectContaining({ op: 'sql', parts: expect.any(Array), values: [] }),
+      }),
+    );
+    expect(updateBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailRecipients.userId, right: 3 });
     expect(updateBuilder.returning).toHaveBeenCalled();
   });
 

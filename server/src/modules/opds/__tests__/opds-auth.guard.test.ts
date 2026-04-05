@@ -142,6 +142,14 @@ describe('OpdsAuthGuard', () => {
     expect((request.opdsUser as OpdsRequestUser).userId).toBe(1);
   });
 
+  it('rejects a same-length tampered cover token', async () => {
+    const guard = makeGuard();
+    const token = createCoverToken(1, TEST_SECRET);
+    const tamperedToken = `${token.slice(0, -1)}${token.endsWith('0') ? '1' : '0'}`;
+    const { context } = mockContext(undefined, tamperedToken, '/api/v1/opds/42/cover');
+    await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+  });
+
   it('attaches opdsUser to request on success', async () => {
     const guard = makeGuard();
     const { context, request } = mockContext(basicHeader('reader', 'pass'));

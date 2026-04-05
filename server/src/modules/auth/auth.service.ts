@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -265,9 +266,6 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    // Rotate: revoke old, issue new
-    await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id));
-
     const userForToken = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
     if (!userForToken) throw new UnauthorizedException();
     if (!userForToken.active) {
@@ -276,6 +274,9 @@ export class AuthService {
       this.clearAccessCookie(reply);
       throw new UnauthorizedException('Account disabled');
     }
+
+    // Rotate: revoke old, issue new
+    await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id));
 
     const { accessToken, rawRefreshToken } = await this.issueTokenPair(row.userId, userForToken.tokenVersion);
     this.setRefreshCookie(reply, rawRefreshToken);
@@ -325,6 +326,7 @@ export class AuthService {
     await this.oidcSessionRepo.revokeByUserId(userId);
     if (!oidcSession.idTokenHint) return {};
 
+    const oidcLogoutStart = Date.now();
     try {
       const config = await this.appSettings.getOidcConfig();
       if (!config.enabled) return {};
@@ -340,7 +342,7 @@ export class AuthService {
 
       return { logoutUrl: `${disc.endSessionEndpoint}?${params.toString()}` };
     } catch (error) {
-      const durationMs = 0;
+      const durationMs = Date.now() - oidcLogoutStart;
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       const errorMessage = error instanceof Error ? error.message : 'unknown error';
       this.logger.warn(
@@ -368,7 +370,7 @@ export class AuthService {
     const row = await this.db.query.refreshTokens.findFirst({
       where: eq(schema.refreshTokens.id, sessionId),
     });
-    if (!row) throw new UnauthorizedException();
+    if (!row) throw new NotFoundException('Session not found');
     if (row.userId !== userId) throw new ForbiddenException('You do not have access to this session');
     await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, sessionId));
   }

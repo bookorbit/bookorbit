@@ -504,6 +504,19 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
         defaultTemplateId: foreignTemplate.id,
       });
       expectError(foreignTemplatePreferenceResponse, 403, 'No access to this template');
+
+      const recipientWithForeignTemplate = await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', {
+        name: 'Recipient With Foreign Template',
+        email: 'recipient-with-foreign-template@example.com',
+        defaultTemplateId: foreignTemplate.id,
+      });
+      expectError(recipientWithForeignTemplate, 403, 'No access to this template');
+
+      const groupWithForeignTemplate = await apiAs(senderOnly, 'POST', '/api/v1/email/recipient-groups', {
+        name: `foreign-template-group-${randomUUID().slice(0, 8)}`,
+        defaultTemplateId: foreignTemplate.id,
+      });
+      expectError(groupWithForeignTemplate, 403, 'No access to this template');
     });
   });
 
@@ -565,6 +578,14 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
       expect(fromHeader).toContain('ProjectX Bot <bot@example.com>');
       expect(subjectHeader).toBe('Override Email Lifecycle Book');
       expect(subjectHeader).not.toContain('Recipient');
+
+      const missingTemplateSendResponse = await apiAs(senderOnly, 'POST', '/api/v1/email/send', {
+        bookIds: [book.bookId],
+        recipientIds: [recipient.id],
+        providerId: provider.id,
+        templateId: 999_999_999,
+      });
+      expectError(missingTemplateSendResponse, 404, 'Template not found');
     });
 
     it('keeps group defaultTemplateId non-operational in send resolution', async () => {

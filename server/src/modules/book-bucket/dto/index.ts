@@ -1,6 +1,47 @@
-import { IsArray, IsBoolean, IsInt, IsNumber, IsObject, IsOptional, IsString, ValidateIf, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateIf,
+  ValidateNested,
+  type ValidationArguments,
+  registerDecorator,
+  type ValidationOptions,
+  type ValidatorConstraintInterface,
+  ValidatorConstraint,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import type { BookBucketMetadata } from '@projectx/types';
+
+@ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
+class HasCompleteDefaultDestinationConstraint implements ValidatorConstraintInterface {
+  validate(_: unknown, args?: ValidationArguments): boolean {
+    const dto = args?.object as FinalizeBookBucketDto | undefined;
+    if (!dto) return false;
+    return (dto.defaultLibraryId === undefined) === (dto.defaultFolderId === undefined);
+  }
+
+  defaultMessage(): string {
+    return 'defaultLibraryId and defaultFolderId must either both be provided or both be omitted';
+  }
+}
+
+function HasCompleteDefaultDestination(options?: ValidationOptions) {
+  return function (constructor: new (...args: unknown[]) => unknown) {
+    registerDecorator({
+      name: 'hasCompleteDefaultDestination',
+      target: constructor,
+      propertyName: '',
+      options,
+      constraints: [],
+      validator: HasCompleteDefaultDestinationConstraint,
+    });
+  };
+}
 
 export class UpdateBookBucketFileDto {
   @IsOptional()
@@ -31,6 +72,7 @@ class FinalizeOverrideDto {
   folderId?: number;
 }
 
+@HasCompleteDefaultDestination()
 export class FinalizeBookBucketDto {
   @IsOptional()
   @IsArray()

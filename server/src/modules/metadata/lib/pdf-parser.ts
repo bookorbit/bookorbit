@@ -34,6 +34,10 @@ export interface PdfParsed {
   coverBuffer: Buffer | null;
 }
 
+interface PdfParseOptions {
+  extractCover?: boolean;
+}
+
 function clean(value: string | undefined): string | null {
   if (!value) return null;
   const s = value.trim();
@@ -64,7 +68,7 @@ async function extractPdfCover(absolutePath: string): Promise<Buffer | null> {
   }
 }
 
-export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | null> {
+export async function parsePdfFile(absolutePath: string, options: PdfParseOptions = {}): Promise<PdfParsed | null> {
   try {
     const buf = await readFile(absolutePath);
     const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
@@ -88,7 +92,7 @@ export async function parsePdfFile(absolutePath: string): Promise<PdfParsed | nu
           .map((name) => ({ name, sortName: null }))
       : [];
 
-    const coverBuffer = await extractPdfCover(absolutePath);
+    const coverBuffer = options.extractCover === false ? null : await extractPdfCover(absolutePath);
 
     return {
       title: hasXmp ? xmp.title : infoTitle,

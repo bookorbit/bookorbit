@@ -10,6 +10,7 @@ import { AppModule } from '../src/app.module';
 import { DB } from '../src/db';
 import * as schema from '../src/db/schema';
 import { MetadataService } from '../src/modules/metadata/metadata.service';
+import { makeMetadataNoopMock } from './e2e/app-harness';
 import type { Db } from './e2e/app-harness';
 
 type CookieJar = Map<string, string>;
@@ -99,19 +100,6 @@ function cookieHeader(jar: CookieJar): string {
   return Array.from(jar.entries())
     .map(([name, value]) => `${name}=${value}`)
     .join('; ');
-}
-
-function makeMetadataNoopMock(): Pick<
-  MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
-> {
-  return {
-    extractAndSave: () => Promise.resolve(undefined),
-    refreshCoverForBook: () => Promise.resolve(false),
-    extractAudioFileDuration: () => Promise.resolve(undefined),
-    aggregateAudioDuration: () => Promise.resolve(undefined),
-    extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
-  };
 }
 
 async function createAuthE2EContext(): Promise<AuthE2EContext> {
@@ -241,7 +229,11 @@ describe('Auth session security (e2e)', () => {
       expect(refreshCookieLine).toBeDefined();
       expect(accessCookieLine).toBeDefined();
       expect(cookieAttribute(refreshCookieLine!, 'path')).toBe('/api/v1/auth');
+      expect(cookieAttribute(refreshCookieLine!, 'httponly')).toBe('');
+      expect(cookieAttribute(refreshCookieLine!, 'samesite')).toBe('Strict');
       expect(cookieAttribute(accessCookieLine!, 'path')).toBe('/api');
+      expect(cookieAttribute(accessCookieLine!, 'httponly')).toBe('');
+      expect(cookieAttribute(accessCookieLine!, 'samesite')).toBe('Lax');
 
       const statusAfter = await context.app.inject({
         method: 'GET',
@@ -368,6 +360,9 @@ describe('Auth session security (e2e)', () => {
       const responseCookies = getSetCookieLines(response.headers);
       expect(cookieValue(responseCookies, 'refresh_token')).toBe('');
       expect(cookieValue(responseCookies, 'access_token')).toBe('');
+
+      const tokenRow = await findRefreshTokenByRawToken(context.db, loginResult.refreshToken);
+      expect(tokenRow?.revokedAt).toBeNull();
 
       const meResponse = await context.app.inject({
         method: 'GET',
@@ -704,7 +699,7 @@ describe('Auth session security (e2e)', () => {
           authorization: `Bearer ${sessionB.accessToken}`,
         },
       });
-      expect(missingSessionResponse.statusCode).toBe(401);
+      expect(missingSessionResponse.statusCode).toBe(404);
 
       const activeSessionRefresh = await context.app.inject({
         method: 'POST',

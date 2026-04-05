@@ -51,16 +51,19 @@ function naturalCompare(a: string, b: string): number {
   return 0;
 }
 
-function matchesExcludePattern(name: string, patterns: string[]): boolean {
-  for (const pattern of patterns) {
-    if (!pattern.includes('*')) {
-      if (name === pattern) return true;
-    } else {
-      const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-      if (new RegExp(`^${escaped}$`).test(name)) return true;
+function buildExcludeMatcher(patterns: string[]): (name: string) => boolean {
+  if (patterns.length === 0) return () => false;
+  const compiled = patterns.map((p) => {
+    if (!p.includes('*')) return { literal: p, regex: null as RegExp | null };
+    const escaped = p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+    return { literal: null as string | null, regex: new RegExp(`^${escaped}$`) };
+  });
+  return (name: string) => {
+    for (const { literal, regex } of compiled) {
+      if (literal !== null ? name === literal : regex!.test(name)) return true;
     }
-  }
-  return false;
+    return false;
+  };
 }
 
 // Recursively collect files, grouped by their parent directory.
@@ -68,7 +71,7 @@ async function collectByDir(
   dir: string,
   libraryRoot: string,
   acc: Map<string, FileStat[]>,
-  excludePatterns: string[],
+  shouldExclude: (name: string) => boolean,
   logger?: (msg: string) => void,
 ): Promise<void> {
   let entries;
@@ -90,7 +93,7 @@ async function collectByDir(
     const full = join(dir, entry.name);
 
     if (entry.name.startsWith('.')) continue;
-    if (excludePatterns.length > 0 && matchesExcludePattern(entry.name, excludePatterns)) continue;
+    if (shouldExclude(entry.name)) continue;
 
     if (entry.isDirectory()) {
       subdirs.push(full);
@@ -104,8 +107,18 @@ async function collectByDir(
   }
 
   if (filePaths.length > 0) {
-    const stats = await Promise.all(filePaths.map(async (full) => ({ full, s: await stat(full) })));
-    for (const { full, s } of stats) {
+    const statResults = await Promise.all(
+      filePaths.map(async (full) => {
+        const s = await stat(full).catch((err: NodeJS.ErrnoException) => {
+          if (err.code === 'ENOENT') return null;
+          throw err;
+        });
+        return s ? { full, s } : null;
+      }),
+    );
+    for (const entry of statResults) {
+      if (!entry) continue;
+      const { full, s } = entry;
       if (!acc.has(dir)) acc.set(dir, []);
       acc.get(dir)!.push({
         absolutePath: full,
@@ -117,7 +130,7 @@ async function collectByDir(
     }
   }
 
-  await Promise.all(subdirs.map((full) => collectByDir(full, libraryRoot, acc, excludePatterns, logger)));
+  await Promise.all(subdirs.map((full) => collectByDir(full, libraryRoot, acc, shouldExclude, logger)));
 }
 
 /**
@@ -143,7 +156,8 @@ export async function findBookCandidates(
   logger?: (msg: string) => void,
 ): Promise<BookCandidate[]> {
   const byDir = new Map<string, FileStat[]>();
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, excludePatterns, logger);
+  const shouldExclude = buildExcludeMatcher(excludePatterns);
+  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, logger);
 
   // Flatten disc subdirectories (e.g. "CD 1", "Disc 2") into their parent.
   // Collect disc dirs first to avoid mutating the map while iterating.
@@ -234,7 +248,8 @@ export async function findLooseFileCandidates(
   logger?: (msg: string) => void,
 ): Promise<BookCandidate[]> {
   const byDir = new Map<string, FileStat[]>();
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, excludePatterns, logger);
+  const shouldExclude = buildExcludeMatcher(excludePatterns);
+  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, logger);
 
   const candidates: BookCandidate[] = [];
 
@@ -272,13 +287,14 @@ export async function buildSingleBookCandidate(
     return null;
   }
 
+  const shouldExclude = buildExcludeMatcher(excludePatterns);
   const filePaths: string[] = [];
   const discDirs: string[] = [];
   const nonDiscDirs: { name: string; path: string }[] = [];
 
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue;
-    if (excludePatterns.length > 0 && matchesExcludePattern(entry.name, excludePatterns)) continue;
+    if (shouldExclude(entry.name)) continue;
     const full = join(folderPath, entry.name);
     if (entry.isDirectory()) {
       if (isDiscDirectory(entry.name)) {
@@ -295,6 +311,7 @@ export async function buildSingleBookCandidate(
     const discEntries = await readdir(discDir, { withFileTypes: true }).catch(() => []);
     for (const entry of discEntries) {
       if (!entry.isFile() || entry.name.startsWith('.')) continue;
+      if (shouldExclude(entry.name)) continue;
       const full = join(discDir, entry.name);
       if (full.length <= MAX_PATH_LENGTH) filePaths.push(full);
     }
@@ -310,6 +327,7 @@ export async function buildSingleBookCandidate(
     const stemEntries = await readdir(stemDir, { withFileTypes: true }).catch(() => []);
     for (const entry of stemEntries) {
       if (!entry.isFile() || entry.name.startsWith('.')) continue;
+      if (shouldExclude(entry.name)) continue;
       const full = join(stemDir, entry.name);
       if (full.length <= MAX_PATH_LENGTH) filePaths.push(full);
     }

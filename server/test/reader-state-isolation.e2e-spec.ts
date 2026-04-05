@@ -231,6 +231,17 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
 
   describe('reader preferences ownership', () => {
     it('isolates per-book and default reader preferences per user', async () => {
+      const preCustomizationResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/reader/preferences/${sharedEpub.bookFileId}`,
+        headers: authHeader(userA.accessToken),
+      });
+      expect(preCustomizationResponse.statusCode).toBe(200);
+      expect(preCustomizationResponse.json()).toEqual({
+        settings: null,
+        isCustomized: false,
+      });
+
       const userASettings = {
         themeName: 'dark',
         fontSize: 20,
@@ -539,6 +550,13 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
       });
       expect(bookmarkResponse.statusCode).toBe(403);
 
+      const annotationResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/books/${sharedEpub.bookId}/annotations`,
+        headers: authHeader(outsider.accessToken),
+      });
+      expect(annotationResponse.statusCode).toBe(403);
+
       const preferenceResponse = await ctx.app.inject({
         method: 'GET',
         url: `/api/v1/reader/preferences/${sharedEpub.bookFileId}`,
@@ -664,13 +682,15 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
 });
 
 async function resetReaderState(ctx: ReaderStateIsolationE2EContext): Promise<void> {
-  await ctx.db.delete(schema.readingSessions);
-  await ctx.db.delete(schema.userReadingDailyStats);
-  await ctx.db.delete(schema.readingProgress);
-  await ctx.db.delete(schema.audiobookProgress);
-  await ctx.db.delete(schema.bookmarks);
-  await ctx.db.delete(schema.annotations);
-  await ctx.db.delete(schema.readerPreferences);
-  await ctx.db.delete(schema.readerDefaultPreferences);
-  await ctx.db.delete(schema.userBookStatus);
+  await Promise.all([
+    ctx.db.delete(schema.readingSessions),
+    ctx.db.delete(schema.userReadingDailyStats),
+    ctx.db.delete(schema.readingProgress),
+    ctx.db.delete(schema.audiobookProgress),
+    ctx.db.delete(schema.bookmarks),
+    ctx.db.delete(schema.annotations),
+    ctx.db.delete(schema.readerPreferences),
+    ctx.db.delete(schema.readerDefaultPreferences),
+    ctx.db.delete(schema.userBookStatus),
+  ]);
 }

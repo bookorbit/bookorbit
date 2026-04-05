@@ -12,7 +12,7 @@ import * as schema from '../src/db/schema';
 import { MetadataService } from '../src/modules/metadata/metadata.service';
 import { OidcDiscoveryService } from '../src/modules/auth/oidc/oidc-discovery.service';
 import { SystemMailService } from '../src/modules/email/system-mail.service';
-import type { Db } from './e2e/app-harness';
+import { makeMetadataNoopMock, type Db } from './e2e/app-harness';
 
 type CookieJar = Map<string, string>;
 
@@ -92,19 +92,6 @@ function cookieHeader(jar: CookieJar): string {
   return Array.from(jar.entries())
     .map(([name, value]) => `${name}=${value}`)
     .join('; ');
-}
-
-function makeMetadataNoopMock(): Pick<
-  MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
-> {
-  return {
-    extractAndSave: () => Promise.resolve(undefined),
-    refreshCoverForBook: () => Promise.resolve(false),
-    extractAudioFileDuration: () => Promise.resolve(undefined),
-    aggregateAudioDuration: () => Promise.resolve(undefined),
-    extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
-  };
 }
 
 function defaultDiscoveryDoc() {
@@ -586,6 +573,30 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
   });
 
   describe('OIDC logout', () => {
+    it('clears cookies and revokes session for local user without OIDC session', async () => {
+      const user = await createUser(context.db);
+      const session = await login(context.app, user.username, user.password);
+
+      const logoutResponse = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/logout',
+        headers: { cookie: cookieHeader(session.jar) },
+      });
+      expect(logoutResponse.statusCode).toBe(200);
+      expect(logoutResponse.json()).toEqual({});
+
+      const logoutCookies = getSetCookieLines(logoutResponse.headers);
+      expect(cookieValue(logoutCookies, 'refresh_token')).toBe('');
+      expect(cookieValue(logoutCookies, 'access_token')).toBe('');
+
+      const refreshAfterLogout = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/refresh',
+        headers: { cookie: `refresh_token=${session.refreshToken}` },
+      });
+      expect(refreshAfterLogout.statusCode).toBe(401);
+    });
+
     it('returns provider logout URL and revokes local OIDC session', async () => {
       const user = await createUser(context.db);
       const session = await login(context.app, user.username, user.password);

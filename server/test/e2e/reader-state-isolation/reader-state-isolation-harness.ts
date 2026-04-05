@@ -214,7 +214,7 @@ export async function createUserAndLogin(
   const username = options.username ?? `reader-state-user-${suffix}`;
   const password = options.password ?? 'ReaderStateUser123';
   const email = options.email ?? `${username}@example.com`;
-  const passwordHash = await hash(password, 12);
+  const passwordHash = await hash(password, 4);
 
   const [created] = await ctx.db
     .insert(schema.users)
@@ -281,7 +281,7 @@ async function getAdminToken(app: NestFastifyApplication, db: Db): Promise<strin
 
     const suffix = randomUUID().replaceAll('-', '');
     const fallbackUsername = `reader-state-e2e-admin-${suffix}`;
-    const passwordHash = await hash(ADMIN_SETUP_DTO.password, 12);
+    const passwordHash = await hash(ADMIN_SETUP_DTO.password, 4);
 
     await db.insert(schema.users).values({
       username: fallbackUsername,

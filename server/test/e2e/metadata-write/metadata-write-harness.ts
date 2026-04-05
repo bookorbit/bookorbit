@@ -71,7 +71,7 @@ export async function createMetadataWriteE2EContext(): Promise<MetadataWriteE2EC
   };
 
   process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.FILE_WRITE_DEBOUNCE_MS = '100';
+  process.env.FILE_WRITE_DEBOUNCE_MS = '25';
   process.env.FILE_WRITE_MAX_CONCURRENT_WRITES = '1';
 
   const moduleFixture = await Test.createTestingModule({

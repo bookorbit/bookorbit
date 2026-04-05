@@ -15,7 +15,7 @@ import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
 import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
-import { seedLibrary } from '../app-harness';
+import { makeMetadataNoopMock, seedLibrary } from '../app-harness';
 import { createUsersAdminLifecycleFixtureRoot, type UsersAdminLifecycleFixtureRoot } from './users-admin-lifecycle-fixture-builder';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -27,6 +27,7 @@ const ADMIN_SETUP_DTO = {
   password: 'UsersAdminLifecycleE2E123',
 };
 const MAX_MULTIPART_BYTES = 20 * 1024 * 1024;
+const BCRYPT_TEST_ROUNDS = 4;
 
 interface EnvSnapshot {
   booksPath: string | undefined;
@@ -157,7 +158,7 @@ export async function createUserAndLogin(
   const username = options.username ?? `users-admin-lifecycle-${suffix}`;
   const password = options.password ?? 'UsersAdminLifecycleUser123';
   const email = options.email ?? `${username}@example.com`;
-  const passwordHash = await hash(password, 12);
+  const passwordHash = await hash(password, BCRYPT_TEST_ROUNDS);
 
   const [created] = await ctx.db
     .insert(schema.users)
@@ -201,7 +202,7 @@ export async function createOidcUser(
   const suffix = randomUUID().replaceAll('-', '');
   const username = options.username ?? `users-admin-lifecycle-oidc-${suffix}`;
   const email = options.email ?? `${username}@example.com`;
-  const passwordHash = await hash(`OIDC_${suffix}`, 12);
+  const passwordHash = await hash(`OIDC_${suffix}`, BCRYPT_TEST_ROUNDS);
 
   const [created] = await ctx.db
     .insert(schema.users)
@@ -263,7 +264,7 @@ async function getAdminToken(app: NestFastifyApplication, db: Db): Promise<strin
 
     const suffix = randomUUID().replaceAll('-', '');
     const fallbackUsername = `users-admin-lifecycle-admin-${suffix}`;
-    const passwordHash = await hash(ADMIN_SETUP_DTO.password, 12);
+    const passwordHash = await hash(ADMIN_SETUP_DTO.password, BCRYPT_TEST_ROUNDS);
 
     await db.insert(schema.users).values({
       username: fallbackUsername,
@@ -301,19 +302,6 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
   if (response.statusCode !== 200) return null;
   const body = response.json() as { accessToken?: string };
   return body.accessToken ?? null;
-}
-
-function makeMetadataNoopMock(): Pick<
-  MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
-> {
-  return {
-    extractAndSave: () => Promise.resolve(undefined),
-    refreshCoverForBook: () => Promise.resolve(false),
-    extractAudioFileDuration: () => Promise.resolve(undefined),
-    aggregateAudioDuration: () => Promise.resolve(undefined),
-    extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
-  };
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {

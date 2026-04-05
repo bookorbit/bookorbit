@@ -3,12 +3,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailRecipientGroupService } from './email-recipient-group.service';
 import { EmailRecipientGroupRepository } from './email-recipient-group.repository';
 import { EmailRecipientRepository } from './email-recipient.repository';
+import { EmailTemplateService } from './email-template.service';
 import type { RequestUser } from '../../common/types/request-user';
 
 describe('EmailRecipientGroupService', () => {
   let service: EmailRecipientGroupService;
   let repo: EmailRecipientGroupRepository;
   let recipientRepo: EmailRecipientRepository;
+  let templateService: EmailTemplateService;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -52,12 +54,19 @@ describe('EmailRecipientGroupService', () => {
             findById: vi.fn().mockResolvedValue([{ id: 100, userId: 1 }]),
           },
         },
+        {
+          provide: EmailTemplateService,
+          useValue: {
+            findOne: vi.fn().mockResolvedValue({ id: 8 }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<EmailRecipientGroupService>(EmailRecipientGroupService);
     repo = module.get<EmailRecipientGroupRepository>(EmailRecipientGroupRepository);
     recipientRepo = module.get<EmailRecipientRepository>(EmailRecipientRepository);
+    templateService = module.get<EmailTemplateService>(EmailTemplateService);
   });
 
   describe('findAll', () => {
@@ -86,6 +95,11 @@ describe('EmailRecipientGroupService', () => {
       expect(result.id).toBe(10);
     });
 
+    it('should validate template access when creating a group with a default template', async () => {
+      await service.create({ name: 'New Group', defaultTemplateId: 8 }, mockUser);
+      expect(templateService.findOne).toHaveBeenCalledWith(8, mockUser);
+    });
+
     it('should map duplicate group names to ConflictException', async () => {
       (repo.insert as vi.Mock).mockRejectedValue({ code: '23505' });
       await expect(service.create({ name: 'New Group' }, mockUser)).rejects.toThrow(ConflictException);
@@ -98,6 +112,11 @@ describe('EmailRecipientGroupService', () => {
       const result = await service.update(10, dto, mockUser);
       expect(repo.update).toHaveBeenCalledWith(10, 1, dto);
       expect(result.id).toBe(10);
+    });
+
+    it('should validate template access when updating a group default template', async () => {
+      await service.update(10, { defaultTemplateId: 8 }, mockUser);
+      expect(templateService.findOne).toHaveBeenCalledWith(8, mockUser);
     });
 
     it('should map duplicate group names to ConflictException', async () => {

@@ -3,6 +3,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientGroupRepository } from './email-recipient-group.repository';
 import { EmailRecipientRepository } from './email-recipient.repository';
+import { EmailTemplateService } from './email-template.service';
 import { CreateEmailRecipientGroupDto } from './dto/create-email-recipient-group.dto';
 import { UpdateEmailRecipientGroupDto } from './dto/update-email-recipient-group.dto';
 import type { EmailRecipientGroup } from '../../db/schema';
@@ -13,6 +14,7 @@ export class EmailRecipientGroupService {
   constructor(
     private readonly repo: EmailRecipientGroupRepository,
     private readonly recipientRepo: EmailRecipientRepository,
+    private readonly templateService: EmailTemplateService,
   ) {}
 
   async findAll(user: RequestUser) {
@@ -43,6 +45,7 @@ export class EmailRecipientGroupService {
   }
 
   async create(dto: CreateEmailRecipientGroupDto, user: RequestUser) {
+    await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [created] = await this.repo.insert({
         userId: user.id,
@@ -60,6 +63,7 @@ export class EmailRecipientGroupService {
 
   async update(id: number, dto: UpdateEmailRecipientGroupDto, user: RequestUser) {
     await this.getOwned(id, user);
+    await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [updated] = await this.repo.update(id, user.id, dto);
       if (!updated) throw new NotFoundException('Group not found');
@@ -102,5 +106,10 @@ export class EmailRecipientGroupService {
     if (!group) throw new NotFoundException('Group not found');
     if (group.userId !== user.id) throw new ForbiddenException('Cannot modify this group');
     return group;
+  }
+
+  private async validateDefaultTemplate(templateId: number | null | undefined, user: RequestUser): Promise<void> {
+    if (templateId === null || templateId === undefined) return;
+    await this.templateService.findOne(templateId, user);
   }
 }

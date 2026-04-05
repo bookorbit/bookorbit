@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -31,7 +31,9 @@ export class KoboBookAccessService {
       columns: { id: true, libraryId: true },
     });
 
-    if (!book) return;
+    if (!book) {
+      throw new NotFoundException('Book not found');
+    }
 
     const accessibleLibraryIds = await this.getAccessibleLibraryIds(userId);
     if (accessibleLibraryIds !== null && !accessibleLibraryIds.includes(book.libraryId)) {

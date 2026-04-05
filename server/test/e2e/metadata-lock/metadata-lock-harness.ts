@@ -298,33 +298,35 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
     ctx.db.select().from(comicMetadata).where(eq(comicMetadata.bookId, bookId)).limit(1),
   ]);
 
+  const meta = metadataRows[0];
   const comic = comicRows[0] ?? null;
 
   return {
-    metadata: metadataRows[0]
+    metadata: meta
       ? {
-          ...metadataRows[0],
-          title: metadataRows[0].title ?? null,
-          subtitle: metadataRows[0].subtitle ?? null,
-          description: metadataRows[0].description ?? null,
-          publisher: metadataRows[0].publisher ?? null,
-          publishedYear: metadataRows[0].publishedYear ?? null,
-          language: metadataRows[0].language ?? null,
-          pageCount: metadataRows[0].pageCount ?? null,
-          coverSource: metadataRows[0].coverSource ?? null,
-          goodreadsId: metadataRows[0].goodreadsId ?? null,
-          openLibraryId: metadataRows[0].openLibraryId ?? null,
-          durationSeconds: metadataRows[0].durationSeconds ?? null,
-          lockedFields: [...(metadataRows[0].lockedFields ?? [])],
-          lastMetadataFetchAt: metadataRows[0].lastMetadataFetchAt ?? null,
+          title: meta.title,
+          subtitle: meta.subtitle,
+          description: meta.description,
+          publisher: meta.publisher,
+          publishedYear: meta.publishedYear,
+          language: meta.language,
+          pageCount: meta.pageCount,
+          coverSource: meta.coverSource,
+          goodreadsId: meta.goodreadsId,
+          openLibraryId: meta.openLibraryId,
+          durationSeconds: meta.durationSeconds,
+          abridged: meta.abridged,
+          chapters: meta.chapters,
+          lockedFields: [...meta.lockedFields],
+          lastMetadataFetchAt: meta.lastMetadataFetchAt,
         }
       : null,
     genres: genreRows.map((row) => row.name).sort(),
     narrators: narratorRows.map((row) => row.name),
     comicMetadata: comic
       ? {
-          issueNumber: comic.issueNumber ?? null,
-          volumeName: comic.volumeName ?? null,
+          issueNumber: comic.issueNumber,
+          volumeName: comic.volumeName,
           storyArcs: [...(comic.storyArcs ?? [])].sort(),
         }
       : null,

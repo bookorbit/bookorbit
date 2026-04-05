@@ -308,6 +308,7 @@ describe('Book Bucket ingest + finalize (e2e)', () => {
       .select({
         id: schema.books.id,
         libraryId: schema.books.libraryId,
+        folderPath: schema.books.folderPath,
       })
       .from(schema.books)
       .where(eq(schema.books.id, finalizedBookId))
@@ -324,6 +325,7 @@ describe('Book Bucket ingest + finalize (e2e)', () => {
       .limit(1);
     expect(bookFile).toBeDefined();
     expect(bookFile!.absolutePath.startsWith(destination.folderPath)).toBe(true);
+    expect(book?.folderPath).toBe(dirname(bookFile!.absolutePath));
     expect(await fileExists(bookFile!.absolutePath)).toBe(true);
     expect(await fileExists(bookBucketRow.absolutePath)).toBe(false);
 
@@ -421,6 +423,93 @@ describe('Book Bucket ingest + finalize (e2e)', () => {
     expect(await getBookBucketRow(context, duplicateRow.id)).toBeDefined();
     expect(await getBookBucketRow(context, conflictRow.id)).toBeDefined();
     expect(await getBookBucketRow(context, successRow.id)).toBeUndefined();
+  });
+
+  it('finalize stores a folder path even when the naming pattern is flat', async () => {
+    const destination = await createLibraryWithFolder(context);
+    await context.db.update(schema.libraries).set({ fileNamingPattern: '{title}' }).where(eq(schema.libraries.id, destination.libraryId));
+
+    const bookBucketRow = await createBookBucketRow(context, {
+      fileName: 'flat-pattern.fb2',
+      selectedMetadata: {
+        title: 'Flat Pattern Title',
+        authors: ['Flat Pattern Author'],
+      },
+      targetLibraryId: destination.libraryId,
+      targetFolderId: destination.libraryFolderId,
+    });
+
+    const response = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-bucket/finalize',
+      headers: authHeader(context.adminToken),
+      payload: {
+        fileIds: [bookBucketRow.id],
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as BookBucketFinalizeResult;
+    expect(body).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+
+    const finalizedBookId = body.results[0]!.bookId!;
+    const [book] = await context.db
+      .select({
+        folderPath: schema.books.folderPath,
+      })
+      .from(schema.books)
+      .where(eq(schema.books.id, finalizedBookId))
+      .limit(1);
+    const [bookFile] = await context.db
+      .select({
+        absolutePath: schema.bookFiles.absolutePath,
+      })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.bookId, finalizedBookId))
+      .limit(1);
+
+    expect(book?.folderPath).toBe(destination.folderPath);
+    expect(book?.folderPath).toBe(dirname(bookFile!.absolutePath));
+  });
+
+  it('finalize treats title duplicates as exact matches instead of wildcard patterns', async () => {
+    const destination = await createLibraryWithFolder(context);
+
+    const seedRow = await createBookBucketRow(context, {
+      fileName: 'seed-wildcard-duplicate.fb2',
+      selectedMetadata: { title: 'The Real Title', authors: ['Seed Author'] },
+      targetLibraryId: destination.libraryId,
+      targetFolderId: destination.libraryFolderId,
+    });
+
+    const seedResponse = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-bucket/finalize',
+      headers: authHeader(context.adminToken),
+      payload: { fileIds: [seedRow.id] },
+    });
+    expect(seedResponse.statusCode).toBe(201);
+    expect((seedResponse.json() as BookBucketFinalizeResult).results[0]?.success).toBe(true);
+
+    const wildcardTitleRow = await createBookBucketRow(context, {
+      fileName: 'wildcard-title.fb2',
+      selectedMetadata: { title: 'The %', authors: ['Wildcard Author'] },
+      targetLibraryId: destination.libraryId,
+      targetFolderId: destination.libraryFolderId,
+    });
+
+    const response = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-bucket/finalize',
+      headers: authHeader(context.adminToken),
+      payload: { fileIds: [wildcardTitleRow.id] },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as BookBucketFinalizeResult;
+    expect(body).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+    expect(body.results[0]).toMatchObject({ fileId: wildcardTitleRow.id, success: true });
+    expect(body.results[0]?.isDuplicate).toBeUndefined();
   });
 
   it('finalize selectAll honors status/search filters and excluded ids', async () => {
@@ -584,6 +673,21 @@ describe('Book Bucket ingest + finalize (e2e)', () => {
     expect(targetValidationResponse.statusCode).toBe(400);
     expect(targetValidationResponse.json()).toMatchObject({
       message: 'targetLibraryId and targetFolderId must both be set or both be null',
+    });
+
+    const finalizeValidationResponse = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-bucket/finalize',
+      headers: authHeader(context.adminToken),
+      payload: {
+        fileIds: [123],
+        defaultLibraryId: 1,
+      },
+    });
+
+    expect(finalizeValidationResponse.statusCode).toBe(400);
+    expect(finalizeValidationResponse.json()).toMatchObject({
+      message: expect.arrayContaining(['defaultLibraryId and defaultFolderId must either both be provided or both be omitted']),
     });
 
     const retriableErrorRow = await createBookBucketRow(context, {

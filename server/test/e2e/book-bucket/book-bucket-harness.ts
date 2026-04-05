@@ -173,7 +173,7 @@ export async function createUserAndLogin(
   const username = options.username ?? `book-bucket-user-${suffix}`;
   const password = options.password ?? 'BookBucketUser123';
   const email = options.email ?? `${username}@example.com`;
-  const passwordHash = await hash(password, 12);
+  const passwordHash = await hash(password, 4);
 
   const [created] = await ctx.db
     .insert(schema.users)
@@ -342,7 +342,7 @@ async function getAdminToken(app: NestFastifyApplication, db: Db): Promise<strin
     const suffix = randomUUID().replaceAll('-', '');
     const fallbackUsername = `book-bucket-e2e-admin-${suffix}`;
     const fallbackPassword = ADMIN_SETUP_DTO.password;
-    const passwordHash = await hash(fallbackPassword, 12);
+    const passwordHash = await hash(fallbackPassword, 4);
 
     await db.insert(schema.users).values({
       username: fallbackUsername,

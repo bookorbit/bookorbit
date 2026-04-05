@@ -40,7 +40,8 @@ export class FileWriteRepository {
       })
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .where(and(eq(books.libraryId, libraryId), ne(books.status, 'missing')));
+      .where(and(eq(books.libraryId, libraryId), ne(books.status, 'missing')))
+      .orderBy(asc(books.id));
   }
 
   async loadPayload(bookId: number) {

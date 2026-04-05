@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateRepository } from './email-template.repository';
@@ -144,7 +144,6 @@ describe('EmailTemplateService', () => {
   describe('setDefault', () => {
     it('should set owned template as default', async () => {
       const result = await service.setDefault(10, mockUser);
-      expect(repo.clearDefault).toHaveBeenCalledWith(1);
       expect(repo.setDefault).toHaveBeenCalledWith(10, 1);
       expect(result.id).toBe(10);
     });
@@ -184,6 +183,11 @@ describe('EmailTemplateService', () => {
     it('should throw ForbiddenException if specific template is not owned', async () => {
       (repo.findById as vi.Mock).mockResolvedValue([{ ...mockTemplate, userId: 2 }]);
       await expect(service.resolveTemplate(10, mockUser)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException if a specific template is requested but missing', async () => {
+      (repo.findById as vi.Mock).mockResolvedValue([]);
+      await expect(service.resolveTemplate(999, mockUser)).rejects.toThrow(NotFoundException);
     });
 
     it('should return user default if no template requested', async () => {

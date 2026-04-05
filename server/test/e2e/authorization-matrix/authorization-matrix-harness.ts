@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { hash } from 'bcryptjs';
 import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
+import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { mkdir, stat } from 'fs/promises';
@@ -10,6 +11,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Permission, BookBucketMetadata } from '@projectx/types';
 
 import { AppModule } from '../../../src/app.module';
+import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
@@ -23,6 +25,7 @@ import {
 } from './authorization-matrix-fixture-builder';
 
 type Db = NodePgDatabase<typeof schema>;
+const TEST_PASSWORD_HASH_ROUNDS = 4;
 
 const ADMIN_SETUP_DTO = {
   username: 'authorization-matrix-e2e-admin',
@@ -114,6 +117,14 @@ export async function createAuthorizationMatrixE2EContext(): Promise<Authorizati
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
   await app.register(fastifyMultipart as never);
   await app.init();
@@ -207,7 +218,7 @@ export async function createUserAndLogin(
   const username = options.username ?? `authorization-matrix-user-${suffix}`;
   const password = options.password ?? 'AuthorizationMatrixUser123';
   const email = options.email ?? `${username}@example.com`;
-  const passwordHash = await hash(password, 12);
+  const passwordHash = await hash(password, TEST_PASSWORD_HASH_ROUNDS);
 
   const [created] = await ctx.db
     .insert(schema.users)
@@ -370,7 +381,7 @@ export async function createOpdsUser(
 ): Promise<{ row: typeof schema.opdsUsers.$inferSelect; password: string }> {
   const username = input.username ?? `opds-${randomUUID().replaceAll('-', '').slice(0, 12)}`;
   const password = input.password ?? 'OpdsPassword123';
-  const passwordHash = await hash(password, 12);
+  const passwordHash = await hash(password, TEST_PASSWORD_HASH_ROUNDS);
 
   const [row] = await ctx.db
     .insert(schema.opdsUsers)
@@ -474,7 +485,7 @@ async function getAdminToken(app: NestFastifyApplication, db: Db): Promise<strin
     const suffix = randomUUID().replaceAll('-', '');
     const fallbackUsername = `authorization-matrix-admin-${suffix}`;
     const fallbackPassword = ADMIN_SETUP_DTO.password;
-    const passwordHash = await hash(fallbackPassword, 12);
+    const passwordHash = await hash(fallbackPassword, TEST_PASSWORD_HASH_ROUNDS);
 
     await db.insert(schema.users).values({
       username: fallbackUsername,

@@ -122,17 +122,20 @@ describe('EmailProviderRepository', () => {
     });
   });
 
-  it('setDefault marks only owner record and returns updated provider', () => {
+  it('setDefault atomically flips defaults within the owner scope and returns updated rows', () => {
     const { db, updateBuilder } = makeDb();
     const repo = new EmailProviderRepository(db as never);
 
     void repo.setDefault(9, 4);
 
     expect(db.update).toHaveBeenCalledWith(emailProviders);
-    expect(updateBuilder.set).toHaveBeenCalledWith({
-      isDefault: true,
-      updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
-    });
+    expect(updateBuilder.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isDefault: expect.objectContaining({ op: 'sql', text: 'case when  =  then true else false end' }),
+        updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
+      }),
+    );
+    expect(updateBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailProviders.userId, right: 4 });
     expect(updateBuilder.returning).toHaveBeenCalled();
   });
 

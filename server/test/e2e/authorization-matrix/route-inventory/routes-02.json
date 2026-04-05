@@ -41,9 +41,7 @@
     "methodName": "refreshEnrichment",
     "httpMethod": "POST",
     "path": "/authors/:id/enrichment/refresh",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -55,9 +53,7 @@
     "methodName": "update",
     "httpMethod": "PATCH",
     "path": "/authors/:id",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -69,9 +65,7 @@
     "methodName": "merge",
     "httpMethod": "POST",
     "path": "/authors/merge",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -83,9 +77,7 @@
     "methodName": "delete",
     "httpMethod": "DELETE",
     "path": "/authors",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -97,9 +89,7 @@
     "methodName": "embedAll",
     "httpMethod": "POST",
     "path": "/books/embed-all",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -111,9 +101,7 @@
     "methodName": "deleteBooks",
     "httpMethod": "DELETE",
     "path": "/books",
-    "permissions": [
-      "Permission.LibraryDeleteBooks"
-    ],
+    "permissions": ["Permission.LibraryDeleteBooks"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -149,9 +137,7 @@
     "methodName": "bulkRefreshMetadata",
     "httpMethod": "POST",
     "path": "/books/bulk-refresh-metadata",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -163,9 +149,7 @@
     "methodName": "bulkReExtractCover",
     "httpMethod": "POST",
     "path": "/books/bulk-re-extract-cover",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -177,9 +161,7 @@
     "methodName": "reExtractCover",
     "httpMethod": "POST",
     "path": "/books/:id/re-extract-cover",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -191,9 +173,7 @@
     "methodName": "exportBooks",
     "httpMethod": "POST",
     "path": "/books/export",
-    "permissions": [
-      "Permission.LibraryDownload"
-    ],
+    "permissions": ["Permission.LibraryDownload"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -289,9 +269,19 @@
     "methodName": "updateMetadata",
     "httpMethod": "PATCH",
     "path": "/books/:id/metadata",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "updateMetadataLocks",
+    "httpMethod": "PATCH",
+    "path": "/books/:id/metadata-locks",
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -303,9 +293,7 @@
     "methodName": "refreshMetadata",
     "httpMethod": "POST",
     "path": "/books/:id/refresh-metadata",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -317,9 +305,7 @@
     "methodName": "getWriteLog",
     "httpMethod": "GET",
     "path": "/books/:id/write-log",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -331,9 +317,7 @@
     "methodName": "getKoboState",
     "httpMethod": "GET",
     "path": "/books/:id/kobo-state",
-    "permissions": [
-      "Permission.KoboSync"
-    ],
+    "permissions": ["Permission.KoboSync"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -381,9 +365,7 @@
     "methodName": "getConfig",
     "httpMethod": "GET",
     "path": "/book-metadata-fetch/config",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -395,9 +377,7 @@
     "methodName": "updateConfig",
     "httpMethod": "PUT",
     "path": "/book-metadata-fetch/config",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -409,9 +389,7 @@
     "methodName": "getLibraryConfig",
     "httpMethod": "GET",
     "path": "/book-metadata-fetch/config/libraries/:id",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -423,9 +401,7 @@
     "methodName": "updateLibraryConfig",
     "httpMethod": "PUT",
     "path": "/book-metadata-fetch/config/libraries/:id",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -437,9 +413,7 @@
     "methodName": "getStatus",
     "httpMethod": "GET",
     "path": "/book-metadata-fetch/status",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -451,9 +425,7 @@
     "methodName": "triggerGlobal",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/run",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -465,9 +437,7 @@
     "methodName": "triggerForLibrary",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/run/:libraryId",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -479,9 +449,7 @@
     "methodName": "pause",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/pause",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -493,9 +461,7 @@
     "methodName": "resume",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/resume",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -507,9 +473,7 @@
     "methodName": "cancel",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/cancel",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -521,9 +485,7 @@
     "methodName": "retryFailed",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/retry-failed",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -535,9 +497,7 @@
     "methodName": "previewCount",
     "httpMethod": "POST",
     "path": "/book-metadata-fetch/preview-count",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -549,9 +509,7 @@
     "methodName": "getFailedItems",
     "httpMethod": "GET",
     "path": "/book-metadata-fetch/failed",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,

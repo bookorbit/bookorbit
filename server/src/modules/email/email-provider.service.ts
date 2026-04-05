@@ -92,8 +92,7 @@ export class EmailProviderService {
 
   async setDefault(id: number, user: RequestUser) {
     await this.getOwned(id, user);
-    await this.repo.clearDefault(user.id);
-    const [updated] = await this.repo.setDefault(id, user.id);
+    const updated = (await this.repo.setDefault(id, user.id)).find((provider) => provider.id === id);
     if (!updated) throw new NotFoundException('Provider not found');
     return this.sanitize(updated);
   }

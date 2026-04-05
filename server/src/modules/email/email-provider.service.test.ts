@@ -142,7 +142,6 @@ describe('EmailProviderService', () => {
   describe('setDefault', () => {
     it('should set default provider', async () => {
       const result = await service.setDefault(10, mockUser);
-      expect(repo.clearDefault).toHaveBeenCalledWith(1);
       expect(repo.setDefault).toHaveBeenCalledWith(10, 1);
       expect(result.id).toBe(10);
     });

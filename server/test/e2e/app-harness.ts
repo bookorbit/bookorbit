@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { expect } from 'vitest';
 import fastifyCookie from '@fastify/cookie';
-import { count, eq, isNull, sql } from 'drizzle-orm';
+import { count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
@@ -27,7 +27,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function makeMetadataNoopMock(): Pick<
+export function makeMetadataNoopMock(): Pick<
   MetadataService,
   'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
 > {
@@ -181,26 +181,30 @@ export async function loadLibraryBookState(db: Db, libraryId: number): Promise<L
     .from(books)
     .where(eq(books.libraryId, libraryId));
 
-  const states: LibraryBookState[] = [];
+  if (bookRows.length === 0) return [];
 
-  for (const row of bookRows) {
-    const fileRows = await db.select({ absolutePath: bookFiles.absolutePath }).from(bookFiles).where(eq(bookFiles.bookId, row.id));
+  const bookIds = bookRows.map((r) => r.id);
+  const allFileRows = await db
+    .select({ bookId: bookFiles.bookId, id: bookFiles.id, absolutePath: bookFiles.absolutePath })
+    .from(bookFiles)
+    .where(inArray(bookFiles.bookId, bookIds));
 
-    let primaryPath: string | null = null;
-    if (row.primaryFileId !== null) {
-      const [primary] = await db.select({ absolutePath: bookFiles.absolutePath }).from(bookFiles).where(eq(bookFiles.id, row.primaryFileId)).limit(1);
-      primaryPath = primary?.absolutePath ?? null;
-    }
-
-    states.push({
-      folderPath: row.folderPath,
-      status: row.status,
-      primaryPath,
-      filePaths: fileRows.map((fileRow) => fileRow.absolutePath).sort(),
-    });
+  const filesByBookId = new Map<number, { id: number; absolutePath: string }[]>();
+  const fileById = new Map<number, string>();
+  for (const f of allFileRows) {
+    if (!filesByBookId.has(f.bookId)) filesByBookId.set(f.bookId, []);
+    filesByBookId.get(f.bookId)!.push({ id: f.id, absolutePath: f.absolutePath });
+    fileById.set(f.id, f.absolutePath);
   }
 
-  return states.sort((a, b) => a.folderPath.localeCompare(b.folderPath));
+  return bookRows
+    .map((row) => ({
+      folderPath: row.folderPath,
+      status: row.status,
+      primaryPath: row.primaryFileId !== null ? (fileById.get(row.primaryFileId) ?? null) : null,
+      filePaths: (filesByBookId.get(row.id) ?? []).map((f) => f.absolutePath).sort(),
+    }))
+    .sort((a, b) => a.folderPath.localeCompare(b.folderPath));
 }
 
 export interface IntegritySnapshot {

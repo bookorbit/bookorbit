@@ -6,6 +6,7 @@ import { Permission, type LibraryFileSyncProgressEvent } from '@projectx/types';
 
 import * as schema from '../src/db/schema';
 import { BookService, type MetadataUpdateFailpoint } from '../src/modules/book/book.service';
+import { FileWriteService } from '../src/modules/file-write/file-write.service';
 import { extractCb7Metadata, extractCbzMetadata } from '../src/modules/metadata/lib/cbz-metadata';
 import { extractEpubMetadata } from '../src/modules/metadata/lib/epub';
 import { parsePdfFile } from '../src/modules/metadata/lib/pdf-parser';
@@ -203,9 +204,10 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     context = await createMetadataWriteE2EContext();
   });
 
-  afterEach((taskContext) => {
+  afterEach(async (taskContext) => {
     if (context) {
       context.app.get(BookService).clearMetadataUpdateFailpointForTests();
+      await drainScheduledFileWrites(context);
     }
 
     const result = taskContext.task.result;
@@ -231,7 +233,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
   beforeEach(async () => {
     scenarioStartedAt = Date.now();
     await setFileWriteSettings(context.db, {
-      enabled: true,
+      enabled: false,
       writeCover: false,
       epub: { enabled: true },
       pdf: { enabled: true },
@@ -441,6 +443,8 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
   describe('auto-write on metadata patch', () => {
     it('writes PDF metadata to disk and records auto write-log entry', async () => {
+      await setFileWriteSettings(context.db, { enabled: true });
+
       const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
       await createPdfFixture(library.folderPath, 'auto-write/book.pdf', 'Auto Seed PDF');
       await triggerAndWaitForLibraryScan(context, library.libraryId);
@@ -466,7 +470,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       });
       expect(logEntry.format).toBe('pdf');
 
-      const parsedPdf = await parsePdfFile(book.absolutePath);
+      const parsedPdf = await parsePdfFile(book.absolutePath, { extractCover: false });
       expect(parsedPdf?.title).toBe('Auto PDF Title');
       expect(parsedPdf?.authors.map((author) => author.name)).toContain('Auto PDF Author');
       expect(parsedPdf?.description).toBe('Auto PDF Description');
@@ -480,6 +484,8 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     });
 
     it('writes EPUB metadata to disk and records auto write-log entry', async () => {
+      await setFileWriteSettings(context.db, { enabled: true });
+
       const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
       await createEpubFixture(library.folderPath, 'auto-write/book.epub', { title: 'Auto Seed EPUB' });
       await triggerAndWaitForLibraryScan(context, library.libraryId);
@@ -541,7 +547,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         expect(patchResponse.statusCode).toBe(200);
       }
 
-      await sleep(250);
+      await drainScheduledFileWrites(context);
 
       await setFileWriteSettings(context.db, {
         enabled: true,
@@ -574,7 +580,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         }
       }
 
-      const parsedPdf = await parsePdfFile(prepared.books.pdf.absolutePath);
+      const parsedPdf = await parsePdfFile(prepared.books.pdf.absolutePath, { extractCover: false });
       expect(parsedPdf).toMatchObject({
         title: MATRIX_SET_PAYLOAD.title,
         subtitle: MATRIX_SET_PAYLOAD.subtitle,
@@ -763,7 +769,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         expect(tagRows).toHaveLength(0);
       }
 
-      await sleep(250);
+      await drainScheduledFileWrites(context);
 
       await setFileWriteSettings(context.db, {
         enabled: true,
@@ -784,7 +790,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       );
       expect(doneEvent).toMatchObject({ processed: 4, succeeded: 4, failed: 0, skipped: 0 });
 
-      const parsedPdf = await parsePdfFile(prepared.books.pdf.absolutePath);
+      const parsedPdf = await parsePdfFile(prepared.books.pdf.absolutePath, { extractCover: false });
       expect(parsedPdf).toMatchObject({
         title: null,
         subtitle: null,
@@ -903,7 +909,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       });
       expect(patchResponse.statusCode).toBe(200);
 
-      await sleep(250);
+      await drainScheduledFileWrites(context);
 
       await setFileWriteSettings(context.db, { enabled: true });
 
@@ -979,7 +985,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         expect(patchResponse.statusCode).toBe(200);
       }
 
-      await sleep(250);
+      await drainScheduledFileWrites(context);
 
       await setFileWriteSettings(context.db, { enabled: true, cbx: { enabled: true, formats: ['cbz', 'cb7'] } });
 
@@ -1001,13 +1007,15 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       expect(successLog.errorMessage ?? null).toBeNull();
       expect(failureLog.errorMessage).toBeTruthy();
 
-      const parsedPdf = await parsePdfFile(okBook.absolutePath);
+      const parsedPdf = await parsePdfFile(okBook.absolutePath, { extractCover: false });
       expect(parsedPdf?.title).toBe('Failure Isolation Success');
     });
   });
 
   describe('concurrency hardening', () => {
     it('resolves parallel PATCH conflicts to one complete payload shape', async () => {
+      await setFileWriteSettings(context.db, { enabled: true });
+
       const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
       await createPdfFixture(library.folderPath, 'concurrency/parallel-patch.pdf', 'Parallel Patch Seed');
       await triggerAndWaitForLibraryScan(context, library.libraryId);
@@ -1089,7 +1097,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       const winningPayload = matchesBookWriteState(dbState, payloadA) ? payloadA : matchesBookWriteState(dbState, payloadB) ? payloadB : null;
       expect(winningPayload).not.toBeNull();
 
-      const parsedPdf = await parsePdfFile(book.absolutePath);
+      const parsedPdf = await parsePdfFile(book.absolutePath, { extractCover: false });
       expect(parsedPdf).toMatchObject({
         title: winningPayload!.title,
         subtitle: winningPayload!.subtitle,
@@ -1139,7 +1147,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         expect(seedResponse.statusCode).toBe(200);
       }
 
-      await sleep(250);
+      await drainScheduledFileWrites(context);
 
       await setFileWriteSettings(context.db, {
         enabled: true,
@@ -1173,23 +1181,58 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         itunesId: 'overlap-itunes',
       } as const;
 
-      const syncPromise = context.app.inject({
-        method: 'POST',
-        url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
-        headers: authHeader(context.adminToken),
+      const fileWriteService = context.app.get(FileWriteService);
+      const originalWriteToFile = fileWriteService.writeToFile.bind(fileWriteService);
+      let releaseFirstSyncWrite!: () => void;
+      let resolveFirstSyncWriteStarted!: () => void;
+      const firstSyncWriteStarted = new Promise<void>((resolve) => {
+        resolveFirstSyncWriteStarted = resolve;
       });
-
-      await sleep(75);
-
-      const patchResponse = await context.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${targetBook.bookId}/metadata`,
-        headers: authHeader(context.adminToken),
-        payload: overlapPayload,
+      const releaseFirstSyncWritePromise = new Promise<void>((resolve) => {
+        releaseFirstSyncWrite = resolve;
       });
-      expect(patchResponse.statusCode).toBe(200);
+      let blockedFirstSyncWrite = false;
+      let releasedFirstSyncWrite = false;
 
-      const syncResponse = await syncPromise;
+      const writeSpy = vi
+        .spyOn(fileWriteService, 'writeToFile')
+        .mockImplementation(async (bookId: number, triggeredBy: 'auto' | 'sync', userId?: number, dryRun?: boolean) => {
+          if (triggeredBy === 'sync' && !blockedFirstSyncWrite) {
+            blockedFirstSyncWrite = true;
+            resolveFirstSyncWriteStarted();
+            await releaseFirstSyncWritePromise;
+          }
+          return originalWriteToFile(bookId, triggeredBy, userId, dryRun);
+        });
+
+      let syncResponse!: Awaited<ReturnType<typeof context.app.inject>>;
+      try {
+        const syncPromise = context.app.inject({
+          method: 'POST',
+          url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
+          headers: authHeader(context.adminToken),
+        });
+
+        await firstSyncWriteStarted;
+
+        const patchResponse = await context.app.inject({
+          method: 'PATCH',
+          url: `/api/v1/books/${targetBook.bookId}/metadata`,
+          headers: authHeader(context.adminToken),
+          payload: overlapPayload,
+        });
+        expect(patchResponse.statusCode).toBe(200);
+
+        releasedFirstSyncWrite = true;
+        releaseFirstSyncWrite();
+        syncResponse = await syncPromise;
+      } finally {
+        if (blockedFirstSyncWrite && !releasedFirstSyncWrite) {
+          releaseFirstSyncWrite();
+        }
+        writeSpy.mockRestore();
+      }
+
       expect(syncResponse.statusCode).toBe(200);
       const syncEvents = parseSseEvents(syncResponse.body);
       const doneEvent = syncEvents.find(
@@ -1206,7 +1249,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       const targetState = await readBookWriteState(context, targetBook.bookId);
       expect(matchesBookWriteState(targetState, overlapPayload)).toBe(true);
 
-      const parsedPdf = await parsePdfFile(targetBook.absolutePath);
+      const parsedPdf = await parsePdfFile(targetBook.absolutePath, { extractCover: false });
       expect(parsedPdf).toMatchObject({
         title: overlapPayload.title,
         subtitle: overlapPayload.subtitle,
@@ -1252,7 +1295,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         expect(patchResponse.statusCode).toBe(200);
       }
 
-      await sleep(250);
+      await drainScheduledFileWrites(context);
 
       await setFileWriteSettings(context.db, {
         enabled: true,
@@ -1334,6 +1377,19 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       expect(success.statusCode).toBe(200);
     });
 
+    it('returns 404 for sync requests targeting a missing library', async () => {
+      await setFileWriteSettings(context.db, { enabled: true });
+
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/libraries/999999/write-metadata-to-files',
+        headers: authHeader(context.adminToken),
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ message: 'Library not found' });
+    });
+
     it('enforces permission and editor-level library access for sync endpoint', async () => {
       const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
       await createPdfFixture(library.folderPath, 'access/sync.pdf');
@@ -1369,6 +1425,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       expect(viewerAccess.statusCode).toBe(403);
 
       await grantLibraryAccess(context, withPermissionUser.userId, library.libraryId, 'editor');
+      await setFileWriteSettings(context.db, { enabled: true });
       const editorAccess = await context.app.inject({
         method: 'POST',
         url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
@@ -1425,6 +1482,10 @@ function parseSseEvents(rawBody: string): LibraryFileSyncProgressEvent[] {
   }
 
   return events;
+}
+
+async function drainScheduledFileWrites(context: MetadataWriteE2EContext): Promise<void> {
+  await context.app.get(FileWriteService).drainScheduledWritesForTests();
 }
 
 function buildAtomicityFailurePayload(failpoint: MetadataUpdateFailpoint) {
@@ -1645,8 +1706,4 @@ async function countSyncSuccessLogs(context: MetadataWriteE2EContext, bookId: nu
     .where(eq(schema.fileWriteLog.bookId, bookId));
 
   return rows.filter((row) => row.triggeredBy === 'sync' && row.status === 'success').length;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

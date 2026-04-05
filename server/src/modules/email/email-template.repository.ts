@@ -70,8 +70,11 @@ export class EmailTemplateRepository {
   setDefault(id: number, userId: number) {
     return this.db
       .update(emailTemplates)
-      .set({ isDefault: true, updatedAt: sql`now()` })
-      .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)))
+      .set({
+        isDefault: sql`case when ${emailTemplates.id} = ${id} then true else false end`,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(emailTemplates.userId, userId))
       .returning();
   }
 

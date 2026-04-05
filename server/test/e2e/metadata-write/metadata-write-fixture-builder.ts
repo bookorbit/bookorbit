@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { createWriteStream } from 'fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import { dirname, join } from 'path';
+import { dirname, isAbsolute, join, normalize } from 'path';
 import { PDFDocument } from 'pdf-lib';
 
 import { getSevenZip } from '../../../src/common/sevenzip';
@@ -33,9 +33,10 @@ interface ComicFixtureInput {
   year?: number;
 }
 
-function assertRelativePath(path: string): void {
-  if (path.startsWith('/')) {
-    throw new Error(`Fixture paths must be relative. Received "${path}"`);
+function assertRelativePath(relativePath: string): void {
+  const normalized = normalize(relativePath);
+  if (isAbsolute(relativePath) || normalized === '..' || normalized.startsWith('../') || normalized.startsWith('..\\')) {
+    throw new Error(`Fixture paths must be relative. Received "${relativePath}"`);
   }
 }
 

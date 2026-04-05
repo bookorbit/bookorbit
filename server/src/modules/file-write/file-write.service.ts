@@ -25,6 +25,7 @@ export class FileWriteService implements OnModuleDestroy {
   private readonly debounceMs: number;
   private readonly maxConcurrentWrites: number;
   private readonly debounceMap = new Map<number, NodeJS.Timeout>();
+  private readonly scheduledWriteRuns = new Set<Promise<unknown>>();
   private readonly writeQueue: Array<() => void> = [];
   private activeWrites = 0;
 
@@ -53,22 +54,38 @@ export class FileWriteService implements OnModuleDestroy {
       this.logger.debug(
         `[${FILE_WRITE_SCHEDULE_EVENT}] [end] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} - scheduled file write fired`,
       );
-      this.writeToFile(bookId, triggeredBy, userId).catch((err: Error) =>
-        this.logger.warn(
-          `[${FILE_WRITE_SCHEDULE_EVENT}] [fail] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} errorClass=${err.name} error="${sanitizeErrorMessage(err.message)}" - scheduled file write failed`,
-        ),
-      );
+      const run = this.writeToFile(bookId, triggeredBy, userId)
+        .catch((err: Error) =>
+          this.logger.warn(
+            `[${FILE_WRITE_SCHEDULE_EVENT}] [fail] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} errorClass=${err.name} error="${sanitizeErrorMessage(err.message)}" - scheduled file write failed`,
+          ),
+        )
+        .finally(() => {
+          this.scheduledWriteRuns.delete(run);
+        });
+      this.scheduledWriteRuns.add(run);
     }, this.debounceMs);
     this.debounceMap.set(bookId, timer);
   }
 
   onModuleDestroy(): void {
-    for (const timer of this.debounceMap.values()) clearTimeout(timer);
-    this.debounceMap.clear();
+    this.clearScheduledWrites();
     for (const release of this.writeQueue) {
       release();
     }
     this.writeQueue.length = 0;
+  }
+
+  async drainScheduledWritesForTests(): Promise<void> {
+    this.clearScheduledWrites();
+    while (this.scheduledWriteRuns.size > 0) {
+      await Promise.allSettled([...this.scheduledWriteRuns]);
+    }
+  }
+
+  private clearScheduledWrites(): void {
+    for (const timer of this.debounceMap.values()) clearTimeout(timer);
+    this.debounceMap.clear();
   }
 
   async writeToFile(bookId: number, triggeredBy: 'auto' | 'sync', userId?: number, dryRun = false): Promise<WriteResult> {

@@ -46,8 +46,11 @@ export class EmailProviderRepository {
   setDefault(id: number, userId: number) {
     return this.db
       .update(emailProviders)
-      .set({ isDefault: true, updatedAt: sql`now()` })
-      .where(and(eq(emailProviders.id, id), eq(emailProviders.userId, userId)))
+      .set({
+        isDefault: sql`case when ${emailProviders.id} = ${id} then true else false end`,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(emailProviders.userId, userId))
       .returning();
   }
 

@@ -276,12 +276,21 @@ describe('LibraryService', () => {
   });
 
   it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
     fileWriteService.resolveSettings.mockResolvedValue({ enabled: false });
 
     await expect(service.writeMetadataToFiles(1, 7, false)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('writeMetadataToFiles throws when the library does not exist', async () => {
+    libraryRepo.findById.mockResolvedValue([]);
+
+    await expect(service.writeMetadataToFiles(404, 7, true)).rejects.toBeInstanceOf(NotFoundException);
+    expect(fileWriteService.findNonMissingPrimaryFilesByLibrary).not.toHaveBeenCalled();
+  });
+
   it('writeMetadataToFiles emits progress and returns summary counters', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
     fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
     fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
     fileWriteService.writeToFile
@@ -299,6 +308,7 @@ describe('LibraryService', () => {
   });
 
   it('writeMetadataToFiles stops when cancellation is requested', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
     fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
     fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }]);
     fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });

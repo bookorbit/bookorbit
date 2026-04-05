@@ -79,12 +79,12 @@ export class EmailTemplateService {
     if (template.userId !== user.id && !template.isSystem) {
       throw new ForbiddenException('Cannot set this template as default');
     }
-    await this.repo.clearDefault(user.id);
     if (!template.isSystem) {
-      const [updated] = await this.repo.setDefault(id, user.id);
+      const updated = (await this.repo.setDefault(id, user.id)).find((row) => row.id === id);
       if (!updated) throw new NotFoundException('Template not found');
       return updated;
     }
+    await this.repo.clearDefault(user.id);
     return template;
   }
 
@@ -96,14 +96,15 @@ export class EmailTemplateService {
   }
 
   async resolveTemplate(templateId: number | null | undefined, user: RequestUser): Promise<EmailTemplate> {
-    if (templateId) {
+    if (templateId !== null && templateId !== undefined) {
       const [tpl] = await this.repo.findById(templateId);
-      if (tpl) {
-        if (tpl.userId !== null && tpl.userId !== user.id) {
-          throw new ForbiddenException('No access to the specified email template');
-        }
-        return tpl;
+      if (!tpl) {
+        throw new NotFoundException('Template not found');
       }
+      if (tpl.userId !== null && tpl.userId !== user.id) {
+        throw new ForbiddenException('No access to the specified email template');
+      }
+      return tpl;
     }
     const [userDefault] = await this.repo.findUserDefault(user.id);
     if (userDefault) return userDefault;

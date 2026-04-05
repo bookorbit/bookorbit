@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { basename, dirname, extname, join } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
-import { and, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { BookBucketAutoFinalizeMetadataMode, BookBucketFinalizeFileResult, BookBucketFinalizeResult, BookBucketMetadata } from '@projectx/types';
@@ -169,7 +169,7 @@ export class BookBucketFinalizeService implements OnModuleInit {
       let bookId: number;
       try {
         const { size } = await stat(destPath);
-        const bookFolderPath = dirname(destPath) === folder.path ? destPath : dirname(destPath);
+        const bookFolderPath = dirname(destPath);
         ({ bookId } = await this.processor.createBookRecord(
           libraryId,
           folder.id,
@@ -278,7 +278,7 @@ export class BookBucketFinalizeService implements OnModuleInit {
         .select({ bookId: bookMetadata.bookId })
         .from(bookMetadata)
         .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .where(and(eq(books.libraryId, libraryId), ilike(bookMetadata.title, meta.title)))
+        .where(and(eq(books.libraryId, libraryId), sql`lower(${bookMetadata.title}) = lower(${meta.title})`))
         .limit(1);
 
       if (existing) return existing.bookId;
