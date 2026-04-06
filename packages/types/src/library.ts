@@ -60,6 +60,14 @@ export interface Library {
   readingThreshold: number;
   markAsFinishedPercentComplete: number;
   fileNamingPattern?: string | null;
+  fileWriteEnabled: boolean;
+  fileWriteWriteCover: boolean;
+  fileWriteEpubEnabled: boolean;
+  fileWriteEpubMaxFileSizeMb: number;
+  fileWritePdfEnabled: boolean;
+  fileWritePdfMaxFileSizeMb: number;
+  fileWriteCbxEnabled: boolean;
+  fileWriteCbxMaxFileSizeMb: number;
   folders: LibraryFolder[];
   bookCount?: number;
   createdAt: string;

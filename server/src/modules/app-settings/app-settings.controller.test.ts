@@ -1,8 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
-import { DEFAULT_FILE_WRITE_SETTINGS } from '@projectx/types';
-
 import { AppSettingsController } from './app-settings.controller';
 import { AppSettingsService } from './app-settings.service';
 
@@ -22,8 +20,6 @@ function makeService(): jest.Mocked<AppSettingsService> {
     getDownloadPattern: vi.fn(),
     setDownloadPattern: vi.fn(),
     getAutoFinalizeSettings: vi.fn(),
-    getFileWriteSettings: vi.fn().mockResolvedValue({ ...DEFAULT_FILE_WRITE_SETTINGS }),
-    updateFileWriteSettings: vi.fn(),
     getMetadataScoreWeights: vi.fn(),
     setMetadataScoreWeights: vi.fn(),
   } as unknown as jest.Mocked<AppSettingsService>;
@@ -155,26 +151,6 @@ describe('AppSettingsController', () => {
     it('propagates BadRequestException from service', async () => {
       service.testOidcConnection.mockRejectedValue(new BadRequestException('Issuer URI is not configured'));
       await expect(controller.testOidcConnection()).rejects.toThrow(BadRequestException);
-    });
-  });
-
-  describe('getFileWriteSettings', () => {
-    it('returns settings from service', async () => {
-      const result = await controller.getFileWriteSettings();
-      expect(result).toHaveProperty('epub');
-      expect(result).toHaveProperty('pdf');
-      expect(result).toHaveProperty('cbx');
-    });
-  });
-
-  describe('updateFileWriteSettings', () => {
-    it('delegates to service.updateFileWriteSettings with validated DTO', async () => {
-      const merged = { ...DEFAULT_FILE_WRITE_SETTINGS, enabled: true };
-      service.updateFileWriteSettings.mockResolvedValue(merged);
-      const dto = { enabled: true };
-      const result = await controller.updateFileWriteSettings(dto as never);
-      expect(service.updateFileWriteSettings).toHaveBeenCalledWith(dto);
-      expect(result.enabled).toBe(true);
     });
   });
 });

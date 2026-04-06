@@ -5,7 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { WriteResult, WriteLogEntry } from '@projectx/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, fileWriteLog, genres, tags, bookTags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, fileWriteLog, genres, libraries, tags, bookTags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -25,6 +25,24 @@ export class FileWriteRepository {
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(eq(books.id, bookId))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findLibraryFileWriteConfig(libraryId: number) {
+    const [row] = await this.db
+      .select({
+        fileWriteEnabled: libraries.fileWriteEnabled,
+        fileWriteWriteCover: libraries.fileWriteWriteCover,
+        fileWriteEpubEnabled: libraries.fileWriteEpubEnabled,
+        fileWriteEpubMaxFileSizeMb: libraries.fileWriteEpubMaxFileSizeMb,
+        fileWritePdfEnabled: libraries.fileWritePdfEnabled,
+        fileWritePdfMaxFileSizeMb: libraries.fileWritePdfMaxFileSizeMb,
+        fileWriteCbxEnabled: libraries.fileWriteCbxEnabled,
+        fileWriteCbxMaxFileSizeMb: libraries.fileWriteCbxMaxFileSizeMb,
+      })
+      .from(libraries)
+      .where(eq(libraries.id, libraryId))
       .limit(1);
     return row ?? null;
   }

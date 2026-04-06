@@ -4,9 +4,7 @@ import {
   AuthorAutoEnrichmentWriteMode,
   DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN,
-  DEFAULT_FILE_WRITE_SETTINGS,
   DEFAULT_METADATA_SCORE_WEIGHTS,
-  type GlobalFileWriteSettings,
   type MetadataScoreWeights,
   type BookBucketAutoFinalizeMetadataMode,
 } from '@projectx/types';
@@ -173,13 +171,6 @@ export class AppSettingsService {
     };
   }
 
-  async getFileWriteSettings(): Promise<GlobalFileWriteSettings> {
-    const row = await this.repo.findByKey(APP_SETTING_KEYS.FILE_WRITE_SETTINGS);
-    if (!row?.value) return { ...DEFAULT_FILE_WRITE_SETTINGS };
-    const stored = parseSafe<Partial<GlobalFileWriteSettings>>(APP_SETTING_KEYS.FILE_WRITE_SETTINGS, row.value, {}, this.logger);
-    return mergeFileWriteSettings(DEFAULT_FILE_WRITE_SETTINGS, stored);
-  }
-
   async getMetadataScoreWeights(): Promise<MetadataScoreWeights> {
     const row = await this.repo.findByKey(APP_SETTING_KEYS.METADATA_SCORE_WEIGHTS);
     const stored = parseSafe<Partial<MetadataScoreWeights>>(APP_SETTING_KEYS.METADATA_SCORE_WEIGHTS, row?.value, {}, this.logger);
@@ -190,42 +181,11 @@ export class AppSettingsService {
     await this.repo.upsert(APP_SETTING_KEYS.METADATA_SCORE_WEIGHTS, JSON.stringify(weights));
     return weights;
   }
-
-  async updateFileWriteSettings(patch: {
-    enabled?: boolean;
-    writeCover?: boolean;
-    epub?: { enabled?: boolean; maxFileSizeBytes?: number };
-    pdf?: { enabled?: boolean; maxFileSizeBytes?: number };
-    cbx?: { enabled?: boolean; maxFileSizeBytes?: number; formats?: ('cbz' | 'cb7')[] };
-  }): Promise<GlobalFileWriteSettings> {
-    const current = await this.getFileWriteSettings();
-    const merged = mergeFileWriteSettings(current, patch);
-    await this.repo.upsert(APP_SETTING_KEYS.FILE_WRITE_SETTINGS, JSON.stringify(merged));
-    return merged;
-  }
 }
 
 function parseAutoFinalizeMetadataMode(value: string | undefined): BookBucketAutoFinalizeMetadataMode {
   if (value === 'fetched_only' || value === 'embedded_only') return value;
   return 'safe_merge';
-}
-
-type FileWriteSettingsPatch = {
-  enabled?: boolean;
-  writeCover?: boolean;
-  epub?: { enabled?: boolean; maxFileSizeBytes?: number };
-  pdf?: { enabled?: boolean; maxFileSizeBytes?: number };
-  cbx?: { enabled?: boolean; maxFileSizeBytes?: number; formats?: ('cbz' | 'cb7')[] };
-};
-
-function mergeFileWriteSettings(base: GlobalFileWriteSettings, patch: FileWriteSettingsPatch): GlobalFileWriteSettings {
-  return {
-    ...base,
-    ...patch,
-    epub: { ...base.epub, ...(patch.epub ?? {}) },
-    pdf: { ...base.pdf, ...(patch.pdf ?? {}) },
-    cbx: { ...base.cbx, ...(patch.cbx ?? {}) },
-  };
 }
 
 function mergeOidcConfig(base: OidcFullConfig, patch: Partial<OidcFullConfig>): OidcFullConfig {

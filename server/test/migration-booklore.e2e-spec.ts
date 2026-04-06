@@ -425,11 +425,11 @@ describe('Migration Booklore API to DB (e2e)', { timeout: 240_000 }, () => {
     expect(reportDetails.userPreview).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          username: 'alice',
+          username: 'alice-source',
           counts: expect.objectContaining({ statuses: 2, fileProgress: 2, bookmarks: 1, annotations: 1, shelves: 2 }),
         }),
         expect.objectContaining({
-          username: 'bob',
+          username: 'bob-source',
           counts: expect.objectContaining({ statuses: 1, fileProgress: 1, bookmarks: 1, annotations: 1, shelves: 1 }),
         }),
       ]),

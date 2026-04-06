@@ -6,7 +6,6 @@ import MetadataFieldRulesSettings from './metadata-preferences/MetadataFieldRule
 import MetadataScoreWeightsSettings from './MetadataScoreWeightsSettings.vue'
 import BookMetadataFetchSettings from './metadata-auto-fetch/BookMetadataFetchSettings.vue'
 import AuthorEnrichmentSettings from './AuthorEnrichmentSettings.vue'
-import MetadataFileSyncSettings from './MetadataFileSyncSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { METADATA_TAB_INFO, METADATA_TABS, normalizeMetadataTab, type MetadataTab as Tab } from './lib/metadata-tabs'
 
@@ -41,7 +40,6 @@ const tabWidths: Record<Tab, string> = {
   score: 'max-w-3xl',
   'auto-fetch': 'max-w-3xl',
   authors: 'max-w-3xl',
-  'file-sync': 'max-w-3xl',
 }
 
 function selectTab(tab: Tab) {
@@ -76,7 +74,6 @@ function selectTab(tab: Tab) {
       <MetadataScoreWeightsSettings v-else-if="activeTab === 'score'" />
       <BookMetadataFetchSettings v-else-if="activeTab === 'auto-fetch'" />
       <AuthorEnrichmentSettings v-else-if="activeTab === 'authors'" />
-      <MetadataFileSyncSettings v-else-if="activeTab === 'file-sync'" />
     </div>
   </div>
 </template>

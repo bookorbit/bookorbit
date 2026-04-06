@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteService } from './file-write.service';
-import { FileWriteSettingsService } from './file-write-settings.service';
 import { FormatWriterRegistry } from './format-writer.registry';
 import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
 import { EpubFormatWriter } from './formats/epub/epub-format-writer';
@@ -15,7 +14,6 @@ import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
   providers: [
     FileWriteService,
     FileWriteRepository,
-    FileWriteSettingsService,
     FileLockService,
     EpubFormatWriter,
     PdfFormatWriter,
@@ -28,6 +26,6 @@ import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
     },
     FormatWriterRegistry,
   ],
-  exports: [FileWriteService, FileWriteRepository, FileWriteSettingsService],
+  exports: [FileWriteService, FileWriteRepository],
 })
 export class FileWriteModule {}

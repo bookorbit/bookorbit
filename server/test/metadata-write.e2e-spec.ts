@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
@@ -19,7 +20,7 @@ import {
   getLatestWriteLogEntry,
   grantLibraryAccess,
   locateBookFileByRelPath,
-  setFileWriteSettings,
+  setLibraryFileWriteSettings,
   triggerAndWaitForLibraryScan,
   waitForWriteLogEntry,
   type LocatedBookFile,
@@ -230,15 +231,8 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     }
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     scenarioStartedAt = Date.now();
-    await setFileWriteSettings(context.db, {
-      enabled: false,
-      writeCover: false,
-      epub: { enabled: true },
-      pdf: { enabled: true },
-      cbx: { enabled: true, formats: ['cbz', 'cb7'] },
-    });
   });
 
   describe('database metadata writes', () => {
@@ -412,7 +406,6 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       await triggerAndWaitForLibraryScan(context, library.libraryId);
       const book = await locateBookFileByRelPath(context, library.libraryId, 'atomicity/book.pdf');
 
-      await setFileWriteSettings(context.db, { enabled: false });
       const baselineResponse = await context.app.inject({
         method: 'PATCH',
         url: `/api/v1/books/${book.bookId}/metadata`,
@@ -443,9 +436,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
   describe('auto-write on metadata patch', () => {
     it('writes PDF metadata to disk and records auto write-log entry', async () => {
-      await setFileWriteSettings(context.db, { enabled: true });
-
-      const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+      const library = await createLibraryWithFolder(context, { mode: 'book_per_file', fileWriteEnabled: true });
       await createPdfFixture(library.folderPath, 'auto-write/book.pdf', 'Auto Seed PDF');
       await triggerAndWaitForLibraryScan(context, library.libraryId);
       const book = await locateBookFileByRelPath(context, library.libraryId, 'auto-write/book.pdf');
@@ -484,9 +475,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     });
 
     it('writes EPUB metadata to disk and records auto write-log entry', async () => {
-      await setFileWriteSettings(context.db, { enabled: true });
-
-      const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+      const library = await createLibraryWithFolder(context, { mode: 'book_per_file', fileWriteEnabled: true });
       await createEpubFixture(library.folderPath, 'auto-write/book.epub', { title: 'Auto Seed EPUB' });
       await triggerAndWaitForLibraryScan(context, library.libraryId);
       const book = await locateBookFileByRelPath(context, library.libraryId, 'auto-write/book.epub');
@@ -529,12 +518,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
   describe('library sync write flow', () => {
     it('writes metadata to PDF/EPUB/CBZ/CB7 and emits SSE summary', async () => {
-      const prepared = await prepareLibraryWithAllFormats(context);
-
-      await setFileWriteSettings(context.db, {
-        enabled: false,
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
-      });
+      const prepared = await prepareLibraryWithAllFormats(context, { fileWriteCbxEnabled: true });
 
       for (const format of Object.keys(prepared.books) as SupportedFormat[]) {
         const book = prepared.books[format];
@@ -549,10 +533,9 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       await drainScheduledFileWrites(context);
 
-      await setFileWriteSettings(context.db, {
-        enabled: true,
-        writeCover: false,
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
+      await setLibraryFileWriteSettings(context.db, prepared.libraryId, {
+        fileWriteEnabled: true,
+        fileWriteWriteCover: false,
       });
 
       const syncResponse = await context.app.inject({
@@ -682,12 +665,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     });
 
     it('clears supported metadata in DB and files across all formats', async () => {
-      const prepared = await prepareLibraryWithAllFormats(context);
-
-      await setFileWriteSettings(context.db, {
-        enabled: false,
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
-      });
+      const prepared = await prepareLibraryWithAllFormats(context, { fileWriteCbxEnabled: true });
 
       for (const format of Object.keys(prepared.books) as SupportedFormat[]) {
         const book = prepared.books[format];
@@ -771,10 +749,9 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       await drainScheduledFileWrites(context);
 
-      await setFileWriteSettings(context.db, {
-        enabled: true,
-        writeCover: false,
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
+      await setLibraryFileWriteSettings(context.db, prepared.libraryId, {
+        fileWriteEnabled: true,
+        fileWriteWriteCover: false,
       });
 
       const syncResponse = await context.app.inject({
@@ -897,7 +874,6 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       await triggerAndWaitForLibraryScan(context, library.libraryId);
       const book = await locateBookFileByRelPath(context, library.libraryId, 'dry-run/book.pdf');
 
-      await setFileWriteSettings(context.db, { enabled: false });
       const patchResponse = await context.app.inject({
         method: 'PATCH',
         url: `/api/v1/books/${book.bookId}/metadata`,
@@ -911,7 +887,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       await drainScheduledFileWrites(context);
 
-      await setFileWriteSettings(context.db, { enabled: true });
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEnabled: true });
 
       const dryRunResponse = await context.app.inject({
         method: 'POST',
@@ -945,8 +921,6 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       await createPdfFixture(library.folderPath, 'disabled-sync/book.pdf');
       await triggerAndWaitForLibraryScan(context, library.libraryId);
 
-      await setFileWriteSettings(context.db, { enabled: false });
-
       const response = await context.app.inject({
         method: 'POST',
         url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
@@ -970,8 +944,6 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       const okBook = await locateBookFileByRelPath(context, library.libraryId, 'failure-isolation/ok.pdf');
       const brokenBook = await locateBookFileByRelPath(context, library.libraryId, 'failure-isolation/broken.epub');
 
-      await setFileWriteSettings(context.db, { enabled: false });
-
       for (const target of [okBook, brokenBook]) {
         const patchResponse = await context.app.inject({
           method: 'PATCH',
@@ -987,7 +959,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       await drainScheduledFileWrites(context);
 
-      await setFileWriteSettings(context.db, { enabled: true, cbx: { enabled: true, formats: ['cbz', 'cb7'] } });
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEnabled: true, fileWriteCbxEnabled: true });
 
       const syncResponse = await context.app.inject({
         method: 'POST',
@@ -1014,9 +986,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
   describe('concurrency hardening', () => {
     it('resolves parallel PATCH conflicts to one complete payload shape', async () => {
-      await setFileWriteSettings(context.db, { enabled: true });
-
-      const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+      const library = await createLibraryWithFolder(context, { mode: 'book_per_file', fileWriteEnabled: true });
       await createPdfFixture(library.folderPath, 'concurrency/parallel-patch.pdf', 'Parallel Patch Seed');
       await triggerAndWaitForLibraryScan(context, library.libraryId);
       const book = await locateBookFileByRelPath(context, library.libraryId, 'concurrency/parallel-patch.pdf');
@@ -1132,7 +1102,6 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       const books = await Promise.all(relPaths.map((relPath) => locateBookFileByRelPath(context, library.libraryId, relPath)));
       const targetBook = books[0]!;
 
-      await setFileWriteSettings(context.db, { enabled: false });
       for (const located of books) {
         const seedResponse = await context.app.inject({
           method: 'PATCH',
@@ -1149,12 +1118,9 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       await drainScheduledFileWrites(context);
 
-      await setFileWriteSettings(context.db, {
-        enabled: true,
-        writeCover: false,
-        epub: { enabled: true },
-        pdf: { enabled: true },
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
+      await setLibraryFileWriteSettings(context.db, library.libraryId, {
+        fileWriteEnabled: true,
+        fileWriteWriteCover: false,
       });
 
       const overlapPayload = {
@@ -1276,13 +1242,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     });
 
     it('allows concurrent sync runs on the same library with consistent outcomes', async () => {
-      const prepared = await prepareLibraryWithAllFormats(context);
-
-      await setFileWriteSettings(context.db, {
-        enabled: false,
-        writeCover: false,
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
-      });
+      const prepared = await prepareLibraryWithAllFormats(context, { fileWriteCbxEnabled: true, fileWriteWriteCover: false });
 
       for (const format of Object.keys(prepared.books) as SupportedFormat[]) {
         const book = prepared.books[format];
@@ -1297,11 +1257,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       await drainScheduledFileWrites(context);
 
-      await setFileWriteSettings(context.db, {
-        enabled: true,
-        writeCover: false,
-        cbx: { enabled: true, formats: ['cbz', 'cb7'] },
-      });
+      await setLibraryFileWriteSettings(context.db, prepared.libraryId, { fileWriteEnabled: true });
 
       const [syncA, syncB] = await Promise.all([
         context.app.inject({
@@ -1333,6 +1289,188 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         const syncSuccessLogs = await countSyncSuccessLogs(context, book.bookId);
         expect(syncSuccessLogs).toBe(2);
       }
+    });
+  });
+
+  describe('per-library file write settings', () => {
+    it('only auto-writes for the library that has file write enabled', async () => {
+      const enabledLibrary = await createLibraryWithFolder(context, { mode: 'book_per_file', fileWriteEnabled: true });
+      const disabledLibrary = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+
+      await createPdfFixture(enabledLibrary.folderPath, 'per-library/enabled.pdf');
+      await createPdfFixture(disabledLibrary.folderPath, 'per-library/disabled.pdf');
+      await triggerAndWaitForLibraryScan(context, enabledLibrary.libraryId);
+      await triggerAndWaitForLibraryScan(context, disabledLibrary.libraryId);
+
+      const enabledBook = await locateBookFileByRelPath(context, enabledLibrary.libraryId, 'per-library/enabled.pdf');
+      const disabledBook = await locateBookFileByRelPath(context, disabledLibrary.libraryId, 'per-library/disabled.pdf');
+
+      await context.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${enabledBook.bookId}/metadata`,
+        headers: authHeader(context.adminToken),
+        payload: { title: 'Enabled Library Book' },
+      });
+      await context.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${disabledBook.bookId}/metadata`,
+        headers: authHeader(context.adminToken),
+        payload: { title: 'Disabled Library Book' },
+      });
+
+      const enabledLog = await waitForWriteLogEntry(context.db, enabledBook.bookId, {
+        triggeredBy: 'auto',
+        status: 'success',
+      });
+      expect(enabledLog.format).toBe('pdf');
+
+      const disabledLog = await getLatestWriteLogEntry(context.db, disabledBook.bookId, 'auto');
+      expect(disabledLog).toBeNull();
+    });
+
+    it('skips cbz book when cbx format is disabled for the library', async () => {
+      const library = await createLibraryWithFolder(context, {
+        mode: 'book_per_file',
+        fileWriteEnabled: true,
+        fileWriteCbxEnabled: false,
+      });
+      await createCbzFixture(library.folderPath, 'per-format/book.cbz', { title: 'CBX Disabled' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      const book = await locateBookFileByRelPath(context, library.libraryId, 'per-format/book.cbz');
+
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEnabled: true, fileWriteCbxEnabled: false });
+
+      const syncResponse = await context.app.inject({
+        method: 'POST',
+        url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
+        headers: authHeader(context.adminToken),
+      });
+      expect(syncResponse.statusCode).toBe(200);
+
+      const events = parseSseEvents(syncResponse.body);
+      const doneEvent = events.find(
+        (event): event is Extract<LibraryFileSyncProgressEvent, { done: true }> => 'done' in event && event.done === true,
+      );
+      expect(doneEvent).toMatchObject({ processed: 1, succeeded: 0, failed: 0, skipped: 1 });
+
+      const logEntry = await getLatestWriteLogEntry(context.db, book.bookId, 'sync');
+      expect(logEntry?.status).toBe('skipped');
+      expect(logEntry?.errorMessage).toBe('format disabled');
+    });
+
+    it('skips epub book when epub exceeds per-library max file size', async () => {
+      const library = await createLibraryWithFolder(context, {
+        mode: 'book_per_file',
+        fileWriteEnabled: true,
+        fileWriteEpubMaxFileSizeMb: 1,
+      });
+
+      await createEpubFixture(library.folderPath, 'per-size/book.epub', { title: 'Large EPUB' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      const book = await locateBookFileByRelPath(context, library.libraryId, 'per-size/book.epub');
+
+      const [fileRow] = await context.db
+        .select({ sizeBytes: schema.bookFiles.sizeBytes })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.id, book.bookFileId))
+        .limit(1);
+
+      const fileSizeBytes = fileRow?.sizeBytes ?? 0;
+      const limitBytes = 1 * 1024 * 1024;
+
+      if (fileSizeBytes <= limitBytes) {
+        await context.db
+          .update(schema.bookFiles)
+          .set({ sizeBytes: limitBytes + 1 })
+          .where(eq(schema.bookFiles.id, book.bookFileId));
+      }
+
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEpubMaxFileSizeMb: 1 });
+
+      const syncResponse = await context.app.inject({
+        method: 'POST',
+        url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
+        headers: authHeader(context.adminToken),
+      });
+      expect(syncResponse.statusCode).toBe(200);
+
+      const events = parseSseEvents(syncResponse.body);
+      const doneEvent = events.find(
+        (event): event is Extract<LibraryFileSyncProgressEvent, { done: true }> => 'done' in event && event.done === true,
+      );
+      expect(doneEvent).toMatchObject({ processed: 1, skipped: 1, succeeded: 0, failed: 0 });
+
+      const logEntry = await getLatestWriteLogEntry(context.db, book.bookId, 'sync');
+      expect(logEntry?.status).toBe('skipped');
+      expect(logEntry?.errorMessage).toBe('file exceeds size limit');
+    });
+
+    it('persists file write settings when creating library via API', async () => {
+      const folderPath = `${context.fixture.booksPath}/api-create-${randomUUID()}`;
+      await mkdir(folderPath, { recursive: true });
+
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/libraries',
+        headers: authHeader(context.adminToken),
+        payload: {
+          name: `api-create-file-write-${randomUUID()}`,
+          folders: [folderPath],
+          fileWriteEnabled: true,
+          fileWriteWriteCover: false,
+          fileWriteEpubEnabled: true,
+          fileWriteEpubMaxFileSizeMb: 200,
+          fileWritePdfEnabled: false,
+          fileWritePdfMaxFileSizeMb: 50,
+          fileWriteCbxEnabled: true,
+          fileWriteCbxMaxFileSizeMb: 1000,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as Record<string, unknown>;
+      expect(body.fileWriteEnabled).toBe(true);
+      expect(body.fileWriteWriteCover).toBe(false);
+      expect(body.fileWriteEpubEnabled).toBe(true);
+      expect(body.fileWriteEpubMaxFileSizeMb).toBe(200);
+      expect(body.fileWritePdfEnabled).toBe(false);
+      expect(body.fileWritePdfMaxFileSizeMb).toBe(50);
+      expect(body.fileWriteCbxEnabled).toBe(true);
+      expect(body.fileWriteCbxMaxFileSizeMb).toBe(1000);
+    });
+
+    it('updates file write settings for an existing library via API', async () => {
+      const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+
+      const response = await context.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(context.adminToken),
+        payload: {
+          fileWriteEnabled: true,
+          fileWriteCbxEnabled: true,
+          fileWriteCbxMaxFileSizeMb: 750,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as Record<string, unknown>;
+      expect(body.fileWriteEnabled).toBe(true);
+      expect(body.fileWriteCbxEnabled).toBe(true);
+      expect(body.fileWriteCbxMaxFileSizeMb).toBe(750);
+    });
+
+    it('rejects API call when max size is below minimum', async () => {
+      const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+
+      const response = await context.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(context.adminToken),
+        payload: { fileWriteEpubMaxFileSizeMb: 0 },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
   });
 
@@ -1378,8 +1516,6 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     });
 
     it('returns 404 for sync requests targeting a missing library', async () => {
-      await setFileWriteSettings(context.db, { enabled: true });
-
       const response = await context.app.inject({
         method: 'POST',
         url: '/api/v1/libraries/999999/write-metadata-to-files',
@@ -1425,7 +1561,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       expect(viewerAccess.statusCode).toBe(403);
 
       await grantLibraryAccess(context, withPermissionUser.userId, library.libraryId, 'editor');
-      await setFileWriteSettings(context.db, { enabled: true });
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEnabled: true });
       const editorAccess = await context.app.inject({
         method: 'POST',
         url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
@@ -1442,8 +1578,15 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
   });
 });
 
-async function prepareLibraryWithAllFormats(ctx: MetadataWriteE2EContext): Promise<PreparedLibraryResult> {
-  const library = await createLibraryWithFolder(ctx, { mode: 'book_per_file' });
+async function prepareLibraryWithAllFormats(
+  ctx: MetadataWriteE2EContext,
+  fileWriteOptions: {
+    fileWriteEnabled?: boolean;
+    fileWriteWriteCover?: boolean;
+    fileWriteCbxEnabled?: boolean;
+  } = {},
+): Promise<PreparedLibraryResult> {
+  const library = await createLibraryWithFolder(ctx, { mode: 'book_per_file', ...fileWriteOptions });
 
   await Promise.all([
     createPdfFixture(library.folderPath, 'all-formats/book.pdf', 'All Formats PDF Seed'),

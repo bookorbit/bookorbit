@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags, BookOpen } from 'lucide-vue-next'
+import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags, BookOpen, FileEdit } from 'lucide-vue-next'
 import type { CoverAspectRatio, Library, OrganizationMode } from '@projectx/types'
 import { api } from '@/lib/api'
 import { useLibraryCreator } from '../composables/useLibraryCreator'
@@ -11,6 +11,7 @@ import LibraryCreatorSchedule from './LibraryCreatorSchedule.vue'
 import LibraryCreatorAccess from './LibraryCreatorAccess.vue'
 import LibraryCreatorMetadata from './LibraryCreatorMetadata.vue'
 import LibraryCreatorReading from './LibraryCreatorReading.vue'
+import LibraryCreatorFileWrite from './LibraryCreatorFileWrite.vue'
 
 const props = defineProps<{
   library?: Library | null
@@ -24,13 +25,14 @@ const emit = defineEmits<{
 const creator = useLibraryCreator()
 const { form, mode, editingLibraryId, loading, prescanLoading, prescanResult, error } = creator
 
-type SectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'reading' | 'schedule' | 'access'
+type SectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'fileWrite' | 'reading' | 'schedule' | 'access'
 
 const ALL_SECTIONS: { id: SectionId; label: string; icon: unknown; component: unknown }[] = [
   { id: 'details', label: 'Details', icon: Info, component: LibraryCreatorDetails },
   { id: 'folders', label: 'Folders', icon: FolderOpen, component: LibraryCreatorFolders },
   { id: 'scanner', label: 'Scanner', icon: ScanLine, component: LibraryCreatorScanner },
   { id: 'metadata', label: 'Metadata', icon: Tags, component: LibraryCreatorMetadata },
+  { id: 'fileWrite', label: 'File Write', icon: FileEdit, component: LibraryCreatorFileWrite },
   { id: 'reading', label: 'Reading', icon: BookOpen, component: LibraryCreatorReading },
   { id: 'schedule', label: 'Schedule', icon: Clock, component: LibraryCreatorSchedule },
   { id: 'access', label: 'Access', icon: Users, component: LibraryCreatorAccess },
@@ -133,6 +135,16 @@ const sectionProps = computed(() => ({
     metadataPrecedence: form.metadataPrecedence,
     formatPriority: form.formatPriority,
   },
+  fileWrite: {
+    fileWriteEnabled: form.fileWriteEnabled,
+    fileWriteWriteCover: form.fileWriteWriteCover,
+    fileWriteEpubEnabled: form.fileWriteEpubEnabled,
+    fileWriteEpubMaxFileSizeMb: form.fileWriteEpubMaxFileSizeMb,
+    fileWritePdfEnabled: form.fileWritePdfEnabled,
+    fileWritePdfMaxFileSizeMb: form.fileWritePdfMaxFileSizeMb,
+    fileWriteCbxEnabled: form.fileWriteCbxEnabled,
+    fileWriteCbxMaxFileSizeMb: form.fileWriteCbxMaxFileSizeMb,
+  },
   reading: {
     readingThreshold: form.readingThreshold,
     markAsFinishedPercentComplete: form.markAsFinishedPercentComplete,
@@ -160,6 +172,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
   else if (event === 'update:markAsFinishedPercentComplete') form.markAsFinishedPercentComplete = value as number
   else if (event === 'update:watch') form.watch = value as boolean
   else if (event === 'update:autoScanCronExpression') form.autoScanCronExpression = value as string | null
+  else if (event === 'update:fileWriteEnabled') form.fileWriteEnabled = value as boolean
+  else if (event === 'update:fileWriteWriteCover') form.fileWriteWriteCover = value as boolean
+  else if (event === 'update:fileWriteEpubEnabled') form.fileWriteEpubEnabled = value as boolean
+  else if (event === 'update:fileWriteEpubMaxFileSizeMb') form.fileWriteEpubMaxFileSizeMb = value as number
+  else if (event === 'update:fileWritePdfEnabled') form.fileWritePdfEnabled = value as boolean
+  else if (event === 'update:fileWritePdfMaxFileSizeMb') form.fileWritePdfMaxFileSizeMb = value as number
+  else if (event === 'update:fileWriteCbxEnabled') form.fileWriteCbxEnabled = value as boolean
+  else if (event === 'update:fileWriteCbxMaxFileSizeMb') form.fileWriteCbxMaxFileSizeMb = value as number
 }
 </script>
 
@@ -256,6 +276,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:markAsFinishedPercentComplete="onSectionEvent(activeId, 'update:markAsFinishedPercentComplete', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
+                @update:fileWriteEnabled="onSectionEvent(activeId, 'update:fileWriteEnabled', $event)"
+                @update:fileWriteWriteCover="onSectionEvent(activeId, 'update:fileWriteWriteCover', $event)"
+                @update:fileWriteEpubEnabled="onSectionEvent(activeId, 'update:fileWriteEpubEnabled', $event)"
+                @update:fileWriteEpubMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteEpubMaxFileSizeMb', $event)"
+                @update:fileWritePdfEnabled="onSectionEvent(activeId, 'update:fileWritePdfEnabled', $event)"
+                @update:fileWritePdfMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWritePdfMaxFileSizeMb', $event)"
+                @update:fileWriteCbxEnabled="onSectionEvent(activeId, 'update:fileWriteCbxEnabled', $event)"
+                @update:fileWriteCbxMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteCbxMaxFileSizeMb', $event)"
               />
             </div>
             <div class="shrink-0 px-4 py-4 border-t border-border">
@@ -383,6 +411,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:markAsFinishedPercentComplete="onSectionEvent(activeId, 'update:markAsFinishedPercentComplete', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
+                @update:fileWriteEnabled="onSectionEvent(activeId, 'update:fileWriteEnabled', $event)"
+                @update:fileWriteWriteCover="onSectionEvent(activeId, 'update:fileWriteWriteCover', $event)"
+                @update:fileWriteEpubEnabled="onSectionEvent(activeId, 'update:fileWriteEpubEnabled', $event)"
+                @update:fileWriteEpubMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteEpubMaxFileSizeMb', $event)"
+                @update:fileWritePdfEnabled="onSectionEvent(activeId, 'update:fileWritePdfEnabled', $event)"
+                @update:fileWritePdfMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWritePdfMaxFileSizeMb', $event)"
+                @update:fileWriteCbxEnabled="onSectionEvent(activeId, 'update:fileWriteCbxEnabled', $event)"
+                @update:fileWriteCbxMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteCbxMaxFileSizeMb', $event)"
               />
             </div>
 

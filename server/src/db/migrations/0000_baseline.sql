@@ -1,7 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS vector;
---> statement-breakpoint
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
---> statement-breakpoint
 CREATE TYPE "public"."library_access_level" AS ENUM('viewer', 'editor', 'owner');--> statement-breakpoint
 CREATE TYPE "public"."user_avatar_source" AS ENUM('none', 'external', 'uploaded');--> statement-breakpoint
 CREATE TYPE "public"."opds_sort_order" AS ENUM('recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc');--> statement-breakpoint
@@ -201,6 +197,14 @@ CREATE TABLE "libraries" (
 	"exclude_patterns" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"reading_threshold" double precision DEFAULT 0.25 NOT NULL,
 	"mark_as_finished_percent_complete" integer DEFAULT 98 NOT NULL,
+	"file_write_enabled" boolean DEFAULT false NOT NULL,
+	"file_write_write_cover" boolean DEFAULT true NOT NULL,
+	"file_write_epub_enabled" boolean DEFAULT true NOT NULL,
+	"file_write_epub_max_file_size_mb" integer DEFAULT 100 NOT NULL,
+	"file_write_pdf_enabled" boolean DEFAULT true NOT NULL,
+	"file_write_pdf_max_file_size_mb" integer DEFAULT 100 NOT NULL,
+	"file_write_cbx_enabled" boolean DEFAULT false NOT NULL,
+	"file_write_cbx_max_file_size_mb" integer DEFAULT 500 NOT NULL,
 	"file_naming_pattern" varchar(500),
 	"metadata_fetch_preferences" jsonb,
 	"book_metadata_fetch_config" jsonb,
@@ -211,11 +215,14 @@ CREATE TABLE "libraries" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "libraries_display_order_nonnegative_chk" CHECK ("libraries"."display_order" >= 0),
-	CONSTRAINT "libraries_organization_mode_chk" CHECK ("libraries"."organization_mode" in ('book_per_folder', 'file_per_book')),
+	CONSTRAINT "libraries_organization_mode_chk" CHECK ("libraries"."organization_mode" in ('book_per_folder', 'book_per_file')),
 	CONSTRAINT "libraries_reading_threshold_range_chk" CHECK ("libraries"."reading_threshold" >= 0 and "libraries"."reading_threshold" <= 1),
 	CONSTRAINT "libraries_mark_finished_percent_range_chk" CHECK ("libraries"."mark_as_finished_percent_complete" >= 0 and "libraries"."mark_as_finished_percent_complete" <= 100),
 	CONSTRAINT "libraries_scan_mode_chk" CHECK ("libraries"."scan_mode" in ('auto', 'manual')),
-	CONSTRAINT "libraries_poll_interval_nonnegative_chk" CHECK ("libraries"."poll_interval_seconds" is null or "libraries"."poll_interval_seconds" >= 0)
+	CONSTRAINT "libraries_poll_interval_nonnegative_chk" CHECK ("libraries"."poll_interval_seconds" is null or "libraries"."poll_interval_seconds" >= 0),
+	CONSTRAINT "libraries_file_write_epub_max_size_chk" CHECK ("libraries"."file_write_epub_max_file_size_mb" >= 1),
+	CONSTRAINT "libraries_file_write_pdf_max_size_chk" CHECK ("libraries"."file_write_pdf_max_file_size_mb" >= 1),
+	CONSTRAINT "libraries_file_write_cbx_max_size_chk" CHECK ("libraries"."file_write_cbx_max_file_size_mb" >= 1)
 );
 --> statement-breakpoint
 CREATE TABLE "library_folders" (
@@ -811,7 +818,7 @@ ALTER TABLE "migration_sources" ADD CONSTRAINT "migration_sources_created_by_use
 ALTER TABLE "library_folders" ADD CONSTRAINT "library_folders_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_files" ADD CONSTRAINT "book_files_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_files" ADD CONSTRAINT "book_files_library_folder_id_library_folders_id_fk" FOREIGN KEY ("library_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "book_files" ADD CONSTRAINT "book_files_book_folder_consistency_fk" FOREIGN KEY ("book_id","library_folder_id") REFERENCES "public"."books"("id","library_folder_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_files" ADD CONSTRAINT "book_files_book_folder_consistency_fk" FOREIGN KEY ("book_id","library_folder_id") REFERENCES "public"."books"("id","library_folder_id") ON DELETE no action ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "books" ADD CONSTRAINT "books_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "books" ADD CONSTRAINT "books_library_folder_id_library_folders_id_fk" FOREIGN KEY ("library_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "books" ADD CONSTRAINT "books_primary_file_id_book_files_id_fk" FOREIGN KEY ("primary_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

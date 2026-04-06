@@ -17,3 +17,6 @@ export const LIBRARY_MARK_AS_FINISHED_MAX = 100;
 
 export const LIBRARY_BOOK_STATUS_PRESENT = 'present';
 export const LIBRARY_METADATA_PRECEDENCE_DEFAULT = ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'] as const;
+
+export const LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN = 1;
+export const LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX = 10000;

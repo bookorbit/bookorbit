@@ -1,5 +1,5 @@
 {
-  "id": "67c2c149-d6e1-477c-a7a0-67f819b511ab",
+  "id": "48886cdb-ff31-4dca-9781-e0a35a0750c8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1749,6 +1749,62 @@
           "notNull": true,
           "default": 98
         },
+        "file_write_enabled": {
+          "name": "file_write_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "file_write_write_cover": {
+          "name": "file_write_write_cover",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "file_write_epub_enabled": {
+          "name": "file_write_epub_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "file_write_epub_max_file_size_mb": {
+          "name": "file_write_epub_max_file_size_mb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 100
+        },
+        "file_write_pdf_enabled": {
+          "name": "file_write_pdf_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "file_write_pdf_max_file_size_mb": {
+          "name": "file_write_pdf_max_file_size_mb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 100
+        },
+        "file_write_cbx_enabled": {
+          "name": "file_write_cbx_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "file_write_cbx_max_file_size_mb": {
+          "name": "file_write_cbx_max_file_size_mb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 500
+        },
         "file_naming_pattern": {
           "name": "file_naming_pattern",
           "type": "varchar(500)",
@@ -1836,7 +1892,7 @@
         },
         "libraries_organization_mode_chk": {
           "name": "libraries_organization_mode_chk",
-          "value": "\"libraries\".\"organization_mode\" in ('book_per_folder', 'file_per_book')"
+          "value": "\"libraries\".\"organization_mode\" in ('book_per_folder', 'book_per_file')"
         },
         "libraries_reading_threshold_range_chk": {
           "name": "libraries_reading_threshold_range_chk",
@@ -1853,6 +1909,18 @@
         "libraries_poll_interval_nonnegative_chk": {
           "name": "libraries_poll_interval_nonnegative_chk",
           "value": "\"libraries\".\"poll_interval_seconds\" is null or \"libraries\".\"poll_interval_seconds\" >= 0"
+        },
+        "libraries_file_write_epub_max_size_chk": {
+          "name": "libraries_file_write_epub_max_size_chk",
+          "value": "\"libraries\".\"file_write_epub_max_file_size_mb\" >= 1"
+        },
+        "libraries_file_write_pdf_max_size_chk": {
+          "name": "libraries_file_write_pdf_max_size_chk",
+          "value": "\"libraries\".\"file_write_pdf_max_file_size_mb\" >= 1"
+        },
+        "libraries_file_write_cbx_max_size_chk": {
+          "name": "libraries_file_write_cbx_max_size_chk",
+          "value": "\"libraries\".\"file_write_cbx_max_file_size_mb\" >= 1"
         }
       },
       "isRLSEnabled": false
@@ -2206,7 +2274,7 @@
           "columnsFrom": ["book_id", "library_folder_id"],
           "columnsTo": ["id", "library_folder_id"],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},

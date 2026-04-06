@@ -56,7 +56,6 @@ describe('LibraryService', () => {
   const scannerService = { startScanAsync: vi.fn() };
   const fileWatcherService = { startWatcher: vi.fn(), stopWatcher: vi.fn() };
   const fileWriteService = {
-    resolveSettings: vi.fn(),
     findNonMissingPrimaryFilesByLibrary: vi.fn(),
     writeToFile: vi.fn(),
   };
@@ -120,6 +119,27 @@ describe('LibraryService', () => {
       { id: 11, path: '/a' },
       { id: 12, path: '/b' },
     ]);
+  });
+
+  it('create passes file write defaults to insert', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi' }]);
+    libraryRepo.insertFolder.mockResolvedValueOnce([{ id: 11, path: '/a' }]);
+
+    await service.create({ name: 'Sci-Fi', folders: ['/a'] } as any);
+
+    expect(libraryRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileWriteEnabled: false,
+        fileWriteWriteCover: true,
+        fileWriteEpubEnabled: true,
+        fileWriteEpubMaxFileSizeMb: 100,
+        fileWritePdfEnabled: true,
+        fileWritePdfMaxFileSizeMb: 100,
+        fileWriteCbxEnabled: false,
+        fileWriteCbxMaxFileSizeMb: 500,
+      }),
+    );
   });
 
   it('create starts watcher immediately when watch is enabled', async () => {
@@ -276,8 +296,7 @@ describe('LibraryService', () => {
   });
 
   it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
-    fileWriteService.resolveSettings.mockResolvedValue({ enabled: false });
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L', fileWriteEnabled: false }]);
 
     await expect(service.writeMetadataToFiles(1, 7, false)).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -290,8 +309,7 @@ describe('LibraryService', () => {
   });
 
   it('writeMetadataToFiles emits progress and returns summary counters', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
-    fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L', fileWriteEnabled: true }]);
     fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }, { bookId: 3 }]);
     fileWriteService.writeToFile
       .mockResolvedValueOnce({ status: 'success', fieldsWritten: [], durationMs: 1 })
@@ -308,8 +326,7 @@ describe('LibraryService', () => {
   });
 
   it('writeMetadataToFiles stops when cancellation is requested', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L' }]);
-    fileWriteService.resolveSettings.mockResolvedValue({ enabled: true });
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L', fileWriteEnabled: true }]);
     fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }, { bookId: 2 }]);
     fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
 

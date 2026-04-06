@@ -5,9 +5,7 @@
     "methodName": "setLibraries",
     "httpMethod": "PUT",
     "path": "/users/:id/libraries",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -19,9 +17,7 @@
     "methodName": "adminResetPassword",
     "httpMethod": "POST",
     "path": "/users/:id/reset-password",
-    "permissions": [
-      "Permission.ManageUsers"
-    ],
+    "permissions": ["Permission.ManageUsers"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,

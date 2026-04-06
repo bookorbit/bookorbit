@@ -6,7 +6,7 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 import * as LucideIcons from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import type { GlobalFileWriteSettings, Library as LibraryType, LibraryStats } from '@projectx/types'
+import type { Library as LibraryType, LibraryStats } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
@@ -34,7 +34,6 @@ const deletingLibrary = ref<LibraryType | null>(null)
 const deleteConfirmName = ref('')
 const deleting = ref(false)
 const fileSyncingMap = ref<Record<number, boolean>>({})
-const fileWriteEnabled = ref(false)
 const confirmSyncLibrary = ref<LibraryType | null>(null)
 
 const { syncAll: syncAllFiles } = useLibraryFileSync()
@@ -59,7 +58,7 @@ async function confirmSyncFiles() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
     if (msg.includes('400')) {
-      toast.error('Metadata file write is not enabled. Turn it on in Maintenance settings.')
+      toast.error('Metadata file write is not enabled for this library. Enable it in the library settings.')
     } else {
       toast.error(`File sync failed for "${lib.name}"`)
     }
@@ -88,12 +87,6 @@ onMounted(async () => {
   await fetchLibraries()
   subscribeAll()
   loadAllStats()
-  api('/api/v1/app-settings/file-write-settings').then(async (res) => {
-    if (res.ok) {
-      const data: GlobalFileWriteSettings = await res.json()
-      fileWriteEnabled.value = data.enabled
-    }
-  })
 })
 
 const statsReloadedFor = new Set<number>()
@@ -329,7 +322,7 @@ function coverRefreshLabel(libraryId: number): string {
                   <Images :class="isRefreshingCovers(lib.id) ? 'animate-pulse' : ''" />
                   Refresh covers
                 </DropdownMenuItem>
-                <DropdownMenuItem :disabled="!!fileSyncingMap[lib.id] || !fileWriteEnabled" @click="promptSyncFiles(lib)">
+                <DropdownMenuItem :disabled="!!fileSyncingMap[lib.id] || !lib.fileWriteEnabled" @click="promptSyncFiles(lib)">
                   <FileEdit :class="fileSyncingMap[lib.id] ? 'animate-pulse' : ''" />
                   <span class="flex-1">Sync metadata to files</span>
                 </DropdownMenuItem>

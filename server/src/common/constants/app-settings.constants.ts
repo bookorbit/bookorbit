@@ -17,7 +17,6 @@ export const APP_SETTING_KEYS = {
   OIDC_CONFIG: 'oidc_config',
   UPLOAD_FILE_PATTERN: 'upload_file_pattern',
   DOWNLOAD_FILE_PATTERN: 'download_file_pattern',
-  FILE_WRITE_SETTINGS: 'file_write_settings',
   METADATA_SCORE_WEIGHTS: 'metadata_score_weights',
   AUDIT_RETENTION_DAYS: 'audit_retention_days',
   INITIAL_SETUP_COMPLETED_AT: 'initial_setup_completed_at',

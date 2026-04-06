@@ -2,7 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import type { MockedFunction } from 'vitest';
 import { readdir, readFile } from 'fs/promises';
 
-import { DEFAULT_FILE_WRITE_SETTINGS } from '@projectx/types';
 import { FileWriteService } from './file-write.service';
 
 vi.mock('fs/promises', async () => {
@@ -17,16 +16,25 @@ vi.mock('fs/promises', async () => {
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
 
+const DEFAULT_LIB_CONFIG = {
+  fileWriteEnabled: true,
+  fileWriteWriteCover: true,
+  fileWriteEpubEnabled: true,
+  fileWriteEpubMaxFileSizeMb: 100,
+  fileWritePdfEnabled: true,
+  fileWritePdfMaxFileSizeMb: 100,
+  fileWriteCbxEnabled: true,
+  fileWriteCbxMaxFileSizeMb: 500,
+};
+
 describe('FileWriteService', () => {
   function makeService(configValues: Record<string, unknown> = {}) {
     const fileWriteRepo = {
       findPrimaryFileForBook: vi.fn(),
+      findLibraryFileWriteConfig: vi.fn().mockResolvedValue({ ...DEFAULT_LIB_CONFIG }),
       loadPayload: vi.fn(),
       insertLog: vi.fn().mockResolvedValue(undefined),
       setLastWrittenAt: vi.fn().mockResolvedValue(undefined),
-    };
-    const settingsService = {
-      resolveForLibrary: vi.fn().mockResolvedValue({ ...DEFAULT_FILE_WRITE_SETTINGS, enabled: true }),
     };
     const writer = {
       write: vi.fn(),
@@ -42,9 +50,9 @@ describe('FileWriteService', () => {
       get: vi.fn().mockImplementation((key: string) => (key === 'storage.booksPath' ? '/books' : configValues[key])),
     } as unknown as ConfigService;
 
-    const service = new FileWriteService(fileWriteRepo as never, settingsService as never, registry as never, lockService as never, config);
+    const service = new FileWriteService(fileWriteRepo as never, registry as never, lockService as never, config);
 
-    return { service, fileWriteRepo, settingsService, registry, writer, lockService };
+    return { service, fileWriteRepo, registry, writer, lockService };
   }
 
   beforeEach(() => {
@@ -91,8 +99,8 @@ describe('FileWriteService', () => {
     );
   });
 
-  it('returns disabled when global writes are off (non-dry-run)', async () => {
-    const { service, fileWriteRepo, settingsService, writer } = makeService();
+  it('returns disabled when file write is off for the library (non-dry-run)', async () => {
+    const { service, fileWriteRepo, writer } = makeService();
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
       absolutePath: '/books/x.epub',
@@ -100,7 +108,7 @@ describe('FileWriteService', () => {
       sizeBytes: 10,
       libraryId: 2,
     });
-    settingsService.resolveForLibrary.mockResolvedValue({ ...DEFAULT_FILE_WRITE_SETTINGS, enabled: false });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false });
 
     const result = await service.writeToFile(10, 'auto');
 
@@ -109,7 +117,7 @@ describe('FileWriteService', () => {
   });
 
   it('skips when format exceeds max size and logs for sync trigger', async () => {
-    const { service, fileWriteRepo, settingsService } = makeService();
+    const { service, fileWriteRepo } = makeService();
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
       absolutePath: '/books/x.pdf',
@@ -117,10 +125,9 @@ describe('FileWriteService', () => {
       sizeBytes: 500,
       libraryId: 2,
     });
-    settingsService.resolveForLibrary.mockResolvedValue({
-      ...DEFAULT_FILE_WRITE_SETTINGS,
-      enabled: true,
-      pdf: { enabled: true, maxFileSizeBytes: 100 },
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({
+      ...DEFAULT_LIB_CONFIG,
+      fileWritePdfMaxFileSizeMb: 0,
     });
 
     const result = await service.writeToFile(10, 'sync', 8);
@@ -136,7 +143,7 @@ describe('FileWriteService', () => {
   });
 
   it('writes successfully with lock, cover loading, logging, and lastWrittenAt update', async () => {
-    const { service, fileWriteRepo, settingsService, writer, lockService } = makeService();
+    const { service, fileWriteRepo, writer, lockService } = makeService();
 
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
@@ -146,7 +153,7 @@ describe('FileWriteService', () => {
       libraryId: 2,
     });
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune', authors: [{ name: 'Frank Herbert', sortName: null }] });
-    settingsService.resolveForLibrary.mockResolvedValue({ ...DEFAULT_FILE_WRITE_SETTINGS, enabled: true, writeCover: true });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: true });
 
     const coverBytes = Buffer.from('cover');
     mockReaddir.mockResolvedValue(['cover_extracted.jpg', 'cover_custom.png'] as never);
@@ -168,8 +175,87 @@ describe('FileWriteService', () => {
     expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledWith(5, expect.any(Date));
   });
 
+  it('returns skip when library config is not found', async () => {
+    const { service, fileWriteRepo } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/x.epub',
+      format: 'epub',
+      sizeBytes: 10,
+      libraryId: 99,
+    });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue(null);
+
+    const result = await service.writeToFile(5, 'auto');
+
+    expect(result).toEqual({ status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'library not found' });
+    expect(fileWriteRepo.insertLog).not.toHaveBeenCalled();
+  });
+
+  it('skips with format disabled when cbz routes to cbx settings and cbx is off', async () => {
+    const { service, fileWriteRepo } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/x.cbz',
+      format: 'cbz',
+      sizeBytes: 100,
+      libraryId: 2,
+    });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({
+      ...DEFAULT_LIB_CONFIG,
+      fileWriteCbxEnabled: false,
+    });
+
+    const result = await service.writeToFile(10, 'auto');
+
+    expect(result.status).toBe('skipped');
+    expect(result.reason).toBe('format disabled');
+  });
+
+  it('skips with format disabled when cb7 routes to cbx settings and cbx is off', async () => {
+    const { service, fileWriteRepo } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/x.cb7',
+      format: 'cb7',
+      sizeBytes: 100,
+      libraryId: 2,
+    });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({
+      ...DEFAULT_LIB_CONFIG,
+      fileWriteCbxEnabled: false,
+    });
+
+    const result = await service.writeToFile(10, 'sync', 5);
+
+    expect(result.status).toBe('skipped');
+    expect(result.reason).toBe('format disabled');
+    expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(expect.objectContaining({ format: 'cb7', triggeredBy: 'sync' }));
+  });
+
+  it('skips when cbz file exceeds cbxMaxFileSizeMb', async () => {
+    const { service, fileWriteRepo } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/x.cbz',
+      format: 'cbz',
+      sizeBytes: 600 * 1024 * 1024,
+      libraryId: 2,
+    });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({
+      ...DEFAULT_LIB_CONFIG,
+      fileWriteCbxEnabled: true,
+      fileWriteCbxMaxFileSizeMb: 500,
+    });
+
+    const result = await service.writeToFile(10, 'auto');
+
+    expect(result.status).toBe('skipped');
+    expect(result.reason).toBe('file exceeds size limit');
+  });
+
   it('returns failed and logs when writer throws', async () => {
-    const { service, fileWriteRepo, settingsService, writer } = makeService();
+    const { service, fileWriteRepo, writer } = makeService();
 
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
@@ -179,11 +265,7 @@ describe('FileWriteService', () => {
       libraryId: 2,
     });
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune' });
-    settingsService.resolveForLibrary.mockResolvedValue({
-      ...DEFAULT_FILE_WRITE_SETTINGS,
-      enabled: true,
-      cbx: { enabled: true, formats: ['cbz', 'cb7'], maxFileSizeBytes: 1_000_000 },
-    });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteCbxEnabled: true });
     writer.write.mockRejectedValue(new Error('zip broken'));
 
     const result = await service.writeToFile(5, 'sync', 3);
@@ -198,8 +280,8 @@ describe('FileWriteService', () => {
     expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
   });
 
-  it('dry-run bypasses global disabled gate and avoids cover read', async () => {
-    const { service, fileWriteRepo, settingsService, writer } = makeService();
+  it('dry-run bypasses disabled gate and avoids cover read', async () => {
+    const { service, fileWriteRepo, writer } = makeService();
 
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
@@ -209,7 +291,7 @@ describe('FileWriteService', () => {
       libraryId: 2,
     });
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune' });
-    settingsService.resolveForLibrary.mockResolvedValue({ ...DEFAULT_FILE_WRITE_SETTINGS, enabled: false, writeCover: true });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false, fileWriteWriteCover: true });
     writer.write.mockResolvedValue({ status: 'skipped', fieldsWritten: ['title'], durationMs: 0, reason: 'dry-run' });
 
     const result = await service.writeToFile(5, 'auto', undefined, true);
@@ -267,7 +349,7 @@ describe('FileWriteService', () => {
   });
 
   it('limits concurrent writes using configured max write slots', async () => {
-    const { service, fileWriteRepo, settingsService, writer } = makeService({ 'fileWrite.maxConcurrentWrites': 1 });
+    const { service, fileWriteRepo, writer } = makeService({ 'fileWrite.maxConcurrentWrites': 1 });
     fileWriteRepo.findPrimaryFileForBook.mockImplementation((bookId: number) => ({
       id: bookId,
       absolutePath: `/books/${bookId}.epub`,
@@ -276,7 +358,7 @@ describe('FileWriteService', () => {
       libraryId: 2,
     }));
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Queued write' });
-    settingsService.resolveForLibrary.mockResolvedValue({ ...DEFAULT_FILE_WRITE_SETTINGS, enabled: true, writeCover: false });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
 
     const order: string[] = [];
     let releaseFirst!: () => void;

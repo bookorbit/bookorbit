@@ -509,6 +509,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
       await context.db.insert(schema.passwordResetTokens).values({
         userId: user.userId,
         tokenHash: sha256(expiredToken),
+        createdAt: new Date(Date.now() - 120_000),
         expiresAt: new Date(Date.now() - 60_000),
       });
 
@@ -610,6 +611,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
           idTokenHint: `id-token-${randomUUID()}`,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         })
         .returning({ id: schema.oidcSessions.id, idTokenHint: schema.oidcSessions.idTokenHint });
 
@@ -670,6 +672,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
           idTokenHint: null,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         })
         .returning({ id: schema.oidcSessions.id });
 
@@ -703,6 +706,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
           idTokenHint: `id-token-${randomUUID()}`,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         })
         .returning({ id: schema.oidcSessions.id });
 
@@ -740,6 +744,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
           idTokenHint: `id-token-${randomUUID()}`,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         })
         .returning({ id: schema.oidcSessions.id });
 

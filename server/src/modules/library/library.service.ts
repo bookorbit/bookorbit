@@ -112,6 +112,14 @@ export class LibraryService {
       readingThreshold: dto.readingThreshold ?? 0.25,
       markAsFinishedPercentComplete: dto.markAsFinishedPercentComplete ?? 98,
       fileNamingPattern: dto.fileNamingPattern ?? null,
+      fileWriteEnabled: dto.fileWriteEnabled ?? false,
+      fileWriteWriteCover: dto.fileWriteWriteCover ?? true,
+      fileWriteEpubEnabled: dto.fileWriteEpubEnabled ?? true,
+      fileWriteEpubMaxFileSizeMb: dto.fileWriteEpubMaxFileSizeMb ?? 100,
+      fileWritePdfEnabled: dto.fileWritePdfEnabled ?? true,
+      fileWritePdfMaxFileSizeMb: dto.fileWritePdfMaxFileSizeMb ?? 100,
+      fileWriteCbxEnabled: dto.fileWriteCbxEnabled ?? false,
+      fileWriteCbxMaxFileSizeMb: dto.fileWriteCbxMaxFileSizeMb ?? 500,
     });
 
     const folders = await Promise.all(dto.folders.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));
@@ -283,11 +291,8 @@ export class LibraryService {
     const [library] = await this.libraryRepo.findById(libraryId);
     if (!library) throw new NotFoundException('Library not found');
 
-    if (!dryRun) {
-      const settings = await this.fileWriteService.resolveSettings(libraryId);
-      if (!settings.enabled) {
-        throw new BadRequestException('Metadata file write is not enabled. Enable it in Maintenance settings first.');
-      }
+    if (!dryRun && !library.fileWriteEnabled) {
+      throw new BadRequestException('Metadata file write is not enabled for this library.');
     }
 
     const rows = await this.fileWriteService.findNonMissingPrimaryFilesByLibrary(libraryId);

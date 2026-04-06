@@ -53,9 +53,7 @@
     "methodName": "listSettings",
     "httpMethod": "GET",
     "path": "/app-settings",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -67,9 +65,7 @@
     "methodName": "update",
     "httpMethod": "PATCH",
     "path": "/app-settings/:key",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -81,9 +77,7 @@
     "methodName": "getUploadPattern",
     "httpMethod": "GET",
     "path": "/app-settings/upload-pattern",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -95,9 +89,7 @@
     "methodName": "setUploadPattern",
     "httpMethod": "PUT",
     "path": "/app-settings/upload-pattern",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -109,9 +101,7 @@
     "methodName": "getDownloadPattern",
     "httpMethod": "GET",
     "path": "/app-settings/download-pattern",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -123,9 +113,7 @@
     "methodName": "setDownloadPattern",
     "httpMethod": "PUT",
     "path": "/app-settings/download-pattern",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -137,9 +125,7 @@
     "methodName": "getOidcPublicConfig",
     "httpMethod": "GET",
     "path": "/app-settings/oidc/public",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": true,
     "allowDefault": false,
@@ -151,9 +137,7 @@
     "methodName": "getOidcConfig",
     "httpMethod": "GET",
     "path": "/app-settings/oidc",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -165,9 +149,7 @@
     "methodName": "updateOidcConfig",
     "httpMethod": "PUT",
     "path": "/app-settings/oidc",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -179,37 +161,7 @@
     "methodName": "testOidcConnection",
     "httpMethod": "POST",
     "path": "/app-settings/oidc/test",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
-    "libraryAccess": [],
-    "isPublic": false,
-    "allowDefault": false,
-    "useGuards": []
-  },
-  {
-    "file": "server/src/modules/app-settings/app-settings.controller.ts",
-    "className": "AppSettingsController",
-    "methodName": "getFileWriteSettings",
-    "httpMethod": "GET",
-    "path": "/app-settings/file-write-settings",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
-    "libraryAccess": [],
-    "isPublic": false,
-    "allowDefault": false,
-    "useGuards": []
-  },
-  {
-    "file": "server/src/modules/app-settings/app-settings.controller.ts",
-    "className": "AppSettingsController",
-    "methodName": "updateFileWriteSettings",
-    "httpMethod": "PUT",
-    "path": "/app-settings/file-write-settings",
-    "permissions": [
-      "Permission.ManageAppSettings"
-    ],
+    "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -221,9 +173,7 @@
     "methodName": "getAuditLogs",
     "httpMethod": "GET",
     "path": "/audit-log",
-    "permissions": [
-      "Permission.ViewAuditLog"
-    ],
+    "permissions": ["Permission.ViewAuditLog"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -487,9 +437,7 @@
     "methodName": "bulkRefreshMetadata",
     "httpMethod": "POST",
     "path": "/authors/bulk-refresh-metadata",
-    "permissions": [
-      "Permission.LibraryEditMetadata"
-    ],
+    "permissions": ["Permission.LibraryEditMetadata"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -501,9 +449,7 @@
     "methodName": "getEnrichmentConfig",
     "httpMethod": "GET",
     "path": "/authors/enrichment/config",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -515,9 +461,7 @@
     "methodName": "setEnrichmentConfig",
     "httpMethod": "PUT",
     "path": "/authors/enrichment/config",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -529,9 +473,7 @@
     "methodName": "previewCount",
     "httpMethod": "POST",
     "path": "/authors/enrichment/preview-count",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -543,9 +485,7 @@
     "methodName": "enqueueBackfill",
     "httpMethod": "POST",
     "path": "/authors/enrichment/backfill",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -557,9 +497,7 @@
     "methodName": "enqueueBackfillAll",
     "httpMethod": "POST",
     "path": "/authors/enrichment/backfill-all",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -571,9 +509,7 @@
     "methodName": "pauseEnrichment",
     "httpMethod": "POST",
     "path": "/authors/enrichment/pause",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -585,9 +521,7 @@
     "methodName": "resumeEnrichment",
     "httpMethod": "POST",
     "path": "/authors/enrichment/resume",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -599,9 +533,7 @@
     "methodName": "cancelEnrichment",
     "httpMethod": "POST",
     "path": "/authors/enrichment/cancel",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -613,9 +545,7 @@
     "methodName": "retryFailedEnrichment",
     "httpMethod": "POST",
     "path": "/authors/enrichment/retry-failed",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
@@ -627,9 +557,7 @@
     "methodName": "getFailedEnrichment",
     "httpMethod": "GET",
     "path": "/authors/enrichment/failed",
-    "permissions": [
-      "Permission.ManageMetadataConfig"
-    ],
+    "permissions": ["Permission.ManageMetadataConfig"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,

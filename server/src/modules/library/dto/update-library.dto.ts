@@ -20,6 +20,8 @@ import {
   LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,
   LIBRARY_AUTO_SCAN_CRON_EXPRESSION_REGEX,
   LIBRARY_COVER_ASPECT_RATIOS,
+  LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX,
+  LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN,
   LIBRARY_MARK_AS_FINISHED_MAX,
   LIBRARY_MARK_AS_FINISHED_MIN,
   LIBRARY_ORGANIZATION_MODES,
@@ -108,4 +110,42 @@ export class UpdateLibraryDto {
   @IsString()
   @MaxLength(500)
   fileNamingPattern?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  fileWriteEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fileWriteWriteCover?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fileWriteEpubEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN)
+  @Max(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX)
+  fileWriteEpubMaxFileSizeMb?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  fileWritePdfEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN)
+  @Max(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX)
+  fileWritePdfMaxFileSizeMb?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  fileWriteCbxEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN)
+  @Max(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX)
+  fileWriteCbxMaxFileSizeMb?: number;
 }

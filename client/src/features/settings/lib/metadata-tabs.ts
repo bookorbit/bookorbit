@@ -1,4 +1,4 @@
-export const METADATA_TABS = ['providers', 'field-rules', 'score', 'auto-fetch', 'authors', 'file-sync'] as const
+export const METADATA_TABS = ['providers', 'field-rules', 'score', 'auto-fetch', 'authors'] as const
 
 export type MetadataTab = (typeof METADATA_TABS)[number]
 
@@ -33,11 +33,6 @@ export const METADATA_TAB_INFO: Record<MetadataTab, MetadataTabInfo> = {
     navLabel: 'Authors',
     titleLabel: 'Author Auto-Fetch',
     subtitle: 'Automatically fetch biographies and profile photos when new authors appear in your library.',
-  },
-  'file-sync': {
-    navLabel: 'File Sync',
-    titleLabel: 'File Write-Back',
-    subtitle: 'Configure which metadata fields are saved directly into your book files on disk.',
   },
 }
 

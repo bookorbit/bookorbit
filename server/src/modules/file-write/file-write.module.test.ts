@@ -4,7 +4,6 @@ import { FileLockService } from './file-lock.service';
 import { FileWriteModule } from './file-write.module';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteService } from './file-write.service';
-import { FileWriteSettingsService } from './file-write-settings.service';
 import { FormatWriterRegistry } from './format-writer.registry';
 import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
 import { CbzFormatWriter } from './formats/cbx/cbz-format-writer';
@@ -21,7 +20,6 @@ describe('FileWriteModule', () => {
       expect.arrayContaining([
         FileWriteService,
         FileWriteRepository,
-        FileWriteSettingsService,
         FileLockService,
         EpubFormatWriter,
         PdfFormatWriter,
@@ -31,7 +29,7 @@ describe('FileWriteModule', () => {
       ]),
     );
 
-    expect(exportsMeta).toEqual(expect.arrayContaining([FileWriteService, FileWriteRepository, FileWriteSettingsService]));
+    expect(exportsMeta).toEqual(expect.arrayContaining([FileWriteService, FileWriteRepository]));
 
     const writerProvider = providers.find((p: { provide?: unknown }) => p?.provide === FORMAT_WRITERS) as {
       useFactory: (...args: unknown[]) => unknown;

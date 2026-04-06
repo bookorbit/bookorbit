@@ -119,14 +119,14 @@ export function buildMetadataPatch(sourceBook: {
 function sanitizeBoundedInteger(value: number | null | undefined, min: number, max: number): number | null | undefined {
   if (value === undefined) return undefined;
   if (value == null) return null;
-  if (!Number.isFinite(value) || value < min || value > max) return undefined;
+  if (!Number.isFinite(value) || value < min || value > max) return null;
   return Math.round(value);
 }
 
 function sanitizeNonNegativeInteger(value: number | null | undefined): number | null | undefined {
   if (value === undefined) return undefined;
   if (value == null) return null;
-  if (!Number.isFinite(value) || value < 0) return undefined;
+  if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
 }
 

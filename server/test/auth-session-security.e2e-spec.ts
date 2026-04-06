@@ -325,7 +325,7 @@ describe('Auth session security (e2e)', () => {
 
       await context.db
         .update(schema.refreshTokens)
-        .set({ expiresAt: new Date(Date.now() - 60_000) })
+        .set({ createdAt: new Date(Date.now() - 120_000), expiresAt: new Date(Date.now() - 60_000) })
         .where(eq(schema.refreshTokens.id, tokenRow!.id));
 
       const response = await context.app.inject({

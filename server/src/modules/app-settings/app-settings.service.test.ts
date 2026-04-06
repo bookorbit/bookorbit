@@ -359,68 +359,6 @@ describe('AppSettingsService', () => {
     });
   });
 
-  describe('getFileWriteSettings', () => {
-    it('returns default settings when not configured', async () => {
-      repo.findByKey.mockResolvedValue(undefined);
-      const settings = await service.getFileWriteSettings();
-      expect(settings).toHaveProperty('epub');
-      expect(settings).toHaveProperty('pdf');
-      expect(settings).toHaveProperty('cbx');
-      expect(settings.enabled).toBe(false);
-    });
-
-    it('returns defaults when row value is empty string', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'file_write_settings', value: '' } as never);
-      const settings = await service.getFileWriteSettings();
-      expect(settings).toHaveProperty('epub');
-    });
-
-    it('merges stored partial settings with defaults', async () => {
-      const stored = { epub: { writeMetadata: true, enabled: true, maxFileSizeBytes: 1000 } };
-      repo.findByKey.mockResolvedValue({ key: 'file_write_settings', value: JSON.stringify(stored) } as never);
-      const settings = await service.getFileWriteSettings();
-      expect(settings.epub.enabled).toBe(true);
-      expect(settings.epub.maxFileSizeBytes).toBe(1000);
-      expect(settings.pdf).toBeDefined();
-    });
-
-    it('returns defaults and warns when stored value is corrupt JSON', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'file_write_settings', value: '{broken' } as never);
-      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
-      const settings = await service.getFileWriteSettings();
-      expect(settings).toHaveProperty('epub');
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('file_write_settings'));
-    });
-  });
-
-  describe('updateFileWriteSettings', () => {
-    it('deep-merges epub patch without overwriting pdf/cbx', async () => {
-      repo.findByKey.mockResolvedValue(undefined);
-
-      const result = await service.updateFileWriteSettings({ epub: { enabled: true, maxFileSizeBytes: 500 } });
-      expect(result.epub.enabled).toBe(true);
-      expect(result.epub.maxFileSizeBytes).toBe(500);
-      expect(result.pdf).toBeDefined();
-      expect(result.cbx).toBeDefined();
-    });
-
-    it('merges top-level enabled flag', async () => {
-      repo.findByKey.mockResolvedValue(undefined);
-      const result = await service.updateFileWriteSettings({ enabled: true });
-      expect(result.enabled).toBe(true);
-      expect(result.epub).toBeDefined();
-    });
-
-    it('calls upsert once with serialized merged settings', async () => {
-      repo.findByKey.mockResolvedValue(undefined);
-      await service.updateFileWriteSettings({ writeCover: false });
-      expect(repo.upsert).toHaveBeenCalledOnce();
-      const [key, value] = repo.upsert.mock.calls[0];
-      expect(key).toBe('file_write_settings');
-      expect(JSON.parse(value)).toMatchObject({ writeCover: false });
-    });
-  });
-
   describe('getMetadataScoreWeights', () => {
     it('returns defaults when not configured', async () => {
       repo.findByKey.mockResolvedValue(undefined);

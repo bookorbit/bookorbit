@@ -3,11 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
-import type { WriteResult, GlobalFileWriteSettings } from '@projectx/types';
-import { CBX_FORMATS, FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
+import type { WriteResult } from '@projectx/types';
+import { FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
-import { FileWriteSettingsService } from './file-write-settings.service';
 import { FormatWriterRegistry } from './format-writer.registry';
 import type { BookWritePayload } from './interfaces/book-write-payload.interface';
 
@@ -31,7 +30,6 @@ export class FileWriteService implements OnModuleDestroy {
 
   constructor(
     private readonly fileWriteRepo: FileWriteRepository,
-    private readonly settingsService: FileWriteSettingsService,
     private readonly registry: FormatWriterRegistry,
     private readonly lockService: FileLockService,
     private readonly config: ConfigService,
@@ -121,14 +119,20 @@ export class FileWriteService implements OnModuleDestroy {
         return result;
       }
 
-      const settings = await this.settingsService.resolveForLibrary(file.libraryId);
-      if (!settings.enabled && !dryRun) {
+      const libConfig = await this.fileWriteRepo.findLibraryFileWriteConfig(file.libraryId);
+      if (!libConfig) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'library not found' };
+        this.logWriteEnd(bookId, format || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      if (!libConfig.fileWriteEnabled && !dryRun) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
         this.logWriteEnd(bookId, format || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
-      const formatSettings = resolveFormatSettings(settings, format);
+      const formatSettings = resolveFormatSettings(libConfig, format);
       if (!formatSettings.enabled) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format disabled' };
         if (triggeredBy === 'sync') {
@@ -157,7 +161,7 @@ export class FileWriteService implements OnModuleDestroy {
 
       const payload: BookWritePayload = { ...rawPayload };
 
-      if (settings.writeCover && !dryRun) {
+      if (libConfig.fileWriteWriteCover && !dryRun) {
         payload.coverBytes = await this.loadCoverBytes(bookId);
       }
 
@@ -193,10 +197,6 @@ export class FileWriteService implements OnModuleDestroy {
 
   findNonMissingPrimaryFilesByLibrary(libraryId: number) {
     return this.fileWriteRepo.findNonMissingPrimaryFilesByLibrary(libraryId);
-  }
-
-  resolveSettings(libraryId: number) {
-    return this.settingsService.resolveForLibrary(libraryId);
   }
 
   private async loadCoverBytes(bookId: number): Promise<Buffer | null> {
@@ -269,25 +269,29 @@ export class FileWriteService implements OnModuleDestroy {
   }
 }
 
-function resolveFormatSettings(settings: GlobalFileWriteSettings, format: string): { enabled: boolean; maxFileSizeBytes: number } {
+type LibraryFileWriteConfig = {
+  fileWriteEnabled: boolean;
+  fileWriteWriteCover: boolean;
+  fileWriteEpubEnabled: boolean;
+  fileWriteEpubMaxFileSizeMb: number;
+  fileWritePdfEnabled: boolean;
+  fileWritePdfMaxFileSizeMb: number;
+  fileWriteCbxEnabled: boolean;
+  fileWriteCbxMaxFileSizeMb: number;
+};
+
+function resolveFormatSettings(config: LibraryFileWriteConfig, format: string): { enabled: boolean; maxFileSizeBytes: number } {
   switch (format) {
     case FORMAT_EPUB:
-      return settings.epub;
+      return { enabled: config.fileWriteEpubEnabled, maxFileSizeBytes: config.fileWriteEpubMaxFileSizeMb * 1024 * 1024 };
     case FORMAT_PDF:
-      return settings.pdf;
+      return { enabled: config.fileWritePdfEnabled, maxFileSizeBytes: config.fileWritePdfMaxFileSizeMb * 1024 * 1024 };
     case FORMAT_CBZ:
     case FORMAT_CB7:
-      return {
-        enabled: settings.cbx.enabled && isCbxFormat(format) && settings.cbx.formats.includes(format),
-        maxFileSizeBytes: settings.cbx.maxFileSizeBytes,
-      };
+      return { enabled: config.fileWriteCbxEnabled, maxFileSizeBytes: config.fileWriteCbxMaxFileSizeMb * 1024 * 1024 };
     default:
       return { enabled: false, maxFileSizeBytes: 0 };
   }
-}
-
-function isCbxFormat(format: string): format is (typeof CBX_FORMATS)[number] {
-  return (CBX_FORMATS as readonly string[]).includes(format);
 }
 
 function resolvePositiveInteger(value: unknown, fallback: number): number {

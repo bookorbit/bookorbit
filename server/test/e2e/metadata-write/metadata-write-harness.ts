@@ -2,16 +2,18 @@ import { randomUUID } from 'crypto';
 import { hash } from 'bcryptjs';
 import fastifyCookie from '@fastify/cookie';
 import { Test } from '@nestjs/testing';
+import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { mkdir } from 'fs/promises';
 import { and, desc, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { DEFAULT_FILE_WRITE_SETTINGS, DEFAULT_FORMAT_PRIORITY, type GlobalFileWriteSettings, type Permission } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@projectx/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { appSettings, bookFiles, books, fileWriteLog, libraries, libraryFolders, scanJobs } from '../../../src/db/schema';
+import { bookFiles, books, fileWriteLog, libraries, libraryFolders, scanJobs } from '../../../src/db/schema';
+import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { createMetadataWriteFixtureRoot, type MetadataWriteFixtureRoot } from './metadata-write-fixture-builder';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -58,6 +60,17 @@ export interface LocatedBookFile {
   format: string | null;
 }
 
+export type LibraryFileWritePatch = {
+  fileWriteEnabled?: boolean;
+  fileWriteWriteCover?: boolean;
+  fileWriteEpubEnabled?: boolean;
+  fileWriteEpubMaxFileSizeMb?: number;
+  fileWritePdfEnabled?: boolean;
+  fileWritePdfMaxFileSizeMb?: number;
+  fileWriteCbxEnabled?: boolean;
+  fileWriteCbxMaxFileSizeMb?: number;
+};
+
 export function authHeader(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
 }
@@ -80,20 +93,20 @@ export async function createMetadataWriteE2EContext(): Promise<MetadataWriteE2EC
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
-
-  await setFileWriteSettings(db, {
-    enabled: true,
-    writeCover: false,
-    epub: { enabled: true, maxFileSizeBytes: DEFAULT_FILE_WRITE_SETTINGS.epub.maxFileSizeBytes },
-    pdf: { enabled: true, maxFileSizeBytes: DEFAULT_FILE_WRITE_SETTINGS.pdf.maxFileSizeBytes },
-    cbx: { enabled: true, maxFileSizeBytes: DEFAULT_FILE_WRITE_SETTINGS.cbx.maxFileSizeBytes, formats: ['cbz', 'cb7'] },
-  });
 
   return {
     app,
@@ -116,6 +129,14 @@ export async function createLibraryWithFolder(
     mode?: 'book_per_file' | 'book_per_folder';
     allowedFormats?: string[];
     name?: string;
+    fileWriteEnabled?: boolean;
+    fileWriteWriteCover?: boolean;
+    fileWriteEpubEnabled?: boolean;
+    fileWritePdfEnabled?: boolean;
+    fileWriteCbxEnabled?: boolean;
+    fileWriteCbxMaxFileSizeMb?: number;
+    fileWriteEpubMaxFileSizeMb?: number;
+    fileWritePdfMaxFileSizeMb?: number;
   } = {},
 ): Promise<CreatedLibrary> {
   const folderPath = `${ctx.fixture.booksPath}/library-${randomUUID()}`;
@@ -130,6 +151,14 @@ export async function createLibraryWithFolder(
       allowedFormats: options.allowedFormats ?? [],
       excludePatterns: [],
       formatPriority: [...DEFAULT_FORMAT_PRIORITY],
+      fileWriteEnabled: options.fileWriteEnabled ?? false,
+      fileWriteWriteCover: options.fileWriteWriteCover ?? true,
+      fileWriteEpubEnabled: options.fileWriteEpubEnabled ?? true,
+      fileWritePdfEnabled: options.fileWritePdfEnabled ?? true,
+      fileWriteCbxEnabled: options.fileWriteCbxEnabled ?? false,
+      fileWriteCbxMaxFileSizeMb: options.fileWriteCbxMaxFileSizeMb ?? 500,
+      fileWriteEpubMaxFileSizeMb: options.fileWriteEpubMaxFileSizeMb ?? 100,
+      fileWritePdfMaxFileSizeMb: options.fileWritePdfMaxFileSizeMb ?? 100,
     })
     .returning({ id: libraries.id });
 
@@ -146,6 +175,22 @@ export async function createLibraryWithFolder(
     libraryFolderId: libraryFolder.id,
     folderPath,
   };
+}
+
+export async function setLibraryFileWriteSettings(db: Db, libraryId: number, patch: LibraryFileWritePatch): Promise<void> {
+  const updateValues: Partial<typeof libraries.$inferInsert> = {};
+  if (patch.fileWriteEnabled !== undefined) updateValues.fileWriteEnabled = patch.fileWriteEnabled;
+  if (patch.fileWriteWriteCover !== undefined) updateValues.fileWriteWriteCover = patch.fileWriteWriteCover;
+  if (patch.fileWriteEpubEnabled !== undefined) updateValues.fileWriteEpubEnabled = patch.fileWriteEpubEnabled;
+  if (patch.fileWriteEpubMaxFileSizeMb !== undefined) updateValues.fileWriteEpubMaxFileSizeMb = patch.fileWriteEpubMaxFileSizeMb;
+  if (patch.fileWritePdfEnabled !== undefined) updateValues.fileWritePdfEnabled = patch.fileWritePdfEnabled;
+  if (patch.fileWritePdfMaxFileSizeMb !== undefined) updateValues.fileWritePdfMaxFileSizeMb = patch.fileWritePdfMaxFileSizeMb;
+  if (patch.fileWriteCbxEnabled !== undefined) updateValues.fileWriteCbxEnabled = patch.fileWriteCbxEnabled;
+  if (patch.fileWriteCbxMaxFileSizeMb !== undefined) updateValues.fileWriteCbxMaxFileSizeMb = patch.fileWriteCbxMaxFileSizeMb;
+
+  if (Object.keys(updateValues).length > 0) {
+    await db.update(libraries).set(updateValues).where(eq(libraries.id, libraryId));
+  }
 }
 
 export async function triggerAndWaitForLibraryScan(
@@ -208,23 +253,6 @@ export async function locateBookFileByRelPath(ctx: MetadataWriteE2EContext, libr
   }
 
   return row;
-}
-
-export async function setFileWriteSettings(db: Db, patch: Partial<GlobalFileWriteSettings>): Promise<GlobalFileWriteSettings> {
-  const currentRow = await db.query.appSettings.findFirst({
-    where: eq(appSettings.key, 'file_write_settings'),
-  });
-
-  const current = parseFileWriteSettings(currentRow?.value);
-  const merged = mergeFileWriteSettings(current, patch);
-  const value = JSON.stringify(merged);
-
-  await db.insert(appSettings).values({ key: 'file_write_settings', value }).onConflictDoUpdate({
-    target: appSettings.key,
-    set: { value },
-  });
-
-  return merged;
 }
 
 export async function getLatestWriteLogEntry(db: Db, bookId: number, triggeredBy?: 'auto' | 'sync') {
@@ -397,26 +425,6 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
   if (response.statusCode !== 200) return null;
   const body = response.json() as { accessToken?: string };
   return body.accessToken ?? null;
-}
-
-function parseFileWriteSettings(value: string | undefined): GlobalFileWriteSettings {
-  if (!value) return { ...DEFAULT_FILE_WRITE_SETTINGS };
-  try {
-    const parsed = JSON.parse(value) as Partial<GlobalFileWriteSettings>;
-    return mergeFileWriteSettings(DEFAULT_FILE_WRITE_SETTINGS, parsed);
-  } catch {
-    return { ...DEFAULT_FILE_WRITE_SETTINGS };
-  }
-}
-
-function mergeFileWriteSettings(base: GlobalFileWriteSettings, patch: Partial<GlobalFileWriteSettings>): GlobalFileWriteSettings {
-  return {
-    ...base,
-    ...patch,
-    epub: { ...base.epub, ...(patch.epub ?? {}) },
-    pdf: { ...base.pdf, ...(patch.pdf ?? {}) },
-    cbx: { ...base.cbx, ...(patch.cbx ?? {}) },
-  };
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {

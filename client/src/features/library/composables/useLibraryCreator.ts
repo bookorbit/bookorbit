@@ -28,6 +28,14 @@ function blankForm() {
     excludePatterns: [] as string[],
     readingThreshold: 0.25,
     markAsFinishedPercentComplete: 98,
+    fileWriteEnabled: false,
+    fileWriteWriteCover: true,
+    fileWriteEpubEnabled: true,
+    fileWriteEpubMaxFileSizeMb: 100,
+    fileWritePdfEnabled: true,
+    fileWritePdfMaxFileSizeMb: 100,
+    fileWriteCbxEnabled: false,
+    fileWriteCbxMaxFileSizeMb: 500,
   }
 }
 
@@ -64,6 +72,14 @@ export function useLibraryCreator() {
     form.excludePatterns = [...library.excludePatterns]
     form.readingThreshold = library.readingThreshold
     form.markAsFinishedPercentComplete = library.markAsFinishedPercentComplete
+    form.fileWriteEnabled = library.fileWriteEnabled
+    form.fileWriteWriteCover = library.fileWriteWriteCover
+    form.fileWriteEpubEnabled = library.fileWriteEpubEnabled
+    form.fileWriteEpubMaxFileSizeMb = library.fileWriteEpubMaxFileSizeMb
+    form.fileWritePdfEnabled = library.fileWritePdfEnabled
+    form.fileWritePdfMaxFileSizeMb = library.fileWritePdfMaxFileSizeMb
+    form.fileWriteCbxEnabled = library.fileWriteCbxEnabled
+    form.fileWriteCbxMaxFileSizeMb = library.fileWriteCbxMaxFileSizeMb
     mode.value = 'edit'
     editingLibraryId.value = library.id
     prescanResult.value = null
