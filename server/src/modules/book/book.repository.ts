@@ -438,6 +438,16 @@ export class BookRepository {
     return rows.map((r) => r.id);
   }
 
+  async findPrimaryFile(bookId: number): Promise<{ absolutePath: string; format: string | null } | null> {
+    const [row] = await this.db
+      .select({ absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(eq(books.id, bookId))
+      .limit(1);
+    return row ?? null;
+  }
+
   async findPrimaryFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
     if (bookIds.length === 0) return [];
     return this.db

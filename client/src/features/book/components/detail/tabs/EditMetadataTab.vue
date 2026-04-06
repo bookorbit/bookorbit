@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ChevronDown, Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
+import { ChevronDown, HardDriveUpload, Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import type { BookDetail, BookMetadataLockField } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
@@ -12,6 +12,7 @@ import MetadataFieldLabel from './MetadataFieldLabel.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { type MetadataRefreshPreview, useRefreshMetadata } from '../../../composables/useRefreshMetadata'
+import { type FileMetadata, useFileMetadata } from '../../../composables/useFileMetadata'
 import { useMetadataLocks } from '../../../composables/useMetadataLocks'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
 import { useNarratorSearch } from '../../../composables/useNarratorSearch'
@@ -254,6 +255,7 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
 }
 
 const { refreshing: autoFilling, previewRefresh } = useRefreshMetadata()
+const { loading: loadingFromFile, loadFromFile } = useFileMetadata()
 
 function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
   return {
@@ -294,6 +296,54 @@ async function autoFill() {
 
   const { skippedFields, updatedCount } = applyPatchToForm(buildPreviewPatch(preview), preview.coverUrl)
   showApplyResult(skippedFields, updatedCount)
+}
+
+function applyFileMetadataToForm(meta: FileMetadata): number {
+  let count = 0
+  const directFields = [
+    'title',
+    'subtitle',
+    'description',
+    'publisher',
+    'publishedYear',
+    'language',
+    'pageCount',
+    'seriesName',
+    'seriesIndex',
+    'isbn10',
+    'isbn13',
+    'authors',
+    'genres',
+  ] as const
+  for (const field of directFields) {
+    if (meta[field] !== undefined) {
+      form[field] = meta[field] as never
+      count++
+    }
+  }
+  if (meta.comicMetadata) {
+    for (const [comicKey, formKey] of Object.entries(COMIC_FIELD_MAP) as [
+      keyof typeof COMIC_FIELD_MAP,
+      (typeof COMIC_FIELD_MAP)[keyof typeof COMIC_FIELD_MAP],
+    ][]) {
+      const value = meta.comicMetadata[comicKey]
+      if (value !== undefined) {
+        form[formKey] = value as never
+        count++
+      }
+    }
+  }
+  return count
+}
+
+async function handleLoadFromFile() {
+  const meta = await loadFromFile(props.book.id)
+  if (!meta) {
+    toast.error('Failed to load metadata from file')
+    return
+  }
+  const count = applyFileMetadataToForm(meta)
+  toast.info(count > 0 ? `Loaded ${count} field${count === 1 ? '' : 's'} from file` : 'No metadata found in file')
 }
 
 async function handleLockToggle(field: BookMetadataLockField) {
@@ -340,6 +390,25 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         <p v-if="combinedError" class="text-sm text-destructive">{{ combinedError }}</p>
         <span v-else />
         <div class="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+                :disabled="loadingFromFile || !primaryFile"
+                @click="handleLoadFromFile"
+              >
+                <Loader2 v-if="loadingFromFile" class="size-3.5 animate-spin" />
+                <HardDriveUpload v-else class="size-3.5" />
+                Load from file
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{
+              loadingFromFile ? 'Loading...' : !primaryFile ? 'No primary file available' : 'Load metadata from the primary book file'
+            }}</TooltipContent>
+          </Tooltip>
+
+          <div class="w-px h-4 bg-border mx-0.5" />
+
           <button
             class="search-online-btn flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
             @click="searchOpen = true"

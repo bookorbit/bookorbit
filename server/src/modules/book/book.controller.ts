@@ -369,6 +369,12 @@ export class BookController {
     return this.bookService.refreshMetadata(id, preview === 'true', user);
   }
 
+  @Get(':id/metadata-from-file')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  getMetadataFromFile(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.getMetadataFromFile(id, user);
+  }
+
   @Get(':id/write-log')
   @RequirePermission(Permission.LibraryEditMetadata)
   async getWriteLog(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {

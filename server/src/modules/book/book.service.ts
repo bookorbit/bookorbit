@@ -1,6 +1,12 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
+
+import { extractEpubMetadata } from '../metadata/lib/epub';
+import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
+import { parseFb2File } from '../metadata/lib/fb2-parser';
+import { parseMobiFile } from '../metadata/lib/mobi-parser';
+import { parsePdfFile } from '../metadata/lib/pdf-parser';
 import { basename, extname, join } from 'path';
 
 import { DEFAULT_DOWNLOAD_PATTERN, MetadataProviderKey, Permission, isAudioFormat, resolveUploadPath } from '@projectx/types';
@@ -1081,6 +1087,103 @@ export class BookService {
         : null,
       collections: collectionRows,
     };
+  }
+
+  async getMetadataFromFile(id: number, user: RequestUser): Promise<Record<string, unknown>> {
+    await this.verifyBookAccess(id, user);
+    const file = await this.bookRepo.findPrimaryFile(id);
+    if (!file) throw new NotFoundException(`Book ${id} has no primary file`);
+
+    const { absolutePath, format } = file;
+    if (!format) return {};
+
+    switch (format) {
+      case 'epub': {
+        const parsed = await extractEpubMetadata(absolutePath);
+        if (!parsed) return {};
+        return {
+          title: parsed.title,
+          subtitle: parsed.subtitle,
+          description: parsed.description,
+          publisher: parsed.publisher,
+          publishedYear: parsed.publishedYear,
+          language: parsed.language,
+          isbn10: parsed.isbn10,
+          isbn13: parsed.isbn13,
+          seriesName: parsed.seriesName,
+          seriesIndex: parsed.seriesIndex,
+          authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
+          genres: parsed.tags.length > 0 ? parsed.tags : undefined,
+        };
+      }
+      case 'pdf': {
+        const parsed = await parsePdfFile(absolutePath);
+        if (!parsed) return {};
+        return {
+          title: parsed.title,
+          publisher: parsed.publisher,
+          pageCount: parsed.pageCount,
+          authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
+          genres: parsed.genres.length > 0 ? parsed.genres : undefined,
+        };
+      }
+      case 'mobi':
+      case 'azw3':
+      case 'azw': {
+        const parsed = await parseMobiFile(absolutePath);
+        if (!parsed) return {};
+        const year = parsed.publishedDate ? parseInt(parsed.publishedDate.substring(0, 4), 10) || undefined : undefined;
+        return {
+          title: parsed.title,
+          description: parsed.description,
+          publisher: parsed.publisher,
+          publishedYear: year,
+          language: parsed.language,
+          isbn13: parsed.isbn,
+          authors: parsed.authors.length > 0 ? parsed.authors : undefined,
+          genres: parsed.tags.length > 0 ? parsed.tags : undefined,
+        };
+      }
+      case 'cbz':
+      case 'cbr':
+      case 'cb7': {
+        const extractor = format === 'cbz' ? extractCbzMetadata : format === 'cbr' ? extractCbrMetadata : extractCb7Metadata;
+        const parsed = await extractor(absolutePath);
+        if (!parsed) return {};
+        return {
+          title: parsed.title,
+          subtitle: parsed.subtitle,
+          description: parsed.description,
+          publisher: parsed.publisher,
+          publishedYear: parsed.publishedYear,
+          language: parsed.language,
+          pageCount: parsed.pageCount,
+          isbn10: parsed.isbn10,
+          isbn13: parsed.isbn13,
+          seriesName: parsed.seriesName,
+          seriesIndex: parsed.seriesIndex,
+          authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
+          genres: parsed.tags.length > 0 ? parsed.tags : undefined,
+          comicMetadata: parsed.comicMetadata ?? undefined,
+        };
+      }
+      case 'fb2': {
+        const parsed = await parseFb2File(absolutePath);
+        if (!parsed) return {};
+        return {
+          title: parsed.title,
+          description: parsed.description,
+          publishedYear: parsed.publishedYear,
+          language: parsed.language,
+          seriesName: parsed.seriesName,
+          seriesIndex: parsed.seriesIndex,
+          authors: parsed.authors.length > 0 ? parsed.authors : undefined,
+          genres: parsed.genres.length > 0 ? parsed.genres : undefined,
+        };
+      }
+      default:
+        return {};
+    }
   }
 
   private resolveChapters(
