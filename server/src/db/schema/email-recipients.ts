@@ -29,7 +29,7 @@ export const emailRecipients = pgTable(
     uniqueIndex('email_recipients_one_default_per_user_uidx')
       .on(t.userId)
       .where(sql`${t.isDefault} = true`),
-    uniqueIndex('email_recipients_id_user_id_uidx').on(t.id, t.userId),
+    unique('email_recipients_id_user_id_unique').on(t.id, t.userId),
     check('email_recipients_device_type_chk', sql`${t.deviceType} is null or ${t.deviceType} in ('kindle', 'kobo', 'other')`),
     check(
       'email_recipients_preferred_format_chk',
@@ -53,7 +53,7 @@ export const emailRecipientGroups = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique().on(t.userId, t.name), uniqueIndex('email_recipient_groups_id_user_id_uidx').on(t.id, t.userId)],
+  (t) => [unique().on(t.userId, t.name), unique('email_recipient_groups_id_user_id_unique').on(t.id, t.userId)],
 );
 
 export const emailRecipientGroupMembers = pgTable(

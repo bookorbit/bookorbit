@@ -1,5 +1,5 @@
 {
-  "id": "518e0d80-949a-48cf-a150-e83b21bfa2c1",
+  "id": "67c2c149-d6e1-477c-a7a0-67f819b511ab",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -941,33 +941,6 @@
           "method": "btree",
           "with": {}
         },
-        "migration_plan_artifacts_id_source_profile_uidx": {
-          "name": "migration_plan_artifacts_id_source_profile_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "migration_plan_artifacts_source_id_idx": {
           "name": "migration_plan_artifacts_source_id_idx",
           "columns": [
@@ -1038,7 +1011,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "migration_plan_artifacts_id_source_profile_unique": {
+          "name": "migration_plan_artifacts_id_source_profile_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "source_id", "profile_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1141,27 +1120,6 @@
           "method": "btree",
           "with": {}
         },
-        "migration_profiles_id_source_id_uidx": {
-          "name": "migration_profiles_id_source_id_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "migration_profiles_source_id_idx": {
           "name": "migration_profiles_source_id_idx",
           "columns": [
@@ -1199,7 +1157,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "migration_profiles_id_source_id_unique": {
+          "name": "migration_profiles_id_source_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "source_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "migration_profiles_version_positive_chk": {
@@ -1959,27 +1923,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "library_folders_id_library_id_uidx": {
-          "name": "library_folders_id_library_id_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "library_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1994,7 +1937,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "library_folders_id_library_id_unique": {
+          "name": "library_folders_id_library_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "library_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2357,27 +2306,6 @@
           "method": "btree",
           "with": {}
         },
-        "books_id_library_folder_id_uidx": {
-          "name": "books_id_library_folder_id_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "library_folder_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "books_primary_file_id_idx": {
           "name": "books_primary_file_id_idx",
           "columns": [
@@ -2475,7 +2403,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "books_id_library_folder_id_unique": {
+          "name": "books_id_library_folder_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "library_folder_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "books_status_chk": {
@@ -6365,27 +6299,6 @@
         }
       },
       "indexes": {
-        "email_providers_id_user_id_uidx": {
-          "name": "email_providers_id_user_id_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "email_providers_one_default_per_user_uidx": {
           "name": "email_providers_one_default_per_user_uidx",
           "columns": [
@@ -6436,6 +6349,11 @@
           "name": "email_providers_user_id_name_unique",
           "nullsNotDistinct": false,
           "columns": ["user_id", "name"]
+        },
+        "email_providers_id_user_id_unique": {
+          "name": "email_providers_id_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "user_id"]
         }
       },
       "policies": {},
@@ -6572,29 +6490,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "email_recipient_groups_id_user_id_uidx": {
-          "name": "email_recipient_groups_id_user_id_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "email_recipient_groups_user_id_users_id_fk": {
           "name": "email_recipient_groups_user_id_users_id_fk",
@@ -6621,6 +6517,11 @@
           "name": "email_recipient_groups_user_id_name_unique",
           "nullsNotDistinct": false,
           "columns": ["user_id", "name"]
+        },
+        "email_recipient_groups_id_user_id_unique": {
+          "name": "email_recipient_groups_id_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "user_id"]
         }
       },
       "policies": {},
@@ -6732,27 +6633,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "email_recipients_id_user_id_uidx": {
-          "name": "email_recipients_id_user_id_uidx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -6781,6 +6661,11 @@
           "name": "email_recipients_user_id_email_unique",
           "nullsNotDistinct": false,
           "columns": ["user_id", "email"]
+        },
+        "email_recipients_id_user_id_unique": {
+          "name": "email_recipients_id_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "user_id"]
         }
       },
       "policies": {},

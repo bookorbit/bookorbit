@@ -216,9 +216,11 @@ export async function waitForMigrationToFinish(
   };
   report: {
     run: { id: number; state: string; currentStage: string | null };
+    totals: { processed: number; imported: number; skipped: number; unresolved: number; failed: number };
     metrics: Array<Record<string, unknown>>;
     plan: Record<string, unknown> | null;
     summary: Record<string, unknown> | null;
+    details: Record<string, unknown>;
   };
 }> {
   let latestProgress:
@@ -255,9 +257,11 @@ export async function waitForMigrationToFinish(
 
   const reportResponse = await apiJson<{
     run: { id: number; state: string; currentStage: string | null };
+    totals: { processed: number; imported: number; skipped: number; unresolved: number; failed: number };
     metrics: Array<Record<string, unknown>>;
     plan: Record<string, unknown> | null;
     summary: Record<string, unknown> | null;
+    details: Record<string, unknown>;
   }>(ctx, {
     method: 'GET',
     url: `/api/v1/migration/runs/${runId}/report`,

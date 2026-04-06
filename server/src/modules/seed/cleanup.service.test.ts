@@ -7,6 +7,7 @@ function makeDb(options?: {
   refreshDeleteResult?: { rowCount?: number };
   resetDeleteResult?: { rowCount?: number };
   oidcDeleteResult?: { rowCount?: number };
+  authStateTablesPresent?: boolean;
 }) {
   const refreshDeleteBuilder = {
     where: vi.fn().mockResolvedValue(options?.refreshDeleteResult ?? { rowCount: 2 }),
@@ -19,6 +20,12 @@ function makeDb(options?: {
   };
 
   return {
+    execute: vi.fn().mockResolvedValue({
+      rows:
+        (options?.authStateTablesPresent ?? true)
+          ? [{ table_name: 'refresh_tokens' }, { table_name: 'password_reset_tokens' }, { table_name: 'oidc_sessions' }]
+          : [],
+    }),
     delete: vi.fn().mockReturnValueOnce(refreshDeleteBuilder).mockReturnValueOnce(resetDeleteBuilder).mockReturnValueOnce(oidcDeleteBuilder),
     __refreshDeleteBuilder: refreshDeleteBuilder,
     __resetDeleteBuilder: resetDeleteBuilder,
@@ -48,6 +55,7 @@ describe('CleanupService', () => {
 
     await service.cleanup();
 
+    expect(db.execute).toHaveBeenCalledTimes(1);
     expect(db.delete).toHaveBeenNthCalledWith(1, schema.refreshTokens);
     expect(db.delete).toHaveBeenNthCalledWith(2, schema.passwordResetTokens);
     expect(db.delete).toHaveBeenNthCalledWith(3, schema.oidcSessions);
@@ -56,6 +64,18 @@ describe('CleanupService', () => {
     expect(db.__oidcDeleteBuilder.where).toHaveBeenCalledTimes(1);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[seed.cleanup_auth_state] [start]'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[seed.cleanup_auth_state] [end] refreshDeleted=2 resetDeleted=1 oidcDeleted=3'));
+  });
+
+  it('skips cleanup when auth state tables are missing', async () => {
+    const db = makeDb({ authStateTablesPresent: false });
+    const logSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const service = new CleanupService(db as never);
+
+    await service.cleanup();
+
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[seed.cleanup_auth_state] [end] skipped=true reason=auth_tables_missing'));
   });
 
   it('logs failure and rethrows on cleanup errors', async () => {

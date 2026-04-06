@@ -369,7 +369,25 @@ describe('Migration Booklore API to DB (e2e)', { timeout: 240_000 }, () => {
     });
     expect(jsonExport.statusCode).toBe(200);
     expect(jsonExport.headers['content-type']).toContain('application/json');
-    expect(jsonExport.body).toContain('"state": "completed"');
+    const parsedJsonExport = JSON.parse(jsonExport.body) as {
+      run: { state: string };
+      details: {
+        matchedBooks: Array<{ sourceBookId: string; sourceTitle: string | null; targetBookId: number; strategy: string }>;
+        userPreview: unknown[];
+      };
+    };
+    expect(parsedJsonExport.run.state).toBe('completed');
+    expect(parsedJsonExport.details.matchedBooks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceBookId: '101',
+          sourceTitle: 'Imported ISBN Title',
+          targetBookId: scenario.books.isbn.bookId,
+          strategy: 'isbn',
+        }),
+      ]),
+    );
+    expect(parsedJsonExport.details.userPreview).toHaveLength(2);
 
     const csvExport = await apiText(ctx, {
       method: 'GET',
@@ -378,7 +396,44 @@ describe('Migration Booklore API to DB (e2e)', { timeout: 240_000 }, () => {
     });
     expect(csvExport.statusCode).toBe(200);
     expect(csvExport.headers['content-type']).toContain('text/csv');
-    expect(csvExport.body).toContain('section,stage,entityType,processed,imported,skipped,unresolved,failed,code,message,createdAt');
+    expect(csvExport.body).toContain(
+      'section,stage,entityType,processed,imported,skipped,unresolved,failed,sourceBookId,sourceTitle,sourceAuthor,targetBookId,targetTitle,strategy,sourceUserId,targetUserId,username,reason,details,code,message,createdAt',
+    );
+    expect(csvExport.body).toContain('matched_books,shared_overlays,book_match');
+    expect(csvExport.body).toContain('Imported ISBN Title');
+
+    const reportDetails = finished.report.details as {
+      matchedBooks?: Array<{ sourceBookId: string; sourceTitle: string | null; targetBookId: number; strategy: string }>;
+      userPreview?: Array<{ username: string; counts: Record<string, number> }>;
+    };
+    expect(reportDetails.matchedBooks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceBookId: '101',
+          sourceTitle: 'Imported ISBN Title',
+          targetBookId: scenario.books.isbn.bookId,
+          strategy: 'isbn',
+        }),
+        expect.objectContaining({
+          sourceBookId: '102',
+          sourceTitle: 'Imported Hash Title',
+          targetBookId: scenario.books.hash.bookId,
+          strategy: 'file_hash',
+        }),
+      ]),
+    );
+    expect(reportDetails.userPreview).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          username: 'alice',
+          counts: expect.objectContaining({ statuses: 2, fileProgress: 2, bookmarks: 1, annotations: 1, shelves: 2 }),
+        }),
+        expect.objectContaining({
+          username: 'bob',
+          counts: expect.objectContaining({ statuses: 1, fileProgress: 1, bookmarks: 1, annotations: 1, shelves: 1 }),
+        }),
+      ]),
+    );
 
     const metricByKey = buildMetricMap(finished.report.metrics as MetricRow[]);
     expect(metricByKey.get('shared_overlays:book_metadata')).toMatchObject({
@@ -478,8 +533,11 @@ describe('Migration Booklore API to DB (e2e)', { timeout: 240_000 }, () => {
       title: 'Imported Hash Title',
       description: 'Hash description',
       subtitle: null,
+      publishedYear: null,
+      pageCount: null,
       rating: null,
       googleBooksId: null,
+      durationSeconds: null,
     });
     expect(metadataByBookId.get(scenario.books.audio.bookId)).toMatchObject({
       title: 'Audio Path Match',

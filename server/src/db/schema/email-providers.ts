@@ -29,7 +29,7 @@ export const emailProviders = pgTable(
   },
   (t) => [
     unique().on(t.userId, t.name),
-    uniqueIndex('email_providers_id_user_id_uidx').on(t.id, t.userId),
+    unique('email_providers_id_user_id_unique').on(t.id, t.userId),
     uniqueIndex('email_providers_one_default_per_user_uidx')
       .on(t.userId)
       .where(sql`${t.isDefault} = true and ${t.userId} is not null`),

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, foreignKey, index, integer, pgTable, serial, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { bigint, check, foreignKey, index, integer, pgTable, serial, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { libraryFolders, libraries } from './libraries';
 
@@ -24,7 +24,7 @@ export const books = pgTable(
   },
   (t) => [
     uniqueIndex('books_library_id_folder_path_idx').on(t.libraryId, t.folderPath),
-    uniqueIndex('books_id_library_folder_id_uidx').on(t.id, t.libraryFolderId),
+    unique('books_id_library_folder_id_unique').on(t.id, t.libraryFolderId),
     index('books_primary_file_id_idx').on(t.primaryFileId),
     index('books_library_status_idx').on(t.libraryId, t.status),
     index('books_library_added_at_idx').on(t.libraryId, sql`${t.addedAt} desc`),

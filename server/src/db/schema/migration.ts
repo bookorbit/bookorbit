@@ -1,4 +1,4 @@
-import { check, foreignKey, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { check, foreignKey, index, integer, jsonb, pgTable, serial, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 import { users } from './auth';
@@ -50,7 +50,7 @@ export const migrationProfiles = pgTable(
   },
   (t) => [
     uniqueIndex('migration_profiles_source_name_version_uidx').on(t.sourceId, t.name, t.version),
-    uniqueIndex('migration_profiles_id_source_id_uidx').on(t.id, t.sourceId),
+    unique('migration_profiles_id_source_id_unique').on(t.id, t.sourceId),
     index('migration_profiles_source_id_idx').on(t.sourceId),
     check('migration_profiles_version_positive_chk', sql`${t.version} >= 1`),
   ],
@@ -81,7 +81,7 @@ export const migrationPlanArtifacts = pgTable(
   },
   (t) => [
     uniqueIndex('migration_plan_artifacts_plan_hash_uidx').on(t.planHash),
-    uniqueIndex('migration_plan_artifacts_id_source_profile_uidx').on(t.id, t.sourceId, t.profileId),
+    unique('migration_plan_artifacts_id_source_profile_unique').on(t.id, t.sourceId, t.profileId),
     index('migration_plan_artifacts_source_id_idx').on(t.sourceId),
     index('migration_plan_artifacts_profile_id_idx').on(t.profileId),
     foreignKey({

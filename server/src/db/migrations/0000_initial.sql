@@ -1,5 +1,7 @@
-CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
-CREATE EXTENSION IF NOT EXISTS pg_trgm;--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS vector;
+--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+--> statement-breakpoint
 CREATE TYPE "public"."library_access_level" AS ENUM('viewer', 'editor', 'owner');--> statement-breakpoint
 CREATE TYPE "public"."user_avatar_source" AS ENUM('none', 'external', 'uploaded');--> statement-breakpoint
 CREATE TYPE "public"."opds_sort_order" AS ENUM('recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc');--> statement-breakpoint
@@ -116,7 +118,8 @@ CREATE TABLE "migration_plan_artifacts" (
 	"summary" jsonb NOT NULL,
 	"created_by_user_id" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "migration_plan_artifacts_id_source_profile_unique" UNIQUE("id","source_id","profile_id")
 );
 --> statement-breakpoint
 CREATE TABLE "migration_profiles" (
@@ -130,6 +133,7 @@ CREATE TABLE "migration_profiles" (
 	"created_by_user_id" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "migration_profiles_id_source_id_unique" UNIQUE("id","source_id"),
 	CONSTRAINT "migration_profiles_version_positive_chk" CHECK ("migration_profiles"."version" >= 1)
 );
 --> statement-breakpoint
@@ -218,7 +222,8 @@ CREATE TABLE "library_folders" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"library_id" integer NOT NULL,
 	"path" varchar(4096) NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "library_folders_id_library_id_unique" UNIQUE("id","library_id")
 );
 --> statement-breakpoint
 CREATE TABLE "book_files" (
@@ -251,6 +256,7 @@ CREATE TABLE "books" (
 	"status" varchar(20) DEFAULT 'present' NOT NULL,
 	"added_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "books_id_library_folder_id_unique" UNIQUE("id","library_folder_id"),
 	CONSTRAINT "books_status_chk" CHECK ("books"."status" in ('present', 'missing'))
 );
 --> statement-breakpoint
@@ -709,6 +715,7 @@ CREATE TABLE "email_providers" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "email_providers_user_id_name_unique" UNIQUE("user_id","name"),
+	CONSTRAINT "email_providers_id_user_id_unique" UNIQUE("id","user_id"),
 	CONSTRAINT "email_providers_port_range_chk" CHECK ("email_providers"."port" >= 1 and "email_providers"."port" <= 65535)
 );
 --> statement-breakpoint
@@ -726,7 +733,8 @@ CREATE TABLE "email_recipient_groups" (
 	"default_template_id" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "email_recipient_groups_user_id_name_unique" UNIQUE("user_id","name")
+	CONSTRAINT "email_recipient_groups_user_id_name_unique" UNIQUE("user_id","name"),
+	CONSTRAINT "email_recipient_groups_id_user_id_unique" UNIQUE("id","user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "email_recipients" (
@@ -741,6 +749,7 @@ CREATE TABLE "email_recipients" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "email_recipients_user_id_email_unique" UNIQUE("user_id","email"),
+	CONSTRAINT "email_recipients_id_user_id_unique" UNIQUE("id","user_id"),
 	CONSTRAINT "email_recipients_device_type_chk" CHECK ("email_recipients"."device_type" is null or "email_recipients"."device_type" in ('kindle', 'kobo', 'other')),
 	CONSTRAINT "email_recipients_preferred_format_chk" CHECK ("email_recipients"."preferred_format" is null or "email_recipients"."preferred_format" in ('epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr'))
 );
@@ -889,11 +898,9 @@ CREATE UNIQUE INDEX "users_username_lower_uidx" ON "users" USING btree (lower("u
 CREATE UNIQUE INDEX "users_email_lower_uidx" ON "users" USING btree (lower("email")) WHERE "users"."email" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "users_oidc_subject_issuer_uidx" ON "users" USING btree ("oidc_subject","oidc_issuer") WHERE "users"."oidc_subject" is not null and "users"."oidc_issuer" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "migration_plan_artifacts_plan_hash_uidx" ON "migration_plan_artifacts" USING btree ("plan_hash");--> statement-breakpoint
-CREATE UNIQUE INDEX "migration_plan_artifacts_id_source_profile_uidx" ON "migration_plan_artifacts" USING btree ("id","source_id","profile_id");--> statement-breakpoint
 CREATE INDEX "migration_plan_artifacts_source_id_idx" ON "migration_plan_artifacts" USING btree ("source_id");--> statement-breakpoint
 CREATE INDEX "migration_plan_artifacts_profile_id_idx" ON "migration_plan_artifacts" USING btree ("profile_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "migration_profiles_source_name_version_uidx" ON "migration_profiles" USING btree ("source_id","name","version");--> statement-breakpoint
-CREATE UNIQUE INDEX "migration_profiles_id_source_id_uidx" ON "migration_profiles" USING btree ("id","source_id");--> statement-breakpoint
 CREATE INDEX "migration_profiles_source_id_idx" ON "migration_profiles" USING btree ("source_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "migration_run_metrics_run_stage_entity_uidx" ON "migration_run_metrics" USING btree ("run_id","stage","entity_type");--> statement-breakpoint
 CREATE INDEX "migration_run_metrics_run_id_idx" ON "migration_run_metrics" USING btree ("run_id");--> statement-breakpoint
@@ -904,7 +911,6 @@ CREATE INDEX "migration_sources_created_by_user_id_idx" ON "migration_sources" U
 CREATE UNIQUE INDEX "libraries_name_lower_uidx" ON "libraries" USING btree (lower("name"));--> statement-breakpoint
 CREATE INDEX "library_folders_library_id_idx" ON "library_folders" USING btree ("library_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "library_folders_library_path_uidx" ON "library_folders" USING btree ("library_id","path");--> statement-breakpoint
-CREATE UNIQUE INDEX "library_folders_id_library_id_uidx" ON "library_folders" USING btree ("id","library_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "book_files_absolute_path_uidx" ON "book_files" USING btree ("absolute_path");--> statement-breakpoint
 CREATE INDEX "book_files_book_id_idx" ON "book_files" USING btree ("book_id");--> statement-breakpoint
 CREATE INDEX "book_files_library_folder_id_idx" ON "book_files" USING btree ("library_folder_id");--> statement-breakpoint
@@ -914,7 +920,6 @@ CREATE INDEX "book_files_format_idx" ON "book_files" USING btree ("format");--> 
 CREATE INDEX "book_files_library_folder_hash_idx" ON "book_files" USING btree ("library_folder_id","hash");--> statement-breakpoint
 CREATE INDEX "book_files_library_folder_ino_idx" ON "book_files" USING btree ("library_folder_id","ino");--> statement-breakpoint
 CREATE UNIQUE INDEX "books_library_id_folder_path_idx" ON "books" USING btree ("library_id","folder_path");--> statement-breakpoint
-CREATE UNIQUE INDEX "books_id_library_folder_id_uidx" ON "books" USING btree ("id","library_folder_id");--> statement-breakpoint
 CREATE INDEX "books_primary_file_id_idx" ON "books" USING btree ("primary_file_id");--> statement-breakpoint
 CREATE INDEX "books_library_status_idx" ON "books" USING btree ("library_id","status");--> statement-breakpoint
 CREATE INDEX "books_library_added_at_idx" ON "books" USING btree ("library_id","added_at" desc);--> statement-breakpoint
@@ -963,13 +968,10 @@ CREATE INDEX "book_bucket_files_status_idx" ON "book_bucket_files" USING btree (
 CREATE INDEX "fwl_book_id_written_at_idx" ON "file_write_log" USING btree ("book_id","written_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_one_default_per_user_uidx" ON "email_templates" USING btree ("user_id") WHERE "email_templates"."is_default" = true and "email_templates"."user_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_system_name_unique" ON "email_templates" USING btree ("name") WHERE "email_templates"."user_id" is null;--> statement-breakpoint
-CREATE UNIQUE INDEX "email_providers_id_user_id_uidx" ON "email_providers" USING btree ("id","user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_providers_one_default_per_user_uidx" ON "email_providers" USING btree ("user_id") WHERE "email_providers"."is_default" = true and "email_providers"."user_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "email_providers_one_system_provider_uidx" ON "email_providers" USING btree ("is_system_provider") WHERE "email_providers"."is_system_provider" = true;--> statement-breakpoint
-CREATE UNIQUE INDEX "email_recipient_groups_id_user_id_uidx" ON "email_recipient_groups" USING btree ("id","user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_recipients_user_email_lower_uidx" ON "email_recipients" USING btree ("user_id",lower("email"));--> statement-breakpoint
 CREATE UNIQUE INDEX "email_recipients_one_default_per_user_uidx" ON "email_recipients" USING btree ("user_id") WHERE "email_recipients"."is_default" = true;--> statement-breakpoint
-CREATE UNIQUE INDEX "email_recipients_id_user_id_uidx" ON "email_recipients" USING btree ("id","user_id");--> statement-breakpoint
 CREATE INDEX "email_send_log_user_created_at_idx" ON "email_send_log" USING btree ("user_id","created_at");--> statement-breakpoint
 CREATE INDEX "email_send_log_created_at_idx" ON "email_send_log" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "email_send_log_status_next_retry_idx" ON "email_send_log" USING btree ("status","next_retry_at");

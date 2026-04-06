@@ -3,9 +3,11 @@ import { constants as fsConstants } from 'fs';
 import { access, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 
+import type { CoverRefreshedEvent } from '@projectx/types';
 import { coverDirPath, generateThumbnail, imageExt } from '../../metadata/lib/cover';
 import { MigrationRepository } from '../migration.repository';
 import { MigrationImportRepository } from './migration-import.repository';
+import { ScanGateway } from '../../scanner/scan.gateway';
 import type { PlannerResult } from '../planner/planner.types';
 import { type RunStateCheck, emptyCounters, hasErrorCode } from './executor-utils';
 
@@ -18,6 +20,7 @@ export class CoverImporter {
   constructor(
     private readonly repo: MigrationRepository,
     private readonly importRepo: MigrationImportRepository,
+    private readonly scanGateway: ScanGateway,
   ) {}
 
   async import(
@@ -37,16 +40,26 @@ export class CoverImporter {
       return;
     }
 
+    const libraryIdByBookId = await this.importRepo.fetchLibraryIdsByBookIds(matches.map((m) => m.targetBookId));
+
     for (let i = 0; i < matches.length; i += COVER_CONCURRENCY) {
       await ensureRunning();
       const batch = matches.slice(i, i + COVER_CONCURRENCY);
 
       const results = await Promise.allSettled(batch.map((match) => this.processSingleMatch(runId, match, booksPath, sourceMediaRootPath)));
 
-      for (const result of results) {
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        const match = batch[j];
         counters.processed += 1;
         if (result.status === 'fulfilled') {
           counters[result.value] += 1;
+          if (result.value === 'imported') {
+            const libraryId = libraryIdByBookId.get(match.targetBookId);
+            if (libraryId) {
+              this.scanGateway.emitCoverRefreshed({ bookId: match.targetBookId, libraryId } satisfies CoverRefreshedEvent);
+            }
+          }
         } else {
           counters.failed += 1;
         }

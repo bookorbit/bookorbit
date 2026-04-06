@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 
 import { AuthModule } from '../auth/auth.module';
+import { ScannerModule } from '../scanner/scanner.module';
 import { MigrationController } from './migration.controller';
 import { MigrationProgressGateway } from './migration-progress.gateway';
 import { MigrationRepository } from './migration.repository';
@@ -27,6 +28,7 @@ import { MigrationReportingService } from './reporting/migration-reporting.servi
 @Module({
   imports: [
     AuthModule,
+    ScannerModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

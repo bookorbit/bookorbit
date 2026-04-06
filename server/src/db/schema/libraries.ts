@@ -1,5 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, doublePrecision, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride } from '@projectx/types';
 
 export const libraries = pgTable(
@@ -79,7 +93,7 @@ export const libraryFolders = pgTable(
   (t) => [
     index('library_folders_library_id_idx').on(t.libraryId),
     uniqueIndex('library_folders_library_path_uidx').on(t.libraryId, t.path),
-    uniqueIndex('library_folders_id_library_id_uidx').on(t.id, t.libraryId),
+    unique('library_folders_id_library_id_unique').on(t.id, t.libraryId),
   ],
 );
 

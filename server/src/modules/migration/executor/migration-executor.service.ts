@@ -121,9 +121,10 @@ export class MigrationExecutorService {
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
+      const cause = error instanceof Error && error.cause instanceof Error ? ` cause="${error.cause.message}"` : '';
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
       this.logger.warn(
-        `[migration.execute] [fail] runId=${runId} durationMs=${durationMs} errorClass=${errorClass} error="${message}" - migration execution failed`,
+        `[migration.execute] [fail] runId=${runId} durationMs=${durationMs} errorClass=${errorClass} error="${message}"${cause} - migration execution failed`,
       );
       const failedStage = await this.failRun(runId, message);
       await this.emitRunProgress(runId, 'failed', failedStage);

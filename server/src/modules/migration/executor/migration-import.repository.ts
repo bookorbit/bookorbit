@@ -546,4 +546,20 @@ export class MigrationImportRepository {
 
     return result;
   }
+
+  async fetchLibraryIdsByBookIds(bookIds: number[]): Promise<Map<number, number>> {
+    const result = new Map<number, number>();
+    if (bookIds.length === 0) return result;
+
+    const rows = await this.db
+      .select({ id: schema.books.id, libraryId: schema.books.libraryId })
+      .from(schema.books)
+      .where(inArray(schema.books.id, bookIds));
+
+    for (const row of rows) {
+      result.set(row.id, row.libraryId);
+    }
+
+    return result;
+  }
 }

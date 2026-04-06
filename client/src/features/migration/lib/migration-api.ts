@@ -37,9 +37,52 @@ export interface MigrationRunProgress {
 
 export interface MigrationRunReport {
   run: MigrationRun
+  totals: {
+    processed: number
+    imported: number
+    skipped: number
+    unresolved: number
+    failed: number
+  }
   metrics: MigrationRunMetric[]
   plan: Record<string, unknown> | null
   summary: MigrationPlanSummary | null
+  details: {
+    matchedBooks: Array<{
+      sourceBookId: string
+      sourceTitle: string | null
+      sourceAuthor: string | null
+      targetBookId: number
+      targetTitle: string | null
+      strategy: string
+    }>
+    unresolvedBooks: Array<{
+      sourceBookId: string
+      title: string | null
+      author: string | null
+      reason: string
+    }>
+    duplicateBookMatches: Array<{
+      targetBookId: number
+      targetTitle: string | null
+      sourceBookIds: string[]
+      sourceTitles: Array<string | null>
+      strategies: string[]
+      reason: string
+    }>
+    userPreview: Array<{
+      sourceUserId: string
+      targetUserId: number
+      username: string
+      counts: {
+        statuses: number
+        fileProgress: number
+        bookmarks: number
+        annotations: number
+        shelves: number
+      }
+    }>
+  }
 }
 
 export interface MigrationWorkflowState {

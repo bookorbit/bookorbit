@@ -27,6 +27,12 @@ function createRepoMock() {
   };
 }
 
+function createScanGatewayMock() {
+  return {
+    emitCoverRefreshed: vi.fn(),
+  };
+}
+
 function createImportRepoMock() {
   const repo = {
     // Single-row methods (kept for backward compat)
@@ -65,6 +71,7 @@ function createImportRepoMock() {
       }),
     ),
     fetchTargetBookFiles: vi.fn(() => Promise.resolve(new Map())),
+    fetchLibraryIdsByBookIds: vi.fn(() => Promise.resolve(new Map())),
     // Batch methods
     batchUpsertBookMetadata: vi.fn(() => Promise.resolve()),
     batchDeleteBookAuthors: vi.fn(() => Promise.resolve()),
@@ -272,7 +279,9 @@ describe('CoverImporter book cover import', () => {
 
       const repo = createRepoMock();
       const importRepo = createImportRepoMock();
-      const importer = new CoverImporter(repo as never, importRepo as never);
+      const scanGateway = createScanGatewayMock();
+      importRepo.fetchLibraryIdsByBookIds.mockResolvedValue(new Map([[901, 1]]));
+      const importer = new CoverImporter(repo as never, importRepo as never, scanGateway as never);
 
       const planned = {
         execution: {
@@ -294,6 +303,7 @@ describe('CoverImporter book cover import', () => {
       expect(copiedThumbnailBytes.equals(sourceThumbnailBytes)).toBe(true);
 
       expect(importRepo.markCoverAsCustom).toHaveBeenCalledWith(901);
+      expect(scanGateway.emitCoverRefreshed).toHaveBeenCalledWith({ bookId: 901, libraryId: 1 });
       expect(repo.setRunMetric).toHaveBeenCalledWith(
         52,
         'book_covers',
@@ -316,7 +326,9 @@ describe('CoverImporter book cover import', () => {
 
       const repo = createRepoMock();
       const importRepo = createImportRepoMock();
-      const importer = new CoverImporter(repo as never, importRepo as never);
+      const scanGateway = createScanGatewayMock();
+      importRepo.fetchLibraryIdsByBookIds.mockResolvedValue(new Map([[902, 1]]));
+      const importer = new CoverImporter(repo as never, importRepo as never, scanGateway as never);
 
       const planned = {
         execution: {
@@ -328,6 +340,7 @@ describe('CoverImporter book cover import', () => {
 
       const generatedThumbnail = await readFile(join(booksPath, 'covers', '902', 'thumbnail.jpg'));
       expect(generatedThumbnail.length).toBeGreaterThan(0);
+      expect(scanGateway.emitCoverRefreshed).toHaveBeenCalledWith({ bookId: 902, libraryId: 1 });
       expect(repo.setRunMetric).toHaveBeenCalledWith(
         53,
         'book_covers',
@@ -343,7 +356,8 @@ describe('CoverImporter book cover import', () => {
   it('skips book cover stage when source media root is not configured', async () => {
     const repo = createRepoMock();
     const importRepo = createImportRepoMock();
-    const importer = new CoverImporter(repo as never, importRepo as never);
+    const scanGateway = createScanGatewayMock();
+    const importer = new CoverImporter(repo as never, importRepo as never, scanGateway as never);
 
     const planned = {
       execution: {
@@ -354,6 +368,7 @@ describe('CoverImporter book cover import', () => {
     await importer.import(54, planned as never, '/tmp/books', null, async () => {});
 
     expect(importRepo.markCoverAsCustom).not.toHaveBeenCalled();
+    expect(scanGateway.emitCoverRefreshed).not.toHaveBeenCalled();
     expect(repo.setRunMetric).toHaveBeenCalledWith(
       54,
       'book_covers',

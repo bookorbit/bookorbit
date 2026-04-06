@@ -62,6 +62,7 @@ interface PathMappingDraft {
 interface ReportUnresolvedBook {
   sourceBookId: string
   title: string | null
+  author: string | null
   reason: string | null
 }
 
@@ -264,7 +265,7 @@ const reportData = computed(() => {
   const bookCovers = m('book_covers', 'book_covers')
   const coversSkippedAll =
     !!bookCovers && bookCovers.imported === 0 && bookCovers.skipped > 0 && bookCovers.unresolved === 0 && bookCovers.failed === 0
-  const unresolvedBooks = extractPlanUnresolvedBooks(runReport.value?.plan ?? plan.value?.plan ?? null)
+  const unresolvedBooks = runReport.value?.details.unresolvedBooks ?? extractPlanUnresolvedBooks(runReport.value?.plan ?? plan.value?.plan ?? null)
   const startedAt = run.value?.startedAt ? new Date(run.value.startedAt) : null
   const endedAt = run.value?.endedAt ? new Date(run.value.endedAt) : null
   return {
@@ -282,6 +283,8 @@ const reportData = computed(() => {
     bookmarks: m('user_state', 'bookmarks'),
     annotations: m('user_state', 'annotations'),
     collections: m('user_state', 'collections'),
+    matchedBooks: runReport.value?.details.matchedBooks ?? [],
+    userPreview: runReport.value?.details.userPreview ?? [],
     unresolvedBooks,
     coverFailureCount: bookCovers?.failed ?? 0,
   }
@@ -854,6 +857,24 @@ function friendlyUnresolvedReason(reason: string | null): string {
   return reason ?? 'Could not determine reason'
 }
 
+function friendlyMatchStrategy(strategy: string | null): string {
+  if (strategy === 'isbn') return 'Matched by ISBN'
+  if (strategy === 'file_hash') return 'Matched by file hash'
+  if (strategy === 'path_mapping') return 'Matched by mapped file path'
+  if (strategy === 'title_author') return 'Matched by title and author'
+  return strategy ?? 'Match strategy unavailable'
+}
+
+function describeUserPreviewCounts(counts: {
+  statuses: number
+  fileProgress: number
+  bookmarks: number
+  annotations: number
+  shelves: number
+}): string {
+  return `${counts.statuses} statuses, ${counts.fileProgress} progress entries, ${counts.bookmarks} bookmarks, ${counts.annotations} annotations, ${counts.shelves} collection entries`
+}
+
 function extractPlanUnresolvedBooks(planPayload: unknown): ReportUnresolvedBook[] {
   const rows = asRecord(planPayload).unresolvedBooks
   if (!Array.isArray(rows)) return []
@@ -866,6 +887,7 @@ function extractPlanUnresolvedBooks(planPayload: unknown): ReportUnresolvedBook[
       return {
         sourceBookId,
         title: asString(record.title),
+        author: null as string | null,
         reason: asString(record.reason),
       }
     })
@@ -1480,6 +1502,28 @@ function formatSourceCountLabel(key: string) {
                   Migration completed with no unresolved books or failures.
                 </div>
 
+                <div v-if="reportData.matchedBooks.length > 0" class="space-y-2">
+                  <div>
+                    <p class="text-sm font-semibold">Matched books ({{ reportData.matchedBooks.length }})</p>
+                    <p class="text-xs text-muted-foreground mt-0.5">
+                      These dry-run matches were used to decide which library books received imported data.
+                    </p>
+                  </div>
+                  <div class="space-y-1.5 max-h-56 overflow-y-auto">
+                    <div
+                      v-for="book in reportData.matchedBooks"
+                      :key="`${book.sourceBookId}-${book.targetBookId}`"
+                      class="rounded border border-border px-3 py-2 text-xs"
+                    >
+                      <p class="font-medium text-foreground">{{ book.sourceTitle || `Source book ${book.sourceBookId}` }}</p>
+                      <p v-if="book.sourceAuthor" class="text-muted-foreground mt-0.5">{{ book.sourceAuthor }}</p>
+                      <p class="text-muted-foreground mt-0.5">
+                        {{ friendlyMatchStrategy(book.strategy) }} - {{ book.targetTitle || `Library book ${book.targetBookId}` }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div v-if="reportData.unresolvedBooks.length > 0" class="space-y-2">
                   <div>
                     <p class="text-sm font-semibold text-amber-600">Unresolved books ({{ reportData.unresolvedBooks.length }})</p>
@@ -1494,7 +1538,25 @@ function formatSourceCountLabel(key: string) {
                       class="rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs"
                     >
                       <p class="font-medium text-foreground">{{ book.title || `Source book ${book.sourceBookId}` }}</p>
+                      <p v-if="book.author" class="text-muted-foreground mt-0.5">{{ book.author }}</p>
                       <p class="text-muted-foreground mt-0.5">{{ friendlyUnresolvedReason(book.reason) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="reportData.userPreview.length > 0" class="space-y-2">
+                  <div>
+                    <p class="text-sm font-semibold">Mapped users ({{ reportData.userPreview.length }})</p>
+                    <p class="text-xs text-muted-foreground mt-0.5">Per-user totals come from the dry-run preview cached with the migration plan.</p>
+                  </div>
+                  <div class="space-y-1.5">
+                    <div
+                      v-for="preview in reportData.userPreview"
+                      :key="`${preview.sourceUserId}-${preview.targetUserId}`"
+                      class="rounded border border-border px-3 py-2 text-xs"
+                    >
+                      <p class="font-medium text-foreground">{{ preview.username }}</p>
+                      <p class="text-muted-foreground mt-0.5">{{ describeUserPreviewCounts(preview.counts) }}</p>
                     </div>
                   </div>
                 </div>

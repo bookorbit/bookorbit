@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { sql } from 'drizzle-orm';
 import { eq, isNotNull, lt, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -17,12 +18,27 @@ export class CleanupService implements OnApplicationBootstrap {
     await this.cleanup();
   }
 
+  private async hasAuthStateTables(): Promise<boolean> {
+    const result = await this.db.execute<{ table_name: string }>(sql`
+      select table_name
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name in ('refresh_tokens', 'password_reset_tokens', 'oidc_sessions')
+    `);
+    return result.rows.length === 3;
+  }
+
   @Cron('0 3 * * *')
   async cleanup() {
     const startedAt = Date.now();
     const event = 'seed.cleanup_auth_state';
     this.logger.log(`[${event}] [start] - auth state cleanup started`);
     try {
+      if (!(await this.hasAuthStateTables())) {
+        this.logger.log(`[${event}] [end] skipped=true reason=auth_tables_missing durationMs=${Date.now() - startedAt} - auth state cleanup skipped`);
+        return;
+      }
+
       const now = new Date();
 
       const { rowCount: refreshCount } = await this.db

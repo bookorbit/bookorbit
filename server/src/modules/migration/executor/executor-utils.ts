@@ -99,21 +99,35 @@ export function buildMetadataPatch(sourceBook: {
     isbn13: field('isbn13', truncateNullableText(sourceBook.isbn13, 13)),
     description: field('description', sourceBook.description),
     publisher: field('publisher', truncateNullableText(sourceBook.publisher, 500)),
-    publishedYear: field('publishedYear', sourceBook.publishedYear),
+    publishedYear: field('publishedYear', sanitizeBoundedInteger(sourceBook.publishedYear, 1000, 2200)),
     language: field('language', truncateNullableText(sourceBook.language, 100)),
-    pageCount: field('pageCount', sourceBook.pageCount),
+    pageCount: field('pageCount', sanitizeNonNegativeInteger(sourceBook.pageCount)),
     seriesName: field('seriesName', truncateNullableText(sourceBook.seriesName, 500)),
     seriesIndex: field('seriesIndex', sourceBook.seriesIndex),
-    rating: field('rating', sourceBook.rating),
+    rating: field('rating', sanitizeBoundedInteger(sourceBook.rating, 1, 10)),
     googleBooksId: field('googleBooksId', truncateNullableText(sourceBook.googleBooksId, 50)),
     goodreadsId: field('goodreadsId', truncateNullableText(sourceBook.goodreadsId, 50)),
     amazonId: field('amazonId', truncateNullableText(sourceBook.amazonId, 20)),
     hardcoverId: field('hardcoverId', truncateNullableText(sourceBook.hardcoverId, 50)),
     audibleId: field('audibleId', truncateNullableText(sourceBook.audibleId, 20)),
     comicvineId: field('comicvineId', truncateNullableText(sourceBook.comicvineId, 50)),
-    durationSeconds: field('durationSeconds', sourceBook.durationSeconds),
+    durationSeconds: field('durationSeconds', sanitizeNonNegativeInteger(sourceBook.durationSeconds)),
     abridged: field('abridged', sourceBook.abridged === undefined ? undefined : (sourceBook.abridged ?? false)),
   });
+}
+
+function sanitizeBoundedInteger(value: number | null | undefined, min: number, max: number): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value < min || value > max) return undefined;
+  return Math.round(value);
+}
+
+function sanitizeNonNegativeInteger(value: number | null | undefined): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value < 0) return undefined;
+  return Math.round(value);
 }
 
 export function buildContributorValues(contributor: {
