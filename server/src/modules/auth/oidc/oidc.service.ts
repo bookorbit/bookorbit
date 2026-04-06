@@ -14,6 +14,21 @@ import { OidcStateService } from './oidc-state.service';
 import { OidcTokenClientService } from './oidc-token-client.service';
 import { OidcTokenValidatorService } from './oidc-token-validator.service';
 
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const directCode = (error as { code?: unknown }).code;
+  if (directCode === '23505') return true;
+
+  if (!(error instanceof Error)) return false;
+  const causeCode = (error.cause as { code?: unknown } | undefined)?.code;
+  return causeCode === '23505';
+}
+
+function toThrowable(error: unknown, fallbackMessage: string): Error {
+  return error instanceof Error ? error : new UnauthorizedException(fallbackMessage);
+}
+
 @Injectable()
 export class OidcService {
   private readonly logger = new Logger(OidcService.name);
@@ -87,6 +102,7 @@ export class OidcService {
       oidcIssuer: disc.issuer,
       oidcSessionId: sid,
       idTokenHint: tokens.idToken,
+      expiresAt: this.authService.getRefreshTokenExpiryDate(),
     });
 
     return this.authService.issueTokensForUser(user.id, reply);
@@ -104,23 +120,40 @@ export class OidcService {
     if (!user && config.autoProvision.allowLocalLinking) {
       const byUsername = await this.userService.findByUsername(claims.username);
       if (byUsername) {
-        await this.userService.linkOidcIdentity(byUsername.id, claims.subject, issuer, claims.avatarUrl);
+        let linkConflict: unknown;
+        try {
+          await this.userService.linkOidcIdentity(byUsername.id, claims.subject, issuer, claims.avatarUrl);
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+          linkConflict = error;
+        }
         user = await this.userService.findByOidcSubject(claims.subject, issuer);
+        if (!user && linkConflict) {
+          throw toThrowable(linkConflict, 'OIDC identity conflict');
+        }
       }
     }
 
     // 3. Auto-provision new user
+    let createdUser = false;
     if (!user && config.autoProvision.enabled) {
-      user = await this.userService.createOidcUser({
-        username: claims.username,
-        name: claims.name,
-        email: claims.email,
-        oidcSubject: claims.subject,
-        oidcIssuer: issuer,
-        avatarUrl: claims.avatarUrl,
-      });
+      try {
+        user = await this.userService.createOidcUser({
+          username: claims.username,
+          name: claims.name,
+          email: claims.email,
+          oidcSubject: claims.subject,
+          oidcIssuer: issuer,
+          avatarUrl: claims.avatarUrl,
+        });
+        createdUser = true;
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        user = await this.userService.findByOidcSubject(claims.subject, issuer);
+        if (!user) throw toThrowable(error, 'OIDC user provisioning conflict');
+      }
 
-      if (config.autoProvision.defaultPermissionNames?.length) {
+      if (createdUser && config.autoProvision.defaultPermissionNames?.length) {
         await this.userService.setPermissionsDirectly(user.id, config.autoProvision.defaultPermissionNames as Permission[]);
       }
     }

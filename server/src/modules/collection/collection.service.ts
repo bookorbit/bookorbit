@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BooksPage } from '@projectx/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
@@ -14,6 +14,17 @@ import { CollectionRepository } from './collection.repository';
 const COLLECTION_NOT_FOUND_MESSAGE = 'Collection not found';
 const COLLECTION_ACCESS_DENIED_MESSAGE = 'No access to this collection';
 const BOOKS_NOT_FOUND_MESSAGE = 'One or more books were not found';
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const directCode = (error as { code?: unknown }).code;
+  if (directCode === '23505') return true;
+
+  if (!(error instanceof Error)) return false;
+  const causeCode = (error.cause as { code?: unknown } | undefined)?.code;
+  return causeCode === '23505';
+}
 
 @Injectable()
 export class CollectionService {
@@ -71,26 +82,40 @@ export class CollectionService {
   }
 
   async create(dto: CreateCollectionDto, user: RequestUser) {
-    const [inserted] = await this.collectionRepo.insert({
-      userId: user.id,
-      name: dto.name,
-      icon: dto.icon.trim(),
-      description: dto.description ?? null,
-      syncToKobo: dto.syncToKobo ?? false,
-    });
-    const [collection] = await this.collectionRepo.findById(inserted.id);
-    return collection;
+    try {
+      const [inserted] = await this.collectionRepo.insert({
+        userId: user.id,
+        name: dto.name,
+        icon: dto.icon.trim(),
+        description: dto.description ?? null,
+        syncToKobo: dto.syncToKobo ?? false,
+      });
+      const [collection] = await this.collectionRepo.findById(inserted.id);
+      return collection;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('A collection with this name already exists');
+      }
+      throw error;
+    }
   }
 
   async update(id: number, dto: UpdateCollectionDto, user: RequestUser) {
     const existing = await this.findCollectionForUserOrThrow(id, user);
 
-    await this.collectionRepo.update(id, existing.userId, {
-      ...(dto.name !== undefined && { name: dto.name }),
-      ...(dto.icon !== undefined && { icon: dto.icon.trim() || null }),
-      ...(dto.description !== undefined && { description: dto.description }),
-      ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
-    });
+    try {
+      await this.collectionRepo.update(id, existing.userId, {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.icon !== undefined && { icon: dto.icon.trim() || null }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('A collection with this name already exists');
+      }
+      throw error;
+    }
 
     const [updated] = await this.collectionRepo.findById(id);
     return updated;

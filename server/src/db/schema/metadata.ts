@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   customType,
   index,
   integer,
@@ -56,9 +57,9 @@ export const bookMetadata = pgTable(
     openLibraryId: varchar('open_library_id', { length: 50 }),
     itunesId: varchar('itunes_id', { length: 50 }),
     metadataScore: integer('metadata_score'),
-    lastMetadataFetchAt: timestamp('last_metadata_fetch_at'),
+    lastMetadataFetchAt: timestamp('last_metadata_fetch_at', { withTimezone: true }),
     embedding: embedding256('embedding'),
-    lastWrittenAt: timestamp('last_written_at'),
+    lastWrittenAt: timestamp('last_written_at', { withTimezone: true }),
     durationSeconds: integer('duration_seconds'),
     abridged: boolean('abridged').notNull().default(false),
     audibleId: varchar('audible_id', { length: 20 }),
@@ -68,7 +69,7 @@ export const bookMetadata = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
-    updatedAt: timestamp('updated_at')
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => new Date()),
@@ -78,6 +79,13 @@ export const bookMetadata = pgTable(
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
     index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
     index('bm_language_idx').on(t.language),
+    index('bm_published_year_idx').on(t.publishedYear),
+    index('bm_series_name_index_idx').on(t.seriesName, t.seriesIndex),
+    check('book_metadata_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 10)`),
+    check('book_metadata_published_year_range_chk', sql`${t.publishedYear} is null or (${t.publishedYear} >= 1000 and ${t.publishedYear} <= 2200)`),
+    check('book_metadata_page_count_nonnegative_chk', sql`${t.pageCount} is null or ${t.pageCount} >= 0`),
+    check('book_metadata_duration_seconds_nonnegative_chk', sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`),
+    check('book_metadata_cover_source_chk', sql`${t.coverSource} is null or ${t.coverSource} in ('extracted', 'custom')`),
   ],
 );
 
@@ -89,7 +97,7 @@ export const authors = pgTable(
     sortName: varchar('sort_name', { length: 500 }),
     description: text('description'),
     hasPhoto: boolean('has_photo').notNull().default(false),
-    lastEnrichedAt: timestamp('last_enriched_at'),
+    lastEnrichedAt: timestamp('last_enriched_at', { withTimezone: true }),
   },
   (t) => [unique('authors_name_unique').on(t.name), index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
 );
@@ -117,13 +125,13 @@ export const authorEnrichmentQueue = pgTable(
     status: varchar('status', { length: 20 }).notNull().default('queued'),
     reason: varchar('reason', { length: 50 }).notNull().default('unknown'),
     attemptCount: integer('attempt_count').notNull().default(0),
-    nextAttemptAt: timestamp('next_attempt_at').notNull().defaultNow(),
-    lastAttemptAt: timestamp('last_attempt_at'),
-    lastSuccessAt: timestamp('last_success_at'),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastHttpStatus: integer('last_http_status'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at')
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdateFn(() => new Date()),
@@ -134,6 +142,12 @@ export const authorEnrichmentQueue = pgTable(
     uniqueIndex('author_enrichment_queue_single_processing_idx')
       .on(t.status)
       .where(sql`${t.status} = 'processing'`),
+    check('author_enrichment_queue_status_chk', sql`${t.status} in ('queued', 'processing', 'rate_limited', 'failed', 'done')`),
+    check(
+      'author_enrichment_queue_reason_chk',
+      sql`${t.reason} in ('unknown', 'metadata_replace', 'manual_backfill', 'manual_backfill_all', 'author_rename', 'author_merge_target')`,
+    ),
+    check('author_enrichment_queue_attempt_count_nonnegative_chk', sql`${t.attemptCount} >= 0`),
   ],
 );
 
@@ -197,16 +211,22 @@ export const bookMetadataFetchQueue = pgTable(
     status: varchar('status', { length: 20 }).notNull().default('queued'),
     reason: varchar('reason', { length: 50 }).notNull().default('manual_trigger'),
     attemptCount: integer('attempt_count').notNull().default(0),
-    lastAttemptAt: timestamp('last_attempt_at'),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastHttpStatus: integer('last_http_status'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at')
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [index('bmfq_status_idx').on(t.status), index('bmfq_created_at_idx').on(t.createdAt)],
+  (t) => [
+    index('bmfq_status_idx').on(t.status),
+    index('bmfq_created_at_idx').on(t.createdAt),
+    check('book_metadata_fetch_queue_status_chk', sql`${t.status} in ('queued', 'processing', 'failed')`),
+    check('book_metadata_fetch_queue_reason_chk', sql`${t.reason} in ('event_import', 'manual_trigger', 'manual_retry')`),
+    check('book_metadata_fetch_queue_attempt_count_nonnegative_chk', sql`${t.attemptCount} >= 0`),
+  ],
 );
 
 export type BookMetadataFetchQueue = typeof bookMetadataFetchQueue.$inferSelect;

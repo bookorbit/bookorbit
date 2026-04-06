@@ -241,7 +241,7 @@ export class MigrationImportRepository {
   }
 
   async insertBookmark(values: typeof schema.bookmarks.$inferInsert): Promise<void> {
-    await this.db.insert(schema.bookmarks).values(values);
+    await this.db.insert(schema.bookmarks).values(values).onConflictDoNothing();
   }
 
   // --- Annotations ---
@@ -472,7 +472,7 @@ export class MigrationImportRepository {
   async batchInsertBookmarks(items: Array<typeof schema.bookmarks.$inferInsert>): Promise<void> {
     if (items.length === 0) return;
     for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
-      await this.db.insert(schema.bookmarks).values(batch);
+      await this.db.insert(schema.bookmarks).values(batch).onConflictDoNothing();
     }
   }
 

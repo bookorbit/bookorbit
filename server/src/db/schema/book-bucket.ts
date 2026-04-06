@@ -1,4 +1,5 @@
-import { bigint, index, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigint, check, index, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 import type { BookBucketMetadata } from '@projectx/types';
 
 import { libraries, libraryFolders } from './libraries';
@@ -21,14 +22,18 @@ export const bookBucketFiles = pgTable(
     confidence: integer('confidence'),
     fetchedMetadataSources: jsonb('fetched_metadata_sources').$type<Partial<Record<keyof BookBucketMetadata, string>>>(),
     errorMessage: text('error_message'),
-    metadataEditedAt: timestamp('metadata_edited_at'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at')
+    metadataEditedAt: timestamp('metadata_edited_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [index('book_bucket_files_status_idx').on(t.status)],
+  (t) => [
+    index('book_bucket_files_status_idx').on(t.status),
+    check('book_bucket_files_status_chk', sql`${t.status} in ('pending', 'extracting', 'fetching', 'ready', 'error')`),
+    check('book_bucket_files_confidence_range_chk', sql`${t.confidence} is null or (${t.confidence} >= 0 and ${t.confidence} <= 100)`),
+  ],
 );
 
 export type BookBucketFileRow = typeof bookBucketFiles.$inferSelect;

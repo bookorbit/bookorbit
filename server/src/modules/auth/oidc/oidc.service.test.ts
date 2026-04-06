@@ -52,6 +52,7 @@ function makeService() {
     setPermissionsDirectly: vi.fn(),
   };
   const authService = {
+    getRefreshTokenExpiryDate: vi.fn().mockReturnValue(new Date('2026-01-08T00:00:00Z')),
     issueTokensForUser: vi.fn(),
   };
 
@@ -69,7 +70,7 @@ function makeService() {
     authService as never,
   );
 
-  return { service, claimExtractor };
+  return { service, claimExtractor, userService, appSettings, authService, sessionRepo };
 }
 
 describe('OidcService', () => {
@@ -95,5 +96,51 @@ describe('OidcService', () => {
         { setCookie: vi.fn() } as never,
       ),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('reuses an OIDC user when auto-provision races on the new unique constraint', async () => {
+    const { service, claimExtractor, userService, appSettings, authService, sessionRepo } = makeService();
+    const existingUser = { id: 7, active: true };
+    appSettings.getOidcConfig.mockResolvedValue({
+      enabled: true,
+      issuerUri: 'https://issuer.example',
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
+      autoProvision: { enabled: true, allowLocalLinking: false, defaultPermissionNames: ['library_download'] },
+    });
+    claimExtractor.extract.mockReturnValue({
+      subject: 'sub-1',
+      username: 'u1',
+      name: 'User One',
+      email: 'u1@example.com',
+      groups: [],
+    });
+    userService.findByOidcSubject.mockResolvedValueOnce(null).mockResolvedValueOnce(existingUser);
+    userService.createOidcUser.mockRejectedValueOnce({ code: '23505' });
+    authService.issueTokensForUser.mockResolvedValue({ accessToken: 'token' });
+
+    await expect(
+      service.handleCallback(
+        {
+          code: 'code',
+          codeVerifier: 'verifier',
+          redirectUri: 'https://app.example/callback',
+          nonce: 'nonce',
+          state: 'state',
+        },
+        { setCookie: vi.fn() } as never,
+      ),
+    ).resolves.toEqual({ accessToken: 'token' });
+
+    expect(userService.setPermissionsDirectly).not.toHaveBeenCalled();
+    expect(sessionRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 7,
+        oidcSubject: 'sub-1',
+        oidcIssuer: 'https://issuer.example',
+        expiresAt: new Date('2026-01-08T00:00:00Z'),
+      }),
+    );
   });
 });

@@ -50,8 +50,9 @@ export class BookmarkRepository {
     const [row] = await this.db
       .insert(bookmarks)
       .values({ userId, bookId, cfi: data.cfi ?? null, title: data.title, positionSeconds: data.positionSeconds ?? null })
+      .onConflictDoNothing()
       .returning();
-    return row;
+    return row ?? null;
   }
 
   async delete(bookId: number, bookmarkId: number, userId: number) {

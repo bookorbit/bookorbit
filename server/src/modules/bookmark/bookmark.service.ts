@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { NewBookmark } from '../../db/schema';
@@ -6,6 +6,8 @@ import { BookService } from '../book/book.service';
 import { BookmarkRepository } from './bookmark.repository';
 import { BookmarkResponseDto } from './dto/bookmark-response.dto';
 import { CreateBookmarkDto } from './dto/create-bookmark.dto';
+
+const BOOKMARK_CONFLICT_MESSAGE = 'Bookmark already exists';
 
 @Injectable()
 export class BookmarkService {
@@ -30,6 +32,14 @@ export class BookmarkService {
     if (existing) return BookmarkResponseDto.from(existing);
 
     const row = await this.bookmarkRepo.create(user.id, bookId, createData);
+    if (!row) {
+      const concurrent = await this.bookmarkRepo.findExistingByLocation(user.id, bookId, {
+        cfi: createData.cfi,
+        positionSeconds: createData.positionSeconds,
+      });
+      if (concurrent) return BookmarkResponseDto.from(concurrent);
+      throw new ConflictException(BOOKMARK_CONFLICT_MESSAGE);
+    }
     return BookmarkResponseDto.from(row);
   }
 

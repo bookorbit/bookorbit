@@ -59,8 +59,8 @@ export class EmailRecipientGroupRepository {
       .returning();
   }
 
-  addMember(groupId: number, recipientId: number) {
-    return this.db.insert(emailRecipientGroupMembers).values({ groupId, recipientId }).onConflictDoNothing().returning();
+  addMember(groupId: number, recipientId: number, userId: number) {
+    return this.db.insert(emailRecipientGroupMembers).values({ groupId, recipientId, userId }).onConflictDoNothing().returning();
   }
 
   removeMember(groupId: number, recipientId: number) {

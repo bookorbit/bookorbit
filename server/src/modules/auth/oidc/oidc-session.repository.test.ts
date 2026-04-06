@@ -1,10 +1,11 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
+  gt: vi.fn((left: unknown, right: unknown) => ({ op: 'gt', left, right })),
   sql: vi.fn((parts: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', parts, values })),
 }));
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 
 import * as schema from '../../../db/schema';
 import { OidcSessionRepository } from './oidc-session.repository';
@@ -51,7 +52,7 @@ describe('OidcSessionRepository', () => {
   it('creates an OIDC session and returns the inserted row', async () => {
     const { db, insert, insertValues, insertReturning } = makeDb();
     const repository = new OidcSessionRepository(db as never);
-    const payload = { userId: 2, oidcSubject: 'sub', oidcIssuer: 'issuer', oidcSessionId: 'sid-1' };
+    const payload = { userId: 2, oidcSubject: 'sub', oidcIssuer: 'issuer', oidcSessionId: 'sid-1', expiresAt: new Date('2026-01-08T00:00:00Z') };
     const created = { id: 7, ...payload };
 
     insertReturning.mockResolvedValue([created]);
@@ -62,7 +63,7 @@ describe('OidcSessionRepository', () => {
     expect(insertReturning).toHaveBeenCalledTimes(1);
   });
 
-  it('finds an active session by sid and always filters out revoked rows', async () => {
+  it('finds an active session by sid and always filters out revoked and expired rows', async () => {
     const { db, findFirst } = makeDb();
     const repository = new OidcSessionRepository(db as never);
 
@@ -70,9 +71,11 @@ describe('OidcSessionRepository', () => {
 
     expect(eq).toHaveBeenCalledWith(schema.oidcSessions.oidcSessionId, 'sid-123');
     expect(eq).toHaveBeenCalledWith(schema.oidcSessions.revoked, false);
+    expect(gt).toHaveBeenCalledWith(schema.oidcSessions.expiresAt, expect.any(Date));
     expect(and).toHaveBeenCalledWith(
       { op: 'eq', left: schema.oidcSessions.oidcSessionId, right: 'sid-123' },
       { op: 'eq', left: schema.oidcSessions.revoked, right: false },
+      expect.objectContaining({ op: 'gt', left: schema.oidcSessions.expiresAt, right: expect.any(Date) }),
     );
     expect(findFirst).toHaveBeenCalledWith({
       where: {
@@ -80,6 +83,7 @@ describe('OidcSessionRepository', () => {
         clauses: [
           { op: 'eq', left: schema.oidcSessions.oidcSessionId, right: 'sid-123' },
           { op: 'eq', left: schema.oidcSessions.revoked, right: false },
+          expect.objectContaining({ op: 'gt', left: schema.oidcSessions.expiresAt, right: expect.any(Date) }),
         ],
       },
     });
@@ -98,6 +102,7 @@ describe('OidcSessionRepository', () => {
           { op: 'eq', left: schema.oidcSessions.oidcSubject, right: 'subject-a' },
           { op: 'eq', left: schema.oidcSessions.oidcIssuer, right: 'https://issuer.example' },
           { op: 'eq', left: schema.oidcSessions.revoked, right: false },
+          expect.objectContaining({ op: 'gt', left: schema.oidcSessions.expiresAt, right: expect.any(Date) }),
         ],
       },
     });
@@ -115,6 +120,7 @@ describe('OidcSessionRepository', () => {
       clauses: [
         { op: 'eq', left: schema.oidcSessions.userId, right: 42 },
         { op: 'eq', left: schema.oidcSessions.revoked, right: false },
+        expect.objectContaining({ op: 'gt', left: schema.oidcSessions.expiresAt, right: expect.any(Date) }),
       ],
     });
 
@@ -147,5 +153,23 @@ describe('OidcSessionRepository', () => {
       ],
     });
     expect(updateWhere).toHaveBeenNthCalledWith(3, { op: 'eq', left: schema.oidcSessions.userId, right: 91 });
+  });
+
+  it('extends active sessions for a user without reviving expired ones', async () => {
+    const { db, updateSet, updateWhere } = makeDb();
+    const repository = new OidcSessionRepository(db as never);
+    const expiresAt = new Date('2026-01-09T00:00:00Z');
+
+    await repository.touchActiveByUserId(42, expiresAt);
+
+    expect(updateSet).toHaveBeenCalledWith({ expiresAt });
+    expect(updateWhere).toHaveBeenCalledWith({
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: schema.oidcSessions.userId, right: 42 },
+        { op: 'eq', left: schema.oidcSessions.revoked, right: false },
+        expect.objectContaining({ op: 'gt', left: schema.oidcSessions.expiresAt, right: expect.any(Date) }),
+      ],
+    });
   });
 });

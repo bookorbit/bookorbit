@@ -25,9 +25,11 @@ function makeDb() {
   orderByResult.limit.mockResolvedValue([]);
 
   const insertResult = { values: vi.fn() };
-  const valuesResult = { returning: vi.fn() };
+  const valuesResult = { onConflictDoNothing: vi.fn() };
+  const conflictResult = { returning: vi.fn() };
   insertResult.values.mockReturnValue(valuesResult);
-  valuesResult.returning.mockResolvedValue([]);
+  valuesResult.onConflictDoNothing.mockReturnValue(conflictResult);
+  conflictResult.returning.mockResolvedValue([]);
 
   const deleteResult = { where: vi.fn() };
   const deleteWhereResult = { returning: vi.fn() };
@@ -42,6 +44,7 @@ function makeDb() {
     _orderBy: orderByResult,
     _insert: insertResult,
     _values: valuesResult,
+    _conflict: conflictResult,
     _deleteWhere: deleteWhereResult,
   };
   return db;
@@ -116,12 +119,22 @@ describe('BookmarkRepository', () => {
     it('inserts and returns created row', async () => {
       const { repo, db } = makeRepository();
       const row = makeRow({ id: 8, cfi: null, positionSeconds: 15, title: '00:00:15' });
-      db._values.returning.mockResolvedValue([row]);
+      db._conflict.returning.mockResolvedValue([row]);
 
       const result = await repo.create(10, 5, { cfi: null, title: '00:00:15', positionSeconds: 15 });
 
       expect(db._insert.values).toHaveBeenCalledWith({ userId: 10, bookId: 5, cfi: null, title: '00:00:15', positionSeconds: 15 });
+      expect(db._values.onConflictDoNothing).toHaveBeenCalledTimes(1);
       expect(result).toEqual(row);
+    });
+
+    it('returns null when a duplicate insert is ignored by the database', async () => {
+      const { repo, db } = makeRepository();
+      db._conflict.returning.mockResolvedValue([]);
+
+      const result = await repo.create(10, 5, { cfi: 'epubcfi(/6/2)', title: 'Chapter 1', positionSeconds: null });
+
+      expect(result).toBeNull();
     });
   });
 

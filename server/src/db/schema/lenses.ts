@@ -16,8 +16,8 @@ export const lenses = pgTable(
     defaultSort: jsonb('default_sort').$type<SortSpec[]>().notNull().default([]),
     isPublic: boolean('is_public').notNull().default(false),
     displayOrder: integer('display_order').notNull().default(0),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at')
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => new Date()),

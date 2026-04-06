@@ -91,6 +91,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
   const oidcSessionRepo = {
     findActiveByUserId: vi.fn().mockResolvedValue(null),
     revokeByUserId: vi.fn().mockResolvedValue(undefined),
+    touchActiveByUserId: vi.fn().mockResolvedValue(undefined),
   };
   const oidcDiscovery = {
     getDiscoveryDoc: vi.fn(),
@@ -345,7 +346,7 @@ describe('AuthService', () => {
     });
 
     it('rotates token and sets cookies when refresh succeeds', async () => {
-      const { service, db } = makeService();
+      const { service, db, oidcSessionRepo } = makeService();
       const reply = makeReply();
       (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({
         id: 11,
@@ -362,6 +363,7 @@ describe('AuthService', () => {
       const result = await service.refresh(makeRequest({ refresh_token: 'ok-token' }), reply);
       expect(result).toEqual({ accessToken: 'signed-jwt' });
       expect(db.update).toHaveBeenCalled();
+      expect(oidcSessionRepo.touchActiveByUserId).toHaveBeenCalledWith(5, expect.any(Date));
       expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalled();
     });
   });

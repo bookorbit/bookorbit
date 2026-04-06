@@ -20,8 +20,8 @@ export const comicMetadata = pgTable(
     teams: text('teams').array(),
     locations: text('locations').array(),
     storyArcs: text('story_arcs').array(),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at')
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdateFn(() => new Date()),

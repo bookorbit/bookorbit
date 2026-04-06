@@ -79,11 +79,15 @@ export class AuthService {
 
     const passwordHash = await hash(dto.password, 12);
     return this.db.transaction(async (tx) => {
-      const existingUsername = await tx.query.users.findFirst({ where: eq(schema.users.username, dto.username) });
+      const existingUsername = await tx.query.users.findFirst({
+        where: eq(sql`lower(${schema.users.username})`, dto.username.toLowerCase()),
+      });
       if (existingUsername) throw new ConflictException('Username already taken');
 
       if (dto.email) {
-        const existingEmail = await tx.query.users.findFirst({ where: eq(schema.users.email, dto.email) });
+        const existingEmail = await tx.query.users.findFirst({
+          where: eq(sql`lower(${schema.users.email})`, dto.email.toLowerCase()),
+        });
         if (existingEmail) throw new ConflictException('Email already in use');
       }
 
@@ -135,12 +139,16 @@ export class AuthService {
         throw new ConflictException('Setup already completed');
       }
 
-      const existingUsername = await tx.query.users.findFirst({ where: eq(schema.users.username, dto.username) });
+      const existingUsername = await tx.query.users.findFirst({
+        where: eq(sql`lower(${schema.users.username})`, dto.username.toLowerCase()),
+      });
       if (existingUsername) {
         throw new ConflictException('Username already taken');
       }
 
-      const existingEmail = await tx.query.users.findFirst({ where: eq(schema.users.email, dto.email) });
+      const existingEmail = await tx.query.users.findFirst({
+        where: eq(sql`lower(${schema.users.email})`, dto.email.toLowerCase()),
+      });
       if (existingEmail) {
         throw new ConflictException('Email already in use');
       }
@@ -222,7 +230,8 @@ export class AuthService {
   async issueTokensForUser(userId: number, reply: FastifyReply) {
     const user = await this.userService.findByIdWithPermissions(userId);
     if (!user || !user.active) throw new UnauthorizedException();
-    const { accessToken, rawRefreshToken } = await this.issueTokenPair(userId, user.tokenVersion);
+    const { accessToken, rawRefreshToken, refreshExpiresAt } = await this.issueTokenPair(userId, user.tokenVersion);
+    await this.oidcSessionRepo.touchActiveByUserId(userId, refreshExpiresAt);
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
     return { accessToken, user: this.buildUserResponse(user) };
@@ -278,7 +287,8 @@ export class AuthService {
     // Rotate: revoke old, issue new
     await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id));
 
-    const { accessToken, rawRefreshToken } = await this.issueTokenPair(row.userId, userForToken.tokenVersion);
+    const { accessToken, rawRefreshToken, refreshExpiresAt } = await this.issueTokenPair(row.userId, userForToken.tokenVersion);
+    await this.oidcSessionRepo.touchActiveByUserId(row.userId, refreshExpiresAt);
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
 
@@ -491,17 +501,20 @@ export class AuthService {
     });
   }
 
+  getRefreshTokenExpiryDate(baseDate = new Date()) {
+    return new Date(baseDate.getTime() + parseDurationMs(this.config.get<string>('auth.jwtRefreshExpiresIn') ?? '7d'));
+  }
+
   private async issueTokenPair(userId: number, tokenVersion: number) {
     const accessToken = this.jwtService.sign({ sub: userId, ver: tokenVersion });
 
     const rawRefreshToken = randomBytes(32).toString('hex');
     const tokenHash = sha256(rawRefreshToken);
-    const refreshTtlMs = parseDurationMs(this.config.get<string>('auth.jwtRefreshExpiresIn') ?? '7d');
-    const expiresAt = new Date(Date.now() + refreshTtlMs);
+    const expiresAt = this.getRefreshTokenExpiryDate();
 
     await this.db.insert(schema.refreshTokens).values({ userId, tokenHash, expiresAt });
 
-    return { accessToken, rawRefreshToken };
+    return { accessToken, rawRefreshToken, refreshExpiresAt: expiresAt };
   }
 
   private assertSetupToken(setupToken: string | undefined) {

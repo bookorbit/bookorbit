@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
@@ -18,13 +18,18 @@ export class OidcSessionRepository {
 
   async findActiveBySid(sid: string) {
     return this.db.query.oidcSessions.findFirst({
-      where: and(eq(schema.oidcSessions.oidcSessionId, sid), eq(schema.oidcSessions.revoked, false)),
+      where: and(eq(schema.oidcSessions.oidcSessionId, sid), eq(schema.oidcSessions.revoked, false), gt(schema.oidcSessions.expiresAt, new Date())),
     });
   }
 
   async findActiveBySubjectAndIssuer(subject: string, issuer: string) {
     return this.db.query.oidcSessions.findMany({
-      where: and(eq(schema.oidcSessions.oidcSubject, subject), eq(schema.oidcSessions.oidcIssuer, issuer), eq(schema.oidcSessions.revoked, false)),
+      where: and(
+        eq(schema.oidcSessions.oidcSubject, subject),
+        eq(schema.oidcSessions.oidcIssuer, issuer),
+        eq(schema.oidcSessions.revoked, false),
+        gt(schema.oidcSessions.expiresAt, new Date()),
+      ),
     });
   }
 
@@ -41,9 +46,16 @@ export class OidcSessionRepository {
 
   async findActiveByUserId(userId: number) {
     return this.db.query.oidcSessions.findFirst({
-      where: and(eq(schema.oidcSessions.userId, userId), eq(schema.oidcSessions.revoked, false)),
+      where: and(eq(schema.oidcSessions.userId, userId), eq(schema.oidcSessions.revoked, false), gt(schema.oidcSessions.expiresAt, new Date())),
       orderBy: (t, { desc }) => [desc(t.createdAt)],
     });
+  }
+
+  async touchActiveByUserId(userId: number, expiresAt: Date) {
+    await this.db
+      .update(schema.oidcSessions)
+      .set({ expiresAt })
+      .where(and(eq(schema.oidcSessions.userId, userId), eq(schema.oidcSessions.revoked, false), gt(schema.oidcSessions.expiresAt, new Date())));
   }
 
   async revokeByUserId(userId: number) {

@@ -44,12 +44,15 @@ describe('email-recipients schema', () => {
 
   it('protects group-membership integrity with composite uniqueness and cascade deletes', () => {
     const config = getTableConfig(emailRecipientGroupMembers);
-    const unique = config.uniqueConstraints.map((constraint) => constraint.columns.map((col) => col.name));
+    const primaryKeys = config.primaryKeys.map((constraint) => constraint.columns.map((col) => col.name));
 
-    expect(unique).toContainEqual(['group_id', 'recipient_id']);
+    expect(primaryKeys).toContainEqual(['group_id', 'recipient_id']);
 
     const foreignKeys = fkByColumn(emailRecipientGroupMembers);
+    expect(foreignKeys.get('user_id')?.onDelete).toBe('cascade');
     expect(foreignKeys.get('group_id')?.onDelete).toBe('cascade');
     expect(foreignKeys.get('recipient_id')?.onDelete).toBe('cascade');
+    expect(foreignKeys.get('group_id,user_id')).toBeDefined();
+    expect(foreignKeys.get('recipient_id,user_id')).toBeDefined();
   });
 });

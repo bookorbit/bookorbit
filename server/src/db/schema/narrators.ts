@@ -8,7 +8,7 @@ export const narrators = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 500 }).notNull().unique(),
     sortName: varchar('sort_name', { length: 500 }),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index('narrators_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
 );

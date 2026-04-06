@@ -1,4 +1,5 @@
-import { boolean, integer, pgTable, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, check, integer, pgTable, serial, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { users } from './auth';
 
@@ -20,13 +21,23 @@ export const emailProviders = pgTable(
     isDefault: boolean('is_default').notNull().default(false),
     isShared: boolean('is_shared').notNull().default(false),
     isSystemProvider: boolean('is_system_provider').notNull().default(false),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at')
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique().on(t.userId, t.name)],
+  (t) => [
+    unique().on(t.userId, t.name),
+    uniqueIndex('email_providers_id_user_id_uidx').on(t.id, t.userId),
+    uniqueIndex('email_providers_one_default_per_user_uidx')
+      .on(t.userId)
+      .where(sql`${t.isDefault} = true and ${t.userId} is not null`),
+    uniqueIndex('email_providers_one_system_provider_uidx')
+      .on(t.isSystemProvider)
+      .where(sql`${t.isSystemProvider} = true`),
+    check('email_providers_port_range_chk', sql`${t.port} >= 1 and ${t.port} <= 65535`),
+  ],
 );
 
 export type EmailProvider = typeof emailProviders.$inferSelect;

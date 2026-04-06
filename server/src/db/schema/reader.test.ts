@@ -57,18 +57,23 @@ describe('reader schema', () => {
 
     expect(pkColumns).toContainEqual(['user_id', 'library_id', 'day']);
     expect(indexNames).toContain('urds_user_day_idx');
-    expect(indexNames).toContain('urds_user_library_day_idx');
+    expect(indexNames).not.toContain('urds_user_library_day_idx');
     expect(fkMap.get('user_id')?.onDelete).toBe('cascade');
     expect(fkMap.get('library_id')?.onDelete).toBe('cascade');
     expect(userReadingDailyStats.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date);
   });
 
-  it('enforces cascade deletes for bookmarks and annotations ownership', () => {
+  it('enforces cascade deletes and bookmark uniqueness by logical location', () => {
     const bookmarkFks = fkByColumn(bookmarks);
     const annotationFks = fkByColumn(annotations);
+    const bookmarkConfig = getTableConfig(bookmarks);
+    const bookmarkIndexNames = bookmarkConfig.indexes.map((idx) => idx.config.name);
 
     expect(bookmarkFks.get('user_id')?.onDelete).toBe('cascade');
     expect(bookmarkFks.get('book_id')?.onDelete).toBe('cascade');
+    expect(bookmarkIndexNames).toContain('bookmarks_user_book_idx');
+    expect(bookmarkIndexNames).toContain('bookmarks_user_book_cfi_uidx');
+    expect(bookmarkIndexNames).toContain('bookmarks_user_book_pos_uidx');
     expect(annotationFks.get('user_id')?.onDelete).toBe('cascade');
     expect(annotationFks.get('book_id')?.onDelete).toBe('cascade');
     expect(annotations.color.default).toBe('yellow');

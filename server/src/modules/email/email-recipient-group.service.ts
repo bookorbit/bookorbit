@@ -86,7 +86,7 @@ export class EmailRecipientGroupService {
     const [recipient] = await this.recipientRepo.findById(recipientId);
     if (!recipient) throw new NotFoundException('Recipient not found');
     if (recipient.userId !== user.id) throw new ForbiddenException('Cannot add a recipient you do not own');
-    await this.repo.addMember(groupId, recipientId);
+    await this.repo.addMember(groupId, recipientId, user.id);
     return this.findOne(groupId, user);
   }
 

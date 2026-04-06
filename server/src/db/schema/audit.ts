@@ -14,7 +14,7 @@ export const auditLog = pgTable(
     description: text('description').notNull(),
     ip: varchar('ip', { length: 45 }),
     meta: jsonb('meta'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index('idx_audit_user_id').on(t.userId),

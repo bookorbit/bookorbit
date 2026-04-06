@@ -122,6 +122,18 @@ describe('BookmarkService', () => {
       expect(result.positionSeconds).toBe(42);
     });
 
+    it('re-reads and returns the existing bookmark when a concurrent duplicate insert is ignored', async () => {
+      const { service, bookmarkRepo } = makeService();
+      const existing = makeBookmarkRow({ id: 13, cfi: null, positionSeconds: 42, title: '00:00:42' });
+      bookmarkRepo.findExistingByLocation.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
+      bookmarkRepo.create.mockResolvedValue(null);
+
+      const result = await service.createBookmark(5, makeUser(), { title: '00:00:42', positionSeconds: 42 });
+
+      expect(bookmarkRepo.findExistingByLocation).toHaveBeenNthCalledWith(2, 1, 5, { cfi: null, positionSeconds: 42 });
+      expect(result.id).toBe(13);
+    });
+
     it('propagates access errors and does not query repository', async () => {
       const { service, bookService, bookmarkRepo } = makeService();
       bookService.verifyBookAccess.mockRejectedValue(new NotFoundException('Book 5 not found'));

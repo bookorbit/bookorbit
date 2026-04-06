@@ -144,9 +144,9 @@ describe('EmailRecipientGroupRepository', () => {
     const { db, insertBuilder, deleteBuilder } = makeDb();
     const repo = new EmailRecipientGroupRepository(db as never);
 
-    void repo.addMember(3, 4);
+    void repo.addMember(3, 4, 8);
     expect(db.insert).toHaveBeenCalledWith(emailRecipientGroupMembers);
-    expect(insertBuilder.values).toHaveBeenCalledWith({ groupId: 3, recipientId: 4 });
+    expect(insertBuilder.values).toHaveBeenCalledWith({ groupId: 3, recipientId: 4, userId: 8 });
     expect(insertBuilder.onConflictDoNothing).toHaveBeenCalled();
     expect(insertBuilder.returning).toHaveBeenCalled();
 

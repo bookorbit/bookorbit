@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { isNotNull, lt, or } from 'drizzle-orm';
+import { eq, isNotNull, lt, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -20,8 +20,8 @@ export class CleanupService implements OnApplicationBootstrap {
   @Cron('0 3 * * *')
   async cleanup() {
     const startedAt = Date.now();
-    const event = 'seed.cleanup_tokens';
-    this.logger.log(`[${event}] [start] - token cleanup started`);
+    const event = 'seed.cleanup_auth_state';
+    this.logger.log(`[${event}] [start] - auth state cleanup started`);
     try {
       const now = new Date();
 
@@ -32,13 +32,18 @@ export class CleanupService implements OnApplicationBootstrap {
       const { rowCount: resetCount } = await this.db
         .delete(schema.passwordResetTokens)
         .where(or(lt(schema.passwordResetTokens.expiresAt, now), isNotNull(schema.passwordResetTokens.usedAt)));
+
+      const { rowCount: oidcCount } = await this.db
+        .delete(schema.oidcSessions)
+        .where(or(lt(schema.oidcSessions.expiresAt, now), eq(schema.oidcSessions.revoked, true)));
+
       this.logger.log(
-        `[${event}] [end] refreshDeleted=${refreshCount ?? 0} resetDeleted=${resetCount ?? 0} durationMs=${Date.now() - startedAt} - token cleanup completed`,
+        `[${event}] [end] refreshDeleted=${refreshCount ?? 0} resetDeleted=${resetCount ?? 0} oidcDeleted=${oidcCount ?? 0} durationMs=${Date.now() - startedAt} - auth state cleanup completed`,
       );
     } catch (error) {
       const { errorClass, errorMessage } = getSanitizedErrorInfo(error);
       this.logger.error(
-        `[${event}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - token cleanup failed`,
+        `[${event}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - auth state cleanup failed`,
       );
       throw error;
     }

@@ -135,7 +135,7 @@ describe('EmailRecipientGroupService', () => {
   describe('addMember', () => {
     it('should add member and return updated group', async () => {
       await service.addMember(10, 100, mockUser);
-      expect(repo.addMember).toHaveBeenCalledWith(10, 100);
+      expect(repo.addMember).toHaveBeenCalledWith(10, 100, 1);
       expect(repo.findMembers).toHaveBeenCalledWith(10);
     });
 
