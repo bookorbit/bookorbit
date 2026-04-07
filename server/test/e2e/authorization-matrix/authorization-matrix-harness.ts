@@ -16,7 +16,7 @@ import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
 import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
-import { seedLibrary, waitForScanCompletion } from '../app-harness';
+import { makeMetadataNoopMock, seedLibrary, waitForScanCompletion, type MetadataNoopMock } from '../app-harness';
 import {
   buildFb2Fixture,
   createAuthorizationFixtureRoot,
@@ -45,6 +45,7 @@ export interface AuthorizationMatrixE2EContext {
   adminToken: string;
   fixture: AuthorizationMatrixFixtureRoot;
   envSnapshot: EnvSnapshot;
+  metadataMock: MetadataNoopMock;
 }
 
 export interface CreatedLibrary {
@@ -108,11 +109,12 @@ export async function createAuthorizationMatrixE2EContext(): Promise<Authorizati
   process.env.BOOKS_PATH = fixture.booksPath;
   process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
 
+  const metadataMock = makeMetadataNoopMock();
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
   })
     .overrideProvider(MetadataService)
-    .useValue(makeMetadataNoopMock())
+    .useValue(metadataMock)
     .compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -144,6 +146,7 @@ export async function createAuthorizationMatrixE2EContext(): Promise<Authorizati
     adminToken,
     fixture,
     envSnapshot,
+    metadataMock,
   };
 }
 
@@ -451,19 +454,6 @@ function buildMultipartBody(fileName: string, content: Buffer, contentType: stri
   );
   const closing = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
   return { body: Buffer.concat([preamble, content, closing]), boundary };
-}
-
-function makeMetadataNoopMock(): Pick<
-  MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
-> {
-  return {
-    extractAndSave: () => Promise.resolve(undefined),
-    refreshCoverForBook: () => Promise.resolve(false),
-    extractAudioFileDuration: () => Promise.resolve(undefined),
-    aggregateAudioDuration: () => Promise.resolve(undefined),
-    extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
-  };
 }
 
 async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 
-export { createEpubFixture } from '../metadata-write/metadata-write-fixture-builder';
+export { createCbzFixture, createEpubFixture, createZipArchiveFixture } from '../metadata-write/metadata-write-fixture-builder';
 
 export interface ReaderStateIsolationFixtureRoot {
   rootPath: string;

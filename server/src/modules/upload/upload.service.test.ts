@@ -134,7 +134,7 @@ describe('UploadService', () => {
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/book/book.epub');
   });
 
-  it('throws ConflictException when destination already exists and cleans both temp and destination paths', async () => {
+  it('throws ConflictException when destination already exists and cleans temp path', async () => {
     db.select
       .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
       .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
@@ -142,7 +142,7 @@ describe('UploadService', () => {
 
     await expect(service.upload(1, 2, 'raw.epub', {} as any, user)).rejects.toBeInstanceOf(ConflictException);
     expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
-    expect(storage.cleanup).toHaveBeenCalledWith('/library/book/book.epub');
+    expect(storage.cleanup).not.toHaveBeenCalledWith('/library/book/book.epub');
     expect(storage.moveToPath).not.toHaveBeenCalled();
   });
 

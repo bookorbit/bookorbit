@@ -303,6 +303,9 @@ export class EpubService {
 
     const epubPath = await this.resolveEpubPath(bookId, fileId, user);
     const cached = await this.getCachedEntry(epubPath);
+    if (!cached.validPaths.has(normalizedPath)) {
+      throw new NotFoundException(`Entry not in archive: ${normalizedPath}`);
+    }
     const zip = await unzipper.Open.file(epubPath);
     const entry = findInZip(zip.files, normalizedPath);
     if (!entry) throw new NotFoundException(`Entry not in archive: ${normalizedPath}`);
@@ -343,6 +346,7 @@ export class EpubService {
 
     const validPaths = new Set<string>(['META-INF/container.xml', normalizeZipPath(info.containerPath)]);
     for (const item of info.manifest) validPaths.add(normalizeZipPath(item.href));
+    for (const path of info.optionalFiles ?? []) validPaths.add(normalizeZipPath(path));
 
     const entry: CacheEntry = { info, mtime: mtimeMs, validPaths, lastAccessed: Date.now() };
     this.evict();

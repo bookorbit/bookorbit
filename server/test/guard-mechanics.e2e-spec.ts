@@ -116,7 +116,7 @@ class SmokeProtectedController {
 })
 class SmokeAppModule {}
 
-describe('API smoke (e2e)', () => {
+describe('Guard mechanics (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {

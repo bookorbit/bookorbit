@@ -14,7 +14,7 @@ export interface MetadataWriteFixtureRoot {
   cleanup: () => Promise<void>;
 }
 
-interface ZipEntryInput {
+export interface ZipEntryInput {
   path: string;
   content: string | Buffer;
   store?: boolean;
@@ -134,6 +134,14 @@ export async function createCb7Fixture(rootPath: string, relativePath: string, i
   const xml = buildComicInfoXml(input);
   const archiveBytes = await buildCb7Archive(xml);
   return writeFixtureFile(rootPath, relativePath, archiveBytes);
+}
+
+export async function createZipArchiveFixture(rootPath: string, relativePath: string, entries: ZipEntryInput[]): Promise<string> {
+  assertRelativePath(relativePath);
+  const absolutePath = join(rootPath, relativePath);
+  await mkdir(dirname(absolutePath), { recursive: true });
+  await writeZipArchive(absolutePath, entries);
+  return absolutePath;
 }
 
 async function writeZipArchive(absolutePath: string, entries: ZipEntryInput[]): Promise<void> {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { expect } from 'vitest';
+import { expect, vi } from 'vitest';
 import fastifyCookie from '@fastify/cookie';
 import { count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -17,6 +17,13 @@ import { MetadataService } from '../../src/modules/metadata/metadata.service';
 
 export type Db = NodePgDatabase<typeof schema>;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
+export type MetadataNoopMock = {
+  extractAndSave: ReturnType<typeof vi.fn>;
+  refreshCoverForBook: ReturnType<typeof vi.fn>;
+  extractAudioFileDuration: ReturnType<typeof vi.fn>;
+  aggregateAudioDuration: ReturnType<typeof vi.fn>;
+  extractAudioChaptersAndNarrators: ReturnType<typeof vi.fn>;
+};
 
 const ADMIN_SETUP_DTO = {
   username: 'scanner-e2e-admin',
@@ -29,16 +36,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function makeMetadataNoopMock(): Pick<
-  MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
-> {
+export function makeMetadataNoopMock(): MetadataNoopMock {
   return {
-    extractAndSave: () => Promise.resolve(undefined),
-    refreshCoverForBook: () => Promise.resolve(false),
-    extractAudioFileDuration: () => Promise.resolve(undefined),
-    aggregateAudioDuration: () => Promise.resolve(undefined),
-    extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
+    extractAndSave: vi.fn().mockResolvedValue(undefined),
+    refreshCoverForBook: vi.fn().mockResolvedValue(false),
+    extractAudioFileDuration: vi.fn().mockResolvedValue(undefined),
+    aggregateAudioDuration: vi.fn().mockResolvedValue(undefined),
+    extractAudioChaptersAndNarrators: vi.fn().mockResolvedValue(undefined),
   };
 }
 

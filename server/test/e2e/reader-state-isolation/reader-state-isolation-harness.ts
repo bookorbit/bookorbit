@@ -10,11 +10,12 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@projectx/types';
 
 import { AppModule } from '../../../src/app.module';
+import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
 import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
-import { seedLibrary, waitForScanCompletion } from '../app-harness';
+import { makeMetadataNoopMock, seedLibrary, waitForScanCompletion } from '../app-harness';
 import { createReaderStateIsolationFixtureRoot, type ReaderStateIsolationFixtureRoot } from './reader-state-isolation-fixture-builder';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -91,6 +92,7 @@ export async function createReaderStateIsolationE2EContext(): Promise<ReaderStat
       transform: true,
     }),
   );
+  app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
@@ -319,19 +321,6 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
   if (response.statusCode !== 200) return null;
   const body = response.json() as { accessToken?: string };
   return body.accessToken ?? null;
-}
-
-function makeMetadataNoopMock(): Pick<
-  MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
-> {
-  return {
-    extractAndSave: () => Promise.resolve(undefined),
-    refreshCoverForBook: () => Promise.resolve(false),
-    extractAudioFileDuration: () => Promise.resolve(undefined),
-    aggregateAudioDuration: () => Promise.resolve(undefined),
-    extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
-  };
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {

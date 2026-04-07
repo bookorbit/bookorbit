@@ -14,7 +14,7 @@ import { LibraryService } from '../library/library.service';
 import { UploadValidatorService } from './upload-validator.service';
 import { UploadStorageService } from './upload-storage.service';
 import { UploadProcessorService } from './upload-processor.service';
-import { resolveUploadPath } from '@projectx/types';
+import { resolveDownloadFilename, resolveUploadPath } from '@projectx/types';
 import type { UploadResult } from '@projectx/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
@@ -54,18 +54,20 @@ export class UploadService {
 
     const { tempPath, sizeBytes } = await this.storage.streamToTemp(fileStream);
     let destinationPath: string | null = null;
+    let shouldCleanupDestination = false;
 
     try {
-      const { absolutePath, folderPath, relPath } = await this.resolveDestination(library, folder.path, tempPath, filename, format);
+      const { absolutePath, bookFolderPath, relPath } = await this.resolveDestination(library, folder.path, tempPath, filename, format);
       destinationPath = absolutePath;
 
       if (await this.destinationExists(absolutePath)) {
         throw new ConflictException(`A file named "${basename(absolutePath)}" already exists at the target location`);
       }
 
+      shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, absolutePath);
 
-      const { bookId } = await this.processor.createBookRecord(libraryId, folder.id, folderPath, absolutePath, relPath, format, sizeBytes);
+      const { bookId } = await this.processor.createBookRecord(libraryId, folder.id, bookFolderPath, absolutePath, relPath, format, sizeBytes);
 
       this.processor.extractMetadataAsync(bookId, absolutePath, format);
 
@@ -78,38 +80,62 @@ export class UploadService {
       this.logger.error(
         `[${event}] [fail] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - upload failed`,
       );
-      await Promise.allSettled([this.storage.cleanup(tempPath), destinationPath ? this.storage.cleanup(destinationPath) : Promise.resolve()]);
+      await Promise.allSettled([
+        this.storage.cleanup(tempPath),
+        shouldCleanupDestination && destinationPath ? this.storage.cleanup(destinationPath) : Promise.resolve(),
+      ]);
       throw err;
     }
   }
 
   private async resolveDestination(
-    library: { fileNamingPattern?: string | null },
+    library: { fileNamingPattern?: string | null; organizationMode?: string | null },
     libraryFolderPath: string,
     tempPath: string,
     filename: string,
     format: string,
-  ): Promise<{ absolutePath: string; folderPath: string; relPath: string }> {
+  ): Promise<{ absolutePath: string; bookFolderPath: string; relPath: string }> {
     const pattern = library.fileNamingPattern ?? (await this.appSettings.getUploadPattern());
 
     if (pattern) {
       const stem = basename(filename, extname(filename));
       const tokens = await this.buildPatternTokens(tempPath, format, stem);
-      const resolved = resolveUploadPath(pattern, tokens, format);
+      if (library.organizationMode === 'book_per_file') {
+        const resolvedFilename = resolveDownloadFilename(pattern, tokens, format);
+        if (resolvedFilename) {
+          const absolutePath = join(libraryFolderPath, resolvedFilename);
+          return {
+            absolutePath,
+            bookFolderPath: absolutePath,
+            relPath: resolvedFilename,
+          };
+        }
+      } else {
+        const resolved = resolveUploadPath(pattern, tokens, format);
 
-      if (resolved) {
-        const absolutePath = join(libraryFolderPath, resolved);
-        const folderPath = dirname(absolutePath);
-        const relPath = resolved;
-        return { absolutePath, folderPath, relPath };
+        if (resolved) {
+          const absolutePath = join(libraryFolderPath, resolved);
+          const relPath = resolved;
+          const bookFolderPath = dirname(absolutePath);
+          return { absolutePath, bookFolderPath, relPath };
+        }
       }
     }
 
+    if (library.organizationMode === 'book_per_file') {
+      const absolutePath = join(libraryFolderPath, filename);
+      return {
+        absolutePath,
+        bookFolderPath: absolutePath,
+        relPath: filename,
+      };
+    }
+
     const stem = basename(filename, extname(filename));
-    const folderPath = join(libraryFolderPath, stem);
-    const absolutePath = join(folderPath, filename);
+    const bookFolderPath = join(libraryFolderPath, stem);
+    const absolutePath = join(bookFolderPath, filename);
     const relPath = join(stem, filename);
-    return { absolutePath, folderPath, relPath };
+    return { absolutePath, bookFolderPath, relPath };
   }
 
   private async buildPatternTokens(tempPath: string, format: string, stem: string): Promise<Record<string, string>> {
