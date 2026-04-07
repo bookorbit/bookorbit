@@ -43,9 +43,10 @@ export class BookBucketIngestService {
     }
 
     const { tempPath, sizeBytes } = await this.storage.streamToTemp(fileStream);
+    let destPath: string | null = null;
 
     try {
-      const destPath = await this.resolveUniquePath(join(this.bookBucketPath, filename));
+      destPath = await this.resolveUniquePath(join(this.bookBucketPath, filename));
 
       await this.storage.moveToPath(tempPath, destPath);
 
@@ -61,7 +62,7 @@ export class BookBucketIngestService {
 
       return row.id;
     } catch (err) {
-      await this.storage.cleanup(tempPath);
+      await Promise.allSettled([this.storage.cleanup(tempPath), destPath ? this.storage.cleanup(destPath) : Promise.resolve()]);
       throw err;
     }
   }

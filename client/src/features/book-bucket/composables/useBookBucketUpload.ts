@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { getAccessToken } from '@/lib/api'
 import type { BookBucketFile } from '@projectx/types'
 
-export const SUPPORTED_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2']
+export const SUPPORTED_FORMATS = ['epub', 'kepub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2', 'm4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac']
 export const SUPPORTED_FORMATS_ACCEPT = SUPPORTED_FORMATS.map((f) => `.${f}`).join(',')
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024
 

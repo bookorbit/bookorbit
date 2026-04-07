@@ -18,7 +18,7 @@ import {
 import { createReadStream } from 'fs';
 import { access } from 'fs/promises';
 import { Readable } from 'stream';
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply } from 'fastify';
 import { Permission } from '@projectx/types';
 import type { BookBucketMetadata } from '@projectx/types';
 
@@ -26,6 +26,7 @@ import { AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookBucketService } from './book-bucket.service';
 import { BookBucketIngestService } from './book-bucket-ingest.service';
@@ -45,10 +46,6 @@ import {
   SelectionSummaryDto,
 } from './dto/index';
 import { MAX_UPLOAD_BYTES } from '../upload/upload-storage.service';
-
-type MultipartRequest = FastifyRequest & {
-  file: (opts?: object) => Promise<{ filename: string; file: NodeJS.ReadableStream } | undefined>;
-};
 
 @Controller('book-bucket')
 @RequirePermission(Permission.BookBucketAccess)

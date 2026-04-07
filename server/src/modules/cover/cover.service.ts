@@ -352,9 +352,12 @@ export class CoverService {
       throw new BadRequestException('URL host is not allowed');
     }
 
-    const ipFamily = isIP(normalizedHost);
+    // URL.hostname wraps IPv6 in brackets (e.g. [::1]); strip them for isIP/range checks
+    const bareHost = normalizedHost.startsWith('[') && normalizedHost.endsWith(']') ? normalizedHost.slice(1, -1) : normalizedHost;
+
+    const ipFamily = isIP(bareHost);
     if (ipFamily > 0) {
-      if (isPrivateOrLocalAddress(normalizedHost)) {
+      if (isPrivateOrLocalAddress(bareHost)) {
         throw new BadRequestException('URL host is not allowed');
       }
       return;

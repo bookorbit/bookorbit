@@ -135,4 +135,26 @@ describe('UploadProcessorService', () => {
     expect(metadataService.extractAndSave).toHaveBeenCalledWith(9, '/tmp/a.epub', 'epub');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('upstream failed'));
   });
+
+  describe('with undefined orchestrator', () => {
+    let serviceNoOrch: UploadProcessorService;
+
+    beforeEach(() => {
+      metadataService.extractAndSave.mockResolvedValue(undefined);
+      serviceNoOrch = new UploadProcessorService(db as any, metadataService as any, undefined);
+    });
+
+    it('createBookRecord completes without scheduling when orchestrator is undefined', async () => {
+      const result = await serviceNoOrch.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
+
+      expect(result).toEqual({ bookId: 42 });
+      expect(orchestrator.scheduleIfEligible).not.toHaveBeenCalled();
+    });
+
+    it('extractMetadataAsync handles supported format boundary', () => {
+      serviceNoOrch.extractMetadataAsync(1, '/tmp/file.azw', 'azw');
+
+      expect(metadataService.extractAndSave).toHaveBeenCalledWith(1, '/tmp/file.azw', 'azw');
+    });
+  });
 });

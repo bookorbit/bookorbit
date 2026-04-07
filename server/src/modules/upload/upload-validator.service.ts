@@ -3,8 +3,10 @@ import { extname } from 'path';
 
 export const SUPPORTED_BOOK_FORMATS = new Set([
   'epub',
+  'kepub',
   'pdf',
   'mobi',
+  'azw',
   'azw3',
   'cbz',
   'cbr',

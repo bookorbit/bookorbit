@@ -33,6 +33,26 @@ describe('UploadValidatorService', () => {
     it('rejects an audio format when blocked by library policy', () => {
       expect(() => service.validateFormat('book.m4b', ['epub', 'pdf'])).toThrow(BadRequestException);
     });
+
+    it('accepts .azw format', () => {
+      expect(service.validateFormat('book.azw', [])).toBe('azw');
+    });
+
+    it('accepts .kepub format', () => {
+      expect(service.validateFormat('book.kepub', [])).toBe('kepub');
+    });
+
+    it('double extension uses last extension', () => {
+      expect(service.validateFormat('book.epub.pdf', [])).toBe('pdf');
+    });
+
+    it('no extension is rejected', () => {
+      expect(() => service.validateFormat('book', [])).toThrow(BadRequestException);
+    });
+
+    it('empty allowed list means global set is used', () => {
+      expect(service.validateFormat('book.epub', [])).toBe('epub');
+    });
   });
 
   describe('sanitizeFilename', () => {
@@ -53,6 +73,46 @@ describe('UploadValidatorService', () => {
 
     it('adds upload stem when stem is empty but extension exists', () => {
       expect(service.sanitizeFilename('.epub')).toBe('upload.epub');
+    });
+
+    it('preserves CJK and accented characters', () => {
+      expect(service.sanitizeFilename('日本語の本.epub')).toBe('日本語の本.epub');
+      expect(service.sanitizeFilename('café.pdf')).toBe('café.pdf');
+    });
+
+    it('replaces null bytes with underscores', () => {
+      expect(service.sanitizeFilename('\0\0\0')).toBe('___');
+    });
+
+    it('handles filename of only dots', () => {
+      const result = service.sanitizeFilename('...');
+      expect(result.length).toBeLessThanOrEqual(255);
+    });
+
+    it('trims trailing spaces', () => {
+      expect(service.sanitizeFilename('  book.epub  ')).toBe('book.epub');
+    });
+
+    it('handles dotfile-like names with real extension', () => {
+      expect(service.sanitizeFilename('..hidden.epub')).toBe('..hidden.epub');
+    });
+
+    it('truncates stem to keep total under 255 with long extension', () => {
+      const raw = `${'x'.repeat(300)}.epub`;
+      const result = service.sanitizeFilename(raw);
+      expect(result.length).toBeLessThanOrEqual(255);
+      expect(result.endsWith('.epub')).toBe(true);
+      expect(result.startsWith('x'.repeat(250))).toBe(true);
+    });
+
+    it('truncates to 255 when extension alone exceeds limit', () => {
+      const raw = `a.${'z'.repeat(260)}`;
+      const result = service.sanitizeFilename(raw);
+      expect(result.length).toBe(255);
+    });
+
+    it('preserves original extension casing', () => {
+      expect(service.sanitizeFilename('Book.EPUB')).toBe('Book.EPUB');
     });
   });
 });

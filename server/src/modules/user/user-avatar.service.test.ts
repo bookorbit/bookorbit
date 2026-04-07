@@ -51,4 +51,18 @@ describe('UserAvatarService', () => {
   it('blocks reading other users avatar without permission', async () => {
     await expect(service.getAvatarPath({ id: 1, isSuperuser: false, permissions: [] } as any, 2)).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('rejects empty file (0 bytes)', async () => {
+    await expect(service.uploadOwnAvatar({ id: 1 } as any, Buffer.alloc(0), 'image/png')).rejects.toThrow('File is empty');
+  });
+
+  it('rejects file exceeding MAX_USER_AVATAR_BYTES', async () => {
+    await expect(service.uploadOwnAvatar({ id: 1 } as any, Buffer.alloc(5 * 1024 * 1024 + 1), 'image/png')).rejects.toThrow(
+      'Image exceeds 5 MB limit',
+    );
+  });
+
+  it('rejects corrupt image data with Invalid image file', async () => {
+    await expect(service.uploadOwnAvatar({ id: 1 } as any, Buffer.from('not-an-image'), 'image/png')).rejects.toThrow('Invalid image file');
+  });
 });

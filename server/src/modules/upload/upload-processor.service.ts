@@ -12,7 +12,24 @@ import { fingerprintFile } from '../scanner/lib/hash';
 
 type Db = NodePgDatabase<typeof schema>;
 
-const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf']);
+const METADATA_FORMATS = new Set([
+  'epub',
+  'kepub',
+  'mobi',
+  'azw3',
+  'azw',
+  'cbz',
+  'cbr',
+  'cb7',
+  'fb2',
+  'pdf',
+  'm4b',
+  'm4a',
+  'mp3',
+  'opus',
+  'ogg',
+  'flac',
+]);
 
 @Injectable()
 export class UploadProcessorService {

@@ -3,6 +3,7 @@ export type CoverAspectRatio = "2/3" | "1/1";
 
 export const DEFAULT_FORMAT_PRIORITY = [
   "epub",
+  "kepub",
   "pdf",
   "cbz",
   "cbr",
@@ -21,6 +22,7 @@ export const DEFAULT_FORMAT_PRIORITY = [
 
 export const FORMAT_LABELS: Record<string, string> = {
   epub: "EPUB e-book",
+  kepub: "KEPUB e-book",
   pdf: "PDF document",
   cbz: "CBZ comic",
   cbr: "CBR comic",

@@ -19,24 +19,23 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import type { MultipartFile } from '@fastify/multipart';
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { MAX_USER_AVATAR_BYTES } from './user-avatar.service';
 import { UserAvatarService } from './user-avatar.service';
 import { UserService } from './user.service';
-
-type MultipartRequest = FastifyRequest & { file: () => Promise<MultipartFile | undefined> };
 
 @Controller('users')
 export class UserController {
@@ -80,7 +79,7 @@ export class UserController {
     description: () => 'User uploaded a profile picture',
   })
   async uploadMyAvatar(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
-    const data = await req.file();
+    const data = await req.file({ limits: { fileSize: MAX_USER_AVATAR_BYTES } });
     if (!data) throw new BadRequestException('No file provided');
     const buffer = await data.toBuffer();
     return this.userAvatarService.uploadOwnAvatar(user, buffer, data.mimetype);

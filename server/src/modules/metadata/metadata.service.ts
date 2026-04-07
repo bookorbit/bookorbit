@@ -59,8 +59,10 @@ export class MetadataService {
     this.booksPath = this.config.get<string>('storage.booksPath')!;
     const audio = new AudioFormatExtractor();
     const mobi = new MobiFormatExtractor();
+    const epub = new EpubFormatExtractor();
     this.extractorMap = new Map<string, FormatExtractor>([
-      ['epub', new EpubFormatExtractor()],
+      ['epub', epub],
+      ['kepub', epub],
       ['pdf', new PdfFormatExtractor()],
       ['mobi', mobi],
       ['azw3', mobi],

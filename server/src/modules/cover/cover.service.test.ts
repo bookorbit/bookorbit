@@ -1,14 +1,30 @@
 import { type LookupAddress, lookup } from 'dns/promises';
+import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
 import type { CoverSearchResult } from '@projectx/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER_AGENT } from './constants';
+import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover';
+import { COVER_CUSTOM_FILE_PREFIX, COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER_AGENT, COVER_THUMBNAIL_FILE_NAME } from './constants';
 import { CoverService } from './cover.service';
 import type { CoverProviderRegistry } from './provider-registry';
 import { DUCKDUCKGO_PROVIDER_KEY, ITUNES_PROVIDER_KEY } from './providers/cover-provider';
 
 vi.mock('dns/promises', () => ({
   lookup: vi.fn(),
+}));
+
+vi.mock('fs/promises', () => ({
+  mkdir: vi.fn(),
+  readdir: vi.fn(),
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  unlink: vi.fn(),
+}));
+
+vi.mock('../metadata/lib/cover', () => ({
+  coverDirPath: vi.fn(),
+  generateThumbnail: vi.fn(),
+  imageExt: vi.fn(),
 }));
 
 function makeResult(url: string, previewUrl: string): CoverSearchResult {
@@ -83,6 +99,24 @@ function createService(providerRegistry: CoverProviderRegistry, options?: { asse
     { get: vi.fn().mockReturnValue('/tmp/books') } as never,
     providerRegistry,
   );
+}
+
+function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typeof vi.fn> }) {
+  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+  const insert = vi.fn().mockReturnValue({ values });
+  const mockDb = { insert };
+
+  const service = new CoverService(
+    mockDb as never,
+    { findLibraryIdByBookId: vi.fn().mockResolvedValue(7) } as never,
+    { assertFieldsUnlocked: options?.assertFieldsUnlocked ?? vi.fn().mockResolvedValue(undefined) } as never,
+    { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
+    { get: vi.fn().mockReturnValue('/tmp/books') } as never,
+    { select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry,
+  );
+
+  return { service, mockDb };
 }
 
 describe('CoverService', () => {
@@ -300,6 +334,73 @@ describe('CoverService', () => {
 
       await expect(service.proxyImage('https://missing.example.com/cover.jpg')).rejects.toThrow('Unable to resolve URL host');
     });
+
+    describe('SSRF protection', () => {
+      it.each([
+        ['10.0.0.1', '10.x range'],
+        ['172.16.0.1', '172.16-31.x range'],
+        ['172.31.255.255', '172.31 upper bound'],
+        ['192.168.1.1', '192.168.x range'],
+        ['0.0.0.0', '0.x range'],
+        ['169.254.169.254', 'link-local'],
+        ['100.64.0.1', 'CGN lower bound'],
+        ['100.127.255.255', 'CGN upper bound'],
+      ])('rejects IPv4 literal %s (%s)', async (ip) => {
+        const service = createProxyService();
+        await expect(service.proxyImage(`http://${ip}/cover.jpg`)).rejects.toThrow('URL host is not allowed');
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('rejects multicast IPv4 address', async () => {
+        const service = createProxyService();
+        await expect(service.proxyImage('http://224.0.0.1/cover.jpg')).rejects.toThrow('URL host is not allowed');
+      });
+
+      it.each([
+        ['::1', 'loopback'],
+        ['fc00::1', 'unique local fc'],
+        ['fd12::1', 'unique local fd'],
+        ['fe80::1', 'link-local'],
+      ])('rejects IPv6 literal %s (%s)', async (ip) => {
+        const service = createProxyService();
+        await expect(service.proxyImage(`http://[${ip}]/cover.jpg`)).rejects.toThrow('URL host is not allowed');
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('rejects IPv4-mapped IPv6 address that resolves to private', async () => {
+        const service = createProxyService();
+        lookupMock.mockResolvedValueOnce([{ address: '::ffff:10.0.0.1', family: 6 } as LookupAddress]);
+
+        await expect(service.proxyImage('https://sneaky.example.com/cover.jpg')).rejects.toThrow('URL host is not allowed');
+      });
+
+      it('rejects .localhost domains', async () => {
+        const service = createProxyService();
+        await expect(service.proxyImage('http://evil.localhost/cover.jpg')).rejects.toThrow('URL host is not allowed');
+      });
+
+      it('rejects .local domains', async () => {
+        const service = createProxyService();
+        await expect(service.proxyImage('http://printer.local/cover.jpg')).rejects.toThrow('URL host is not allowed');
+      });
+
+      it('rejects when DNS resolves to mixed private+public', async () => {
+        const service = createProxyService();
+        lookupMock.mockResolvedValueOnce([
+          { address: '93.184.216.34', family: 4 },
+          { address: '10.0.0.1', family: 4 },
+        ] as LookupAddress[]);
+
+        await expect(service.proxyImage('https://mixed.example.com/cover.jpg')).rejects.toThrow('URL host is not allowed');
+      });
+
+      it('rejects redirect to private host', async () => {
+        const service = createProxyService();
+        fetchMock.mockResolvedValueOnce(makeRedirectResponse('http://10.0.0.1/internal'));
+
+        await expect(service.proxyImage('https://covers.example.com/start')).rejects.toThrow('URL host is not allowed');
+      });
+    });
   });
 
   describe('manual cover mutations', () => {
@@ -329,6 +430,58 @@ describe('CoverService', () => {
       await expect(service.deleteCover(12, makeUser())).rejects.toThrow('locked');
 
       expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
+    });
+
+    it('rejects non-image mimetype on upload', async () => {
+      const { service } = createMutationService();
+
+      await expect(service.uploadCover(12, Buffer.from('img'), 'text/plain', makeUser())).rejects.toThrow('File must be an image');
+    });
+
+    it('saves custom cover file and thumbnail when unlocked', async () => {
+      const { service } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(imageExt).mockReturnValue('jpg');
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(readdir).mockResolvedValue([] as never);
+      vi.mocked(mkdir).mockResolvedValue(undefined as never);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+
+      await service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser());
+
+      expect(mkdir).toHaveBeenCalledWith('/tmp/books/covers/12', { recursive: true });
+      expect(writeFile).toHaveBeenCalledTimes(2);
+      expect(writeFile).toHaveBeenCalledWith(`/tmp/books/covers/12/${COVER_CUSTOM_FILE_PREFIX}jpg`, Buffer.from('image-data'));
+      expect(writeFile).toHaveBeenCalledWith(`/tmp/books/covers/12/${COVER_THUMBNAIL_FILE_NAME}`, Buffer.from('thumb'));
+    });
+
+    it('removes custom cover and restores extracted if available', async () => {
+      const { service } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg', 'cover_extracted.png'] as never);
+      vi.mocked(readFile).mockResolvedValue(Buffer.from('extracted-img'));
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(unlink).mockResolvedValue(undefined);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+
+      const result = await service.deleteCover(12, makeUser());
+
+      expect(result).toBe('extracted');
+      expect(unlink).toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.jpg');
+    });
+
+    it('returns null when no extracted cover exists after delete', async () => {
+      const { service } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg'] as never);
+      vi.mocked(unlink).mockResolvedValue(undefined);
+
+      const result = await service.deleteCover(12, makeUser());
+
+      expect(result).toBeNull();
     });
   });
 });
