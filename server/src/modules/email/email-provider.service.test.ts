@@ -1,5 +1,4 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
 import { EmailProviderService } from './email-provider.service';
 import { EmailProviderRepository } from './email-provider.repository';
 import { EmailEncryptionService } from './email-encryption.service';
@@ -46,38 +45,29 @@ describe('EmailProviderService', () => {
     startTls: true,
   };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EmailProviderService,
-        {
-          provide: EmailProviderRepository,
-          useValue: {
-            findAllForUser: vi.fn().mockResolvedValue([mockProvider]),
-            findById: vi.fn().mockResolvedValue([mockProvider]),
-            insert: vi.fn().mockResolvedValue([mockProvider]),
-            update: vi.fn().mockResolvedValue([mockProvider]),
-            delete: vi.fn(),
-            clearDefault: vi.fn(),
-            setDefault: vi.fn().mockResolvedValue([mockProvider]),
-            setSharedByOwner: vi.fn().mockResolvedValue([{ ...mockProvider, isShared: true }]),
-          },
-        },
-        {
-          provide: EmailEncryptionService,
-          useValue: { encrypt: vi.fn().mockReturnValue('encrypted'), decrypt: vi.fn().mockReturnValue('decrypted') },
-        },
-        {
-          provide: EmailTransportService,
-          useValue: { buildTransporter: vi.fn(), verifyTransporter: vi.fn() },
-        },
-      ],
-    }).compile();
+  beforeEach(() => {
+    repo = {
+      findAllForUser: vi.fn().mockResolvedValue([mockProvider]),
+      findById: vi.fn().mockResolvedValue([mockProvider]),
+      insert: vi.fn().mockResolvedValue([mockProvider]),
+      update: vi.fn().mockResolvedValue([mockProvider]),
+      delete: vi.fn(),
+      clearDefault: vi.fn(),
+      setDefault: vi.fn().mockResolvedValue([mockProvider]),
+      setSharedByOwner: vi.fn().mockResolvedValue([{ ...mockProvider, isShared: true }]),
+    } as unknown as EmailProviderRepository;
 
-    service = module.get<EmailProviderService>(EmailProviderService);
-    repo = module.get<EmailProviderRepository>(EmailProviderRepository);
-    encryption = module.get<EmailEncryptionService>(EmailEncryptionService);
-    transport = module.get<EmailTransportService>(EmailTransportService);
+    encryption = {
+      encrypt: vi.fn().mockReturnValue('encrypted'),
+      decrypt: vi.fn().mockReturnValue('decrypted'),
+    } as unknown as EmailEncryptionService;
+
+    transport = {
+      buildTransporter: vi.fn(),
+      verifyTransporter: vi.fn(),
+    } as unknown as EmailTransportService;
+
+    service = new EmailProviderService(repo, encryption, transport);
   });
 
   describe('findAll', () => {

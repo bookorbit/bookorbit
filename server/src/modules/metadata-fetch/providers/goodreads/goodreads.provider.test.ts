@@ -1,4 +1,3 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ProviderConfigurations } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
@@ -21,21 +20,11 @@ describe('GoodreadsProvider', () => {
     comicvine: { enabled: false, apiKey: '' },
   };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        GoodreadsProvider,
-        {
-          provide: ProviderConfigService,
-          useValue: {
-            getConfig: vi.fn().mockResolvedValue(mockConfig),
-          },
-        },
-      ],
-    }).compile();
-
-    provider = module.get<GoodreadsProvider>(GoodreadsProvider);
-    providerConfig = module.get<ProviderConfigService>(ProviderConfigService);
+  beforeEach(() => {
+    providerConfig = {
+      getConfig: vi.fn().mockResolvedValue(mockConfig),
+    } as unknown as ProviderConfigService;
+    provider = new GoodreadsProvider(providerConfig);
   });
 
   afterEach(() => {
