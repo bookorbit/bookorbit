@@ -1,4 +1,3 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import * as nodemailer from 'nodemailer';
 import { EmailTransportService } from './email-transport.service';
 
@@ -7,12 +6,9 @@ vi.mock('nodemailer');
 describe('EmailTransportService', () => {
   let service: EmailTransportService;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [EmailTransportService],
-    }).compile();
-
-    service = module.get<EmailTransportService>(EmailTransportService);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = new EmailTransportService();
   });
 
   it('should build transporter with correct config (Port 587)', () => {
