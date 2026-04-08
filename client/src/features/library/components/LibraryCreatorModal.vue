@@ -39,7 +39,7 @@ const ALL_SECTIONS: { id: SectionId; label: string; icon: unknown; component: un
 ]
 
 // Access is only meaningful after a library exists
-const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 6) : ALL_SECTIONS))
+const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 7) : ALL_SECTIONS))
 
 // ── Stepper state ──────────────────────────────────────────────────────────
 

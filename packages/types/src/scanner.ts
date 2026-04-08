@@ -36,3 +36,8 @@ export interface BookMovedEvent {
   libraryId: number;
   bookIds: number[];
 }
+
+export interface ScanBooksAddedEvent {
+  libraryId: number;
+  books: import("./book").BookCard[];
+}

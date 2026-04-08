@@ -29,7 +29,6 @@ const stats = ref<Record<number, LibraryStats>>({})
 const scanningAll = ref(false)
 const creatorOpen = ref(false)
 const editingLibrary = ref<LibraryType | null>(null)
-const pendingNavigateLibraryId = ref<number | null>(null)
 const deletingLibrary = ref<LibraryType | null>(null)
 const deleteConfirmName = ref('')
 const deleting = ref(false)
@@ -99,10 +98,6 @@ watch(progressMap, (map) => {
         if (res.ok) stats.value[libraryId] = await res.json()
         setTimeout(() => statsReloadedFor.delete(libraryId), 5000)
       })
-      if (pendingNavigateLibraryId.value === libraryId) {
-        pendingNavigateLibraryId.value = null
-        router.push({ name: 'library', params: { id: libraryId } })
-      }
     }
   }
 })
@@ -169,8 +164,10 @@ async function onSaved(library: LibraryType) {
   editingLibrary.value = null
   subscribeLibrary(library.id)
   if (isNew) {
-    pendingNavigateLibraryId.value = library.id
     toast.success(`Library "${library.name}" created`)
+    const sortKey = `projectx:sort:library:${library.id}`
+    localStorage.setItem(sortKey, JSON.stringify([{ field: 'addedAt', dir: 'desc' }]))
+    router.push({ name: 'library', params: { id: library.id } })
   } else {
     toast.success(`Library "${library.name}" updated`)
   }

@@ -9,6 +9,7 @@ import type {
   BookRestoredEvent,
   CoverRefreshedEvent,
   CoverRefreshProgressEvent,
+  ScanBooksAddedEvent,
   ScanProgressEvent,
 } from '@projectx/types';
 import { AuthService } from '../auth/auth.service';
@@ -93,5 +94,9 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitBookMoved(event: BookMovedEvent): void {
     this.logger.debug(`[scanner.ws_emit] [book:moved] libraryId=${event.libraryId} bookCount=${event.bookIds.length}`);
     this.server?.to(`library:${event.libraryId}`).emit('book:moved', event);
+  }
+
+  emitBooksAdded(event: ScanBooksAddedEvent): void {
+    this.server?.to(`library:${event.libraryId}`).emit('scan:books:added', event);
   }
 }

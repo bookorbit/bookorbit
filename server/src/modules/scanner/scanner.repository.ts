@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, bookMetadata, books, libraryFolders, libraries, scanJobs } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, genres, libraryFolders, libraries, scanJobs } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -310,5 +310,46 @@ export class ScannerRepository {
 
   async updateBookFolderPath(bookId: number, folderPath: string) {
     await this.db.update(books).set({ folderPath, updatedAt: new Date() }).where(eq(books.id, bookId));
+  }
+
+  async findBookCardData(bookIds: number[]) {
+    if (bookIds.length === 0) return { rows: [], authorRows: [], fileRows: [], genreRows: [] };
+
+    const [rows, authorRows, fileRows, genreRows] = await Promise.all([
+      this.db
+        .select({
+          id: books.id,
+          status: books.status,
+          primaryFileId: books.primaryFileId,
+          folderPath: books.folderPath,
+          addedAt: books.addedAt,
+          title: bookMetadata.title,
+          seriesName: bookMetadata.seriesName,
+          seriesIndex: bookMetadata.seriesIndex,
+          publishedYear: bookMetadata.publishedYear,
+          language: bookMetadata.language,
+          rating: bookMetadata.rating,
+        })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(inArray(books.id, bookIds)),
+      this.db
+        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, bookIds))
+        .orderBy(bookAuthors.displayOrder),
+      this.db
+        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+        .from(bookFiles)
+        .where(inArray(bookFiles.bookId, bookIds)),
+      this.db
+        .select({ bookId: bookGenres.bookId, name: genres.name })
+        .from(bookGenres)
+        .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+        .where(inArray(bookGenres.bookId, bookIds)),
+    ]);
+
+    return { rows, authorRows, fileRows, genreRows };
   }
 }

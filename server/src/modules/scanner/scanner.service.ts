@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 
-import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types';
+import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanBooksAddedEvent, ScanProgressEvent } from '@projectx/types';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { ScanGateway } from './scan.gateway';
@@ -13,9 +13,12 @@ import { fingerprintFile } from './lib/hash';
 import { waitForStability } from './lib/stability';
 import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
+import { assembleBookCards } from '../book/utils/assemble-book-cards';
 
 const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
 const BATCH_SIZE = 5;
+const BOOK_EMIT_BUFFER_SIZE = 30;
+const BOOK_EMIT_FLUSH_INTERVAL_MS = 1500;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
 
 interface ScanCounts {
@@ -39,6 +42,55 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly scanGateway: ScanGateway,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
   ) {}
+
+  // ── Live book emission buffer ──────────────────────────────────────────────
+  private readonly bookEmitBuffer = new Map<number, number[]>();
+  private readonly bookEmitTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  private bufferBookForEmit(libraryId: number, bookId: number): void {
+    let ids = this.bookEmitBuffer.get(libraryId);
+    if (!ids) {
+      ids = [];
+      this.bookEmitBuffer.set(libraryId, ids);
+    }
+    ids.push(bookId);
+
+    if (ids.length >= BOOK_EMIT_BUFFER_SIZE) {
+      this.flushBookEmitBuffer(libraryId);
+      return;
+    }
+
+    if (!this.bookEmitTimers.has(libraryId)) {
+      this.bookEmitTimers.set(
+        libraryId,
+        setTimeout(() => this.flushBookEmitBuffer(libraryId), BOOK_EMIT_FLUSH_INTERVAL_MS),
+      );
+    }
+  }
+
+  private flushBookEmitBuffer(libraryId: number): void {
+    const timer = this.bookEmitTimers.get(libraryId);
+    if (timer) clearTimeout(timer);
+    this.bookEmitTimers.delete(libraryId);
+
+    const ids = this.bookEmitBuffer.get(libraryId);
+    this.bookEmitBuffer.delete(libraryId);
+    if (!ids || ids.length === 0) return;
+
+    this.buildAndEmitBookCards(libraryId, ids).catch((err) => {
+      this.logger.warn(
+        `[scanner.emit_books_added] [fail] libraryId=${libraryId} bookCount=${ids.length} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - failed to emit added books`,
+      );
+    });
+  }
+
+  private async buildAndEmitBookCards(libraryId: number, bookIds: number[]): Promise<void> {
+    const { rows, authorRows, fileRows, genreRows } = await this.scannerRepo.findBookCardData(bookIds);
+    const cards = assembleBookCards(rows, authorRows, fileRows, genreRows, []);
+    if (cards.length > 0) {
+      this.scanGateway.emitBooksAdded({ libraryId, books: cards } satisfies ScanBooksAddedEvent);
+    }
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     await this.scannerRepo.failAllRunningJobs('Server restarted during scan');
@@ -439,6 +491,7 @@ export class ScannerService implements OnApplicationBootstrap {
       );
       this.emitFromStore(libraryId, jobId, 'failed', message);
     } finally {
+      this.flushBookEmitBuffer(libraryId);
       this.scanJobStore.delete(libraryId);
     }
   }
@@ -483,6 +536,9 @@ export class ScannerService implements OnApplicationBootstrap {
           seenBookIds.add(r.bookId);
           counts.addedCount += r.added;
           counts.updatedCount += r.updated;
+          if (r.added > 0) {
+            this.bufferBookForEmit(libraryId, r.bookId);
+          }
         }
 
         const entry = this.scanJobStore.increment(libraryId, { processed: batch.length });
@@ -566,8 +622,7 @@ export class ScannerService implements OnApplicationBootstrap {
         continue;
       }
 
-      counts.added += fileCount.addedCount;
-      counts.updated += fileCount.updatedCount;
+      counts.updated += fileCount.addedCount + fileCount.updatedCount;
 
       if (processResult.fileId !== null) {
         registeredFiles.push({

@@ -4,7 +4,7 @@ import { storage } from '@/services/storage'
 export type CardOverlayKey = 'series' | 'progress-bar' | 'progress-pill' | 'format' | 'rating' | 'new' | 'read-status'
 export type AuthorCoverShape = 'square' | 'circle'
 
-const coverSize = ref(storage.get('coverSize', 140))
+const coverSize = ref(storage.get('coverSize', 130))
 const gridGap = ref(storage.get('gridGap', 20))
 const viewMode = ref<'grid' | 'list'>(storage.get('viewMode', 'grid'))
 const cardOverlays = ref<CardOverlayKey[]>(storage.get('cardOverlays', ['progress-bar', 'format', 'rating', 'read-status']))

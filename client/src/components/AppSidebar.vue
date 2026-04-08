@@ -48,12 +48,22 @@ const { lenses, fetchLenses, reorderLenses } = useLenses()
 const { collections, fetchCollections, reorderCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
+
+const refreshedFor = new Set<number>()
+watch(progressMap, (map) => {
+  for (const [libraryId, event] of map.entries()) {
+    if (event.status === 'completed' && !refreshedFor.has(libraryId)) {
+      refreshedFor.add(libraryId)
+      refreshLibraries()
+      setTimeout(() => refreshedFor.delete(libraryId), 5000)
+    }
+  }
+})
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const createLensOpen = ref(false)
 const createCollectionOpen = ref(false)
 const createLibraryOpen = ref(false)
-const scanningLibraryId = ref<number | null>(null)
 
 const { isOpen: librariesOpen, toggle: toggleLibraries } = useSidebarSection('libraries')
 const { isOpen: lensesOpen, toggle: toggleLenses } = useSidebarSection('lenses')
@@ -108,19 +118,13 @@ function scanPct(libraryId: number): number {
 function onLibrarySaved(library: Library) {
   createLibraryOpen.value = false
   subscribeLibrary(library.id)
-  scanningLibraryId.value = library.id
   refreshLibraries()
-}
 
-watch(progressMap, (map) => {
-  if (scanningLibraryId.value === null) return
-  const event = map.get(scanningLibraryId.value)
-  if (event?.status === 'completed') {
-    const id = scanningLibraryId.value
-    scanningLibraryId.value = null
-    router.push({ name: 'library', params: { id } })
-  }
-})
+  const sortKey = `projectx:sort:library:${library.id}`
+  localStorage.setItem(sortKey, JSON.stringify([{ field: 'addedAt', dir: 'desc' }]))
+
+  router.push({ name: 'library', params: { id: library.id } })
+}
 
 onMounted(async () => {
   getSocket()

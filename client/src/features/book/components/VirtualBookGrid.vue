@@ -15,10 +15,12 @@ const props = withDefaults(
     gridGap: number
     selectionMode?: boolean
     isSelected?: (bookId: number) => boolean
+    newBookIds?: Set<number>
   }>(),
   {
     selectionMode: false,
     isSelected: undefined,
+    newBookIds: () => new Set<number>(),
   },
 )
 
@@ -92,7 +94,7 @@ const scrollerStyle = computed(() => ({
       class="book-grid-scroller"
     >
       <template #default="{ item: book }">
-        <div class="book-grid-cell">
+        <div class="book-grid-cell" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
           <BookCoverCard
             :book="book"
             :selection-mode="selectionMode"
@@ -121,5 +123,20 @@ const scrollerStyle = computed(() => ({
   padding-left: 0;
   padding-right: var(--book-grid-gap);
   padding-bottom: var(--book-grid-gap);
+}
+
+.book-grid-cell--new {
+  animation: book-enter 0.35s ease-out both;
+}
+
+@keyframes book-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 </style>

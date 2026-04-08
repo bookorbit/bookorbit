@@ -21,6 +21,8 @@ import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
+import { useLiveScanBooks } from '@/features/scanner/composables/useLiveScanBooks'
+import ScanProgressBar from '@/features/scanner/components/ScanProgressBar.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
@@ -131,11 +133,19 @@ function forgetSavedFilter() {
   localStorage.removeItem(getFilterKey(libraryId.value))
 }
 
-const { subscribeLibrary } = useScanProgress()
+const { subscribeLibrary, getProgress, isScanning } = useScanProgress()
+const { newBookIds, start: startLiveScan, stop: stopLiveScan } = useLiveScanBooks(libraryId, books, total)
+const scanProgress = computed(() => (libraryId.value !== null ? getProgress(libraryId.value) : undefined))
+
 watch(
   libraryId,
   (id) => {
-    if (id !== null) subscribeLibrary(id)
+    if (id !== null) {
+      subscribeLibrary(id)
+      startLiveScan()
+    } else {
+      stopLiveScan()
+    }
   },
   { immediate: true },
 )
@@ -376,6 +386,8 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       <template v-else>
         <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
+        <ScanProgressBar :progress="scanProgress" class="mb-3" />
+
         <!-- Filter builder panel -->
         <div v-if="filterOpen" class="mb-4 p-3 rounded-md border border-border bg-card">
           <div class="flex items-center justify-between mb-3">
@@ -445,7 +457,11 @@ function handleBookAction(book: BookCard, action: BookActionType) {
           <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
             <BookOpen :size="28" class="text-muted-foreground/70" />
           </div>
-          <div class="flex flex-col gap-1">
+          <div v-if="libraryId !== null && isScanning(libraryId)" class="flex flex-col gap-1">
+            <p class="text-sm font-medium text-foreground">Scanning your library...</p>
+            <p class="text-xs text-muted-foreground max-w-xs">Books will appear here as they are discovered.</p>
+          </div>
+          <div v-else class="flex flex-col gap-1">
             <p class="text-sm font-medium text-foreground">Your library is empty</p>
             <p class="text-xs text-muted-foreground max-w-xs">Once you add books to this library, they will appear here.</p>
           </div>
@@ -459,6 +475,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
           :grid-gap="gridGap"
           :selection-mode="selectionMode"
           :is-selected="isSelected"
+          :new-book-ids="newBookIds"
           @action="handleBookAction"
           @select="handleSelect"
         />

@@ -12,7 +12,7 @@ function gridGapKey(type: ViewType, id: number) {
 }
 
 export function useViewDisplaySettings(viewType: ViewType, viewId: Readonly<Ref<number | null>>) {
-  const globalCoverSize = storage.get('coverSize', 140)
+  const globalCoverSize = storage.get('coverSize', 130)
   const globalGridGap = storage.get('gridGap', 20)
 
   const coverSize = ref(globalCoverSize)
