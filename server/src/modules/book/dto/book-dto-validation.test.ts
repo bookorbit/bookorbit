@@ -32,7 +32,9 @@ describe('Book DTO validation', () => {
 
   it('validates export options and boolean allFormats flag', async () => {
     expect((await errorsFor(ExportBooksDto, { bookIds: [1], allFormats: true })).length).toBe(0);
+    expect((await errorsFor(ExportBooksDto, { bookIds: [1], audioOnly: true })).length).toBe(0);
     expect((await errorsFor(ExportBooksDto, { bookIds: [1], allFormats: 'true' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(ExportBooksDto, { bookIds: [1], audioOnly: 'true' })).length).toBeGreaterThan(0);
   });
 
   it('coerces GetBooksDto numeric query values and enforces bounds', async () => {

@@ -1,4 +1,13 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 
@@ -44,6 +53,29 @@ const METADATA_UPDATE_FAILPOINTS = [
 ] as const;
 
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
+export type ExportScope = 'primary' | 'all' | 'audio';
+
+const EXPORT_LIMITS = {
+  MAX_BOOKS: 250,
+  MAX_FILES: 2000,
+  MAX_PROJECTED_BYTES: 8 * 1024 * 1024 * 1024,
+  MAX_CONCURRENT_PER_USER: 2,
+} as const;
+
+type ExportCandidateFile = {
+  bookId: number;
+  absolutePath: string;
+  format: string | null;
+  sizeBytes: number | null;
+  sortOrder?: number;
+};
+
+export type ExportPlan = {
+  files: { absolutePath: string; zipPath: string; sizeBytes: number }[];
+  projectedBytes: number;
+  bookCount: number;
+  scope: ExportScope;
+};
 
 @Injectable()
 export class BookService {
@@ -51,6 +83,7 @@ export class BookService {
   private readonly appDataPath: string;
   private embeddingRun: Promise<void> | null = null;
   private metadataUpdateFailpoint: MetadataUpdateFailpoint | null = null;
+  private readonly activeExportCounts = new Map<number, number>();
 
   constructor(
     private readonly bookRepo: BookRepository,
@@ -142,6 +175,30 @@ export class BookService {
     if (!file) throw new NotFoundException(`No file with id ${fileId}`);
     await this.libraryService.verifyUserAccess(user.id, file.libraryId, this.isSuperuser(user));
     return file;
+  }
+
+  acquireExportSlot(userId: number): () => void {
+    const current = this.activeExportCounts.get(userId) ?? 0;
+    if (current >= EXPORT_LIMITS.MAX_CONCURRENT_PER_USER) {
+      throw new HttpException(
+        `Too many concurrent exports. Limit is ${EXPORT_LIMITS.MAX_CONCURRENT_PER_USER} active exports per user.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    this.activeExportCounts.set(userId, current + 1);
+    let released = false;
+
+    return () => {
+      if (released) return;
+      released = true;
+      const next = (this.activeExportCounts.get(userId) ?? 1) - 1;
+      if (next <= 0) {
+        this.activeExportCounts.delete(userId);
+      } else {
+        this.activeExportCounts.set(userId, next);
+      }
+    };
   }
 
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
@@ -329,7 +386,15 @@ export class BookService {
     user: RequestUser,
   ): Promise<{ path: string; size: number; format: string; bookId: number; originalFilename: string }> {
     const file = await this.verifyFileAccess(fileId, user);
-    const { size } = await stat(file.absolutePath);
+    let size: number;
+    try {
+      ({ size } = await stat(file.absolutePath));
+    } catch (err) {
+      if (this.isMissingFilesystemEntry(err)) {
+        throw new NotFoundException(`File ${fileId} not found on disk`);
+      }
+      throw err;
+    }
     const originalFilename = basename(file.absolutePath);
     return { path: file.absolutePath, size, format: file.format ?? 'unknown', bookId: file.bookId, originalFilename };
   }
@@ -961,40 +1026,105 @@ export class BookService {
     }
   }
 
-  async getExportFiles(bookIds: number[], user: RequestUser, allFormats: boolean): Promise<{ absolutePath: string; zipPath: string }[]> {
+  private async resolveExportFileSize(file: ExportCandidateFile): Promise<number> {
+    if (typeof file.sizeBytes === 'number' && Number.isFinite(file.sizeBytes) && file.sizeBytes >= 0) {
+      return file.sizeBytes;
+    }
+
+    try {
+      const { size } = await stat(file.absolutePath);
+      return size;
+    } catch (err) {
+      if (this.isMissingFilesystemEntry(err)) {
+        throw new NotFoundException(`File for book ${file.bookId} is missing on disk`);
+      }
+      throw err;
+    }
+  }
+
+  async getExportFiles(bookIds: number[], user: RequestUser, scope: ExportScope): Promise<ExportPlan> {
     const event = 'book.get_export_files';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} allFormats=${allFormats} - get export files started`);
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} scope=${scope} - get export files started`);
     try {
-      if (bookIds.length === 0) throw new BadRequestException('No books selected');
-      await this.verifyLibraryAccessForBookIds(bookIds, user);
+      const uniqueBookIds = [...new Set(bookIds)];
+      if (uniqueBookIds.length === 0) throw new BadRequestException('No books selected');
+      if (uniqueBookIds.length > EXPORT_LIMITS.MAX_BOOKS) {
+        throw new BadRequestException(`Too many books selected. Limit is ${EXPORT_LIMITS.MAX_BOOKS}.`);
+      }
 
-      const files = allFormats ? await this.bookRepo.findAllFilesByBookIds(bookIds) : await this.bookRepo.findPrimaryFilesByBookIds(bookIds);
+      const rows = await this.bookRepo.findLibraryIdsByBookIds(uniqueBookIds);
+      const foundBookIds = new Set(rows.map((row) => row.id));
+      const missingBookIds = uniqueBookIds.filter((id) => !foundBookIds.has(id));
+      if (missingBookIds.length > 0) {
+        throw new BadRequestException(`Some selected books were not found: ${missingBookIds.join(', ')}`);
+      }
+
+      const uniqueLibraryIds = [...new Set(rows.map((row) => row.libraryId))];
+      await Promise.all(uniqueLibraryIds.map((libraryId) => this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user))));
+
+      const bookOrder = new Map(uniqueBookIds.map((id, index) => [id, index]));
+      const fetchedFiles: ExportCandidateFile[] =
+        scope === 'primary' ? await this.bookRepo.findPrimaryFilesByBookIds(uniqueBookIds) : await this.bookRepo.findAllFilesByBookIds(uniqueBookIds);
+      const files = scope === 'audio' ? fetchedFiles.filter((file) => !!file.format && isAudioFormat(file.format)) : fetchedFiles;
+
+      const booksWithFiles = new Set(files.map((file) => file.bookId));
+      const booksWithoutExportFiles = uniqueBookIds.filter((id) => !booksWithFiles.has(id));
+      if (booksWithoutExportFiles.length > 0) {
+        throw new BadRequestException(`Some selected books have no exportable files: ${booksWithoutExportFiles.join(', ')}`);
+      }
+      if (files.length > EXPORT_LIMITS.MAX_FILES) {
+        throw new BadRequestException(`Too many files selected for export. Limit is ${EXPORT_LIMITS.MAX_FILES}.`);
+      }
+
+      const orderedFiles = files.sort((a, b) => {
+        const aOrder = bookOrder.get(a.bookId) ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = bookOrder.get(b.bookId) ?? Number.MAX_SAFE_INTEGER;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        const aSortOrder = a.sortOrder ?? 0;
+        const bSortOrder = b.sortOrder ?? 0;
+        if (aSortOrder !== bSortOrder) return aSortOrder - bSortOrder;
+        return a.absolutePath.localeCompare(b.absolutePath);
+      });
       const [pattern, metadataRows] = await Promise.all([
         this.appSettings.getDownloadPattern(),
-        this.bookRepo.findPatternMetadataByBookIds([...new Set(files.map((f) => f.bookId))]),
+        this.bookRepo.findPatternMetadataByBookIds([...new Set(orderedFiles.map((f) => f.bookId))]),
       ]);
       const metadataByBookId = new Map(metadataRows.map((row) => [row.bookId, row]));
       const usedPaths = new Set<string>();
+      let projectedBytes = 0;
 
-      const result = files.map((file) => {
+      const result: ExportPlan['files'] = [];
+      for (const file of orderedFiles) {
+        const sizeBytes = await this.resolveExportFileSize(file);
+        projectedBytes += sizeBytes;
+        if (projectedBytes > EXPORT_LIMITS.MAX_PROJECTED_BYTES) {
+          throw new BadRequestException(`Export exceeds projected size limit of ${EXPORT_LIMITS.MAX_PROJECTED_BYTES} bytes.`);
+        }
+
         const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metadataByBookId.get(file.bookId));
         const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
         const fallbackFilename = basename(file.absolutePath);
         const rawZipPath = resolvedPath ?? fallbackFilename;
         const safeZipPath = this.sanitizeZipPath(rawZipPath, fallbackFilename);
         const zipPath = this.makeUniqueZipPath(safeZipPath, usedPaths);
-        return { absolutePath: file.absolutePath, zipPath };
-      });
+        result.push({ absolutePath: file.absolutePath, zipPath, sizeBytes });
+      }
+
       this.logger.log(
-        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} files=${result.length} allFormats=${allFormats} - get export files completed`,
+        `[${event}] [end] count=${uniqueBookIds.length} durationMs=${Date.now() - startedAt} files=${result.length} projectedBytes=${projectedBytes} scope=${scope} - get export files completed`,
       );
-      return result;
+      return {
+        files: result,
+        projectedBytes,
+        bookCount: uniqueBookIds.length,
+        scope,
+      };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
       this.logger.warn(
-        `[${event}] [fail] count=${bookIds.length} userId=${user.id} allFormats=${allFormats} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - get export files failed`,
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} scope=${scope} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - get export files failed`,
       );
       throw err;
     }

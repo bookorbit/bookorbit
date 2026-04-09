@@ -485,10 +485,17 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
       expect(invalidRange.statusCode).toBe(416);
       expect(invalidRange.headers['content-range']).toBe(`bytes */${inlinePdf.headers['content-length']}`);
 
+      const forbiddenDownloadEpub = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/books/files/${visibleEpub.bookFileId}/download`,
+        headers: authHeader(limitedUser.accessToken),
+      });
+      expect(forbiddenDownloadEpub.statusCode).toBe(403);
+
       const downloadEpub = await ctx.app.inject({
         method: 'GET',
-        url: `/api/v1/books/files/${visibleEpub.bookFileId}/serve?download=1`,
-        headers: authHeader(limitedUser.accessToken),
+        url: `/api/v1/books/files/${visibleEpub.bookFileId}/download`,
+        headers: authHeader(downloadUser.accessToken),
       });
 
       expect(downloadEpub.statusCode).toBe(200);

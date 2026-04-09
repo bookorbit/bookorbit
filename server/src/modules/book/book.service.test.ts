@@ -235,7 +235,7 @@ describe('BookService', () => {
     it('throws when export is requested with no books', async () => {
       const { service } = makeService();
 
-      await expect(service.getExportFiles([], makeUser(), false)).rejects.toThrow(BadRequestException);
+      await expect(service.getExportFiles([], makeUser(), 'primary')).rejects.toThrow(BadRequestException);
     });
 
     it('applies pattern to export zip paths and de-duplicates collisions', async () => {
@@ -248,17 +248,18 @@ describe('BookService', () => {
         { id: 2, libraryId: 77 },
       ]);
       bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([
-        { bookId: 1, absolutePath: '/books/a.epub', format: 'epub' },
-        { bookId: 2, absolutePath: '/books/b.epub', format: 'epub' },
+        { bookId: 1, absolutePath: '/books/a.epub', format: 'epub', sizeBytes: 100 },
+        { bookId: 2, absolutePath: '/books/b.epub', format: 'epub', sizeBytes: 200 },
       ]);
       bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'Duplicate' }), metaRow(2, { title: 'Duplicate' })]);
 
-      const files = await service.getExportFiles([1, 2], user, false);
+      const plan = await service.getExportFiles([1, 2], user, 'primary');
 
       expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 77, false);
-      expect(files).toEqual([
-        { absolutePath: '/books/a.epub', zipPath: 'Duplicate.epub' },
-        { absolutePath: '/books/b.epub', zipPath: 'Duplicate (2).epub' },
+      expect(plan.projectedBytes).toBe(300);
+      expect(plan.files).toEqual([
+        { absolutePath: '/books/a.epub', zipPath: 'Duplicate.epub', sizeBytes: 100 },
+        { absolutePath: '/books/b.epub', zipPath: 'Duplicate (2).epub', sizeBytes: 200 },
       ]);
     });
 
@@ -268,11 +269,12 @@ describe('BookService', () => {
 
       appSettings.getDownloadPattern.mockResolvedValue('../{title}/..//bad:name');
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
-      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/source.epub', format: 'epub' }]);
+      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/source.epub', format: 'epub', sizeBytes: 100 }]);
       bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: '..' })]);
 
-      const [file] = await service.getExportFiles([1], user, false);
+      const plan = await service.getExportFiles([1], user, 'primary');
 
+      const [file] = plan.files;
       expect(file.zipPath).toBe('download/download/download/bad_name.epub');
     });
 
@@ -282,13 +284,96 @@ describe('BookService', () => {
 
       appSettings.getDownloadPattern.mockResolvedValue('{title}');
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/a.epub', format: 'epub' }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/a.epub', format: 'epub', sizeBytes: 1, sortOrder: 0 }]);
       bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'One' })]);
 
-      await service.getExportFiles([1], user, true);
+      await service.getExportFiles([1], user, 'all');
 
       expect(bookRepo.findAllFilesByBookIds).toHaveBeenCalledWith([1]);
       expect(bookRepo.findPrimaryFilesByBookIds).not.toHaveBeenCalled();
+    });
+
+    it('uses audio-only export scope when requested', async () => {
+      const { service, appSettings, bookRepo } = makeService();
+      const user = makeUser();
+      appSettings.getDownloadPattern.mockResolvedValue('{title}');
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+        { bookId: 1, absolutePath: '/books/a.mp3', format: 'mp3', sizeBytes: 5, sortOrder: 0 },
+        { bookId: 1, absolutePath: '/books/a.epub', format: 'epub', sizeBytes: 10, sortOrder: 1 },
+      ]);
+      bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'One' })]);
+
+      const plan = await service.getExportFiles([1], user, 'audio');
+
+      expect(plan.files).toHaveLength(1);
+      expect(plan.files[0]?.absolutePath).toBe('/books/a.mp3');
+    });
+
+    it('throws when selected book ids include missing records', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+
+      await expect(service.getExportFiles([1, 2], makeUser(), 'primary')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws when selected books have no exportable files', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([]);
+
+      await expect(service.getExportFiles([1], makeUser(), 'primary')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws when selected books exceed configured limit', async () => {
+      const { service } = makeService();
+      const tooManyBookIds = Array.from({ length: 251 }, (_, i) => i + 1);
+
+      await expect(service.getExportFiles(tooManyBookIds, makeUser(), 'primary')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws when selected export files exceed configured limit', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const fileRows = Array.from({ length: 2001 }, (_, i) => ({
+        bookId: 1,
+        absolutePath: `/books/${i}.epub`,
+        format: 'epub',
+        sizeBytes: 1,
+        sortOrder: i,
+      }));
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue(fileRows);
+
+      await expect(service.getExportFiles([1], user, 'all')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws when projected export size exceeds limit', async () => {
+      const { service, bookRepo, appSettings } = makeService();
+      const user = makeUser();
+
+      appSettings.getDownloadPattern.mockResolvedValue('{title}');
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/a.epub', format: 'epub', sizeBytes: 9_000_000_000 }]);
+      bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'Huge' })]);
+
+      await expect(service.getExportFiles([1], user, 'primary')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('export concurrency slots', () => {
+    it('enforces max concurrent exports per user', () => {
+      const { service } = makeService();
+      const releaseOne = service.acquireExportSlot(7);
+      const releaseTwo = service.acquireExportSlot(7);
+
+      expect(() => service.acquireExportSlot(7)).toThrow();
+
+      releaseOne();
+      const releaseThree = service.acquireExportSlot(7);
+      releaseTwo();
+      releaseThree();
     });
   });
 
@@ -360,6 +445,14 @@ describe('BookService', () => {
         bookId: 1,
         originalFilename: 'test.book',
       });
+    });
+
+    it('throws NotFoundException when file exists in DB but is missing on disk', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findFileById.mockResolvedValue({ id: 10, absolutePath: '/books/missing.book', format: null, bookId: 1, libraryId: 7 });
+      mockStat.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+
+      await expect(service.getFileInfo(10, makeUser())).rejects.toThrow(NotFoundException);
     });
   });
 

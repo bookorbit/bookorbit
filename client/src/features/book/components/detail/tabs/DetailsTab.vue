@@ -989,7 +989,7 @@ watch(
             <span
               v-for="(genre, index) in displayedGenres"
               :key="`${genre}-${index}`"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80"
+              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary/85"
             >
               {{ genre }}
             </span>
@@ -1011,7 +1011,7 @@ watch(
               v-for="(genre, index) in book.genres"
               :key="`measure-${genre}-${index}`"
               data-genre-pill="true"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/30 text-primary/80"
+              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary/85"
             >
               {{ genre }}
             </span>

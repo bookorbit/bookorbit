@@ -1,6 +1,17 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/lib/api'
+
+type ExportScope = 'primary' | 'all' | 'audio'
+
+function triggerBrowserDownload(url: string, filename?: string): void {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  if (filename) anchor.download = filename
+  anchor.rel = 'noopener'
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+}
 
 export function useBookDownload() {
   const isDownloading = ref(false)
@@ -8,21 +19,7 @@ export function useBookDownload() {
   async function downloadFile(fileId: number): Promise<void> {
     isDownloading.value = true
     try {
-      const res = await api(`/api/v1/books/files/${fileId}/serve?download=1`)
-      if (!res.ok) {
-        toast.error('Download failed')
-        return
-      }
-      const disposition = res.headers.get('Content-Disposition') ?? ''
-      const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i)
-      const filename = match?.[1] ? decodeURIComponent(match[1].trim()) : 'download'
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
+      triggerBrowserDownload(`/api/v1/books/files/${fileId}/download`)
     } catch {
       toast.error('Download failed')
     } finally {
@@ -30,29 +27,19 @@ export function useBookDownload() {
     }
   }
 
-  async function exportBooks(bookIds: number[], allFormats: boolean): Promise<void> {
+  async function exportBooks(bookIds: number[], allFormats: boolean, scopeOverride?: ExportScope): Promise<void> {
     if (bookIds.length === 0) return
     const label = `${bookIds.length} book${bookIds.length === 1 ? '' : 's'}`
     const toastId = toast.loading(`Preparing ${label} for download...`)
     isDownloading.value = true
     try {
-      const res = await api('/api/v1/books/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookIds, allFormats }),
+      const scope = scopeOverride ?? (allFormats ? 'all' : 'primary')
+      const params = new URLSearchParams({
+        bookIds: bookIds.join(','),
+        scope,
       })
       toast.dismiss(toastId)
-      if (!res.ok) {
-        toast.error('Export failed')
-        return
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'books.zip'
-      a.click()
-      URL.revokeObjectURL(url)
+      triggerBrowserDownload(`/api/v1/books/export/download?${params.toString()}`, 'books.zip')
     } catch {
       toast.dismiss(toastId)
       toast.error('Export failed')

@@ -9,4 +9,8 @@ export class ExportBooksDto {
   @IsOptional()
   @IsBoolean()
   allFormats?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  audioOnly?: boolean;
 }

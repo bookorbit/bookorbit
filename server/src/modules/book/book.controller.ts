@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,6 +7,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -74,12 +76,31 @@ const AUDIO_MIME_TYPES: Record<string, string> = {
   flac: 'audio/flac',
 };
 
+const BOOK_MIME_TYPES: Record<string, string> = {
+  epub: 'application/epub+zip',
+  kepub: 'application/epub+zip',
+  pdf: 'application/pdf',
+  mobi: 'application/x-mobipocket-ebook',
+  azw: 'application/vnd.amazon.ebook',
+  azw3: 'application/vnd.amazon.ebook',
+  fb2: 'application/x-fictionbook+xml',
+  cbz: 'application/vnd.comicbook+zip',
+  cbr: 'application/vnd.comicbook-rar',
+  cb7: 'application/x-cb7',
+};
+
 function resolveAudioMimeType(format: string | null): string | null {
   return format ? (AUDIO_MIME_TYPES[format.toLowerCase()] ?? null) : null;
 }
 
+function resolveBookMimeType(format: string): string {
+  return resolveAudioMimeType(format) ?? BOOK_MIME_TYPES[format.toLowerCase()] ?? 'application/octet-stream';
+}
+
 @Controller('books')
 export class BookController {
+  private readonly logger = new Logger(BookController.name);
+
   constructor(
     private readonly bookService: BookService,
     private readonly fileWriteService: FileWriteService,
@@ -184,7 +205,30 @@ export class BookController {
   @Post('export')
   @RequirePermission(Permission.LibraryDownload)
   async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
-    const files = await this.bookService.getExportFiles(dto.bookIds, user, dto.allFormats ?? false);
+    const scope = dto.audioOnly ? 'audio' : dto.allFormats ? 'all' : 'primary';
+    await this.streamBookExport(dto.bookIds, scope, user, reply);
+  }
+
+  @Get('export/download')
+  @RequirePermission(Permission.LibraryDownload)
+  async exportBooksDownload(
+    @Query('bookIds') bookIdsQuery: string | undefined,
+    @Query('scope') scopeQuery: string | undefined,
+    @CurrentUser() user: RequestUser,
+    @Res() reply: FastifyReply,
+  ) {
+    const bookIds = this.parseBookIdsQuery(bookIdsQuery);
+    const scope = this.parseExportScopeQuery(scopeQuery);
+    await this.streamBookExport(bookIds, scope, user, reply);
+  }
+
+  private async streamBookExport(bookIds: number[], scope: 'primary' | 'all' | 'audio', user: RequestUser, reply: FastifyReply) {
+    const event = 'book.export_books';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} scope=${scope} - export books started`);
+    const releaseExportSlot = this.bookService.acquireExportSlot(user.id);
+    let plannedFiles = 0;
+    let projectedBytes = 0;
     const archive = archiver('zip', { zlib: { level: 0 } });
     let clientDisconnected = false;
     const handleDisconnect = () => {
@@ -193,23 +237,44 @@ export class BookController {
     };
     reply.raw.on('close', handleDisconnect);
     reply.raw.on('aborted', handleDisconnect);
-    reply.raw.setHeader('Content-Type', 'application/zip');
-    reply.raw.setHeader('Content-Disposition', 'attachment; filename="books.zip"');
     const archiveFailure = new Promise<never>((_, reject) => {
       archive.on('warning', reject);
       archive.on('error', reject);
     });
     try {
+      const plan = await this.bookService.getExportFiles(bookIds, user, scope);
+      plannedFiles = plan.files.length;
+      projectedBytes = plan.projectedBytes;
+
+      reply.raw.setHeader('Content-Type', 'application/zip');
+      reply.raw.setHeader('Content-Disposition', 'attachment; filename="books.zip"');
       archive.pipe(reply.raw);
-      for (const file of files) {
+      for (const file of plan.files) {
         archive.file(file.absolutePath, { name: file.zipPath });
       }
       await Promise.race([archive.finalize(), archiveFailure]);
-    } catch (err) {
+
       if (!clientDisconnected) {
-        throw err;
+        this.logger.log(
+          `[${event}] [end] userId=${user.id} count=${bookIds.length} scope=${scope} files=${plannedFiles} projectedBytes=${projectedBytes} durationMs=${Date.now() - startedAt} - export books completed`,
+        );
       }
+    } catch (err) {
+      if (clientDisconnected) {
+        this.logger.log(
+          `[${event}] [end] userId=${user.id} count=${bookIds.length} scope=${scope} files=${plannedFiles} projectedBytes=${projectedBytes} durationMs=${Date.now() - startedAt} disconnected=true - export books disconnected`,
+        );
+        return;
+      }
+
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} count=${bookIds.length} scope=${scope} files=${plannedFiles} projectedBytes=${projectedBytes} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - export books failed`,
+      );
+      throw err;
     } finally {
+      releaseExportSlot();
       reply.raw.off('close', handleDisconnect);
       reply.raw.off('aborted', handleDisconnect);
     }
@@ -271,21 +336,16 @@ export class BookController {
     @Param('fileId', ParseIntPipe) fileId: number,
     @CurrentUser() user: RequestUser,
     @Headers('range') rangeHeader: string | undefined,
-    @Query('download') download: string | undefined,
     @Res() reply: FastifyReply,
   ) {
-    const { path, size, format, bookId, originalFilename } = await this.bookService.getFileInfo(fileId, user);
-    const mimeType =
-      resolveAudioMimeType(format) ?? (format === 'pdf' ? 'application/pdf' : format === 'cbz' ? 'application/zip' : 'application/epub+zip');
-    const isDownload = download === '1' || download === 'true';
-    const filename = isDownload
-      ? await this.bookService.resolveDownloadFilename({ bookId, absolutePath: path, format: format === 'unknown' ? null : format })
-      : originalFilename;
+    const { path, size, format, originalFilename } = await this.bookService.getFileInfo(fileId, user);
+    const mimeType = resolveBookMimeType(format);
+    const filename = originalFilename;
     const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
     const encodedFilename = encodeFilenameStar(filename);
 
     reply.header('Accept-Ranges', 'bytes');
-    const disposition = `${isDownload ? 'attachment' : 'inline'}; filename="${asciiFilename}"`;
+    const disposition = `inline; filename="${asciiFilename}"`;
     reply.header('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
     reply.type(mimeType);
 
@@ -310,6 +370,38 @@ export class BookController {
 
     reply.header('Content-Length', size);
     reply.send(createReadStream(path));
+  }
+
+  @Get('files/:fileId/download')
+  @RequirePermission(Permission.LibraryDownload)
+  async downloadFile(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const event = 'book.download_file';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - download file started`);
+    try {
+      const { path, size, format, bookId } = await this.bookService.getFileInfo(fileId, user);
+      const mimeType = resolveBookMimeType(format);
+      const filename = await this.bookService.resolveDownloadFilename({ bookId, absolutePath: path, format: format === 'unknown' ? null : format });
+      const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
+      const encodedFilename = encodeFilenameStar(filename);
+
+      reply.header('Accept-Ranges', 'bytes');
+      const disposition = `attachment; filename="${asciiFilename}"`;
+      reply.header('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
+      reply.type(mimeType);
+      reply.header('Content-Length', size);
+      reply.send(createReadStream(path));
+      this.logger.log(
+        `[${event}] [end] fileId=${fileId} userId=${user.id} durationMs=${Date.now() - startedAt} sizeBytes=${size} - download file completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] fileId=${fileId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - download file failed`,
+      );
+      throw err;
+    }
   }
 
   @Get('files/:fileId/progress')
@@ -440,5 +532,27 @@ export class BookController {
     };
 
     return { send, isClosed, close };
+  }
+
+  private parseBookIdsQuery(raw: string | undefined): number[] {
+    if (!raw) {
+      throw new BadRequestException('bookIds query parameter is required');
+    }
+
+    const parsed = raw
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => Number.parseInt(part, 10));
+    if (parsed.length === 0 || parsed.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+      throw new BadRequestException('bookIds must be a comma-separated list of positive integers');
+    }
+    return parsed;
+  }
+
+  private parseExportScopeQuery(raw: string | undefined): 'primary' | 'all' | 'audio' {
+    if (!raw) return 'primary';
+    if (raw === 'primary' || raw === 'all' || raw === 'audio') return raw;
+    throw new BadRequestException('scope must be one of: primary, all, audio');
   }
 }

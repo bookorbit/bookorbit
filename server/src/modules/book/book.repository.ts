@@ -448,21 +448,33 @@ export class BookRepository {
     return row ?? null;
   }
 
-  async findPrimaryFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
+  async findPrimaryFilesByBookIds(
+    bookIds: number[],
+  ): Promise<{ bookId: number; absolutePath: string; format: string | null; sizeBytes: number | null }[]> {
     if (bookIds.length === 0) return [];
     return this.db
-      .select({ bookId: books.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .select({ bookId: books.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format, sizeBytes: bookFiles.sizeBytes })
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .where(inArray(books.id, bookIds));
+      .where(inArray(books.id, bookIds))
+      .orderBy(asc(books.id));
   }
 
-  async findAllFilesByBookIds(bookIds: number[]): Promise<{ bookId: number; absolutePath: string; format: string | null }[]> {
+  async findAllFilesByBookIds(
+    bookIds: number[],
+  ): Promise<{ bookId: number; absolutePath: string; format: string | null; sizeBytes: number | null; sortOrder: number }[]> {
     if (bookIds.length === 0) return [];
     return this.db
-      .select({ bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .select({
+        bookId: bookFiles.bookId,
+        absolutePath: bookFiles.absolutePath,
+        format: bookFiles.format,
+        sizeBytes: bookFiles.sizeBytes,
+        sortOrder: bookFiles.sortOrder,
+      })
       .from(bookFiles)
-      .where(inArray(bookFiles.bookId, bookIds));
+      .where(inArray(bookFiles.bookId, bookIds))
+      .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id));
   }
 
   async deleteByIds(bookIds: number[]): Promise<void> {

@@ -239,7 +239,7 @@ function handleApplyZoomPreset(value: AcceptableValue) {
 
     <Tooltip v-if="hasPermission('library_download')">
       <TooltipTrigger as-child>
-        <a :href="`/api/v1/books/files/${fileId}/serve?download=1`" class="viewer-btn flex items-center justify-center">
+        <a :href="`/api/v1/books/files/${fileId}/download`" class="viewer-btn flex items-center justify-center">
           <Download :size="14" />
         </a>
       </TooltipTrigger>

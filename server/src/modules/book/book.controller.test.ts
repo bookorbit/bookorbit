@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import archiver from 'archiver';
 import { createReadStream } from 'fs';
@@ -117,6 +117,7 @@ function makeController() {
     bulkRefreshMetadata: vi.fn(),
     bulkReExtractCover: vi.fn(),
     getExportFiles: vi.fn(),
+    acquireExportSlot: vi.fn().mockReturnValue(vi.fn()),
     getCoverPath: vi.fn(),
     getThumbnailPath: vi.fn(),
     getFileInfo: vi.fn(),
@@ -199,12 +200,28 @@ describe('BookController', () => {
     });
     bookService.resolveDownloadFilename.mockResolvedValue('caf\u00e9.epub');
 
-    await controller.serveFile(1, makeUser(), undefined, '1', reply);
+    await controller.downloadFile(1, makeUser(), reply);
 
     expect(headers['Accept-Ranges']).toBe('bytes');
     expect(headers['Content-Disposition']).toBe(`attachment; filename="caf_.epub"; filename*=UTF-8''caf%C3%A9.epub`);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/tmp/book.epub');
+  });
+
+  it('serves inline content-disposition for file stream route', async () => {
+    const { controller, bookService } = makeController();
+    const { reply, headers } = makeReply();
+    bookService.getFileInfo.mockResolvedValue({
+      path: '/tmp/book.epub',
+      size: 100,
+      format: 'epub',
+      bookId: 5,
+      originalFilename: 'book.epub',
+    });
+
+    await controller.serveFile(1, makeUser(), undefined, reply);
+
+    expect(headers['Content-Disposition']).toBe(`inline; filename="book.epub"; filename*=UTF-8''book.epub`);
   });
 
   it('serves partial content for valid byte ranges', async () => {
@@ -218,7 +235,7 @@ describe('BookController', () => {
       originalFilename: 'book.pdf',
     });
 
-    await controller.serveFile(1, makeUser(), 'bytes=10-19', undefined, reply);
+    await controller.serveFile(1, makeUser(), 'bytes=10-19', reply);
 
     expect(reply.status).toHaveBeenCalledWith(206);
     expect(headers['Content-Range']).toBe('bytes 10-19/500');
@@ -237,7 +254,7 @@ describe('BookController', () => {
       originalFilename: 'book.epub',
     });
 
-    await controller.serveFile(1, makeUser(), 'bytes=120-130', undefined, reply);
+    await controller.serveFile(1, makeUser(), 'bytes=120-130', reply);
 
     expect(reply.status).toHaveBeenCalledWith(416);
     expect(headers['Content-Range']).toBe('bytes */100');
@@ -286,10 +303,15 @@ describe('BookController', () => {
   it('archives exported files into a zip stream', async () => {
     const { controller, bookService } = makeController();
     const { reply, raw } = makeReply();
-    bookService.getExportFiles.mockResolvedValue([
-      { absolutePath: '/books/a.epub', zipPath: 'A.epub' },
-      { absolutePath: '/books/b.epub', zipPath: 'B.epub' },
-    ]);
+    bookService.getExportFiles.mockResolvedValue({
+      files: [
+        { absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 },
+        { absolutePath: '/books/b.epub', zipPath: 'B.epub', sizeBytes: 20 },
+      ],
+      projectedBytes: 30,
+      bookCount: 2,
+      scope: 'primary',
+    });
 
     await controller.exportBooks({ bookIds: [1, 2], allFormats: false }, makeUser(), reply);
 
@@ -306,10 +328,38 @@ describe('BookController', () => {
     expect(archive.finalize).toHaveBeenCalled();
   });
 
+  it('parses export download query args and delegates with scope', async () => {
+    const { controller, bookService } = makeController();
+    const { reply } = makeReply();
+    bookService.getExportFiles.mockResolvedValue({
+      files: [{ absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 }],
+      projectedBytes: 10,
+      bookCount: 1,
+      scope: 'audio',
+    });
+
+    await controller.exportBooksDownload('9,10', 'audio', makeUser(), reply);
+
+    expect(bookService.getExportFiles).toHaveBeenCalledWith([9, 10], expect.any(Object), 'audio');
+  });
+
+  it('rejects invalid export download query args', async () => {
+    const { controller } = makeController();
+    const { reply } = makeReply();
+
+    await expect(controller.exportBooksDownload(undefined, 'primary', makeUser(), reply)).rejects.toThrow(BadRequestException);
+    await expect(controller.exportBooksDownload('1', 'invalid', makeUser(), reply)).rejects.toThrow(BadRequestException);
+  });
+
   it('aborts archive export and swallows finalize errors after client disconnect', async () => {
     const { controller, bookService } = makeController();
     const { reply, emitRawEvent } = makeReply();
-    bookService.getExportFiles.mockResolvedValue([{ absolutePath: '/books/a.epub', zipPath: 'A.epub' }]);
+    bookService.getExportFiles.mockResolvedValue({
+      files: [{ absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 }],
+      projectedBytes: 10,
+      bookCount: 1,
+      scope: 'primary',
+    });
     const archive = {
       pipe: vi.fn(),
       file: vi.fn(),

@@ -44,7 +44,7 @@ function formatFileSize(bytes: number | null | undefined): string {
 
 function handleSingleDownload() {
   if (isMultiTrackAudio.value) {
-    exportBooks([props.bookId], false)
+    exportBooks([props.bookId], false, 'audio')
   } else if (primaryFile.value) {
     downloadFile(primaryFile.value.id)
   }
@@ -59,6 +59,10 @@ function handleExportAll() {
 }
 
 function handleExportPrimary() {
+  if (isMultiTrackAudio.value) {
+    exportBooks([props.bookId], false, 'audio')
+    return
+  }
   exportBooks([props.bookId], false)
 }
 </script>
