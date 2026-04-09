@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { afterEach } from 'vitest';
 
@@ -7,6 +7,7 @@ import { Permission, type BookBucketFile, type BookBucketFinalizeResult } from '
 
 import * as schema from '../src/db/schema';
 import { buildFb2Fixture } from './e2e/book-bucket/book-bucket-fixture-builder';
+import { createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
 import {
   authHeader,
   closeBookBucketE2EContext,
@@ -139,6 +140,27 @@ describe('Book Bucket ingest + finalize (e2e)', () => {
     });
     expect(summaryResponse.statusCode).toBe(200);
     expect(summaryResponse.json()).toMatchObject({ total: 1, ready: 1 });
+  });
+
+  it('ingests pdf uploads and persists extracted cover files', async () => {
+    const fixturePath = await createPdfFixture(context.fixture.rootPath, 'fixtures/book-bucket-cover.pdf', 'Book Bucket PDF Title');
+    const pdfBytes = await readFile(fixturePath);
+
+    const uploadResponse = await uploadBookBucketFile(context, {
+      token: context.adminToken,
+      fileName: 'book-bucket-cover.pdf',
+      content: pdfBytes,
+      contentType: 'application/pdf',
+    });
+
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = uploadResponse.json() as BookBucketFile;
+    const ready = await waitForBookBucketStatus(context, uploaded.id, ['ready']);
+
+    expect(ready.embeddedMetadata?.title).toBe('Book Bucket PDF Title');
+    expect(ready.coverPath).toEqual(expect.stringContaining('.jpg'));
+    expect(ready.coverPath).not.toBeNull();
+    expect(await fileExists(ready.coverPath!)).toBe(true);
   });
 
   it('bulk set-target selectAll with status=pending includes pending, extracting, and fetching', async () => {

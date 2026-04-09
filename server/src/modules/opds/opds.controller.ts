@@ -17,6 +17,7 @@ import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
 
+import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { Public } from '../../common/decorators/public.decorator';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
@@ -193,10 +194,10 @@ export class OpdsController {
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
-    const dir = join(this.booksPath, 'covers', String(bookId));
+    const dir = bookCoverDirPath(this.booksPath, bookId);
     try {
       const files = await readdir(dir);
-      const cover = files.find((f) => f.startsWith('cover.'));
+      const cover = findPreferredBookCoverFileName(files);
       if (!cover) throw new NotFoundException('No cover');
       const coverPath = join(dir, cover);
       const { mtimeMs } = await stat(coverPath);
@@ -223,7 +224,7 @@ export class OpdsController {
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
-    const thumbnailPath = join(this.booksPath, 'covers', String(bookId), 'thumbnail.jpg');
+    const thumbnailPath = bookThumbnailPath(this.booksPath, bookId);
     try {
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;

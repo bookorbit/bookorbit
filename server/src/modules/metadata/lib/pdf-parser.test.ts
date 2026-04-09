@@ -1,11 +1,6 @@
 vi.mock('fs/promises', () => ({
-  mkdtemp: vi.fn(),
   readFile: vi.fn(),
-  readdir: vi.fn(),
-  rm: vi.fn(),
 }));
-
-vi.mock('child_process', () => ({ execFile: vi.fn() }));
 
 vi.mock('pdf-lib', () => ({
   PDFDocument: {
@@ -18,51 +13,49 @@ vi.mock('./pdf-xmp-reader', () => ({
   parseXmp: vi.fn(),
 }));
 
-import { execFile } from 'child_process';
-import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
+vi.mock('./pdf-cover', () => ({
+  extractPdfCover: vi.fn(),
+}));
+
+import { readFile } from 'fs/promises';
+import type { MockedFunction } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 
+import { extractPdfCover } from './pdf-cover';
+import { parsePdfFile, PDF_BUFFER_WARNING_BYTES } from './pdf-parser';
 import { extractXmpXml, parseXmp } from './pdf-xmp-reader';
-import { parsePdfFile } from './pdf-parser';
 
-const mockExecFile = execFile as unknown as vi.Mock;
-const mockMkdtemp = mkdtemp as MockedFunction<typeof mkdtemp>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
-const mockReaddir = readdir as MockedFunction<typeof readdir>;
-const mockRm = rm as MockedFunction<typeof rm>;
-const mockPdfLoad = PDFDocument.load as vi.Mock;
+const mockPdfLoad = PDFDocument.load as MockedFunction<typeof PDFDocument.load>;
 const mockExtractXmpXml = extractXmpXml as MockedFunction<typeof extractXmpXml>;
 const mockParseXmp = parseXmp as MockedFunction<typeof parseXmp>;
+const mockExtractPdfCover = extractPdfCover as MockedFunction<typeof extractPdfCover>;
 
-function mockExecSuccess() {
-  mockExecFile.mockImplementation((_file: string, _args: string[], cb: (err: Error | null, stdout?: string, stderr?: string) => void) => {
-    cb(null, '', '');
-  });
+function makePdfDoc(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    getTitle: () => 'Info Title',
+    getAuthor: () => 'Author One; Author Two',
+    getCreator: () => null,
+    getProducer: () => null,
+    getSubject: () => 'Info Subject',
+    getKeywords: () => 'tag1, tag2',
+    getPageCount: () => 123,
+    ...overrides,
+  };
 }
 
 describe('parsePdfFile', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    mockMkdtemp.mockResolvedValue('/tmp/pdf-cover-1');
-    mockReaddir.mockResolvedValue(['cover-1.jpg'] as unknown as Awaited<ReturnType<typeof readdir>>);
-    mockRm.mockResolvedValue(undefined);
-    mockReadFile
-      .mockResolvedValueOnce(Buffer.from('%PDF-1.7') as unknown as Awaited<ReturnType<typeof readFile>>)
-      .mockResolvedValueOnce(Buffer.from([0xff, 0xd8, 0xff]) as unknown as Awaited<ReturnType<typeof readFile>>);
-
-    mockPdfLoad.mockResolvedValue({
-      getTitle: () => 'Info Title',
-      getAuthor: () => 'Author One; Author Two',
-      getSubject: () => 'Info Subject',
-      getKeywords: () => 'tag1, tag2',
-      getPageCount: () => 123,
-    });
-
-    mockExecSuccess();
+    mockReadFile.mockResolvedValue(Buffer.from('%PDF-1.7') as never);
+    mockPdfLoad.mockResolvedValue(makePdfDoc() as never);
+    mockExtractXmpXml.mockReturnValue(null);
+    mockParseXmp.mockReturnValue(null);
+    mockExtractPdfCover.mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff]));
   });
 
-  it('prefers XMP metadata when available and still includes extracted cover/pageCount', async () => {
+  it('prefers XMP metadata and includes extracted cover when requested', async () => {
     mockExtractXmpXml.mockReturnValue('<xmp/>');
     mockParseXmp.mockReturnValue({
       title: 'XMP Title',
@@ -85,9 +78,10 @@ describe('parsePdfFile', () => {
       amazonId: 'a1',
       hardcoverId: 'h1',
       openLibraryId: 'ol1',
+      itunesId: 'it1',
     });
 
-    const parsed = await parsePdfFile('/books/book.pdf');
+    const parsed = await parsePdfFile('/books/book.pdf', { extractCover: true });
 
     expect(parsed).toEqual(
       expect.objectContaining({
@@ -98,11 +92,10 @@ describe('parsePdfFile', () => {
         coverBuffer: Buffer.from([0xff, 0xd8, 0xff]),
       }),
     );
+    expect(mockExtractPdfCover).toHaveBeenCalledWith('/books/book.pdf');
   });
 
   it('falls back to Info dictionary fields when no XMP is present', async () => {
-    mockExtractXmpXml.mockReturnValue(null);
-
     const parsed = await parsePdfFile('/books/book.pdf');
 
     expect(parsed).toEqual(
@@ -114,33 +107,111 @@ describe('parsePdfFile', () => {
         ],
         description: 'Info Subject',
         tags: ['tag1', 'tag2'],
+        coverBuffer: null,
       }),
     );
   });
 
-  it('can skip cover extraction when only metadata is needed', async () => {
-    mockExtractXmpXml.mockReturnValue(null);
-
-    const parsed = await parsePdfFile('/books/book.pdf', { extractCover: false });
-
-    expect(parsed).toEqual(expect.objectContaining({ title: 'Info Title', coverBuffer: null }));
-    expect(mockExecFile).not.toHaveBeenCalled();
-    expect(mockReadFile).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns null coverBuffer when pdftoppm command fails, but still returns metadata', async () => {
-    mockExtractXmpXml.mockReturnValue(null);
-    mockExecFile.mockImplementation((_file: string, _args: string[], cb: (err: Error | null) => void) => cb(new Error('pdftoppm missing')));
-
+  it('skips cover extraction by default for metadata-only callers', async () => {
     const parsed = await parsePdfFile('/books/book.pdf');
 
     expect(parsed).toEqual(expect.objectContaining({ title: 'Info Title', coverBuffer: null }));
-    expect(mockRm).toHaveBeenCalledWith('/tmp/pdf-cover-1', { recursive: true, force: true });
+    expect(mockExtractPdfCover).not.toHaveBeenCalled();
+    expect(mockReadFile).toHaveBeenCalledTimes(1);
   });
 
-  it('returns null when PDF cannot be parsed', async () => {
-    mockPdfLoad.mockRejectedValue(new Error('invalid pdf'));
+  it('returns null coverBuffer and emits a warning when cover extraction fails', async () => {
+    mockExtractPdfCover.mockRejectedValue(new Error('pdftoppm missing'));
+    const onWarning = vi.fn();
 
-    await expect(parsePdfFile('/books/bad.pdf')).resolves.toBeNull();
+    const parsed = await parsePdfFile('/books/book.pdf', {
+      extractCover: true,
+      onWarning,
+    });
+
+    expect(parsed).toEqual(expect.objectContaining({ title: 'Info Title', coverBuffer: null }));
+    expect(onWarning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'cover-extraction-failed',
+        absolutePath: '/books/book.pdf',
+        errorClass: 'Error',
+        errorMessage: 'pdftoppm missing',
+      }),
+    );
+  });
+
+  it('emits a warning when a large PDF must be buffered in memory', async () => {
+    mockReadFile.mockResolvedValue(Buffer.alloc(PDF_BUFFER_WARNING_BYTES) as never);
+    const onWarning = vi.fn();
+
+    await parsePdfFile('/books/large.pdf', { onWarning });
+
+    expect(onWarning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'buffered-large-pdf',
+        absolutePath: '/books/large.pdf',
+        sizeBytes: PDF_BUFFER_WARNING_BYTES,
+        thresholdBytes: PDF_BUFFER_WARNING_BYTES,
+      }),
+    );
+  });
+
+  it('falls back to the native PDF page count when XMP omits projectx:pageCount', async () => {
+    mockExtractXmpXml.mockReturnValue('<xmp/>');
+    mockParseXmp.mockReturnValue({
+      title: 'XMP Title',
+      subtitle: null,
+      description: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      authors: [],
+      genres: [],
+      tags: [],
+      isbn10: null,
+      isbn13: null,
+      seriesName: null,
+      seriesIndex: null,
+      rating: null,
+      pageCount: null,
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      openLibraryId: null,
+      itunesId: null,
+    });
+
+    const parsed = await parsePdfFile('/books/book.pdf');
+
+    expect(parsed?.pageCount).toBe(123);
+  });
+
+  it('falls back to legacy ProjectX producer metadata when XMP publisher is absent', async () => {
+    mockPdfLoad.mockResolvedValue(
+      makePdfDoc({
+        getCreator: () => 'projectx',
+        getProducer: () => 'Legacy Publisher',
+      }) as never,
+    );
+
+    const parsed = await parsePdfFile('/books/book.pdf');
+
+    expect(parsed?.publisher).toBe('Legacy Publisher');
+  });
+
+  it('returns null and emits a parse warning when the PDF cannot be read', async () => {
+    mockPdfLoad.mockRejectedValue(new Error('invalid pdf'));
+    const onWarning = vi.fn();
+
+    await expect(parsePdfFile('/books/bad.pdf', { onWarning })).resolves.toBeNull();
+    expect(onWarning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'parse-failed',
+        absolutePath: '/books/bad.pdf',
+        errorClass: 'Error',
+        errorMessage: 'invalid pdf',
+      }),
+    );
   });
 });

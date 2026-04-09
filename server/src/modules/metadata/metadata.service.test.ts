@@ -77,6 +77,7 @@ vi.mock('./extractors/audio.extractor', () => ({
 }));
 
 import { mkdir, readdir, rm, writeFile } from 'fs/promises';
+import { Logger } from '@nestjs/common';
 
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
 import { generateThumbnail, imageExt } from './lib/cover';
@@ -235,11 +236,57 @@ describe('MetadataService', () => {
     await expect(service.extractAndSave(15, '/books/a.pdf', 'pdf')).rejects.toThrow('bad metadata');
   });
 
+  it('extractAndSave(pdf) surfaces parser warnings in logs', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    mockParsePdfFile.mockImplementation((_absolutePath, options) => {
+      options?.onWarning?.({
+        code: 'cover-extraction-failed',
+        absolutePath: '/tmp/warn.pdf',
+        errorClass: 'Error',
+        errorMessage: 'pdftoppm missing',
+      });
+
+      return Promise.resolve({
+        title: 'Warn PDF',
+        subtitle: null,
+        description: null,
+        isbn10: null,
+        isbn13: null,
+        publisher: null,
+        publishedYear: null,
+        language: null,
+        seriesName: null,
+        seriesIndex: null,
+        authors: [],
+        genres: [],
+        tags: [],
+        rating: null,
+        pageCount: null,
+        googleBooksId: null,
+        goodreadsId: null,
+        amazonId: null,
+        hardcoverId: null,
+        openLibraryId: null,
+        itunesId: null,
+        coverBuffer: null,
+      });
+    });
+
+    await service.extractAndSave(21, '/tmp/warn.pdf', 'pdf');
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[metadata.pdf_parse] [fail]'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pdftoppm missing'));
+  });
+
   it('extractAndSave(pdf) persists fallback title/year, page count, and extracted cover bytes', async () => {
     const { db, updateSet } = makeDb();
     const service = makeService(db);
     const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
     const replaceGenresSpy = vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+    const replaceTagsSpy = vi.spyOn(service, 'replaceTags').mockResolvedValue(undefined);
 
     mockParsePdfFile.mockResolvedValue({
       title: null,
@@ -254,13 +301,28 @@ describe('MetadataService', () => {
       seriesIndex: 2,
       authors: [{ name: 'Author A', sortName: null }],
       genres: ['Fantasy'],
-      tags: [],
+      tags: ['Shelf'],
+      rating: 4.6,
       pageCount: 321,
+      googleBooksId: 'google-1',
+      goodreadsId: 'goodreads-1',
+      amazonId: 'amazon-1',
+      hardcoverId: 'hardcover-1',
+      openLibraryId: 'open-library-1',
+      itunesId: 'itunes-1',
       coverBuffer: Buffer.from('jpeg-bytes'),
     });
     mockParseBookFilename.mockReturnValue({ title: 'Title From Filename', publishedYear: 1999 });
 
     await service.extractAndSave(22, '/tmp/book.pdf', 'pdf');
+
+    expect(mockParsePdfFile).toHaveBeenCalledWith(
+      '/tmp/book.pdf',
+      expect.objectContaining({
+        extractCover: true,
+        onWarning: expect.any(Function),
+      }),
+    );
 
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -269,12 +331,20 @@ describe('MetadataService', () => {
         subtitle: 'Subtitle',
         description: 'Description',
         pageCount: 321,
+        rating: 5,
+        googleBooksId: 'google-1',
+        goodreadsId: 'goodreads-1',
+        amazonId: 'amazon-1',
+        hardcoverId: 'hardcover-1',
+        openLibraryId: 'open-library-1',
+        itunesId: 'itunes-1',
         updatedAt: expect.any(Date),
       }),
     );
     expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/22/cover_extracted.png', Buffer.from('jpeg-bytes'));
     expect(replaceAuthorsSpy).toHaveBeenCalledWith(22, [{ name: 'Author A', sortName: null }]);
     expect(replaceGenresSpy).toHaveBeenCalledWith(22, ['Fantasy']);
+    expect(replaceTagsSpy).toHaveBeenCalledWith(22, ['Shelf']);
     expect(embedder.embedBook).toHaveBeenCalledWith(22);
   });
 

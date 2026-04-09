@@ -1,3 +1,4 @@
+import { PROJECTX_NS_PREFIX, PROJECTX_NS_URI } from '../../../common/projectx-ns';
 import { parseXmp } from './pdf-xmp-reader';
 
 // Wraps XMP content in standard RDF envelope
@@ -7,7 +8,7 @@ function xmpDoc(body: string): string {
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about=""
       xmlns:dc="http://purl.org/dc/elements/1.1/"
-      xmlns:projectx="https://projectx.app/xmp/1.0/">
+      xmlns:${PROJECTX_NS_PREFIX}="${PROJECTX_NS_URI}">
       ${body}
     </rdf:Description>
   </rdf:RDF>
@@ -195,7 +196,7 @@ describe('parseXmp', () => {
     <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
       <dc:title>Merged Title</dc:title>
     </rdf:Description>
-    <rdf:Description rdf:about="" xmlns:projectx="https://projectx.app/xmp/1.0/">
+    <rdf:Description rdf:about="" xmlns:${PROJECTX_NS_PREFIX}="${PROJECTX_NS_URI}">
       <projectx:seriesName>Merged Series</projectx:seriesName>
     </rdf:Description>
   </rdf:RDF>

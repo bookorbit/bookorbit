@@ -1,13 +1,9 @@
-import { execFile } from 'child_process';
-import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { promisify } from 'util';
+import { readFile } from 'fs/promises';
 import { PDFDocument } from 'pdf-lib';
 
+import { PROJECTX_NS_PREFIX } from '../../../common/projectx-ns';
+import { extractPdfCover } from './pdf-cover';
 import { extractXmpXml, parseXmp, type XmpParsed } from './pdf-xmp-reader';
-
-const execFileAsync = promisify(execFile);
 
 export interface PdfParsed {
   title: string | null;
@@ -34,9 +30,21 @@ export interface PdfParsed {
   coverBuffer: Buffer | null;
 }
 
-interface PdfParseOptions {
-  extractCover?: boolean;
+export interface PdfParseWarning {
+  code: 'buffered-large-pdf' | 'cover-extraction-failed' | 'parse-failed';
+  absolutePath: string;
+  errorClass?: string;
+  errorMessage?: string;
+  sizeBytes?: number;
+  thresholdBytes?: number;
 }
+
+export interface PdfParseOptions {
+  extractCover?: boolean;
+  onWarning?: (warning: PdfParseWarning) => void;
+}
+
+export const PDF_BUFFER_WARNING_BYTES = 25 * 1024 * 1024;
 
 function clean(value: string | undefined): string | null {
   if (!value) return null;
@@ -52,25 +60,27 @@ function splitCommaList(value: string | null): string[] {
     .filter(Boolean);
 }
 
-async function extractPdfCover(absolutePath: string): Promise<Buffer | null> {
-  const tmpDir = await mkdtemp(join(tmpdir(), 'pdf-cover-'));
-  try {
-    const outPrefix = join(tmpDir, 'cover');
-    await execFileAsync('pdftoppm', ['-jpeg', '-r', '150', '-f', '1', '-l', '1', absolutePath, outPrefix]);
-    const files = await readdir(tmpDir);
-    const coverFile = files.find((f) => f.endsWith('.jpg'));
-    if (!coverFile) return null;
-    return await readFile(join(tmpDir, coverFile));
-  } catch {
-    return null;
-  } finally {
-    await rm(tmpDir, { recursive: true, force: true });
-  }
+function createWarning(code: PdfParseWarning['code'], absolutePath: string, error: unknown): PdfParseWarning {
+  const errorClass = error instanceof Error ? error.name : 'Error';
+  const errorMessage = (error instanceof Error ? error.message : String(error)).replace(/"/g, '\\"');
+  return { code, absolutePath, errorClass, errorMessage };
+}
+
+function createLargeBufferWarning(absolutePath: string, sizeBytes: number): PdfParseWarning {
+  return {
+    code: 'buffered-large-pdf',
+    absolutePath,
+    sizeBytes,
+    thresholdBytes: PDF_BUFFER_WARNING_BYTES,
+  };
 }
 
 export async function parsePdfFile(absolutePath: string, options: PdfParseOptions = {}): Promise<PdfParsed | null> {
   try {
     const buf = await readFile(absolutePath);
+    if (buf.length >= PDF_BUFFER_WARNING_BYTES) {
+      options.onWarning?.(createLargeBufferWarning(absolutePath, buf.length));
+    }
     const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
 
     // XMP is the authoritative source — richer and semantically correct.
@@ -81,6 +91,8 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
 
     const infoTitle = clean(doc.getTitle());
     const infoAuthorRaw = clean(doc.getAuthor());
+    const infoCreator = clean(doc.getCreator());
+    const infoProducer = clean(doc.getProducer());
     const infoSubject = clean(doc.getSubject());
     const infoKeywords = splitCommaList(clean(doc.getKeywords()));
 
@@ -92,14 +104,21 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
           .map((name) => ({ name, sortName: null }))
       : [];
 
-    const coverBuffer = options.extractCover === false ? null : await extractPdfCover(absolutePath);
+    let coverBuffer: Buffer | null = null;
+    if (options.extractCover === true) {
+      try {
+        coverBuffer = await extractPdfCover(absolutePath);
+      } catch (error) {
+        options.onWarning?.(createWarning('cover-extraction-failed', absolutePath, error));
+      }
+    }
 
     return {
       title: hasXmp ? xmp.title : infoTitle,
       subtitle: xmp?.subtitle ?? null,
       authors: hasXmp ? xmp.authors : infoAuthors,
       description: hasXmp ? xmp.description : infoSubject,
-      publisher: xmp?.publisher ?? null,
+      publisher: xmp?.publisher ?? (infoCreator === PROJECTX_NS_PREFIX ? infoProducer : null),
       publishedYear: xmp?.publishedYear ?? null,
       language: xmp?.language ?? null,
       genres: xmp?.genres?.length ? xmp.genres : [],
@@ -110,7 +129,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       seriesName: xmp?.seriesName ?? null,
       seriesIndex: xmp?.seriesIndex ?? null,
       rating: xmp?.rating ?? null,
-      pageCount: hasXmp ? xmp.pageCount : doc.getPageCount(),
+      pageCount: xmp?.pageCount ?? doc.getPageCount(),
       googleBooksId: xmp?.googleBooksId ?? null,
       goodreadsId: xmp?.goodreadsId ?? null,
       amazonId: xmp?.amazonId ?? null,
@@ -119,7 +138,8 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       itunesId: xmp?.itunesId ?? null,
       coverBuffer,
     };
-  } catch {
+  } catch (error) {
+    options.onWarning?.(createWarning('parse-failed', absolutePath, error));
     return null;
   }
 }

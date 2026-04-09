@@ -340,6 +340,13 @@ describe('UploadService', () => {
 
     expect(result).toEqual({ bookId: 99, filename: 'Research Paper.pdf', format: 'pdf', sizeBytes: 456 });
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Research Paper.pdf');
+    expect(mockParsePdfFile).toHaveBeenCalledWith(
+      '/tmp/upload.bin',
+      expect.objectContaining({
+        extractCover: false,
+        onWarning: expect.any(Function),
+      }),
+    );
   });
 
   it('cbz metadata populates tokens', async () => {

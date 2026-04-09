@@ -1,6 +1,8 @@
 import { XMLParser } from 'fast-xml-parser';
 import { PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
 
+import { PROJECTX_NS_PREFIX } from '../../../common/projectx-ns';
+
 export interface XmpParsed {
   title: string | null;
   subtitle: string | null;
@@ -125,7 +127,7 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     }
   }
 
-  const px = 'projectx';
+  const px = PROJECTX_NS_PREFIX;
 
   return {
     title: str(merged['dc:title']),

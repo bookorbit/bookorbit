@@ -7,6 +7,7 @@ import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
 import { isIP } from 'net';
 import { join } from 'path';
 
+import { bookCoverDirPath, bookThumbnailPath, findExtractedBookCoverFileName } from '../../common/book-cover-storage';
 import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -14,15 +15,13 @@ import { bookMetadata } from '../../db/schema';
 import { BookReadService } from '../book/book-read.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { LibraryService } from '../library/library.service';
-import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover';
+import { generateThumbnail, imageExt } from '../metadata/lib/cover';
 import {
   COVER_CUSTOM_FILE_PREFIX,
-  COVER_EXTRACTED_FILE_PREFIX,
   COVER_PROXY_MAX_IMAGE_BYTES,
   COVER_PROXY_MAX_REDIRECTS,
   COVER_PROXY_TIMEOUT_MS,
   COVER_PROXY_USER_AGENT,
-  COVER_THUMBNAIL_FILE_NAME,
 } from './constants';
 import { CoverProviderRegistry } from './provider-registry';
 import {
@@ -153,12 +152,12 @@ export class CoverService {
     try {
       await this.verifyAccess(bookId, user);
       await this.bookMetadataLockService.assertFieldsUnlocked(bookId, ['cover']);
-      const dir = coverDirPath(this.booksPath, bookId);
+      const dir = bookCoverDirPath(this.booksPath, bookId);
       await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 
       const extractedPath = await this.findExtractedCover(bookId);
       if (!extractedPath) {
-        await this.removeFileIfPresent(join(dir, COVER_THUMBNAIL_FILE_NAME));
+        await this.removeFileIfPresent(bookThumbnailPath(this.booksPath, bookId));
         await this.setCoverSource(bookId, null);
         this.logger.log(
           `[cover.delete] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} coverSource=null - cover deletion completed`,
@@ -168,7 +167,7 @@ export class CoverService {
 
       const bytes = await readFile(extractedPath);
       const thumb = await generateThumbnail(bytes);
-      await writeFile(join(dir, COVER_THUMBNAIL_FILE_NAME), thumb);
+      await writeFile(bookThumbnailPath(this.booksPath, bookId), thumb);
       await this.setCoverSource(bookId, 'extracted');
       this.logger.log(
         `[cover.delete] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} coverSource=extracted - cover deletion completed`,
@@ -231,20 +230,20 @@ export class CoverService {
   }
 
   private async saveCustomCover(bookId: number, buffer: Buffer): Promise<void> {
-    const dir = coverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.booksPath, bookId);
     await mkdir(dir, { recursive: true });
     await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 
     const ext = imageExt(buffer);
     await writeFile(join(dir, `${COVER_CUSTOM_FILE_PREFIX}${ext}`), buffer);
     const thumb = await generateThumbnail(buffer);
-    await writeFile(join(dir, COVER_THUMBNAIL_FILE_NAME), thumb);
+    await writeFile(bookThumbnailPath(this.booksPath, bookId), thumb);
   }
 
   private async findExtractedCover(bookId: number): Promise<string | null> {
-    const dir = coverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.booksPath, bookId);
     const files = await this.readDirIfExists(dir);
-    const found = files.find((fileName) => fileName.startsWith(COVER_EXTRACTED_FILE_PREFIX));
+    const found = findExtractedBookCoverFileName(files);
     return found ? join(dir, found) : null;
   }
 

@@ -13,6 +13,14 @@ export interface ParsedBookData {
   seriesIndex?: number | null;
   authors: { name: string; sortName: string | null }[];
   genres: string[];
+  tags?: string[];
+  rating?: number | null;
+  googleBooksId?: string | null;
+  goodreadsId?: string | null;
+  amazonId?: string | null;
+  hardcoverId?: string | null;
+  openLibraryId?: string | null;
+  itunesId?: string | null;
   cover: Buffer | null;
   // audio-specific
   narrators?: string[];

@@ -19,7 +19,7 @@ import type { UploadResult } from '@projectx/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
-import { parsePdfFile } from '../metadata/lib/pdf-parser';
+import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -180,7 +180,10 @@ export class UploadService {
           };
         }
       } else if (format === 'pdf') {
-        const pdf = await parsePdfFile(tempPath);
+        const pdf = await parsePdfFile(tempPath, {
+          extractCover: false,
+          onWarning: (warning) => this.logPdfPatternTokenWarning(warning),
+        });
         if (pdf) {
           parsed = { title: pdf.title, publisher: pdf.publisher, authors: pdf.authors, seriesName: null, seriesIndex: null };
         }
@@ -218,6 +221,18 @@ export class UploadService {
     const errorClass = err instanceof Error ? err.name : 'Error';
     const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
     return { errorClass, errorMessage };
+  }
+
+  private logPdfPatternTokenWarning(warning: PdfParseWarning): void {
+    if (warning.code === 'buffered-large-pdf') {
+      this.logger.warn(
+        `[upload.pattern_tokens_pdf] [end] path="${warning.absolutePath}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
+      );
+      return;
+    }
+    this.logger.warn(
+      `[upload.pattern_tokens_pdf] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf token extraction warning emitted`,
+    );
   }
 
   private async destinationExists(absolutePath: string): Promise<boolean> {

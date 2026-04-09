@@ -7,7 +7,7 @@ import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
-import { parsePdfFile } from '../metadata/lib/pdf-parser';
+import { parsePdfFile, type PdfParsed, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { extractCover, generateThumbnail, imageExt } from '../metadata/lib/cover';
 import { BookBucketRepository } from './book-bucket.repository';
 
@@ -18,9 +18,19 @@ export class BookBucketMetadataService {
   constructor(private readonly repo: BookBucketRepository) {}
 
   async extractAndSave(fileId: number, absolutePath: string, format: string, coversDir: string): Promise<void> {
+    const startedAt = Date.now();
     await this.repo.update(fileId, { status: 'extracting' });
     try {
-      const [metadata, coverBytes] = await Promise.all([this.extractMetadata(absolutePath, format), extractCover(absolutePath, format)]);
+      let metadata: BookBucketMetadata;
+      let coverBytes: Buffer | null;
+
+      if (format === 'pdf') {
+        const parsedPdf = await this.extractPdfData(absolutePath, true);
+        metadata = this.toPdfMetadata(parsedPdf);
+        coverBytes = parsedPdf?.coverBuffer ?? null;
+      } else {
+        [metadata, coverBytes] = await Promise.all([this.extractMetadata(absolutePath, format), extractCover(absolutePath, format)]);
+      }
 
       let coverPath: string | null = null;
       if (coverBytes && coverBytes.length > 0) {
@@ -33,7 +43,11 @@ export class BookBucketMetadataService {
         status: 'ready',
       });
     } catch (err) {
-      this.logger.warn(`Metadata extraction failed for Book Bucket file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[book_bucket.extract_metadata] [fail] fileId=${fileId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata extraction failed`,
+      );
       await this.repo.update(fileId, {
         status: 'error',
         errorMessage: err instanceof Error ? err.message : 'Metadata extraction failed',
@@ -84,15 +98,7 @@ export class BookBucketMetadataService {
   }
 
   private async fromPdf(absolutePath: string): Promise<BookBucketMetadata> {
-    const parsed = await parsePdfFile(absolutePath);
-    if (!parsed) return {};
-    return {
-      title: parsed.title ?? undefined,
-      publisher: parsed.publisher ?? undefined,
-      pageCount: parsed.pageCount ?? undefined,
-      authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
-      genres: parsed.genres.length > 0 ? parsed.genres : undefined,
-    };
+    return this.toPdfMetadata(await this.extractPdfData(absolutePath, false));
   }
 
   private async fromMobi(absolutePath: string): Promise<BookBucketMetadata> {
@@ -154,5 +160,35 @@ export class BookBucketMetadataService {
     await Promise.all([writeFile(coverPath, bytes), writeFile(thumbPath, thumbnail)]);
 
     return coverPath;
+  }
+
+  private async extractPdfData(absolutePath: string, extractCover: boolean): Promise<PdfParsed | null> {
+    return parsePdfFile(absolutePath, {
+      extractCover,
+      onWarning: (warning) => this.logPdfParseWarning(warning),
+    });
+  }
+
+  private toPdfMetadata(parsed: PdfParsed | null): BookBucketMetadata {
+    if (!parsed) return {};
+    return {
+      title: parsed.title ?? undefined,
+      publisher: parsed.publisher ?? undefined,
+      pageCount: parsed.pageCount ?? undefined,
+      authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
+      genres: parsed.genres.length > 0 ? parsed.genres : undefined,
+    };
+  }
+
+  private logPdfParseWarning(warning: PdfParseWarning): void {
+    if (warning.code === 'buffered-large-pdf') {
+      this.logger.warn(
+        `[book_bucket.pdf_parse] [end] path="${warning.absolutePath}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
+      );
+      return;
+    }
+    this.logger.warn(
+      `[book_bucket.pdf_parse] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf parse warning emitted`,
+    );
   }
 }

@@ -4,6 +4,7 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
 import type { WriteResult } from '@projectx/types';
+import { bookCoverDirPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
@@ -201,10 +202,10 @@ export class FileWriteService implements OnModuleDestroy {
 
   private async loadCoverBytes(bookId: number): Promise<Buffer | null> {
     const startedAt = Date.now();
-    const dir = join(this.booksPath, 'covers', String(bookId));
+    const dir = bookCoverDirPath(this.booksPath, bookId);
     try {
       const files = await readdir(dir);
-      const cover = files.find((f) => f.startsWith('cover_custom.')) ?? files.find((f) => f.startsWith('cover_extracted.'));
+      const cover = findPreferredBookCoverFileName(files);
       if (!cover) return null;
       return readFile(join(dir, cover));
     } catch (error) {

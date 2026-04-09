@@ -1,12 +1,13 @@
-import { join } from 'path';
 import sharp from 'sharp';
 
+import { bookCoverDirPath } from '../../../common/book-cover-storage';
 import { extractCb7Cover } from './cover-cb7';
 import { extractCbrCover } from './cover-cbr';
 import { extractCbzCover } from './cover-cbz';
 import { extractEpubCover } from './cover-epub';
 import { extractFb2Cover } from './cover-fb2';
 import { extractMobiCover } from './mobi-parser';
+import { extractPdfCover } from './pdf-cover';
 
 const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_HEIGHT = 600;
@@ -41,6 +42,8 @@ export async function extractCover(absolutePath: string, format: string): Promis
       return extractCb7Cover(absolutePath);
     case 'fb2':
       return extractFb2Cover(absolutePath);
+    case 'pdf':
+      return extractPdfCover(absolutePath).catch(() => null);
     default:
       return null;
   }
@@ -48,5 +51,5 @@ export async function extractCover(absolutePath: string, format: string): Promis
 
 /** Resolve the cover directory for a book on disk. */
 export function coverDirPath(booksPath: string, bookId: number): string {
-  return join(booksPath, 'covers', String(bookId));
+  return bookCoverDirPath(booksPath, bookId);
 }

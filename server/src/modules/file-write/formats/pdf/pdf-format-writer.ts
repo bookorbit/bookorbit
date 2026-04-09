@@ -52,9 +52,6 @@ function applyInfoDict(pdfDoc: PDFDocument, payload: BookWritePayload, fieldMask
   if (fieldMask.has('description') && payload.description != null) {
     pdfDoc.setSubject(payload.description);
   }
-  if (fieldMask.has('publisher') && payload.publisher != null) {
-    pdfDoc.setProducer(payload.publisher);
-  }
   if (fieldMask.has('publishedYear') && payload.publishedYear != null) {
     pdfDoc.setCreationDate(new Date(payload.publishedYear, 0, 1));
   }

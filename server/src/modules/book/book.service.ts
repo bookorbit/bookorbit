@@ -2,11 +2,12 @@ import { BadRequestException, Injectable, InternalServerErrorException, Logger, 
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 
+import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
-import { parsePdfFile } from '../metadata/lib/pdf-parser';
+import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { basename, extname, join } from 'path';
 
 import { DEFAULT_DOWNLOAD_PATTERN, MetadataProviderKey, Permission, isAudioFormat, resolveUploadPath } from '@projectx/types';
@@ -185,10 +186,10 @@ export class BookService {
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
     const event = 'book.get_cover_path';
     await this.verifyBookAccess(id, user);
-    const dir = join(this.booksPath, 'covers', String(id));
+    const dir = bookCoverDirPath(this.booksPath, id);
     try {
       const files = await readdir(dir);
-      const cover = files.find((f) => f.startsWith('cover_custom.')) ?? files.find((f) => f.startsWith('cover_extracted.'));
+      const cover = findPreferredBookCoverFileName(files);
       return cover ? join(dir, cover) : null;
     } catch (err) {
       if (this.isMissingFilesystemEntry(err)) return null;
@@ -204,7 +205,7 @@ export class BookService {
   async getThumbnailPath(id: number, user: RequestUser): Promise<string | null> {
     const event = 'book.get_thumbnail_path';
     await this.verifyBookAccess(id, user);
-    const path = join(this.booksPath, 'covers', String(id), 'thumbnail.jpg');
+    const path = bookThumbnailPath(this.booksPath, id);
     try {
       await access(path);
       return path;
@@ -1117,7 +1118,10 @@ export class BookService {
         };
       }
       case 'pdf': {
-        const parsed = await parsePdfFile(absolutePath);
+        const parsed = await parsePdfFile(absolutePath, {
+          extractCover: false,
+          onWarning: (warning) => this.logPdfFileMetadataWarning(warning),
+        });
         if (!parsed) return {};
         return {
           title: parsed.title,
@@ -1184,6 +1188,18 @@ export class BookService {
       default:
         return {};
     }
+  }
+
+  private logPdfFileMetadataWarning(warning: PdfParseWarning): void {
+    if (warning.code === 'buffered-large-pdf') {
+      this.logger.warn(
+        `[book.file_metadata_pdf] [end] path="${warning.absolutePath}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
+      );
+      return;
+    }
+    this.logger.warn(
+      `[book.file_metadata_pdf] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf file metadata warning emitted`,
+    );
   }
 
   private resolveChapters(

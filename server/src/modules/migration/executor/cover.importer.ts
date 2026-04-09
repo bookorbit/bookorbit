@@ -4,7 +4,8 @@ import { access, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises
 import { join } from 'path';
 
 import type { CoverRefreshedEvent } from '@projectx/types';
-import { coverDirPath, generateThumbnail, imageExt } from '../../metadata/lib/cover';
+import { COVER_CUSTOM_FILE_PREFIX, COVER_THUMBNAIL_FILE_NAME, bookCoverDirPath } from '../../../common/book-cover-storage';
+import { generateThumbnail, imageExt } from '../../metadata/lib/cover';
 import { MigrationRepository } from '../migration.repository';
 import { MigrationImportRepository } from './migration-import.repository';
 import { ScanGateway } from '../../scanner/scan.gateway';
@@ -92,16 +93,16 @@ export class CoverImporter {
   }
 
   private async importSingleCover(targetBookId: number, booksPath: string, coverBytes: Buffer, sourceThumbnailPath: string): Promise<void> {
-    const targetCoverDir = coverDirPath(booksPath, targetBookId);
+    const targetCoverDir = bookCoverDirPath(booksPath, targetBookId);
     await mkdir(targetCoverDir, { recursive: true });
-    await this.deleteFilesByPrefix(targetCoverDir, 'cover_custom.');
+    await this.deleteFilesByPrefix(targetCoverDir, COVER_CUSTOM_FILE_PREFIX);
 
     const coverExt = imageExt(coverBytes);
-    await writeFile(join(targetCoverDir, `cover_custom.${coverExt}`), coverBytes);
+    await writeFile(join(targetCoverDir, `${COVER_CUSTOM_FILE_PREFIX}${coverExt}`), coverBytes);
 
     const sourceThumbnailBytes = await this.readOptionalFile(sourceThumbnailPath);
     const thumbnailBytes = sourceThumbnailBytes ?? (await generateThumbnail(coverBytes));
-    await writeFile(join(targetCoverDir, 'thumbnail.jpg'), thumbnailBytes);
+    await writeFile(join(targetCoverDir, COVER_THUMBNAIL_FILE_NAME), thumbnailBytes);
 
     await this.importRepo.markCoverAsCustom(targetBookId);
   }

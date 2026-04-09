@@ -1,10 +1,17 @@
 import { parseBookFilename } from '../lib/filename-parser';
-import { parsePdfFile } from '../lib/pdf-parser';
+import { parsePdfFile, type PdfParseOptions } from '../lib/pdf-parser';
 import type { FormatExtractor, ParsedBookData } from './format-extractor.interface';
 
+type PdfFormatExtractorOptions = Pick<PdfParseOptions, 'extractCover' | 'onWarning'>;
+
 export class PdfFormatExtractor implements FormatExtractor {
+  constructor(private readonly options: PdfFormatExtractorOptions = {}) {}
+
   async extract(absolutePath: string): Promise<ParsedBookData | null> {
-    const pdf = await parsePdfFile(absolutePath);
+    const pdf = await parsePdfFile(absolutePath, {
+      extractCover: this.options.extractCover === true,
+      onWarning: this.options.onWarning,
+    });
     if (!pdf) return null;
 
     const fb = !pdf.title ? parseBookFilename(absolutePath) : null;
@@ -21,6 +28,14 @@ export class PdfFormatExtractor implements FormatExtractor {
       seriesIndex: pdf.seriesIndex,
       authors: pdf.authors,
       genres: pdf.genres,
+      tags: pdf.tags,
+      rating: pdf.rating,
+      googleBooksId: pdf.googleBooksId,
+      goodreadsId: pdf.goodreadsId,
+      amazonId: pdf.amazonId,
+      hardcoverId: pdf.hardcoverId,
+      openLibraryId: pdf.openLibraryId,
+      itunesId: pdf.itunesId,
       cover: pdf.coverBuffer,
       pageCount: pdf.pageCount,
     };

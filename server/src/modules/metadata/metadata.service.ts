@@ -7,6 +7,13 @@ import { join } from 'path';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import {
+  COVER_EXTRACTED_FILE_PREFIX,
+  bookCoverDirPath,
+  bookThumbnailPath,
+  isCustomBookCoverFileName,
+  isExtractedBookCoverFileName,
+} from '../../common/book-cover-storage';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { ComicMetadataRepository } from './comic-metadata.repository';
@@ -23,6 +30,7 @@ import { MobiFormatExtractor } from './extractors/mobi-format.extractor';
 import { PdfFormatExtractor } from './extractors/pdf-format.extractor';
 import type { FormatExtractor, ParsedBookData } from './extractors/format-extractor.interface';
 import { generateThumbnail, imageExt } from './lib/cover';
+import type { PdfParseWarning } from './lib/pdf-parser';
 import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -35,9 +43,6 @@ interface RelationMutationOptions {
 
 const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] as const;
 const MAX_RELATION_NAME_LENGTH = 200;
-const CUSTOM_COVER_FILE_PREFIX = 'cover_custom.';
-const EXTRACTED_COVER_FILE_PREFIX = 'cover_extracted.';
-const THUMBNAIL_FILE_NAME = 'thumbnail.jpg';
 const EXTRACTED_COVER_SOURCE = 'extracted';
 
 @Injectable()
@@ -63,7 +68,7 @@ export class MetadataService {
     this.extractorMap = new Map<string, FormatExtractor>([
       ['epub', epub],
       ['kepub', epub],
-      ['pdf', new PdfFormatExtractor()],
+      ['pdf', new PdfFormatExtractor({ extractCover: true, onWarning: (warning) => this.logPdfParseWarning(warning) })],
       ['mobi', mobi],
       ['azw3', mobi],
       ['azw', mobi],
@@ -468,7 +473,15 @@ export class MetadataService {
       seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
+      tags: data.tags,
+      rating: normalizeImportedRating(data.rating),
       pageCount: data.pageCount,
+      googleBooksId: data.googleBooksId,
+      goodreadsId: data.goodreadsId,
+      amazonId: data.amazonId,
+      hardcoverId: data.hardcoverId,
+      openLibraryId: data.openLibraryId,
+      itunesId: data.itunesId,
       comicMetadata: data.comicMetadata ?? undefined,
     });
 
@@ -483,7 +496,14 @@ export class MetadataService {
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
     if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
+    if (filtered.rating !== undefined) scalarFields.rating = filtered.rating;
     if (filtered.pageCount !== undefined) scalarFields.pageCount = filtered.pageCount;
+    if (filtered.googleBooksId !== undefined) scalarFields.googleBooksId = filtered.googleBooksId;
+    if (filtered.goodreadsId !== undefined) scalarFields.goodreadsId = filtered.goodreadsId;
+    if (filtered.amazonId !== undefined) scalarFields.amazonId = filtered.amazonId;
+    if (filtered.hardcoverId !== undefined) scalarFields.hardcoverId = filtered.hardcoverId;
+    if (filtered.openLibraryId !== undefined) scalarFields.openLibraryId = filtered.openLibraryId;
+    if (filtered.itunesId !== undefined) scalarFields.itunesId = filtered.itunesId;
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();
       await this.db.update(bookMetadata).set(scalarFields).where(eq(bookMetadata.bookId, bookId));
@@ -494,6 +514,9 @@ export class MetadataService {
     }
     if (filtered.genres !== undefined) {
       await this.replaceGenres(bookId, filtered.genres);
+    }
+    if (filtered.tags !== undefined) {
+      await this.replaceTags(bookId, filtered.tags);
     }
 
     if (filtered.comicMetadata) {
@@ -517,20 +540,20 @@ export class MetadataService {
   private async persistCover(bookId: number, bytes: Buffer, overwrite: boolean): Promise<void> {
     if (await this.bookMetadataLockService.isFieldLocked(bookId, 'cover')) return;
     const ext = imageExt(bytes);
-    const dir = join(this.booksPath, 'covers', String(bookId));
+    const dir = bookCoverDirPath(this.booksPath, bookId);
     await mkdir(dir, { recursive: true });
 
     const files = await readdir(dir).catch(() => [] as string[]);
-    const hasCustom = files.some((fileName) => fileName.startsWith(CUSTOM_COVER_FILE_PREFIX));
+    const hasCustom = files.some(isCustomBookCoverFileName);
 
-    const staleExtractedFiles = files.filter((fileName) => fileName.startsWith(EXTRACTED_COVER_FILE_PREFIX));
+    const staleExtractedFiles = files.filter(isExtractedBookCoverFileName);
     await Promise.all(staleExtractedFiles.map((fileName) => rm(join(dir, fileName), { force: true })));
 
-    await writeFile(join(dir, `${EXTRACTED_COVER_FILE_PREFIX}${ext}`), bytes);
+    await writeFile(join(dir, `${COVER_EXTRACTED_FILE_PREFIX}${ext}`), bytes);
 
     if (!hasCustom) {
       const thumbnail = await generateThumbnail(bytes);
-      await writeFile(join(dir, THUMBNAIL_FILE_NAME), thumbnail);
+      await writeFile(bookThumbnailPath(this.booksPath, bookId), thumbnail);
     }
 
     if (overwrite) {
@@ -543,7 +566,27 @@ export class MetadataService {
     }
   }
 
+  private logPdfParseWarning(warning: PdfParseWarning): void {
+    if (warning.code === 'buffered-large-pdf') {
+      this.logger.warn(
+        `[metadata.pdf_parse] [end] path="${warning.absolutePath}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
+      );
+      return;
+    }
+    this.logger.warn(
+      `[metadata.pdf_parse] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf parse warning emitted`,
+    );
+  }
+
   private normalizeUniqueRelationNames(values: string[]): string[] {
     return [...new Set(values.map((value) => value.trim().substring(0, MAX_RELATION_NAME_LENGTH)).filter(Boolean))];
   }
+}
+
+function normalizeImportedRating(value: number | null | undefined): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!Number.isFinite(value)) return null;
+  const normalized = Math.round(value);
+  return normalized >= 1 && normalized <= 10 ? normalized : null;
 }

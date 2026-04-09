@@ -4,6 +4,7 @@ import { readdir, stat } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { join } from 'path';
 import type { FastifyReply } from 'fastify';
+import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../../common/book-cover-storage';
 import { KoboBookAccessService } from './kobo-book-access.service';
 
 @Injectable()
@@ -20,7 +21,7 @@ export class KoboThumbnailService {
   async serveThumbnail(userId: number, bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
     await this.bookAccessService.assertBookAccessible(userId, bookId);
 
-    const thumbnailPath = join(this.booksPath, 'covers', String(bookId), 'thumbnail.jpg');
+    const thumbnailPath = bookThumbnailPath(this.booksPath, bookId);
     try {
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;
@@ -38,10 +39,10 @@ export class KoboThumbnailService {
   }
 
   async serveCover(bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
-    const dir = join(this.booksPath, 'covers', String(bookId));
+    const dir = bookCoverDirPath(this.booksPath, bookId);
     try {
       const files = await readdir(dir);
-      const cover = files.find((f) => f.startsWith('cover.'));
+      const cover = findPreferredBookCoverFileName(files);
       if (!cover) throw new NotFoundException('No cover');
       const coverPath = join(dir, cover);
       const { mtimeMs } = await stat(coverPath);

@@ -4,6 +4,7 @@ vi.mock('./cover-cbr', () => ({ extractCbrCover: vi.fn() }));
 vi.mock('./cover-cb7', () => ({ extractCb7Cover: vi.fn() }));
 vi.mock('./cover-fb2', () => ({ extractFb2Cover: vi.fn() }));
 vi.mock('./mobi-parser', () => ({ extractMobiCover: vi.fn() }));
+vi.mock('./pdf-cover', () => ({ extractPdfCover: vi.fn() }));
 vi.mock('sharp', () => {
   const chain = {
     resize: vi.fn(),
@@ -24,6 +25,7 @@ import { extractCbzCover } from './cover-cbz';
 import { extractEpubCover } from './cover-epub';
 import { extractFb2Cover } from './cover-fb2';
 import { extractMobiCover } from './mobi-parser';
+import { extractPdfCover } from './pdf-cover';
 import { coverDirPath, extractCover, generateThumbnail, imageExt } from './cover';
 const mockEpub = extractEpubCover as MockedFunction<typeof extractEpubCover>;
 const mockMobi = extractMobiCover as MockedFunction<typeof extractMobiCover>;
@@ -31,6 +33,7 @@ const mockCbz = extractCbzCover as MockedFunction<typeof extractCbzCover>;
 const mockCbr = extractCbrCover as MockedFunction<typeof extractCbrCover>;
 const mockCb7 = extractCb7Cover as MockedFunction<typeof extractCb7Cover>;
 const mockFb2 = extractFb2Cover as MockedFunction<typeof extractFb2Cover>;
+const mockPdf = extractPdfCover as MockedFunction<typeof extractPdfCover>;
 
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
 
@@ -43,6 +46,7 @@ beforeEach(() => {
   mockCbr.mockResolvedValue(null);
   mockCb7.mockResolvedValue(null);
   mockFb2.mockResolvedValue(null);
+  mockPdf.mockResolvedValue(null);
 });
 
 // ── imageExt ──────────────────────────────────────────────────────────────────
@@ -150,8 +154,14 @@ describe('extractCover', () => {
     expect(mockFb2).toHaveBeenCalledWith('/book.fb2');
   });
 
+  it('routes pdf to extractPdfCover', async () => {
+    mockPdf.mockResolvedValue(JPEG_BYTES);
+    await extractCover('/book.pdf', 'pdf');
+    expect(mockPdf).toHaveBeenCalledWith('/book.pdf');
+  });
+
   it('returns null for unsupported format', async () => {
-    expect(await extractCover('/book.pdf', 'pdf')).toBeNull();
+    expect(await extractCover('/book.txt', 'txt')).toBeNull();
   });
 
   it('format matching is case-insensitive', async () => {
