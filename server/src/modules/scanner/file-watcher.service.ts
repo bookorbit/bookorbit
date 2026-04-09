@@ -47,12 +47,22 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     this.logger.log(`[${event}] [start] - watcher bootstrap started`);
     try {
       const watchedLibraries = await this.db.select().from(libraries).where(eq(libraries.watch, true));
+      let failedWatcherCount = 0;
       for (const lib of watchedLibraries) {
         const folders = await this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, lib.id));
-        await this.startWatcher(
-          lib.id,
-          folders.map((f) => f.path),
-        );
+        try {
+          await this.startWatcher(
+            lib.id,
+            folders.map((f) => f.path),
+          );
+        } catch (err) {
+          failedWatcherCount += 1;
+          const errorClass = err instanceof Error ? err.name : 'Error';
+          const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+          this.logger.warn(
+            `[${event}] [skip] libraryId=${lib.id} pathCount=${folders.length} errorClass=${errorClass} error="${errorMessage}" - watcher disabled for library during startup`,
+          );
+        }
       }
 
       this.reconcileTimer = setInterval(() => {
@@ -63,7 +73,7 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
         });
       }, RECONCILE_MS);
       this.logger.log(
-        `[${event}] [end] durationMs=${Date.now() - startedAt} watchedLibraryCount=${watchedLibraries.length} - watcher bootstrap completed`,
+        `[${event}] [end] durationMs=${Date.now() - startedAt} watchedLibraryCount=${watchedLibraries.length} failedWatcherCount=${failedWatcherCount} - watcher bootstrap completed`,
       );
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -140,6 +150,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     const event = 'scanner.watcher.start';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] libraryId=${libraryId} pathCount=${paths.length} - watcher start requested`);
+    const subs: AsyncSubscription[] = [];
+    let currentPath: string | null = null;
     try {
       await this.stopWatcher(libraryId);
       if (paths.length === 0) {
@@ -148,9 +160,9 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       }
 
       const { subscribe } = await import('@parcel/watcher');
-      const subs: AsyncSubscription[] = [];
 
       for (const path of paths) {
+        currentPath = path;
         const sub = await subscribe(path, (err, events) => {
           if (err) {
             this.logger.warn(
@@ -169,14 +181,23 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       }
 
       this.subscriptions.set(libraryId, subs);
+      currentPath = null;
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} pathCount=${paths.length} - watcher start completed`,
       );
     } catch (err) {
+      for (const sub of subs) {
+        try {
+          await sub.unsubscribe();
+        } catch {
+          // best-effort cleanup after a partial watcher startup
+        }
+      }
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      const pathPart = currentPath ? ` path="${currentPath.replace(/"/g, '\\"')}"` : '';
       this.logger.warn(
-        `[${event}] [fail] libraryId=${libraryId} pathCount=${paths.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - watcher start failed`,
+        `[${event}] [fail] libraryId=${libraryId}${pathPart} pathCount=${paths.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - watcher start failed`,
       );
       throw err;
     }

@@ -48,7 +48,7 @@ const EXTRACTED_COVER_SOURCE = 'extracted';
 @Injectable()
 export class MetadataService {
   private readonly logger = new Logger(MetadataService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
   private readonly extractorMap: Map<string, FormatExtractor>;
 
   constructor(
@@ -61,7 +61,7 @@ export class MetadataService {
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
     const audio = new AudioFormatExtractor();
     const mobi = new MobiFormatExtractor();
     const epub = new EpubFormatExtractor();
@@ -540,7 +540,7 @@ export class MetadataService {
   private async persistCover(bookId: number, bytes: Buffer, overwrite: boolean): Promise<void> {
     if (await this.bookMetadataLockService.isFieldLocked(bookId, 'cover')) return;
     const ext = imageExt(bytes);
-    const dir = bookCoverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
     await mkdir(dir, { recursive: true });
 
     const files = await readdir(dir).catch(() => [] as string[]);
@@ -553,7 +553,7 @@ export class MetadataService {
 
     if (!hasCustom) {
       const thumbnail = await generateThumbnail(bytes);
-      await writeFile(bookThumbnailPath(this.booksPath, bookId), thumbnail);
+      await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumbnail);
     }
 
     if (overwrite) {

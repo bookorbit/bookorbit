@@ -20,7 +20,7 @@ const STAGE_ORDER = ['shared_overlays', 'book_covers', 'user_state'] as const;
 export class MigrationExecutorService {
   private readonly logger = new Logger(MigrationExecutorService.name);
   private readonly running = new Set<number>();
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(
     private readonly repo: MigrationRepository,
@@ -31,7 +31,7 @@ export class MigrationExecutorService {
     private readonly encryption: MigrationEncryptionService,
     private readonly progressGateway: MigrationProgressGateway,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   start(runId: number): void {
@@ -94,7 +94,7 @@ export class MigrationExecutorService {
       await this.emitRunProgress(runId, 'running', 'shared_overlays');
 
       await this.executeStage(runId, 'book_covers', completedStages, async (ensureRunning) =>
-        this.covers.import(runId, planned, this.booksPath, sourceMediaRootPath, ensureRunning),
+        this.covers.import(runId, planned, this.appDataPath, sourceMediaRootPath, ensureRunning),
       );
       await this.emitRunProgress(runId, 'running', 'book_covers');
 

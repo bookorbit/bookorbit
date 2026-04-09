@@ -84,7 +84,7 @@ function makeService() {
     runWithSources: vi.fn(),
   };
   const config = {
-    get: vi.fn().mockImplementation((key: string) => (key === 'storage.booksPath' ? '/tmp/books' : undefined)),
+    get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/tmp/books' : undefined)),
   };
   const appSettings = {
     getDownloadPattern: vi.fn().mockResolvedValue('{originalFilename}'),

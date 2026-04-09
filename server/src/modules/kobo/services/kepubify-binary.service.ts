@@ -9,17 +9,17 @@ const KEPUBIFY_BASE_URL = 'https://github.com/booklore-app/booklore-tools/raw/ma
 @Injectable()
 export class KepubifyBinaryService {
   private readonly logger = new Logger(KepubifyBinaryService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
   private cachedBinaryPath: string | null = null;
 
   constructor(private readonly config: ConfigService) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   async getBinaryPath(): Promise<string> {
     if (this.cachedBinaryPath) return this.cachedBinaryPath;
     const binaryName = this.detectBinaryName();
-    const toolsDir = join(this.booksPath, '.tools', 'kepubify');
+    const toolsDir = join(this.appDataPath, '.tools', 'kepubify');
     const binaryPath = join(toolsDir, binaryName);
     await this.ensureBinary(binaryPath, binaryName, toolsDir);
     this.cachedBinaryPath = binaryPath;

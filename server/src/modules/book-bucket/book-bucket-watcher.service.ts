@@ -29,8 +29,8 @@ export class BookBucketWatcherService implements OnApplicationBootstrap, OnModul
     private readonly repo: BookBucketRepository,
     private readonly gateway: BookBucketGateway,
   ) {
-    const booksPath = this.config.get<string>('storage.booksPath')!;
-    this.bookBucketPath = this.config.get<string>('storage.bookBucketPath') ?? join(booksPath, 'book-bucket');
+    const appDataPath = this.config.get<string>('storage.appDataPath')!;
+    this.bookBucketPath = join(appDataPath, 'book-bucket');
   }
 
   async onApplicationBootstrap(): Promise<void> {

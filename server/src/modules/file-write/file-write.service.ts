@@ -21,7 +21,7 @@ const DEFAULT_MAX_CONCURRENT_WRITES = 2;
 @Injectable()
 export class FileWriteService implements OnModuleDestroy {
   private readonly logger = new Logger(FileWriteService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
   private readonly debounceMs: number;
   private readonly maxConcurrentWrites: number;
   private readonly debounceMap = new Map<number, NodeJS.Timeout>();
@@ -35,7 +35,7 @@ export class FileWriteService implements OnModuleDestroy {
     private readonly lockService: FileLockService,
     private readonly config: ConfigService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_WRITE_DEBOUNCE_MS);
     this.maxConcurrentWrites = resolvePositiveInteger(this.config.get('fileWrite.maxConcurrentWrites'), DEFAULT_MAX_CONCURRENT_WRITES);
   }
@@ -202,7 +202,7 @@ export class FileWriteService implements OnModuleDestroy {
 
   private async loadCoverBytes(bookId: number): Promise<Buffer | null> {
     const startedAt = Date.now();
-    const dir = bookCoverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
       const files = await readdir(dir);
       const cover = findPreferredBookCoverFileName(files);

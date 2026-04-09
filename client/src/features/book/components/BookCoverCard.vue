@@ -224,10 +224,9 @@ async function handleSetStatus(status: ReadStatus) {
 
       <!-- Blurred background fill for mismatched aspect ratios -->
       <img
-        v-if="!coverFailed"
+        v-if="coverLoaded && !coverFailed"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90 transition-opacity duration-200"
-        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90"
         aria-hidden="true"
         loading="lazy"
       />
@@ -236,8 +235,8 @@ async function handleSetStatus(status: ReadStatus) {
         v-if="!coverFailed"
         :ref="onMainImgRef"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
-        :class="coverLoaded ? (isMissing ? 'opacity-100 brightness-50' : 'opacity-100') : 'opacity-0'"
+        class="absolute inset-0 w-full h-full object-contain"
+        :class="isMissing ? 'brightness-50' : ''"
         loading="lazy"
         decoding="async"
         :alt="book.title ?? ''"

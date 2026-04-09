@@ -26,8 +26,7 @@ const ADMIN_SETUP_DTO = {
 };
 
 interface EnvSnapshot {
-  booksPath: string | undefined;
-  bookBucketPath: string | undefined;
+  appDataPath: string | undefined;
 }
 
 export interface BookBucketE2EContext {
@@ -80,12 +79,10 @@ export function authHeader(token: string): Record<string, string> {
 export async function createBookBucketE2EContext(): Promise<BookBucketE2EContext> {
   const fixture = await createBookBucketFixtureRoot();
   const envSnapshot: EnvSnapshot = {
-    booksPath: process.env.BOOKS_PATH,
-    bookBucketPath: process.env.BOOK_BUCKET_PATH,
+    appDataPath: process.env.APP_DATA_PATH,
   };
 
-  process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
+  process.env.APP_DATA_PATH = fixture.booksPath;
 
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
@@ -390,9 +387,6 @@ async function setSetting(db: Db, key: string, value: string): Promise<void> {
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
-  else process.env.BOOKS_PATH = snapshot.booksPath;
-
-  if (snapshot.bookBucketPath === undefined) delete process.env.BOOK_BUCKET_PATH;
-  else process.env.BOOK_BUCKET_PATH = snapshot.bookBucketPath;
+  if (snapshot.appDataPath === undefined) delete process.env.APP_DATA_PATH;
+  else process.env.APP_DATA_PATH = snapshot.appDataPath;
 }

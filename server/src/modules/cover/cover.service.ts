@@ -41,7 +41,7 @@ const ITUNES_INTERLEAVE_LIMIT = 5;
 @Injectable()
 export class CoverService {
   private readonly logger = new Logger(CoverService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -51,7 +51,7 @@ export class CoverService {
     private readonly config: ConfigService,
     private readonly providerRegistry: CoverProviderRegistry,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   async searchCovers(params: CoverSearchParams & { provider?: string }): Promise<CoverSearchResult[]> {
@@ -152,12 +152,12 @@ export class CoverService {
     try {
       await this.verifyAccess(bookId, user);
       await this.bookMetadataLockService.assertFieldsUnlocked(bookId, ['cover']);
-      const dir = bookCoverDirPath(this.booksPath, bookId);
+      const dir = bookCoverDirPath(this.appDataPath, bookId);
       await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 
       const extractedPath = await this.findExtractedCover(bookId);
       if (!extractedPath) {
-        await this.removeFileIfPresent(bookThumbnailPath(this.booksPath, bookId));
+        await this.removeFileIfPresent(bookThumbnailPath(this.appDataPath, bookId));
         await this.setCoverSource(bookId, null);
         this.logger.log(
           `[cover.delete] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} coverSource=null - cover deletion completed`,
@@ -167,7 +167,7 @@ export class CoverService {
 
       const bytes = await readFile(extractedPath);
       const thumb = await generateThumbnail(bytes);
-      await writeFile(bookThumbnailPath(this.booksPath, bookId), thumb);
+      await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumb);
       await this.setCoverSource(bookId, 'extracted');
       this.logger.log(
         `[cover.delete] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} coverSource=extracted - cover deletion completed`,
@@ -230,18 +230,18 @@ export class CoverService {
   }
 
   private async saveCustomCover(bookId: number, buffer: Buffer): Promise<void> {
-    const dir = bookCoverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
     await mkdir(dir, { recursive: true });
     await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 
     const ext = imageExt(buffer);
     await writeFile(join(dir, `${COVER_CUSTOM_FILE_PREFIX}${ext}`), buffer);
     const thumb = await generateThumbnail(buffer);
-    await writeFile(bookThumbnailPath(this.booksPath, bookId), thumb);
+    await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumb);
   }
 
   private async findExtractedCover(bookId: number): Promise<string | null> {
-    const dir = bookCoverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
     const files = await this.readDirIfExists(dir);
     const found = findExtractedBookCoverFileName(files);
     return found ? join(dir, found) : null;

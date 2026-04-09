@@ -1,15 +1,49 @@
 import { ref } from 'vue'
 import type { AuthUser, AuthResponse } from '@projectx/types'
-import { api, setAccessToken, setOnAuthFailure } from '@/lib/api'
+import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
 import router from '@/router'
 import { useSetupStatus } from './useSetupStatus'
 import { disconnectAuthorEnrichmentSocket } from '@/features/settings/composables/useAuthorEnrichmentStatus'
 import { disconnectBookMetadataFetchSocket } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchStatus'
 
+const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
 const user = ref<AuthUser | null>(null)
 const isLoading = ref(false)
+let sessionRefreshTimer: number | null = null
+
+function canRefreshSession() {
+  return user.value && (typeof document === 'undefined' || document.visibilityState === 'visible')
+}
+
+function stopSessionRefresh() {
+  if (sessionRefreshTimer !== null) {
+    window.clearInterval(sessionRefreshTimer)
+    sessionRefreshTimer = null
+  }
+}
+
+function startSessionRefresh() {
+  stopSessionRefresh()
+  sessionRefreshTimer = window.setInterval(() => {
+    if (!canRefreshSession()) return
+    void refreshAccessToken().catch(() => {
+      // Let the next foreground API request decide whether the session is gone.
+    })
+  }, SESSION_REFRESH_INTERVAL_MS)
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!canRefreshSession()) return
+    void refreshAccessToken().catch(() => {
+      // Best-effort refresh after a sleeping tab wakes up.
+    })
+  })
+}
 
 function clearAuth() {
+  stopSessionRefresh()
   user.value = null
   setAccessToken(null)
   disconnectAuthorEnrichmentSocket()
@@ -37,6 +71,7 @@ export function useAuth() {
       const { accessToken } = await res.json()
       setAccessToken(accessToken)
       await me()
+      startSessionRefresh()
     } catch {
       // no valid session
     } finally {
@@ -60,6 +95,7 @@ export function useAuth() {
     const data: AuthResponse = await res.json()
     setAccessToken(data.accessToken)
     user.value = data.user
+    startSessionRefresh()
 
     if (data.user.isDefaultPassword) {
       router.push('/')
@@ -95,6 +131,7 @@ export function useAuth() {
     const data: AuthResponse = await res.json()
     setAccessToken(data.accessToken)
     user.value = data.user
+    startSessionRefresh()
 
     useSetupStatus().markSetupComplete()
     router.push('/')

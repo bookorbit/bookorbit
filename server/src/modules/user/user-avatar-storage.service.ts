@@ -7,10 +7,10 @@ import { join } from 'path';
 @Injectable()
 export class UserAvatarStorageService {
   private readonly logger = new Logger(UserAvatarStorageService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(private readonly config: ConfigService) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   async saveAvatar(userId: number, bytes: Buffer): Promise<void> {
@@ -38,7 +38,7 @@ export class UserAvatarStorageService {
   }
 
   private avatarDir(userId: number): string {
-    return join(this.booksPath, 'users', String(userId));
+    return join(this.appDataPath, 'users', String(userId));
   }
 
   private avatarPath(userId: number): string {

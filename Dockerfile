@@ -41,7 +41,7 @@ FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 
 RUN apk upgrade --no-cache && \
-    apk add --no-cache poppler-utils && \
+    apk add --no-cache poppler-utils su-exec && \
     rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production
@@ -51,9 +51,7 @@ COPY --from=server-builder --chown=node:node /deploy ./
 COPY --from=client-builder --chown=node:node /app/client/dist ./public
 COPY --from=server-builder --chown=node:node /app/server/entrypoint.sh ./entrypoint.sh
 
-RUN chmod +x /app/entrypoint.sh && mkdir -p /books /book-bucket /data /tmp && chown -R node:node /books /book-bucket /data /tmp
-
-USER node
+RUN chmod +x /app/entrypoint.sh && mkdir -p /books /data/covers /data/book-bucket /tmp && chown -R node:node /data /tmp
 
 EXPOSE 3000
 

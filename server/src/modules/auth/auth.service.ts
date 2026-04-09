@@ -535,7 +535,7 @@ export class AuthService {
       sameSite: 'strict',
       path: '/api/v1/auth',
       maxAge: ttlSeconds,
-      secure: this.config.get('app.nodeEnv') === 'production',
+      secure: 'auto',
     });
   }
 
@@ -545,7 +545,7 @@ export class AuthService {
       sameSite: 'strict',
       path: '/api/v1/auth',
       maxAge: 0,
-      secure: this.config.get('app.nodeEnv') === 'production',
+      secure: 'auto',
     });
   }
 
@@ -556,7 +556,7 @@ export class AuthService {
       sameSite: 'lax',
       path: '/api',
       maxAge: ttlSeconds,
-      secure: this.config.get('app.nodeEnv') === 'production',
+      secure: 'auto',
     });
   }
 
@@ -566,7 +566,7 @@ export class AuthService {
       sameSite: 'lax',
       path: '/api',
       maxAge: 0,
-      secure: this.config.get('app.nodeEnv') === 'production',
+      secure: 'auto',
     });
   }
 }

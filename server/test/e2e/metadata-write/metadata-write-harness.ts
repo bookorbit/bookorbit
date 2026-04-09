@@ -26,7 +26,7 @@ const ADMIN_SETUP_DTO = {
 };
 
 interface EnvSnapshot {
-  booksPath: string | undefined;
+  appDataPath: string | undefined;
   fileWriteDebounceMs: string | undefined;
   fileWriteMaxConcurrentWrites: string | undefined;
 }
@@ -78,12 +78,12 @@ export function authHeader(token: string): Record<string, string> {
 export async function createMetadataWriteE2EContext(): Promise<MetadataWriteE2EContext> {
   const fixture = await createMetadataWriteFixtureRoot();
   const envSnapshot: EnvSnapshot = {
-    booksPath: process.env.BOOKS_PATH,
+    appDataPath: process.env.APP_DATA_PATH,
     fileWriteDebounceMs: process.env.FILE_WRITE_DEBOUNCE_MS,
     fileWriteMaxConcurrentWrites: process.env.FILE_WRITE_MAX_CONCURRENT_WRITES,
   };
 
-  process.env.BOOKS_PATH = fixture.booksPath;
+  process.env.APP_DATA_PATH = fixture.booksPath;
   process.env.FILE_WRITE_DEBOUNCE_MS = '25';
   process.env.FILE_WRITE_MAX_CONCURRENT_WRITES = '1';
 
@@ -428,8 +428,8 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
-  else process.env.BOOKS_PATH = snapshot.booksPath;
+  if (snapshot.appDataPath === undefined) delete process.env.APP_DATA_PATH;
+  else process.env.APP_DATA_PATH = snapshot.appDataPath;
 
   if (snapshot.fileWriteDebounceMs === undefined) delete process.env.FILE_WRITE_DEBOUNCE_MS;
   else process.env.FILE_WRITE_DEBOUNCE_MS = snapshot.fileWriteDebounceMs;

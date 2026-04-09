@@ -32,8 +32,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 interface EnvSnapshot {
-  booksPath: string | undefined;
-  bookBucketPath: string | undefined;
+  appDataPath: string | undefined;
   appUrl: string | undefined;
 }
 
@@ -329,13 +328,11 @@ export function authHeader(token: string): Record<string, string> {
 export async function createEmailE2EContext(): Promise<EmailE2EContext> {
   const fixture = await createEmailFixtureRoot();
   const envSnapshot: EnvSnapshot = {
-    booksPath: process.env.BOOKS_PATH,
-    bookBucketPath: process.env.BOOK_BUCKET_PATH,
+    appDataPath: process.env.APP_DATA_PATH,
     appUrl: process.env.APP_URL,
   };
 
-  process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
+  process.env.APP_DATA_PATH = fixture.booksPath;
   process.env.APP_URL = 'http://localhost:4173';
 
   const smtpSink = new InProcessSmtpSink();
@@ -745,11 +742,8 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
-  else process.env.BOOKS_PATH = snapshot.booksPath;
-
-  if (snapshot.bookBucketPath === undefined) delete process.env.BOOK_BUCKET_PATH;
-  else process.env.BOOK_BUCKET_PATH = snapshot.bookBucketPath;
+  if (snapshot.appDataPath === undefined) delete process.env.APP_DATA_PATH;
+  else process.env.APP_DATA_PATH = snapshot.appDataPath;
 
   if (snapshot.appUrl === undefined) delete process.env.APP_URL;
   else process.env.APP_URL = snapshot.appUrl;

@@ -17,8 +17,7 @@ export const authConfig = registerAs('auth', () => ({
 }));
 
 export const storageConfig = registerAs('storage', () => ({
-  booksPath: process.env.BOOKS_PATH ?? '/data',
-  bookBucketPath: process.env.BOOK_BUCKET_PATH,
+  appDataPath: process.env.APP_DATA_PATH ?? '/data',
 }));
 
 export const fileWriteConfig = registerAs('fileWrite', () => ({

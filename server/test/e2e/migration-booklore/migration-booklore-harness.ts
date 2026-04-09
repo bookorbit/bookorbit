@@ -16,7 +16,7 @@ const TEST_USER_PREFIX = 'migration-booklore-';
 const ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 interface EnvSnapshot {
-  booksPath: string | undefined;
+  appDataPath: string | undefined;
   migrationEncryptionKey: string | undefined;
 }
 
@@ -56,13 +56,13 @@ export async function createMigrationBookloreE2EContext(): Promise<MigrationBook
   const booksPath = join(fixtureRoot, 'books');
   const sourceMediaRoot = join(fixtureRoot, 'booklore-media');
   const envSnapshot: EnvSnapshot = {
-    booksPath: process.env.BOOKS_PATH,
+    appDataPath: process.env.APP_DATA_PATH,
     migrationEncryptionKey: process.env.MIGRATION_ENCRYPTION_KEY,
   };
 
   await mkdir(booksPath, { recursive: true });
   await mkdir(sourceMediaRoot, { recursive: true });
-  process.env.BOOKS_PATH = booksPath;
+  process.env.APP_DATA_PATH = booksPath;
   process.env.MIGRATION_ENCRYPTION_KEY = ENCRYPTION_KEY;
 
   let base: E2EContext | null = null;
@@ -518,7 +518,7 @@ async function resetDirectory(path: string): Promise<void> {
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  process.env.BOOKS_PATH = snapshot.booksPath;
+  process.env.APP_DATA_PATH = snapshot.appDataPath;
   process.env.MIGRATION_ENCRYPTION_KEY = snapshot.migrationEncryptionKey;
 }
 

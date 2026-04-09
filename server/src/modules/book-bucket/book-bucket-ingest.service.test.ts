@@ -13,8 +13,7 @@ const mockedStat = vi.mocked(stat);
 function makeService() {
   const config = {
     get: vi.fn((key: string) => {
-      if (key === 'storage.booksPath') return '/books';
-      if (key === 'storage.bookBucketPath') return undefined;
+      if (key === 'storage.appDataPath') return '/books';
       return undefined;
     }),
   };

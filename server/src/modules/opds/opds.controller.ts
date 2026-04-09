@@ -31,14 +31,14 @@ import { OpdsService } from './opds.service';
 @Public()
 @UseGuards(OpdsEnabledGuard, OpdsAuthGuard)
 export class OpdsController {
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(
     private readonly opdsService: OpdsService,
     private readonly opdsBookService: OpdsBookService,
     private readonly config: ConfigService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   @Get()
@@ -194,7 +194,7 @@ export class OpdsController {
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
-    const dir = bookCoverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
       const files = await readdir(dir);
       const cover = findPreferredBookCoverFileName(files);
@@ -224,7 +224,7 @@ export class OpdsController {
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
-    const thumbnailPath = bookThumbnailPath(this.booksPath, bookId);
+    const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
     try {
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;

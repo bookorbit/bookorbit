@@ -48,7 +48,7 @@ export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number
 @Injectable()
 export class BookService {
   private readonly logger = new Logger(BookService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
   private embeddingRun: Promise<void> | null = null;
   private metadataUpdateFailpoint: MetadataUpdateFailpoint | null = null;
 
@@ -68,7 +68,7 @@ export class BookService {
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   private isSuperuser(user: RequestUser): boolean {
@@ -186,7 +186,7 @@ export class BookService {
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
     const event = 'book.get_cover_path';
     await this.verifyBookAccess(id, user);
-    const dir = bookCoverDirPath(this.booksPath, id);
+    const dir = bookCoverDirPath(this.appDataPath, id);
     try {
       const files = await readdir(dir);
       const cover = findPreferredBookCoverFileName(files);
@@ -205,7 +205,7 @@ export class BookService {
   async getThumbnailPath(id: number, user: RequestUser): Promise<string | null> {
     const event = 'book.get_thumbnail_path';
     await this.verifyBookAccess(id, user);
-    const path = bookThumbnailPath(this.booksPath, id);
+    const path = bookThumbnailPath(this.appDataPath, id);
     try {
       await access(path);
       return path;
@@ -358,7 +358,7 @@ export class BookService {
       await this.bookRepo.deleteByIds(bookIds);
       const deleteTargets = [
         ...rows.map((row) => ({
-          path: join(this.booksPath, 'covers', String(row.id)),
+          path: join(this.appDataPath, 'covers', String(row.id)),
           options: { recursive: true, force: true },
           kind: 'coverDir' as const,
         })),

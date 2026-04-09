@@ -28,7 +28,7 @@ const MIME: Record<string, string> = {
 @Injectable()
 export class KoboDownloadService {
   private readonly logger = new Logger(KoboDownloadService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
   private readonly kepubCachePath: string;
 
   constructor(
@@ -38,8 +38,8 @@ export class KoboDownloadService {
     private readonly settingsService: KoboSettingsService,
     private readonly bookAccessService: KoboBookAccessService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
-    this.kepubCachePath = join(this.booksPath, '.kepub-cache');
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
+    this.kepubCachePath = join(this.appDataPath, '.kepub-cache');
   }
 
   async streamBook(userId: number, bookId: number, reply: FastifyReply) {

@@ -30,6 +30,7 @@ import { useLibraryUploadEvents } from '@/features/library/composables/useLibrar
 import { useBookBucketSummary } from '@/features/book-bucket/composables/useBookBucketSummary'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types'
+import { useThemeStore } from '@/stores/theme'
 
 const router = useRouter()
 const route = useRoute()
@@ -38,9 +39,12 @@ const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 const { summary: bookBucketSummary, fetchSummary: fetchBookBucketSummary, subscribe: subscribeBookBucketSummary } = useBookBucketSummary()
+const themeStore = useThemeStore()
 
 const isBookBucketActive = computed(() => route.name === 'book-bucket')
 const isStatisticsActive = computed(() => route.name === 'statistics')
+
+const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 
 function navigateToBookBucket() {
   router.push({ name: 'book-bucket' })
@@ -147,7 +151,7 @@ onMounted(() => {
   }
 })
 
-const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
+const stopLibraryUploadListener = onLibraryUploadCompleted((event) => {
   if (event.uploadedCount === 0 && event.failedCount === 0) return
 
   const uploadedLabel = `${event.uploadedCount} book${event.uploadedCount === 1 ? '' : 's'}`
@@ -167,7 +171,7 @@ const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
-  stopUploadCompletedListener()
+  stopLibraryUploadListener()
 })
 
 function highlightSegments(text: string | null, query: string) {
@@ -300,7 +304,7 @@ function formatBadgeClass(fmt: string): string {
     <!-- Normal state -->
     <template v-else>
       <!-- Left: sidebar trigger -->
-      <SidebarTrigger class="-ml-1 text-foreground/70 hover:text-foreground" />
+      <SidebarTrigger :class="['-ml-1 text-foreground/70 hover:text-foreground', iconRadiusClass]" />
       <Separator orientation="vertical" class="mx-1 h-4" />
 
       <!-- Center: desktop global search -->
@@ -409,7 +413,10 @@ function formatBadgeClass(fmt: string): string {
             <Button
               variant="ghost"
               size="icon"
-              class="md:hidden h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+              :class="[
+                'md:hidden h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
+                iconRadiusClass,
+              ]"
               @click="mobileSearchOpen = true"
             >
               <Search :size="15" />
@@ -426,12 +433,13 @@ function formatBadgeClass(fmt: string): string {
               <Button
                 variant="ghost"
                 size="icon"
-                class="relative h-8 w-8 rounded-xl border transition-colors"
-                :class="
+                class="relative h-8 w-8 border transition-colors"
+                :class="[
                   isBookBucketActive
                     ? 'border-primary/80 bg-primary/8 text-primary'
-                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground'
-                "
+                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
+                  iconRadiusClass,
+                ]"
                 @click="navigateToBookBucket"
               >
                 <PackageOpen :size="15" />
@@ -452,12 +460,13 @@ function formatBadgeClass(fmt: string): string {
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8 rounded-xl border transition-colors"
-                :class="
+                class="h-8 w-8 border transition-colors"
+                :class="[
                   isStatisticsActive
                     ? 'border-primary/80 bg-primary/8 text-primary'
-                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground'
-                "
+                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
+                  iconRadiusClass,
+                ]"
                 @click="navigateToStatistics"
               >
                 <BarChart3 :size="15" />
@@ -472,7 +481,10 @@ function formatBadgeClass(fmt: string): string {
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+                :class="[
+                  'h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
+                  iconRadiusClass,
+                ]"
                 @click="uploadOpen = true"
               >
                 <Upload :size="15" />
@@ -492,7 +504,7 @@ function formatBadgeClass(fmt: string): string {
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="h-8 w-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    :class="['h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors', iconRadiusClass]"
                   >
                     <Palette :size="15" />
                   </Button>
@@ -528,7 +540,10 @@ function formatBadgeClass(fmt: string): string {
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8 rounded-xl border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+                :class="[
+                  'h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
+                  iconRadiusClass,
+                ]"
                 @click="navigateToSettings"
               >
                 <Settings :size="15" />
@@ -543,7 +558,10 @@ function formatBadgeClass(fmt: string): string {
         <DropdownMenu v-if="user">
           <DropdownMenuTrigger as-child>
             <button
-              class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-primary/50 bg-primary/10 hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              :class="[
+                'flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border border-primary/50 bg-primary/10 hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                iconRadiusClass,
+              ]"
             >
               <UserAvatar :name="user.name" :avatar-url="user.avatarUrl ?? null" size-class="h-full w-full" />
             </button>

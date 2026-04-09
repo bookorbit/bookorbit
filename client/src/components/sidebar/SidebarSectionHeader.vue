@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ChevronDown, Plus, GripVertical, Check, MoreVertical } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useThemeStore } from '@/stores/theme'
 
 const props = defineProps<{
   label: string
@@ -13,6 +15,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ toggle: []; add: []; toggleReorder: [] }>()
+
+const themeStore = useThemeStore()
+const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 
 const hasMenu = () => props.canAdd || props.canReorder
 </script>
@@ -40,8 +45,8 @@ const hasMenu = () => props.canAdd || props.canReorder
     </button>
     <DropdownMenu v-if="hasMenu()">
       <DropdownMenuTrigger
-        class="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent"
-        :class="isReordering ? 'text-primary' : 'text-sidebar-foreground/45 hover:text-sidebar-foreground/90'"
+        class="ml-1 flex h-6 w-6 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent"
+        :class="[isReordering ? 'text-primary' : 'text-sidebar-foreground/45 hover:text-sidebar-foreground/90', iconRadiusClass]"
         @click.stop
       >
         <MoreVertical :size="15" :stroke-width="2.2" />

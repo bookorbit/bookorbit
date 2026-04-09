@@ -137,19 +137,18 @@ function openAuthorBrowse() {
     >
       <!-- Blurred background fill for mismatched aspect ratios -->
       <img
-        v-if="!coverFailed"
+        v-if="coverLoaded && !coverFailed"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-50 transition-opacity duration-200"
-        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-50"
         aria-hidden="true"
         loading="lazy"
       />
       <img
         v-if="!coverFailed"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
-        :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+        class="absolute inset-0 w-full h-full object-contain"
         loading="lazy"
+        decoding="async"
         :alt="book.title ?? ''"
         @load="coverLoaded = true"
         @error="coverFailed = true"

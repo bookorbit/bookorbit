@@ -14,9 +14,24 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
 
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
+const DEFAULT_TRUST_PROXY = 'loopback,linklocal,uniquelocal';
+
+function parseTrustProxy(value: string | undefined) {
+  const raw = value?.trim();
+  if (!raw) return DEFAULT_TRUST_PROXY;
+
+  const normalized = raw.toLowerCase();
+  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+
+  const hopCount = Number(raw);
+  if (Number.isInteger(hopCount) && hopCount >= 0) return hopCount;
+
+  return raw;
+}
 
 async function bootstrap() {
-  const adapter = new FastifyAdapter({ logger: false });
+  const adapter = new FastifyAdapter({ logger: false, trustProxy: parseTrustProxy(process.env.TRUST_PROXY) });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
   app.useLogger(app.get(Logger));
 
@@ -64,6 +79,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   await app.register(fastifyHelmet as never, {
+    crossOriginOpenerPolicy: false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -75,6 +91,7 @@ async function bootstrap() {
         objectSrc: ["'none'"],
         frameSrc: ["'self'", 'blob:'],
         frameAncestors: ["'none'"],
+        upgradeInsecureRequests: null,
       },
     },
   });
@@ -114,4 +131,8 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 
-void bootstrap();
+bootstrap().catch((err: unknown) => {
+  const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  process.stderr.write(`ProjectX startup failed:\n${message}\n`);
+  process.exit(1);
+});

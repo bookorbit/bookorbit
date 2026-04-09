@@ -36,10 +36,10 @@ export class AuthorImageStorageError extends Error {
 @Injectable()
 export class AuthorImageStorageService {
   private readonly logger = new Logger(AuthorImageStorageService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(private readonly config: ConfigService) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   async saveFromUrl(authorId: number, rawUrl: string): Promise<boolean> {
@@ -113,7 +113,7 @@ export class AuthorImageStorageService {
   }
 
   private authorDir(authorId: number): string {
-    return join(this.booksPath, 'authors', String(authorId));
+    return join(this.appDataPath, 'authors', String(authorId));
   }
 
   private async isReadable(path: string): Promise<boolean> {

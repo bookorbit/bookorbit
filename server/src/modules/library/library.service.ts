@@ -42,7 +42,7 @@ interface LibraryMetadataWriteSummary {
 @Injectable()
 export class LibraryService {
   private readonly logger = new Logger(LibraryService.name);
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(
     private readonly libraryRepo: LibraryRepository,
@@ -51,7 +51,7 @@ export class LibraryService {
     private readonly fileWatcherService: FileWatcherService,
     private readonly fileWriteService: FileWriteService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   async verifyUserAccess(userId: number, libraryId: number, isSuperuser: boolean): Promise<void> {
@@ -347,7 +347,7 @@ export class LibraryService {
       const chunk = bookIds.slice(index, index + concurrency);
       await Promise.all(
         chunk.map(async (bookId) => {
-          const coverDir = join(this.booksPath, 'covers', String(bookId));
+          const coverDir = join(this.appDataPath, 'covers', String(bookId));
           try {
             await rm(coverDir, { recursive: true, force: true });
             deletedCount++;

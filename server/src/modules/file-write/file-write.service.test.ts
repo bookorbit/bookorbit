@@ -47,7 +47,7 @@ describe('FileWriteService', () => {
       withLock: vi.fn().mockImplementation(async (_path: string, fn: () => Promise<unknown>) => fn()),
     };
     const config = {
-      get: vi.fn().mockImplementation((key: string) => (key === 'storage.booksPath' ? '/books' : configValues[key])),
+      get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : configValues[key])),
     } as unknown as ConfigService;
 
     const service = new FileWriteService(fileWriteRepo as never, registry as never, lockService as never, config);

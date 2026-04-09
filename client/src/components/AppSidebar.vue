@@ -26,6 +26,7 @@ import type { Library } from '@projectx/types'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
+import { useThemeStore } from '@/stores/theme'
 
 function resolveIcon(name: string | null | undefined, fallback: Component): Component {
   if (name && name in Icons) return (Icons as Record<string, unknown>)[name] as Component
@@ -48,6 +49,9 @@ const { lenses, fetchLenses, reorderLenses } = useLenses()
 const { collections, fetchCollections, reorderCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
+const themeStore = useThemeStore()
+
+const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 
 const refreshedFor = new Set<number>()
 watch(progressMap, (map) => {
@@ -136,13 +140,13 @@ onMounted(async () => {
   fetchCollections()
 })
 
-const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
+const stopLibraryUploadListener = onLibraryUploadCompleted((event) => {
   if (event.uploadedCount > 0) {
     refreshLibraries()
   }
 })
 
-onUnmounted(() => stopUploadCompletedListener())
+onUnmounted(() => stopLibraryUploadListener())
 </script>
 
 <template>
@@ -157,7 +161,8 @@ onUnmounted(() => stopUploadCompletedListener())
       >
         <!-- Logo mark -->
         <div
-          class="flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+          class="flex h-8.5 w-8.5 shrink-0 items-center justify-center shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+          :class="iconRadiusClass"
           style="background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklch, var(--primary) 75%, transparent) 100%)"
         >
           <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true">

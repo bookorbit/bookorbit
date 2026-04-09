@@ -54,7 +54,7 @@ const ADMIN_SETUP_DTO = {
 const MAX_MULTIPART_BYTES = 20 * 1024 * 1024;
 
 interface EnvSnapshot {
-  booksPath: string | undefined;
+  appDataPath: string | undefined;
 }
 
 interface StaticCoverServer {
@@ -119,10 +119,10 @@ export function authHeader(token: string): Record<string, string> {
 export async function createMetadataLockE2EContext(): Promise<MetadataLockE2EContext> {
   const fixture = await createMetadataLockFixtureRoot();
   const envSnapshot: EnvSnapshot = {
-    booksPath: process.env.BOOKS_PATH,
+    appDataPath: process.env.APP_DATA_PATH,
   };
 
-  process.env.BOOKS_PATH = fixture.booksPath;
+  process.env.APP_DATA_PATH = fixture.booksPath;
 
   const coverServer = await startStaticCoverServer();
 
@@ -506,8 +506,8 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
-  else process.env.BOOKS_PATH = snapshot.booksPath;
+  if (snapshot.appDataPath === undefined) delete process.env.APP_DATA_PATH;
+  else process.env.APP_DATA_PATH = snapshot.appDataPath;
 }
 
 function sleep(ms: number): Promise<void> {

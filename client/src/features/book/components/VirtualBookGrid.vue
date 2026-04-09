@@ -126,17 +126,15 @@ const scrollerStyle = computed(() => ({
 }
 
 .book-grid-cell--new {
-  animation: book-enter 0.35s ease-out both;
+  animation: book-enter 0.25s ease-out both;
 }
 
 @keyframes book-enter {
   from {
-    opacity: 0;
-    transform: scale(0.92);
+    transform: translateY(4px) scale(0.98);
   }
   to {
-    opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 </style>

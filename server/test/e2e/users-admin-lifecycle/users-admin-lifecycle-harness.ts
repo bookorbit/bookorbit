@@ -30,8 +30,7 @@ const MAX_MULTIPART_BYTES = 20 * 1024 * 1024;
 const BCRYPT_TEST_ROUNDS = 4;
 
 interface EnvSnapshot {
-  booksPath: string | undefined;
-  bookBucketPath: string | undefined;
+  appDataPath: string | undefined;
 }
 
 export interface UsersAdminLifecycleE2EContext {
@@ -68,12 +67,10 @@ export function authHeader(token: string): Record<string, string> {
 export async function createUsersAdminLifecycleE2EContext(): Promise<UsersAdminLifecycleE2EContext> {
   const fixture = await createUsersAdminLifecycleFixtureRoot();
   const envSnapshot: EnvSnapshot = {
-    booksPath: process.env.BOOKS_PATH,
-    bookBucketPath: process.env.BOOK_BUCKET_PATH,
+    appDataPath: process.env.APP_DATA_PATH,
   };
 
-  process.env.BOOKS_PATH = fixture.booksPath;
-  process.env.BOOK_BUCKET_PATH = fixture.bookBucketPath;
+  process.env.APP_DATA_PATH = fixture.booksPath;
 
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
@@ -305,9 +302,6 @@ async function loginForToken(app: NestFastifyApplication, username: string, pass
 }
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  if (snapshot.booksPath === undefined) delete process.env.BOOKS_PATH;
-  else process.env.BOOKS_PATH = snapshot.booksPath;
-
-  if (snapshot.bookBucketPath === undefined) delete process.env.BOOK_BUCKET_PATH;
-  else process.env.BOOK_BUCKET_PATH = snapshot.bookBucketPath;
+  if (snapshot.appDataPath === undefined) delete process.env.APP_DATA_PATH;
+  else process.env.APP_DATA_PATH = snapshot.appDataPath;
 }

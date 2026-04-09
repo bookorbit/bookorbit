@@ -23,18 +23,26 @@ services:
       SETUP_BOOTSTRAP_TOKEN: ${SETUP_BOOTSTRAP_TOKEN?required}
       APP_URL: ${APP_URL?required}
       CLIENT_URL: ${CLIENT_URL:-${APP_URL?required}}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-2048}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./books:/books
+      - ${BOOKS_HOST_PATH:-./books}:/books
       - ./data/app:/data
-      - ./book-bucket:/data/book-bucket
     read_only: true
     tmpfs:
       - /tmp
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 30s
@@ -57,6 +65,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER?required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?required}
       POSTGRES_DB: ${POSTGRES_DB?required}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:

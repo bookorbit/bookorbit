@@ -2,7 +2,7 @@ import type { RefreshResponse } from '@projectx/types'
 
 let _accessToken: string | null = null
 let _onAuthFailure: (() => void) | null = null
-let _refreshPromise: Promise<void> | null = null
+let _refreshPromise: Promise<string> | null = null
 
 export function setAccessToken(token: string | null): void {
   _accessToken = token
@@ -22,11 +22,21 @@ function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respons
   return fetch(input, { ...init, headers, credentials: 'include' })
 }
 
-async function attemptRefresh(): Promise<void> {
+async function attemptRefresh(): Promise<string> {
   const res = await rawFetch('/api/v1/auth/refresh', { method: 'POST' })
   if (!res.ok) throw new Error('refresh failed')
   const data: RefreshResponse = await res.json()
   _accessToken = data.accessToken
+  return data.accessToken
+}
+
+export async function refreshAccessToken(): Promise<string> {
+  if (!_refreshPromise) {
+    _refreshPromise = attemptRefresh().finally(() => {
+      _refreshPromise = null
+    })
+  }
+  return _refreshPromise
 }
 
 export async function api(input: RequestInfo | URL, init?: RequestInit & { _isRetry?: boolean }): Promise<Response> {
@@ -41,14 +51,8 @@ export async function api(input: RequestInfo | URL, init?: RequestInit & { _isRe
     throw new Error('Session expired')
   }
 
-  if (!_refreshPromise) {
-    _refreshPromise = attemptRefresh().finally(() => {
-      _refreshPromise = null
-    })
-  }
-
   try {
-    await _refreshPromise
+    await refreshAccessToken()
   } catch {
     _onAuthFailure?.()
     throw new Error('Session expired')

@@ -55,7 +55,7 @@ Both must be running. The client proxies all `/api` and `/socket.io` requests to
 2. **Create a library** - open Settings (gear icon) > Libraries > Create Library. Add a folder path pointing to some books on your machine, e.g. any directory containing `.epub`, `.pdf`, or `.cbz` files.
 3. **Scan** - the library scans automatically after creation. You should see books appear on the home page once the scan completes.
 
-> **Where does data go?** `BOOKS_PATH` in `server/.env` defaults to `../local/data` (resolves to `<project-root>/local/data`). This is the app's data directory where extracted cover images and thumbnails are stored (`local/data/covers/`). It is **not** where your book files live - those paths are configured per-library in the UI. The `local/` folder is gitignored.
+> **Where does data go?** `APP_DATA_PATH` in `server/.env` defaults to `../local/data` (resolves to `<project-root>/local/data`). This is the app's data directory where extracted cover images and thumbnails are stored (`local/data/covers/`). It is **not** where your book files live - those paths are configured per-library in the UI. The `local/` folder is gitignored.
 
 ---
 
@@ -211,15 +211,16 @@ The fastest way to learn the patterns is to follow an existing module:
 
 Server environment is configured in `server/.env` for local development. Production compose uses the repo-root `.env` created from `.env.example`.
 
-| Variable                | Default                                                | Description                                                |
-| ----------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
-| `DATABASE_URL`          | `postgres://projectx:projectx@localhost:5432/projectx` | PostgreSQL connection string                               |
-| `PORT`                  | `3000`                                                 | Server port                                                |
-| `NODE_ENV`              | `development`                                          | Environment mode                                           |
-| `JWT_SECRET`            | `change-me-in-production`                              | JWT signing secret                                         |
-| `SETUP_BOOTSTRAP_TOKEN` | (empty)                                                | Required in production for initial `/api/v1/auth/setup`    |
-| `BOOKS_PATH`            | `../local/data`                                        | App data directory for cover images (not where books live) |
-| `APP_URL`               | `http://localhost:5173`                                | Client URL (used in emails)                                |
+| Variable                  | Default                                                | Description                                                |
+| ------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| `DATABASE_URL`            | `postgres://projectx:projectx@localhost:5432/projectx` | PostgreSQL connection string                               |
+| `PORT`                    | `3000`                                                 | Server port                                                |
+| `NODE_ENV`                | `development`                                          | Environment mode                                           |
+| `JWT_SECRET`              | `change-me-in-production`                              | JWT signing secret                                         |
+| `SETUP_BOOTSTRAP_TOKEN`   | (empty)                                                | Required in production for initial `/api/v1/auth/setup`    |
+| `APP_DATA_PATH`           | `../local/data`                                        | App data directory for cover images (not where books live) |
+| `APP_URL`                 | `http://localhost:5173`                                | Client URL (used in emails)                                |
+| `NODE_MAX_OLD_SPACE_SIZE` | `2048`                                                 | Docker Node.js heap limit in MB                            |
 
 ## Production Deploy
 
@@ -233,9 +234,30 @@ Quick start:
 
 ```bash
 cp .env.example .env
-# edit .env and set APP_IMAGE + secrets
+# edit .env and set APP_IMAGE, secrets, APP_URL, and BOOKS_HOST_PATH
 pnpm prod:up
 ```
+
+For production compose, `BOOKS_HOST_PATH` is the only host folder most users need to choose. It is mounted as `/books` in the container, and library paths created in the UI should point under `/books`.
+
+Generated app data and PostgreSQL live in explicit folders beside the compose file:
+
+```text
+./data/app       generated covers, author images, staging files, and Book Bucket uploads
+./data/postgres  PostgreSQL data
+```
+
+The container starts as root only long enough to create/chown app-managed data paths, then runs the Node process as `PUID:PGID`.
+
+On NAS installs, set `PUID` and `PGID` to the user/group that should own app-generated files:
+
+```bash
+id your-media-user
+```
+
+Do not add a compose `user:` override unless your platform requires it; that bypasses the startup permission repair.
+
+The app container defaults Node's JavaScript heap limit to 2048 MB. Set `NODE_MAX_OLD_SPACE_SIZE` in `.env` if the host needs a lower or higher limit.
 
 ---
 
@@ -330,6 +352,12 @@ docker compose down -v
 docker compose up -d --wait
 cd server && pnpm db:migrate
 ```
+
+### `EACCES: permission denied, mkdir '/data/covers'`
+
+The default compose uses `./data/app` for generated app data. The container repairs `/data` ownership during startup, then runs as `PUID:PGID`.
+
+If this still happens, make sure the folder mounted at `/data` is writable by `PUID:PGID`. Avoid adding `user:` to the app service, because startup cannot repair ownership when it is forced to start as a non-root user.
 
 ### `Cannot find module '@projectx/types'`
 

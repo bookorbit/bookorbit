@@ -7,7 +7,7 @@ import { FileEventProcessorService } from './file-event-processor.service';
 import { ScanGateway } from './scan.gateway';
 import { ScannerService } from './scanner.service';
 
-function makeService() {
+function makeService(db: any = {}) {
   const processor = {
     handleUnlink: vi.fn().mockResolvedValue({ type: 'noop' }),
     handleUnlinkDir: vi.fn().mockResolvedValue({ type: 'noop' }),
@@ -27,13 +27,32 @@ function makeService() {
     isScanRunning: vi.fn().mockReturnValue(false),
   } as unknown as ScannerService;
 
-  const db = {} as any;
   const service = new FileWatcherService(db, processor, gateway, scannerService);
   return { service, processor, gateway, scannerService };
 }
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+// ── bootstrap resilience ─────────────────────────────────────────────────────
+
+describe('onApplicationBootstrap()', () => {
+  it('continues startup when a library watcher fails to bind', async () => {
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 42 }]) }) })
+        .mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ path: '/books' }]) }) }),
+    };
+    const { service } = makeService(db);
+    const startWatcher = vi.spyOn(service, 'startWatcher').mockRejectedValue(new Error('Bad file descriptor'));
+
+    await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
+
+    expect(startWatcher).toHaveBeenCalledWith(42, ['/books']);
+    await service.onModuleDestroy();
+  });
+});
 
 // ── process() routing ─────────────────────────────────────────────────────────
 

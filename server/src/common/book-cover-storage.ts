@@ -4,12 +4,12 @@ export const COVER_CUSTOM_FILE_PREFIX = 'cover_custom.';
 export const COVER_EXTRACTED_FILE_PREFIX = 'cover_extracted.';
 export const COVER_THUMBNAIL_FILE_NAME = 'thumbnail.jpg';
 
-export function bookCoverDirPath(booksPath: string, bookId: number): string {
-  return join(booksPath, 'covers', String(bookId));
+export function bookCoverDirPath(appDataPath: string, bookId: number): string {
+  return join(appDataPath, 'covers', String(bookId));
 }
 
-export function bookThumbnailPath(booksPath: string, bookId: number): string {
-  return join(bookCoverDirPath(booksPath, bookId), COVER_THUMBNAIL_FILE_NAME);
+export function bookThumbnailPath(appDataPath: string, bookId: number): string {
+  return join(bookCoverDirPath(appDataPath, bookId), COVER_THUMBNAIL_FILE_NAME);
 }
 
 export function isCustomBookCoverFileName(fileName: string): boolean {

@@ -9,19 +9,19 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 
 @Injectable()
 export class KoboThumbnailService {
-  private readonly booksPath: string;
+  private readonly appDataPath: string;
 
   constructor(
     private readonly config: ConfigService,
     private readonly bookAccessService: KoboBookAccessService,
   ) {
-    this.booksPath = this.config.get<string>('storage.booksPath')!;
+    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
 
   async serveThumbnail(userId: number, bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
     await this.bookAccessService.assertBookAccessible(userId, bookId);
 
-    const thumbnailPath = bookThumbnailPath(this.booksPath, bookId);
+    const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
     try {
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;
@@ -39,7 +39,7 @@ export class KoboThumbnailService {
   }
 
   async serveCover(bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
-    const dir = bookCoverDirPath(this.booksPath, bookId);
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
       const files = await readdir(dir);
       const cover = findPreferredBookCoverFileName(files);

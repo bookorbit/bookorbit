@@ -27,7 +27,7 @@ export class CoverImporter {
   async import(
     runId: number,
     planned: PlannerResult,
-    booksPath: string,
+    appDataPath: string,
     sourceMediaRootPath: string | null,
     ensureRunning: RunStateCheck,
   ): Promise<void> {
@@ -47,7 +47,7 @@ export class CoverImporter {
       await ensureRunning();
       const batch = matches.slice(i, i + COVER_CONCURRENCY);
 
-      const results = await Promise.allSettled(batch.map((match) => this.processSingleMatch(runId, match, booksPath, sourceMediaRootPath)));
+      const results = await Promise.allSettled(batch.map((match) => this.processSingleMatch(runId, match, appDataPath, sourceMediaRootPath)));
 
       for (let j = 0; j < results.length; j++) {
         const result = results[j];
@@ -73,7 +73,7 @@ export class CoverImporter {
   private async processSingleMatch(
     runId: number,
     match: { sourceBookId: string; targetBookId: number },
-    booksPath: string,
+    appDataPath: string,
     sourceMediaRootPath: string,
   ): Promise<'imported' | 'unresolved' | 'failed'> {
     const sourceImageDir = join(sourceMediaRootPath, 'images', match.sourceBookId);
@@ -83,7 +83,7 @@ export class CoverImporter {
     if (!coverBytes) return 'unresolved';
 
     try {
-      await this.importSingleCover(match.targetBookId, booksPath, coverBytes, sourceThumbnailPath);
+      await this.importSingleCover(match.targetBookId, appDataPath, coverBytes, sourceThumbnailPath);
       return 'imported';
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -92,8 +92,8 @@ export class CoverImporter {
     }
   }
 
-  private async importSingleCover(targetBookId: number, booksPath: string, coverBytes: Buffer, sourceThumbnailPath: string): Promise<void> {
-    const targetCoverDir = bookCoverDirPath(booksPath, targetBookId);
+  private async importSingleCover(targetBookId: number, appDataPath: string, coverBytes: Buffer, sourceThumbnailPath: string): Promise<void> {
+    const targetCoverDir = bookCoverDirPath(appDataPath, targetBookId);
     await mkdir(targetCoverDir, { recursive: true });
     await this.deleteFilesByPrefix(targetCoverDir, COVER_CUSTOM_FILE_PREFIX);
 

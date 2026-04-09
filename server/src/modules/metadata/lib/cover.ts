@@ -50,6 +50,6 @@ export async function extractCover(absolutePath: string, format: string): Promis
 }
 
 /** Resolve the cover directory for a book on disk. */
-export function coverDirPath(booksPath: string, bookId: number): string {
-  return bookCoverDirPath(booksPath, bookId);
+export function coverDirPath(appDataPath: string, bookId: number): string {
+  return bookCoverDirPath(appDataPath, bookId);
 }

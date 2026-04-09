@@ -1,4 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import fastifyCookie from '@fastify/cookie';
+import Fastify from 'fastify';
 
 vi.mock('bcryptjs', () => ({
   hash: vi.fn((value: string) => Promise.resolve(`mock-hash:${value}`)),
@@ -37,8 +39,8 @@ function makeReply() {
   } as never;
 }
 
-function makeRequest(cookies: Record<string, string> = {}) {
-  return { cookies, headers: {} } as never;
+function makeRequest(cookies: Record<string, string> = {}, headers: Record<string, string | string[]> = {}) {
+  return { cookies, headers, raw: { socket: {} } } as never;
 }
 
 function makeFullUser(overrides?: Partial<Record<string, unknown>>) {
@@ -113,6 +115,30 @@ function makeService(dbOverrides?: Record<string, unknown>) {
 }
 
 describe('AuthService', () => {
+  describe('cookie transport security', () => {
+    it('omits Secure on direct HTTP and adds Secure for trusted-proxy HTTPS', async () => {
+      const app = Fastify({ trustProxy: 'loopback,linklocal,uniquelocal' });
+      await app.register(fastifyCookie);
+      app.get('/cookie', (_request, reply) => {
+        reply.setCookie('probe', '1', { path: '/', secure: 'auto' }).send({ ok: true });
+      });
+
+      try {
+        const directHttp = await app.inject({ method: 'GET', url: '/cookie' });
+        expect(String(directHttp.headers['set-cookie'])).not.toContain('Secure');
+
+        const proxiedHttps = await app.inject({
+          method: 'GET',
+          url: '/cookie',
+          headers: { 'x-forwarded-proto': 'https' },
+        });
+        expect(String(proxiedHttps.headers['set-cookie'])).toContain('Secure');
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   describe('setupStatus', () => {
     it('returns needsSetup=true when there are no users', async () => {
       const { service, db } = makeService();
@@ -255,6 +281,26 @@ describe('AuthService', () => {
       });
 
       await expect(service.login({ username: 'jdoe', password: 'wrongpass' }, makeReply())).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('sets auth cookies with automatic Secure mode', async () => {
+      const { service, userService } = makeService();
+      const reply = makeReply();
+      userService.findByUsername.mockResolvedValue({ id: 1, active: true, passwordHash: 'mock-hash:pass', tokenVersion: 1, username: 'jdoe' });
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser());
+
+      await service.login({ username: 'jdoe', password: 'pass' }, reply);
+
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'access_token',
+        'signed-jwt',
+        expect.objectContaining({ path: '/api', secure: 'auto' }),
+      );
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expect.any(String),
+        expect.objectContaining({ path: '/api/v1/auth', secure: 'auto' }),
+      );
     });
   });
 
