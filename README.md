@@ -69,14 +69,11 @@ projectx/
 │   └── types/          Shared TypeScript types (@projectx/types)
 ├── docker/
 │   └── postgres/       Postgres init scripts (extensions)
-├── docs/
-│   └── production.md   Production deploy/backup/restore runbook
 ├── local/              Local dev data (covers, docs) - gitignored
-├── docker-compose.yml  Dev: runs Postgres only (app runs natively)
-├── docker-compose.prod.yml  Prod: app + Postgres + migration job
-├── .env.prod.example   Template env file for production compose
-├── Dockerfile          Production multi-stage build
-└── Dockerfile.dev      Runs entire stack in Docker (not used for normal dev)
+├── docker-compose.dev.yml  Dev: runs Postgres only (app runs natively)
+├── docker-compose.yml      Prod: app + Postgres
+├── .env.example            Template env file for production compose
+└── Dockerfile              Production multi-stage build
 ```
 
 ### Monorepo layout
@@ -212,38 +209,33 @@ The fastest way to learn the patterns is to follow an existing module:
 
 ## Environment Variables
 
-Server environment is configured in `server/.env` (created from `.env.example` during setup).
+Server environment is configured in `server/.env` for local development. Production compose uses the repo-root `.env` created from `.env.example`.
 
-| Variable                 | Default                                                | Description                                                |
-| ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------- |
-| `DATABASE_URL`           | `postgres://projectx:projectx@localhost:5432/projectx` | PostgreSQL connection string                               |
-| `PORT`                   | `3000`                                                 | Server port                                                |
-| `NODE_ENV`               | `development`                                          | Environment mode                                           |
-| `JWT_SECRET`             | `change-me-in-production`                              | JWT signing secret                                         |
-| `JWT_EXPIRES_IN`         | `15m`                                                  | Access token lifetime                                      |
-| `JWT_REFRESH_EXPIRES_IN` | `7d`                                                   | Refresh token lifetime                                     |
-| `SETUP_BOOTSTRAP_TOKEN`  | (empty)                                                | Required in production for initial `/api/v1/auth/setup`    |
-| `BOOKS_PATH`             | `../local/data`                                        | App data directory for cover images (not where books live) |
-| `SMTP_*`                 | (empty)                                                | Optional SMTP config for password-reset emails             |
-| `APP_URL`                | `http://localhost:5173`                                | Client URL (used in emails)                                |
+| Variable                | Default                                                | Description                                                |
+| ----------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| `DATABASE_URL`          | `postgres://projectx:projectx@localhost:5432/projectx` | PostgreSQL connection string                               |
+| `PORT`                  | `3000`                                                 | Server port                                                |
+| `NODE_ENV`              | `development`                                          | Environment mode                                           |
+| `JWT_SECRET`            | `change-me-in-production`                              | JWT signing secret                                         |
+| `SETUP_BOOTSTRAP_TOKEN` | (empty)                                                | Required in production for initial `/api/v1/auth/setup`    |
+| `BOOKS_PATH`            | `../local/data`                                        | App data directory for cover images (not where books live) |
+| `APP_URL`               | `http://localhost:5173`                                | Client URL (used in emails)                                |
 
 ## Production Deploy
 
-Production uses a separate compose file and env file:
+Production uses the root compose file and env file:
 
-- Compose: `docker-compose.prod.yml`
-- Env file: `.env.prod` (from `.env.prod.example`)
+- Compose: `docker-compose.yml`
+- Env file: `.env` (from `.env.example`)
 - Image source: immutable images built in CI (`.github/workflows/container-image.yml`)
 
 Quick start:
 
 ```bash
-cp .env.prod.example .env.prod
-# edit .env.prod and set APP_IMAGE + secrets
+cp .env.example .env
+# edit .env and set APP_IMAGE + secrets
 pnpm prod:up
 ```
-
-Detailed runbook (deploy, backup, restore, restore drills): [docs/production.md](docs/production.md)
 
 ---
 

@@ -292,6 +292,7 @@ class View {
   }
   render(layout) {
     if (!layout) return
+    if (!this.document) return
     this.#column = layout.flow !== 'scrolled'
     this.#layout = layout
     if (this.#column) this.columnize(layout)

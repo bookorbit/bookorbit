@@ -16,7 +16,7 @@ import { ScannerRepository } from './scanner.repository';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 
 const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 3;
 const BOOK_EMIT_BUFFER_SIZE = 30;
 const BOOK_EMIT_FLUSH_INTERVAL_MS = 1500;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';

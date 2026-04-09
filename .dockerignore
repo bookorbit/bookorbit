@@ -6,3 +6,10 @@
 client/.env
 server/.env
 docker/postgres/data
+/data
+/books
+/book-bucket
+/local
+/coverage
+/test-results
+**/*.tsbuildinfo

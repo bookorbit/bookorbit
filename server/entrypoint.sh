@@ -9,4 +9,4 @@ export BOOKS_PATH="${BOOKS_PATH:-/data}"
 export BOOK_BUCKET_PATH="${BOOK_BUCKET_PATH:-/book-bucket}"
 
 node dist/scripts/migrate.js
-exec node dist/main.js
+exec node --max-old-space-size=512 dist/main.js

@@ -194,9 +194,6 @@ importers:
       "@fastify/multipart":
         specifier: ^10.0.0
         version: 10.0.0
-      "@fastify/rate-limit":
-        specifier: ^10.3.0
-        version: 10.3.0
       "@fastify/static":
         specifier: ^9.1.0
         version: 9.1.0
@@ -1713,12 +1710,6 @@ packages:
     resolution:
       {
         integrity: sha512-INS+6gh91cLUjB+PVHfu1UqcB76Sqtpyp7bnL+FYojhjygvOPA9ctiD/JDKsyD9Xgu4hUhCSJBPig/w7duNajw==,
-      }
-
-  "@fastify/rate-limit@10.3.0":
-    resolution:
-      {
-        integrity: sha512-eIGkG9XKQs0nyynatApA3EVrojHOuq4l6fhB4eeCk4PIOeadvOJz9/4w3vGI44Go17uaXOWEcPkaD8kuKm7g6Q==,
       }
 
   "@fastify/send@4.1.0":
@@ -11087,12 +11078,6 @@ snapshots:
     dependencies:
       "@fastify/forwarded": 3.0.1
       ipaddr.js: 2.3.0
-
-  "@fastify/rate-limit@10.3.0":
-    dependencies:
-      "@lukeed/ms": 2.0.2
-      fastify-plugin: 5.1.0
-      toad-cache: 3.7.0
 
   "@fastify/send@4.1.0":
     dependencies:

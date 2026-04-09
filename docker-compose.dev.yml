@@ -2,20 +2,22 @@ name: projectx-dev
 
 services:
   postgres:
+    container_name: projectx-dev-db
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-projectx}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-projectx}
-      POSTGRES_DB: ${POSTGRES_DB:-projectx}
+      POSTGRES_USER: ${DEV_POSTGRES_USER:-projectx}
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-projectx}
+      POSTGRES_DB: ${DEV_POSTGRES_DB:-projectx}
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "${DEV_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U projectx"]
+      test:
+        ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       timeout: 5s
       retries: 5

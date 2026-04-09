@@ -9,7 +9,6 @@ import { join } from 'path';
 import { Readable } from 'stream';
 import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
-import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
@@ -69,11 +68,12 @@ async function bootstrap() {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'blob:'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:'],
-        fontSrc: ["'self'", 'data:'],
+        fontSrc: ["'self'", 'data:', 'blob:'],
         objectSrc: ["'none'"],
+        frameSrc: ["'self'", 'blob:'],
         frameAncestors: ["'none'"],
       },
     },
@@ -84,19 +84,6 @@ async function bootstrap() {
   await app.register(fastifyCookie as never);
   await app.register(fastifyMultipart as never, { limits: { fileSize: MAX_COVER_BYTES } });
 
-  // Rate limit unauthenticated requests only (brute-force protection on public endpoints).
-  // Bypass for: JWT cookie (web app), Authorization header (OPDS Basic Auth),
-  // and Kobo device endpoints (token-authenticated via URL).
-  await app.register(fastifyRateLimit as never, {
-    max: 100,
-    timeWindow: '1 minute',
-    allowList: (req: { cookies?: { access_token?: string }; headers?: { authorization?: string }; url?: string }) =>
-      !!req.cookies?.access_token ||
-      !!req.headers?.authorization ||
-      /^\/api\/v1\/kobo\//.test(req.url ?? '') ||
-      /^\/api\/v1\/epub\/\d+\/file\//.test(req.url ?? ''),
-  });
-
   if (process.env.NODE_ENV !== 'production') {
     app.enableCors({
       origin: process.env.CLIENT_URL ?? 'http://localhost:5173',
@@ -105,10 +92,21 @@ async function bootstrap() {
   }
 
   if (process.env.NODE_ENV === 'production') {
+    // NestJS calls setNotFoundHandler during init — intercept it so non-API 404s
+    // fall back to index.html instead of returning a JSON 404 (SPA routing support).
+    const adapterAny = adapter as any;
+    adapterAny.setNotFoundHandler = (nestHandler: (req: unknown, res: unknown) => void) => {
+      fastify.setNotFoundHandler(async (request, reply) => {
+        if (request.url.startsWith('/api')) {
+          return nestHandler(request, reply);
+        }
+        return reply.sendFile('index.html');
+      });
+    };
+
     await app.register(fastifyStatic as never, {
       root: join(__dirname, '..', 'public'),
       prefix: '/',
-      decorateReply: false,
     });
   }
 
