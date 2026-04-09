@@ -75,7 +75,10 @@ export const koboSnapshotBooks = pgTable(
     fileHash: varchar('file_hash', { length: 64 }),
     metadataHash: varchar('metadata_hash', { length: 64 }),
   },
-  (t) => [primaryKey({ columns: [t.snapshotId, t.bookId] })],
+  (t) => [
+    primaryKey({ columns: [t.snapshotId, t.bookId] }),
+    index('kobo_snapshot_books_snapshot_synced_book_idx').on(t.snapshotId, t.synced, t.bookId),
+  ],
 );
 
 export const koboReadingStates = pgTable(

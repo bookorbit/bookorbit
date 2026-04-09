@@ -17,6 +17,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
 
 const POLL_INTERVAL_MS = 4_000;
 const BATCH_SIZE = 1;
+const SCHEDULE_BATCH_SIZE = 1000;
 
 @Injectable()
 export class BookMetadataFetchOrchestratorService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -73,10 +74,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
 
   async triggerGlobal(): Promise<number> {
     const config = await this.configService.getGlobalConfig();
-    const bookIds = await this.queueRepo.fetchEligibleBookIds(config);
-    if (bookIds.length === 0) return 0;
-
-    const queued = await this.queueRepo.upsertSchedule(bookIds, 'manual_trigger');
+    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, SCHEDULE_BATCH_SIZE);
+    if (queued === 0) return 0;
     if (queued > 0) {
       this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
@@ -90,10 +89,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     const config = await this.configService.getEffectiveConfig(libraryId);
     if (!config.enabled) return 0;
 
-    const bookIds = await this.queueRepo.fetchEligibleBookIds(config, libraryId);
-    if (bookIds.length === 0) return 0;
-
-    const queued = await this.queueRepo.upsertSchedule(bookIds, 'manual_trigger');
+    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', libraryId, SCHEDULE_BATCH_SIZE);
+    if (queued === 0) return 0;
     if (queued > 0) {
       this.session.addToTotal(queued);
       await this.unpauseIfNeeded();

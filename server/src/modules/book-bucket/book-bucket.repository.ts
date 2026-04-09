@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, asc, eq, ilike, inArray, notInArray, sum, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ilike, inArray, notInArray, sum, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -22,6 +22,14 @@ export interface ListOptions {
   limit: number;
   sort: string;
   order: string;
+  search?: string;
+}
+
+export interface SelectionBatchOptions {
+  limit: number;
+  afterId?: number;
+  excludedIds?: number[];
+  status?: string;
   search?: string;
 }
 
@@ -96,6 +104,24 @@ export class BookBucketRepository {
   async findByIds(ids: number[]): Promise<BookBucketFileRow[]> {
     if (ids.length === 0) return [];
     return this.db.select().from(bookBucketFiles).where(inArray(bookBucketFiles.id, ids));
+  }
+
+  async findSelectionBatch(options: SelectionBatchOptions): Promise<BookBucketFileRow[]> {
+    const conditions = this.buildSelectionConditions(options.status, options.search);
+    if (options.excludedIds?.length) conditions.push(notInArray(bookBucketFiles.id, options.excludedIds));
+    if (options.afterId !== undefined) conditions.push(gt(bookBucketFiles.id, options.afterId));
+    const where = conditions.length ? and(...conditions) : undefined;
+    return this.db.select().from(bookBucketFiles).where(where).orderBy(asc(bookBucketFiles.id)).limit(options.limit);
+  }
+
+  async setTargetsByIds(ids: number[], targetLibraryId: number | null, targetFolderId: number | null): Promise<number> {
+    if (ids.length === 0) return 0;
+    const updated = await this.db
+      .update(bookBucketFiles)
+      .set({ targetLibraryId, targetFolderId })
+      .where(inArray(bookBucketFiles.id, ids))
+      .returning({ id: bookBucketFiles.id });
+    return updated.length;
   }
 
   async countsByStatus(): Promise<{ pending: number; ready: number; error: number; total: number }> {

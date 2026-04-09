@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import type { BookQuery } from '@projectx/types';
 
+import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../../common/constants/pagination.constants';
 import { groupRuleSchema } from '../utils/group-rule.validator';
 
 const SORT_FIELDS = [
@@ -38,6 +39,15 @@ const bookQuerySchema = z.object({
     .object({
       page: z.number().int().min(0).default(0),
       size: z.number().int().min(1).max(200).default(50),
+    })
+    .superRefine((pagination, ctx) => {
+      if (!isOffsetWithinLimit(pagination.page * pagination.size)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `pagination window is too deep; page * size must be <= ${MAX_OFFSET_ROWS}`,
+          path: ['page'],
+        });
+      }
     })
     .default({ page: 0, size: 50 }),
 });

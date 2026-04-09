@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
@@ -8,6 +8,7 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 
 type Db = NodePgDatabase<typeof schema>;
 type JsonObj = Record<string, unknown>;
+const PROGRESS_PUSH_PAGE_SIZE = 250;
 
 function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj | null | undefined): JsonObj | null {
   if (!incoming) return existing ?? null;
@@ -121,7 +122,11 @@ export class KoboReadingStateService {
     };
   }
 
-  async getAndMarkStatesNeedingPush(userId: number, readingThreshold: number, finishedThreshold: number): Promise<unknown[]> {
+  async getAndMarkStatesNeedingPush(
+    userId: number,
+    readingThreshold: number,
+    finishedThreshold: number,
+  ): Promise<{ items: unknown[]; hasMore: boolean }> {
     const accessibleLibraryIds = await this.bookAccessService.getAccessibleLibraryIds(userId);
     const libraryAccessFilter =
       accessibleLibraryIds === null
@@ -148,14 +153,21 @@ export class KoboReadingStateService {
             sql`${schema.readingProgress.updatedAt} > ${schema.koboReadingStates.progressSyncedAt}`,
           ),
         ),
-      );
+      )
+      .orderBy(asc(schema.readingProgress.updatedAt), asc(schema.books.id))
+      .limit(PROGRESS_PUSH_PAGE_SIZE + 1);
 
-    if (rows.length === 0) return [];
+    if (rows.length === 0) return { items: [], hasMore: false };
 
-    const now = new Date().toISOString();
+    const hasMore = rows.length > PROGRESS_PUSH_PAGE_SIZE;
+    const pageRows = rows.slice(0, PROGRESS_PUSH_PAGE_SIZE);
+
+    const now = new Date();
+    const nowIso = now.toISOString();
     const result: unknown[] = [];
+    const upsertRows: (typeof schema.koboReadingStates.$inferInsert)[] = [];
 
-    for (const row of rows) {
+    for (const row of pageRows) {
       const id = String(row.bookId);
       const pct = row.percentage ?? 0;
       const status = pct >= finishedThreshold ? 'Finished' : pct >= readingThreshold ? 'Reading' : 'ReadyToRead';
@@ -164,35 +176,42 @@ export class KoboReadingStateService {
         ChangedReadingState: {
           ReadingState: {
             EntitlementId: id,
-            Created: now,
-            LastModified: now,
-            PriorityTimestamp: now,
-            StatusInfo: { LastModified: now, Status: status, TimesStartedReading: pct >= readingThreshold ? 1 : 0 },
-            Statistics: { LastModified: now },
-            CurrentBookmark: { LastModified: now, ProgressPercent: pct, ContentSourceProgressPercent: pct },
+            Created: nowIso,
+            LastModified: nowIso,
+            PriorityTimestamp: nowIso,
+            StatusInfo: { LastModified: nowIso, Status: status, TimesStartedReading: pct >= readingThreshold ? 1 : 0 },
+            Statistics: { LastModified: nowIso },
+            CurrentBookmark: { LastModified: nowIso, ProgressPercent: pct, ContentSourceProgressPercent: pct },
           },
         },
       });
 
-      await this.db
-        .insert(schema.koboReadingStates)
-        .values({
-          userId,
-          bookId: row.bookId,
-          entitlementId: id,
-          createdAtKobo: now,
-          lastModifiedKobo: now,
-          priorityTimestamp: now,
-          progressSyncedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: [schema.koboReadingStates.userId, schema.koboReadingStates.bookId],
-          set: { progressSyncedAt: sql`now()` },
-        });
+      upsertRows.push({
+        userId,
+        bookId: row.bookId,
+        entitlementId: id,
+        createdAtKobo: nowIso,
+        lastModifiedKobo: nowIso,
+        priorityTimestamp: nowIso,
+        progressSyncedAt: now,
+        updatedAt: now,
+      });
     }
 
-    return result;
+    await this.db
+      .insert(schema.koboReadingStates)
+      .values(upsertRows)
+      .onConflictDoUpdate({
+        target: [schema.koboReadingStates.userId, schema.koboReadingStates.bookId],
+        set: {
+          lastModifiedKobo: nowIso,
+          priorityTimestamp: nowIso,
+          progressSyncedAt: sql`now()`,
+          updatedAt: sql`now()`,
+        },
+      });
+
+    return { items: result, hasMore };
   }
 
   private extractPercent(bookmark: JsonObj | null): number | null {

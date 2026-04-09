@@ -212,4 +212,22 @@ describe('StatisticsService', () => {
 
     expect(result.items).toEqual([{ name: 'Saga', count: 4 }]);
   });
+
+  it('reuses cached metadata score distribution for identical scope', async () => {
+    const { service, repo } = makeService();
+    repo.metadataScoreDistribution.mockResolvedValue({
+      bins: [{ minScore: 0, count: 1 }],
+      unknownCount: 0,
+      totalCount: 1,
+      percentile25: 0,
+      percentile50: 0,
+      percentile75: 0,
+      percentile90: 0,
+    });
+
+    await service.getMetadataScoreDistribution(makeUser(), { libraryIds: [2, 1] });
+    await service.getMetadataScoreDistribution(makeUser(), { libraryIds: [1, 2] });
+
+    expect(repo.metadataScoreDistribution).toHaveBeenCalledTimes(1);
+  });
 });

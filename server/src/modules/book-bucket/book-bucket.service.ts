@@ -12,6 +12,7 @@ import { BookBucketIngestService } from './book-bucket-ingest.service';
 import type { BookBucketFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+const BULK_SELECTION_BATCH_SIZE = 500;
 
 @Injectable()
 export class BookBucketService {
@@ -63,14 +64,21 @@ export class BookBucketService {
   }
 
   async bulkDiscard(fileIds: number[], selectAll?: boolean, excludedIds?: number[], status?: string, search?: string): Promise<void> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : fileIds;
-    if (!ids.length) return;
-
-    const rows = await this.repo.findByIds(ids);
-    for (const row of rows) {
-      await this.cleanupFiles(row);
-    }
-    await this.repo.deleteByIds(ids);
+    await this.processSelectionRows(
+      {
+        fileIds,
+        selectAll,
+        excludedIds,
+        status,
+        search,
+      },
+      async (rows) => {
+        for (const row of rows) {
+          await this.cleanupFiles(row);
+        }
+        await this.repo.deleteByIds(rows.map((row) => row.id));
+      },
+    );
   }
 
   async bulkEdit(
@@ -83,35 +91,43 @@ export class BookBucketService {
     status?: string,
     search?: string,
   ): Promise<{ total: number; updated: number; failed: number }> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
-    const rows = await this.repo.findByIds(ids);
     let updated = 0;
     let failed = 0;
+    const total = await this.processSelectionRows(
+      {
+        fileIds: fileIds ?? [],
+        selectAll,
+        excludedIds,
+        status,
+        search,
+      },
+      async (rows) => {
+        for (const row of rows) {
+          try {
+            const current: Record<string, unknown> = { ...(row.selectedMetadata ?? row.embeddedMetadata ?? {}) };
 
-    for (const row of rows) {
-      try {
-        const current: Record<string, unknown> = { ...(row.selectedMetadata ?? row.embeddedMetadata ?? {}) };
+            for (const field of enabledFields) {
+              const value = (fields as Record<string, unknown>)[field];
+              if (value === undefined) continue;
 
-        for (const field of enabledFields) {
-          const value = (fields as Record<string, unknown>)[field];
-          if (value === undefined) continue;
+              if (mergeArrays && Array.isArray(value) && Array.isArray(current[field])) {
+                const merged = [...new Set([...(current[field] as string[]), ...(value as string[])])];
+                current[field] = merged;
+              } else {
+                current[field] = value;
+              }
+            }
 
-          if (mergeArrays && Array.isArray(value) && Array.isArray(current[field])) {
-            const merged = [...new Set([...(current[field] as string[]), ...(value as string[])])];
-            current[field] = merged;
-          } else {
-            current[field] = value;
+            await this.repo.update(row.id, { selectedMetadata: current as BookBucketMetadata });
+            updated++;
+          } catch {
+            failed++;
           }
         }
+      },
+    );
 
-        await this.repo.update(row.id, { selectedMetadata: current as BookBucketMetadata });
-        updated++;
-      } catch {
-        failed++;
-      }
-    }
-
-    return { total: rows.length, updated, failed };
+    return { total, updated, failed };
   }
 
   async bulkApplyFetched(
@@ -121,28 +137,34 @@ export class BookBucketService {
     status?: string,
     search?: string,
   ): Promise<{ total: number; applied: number; skipped: number; skippedEdited: number }> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : fileIds;
-    if (!ids.length) return { total: 0, applied: 0, skipped: 0, skippedEdited: 0 };
-
-    const rows = await this.repo.findByIds(ids);
     let applied = 0;
     let skipped = 0;
     let skippedEdited = 0;
+    const total = await this.processSelectionRows(
+      {
+        fileIds,
+        selectAll,
+        excludedIds,
+        status,
+        search,
+      },
+      async (rows) => {
+        for (const row of rows) {
+          if (row.metadataEditedAt) {
+            skippedEdited++;
+            continue;
+          }
+          if (!row.fetchedMetadata) {
+            skipped++;
+            continue;
+          }
+          await this.repo.update(row.id, { selectedMetadata: row.fetchedMetadata, metadataEditedAt: null });
+          applied++;
+        }
+      },
+    );
 
-    for (const row of rows) {
-      if (row.metadataEditedAt) {
-        skippedEdited++;
-        continue;
-      }
-      if (!row.fetchedMetadata) {
-        skipped++;
-        continue;
-      }
-      await this.repo.update(row.id, { selectedMetadata: row.fetchedMetadata, metadataEditedAt: null });
-      applied++;
-    }
-
-    return { total: rows.length, applied, skipped, skippedEdited };
+    return { total, applied, skipped, skippedEdited };
   }
 
   async bulkRetryFetch(
@@ -152,16 +174,25 @@ export class BookBucketService {
     status?: string,
     search?: string,
   ): Promise<{ total: number; queued: number }> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
-    if (!ids.length) return { total: 0, queued: 0 };
+    let queued = 0;
+    const total = await this.processSelectionRows(
+      {
+        fileIds: fileIds ?? [],
+        selectAll,
+        excludedIds,
+        status,
+        search,
+      },
+      (rows) => {
+        const errorRows = rows.filter((row) => row.status === 'error');
+        queued += errorRows.length;
+        for (const row of errorRows) {
+          void this.ingestService.retryFetch(row.id);
+        }
+      },
+    );
 
-    const rows = await this.repo.findByIds(ids);
-    const errorRows = rows.filter((r) => r.status === 'error');
-    for (const row of errorRows) {
-      void this.ingestService.retryFetch(row.id);
-    }
-
-    return { total: rows.length, queued: errorRows.length };
+    return { total, queued };
   }
 
   async bulkSetTarget(
@@ -174,24 +205,25 @@ export class BookBucketService {
     search?: string,
   ): Promise<{ total: number; updated: number; failed: number }> {
     await this.assertValidTarget(targetLibraryId, targetFolderId);
-
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : fileIds;
-    if (!ids.length) return { total: 0, updated: 0, failed: 0 };
-
-    const rows = await this.repo.findByIds(ids);
     let updated = 0;
-    let failed = 0;
-
-    for (const row of rows) {
-      try {
-        await this.repo.update(row.id, { targetLibraryId: targetLibraryId ?? null, targetFolderId: targetFolderId ?? null });
-        updated++;
-      } catch {
-        failed++;
-      }
-    }
-
-    return { total: rows.length, updated, failed };
+    const total = await this.processSelectionRows(
+      {
+        fileIds,
+        selectAll,
+        excludedIds,
+        status,
+        search,
+      },
+      async (rows) => {
+        updated += await this.repo.setTargetsByIds(
+          rows.map((row) => row.id),
+          targetLibraryId ?? null,
+          targetFolderId ?? null,
+        );
+      },
+    );
+    const failed = total - updated;
+    return { total, updated, failed };
   }
 
   async selectionSummary(
@@ -201,12 +233,28 @@ export class BookBucketService {
     status?: string,
     search?: string,
   ): Promise<{ total: number; withDestination: number; withoutDestination: number }> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : fileIds;
-    if (!ids.length) return { total: 0, withDestination: 0, withoutDestination: 0 };
+    const destinationPairCounts = new Map<string, number>();
+    const folderIdSet = new Set<number>();
+    const total = await this.processSelectionRows(
+      {
+        fileIds,
+        selectAll,
+        excludedIds,
+        status,
+        search,
+      },
+      (rows) => {
+        for (const row of rows) {
+          if (row.targetLibraryId === null || row.targetFolderId === null) continue;
+          folderIdSet.add(row.targetFolderId);
+          const key = `${row.targetFolderId}:${row.targetLibraryId}`;
+          destinationPairCounts.set(key, (destinationPairCounts.get(key) ?? 0) + 1);
+        }
+      },
+    );
+    if (total === 0) return { total: 0, withDestination: 0, withoutDestination: 0 };
 
-    const rows = await this.repo.findByIds(ids);
-    const candidates = rows.filter((row) => row.targetLibraryId !== null && row.targetFolderId !== null);
-    const folderIds = [...new Set(candidates.map((row) => row.targetFolderId!).filter((id): id is number => id != null))];
+    const folderIds = [...folderIdSet];
     const folderRows = folderIds.length
       ? await this.db
           .select({ id: libraryFolders.id, libraryId: libraryFolders.libraryId })
@@ -214,8 +262,17 @@ export class BookBucketService {
           .where(inArray(libraryFolders.id, folderIds))
       : [];
     const folderById = new Map(folderRows.map((row) => [row.id, row.libraryId]));
-    const withDestination = candidates.filter((row) => folderById.get(row.targetFolderId!) === row.targetLibraryId).length;
-    return { total: rows.length, withDestination, withoutDestination: rows.length - withDestination };
+    let withDestination = 0;
+    for (const [key, count] of destinationPairCounts) {
+      const [folderIdRaw, libraryIdRaw] = key.split(':');
+      const folderId = Number(folderIdRaw);
+      const libraryId = Number(libraryIdRaw);
+      if (folderById.get(folderId) === libraryId) {
+        withDestination += count;
+      }
+    }
+
+    return { total, withDestination, withoutDestination: total - withDestination };
   }
 
   async getSummary(): Promise<BookBucketSummary> {
@@ -265,6 +322,48 @@ export class BookBucketService {
       throw new BadRequestException('Destination folder does not belong to destination library');
     }
   }
+
+  private async processSelectionRows(
+    options: {
+      fileIds: number[];
+      selectAll?: boolean;
+      excludedIds?: number[];
+      status?: string;
+      search?: string;
+    },
+    processBatch: (rows: BookBucketFileRow[]) => Promise<void> | void,
+  ): Promise<number> {
+    let total = 0;
+
+    if (options.selectAll) {
+      let afterId: number | undefined;
+      while (true) {
+        const rows = await this.repo.findSelectionBatch({
+          limit: BULK_SELECTION_BATCH_SIZE,
+          afterId,
+          excludedIds: options.excludedIds,
+          status: options.status,
+          search: options.search,
+        });
+        if (rows.length === 0) break;
+        await processBatch(rows);
+        total += rows.length;
+        afterId = rows[rows.length - 1]?.id;
+      }
+      return total;
+    }
+
+    const ids = dedupeIds(options.fileIds);
+    for (let index = 0; index < ids.length; index += BULK_SELECTION_BATCH_SIZE) {
+      const batchIds = ids.slice(index, index + BULK_SELECTION_BATCH_SIZE);
+      const rows = await this.repo.findByIds(batchIds);
+      if (rows.length === 0) continue;
+      await processBatch(rows);
+      total += rows.length;
+    }
+
+    return total;
+  }
 }
 
 function toDto(row: BookBucketFileRow): BookBucketFile {
@@ -294,4 +393,8 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // file may already be deleted
   }
+}
+
+function dedupeIds(ids: number[]): number[] {
+  return [...new Set(ids.filter((id): id is number => Number.isInteger(id) && id > 0))];
 }

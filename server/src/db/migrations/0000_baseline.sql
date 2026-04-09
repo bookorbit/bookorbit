@@ -901,6 +901,7 @@ CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USIN
 CREATE INDEX "password_reset_tokens_expires_at_idx" ON "password_reset_tokens" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_expires_at_idx" ON "refresh_tokens" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "user_library_access_library_user_idx" ON "user_library_access" USING btree ("library_id","user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_username_lower_uidx" ON "users" USING btree (lower("username"));--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_lower_uidx" ON "users" USING btree (lower("email")) WHERE "users"."email" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "users_oidc_subject_issuer_uidx" ON "users" USING btree ("oidc_subject","oidc_issuer") WHERE "users"."oidc_subject" is not null and "users"."oidc_issuer" is not null;--> statement-breakpoint
@@ -938,14 +939,21 @@ CREATE INDEX "author_enrichment_queue_next_attempt_idx" ON "author_enrichment_qu
 CREATE UNIQUE INDEX "author_enrichment_queue_single_processing_idx" ON "author_enrichment_queue" USING btree ("status") WHERE "author_enrichment_queue"."status" = 'processing';--> statement-breakpoint
 CREATE INDEX "authors_name_trgm_idx" ON "authors" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "book_authors_author_id_idx" ON "book_authors" USING btree ("author_id");--> statement-breakpoint
+CREATE INDEX "book_genres_genre_id_idx" ON "book_genres" USING btree ("genre_id");--> statement-breakpoint
 CREATE INDEX "bm_title_trgm_idx" ON "book_metadata" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "bm_title_lower_idx" ON "book_metadata" USING btree (lower("title"));--> statement-breakpoint
 CREATE INDEX "bm_series_trgm_idx" ON "book_metadata" USING gin ("series_name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_publisher_trgm_idx" ON "book_metadata" USING gin ("publisher" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_language_idx" ON "book_metadata" USING btree ("language");--> statement-breakpoint
 CREATE INDEX "bm_published_year_idx" ON "book_metadata" USING btree ("published_year");--> statement-breakpoint
 CREATE INDEX "bm_series_name_index_idx" ON "book_metadata" USING btree ("series_name","series_index");--> statement-breakpoint
+CREATE INDEX "bm_isbn10_idx" ON "book_metadata" USING btree ("isbn10");--> statement-breakpoint
+CREATE INDEX "bm_isbn13_idx" ON "book_metadata" USING btree ("isbn13");--> statement-breakpoint
+CREATE INDEX "bm_embedding_hnsw_cosine_idx" ON "book_metadata" USING hnsw ("embedding" vector_cosine_ops);--> statement-breakpoint
 CREATE INDEX "bmfq_status_idx" ON "book_metadata_fetch_queue" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "bmfq_created_at_idx" ON "book_metadata_fetch_queue" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "bmfq_status_created_book_idx" ON "book_metadata_fetch_queue" USING btree ("status","created_at","book_id");--> statement-breakpoint
+CREATE INDEX "book_tags_tag_id_idx" ON "book_tags" USING btree ("tag_id");--> statement-breakpoint
 CREATE INDEX "book_narrators_narrator_id_idx" ON "book_narrators" USING btree ("narrator_id");--> statement-breakpoint
 CREATE INDEX "narrators_name_trgm_idx" ON "narrators" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "scan_jobs_library_status_idx" ON "scan_jobs" USING btree ("library_id","status");--> statement-breakpoint
@@ -958,6 +966,7 @@ CREATE UNIQUE INDEX "bookmarks_user_book_pos_uidx" ON "bookmarks" USING btree ("
 CREATE UNIQUE INDEX "rdp_user_format_idx" ON "reader_default_preferences" USING btree ("user_id","format_group");--> statement-breakpoint
 CREATE UNIQUE INDEX "rp_user_file_idx" ON "reader_preferences" USING btree ("user_id","book_file_id");--> statement-breakpoint
 CREATE INDEX "reading_progress_user_id_idx" ON "reading_progress" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "reading_progress_user_updated_at_idx" ON "reading_progress" USING btree ("user_id","updated_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "rs_user_session_id_uidx" ON "reading_sessions" USING btree ("user_id","session_id");--> statement-breakpoint
 CREATE INDEX "rs_user_started_at_idx" ON "reading_sessions" USING btree ("user_id","started_at");--> statement-breakpoint
 CREATE INDEX "rs_book_file_started_at_idx" ON "reading_sessions" USING btree ("book_file_id","started_at");--> statement-breakpoint
@@ -971,6 +980,7 @@ CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_sessi
 CREATE INDEX "oidc_sessions_expires_at_idx" ON "oidc_sessions" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "opds_users_username_lower_uidx" ON "opds_users" USING btree (lower("username"));--> statement-breakpoint
 CREATE INDEX "kobo_devices_user_id_idx" ON "kobo_devices" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "kobo_snapshot_books_snapshot_synced_book_idx" ON "kobo_snapshot_books" USING btree ("snapshot_id","synced","book_id");--> statement-breakpoint
 CREATE INDEX "book_bucket_files_status_idx" ON "book_bucket_files" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "fwl_book_id_written_at_idx" ON "file_write_log" USING btree ("book_id","written_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_one_default_per_user_uidx" ON "email_templates" USING btree ("user_id") WHERE "email_templates"."is_default" = true and "email_templates"."user_id" is not null;--> statement-breakpoint

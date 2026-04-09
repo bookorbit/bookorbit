@@ -76,41 +76,66 @@ export class BookBucketFinalizeService implements OnModuleInit {
     status?: string,
     search?: string,
   ): Promise<BookBucketFinalizeResult> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : dedupeIds(fileIds ?? []);
+    const ids = selectAll ? [] : dedupeIds(fileIds ?? []);
     const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
 
     const results: BookBucketFinalizeFileResult[] = [];
     let succeeded = 0;
     let failed = 0;
 
-    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-      const batch = ids.slice(i, i + BATCH_SIZE);
-      const rows = await this.repo.findByIds(batch);
-      const rowById = new Map(rows.map((row) => [row.id, row]));
+    if (selectAll) {
+      let afterId: number | undefined;
+      while (true) {
+        const rows = await this.repo.findSelectionBatch({
+          limit: BATCH_SIZE,
+          afterId,
+          excludedIds,
+          status,
+          search,
+        });
+        if (rows.length === 0) break;
 
-      for (const fileId of batch) {
-        const row = rowById.get(fileId);
-        if (!row) {
-          failed++;
-          results.push({
-            fileId,
-            fileName: `book-bucket-file-${fileId}`,
-            success: false,
-            message: 'Book Bucket file not found',
-          });
-          continue;
+        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+        for (const row of rows) {
+          const result = await this.finalizeFile(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+          results.push(result);
+          if (result.success) succeeded++;
+          else failed++;
         }
 
-        const result = await this.finalizeFile(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
-        results.push(result);
-        if (result.success) succeeded++;
-        else failed++;
+        afterId = rows[rows.length - 1]?.id;
+      }
+    } else {
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        const rows = await this.repo.findByIds(batch);
+        const rowById = new Map(rows.map((row) => [row.id, row]));
+        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+
+        for (const fileId of batch) {
+          const row = rowById.get(fileId);
+          if (!row) {
+            failed++;
+            results.push({
+              fileId,
+              fileName: `book-bucket-file-${fileId}`,
+              success: false,
+              message: 'Book Bucket file not found',
+            });
+            continue;
+          }
+
+          const result = await this.finalizeFile(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+          results.push(result);
+          if (result.success) succeeded++;
+          else failed++;
+        }
       }
     }
 
     await this.emitSummary();
 
-    return { total: ids.length, succeeded, failed, results };
+    return { total: results.length, succeeded, failed, results };
   }
 
   private async finalizeFile(
@@ -120,6 +145,7 @@ export class BookBucketFinalizeService implements OnModuleInit {
     overrideMap: Map<number, { libraryId?: number; folderId?: number }>,
     userId: number,
     isSuperuser: boolean,
+    duplicateLookup?: Map<string, number>,
   ): Promise<BookBucketFinalizeFileResult> {
     try {
       const override = overrideMap.get(row.id);
@@ -152,7 +178,7 @@ export class BookBucketFinalizeService implements OnModuleInit {
       }
 
       const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
-      const existingBookId = await this.findDuplicate(libraryId, meta);
+      const existingBookId = await this.findDuplicate(libraryId, meta, duplicateLookup);
       if (existingBookId !== null) {
         return {
           fileId: row.id,
@@ -257,7 +283,110 @@ export class BookBucketFinalizeService implements OnModuleInit {
     });
   }
 
-  private async findDuplicate(libraryId: number, meta: Pick<NormalizedFinalizeMetadata, 'isbn13' | 'isbn10' | 'title'>): Promise<number | null> {
+  private async buildDuplicateLookup(
+    rows: BookBucketFileRow[],
+    defaultLibraryId: number | undefined,
+    overrideMap: Map<number, { libraryId?: number; folderId?: number }>,
+  ): Promise<Map<string, number>> {
+    const needsByLibrary = new Map<number, { isbn13: Set<string>; isbn10: Set<string>; titles: Set<string> }>();
+
+    for (const row of rows) {
+      const override = overrideMap.get(row.id);
+      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
+      if (libraryId === null) continue;
+
+      const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
+      let bucket = needsByLibrary.get(libraryId);
+      if (!bucket) {
+        bucket = { isbn13: new Set(), isbn10: new Set(), titles: new Set() };
+        needsByLibrary.set(libraryId, bucket);
+      }
+
+      if (meta.isbn13) {
+        bucket.isbn13.add(meta.isbn13);
+      } else if (meta.isbn10) {
+        bucket.isbn10.add(meta.isbn10);
+      } else if (meta.title) {
+        bucket.titles.add(meta.title.toLowerCase());
+      }
+    }
+
+    const lookup = new Map<string, number>();
+    for (const [libraryId, values] of needsByLibrary) {
+      if (values.isbn13.size > 0) {
+        const rowsByIsbn13 = await this.db
+          .select({ bookId: bookMetadata.bookId, isbn13: bookMetadata.isbn13 })
+          .from(bookMetadata)
+          .innerJoin(books, eq(books.id, bookMetadata.bookId))
+          .where(and(eq(books.libraryId, libraryId), inArray(bookMetadata.isbn13, [...values.isbn13])));
+        for (const row of rowsByIsbn13) {
+          if (!row.isbn13) continue;
+          const key = this.buildDuplicateLookupKey(libraryId, { isbn13: row.isbn13, isbn10: null, title: null });
+          if (key && !lookup.has(key)) {
+            lookup.set(key, row.bookId);
+          }
+        }
+      }
+
+      if (values.isbn10.size > 0) {
+        const rowsByIsbn10 = await this.db
+          .select({ bookId: bookMetadata.bookId, isbn10: bookMetadata.isbn10 })
+          .from(bookMetadata)
+          .innerJoin(books, eq(books.id, bookMetadata.bookId))
+          .where(and(eq(books.libraryId, libraryId), inArray(bookMetadata.isbn10, [...values.isbn10])));
+        for (const row of rowsByIsbn10) {
+          if (!row.isbn10) continue;
+          const key = this.buildDuplicateLookupKey(libraryId, { isbn13: null, isbn10: row.isbn10, title: null });
+          if (key && !lookup.has(key)) {
+            lookup.set(key, row.bookId);
+          }
+        }
+      }
+
+      if (values.titles.size > 0) {
+        const rowsByTitle = await this.db
+          .select({
+            bookId: bookMetadata.bookId,
+            normalizedTitle: sql<string>`lower(${bookMetadata.title})`,
+          })
+          .from(bookMetadata)
+          .innerJoin(books, eq(books.id, bookMetadata.bookId))
+          .where(and(eq(books.libraryId, libraryId), inArray(sql<string>`lower(${bookMetadata.title})`, [...values.titles])));
+        for (const row of rowsByTitle) {
+          if (!row.normalizedTitle) continue;
+          const key = this.buildDuplicateLookupKey(libraryId, { isbn13: null, isbn10: null, title: row.normalizedTitle });
+          if (key && !lookup.has(key)) {
+            lookup.set(key, row.bookId);
+          }
+        }
+      }
+    }
+
+    return lookup;
+  }
+
+  private buildDuplicateLookupKey(libraryId: number, meta: Pick<NormalizedFinalizeMetadata, 'isbn13' | 'isbn10' | 'title'>): string | null {
+    const isbn = meta.isbn13 ?? meta.isbn10;
+    if (isbn) {
+      const isbnKind = meta.isbn13 ? 'isbn13' : 'isbn10';
+      return `library:${libraryId}|${isbnKind}:${isbn}`;
+    }
+    if (meta.title) {
+      return `library:${libraryId}|title:${meta.title.toLowerCase()}`;
+    }
+    return null;
+  }
+
+  private async findDuplicate(
+    libraryId: number,
+    meta: Pick<NormalizedFinalizeMetadata, 'isbn13' | 'isbn10' | 'title'>,
+    duplicateLookup?: Map<string, number>,
+  ): Promise<number | null> {
+    const lookupKey = this.buildDuplicateLookupKey(libraryId, meta);
+    if (lookupKey && duplicateLookup?.has(lookupKey)) {
+      return duplicateLookup.get(lookupKey) ?? null;
+    }
+
     const isbn = meta.isbn13 ?? meta.isbn10;
 
     if (isbn) {

@@ -82,7 +82,7 @@ export const userLibraryAccess = pgTable(
       .references(() => libraries.id, { onDelete: 'cascade' }),
     accessLevel: libraryAccessLevelEnum('access_level').notNull().default('viewer'),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.libraryId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.libraryId] }), index('user_library_access_library_user_idx').on(t.libraryId, t.userId)],
 );
 
 export const refreshTokens = pgTable(

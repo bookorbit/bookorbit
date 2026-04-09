@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -31,19 +31,38 @@ export class NarratorRepository {
   ): Promise<void> {
     await executor.delete(bookNarrators).where(eq(bookNarrators.bookId, bookId));
 
-    for (let i = 0; i < names.length; i++) {
-      const { name, sortName } = names[i];
+    if (names.length === 0) return;
 
-      // onConflictDoUpdate with a no-op SET guarantees a RETURNING row regardless of
-      // whether the INSERT or the conflict path was taken, avoiding a read-committed
-      // race where onConflictDoNothing + subsequent SELECT could return nothing.
-      await executor.insert(narrators).values({ name, sortName }).onConflictDoUpdate({ target: narrators.name, set: { name } });
-
-      const [narrator] = await executor.select({ id: narrators.id }).from(narrators).where(eq(narrators.name, name)).limit(1);
-
-      if (narrator) {
-        await executor.insert(bookNarrators).values({ bookId, narratorId: narrator.id, displayOrder: i }).onConflictDoNothing();
+    const uniqueByName = new Map<string, { name: string; sortName: string | null }>();
+    for (const value of names) {
+      if (!uniqueByName.has(value.name)) {
+        uniqueByName.set(value.name, value);
       }
+    }
+
+    const uniqueNames = [...uniqueByName.values()];
+    const narratorByName = new Map<string, { id: number }>();
+
+    const upsertedNarrators = await executor
+      .insert(narrators)
+      .values(uniqueNames)
+      .onConflictDoUpdate({
+        target: narrators.name,
+        set: { name: sql`excluded.name` },
+      })
+      .returning({ id: narrators.id, name: narrators.name });
+    for (const row of upsertedNarrators) {
+      narratorByName.set(row.name, { id: row.id });
+    }
+
+    const links = names.flatMap((value, index) => {
+      const match = narratorByName.get(value.name);
+      if (!match) return [];
+      return [{ bookId, narratorId: match.id, displayOrder: index }];
+    });
+
+    if (links.length > 0) {
+      await executor.insert(bookNarrators).values(links).onConflictDoNothing();
     }
   }
 }

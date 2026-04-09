@@ -18,6 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
+import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
@@ -39,6 +40,12 @@ export class OpdsController {
     private readonly config: ConfigService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
+  }
+
+  private assertPaginationWindow(page: number, size: number): void {
+    if (!isOffsetWithinLimit((page - 1) * size)) {
+      throw new BadRequestException(`pagination window is too deep; (page - 1) * size must be <= ${MAX_OFFSET_ROWS}`);
+    }
   }
 
   @Get()
@@ -97,6 +104,7 @@ export class OpdsController {
   ) {
     const clampedSize = Math.min(Math.max(size, 1), 100);
     const clampedPage = Math.max(page, 1);
+    this.assertPaginationWindow(clampedPage, clampedSize);
 
     const filters: Record<string, string | number> = {};
     const libraryId = this.parseOptionalPositiveInt('libraryId', libraryIdStr);
@@ -148,6 +156,7 @@ export class OpdsController {
   ) {
     const clampedSize = Math.min(Math.max(size, 1), 100);
     const clampedPage = Math.max(page, 1);
+    this.assertPaginationWindow(clampedPage, clampedSize);
 
     const { entries, total } = await this.opdsBookService.getRecentBooksPage(user.userId, clampedPage, clampedSize, user.isSuperuser);
     const selfPath = `/api/v1/opds/recent?page=${clampedPage}&size=${clampedSize}`;

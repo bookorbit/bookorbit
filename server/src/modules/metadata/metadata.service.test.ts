@@ -376,21 +376,14 @@ describe('MetadataService', () => {
     const insertedAuthors: Array<{ name: string; sortName: string | null }> = [];
     const insertedBookAuthors: Array<{ bookId: number; authorId: number; displayOrder: number }> = [];
 
-    db.select.mockImplementation(() => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([]),
-        }),
-      }),
-    }));
     db.insert.mockImplementation((table: unknown) => {
       if (table === authors) {
         return {
-          values: (row: { name: string; sortName: string | null }) => {
-            insertedAuthors.push(row);
+          values: (rows: Array<{ name: string; sortName: string | null }>) => {
+            insertedAuthors.push(...rows);
             return {
               onConflictDoNothing: () => ({
-                returning: () => Promise.resolve([{ id: 81 }]),
+                returning: () => Promise.resolve([{ id: 81, name: 'Alice' }]),
               }),
             };
           },
@@ -398,8 +391,8 @@ describe('MetadataService', () => {
       }
       if (table === bookAuthors) {
         return {
-          values: (row: { bookId: number; authorId: number; displayOrder: number }) => {
-            insertedBookAuthors.push(row);
+          values: (rows: Array<{ bookId: number; authorId: number; displayOrder: number }>) => {
+            insertedBookAuthors.push(...rows);
             return { onConflictDoNothing: () => Promise.resolve(undefined) };
           },
         };
@@ -429,16 +422,14 @@ describe('MetadataService', () => {
 
     db.select.mockImplementation(() => ({
       from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([{ id: 9 }]),
-        }),
+        where: () => Promise.resolve([{ id: 9, name: 'Known Author' }]),
       }),
     }));
     db.insert.mockImplementation((table: unknown) => {
       if (table === authors) {
         return {
-          values: (row: { name: string; sortName: string | null }) => {
-            insertedAuthors.push(row);
+          values: (rows: Array<{ name: string; sortName: string | null }>) => {
+            insertedAuthors.push(...rows);
             return {
               onConflictDoNothing: () => ({
                 returning: () => Promise.resolve([]),
@@ -449,8 +440,8 @@ describe('MetadataService', () => {
       }
       if (table === bookAuthors) {
         return {
-          values: (row: { bookId: number; authorId: number; displayOrder: number }) => {
-            insertedBookAuthors.push(row);
+          values: (rows: Array<{ bookId: number; authorId: number; displayOrder: number }>) => {
+            insertedBookAuthors.push(...rows);
             return { onConflictDoNothing: () => Promise.resolve(undefined) };
           },
         };
@@ -481,7 +472,7 @@ describe('MetadataService', () => {
         return {
           values: () => ({
             onConflictDoNothing: () => ({
-              returning: () => Promise.resolve([{ id: 81 }]),
+              returning: () => Promise.resolve([{ id: 81, name: 'New Author' }]),
             }),
           }),
         };
@@ -507,21 +498,14 @@ describe('MetadataService', () => {
     const insertedGenres: string[] = [];
     const insertedBookGenres: Array<{ bookId: number; genreId: number }> = [];
 
-    db.select.mockImplementation(() => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([]),
-        }),
-      }),
-    }));
     db.insert.mockImplementation((table: unknown) => {
       if (table === genres) {
         return {
-          values: (row: { name: string }) => {
-            insertedGenres.push(row.name);
+          values: (rows: Array<{ name: string }>) => {
+            insertedGenres.push(...rows.map((row) => row.name));
             return {
               onConflictDoNothing: () => ({
-                returning: () => Promise.resolve([{ id: 77 }]),
+                returning: () => Promise.resolve(rows.map((row, index) => ({ id: 77 + index, name: row.name }))),
               }),
             };
           },
@@ -529,8 +513,8 @@ describe('MetadataService', () => {
       }
       if (table === bookGenres) {
         return {
-          values: (row: { bookId: number; genreId: number }) => {
-            insertedBookGenres.push(row);
+          values: (rows: Array<{ bookId: number; genreId: number }>) => {
+            insertedBookGenres.push(...rows);
             return { onConflictDoNothing: () => Promise.resolve(undefined) };
           },
         };
@@ -545,7 +529,7 @@ describe('MetadataService', () => {
     expect(insertedGenres).toEqual(['Fantasy', 'X'.repeat(200)]);
     expect(insertedBookGenres).toEqual([
       { bookId: 12, genreId: 77 },
-      { bookId: 12, genreId: 77 },
+      { bookId: 12, genreId: 78 },
     ]);
   });
 
@@ -554,21 +538,14 @@ describe('MetadataService', () => {
     const service = makeService(db);
     const insertedTags: string[] = [];
 
-    db.select.mockImplementation(() => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([]),
-        }),
-      }),
-    }));
     db.insert.mockImplementation((table: unknown) => {
       if (table === tags) {
         return {
-          values: (row: { name: string }) => {
-            insertedTags.push(row.name);
+          values: (rows: Array<{ name: string }>) => {
+            insertedTags.push(...rows.map((row) => row.name));
             return {
               onConflictDoNothing: () => ({
-                returning: () => Promise.resolve([{ id: 88 }]),
+                returning: () => Promise.resolve(rows.map((row, index) => ({ id: 88 + index, name: row.name }))),
               }),
             };
           },

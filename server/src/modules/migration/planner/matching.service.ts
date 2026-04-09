@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, ilike, inArray, sql } from 'drizzle-orm';
+import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
@@ -246,35 +246,38 @@ export class MatchingService {
     const normalizedTitle = title.trim();
     if (!normalizedTitle) return NONE;
 
-    const normalizedAuthors = authors.map((author) => normalizeAuthor(author)).filter((author): author is string => !!author);
+    const normalizedAuthors = [...new Set(authors.map((author) => normalizeAuthor(author)).filter((author): author is string => !!author))];
     if (normalizedAuthors.length === 0) return NONE;
 
-    for (const normalizedAuthor of normalizedAuthors) {
-      const exactRows = await this.db
-        .select({ bookId: schema.bookMetadata.bookId })
-        .from(schema.bookMetadata)
-        .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
-        .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
-        .where(
-          and(sql`lower(${schema.bookMetadata.title}) = lower(${normalizedTitle})`, sql`lower(${schema.authors.name}) = lower(${normalizedAuthor})`),
-        )
-        .limit(2);
-      const result = toLookupResult(exactRows);
-      if (result.kind !== 'none') return result;
+    const normalizedAuthorsLower = normalizedAuthors.map((author) => author.toLowerCase());
+    const exactRows = await this.db
+      .selectDistinct({ bookId: schema.bookMetadata.bookId })
+      .from(schema.bookMetadata)
+      .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
+      .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
+      .where(
+        and(
+          sql`lower(${schema.bookMetadata.title}) = lower(${normalizedTitle})`,
+          inArray(sql<string>`lower(${schema.authors.name})`, normalizedAuthorsLower),
+        ),
+      )
+      .limit(2);
+    const exactResult = toLookupResult(exactRows);
+    if (exactResult.kind !== 'none') {
+      return exactResult;
     }
 
-    for (const normalizedAuthor of normalizedAuthors) {
-      const approxRows = await this.db
-        .select({ bookId: schema.bookMetadata.bookId })
-        .from(schema.bookMetadata)
-        .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
-        .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
-        .where(
-          and(sql`lower(${schema.bookMetadata.title}) = lower(${normalizedTitle})`, ilike(schema.authors.name, `%${escapeLike(normalizedAuthor)}%`)),
-        )
-        .limit(2);
-      const result = toLookupResult(approxRows);
-      if (result.kind !== 'none') return result;
+    const approxClauses = normalizedAuthors.map((author) => ilike(schema.authors.name, `%${escapeLike(author)}%`));
+    const approxRows = await this.db
+      .selectDistinct({ bookId: schema.bookMetadata.bookId })
+      .from(schema.bookMetadata)
+      .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
+      .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
+      .where(and(sql`lower(${schema.bookMetadata.title}) = lower(${normalizedTitle})`, or(...approxClauses)!))
+      .limit(2);
+    const approxResult = toLookupResult(approxRows);
+    if (approxResult.kind !== 'none') {
+      return approxResult;
     }
 
     return NONE;

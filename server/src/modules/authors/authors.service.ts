@@ -15,6 +15,7 @@ import type {
   MergeAuthorsResult,
 } from '@projectx/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
+import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';
 import { books } from '../../db/schema';
 import { BookReadService } from '../book/book-read.service';
@@ -53,7 +54,14 @@ export class AuthorsService {
     private readonly enrichmentOrchestrator: AuthorEnrichmentOrchestratorService,
   ) {}
 
+  private assertPaginationWindow(page: number, size: number): void {
+    if (!isOffsetWithinLimit(page * size)) {
+      throw new BadRequestException(`pagination window is too deep; page * size must be <= ${MAX_OFFSET_ROWS}`);
+    }
+  }
+
   async findAll(user: RequestUser, dto: ListAuthorsDto): Promise<AuthorsPage> {
+    this.assertPaginationWindow(dto.page ?? 0, dto.size ?? 50);
     const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
     if (libraryIds.length === 0) {
       return { items: [], total: 0, page: dto.page ?? 0, size: dto.size ?? 50 };
@@ -85,6 +93,7 @@ export class AuthorsService {
   }
 
   async findBooks(user: RequestUser, authorId: number, dto: ListAuthorBooksDto): Promise<BooksPage> {
+    this.assertPaginationWindow(dto.page ?? 0, dto.size ?? 50);
     const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
     if (libraryIds.length === 0) {
       return { items: [], total: 0, page: dto.page ?? 0, size: dto.size ?? 50 };

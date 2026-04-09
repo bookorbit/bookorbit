@@ -61,7 +61,14 @@ export class ScannerRepository {
   // ── Books ──────────────────────────────────────────────────────────────────
 
   async findBooksByLibraryFolder(libraryFolderId: number) {
-    return this.db.select().from(books).where(eq(books.libraryFolderId, libraryFolderId));
+    return this.db
+      .select({
+        id: books.id,
+        status: books.status,
+        folderPath: books.folderPath,
+      })
+      .from(books)
+      .where(eq(books.libraryFolderId, libraryFolderId));
   }
 
   async findPrimaryBookFilesByLibrary(libraryId: number) {
@@ -135,7 +142,18 @@ export class ScannerRepository {
   // ── Book Files ─────────────────────────────────────────────────────────────
 
   async findBookFilesByLibraryFolder(libraryFolderId: number) {
-    return this.db.select().from(bookFiles).where(eq(bookFiles.libraryFolderId, libraryFolderId));
+    return this.db
+      .select({
+        id: bookFiles.id,
+        bookId: bookFiles.bookId,
+        absolutePath: bookFiles.absolutePath,
+        ino: bookFiles.ino,
+        sizeBytes: bookFiles.sizeBytes,
+        mtime: bookFiles.mtime,
+        hash: bookFiles.hash,
+      })
+      .from(bookFiles)
+      .where(eq(bookFiles.libraryFolderId, libraryFolderId));
   }
 
   async findBookFileByHash(hash: string, libraryFolderId: number) {

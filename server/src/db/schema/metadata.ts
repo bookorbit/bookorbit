@@ -76,11 +76,15 @@ export const bookMetadata = pgTable(
   },
   (t) => [
     index('bm_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
+    index('bm_title_lower_idx').on(sql`lower(${t.title})`),
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
     index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
     index('bm_language_idx').on(t.language),
     index('bm_published_year_idx').on(t.publishedYear),
     index('bm_series_name_index_idx').on(t.seriesName, t.seriesIndex),
+    index('bm_isbn10_idx').on(t.isbn10),
+    index('bm_isbn13_idx').on(t.isbn13),
+    index('bm_embedding_hnsw_cosine_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
     check('book_metadata_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 10)`),
     check('book_metadata_published_year_range_chk', sql`${t.publishedYear} is null or (${t.publishedYear} >= 1000 and ${t.publishedYear} <= 2200)`),
     check('book_metadata_page_count_nonnegative_chk', sql`${t.pageCount} is null or ${t.pageCount} >= 0`),
@@ -166,7 +170,7 @@ export const bookGenres = pgTable(
       .notNull()
       .references(() => genres.id, { onDelete: 'cascade' }),
   },
-  (t) => [primaryKey({ columns: [t.bookId, t.genreId] })],
+  (t) => [primaryKey({ columns: [t.bookId, t.genreId] }), index('book_genres_genre_id_idx').on(t.genreId)],
 );
 
 export const tags = pgTable('tags', {
@@ -184,7 +188,7 @@ export const bookTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (t) => [primaryKey({ columns: [t.bookId, t.tagId] })],
+  (t) => [primaryKey({ columns: [t.bookId, t.tagId] }), index('book_tags_tag_id_idx').on(t.tagId)],
 );
 
 export type BookMetadata = typeof bookMetadata.$inferSelect;
@@ -223,6 +227,7 @@ export const bookMetadataFetchQueue = pgTable(
   (t) => [
     index('bmfq_status_idx').on(t.status),
     index('bmfq_created_at_idx').on(t.createdAt),
+    index('bmfq_status_created_book_idx').on(t.status, t.createdAt, t.bookId),
     check('book_metadata_fetch_queue_status_chk', sql`${t.status} in ('queued', 'processing', 'failed')`),
     check('book_metadata_fetch_queue_reason_chk', sql`${t.reason} in ('event_import', 'manual_trigger', 'manual_retry')`),
     check('book_metadata_fetch_queue_attempt_count_nonnegative_chk', sql`${t.attemptCount} >= 0`),

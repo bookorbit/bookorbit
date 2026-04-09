@@ -178,6 +178,39 @@ export class BookMetadataFetchQueueRepository {
     return rows.map((r) => r.bookId);
   }
 
+  async scheduleEligibleBooksInBatches(
+    config: BookMetadataFetchConfig,
+    reason: BookMetadataFetchReason,
+    libraryId?: number,
+    batchSize = 1000,
+  ): Promise<number> {
+    const whereClause = this.buildEligibleBooksWhereClause(config, libraryId);
+    if (!whereClause || batchSize <= 0) return 0;
+
+    let cursorBookId = 0;
+    let totalQueued = 0;
+
+    for (;;) {
+      const rows = await this.db
+        .select({ bookId: bookMetadata.bookId })
+        .from(bookMetadata)
+        .innerJoin(books, eq(books.id, bookMetadata.bookId))
+        .where(and(whereClause, sql`${bookMetadata.bookId} > ${cursorBookId}`))
+        .orderBy(asc(bookMetadata.bookId))
+        .limit(batchSize);
+
+      if (rows.length === 0) break;
+
+      totalQueued += await this.upsertSchedule(
+        rows.map((row) => row.bookId),
+        reason,
+      );
+      cursorBookId = rows[rows.length - 1]!.bookId;
+    }
+
+    return totalQueued;
+  }
+
   async countEligibleBooks(config: BookMetadataFetchConfig, libraryId?: number): Promise<number> {
     const whereClause = this.buildEligibleBooksWhereClause(config, libraryId);
     if (!whereClause) return 0;

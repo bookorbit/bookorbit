@@ -356,35 +356,70 @@ export class MetadataService {
 
     if (uniqueAuthors.length === 0) return [];
 
-    const authorIds: number[] = [];
-    for (let index = 0; index < uniqueAuthors.length; index += 1) {
-      const { name, sortName } = uniqueAuthors[index];
-
-      let [author] = await executor.insert(authors).values({ name, sortName }).onConflictDoNothing().returning();
-      if (!author) {
-        [author] = await executor.select().from(authors).where(eq(authors.name, name)).limit(1);
-      }
-      if (!author) continue;
-
-      await executor.insert(bookAuthors).values({ bookId, authorId: author.id, displayOrder: index }).onConflictDoNothing();
-      authorIds.push(author.id);
+    const authorByName = new Map<string, { id: number }>();
+    const insertedAuthors = await executor
+      .insert(authors)
+      .values(uniqueAuthors.map((author) => ({ name: author.name, sortName: author.sortName })))
+      .onConflictDoNothing()
+      .returning({ id: authors.id, name: authors.name });
+    for (const row of insertedAuthors) {
+      authorByName.set(row.name, { id: row.id });
     }
 
-    return authorIds;
+    const unresolvedNames = [...new Set(uniqueAuthors.map((author) => author.name))].filter((name) => !authorByName.has(name));
+    if (unresolvedNames.length > 0) {
+      const existingAuthors = await executor
+        .select({ id: authors.id, name: authors.name })
+        .from(authors)
+        .where(inArray(authors.name, unresolvedNames));
+      for (const row of existingAuthors) {
+        authorByName.set(row.name, { id: row.id });
+      }
+    }
+
+    const links = uniqueAuthors.flatMap((author, index) => {
+      const match = authorByName.get(author.name);
+      if (!match) return [];
+      return [{ bookId, authorId: match.id, displayOrder: index }];
+    });
+
+    if (links.length > 0) {
+      await executor.insert(bookAuthors).values(links).onConflictDoNothing();
+    }
+
+    return links.map((link) => link.authorId);
   }
 
   private async replaceGenresInExecutor(executor: RelationMutationExecutor, bookId: number, uniqueGenres: string[]): Promise<void> {
     await executor.delete(bookGenres).where(eq(bookGenres.bookId, bookId));
     if (uniqueGenres.length === 0) return;
 
-    for (const genreName of uniqueGenres) {
-      let [genre] = await executor.insert(genres).values({ name: genreName }).onConflictDoNothing().returning();
-      if (!genre) {
-        [genre] = await executor.select().from(genres).where(eq(genres.name, genreName)).limit(1);
-      }
-      if (!genre) continue;
+    const genreByName = new Map<string, { id: number }>();
+    const insertedGenres = await executor
+      .insert(genres)
+      .values(uniqueGenres.map((name) => ({ name })))
+      .onConflictDoNothing()
+      .returning({ id: genres.id, name: genres.name });
+    for (const row of insertedGenres) {
+      genreByName.set(row.name, { id: row.id });
+    }
 
-      await executor.insert(bookGenres).values({ bookId, genreId: genre.id }).onConflictDoNothing();
+    const unresolvedNames = uniqueGenres.filter((name) => !genreByName.has(name));
+    if (unresolvedNames.length > 0) {
+      const existingGenres = await executor.select({ id: genres.id, name: genres.name }).from(genres).where(inArray(genres.name, unresolvedNames));
+      for (const row of existingGenres) {
+        genreByName.set(row.name, { id: row.id });
+      }
+    }
+
+    const links = uniqueGenres.flatMap((name) => {
+      const match = genreByName.get(name);
+      if (!match) return [];
+      return [{ bookId, genreId: match.id }];
+    });
+
+    if (links.length > 0) {
+      await executor.insert(bookGenres).values(links).onConflictDoNothing();
     }
   }
 
@@ -392,14 +427,32 @@ export class MetadataService {
     await executor.delete(bookTags).where(eq(bookTags.bookId, bookId));
     if (uniqueTags.length === 0) return;
 
-    for (const tagName of uniqueTags) {
-      let [tag] = await executor.insert(tags).values({ name: tagName }).onConflictDoNothing().returning();
-      if (!tag) {
-        [tag] = await executor.select().from(tags).where(eq(tags.name, tagName)).limit(1);
-      }
-      if (!tag) continue;
+    const tagByName = new Map<string, { id: number }>();
+    const insertedTags = await executor
+      .insert(tags)
+      .values(uniqueTags.map((name) => ({ name })))
+      .onConflictDoNothing()
+      .returning({ id: tags.id, name: tags.name });
+    for (const row of insertedTags) {
+      tagByName.set(row.name, { id: row.id });
+    }
 
-      await executor.insert(bookTags).values({ bookId, tagId: tag.id }).onConflictDoNothing();
+    const unresolvedNames = uniqueTags.filter((name) => !tagByName.has(name));
+    if (unresolvedNames.length > 0) {
+      const existingTags = await executor.select({ id: tags.id, name: tags.name }).from(tags).where(inArray(tags.name, unresolvedNames));
+      for (const row of existingTags) {
+        tagByName.set(row.name, { id: row.id });
+      }
+    }
+
+    const links = uniqueTags.flatMap((name) => {
+      const match = tagByName.get(name);
+      if (!match) return [];
+      return [{ bookId, tagId: match.id }];
+    });
+
+    if (links.length > 0) {
+      await executor.insert(bookTags).values(links).onConflictDoNothing();
     }
   }
 

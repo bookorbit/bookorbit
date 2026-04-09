@@ -76,12 +76,12 @@ export class BookQueryBuilder {
       } else if (field === 'readProgress') {
         if (userId === undefined) throw new BadRequestException('readProgress sort requires an authenticated user');
         result.push(
-          sql`(SELECT rp.percentage FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId} ORDER BY rp.percentage DESC LIMIT 1) ${sql.raw(D)} NULLS LAST`,
+          sql`(SELECT max(rp.percentage) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
         );
       } else if (field === 'lastReadAt') {
         if (userId === undefined) throw new BadRequestException('lastReadAt sort requires an authenticated user');
         result.push(
-          sql`(SELECT rp.updated_at FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId} ORDER BY rp.updated_at DESC LIMIT 1) ${sql.raw(D)} NULLS LAST`,
+          sql`(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
         );
       } else if (field === 'finishedAt') {
         if (userId === undefined) throw new BadRequestException('finishedAt sort requires an authenticated user');
@@ -89,7 +89,10 @@ export class BookQueryBuilder {
           sql`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = books.id AND ubs.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
         );
       } else if (field === 'random') {
-        result.push(sql.raw('RANDOM()'));
+        const daySeed = Math.floor(Date.now() / 86_400_000);
+        const scopedSeed = daySeed + (userId ?? 0);
+        result.push(sql`md5(${books.id}::text || ':' || ${scopedSeed}::text) ${sql.raw(D)}`);
+        result.push(sql`${books.id} ${sql.raw(D)}`);
       } else {
         const col = SORT_FIELD_MAP[field];
         if (!col) continue;
@@ -185,9 +188,9 @@ export class BookQueryBuilder {
       case 'notEq':
         return not(ilike(col, value!));
       case 'isEmpty':
-        return isNull(col);
+        return or(isNull(col), eq(col, ''))!;
       case 'isNotEmpty':
-        return isNotNull(col);
+        return and(isNotNull(col), ne(col, ''))!;
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for text field`);
     }
@@ -240,61 +243,85 @@ export class BookQueryBuilder {
   }
 
   private authorRuleToSql(operator: string, values?: string[]): SQL {
-    const sq = (whereClause?: SQL) =>
-      this.db.select({ bookId: bookAuthors.bookId }).from(bookAuthors).innerJoin(authors, eq(bookAuthors.authorId, authors.id)).where(whereClause);
+    const existsAuthor = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(bookAuthors.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(bookAuthors.authorId, authors.id))
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
 
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => ilike(authors.name, `%${v}%`)))));
+        return existsAuthor(or(...values.map((v) => ilike(authors.name, `%${v}%`)))!);
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
-        return and(...values.map((v) => inArray(books.id, sq(ilike(authors.name, `%${v}%`)))))!;
+        return and(...values.map((v) => existsAuthor(ilike(authors.name, `%${v}%`))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => ilike(authors.name, `%${v}%`))))));
+        return not(existsAuthor(or(...values.map((v) => ilike(authors.name, `%${v}%`)))!));
       case 'isEmpty':
-        return not(inArray(books.id, sq()));
+        return not(existsAuthor());
       case 'isNotEmpty':
-        return inArray(books.id, sq());
+        return existsAuthor();
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for author field`);
     }
   }
 
   private genreRuleToSql(operator: string, values?: string[]): SQL {
-    const sq = (whereClause?: SQL) =>
-      this.db.select({ bookId: bookGenres.bookId }).from(bookGenres).innerJoin(genres, eq(bookGenres.genreId, genres.id)).where(whereClause);
+    const existsGenre = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(bookGenres.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookGenres)
+        .innerJoin(genres, eq(bookGenres.genreId, genres.id))
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
 
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => eq(genres.name, v)))));
+        return existsGenre(or(...values.map((v) => eq(genres.name, v)))!);
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
-        return and(...values.map((v) => inArray(books.id, sq(eq(genres.name, v)))))!;
+        return and(...values.map((v) => existsGenre(eq(genres.name, v))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => eq(genres.name, v))))));
+        return not(existsGenre(or(...values.map((v) => eq(genres.name, v)))!));
       case 'isEmpty':
-        return not(inArray(books.id, sq()));
+        return not(existsGenre());
       case 'isNotEmpty':
-        return inArray(books.id, sq());
+        return existsGenre();
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for genre field`);
     }
   }
 
   private formatRuleToSql(operator: string, values?: string[]): SQL {
-    const sq = (whereClause?: SQL) => this.db.select({ bookId: bookFiles.bookId }).from(bookFiles).where(whereClause);
+    const existsFormat = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(bookFiles.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookFiles)
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
 
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(inArray(bookFiles.format, values)));
+        return existsFormat(inArray(bookFiles.format, values));
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(inArray(bookFiles.format, values))));
+        return not(existsFormat(inArray(bookFiles.format, values)));
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for format field`);
     }
@@ -349,46 +376,55 @@ export class BookQueryBuilder {
 
   private readProgressRuleToSql(operator: string, userId?: number): SQL {
     if (userId === undefined) throw new BadRequestException('Reading progress filter requires an authenticated user');
-    const sq = (whereClause: SQL) =>
-      this.db
-        .select({ bookId: bookFiles.bookId })
+    const existsReadingProgress = (whereClause: SQL) => {
+      const sq = this.db
+        .select({ one: sql`1` })
         .from(readingProgress)
         .innerJoin(bookFiles, eq(readingProgress.bookFileId, bookFiles.id))
-        .where(whereClause);
+        .where(and(eq(bookFiles.bookId, books.id), whereClause)!);
+      return sql`exists (${sq})`;
+    };
 
     switch (operator) {
       case 'isUnread':
-        return not(inArray(books.id, sq(and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0))!)));
+        return not(existsReadingProgress(and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0))!));
       case 'isInProgress':
-        return inArray(
-          books.id,
-          sq(and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0), lt(readingProgress.percentage, 100))!),
+        return existsReadingProgress(
+          and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0), lt(readingProgress.percentage, 100))!,
         );
       case 'isFinished':
-        return inArray(books.id, sq(and(eq(readingProgress.userId, userId), gte(readingProgress.percentage, 100))!));
+        return existsReadingProgress(and(eq(readingProgress.userId, userId), gte(readingProgress.percentage, 100))!);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for readProgress field`);
     }
   }
 
   private tagRuleToSql(operator: string, values?: string[]): SQL {
-    const sq = (whereClause?: SQL) =>
-      this.db.select({ bookId: bookTags.bookId }).from(bookTags).innerJoin(tags, eq(bookTags.tagId, tags.id)).where(whereClause);
+    const existsTag = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(bookTags.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookTags)
+        .innerJoin(tags, eq(bookTags.tagId, tags.id))
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
 
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v)))));
+        return existsTag(or(...values.map((v) => eq(tags.name, v)))!);
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
-        return and(...values.map((v) => inArray(books.id, sq(eq(tags.name, v)))))!;
+        return and(...values.map((v) => existsTag(eq(tags.name, v))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => eq(tags.name, v))))));
+        return not(existsTag(or(...values.map((v) => eq(tags.name, v)))!));
       case 'isEmpty':
-        return not(inArray(books.id, sq()));
+        return not(existsTag());
       case 'isNotEmpty':
-        return inArray(books.id, sq());
+        return existsTag();
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for tag field`);
     }
@@ -396,24 +432,28 @@ export class BookQueryBuilder {
 
   private collectionRuleToSql(operator: string, values?: string[], userId?: number): SQL {
     if (userId === undefined) throw new BadRequestException('Collection filter requires an authenticated user');
-    const sq = (whereClause?: SQL) =>
-      this.db
-        .select({ bookId: collectionBooks.bookId })
+    const existsCollection = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(collectionBooks.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
         .from(collectionBooks)
         .innerJoin(collections, and(eq(collectionBooks.collectionId, collections.id), eq(collections.userId, userId)))
-        .where(whereClause);
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
 
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return inArray(books.id, sq(or(...values.map((v) => eq(collections.name, v)))));
+        return existsCollection(or(...values.map((v) => eq(collections.name, v)))!);
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(inArray(books.id, sq(or(...values.map((v) => eq(collections.name, v))))));
+        return not(existsCollection(or(...values.map((v) => eq(collections.name, v)))!));
       case 'isEmpty':
-        return not(inArray(books.id, sq()));
+        return not(existsCollection());
       case 'isNotEmpty':
-        return inArray(books.id, sq());
+        return existsCollection();
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for collection field`);
     }

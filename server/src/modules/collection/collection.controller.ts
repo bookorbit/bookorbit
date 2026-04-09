@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 
 import { AuditAction, AuditResource } from '@projectx/types';
+import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -26,6 +27,7 @@ import { CollectionService } from './collection.service';
 
 const BOOK_IDS_QUERY_INVALID_MESSAGE = 'bookIds must be a comma-separated list of positive integers';
 const PAGE_QUERY_INVALID_MESSAGE = 'page must be greater than or equal to 0';
+const PAGE_WINDOW_INVALID_MESSAGE = `pagination window is too deep; page * size must be <= ${MAX_OFFSET_ROWS}`;
 const SIZE_QUERY_INVALID_MESSAGE = 'size must be between 1 and 100';
 const MAX_PAGE_SIZE = 100;
 
@@ -47,9 +49,13 @@ export class CollectionController {
     return [...new Set(parsed)];
   }
 
-  private validatePageQuery(page: number): void {
+  private validatePageQuery(page: number, size: number): void {
     if (page < 0) {
       throw new BadRequestException(PAGE_QUERY_INVALID_MESSAGE);
+    }
+
+    if (!isOffsetWithinLimit(page * size)) {
+      throw new BadRequestException(PAGE_WINDOW_INVALID_MESSAGE);
     }
   }
 
@@ -146,8 +152,8 @@ export class CollectionController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
   ) {
-    this.validatePageQuery(page);
     this.validateSizeQuery(size);
+    this.validatePageQuery(page, size);
     return this.collectionService.getBooks(id, user, page, size);
   }
 }

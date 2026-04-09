@@ -1,5 +1,5 @@
 {
-  "id": "48886cdb-ff31-4dca-9781-e0a35a0750c8",
+  "id": "3d7638fa-4c77-4988-a03b-15e20345198d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -443,7 +443,29 @@
           "default": "'viewer'"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "user_library_access_library_user_idx": {
+          "name": "user_library_access_library_user_idx",
+          "columns": [
+            {
+              "expression": "library_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "user_library_access_user_id_users_id_fk": {
           "name": "user_library_access_user_id_users_id_fk",
@@ -3106,7 +3128,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "book_genres_genre_id_idx": {
+          "name": "book_genres_genre_id_idx",
+          "columns": [
+            {
+              "expression": "genre_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "book_genres_book_id_books_id_fk": {
           "name": "book_genres_book_id_books_id_fk",
@@ -3349,6 +3387,21 @@
           "method": "gin",
           "with": {}
         },
+        "bm_title_lower_idx": {
+          "name": "bm_title_lower_idx",
+          "columns": [
+            {
+              "expression": "lower(\"title\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "bm_series_trgm_idx": {
           "name": "bm_series_trgm_idx",
           "columns": [
@@ -3430,6 +3483,51 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
+          "with": {}
+        },
+        "bm_isbn10_idx": {
+          "name": "bm_isbn10_idx",
+          "columns": [
+            {
+              "expression": "isbn10",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bm_isbn13_idx": {
+          "name": "bm_isbn13_idx",
+          "columns": [
+            {
+              "expression": "isbn13",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bm_embedding_hnsw_cosine_idx": {
+          "name": "bm_embedding_hnsw_cosine_idx",
+          "columns": [
+            {
+              "expression": "\"embedding\" vector_cosine_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "hnsw",
           "with": {}
         }
       },
@@ -3565,6 +3663,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "bmfq_status_created_book_idx": {
+          "name": "bmfq_status_created_book_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -3614,7 +3739,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "book_tags_tag_id_idx": {
+          "name": "book_tags_tag_id_idx",
+          "columns": [
+            {
+              "expression": "tag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "book_tags_book_id_books_id_fk": {
           "name": "book_tags_book_id_books_id_fk",
@@ -4600,6 +4741,27 @@
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reading_progress_user_updated_at_idx": {
+          "name": "reading_progress_user_updated_at_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5672,7 +5834,35 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "kobo_snapshot_books_snapshot_synced_book_idx": {
+          "name": "kobo_snapshot_books_snapshot_synced_book_idx",
+          "columns": [
+            {
+              "expression": "snapshot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "synced",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "kobo_snapshot_books_snapshot_id_kobo_library_snapshots_id_fk": {
           "name": "kobo_snapshot_books_snapshot_id_kobo_library_snapshots_id_fk",

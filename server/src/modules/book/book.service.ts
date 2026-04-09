@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
+import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseFb2File } from '../metadata/lib/fb2-parser';
@@ -201,7 +202,14 @@ export class BookService {
     };
   }
 
+  private assertPaginationWindow(page: number, size: number): void {
+    if (!isOffsetWithinLimit(page * size)) {
+      throw new BadRequestException(`pagination window is too deep; page * size must be <= ${MAX_OFFSET_ROWS}`);
+    }
+  }
+
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
+    this.assertPaginationWindow(query.pagination.page, query.pagination.size);
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
     const orderBy = this.queryBuilder.buildOrderBy(query.sort, user.id);
@@ -221,6 +229,7 @@ export class BookService {
   }
 
   async globalQuery(user: RequestUser, query: BookQuery): Promise<BooksPage> {
+    this.assertPaginationWindow(query.pagination.page, query.pagination.size);
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = libs.map((l) => l.id);
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });

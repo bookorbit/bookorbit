@@ -66,6 +66,7 @@ export const readingProgress = pgTable(
   (t) => [
     primaryKey({ columns: [t.bookFileId, t.userId] }),
     index('reading_progress_user_id_idx').on(t.userId),
+    index('reading_progress_user_updated_at_idx').on(t.userId, t.updatedAt),
     check('reading_progress_percentage_range_chk', sql`${t.percentage} >= 0 and ${t.percentage} <= 100`),
     check('reading_progress_page_number_nonnegative_chk', sql`${t.pageNumber} is null or ${t.pageNumber} >= 0`),
     check('reading_progress_position_seconds_nonnegative_chk', sql`${t.positionSeconds} is null or ${t.positionSeconds} >= 0`),

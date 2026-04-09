@@ -406,70 +406,53 @@ export class ScannerService implements OnApplicationBootstrap {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] libraryId=${libraryId} jobId=${jobId} folderCount=${folders.length} - scan job started`);
 
-    type FolderWork = {
-      id: number;
-      libraryId: number;
-      path: string;
-      candidates: BookCandidate[];
-      knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>;
-      knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>;
-    };
-
-    const folderWork: FolderWork[] = [];
     let totalCandidates = 0;
 
     const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
 
-    for (const folder of folders) {
-      let candidates: BookCandidate[] = [];
-      try {
-        candidates =
-          organizationMode === 'book_per_file'
-            ? await findLooseFileCandidates(folder.path, excludePatterns, (msg) =>
-                this.logger.warn(
-                  `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
-                ),
-              )
-            : await findBookCandidates(folder.path, excludePatterns, (msg) =>
-                this.logger.warn(
-                  `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
-                ),
-              );
-      } catch (err) {
-        this.logger.warn(
-          `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} path="${folder.path.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk folder`,
-        );
-      }
-
-      if (allowed) {
-        candidates = candidates
-          .map((c) => ({
-            ...c,
-            files: c.files.filter((f) => {
-              const { role, format } = classifyFile(f.absolutePath);
-              return role !== 'content' || (format !== null && allowed.has(format));
-            }),
-          }))
-          .filter((c) => c.files.some((f) => classifyFile(f.absolutePath).role === 'content'));
-      }
-
-      const [knownBooks, knownFiles] = await Promise.all([
-        this.scannerRepo.findBooksByLibraryFolder(folder.id),
-        this.scannerRepo.findBookFilesByLibraryFolder(folder.id),
-      ]);
-
-      folderWork.push({ ...folder, candidates, knownBooks, knownFiles });
-      totalCandidates += candidates.length;
-    }
-
-    this.scanJobStore.setTotal(libraryId, totalCandidates);
-    this.emitFromStore(libraryId, jobId, 'running');
-
     const totals: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
 
     try {
-      for (const { id: folderId, candidates, knownBooks, knownFiles } of folderWork) {
-        const counts = await this.scanFolderCandidates(folderId, libraryId, candidates, knownBooks, knownFiles, jobId, formatPriority);
+      this.scanJobStore.setTotal(libraryId, 0);
+      this.emitFromStore(libraryId, jobId, 'running');
+
+      for (const folder of folders) {
+        let candidates: BookCandidate[] = [];
+        try {
+          candidates =
+            organizationMode === 'book_per_file'
+              ? await findLooseFileCandidates(folder.path, excludePatterns, (msg) =>
+                  this.logger.warn(
+                    `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+                  ),
+                )
+              : await findBookCandidates(folder.path, excludePatterns, (msg) =>
+                  this.logger.warn(
+                    `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+                  ),
+                );
+        } catch (err) {
+          this.logger.warn(
+            `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} path="${folder.path.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk folder`,
+          );
+        }
+
+        if (allowed) {
+          candidates = candidates
+            .map((c) => ({
+              ...c,
+              files: c.files.filter((f) => {
+                const { role, format } = classifyFile(f.absolutePath);
+                return role !== 'content' || (format !== null && allowed.has(format));
+              }),
+            }))
+            .filter((c) => c.files.some((f) => classifyFile(f.absolutePath).role === 'content'));
+        }
+
+        totalCandidates += candidates.length;
+        this.scanJobStore.setTotal(libraryId, totalCandidates);
+
+        const counts = await this.scanFolderCandidates(folder.id, libraryId, candidates, jobId, formatPriority);
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;
@@ -500,8 +483,6 @@ export class ScannerService implements OnApplicationBootstrap {
     libraryFolderId: number,
     libraryId: number,
     candidates: BookCandidate[],
-    knownBooks: Awaited<ReturnType<ScannerRepository['findBooksByLibraryFolder']>>,
-    knownFiles: Awaited<ReturnType<ScannerRepository['findBookFilesByLibraryFolder']>>,
     jobId: number,
     formatPriority: string[],
   ): Promise<ScanCounts> {
@@ -512,6 +493,10 @@ export class ScannerService implements OnApplicationBootstrap {
     );
     try {
       const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
+      const [knownBooks, knownFiles] = await Promise.all([
+        this.scannerRepo.findBooksByLibraryFolder(libraryFolderId),
+        this.scannerRepo.findBookFilesByLibraryFolder(libraryFolderId),
+      ]);
 
       const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
         knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),

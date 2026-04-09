@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { SQL, and, count, eq, inArray, sql } from 'drizzle-orm';
+import { SQL, and, count, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -156,18 +156,45 @@ export class OpdsBookService {
   }
 
   async getRandomBooks(userId: number, count: number, isSuperuser = false): Promise<OpdsBookEntry[]> {
+    if (count <= 0) return [];
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return [];
 
-    const ids = await this.db
+    const baseFilter = and(inArray(books.libraryId, accessibleIds), eq(books.status, 'present'))!;
+    const [bounds] = await this.db
+      .select({
+        minId: sql<number | null>`min(${books.id})`,
+        maxId: sql<number | null>`max(${books.id})`,
+      })
+      .from(books)
+      .where(baseFilter);
+
+    if (bounds?.minId == null || bounds.maxId == null || bounds.minId > bounds.maxId) return [];
+
+    const range = bounds.maxId - bounds.minId + 1;
+    const anchorId = bounds.minId + Math.floor(Math.random() * range);
+
+    const firstPass = await this.db
       .select({ id: books.id })
       .from(books)
-      .where(and(inArray(books.libraryId, accessibleIds), eq(books.status, 'present')))
-      .orderBy(sql`random()`)
+      .where(and(baseFilter, gte(books.id, anchorId)))
+      .orderBy(books.id)
       .limit(count);
 
+    const remaining = count - firstPass.length;
+    const secondPass =
+      remaining > 0
+        ? await this.db
+            .select({ id: books.id })
+            .from(books)
+            .where(and(baseFilter, lt(books.id, anchorId)))
+            .orderBy(books.id)
+            .limit(remaining)
+        : [];
+
+    const ids = [...firstPass, ...secondPass].map((row) => row.id);
     if (ids.length === 0) return [];
-    return this.fetchBookEntries(ids.map((r) => r.id));
+    return this.fetchBookEntries(ids);
   }
 
   async getDistinctAuthors(userId: number, isSuperuser = false): Promise<{ name: string; bookCount: number }[]> {

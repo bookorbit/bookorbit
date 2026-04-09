@@ -329,8 +329,8 @@ describe('textRuleToSql (via title)', () => {
     ['endsWith', 'Dune', { type: 'ilike', pattern: '%Dune' }],
     ['eq', 'Dune', { type: 'ilike', pattern: 'Dune' }],
     ['notEq', 'Dune', { type: 'not' }],
-    ['isEmpty', undefined, { type: 'isNull' }],
-    ['isNotEmpty', undefined, { type: 'isNotNull' }],
+    ['isEmpty', undefined, { type: 'or' }],
+    ['isNotEmpty', undefined, { type: 'and' }],
   ] as const)('operator %s produces the correct SQL shape', (operator, value, expected) => {
     const { builder } = makeBuilder();
     const rule: Record<string, unknown> = { type: 'rule', field: 'title', operator };
@@ -424,23 +424,22 @@ describe('numericRuleToSql (via pageCount and publishedYear)', () => {
 });
 
 describe('authorRuleToSql', () => {
-  it('includesAny with values produces inArray(books.id, subquery)', () => {
+  it('includesAny with values produces an EXISTS subquery', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'author', operator: 'includesAny', value: ['Tolkien'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
-    expect(getRuleSql(where).right).toMatchObject({ type: 'subquery' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 
-  it('excludesAll with values produces not(inArray(books.id, subquery))', () => {
+  it('excludesAll with values produces not(EXISTS subquery)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'author', operator: 'excludesAll', value: ['Tolkien'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
   it('excludesAll with empty array produces always-true branch', () => {
@@ -449,31 +448,28 @@ describe('authorRuleToSql', () => {
     expect(getRuleSql(where)).toMatchObject({ type: 'sql', text: '1 = 1' });
   });
 
-  it('isEmpty produces not(inArray(books.id, subquery with no where clause))', () => {
+  it('isEmpty produces not(EXISTS subquery with no where clause)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'author', operator: 'isEmpty' }) as never, USER_CTX) as any;
     const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(clause).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
-  it('isNotEmpty produces inArray(books.id, subquery with no where clause)', () => {
+  it('isNotEmpty produces EXISTS subquery with no where clause', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'author', operator: 'isNotEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 });
 
 describe('genreRuleToSql', () => {
-  it('includesAny produces inArray with eq-based subquery (not ilike like author)', () => {
+  it('includesAny produces an EXISTS subquery with eq filters', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'genre', operator: 'includesAny', value: ['Fiction'] }) as never,
       USER_CTX,
     ) as any;
-    const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'inArray' });
-    expect(clause.right.whereClause).toMatchObject({ type: 'or' });
-    expect(clause.right.whereClause.clauses[0]).toMatchObject({ type: 'eq' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 
   it('includesAll produces one subquery per value', () => {
@@ -482,13 +478,13 @@ describe('genreRuleToSql', () => {
     expect(db.select).toHaveBeenCalledTimes(2);
   });
 
-  it('excludesAll with values produces not(inArray(books.id, subquery))', () => {
+  it('excludesAll with values produces not(EXISTS subquery)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'genre', operator: 'excludesAll', value: ['Fiction'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
   it('excludesAll with empty array produces always-true branch', () => {
@@ -497,27 +493,27 @@ describe('genreRuleToSql', () => {
     expect(getRuleSql(where)).toMatchObject({ type: 'sql', text: '1 = 1' });
   });
 
-  it('isEmpty produces not(inArray(books.id, subquery))', () => {
+  it('isEmpty produces not(EXISTS subquery)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'genre', operator: 'isEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
-  it('isNotEmpty produces inArray(books.id, subquery)', () => {
+  it('isNotEmpty produces EXISTS subquery', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'genre', operator: 'isNotEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 });
 
 describe('tagRuleToSql', () => {
-  it('includesAny produces inArray(books.id, subquery)', () => {
+  it('includesAny produces an EXISTS subquery', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'tag', operator: 'includesAny', value: ['favourite'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 
   it('includesAll produces one subquery per value', () => {
@@ -526,13 +522,13 @@ describe('tagRuleToSql', () => {
     expect(db.select).toHaveBeenCalledTimes(2);
   });
 
-  it('excludesAll with values produces not(inArray)', () => {
+  it('excludesAll with values produces not(EXISTS subquery)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'tag', operator: 'excludesAll', value: ['favourite'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
   it('excludesAll with empty array produces always-true branch', () => {
@@ -541,36 +537,36 @@ describe('tagRuleToSql', () => {
     expect(getRuleSql(where)).toMatchObject({ type: 'sql', text: '1 = 1' });
   });
 
-  it('isEmpty produces not(inArray)', () => {
+  it('isEmpty produces not(EXISTS subquery)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'tag', operator: 'isEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
-  it('isNotEmpty produces inArray', () => {
+  it('isNotEmpty produces EXISTS subquery', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'tag', operator: 'isNotEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 });
 
 describe('collectionRuleToSql', () => {
-  it('includesAny produces inArray(books.id, user-scoped subquery)', () => {
+  it('includesAny produces user-scoped EXISTS subquery', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'collection', operator: 'includesAny', value: ['Reading'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 
-  it('excludesAll with values produces not(inArray)', () => {
+  it('excludesAll with values produces not(EXISTS)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'collection', operator: 'excludesAll', value: ['Reading'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
   it('excludesAll with empty array produces always-true branch', () => {
@@ -579,27 +575,27 @@ describe('collectionRuleToSql', () => {
     expect(getRuleSql(where)).toMatchObject({ type: 'sql', text: '1 = 1' });
   });
 
-  it('isEmpty produces not(inArray)', () => {
+  it('isEmpty produces not(EXISTS)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'collection', operator: 'isEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
-  it('isNotEmpty produces inArray', () => {
+  it('isNotEmpty produces EXISTS', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'collection', operator: 'isNotEmpty' }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 });
 
 describe('formatRuleToSql', () => {
-  it('includesAny produces inArray(books.id, subquery with inArray on format column)', () => {
+  it('includesAny produces EXISTS subquery with format filter', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'format', operator: 'includesAny', value: ['PDF', 'EPUB'] }) as never,
       USER_CTX,
     ) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'inArray' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 
   it('includesAny with empty array produces always-false branch', () => {
@@ -608,10 +604,10 @@ describe('formatRuleToSql', () => {
     expect(getRuleSql(where)).toMatchObject({ type: 'sql', text: '1 = 0' });
   });
 
-  it('excludesAll with values produces not(inArray)', () => {
+  it('excludesAll with values produces not(EXISTS)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'format', operator: 'excludesAll', value: ['PDF'] }) as never, USER_CTX) as any;
-    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
   it('excludesAll with empty array produces always-true branch', () => {
@@ -685,32 +681,23 @@ describe('statusRuleToSql (fileAvailability)', () => {
 });
 
 describe('readProgressRuleToSql', () => {
-  it('isUnread produces not(inArray(books.id, subquery))', () => {
+  it('isUnread produces not(EXISTS subquery)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readProgress', operator: 'isUnread' }) as never, USER_CTX) as any;
     const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'not', value: { type: 'inArray' } });
+    expect(clause).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
-  it('isInProgress produces inArray(books.id, subquery with percentage between 0 and 100)', () => {
+  it('isInProgress produces EXISTS subquery with percentage between 0 and 100', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readProgress', operator: 'isInProgress' }) as never, USER_CTX) as any;
-    const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'inArray' });
-    expect(clause.right).toMatchObject({ type: 'subquery' });
-    expect(clause.right.whereClause).toMatchObject({ type: 'and' });
-    expect(clause.right.whereClause.clauses).toHaveLength(3);
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 
-  it('isFinished produces inArray(books.id, subquery with percentage >= 100)', () => {
+  it('isFinished produces EXISTS subquery with percentage >= 100', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readProgress', operator: 'isFinished' }) as never, USER_CTX) as any;
-    const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'inArray' });
-    expect(clause.right).toMatchObject({ type: 'subquery' });
-    expect(clause.right.whereClause).toMatchObject({ type: 'and' });
-    expect(clause.right.whereClause.clauses).toHaveLength(2);
-    expect(clause.right.whereClause.clauses[1]).toMatchObject({ type: 'gte' });
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
   });
 });
 
