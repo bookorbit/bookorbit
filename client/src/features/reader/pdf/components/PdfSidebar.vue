@@ -16,7 +16,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex flex-col shrink-0 overflow-hidden border-r border-border bg-card" style="width: 240px">
+  <div class="flex flex-col shrink-0 overflow-hidden border-r border-border bg-card px-1.5 w-64">
     <!-- Header -->
     <div class="flex items-center gap-1.5 px-3 py-2.5 shrink-0 text-xs text-muted-foreground border-b border-border">
       <List :size="12" />

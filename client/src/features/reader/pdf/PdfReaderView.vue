@@ -61,7 +61,7 @@ function onDimUpdate(pageNum: number, dim: PageDim) {
 }
 
 const renderer = usePdfRenderer(startRenderPage, getTextContent, scale, totalPages, onDimUpdate)
-const { canvasMap, textLayerMap, invalidate, setupIO, reset, destroy } = renderer
+const { canvasMap, textLayerMap, invalidate, renderPage, setupIO, reset, destroy } = renderer
 
 // ── Find ──────────────────────────────────────────────────────────────────────
 const find = usePdfFind(textLayerMap)
@@ -161,6 +161,8 @@ watch(currentPage, (page) => {
 })
 
 const progressPct = computed(() => (totalPages.value ? Math.round((currentPage.value / totalPages.value) * 100) : 0))
+const readerReady = ref(false)
+const isReaderLoading = computed(() => !error.value && (!readerReady.value || loading.value))
 
 // ── Scroll container style ────────────────────────────────────────────────────
 const scrollStyle = computed((): CSSProperties => {
@@ -226,49 +228,53 @@ onMounted(async () => {
     isFullscreen.value = !!document.fullscreenElement
   })
 
-  await progress.load()
-  await bookSettings.load()
+  try {
+    await progress.load()
+    await bookSettings.load()
 
-  const ps = bookSettings.effective.value as PdfReaderSettings
-  // Coerce saved 'continuous' (old value) to 'vertical'
-  const savedMode = ps.scrollMode as string
-  scrollMode.value = savedMode === 'continuous' ? 'vertical' : (ps.scrollMode as ScrollMode)
-  spread.value = ps.spread
-  zoomMode.value = ps.zoomMode
-  customScale.value = ps.customScale
+    const ps = bookSettings.effective.value as PdfReaderSettings
+    // Coerce saved 'continuous' (old value) to 'vertical'
+    const savedMode = ps.scrollMode as string
+    scrollMode.value = savedMode === 'continuous' ? 'vertical' : (ps.scrollMode as ScrollMode)
+    spread.value = ps.spread
+    zoomMode.value = ps.zoomMode
+    customScale.value = ps.customScale
 
-  watch(spread, (v) => bookSettings.updateBookSettings({ spread: v }))
-  watch(zoomMode, (v) => bookSettings.updateBookSettings({ zoomMode: v }))
-  watch(customScale, (v) => bookSettings.updateBookSettings({ customScale: v }))
-  watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v } as Parameters<typeof bookSettings.updateBookSettings>[0]))
+    watch(spread, (v) => bookSettings.updateBookSettings({ spread: v }))
+    watch(zoomMode, (v) => bookSettings.updateBookSettings({ zoomMode: v }))
+    watch(customScale, (v) => bookSettings.updateBookSettings({ customScale: v }))
+    watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v } as Parameters<typeof bookSettings.updateBookSettings>[0]))
 
-  await load(props.fileId)
-  if (!pdfDoc.value) return
+    await load(props.fileId)
+    if (!pdfDoc.value) return
 
-  const firstDim = await getPageDim(1)
-  pageDims.value = Array.from({ length: totalPages.value }, () => ({ ...firstDim }))
-  reset()
+    const firstDim = await getPageDim(1)
+    pageDims.value = Array.from({ length: totalPages.value }, () => ({ ...firstDim }))
+    reset()
 
-  await nextTick()
-  measure()
-
-  await outline.load()
-
-  resizeObserver = new ResizeObserver(async () => {
+    await nextTick()
     measure()
-    invalidate()
-    await nextTick()
-    if (scrollRef.value) setupIO(scrollRef.value)
-  })
 
-  if (scrollRef.value) {
-    resizeObserver.observe(scrollRef.value)
-    setupIO(scrollRef.value)
-  }
+    const initialPage = progress.pageNumber.value && progress.pageNumber.value > 1 ? progress.pageNumber.value : 1
+    goToPage(initialPage, 'instant')
+    await renderPage(initialPage)
 
-  if (progress.pageNumber.value && progress.pageNumber.value > 1) {
-    await nextTick()
-    goToPage(progress.pageNumber.value, 'instant')
+    resizeObserver = new ResizeObserver(async () => {
+      measure()
+      invalidate()
+      await nextTick()
+      if (scrollRef.value) setupIO(scrollRef.value)
+    })
+
+    if (scrollRef.value) {
+      resizeObserver.observe(scrollRef.value)
+      setupIO(scrollRef.value)
+    }
+
+    readerReady.value = true
+    outline.load().catch(() => {})
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to initialize PDF reader'
   }
 })
 
@@ -286,6 +292,13 @@ onUnmounted(() => {
 
 <template>
   <div class="fixed inset-0 flex flex-col overflow-hidden select-none bg-muted">
+    <div v-if="isReaderLoading" class="absolute inset-0 z-[60] flex items-center justify-center bg-background">
+      <div class="flex flex-col items-center gap-3">
+        <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <p class="text-sm text-muted-foreground">Loading PDF...</p>
+      </div>
+    </div>
+
     <!-- Toolbar (always visible) -->
     <PdfToolbar
       :current-page="currentPage"
@@ -348,14 +361,7 @@ onUnmounted(() => {
 
       <!-- PDF Viewport -->
       <div class="flex-1 min-w-0 relative">
-        <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-background">
-          <div class="flex flex-col items-center gap-3">
-            <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <p class="text-sm text-muted-foreground">Loading PDF...</p>
-          </div>
-        </div>
-
-        <div v-else-if="error" class="absolute inset-0 flex items-center justify-center p-8 text-center bg-background">
+        <div v-if="error" class="absolute inset-0 flex items-center justify-center p-8 text-center bg-background">
           <div>
             <p class="text-sm font-medium text-foreground mb-1">Failed to load PDF</p>
             <p class="text-xs text-muted-foreground">{{ error }}</p>
@@ -363,7 +369,7 @@ onUnmounted(() => {
         </div>
 
         <div
-          v-else
+          v-show="!error"
           ref="scrollRef"
           class="absolute inset-0"
           :class="cursorTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : 'cursor-auto'"
@@ -454,7 +460,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Progress bar -->
-        <div v-if="!loading && !error && totalPages > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-10">
+        <div v-if="readerReady && !error && totalPages > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-10">
           <div class="h-full bg-primary/60 transition-all duration-500" :style="{ width: `${progressPct}%` }" />
         </div>
       </div>

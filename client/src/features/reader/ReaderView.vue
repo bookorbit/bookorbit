@@ -33,6 +33,8 @@ const bookId = Number(route.params.bookId)
 const fileId = Number(route.params.fileId)
 const fileFormat = (route.query.format as string) || 'epub'
 const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
+const isPdfFormat = fileFormat === 'pdf'
+const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'
 
 const containerRef = ref<HTMLElement | null>(null)
 const showSidebar = ref(false)
@@ -137,26 +139,22 @@ onMounted(async () => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
+  // Specialized readers own their own progress/settings/loading lifecycle.
+  if (isAudioFormat || isPdfFormat || isComicFormat) return
+
   await progress.load()
 
-  // Audio formats are handled entirely by AudiobookReaderView
-  if (isAudioFormat) return
-
-  // Only epub-group formats use the epub reader; PDF/CBZ are rendered by child components
-  const isEpubFormat = !['pdf', 'cbz', 'cbr', 'cb7'].includes(fileFormat)
-  if (isEpubFormat) {
-    await bookSettings.load()
-    const effective = bookSettings.effective.value as EpubReaderSettings
-    if (effective.overrideBookFormatting) {
-      shouldApplyStyles.value = true
-      seedState(effective)
-    } else if (bookSettings.isCustomized.value) {
-      // Only apply the per-book delta - don't bleed global defaults like dark theme into the book
-      shouldApplyStyles.value = true
-      seedState(bookSettings.bookDelta.value as Partial<ReaderState>)
-    } else {
-      shouldApplyStyles.value = false
-    }
+  await bookSettings.load()
+  const effective = bookSettings.effective.value as EpubReaderSettings
+  if (effective.overrideBookFormatting) {
+    shouldApplyStyles.value = true
+    seedState(effective)
+  } else if (bookSettings.isCustomized.value) {
+    // Only apply the per-book delta - don't bleed global defaults like dark theme into the book
+    shouldApplyStyles.value = true
+    seedState(bookSettings.bookDelta.value as Partial<ReaderState>)
+  } else {
+    shouldApplyStyles.value = false
   }
 
   await open(bookId, fileId, fileFormat, progress.cfi.value)
@@ -287,8 +285,8 @@ function closeSearch() {
 </script>
 
 <template>
-  <PdfReaderView v-if="fileFormat === 'pdf'" :bookId="bookId" :fileId="fileId" />
-  <CbzReaderView v-else-if="fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'" :bookId="bookId" :fileId="fileId" />
+  <PdfReaderView v-if="isPdfFormat" :bookId="bookId" :fileId="fileId" />
+  <CbzReaderView v-else-if="isComicFormat" :bookId="bookId" :fileId="fileId" />
   <AudiobookReaderView v-else-if="isAudioFormat" :bookId="bookId" :fileId="fileId" />
   <div
     v-else

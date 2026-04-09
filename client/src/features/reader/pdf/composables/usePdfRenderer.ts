@@ -46,6 +46,12 @@ export function usePdfRenderer(
     flushQueue()
   }
 
+  async function renderPage(pageNum: number) {
+    if (pageNum < 1 || pageNum > totalPages.value || rendered.has(pageNum)) return
+    renderQueue = [pageNum, ...renderQueue.filter((n) => n !== pageNum)]
+    await flushQueue()
+  }
+
   async function flushQueue() {
     if (isRendering) return
     isRendering = true
@@ -147,5 +153,5 @@ export function usePdfRenderer(
     for (const task of activeRenders.values()) task.cancel()
   }
 
-  return { canvasMap, textLayerMap, invalidate, setupIO, reset, destroy }
+  return { canvasMap, textLayerMap, invalidate, renderPage, setupIO, reset, destroy }
 }
