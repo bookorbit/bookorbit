@@ -95,7 +95,7 @@ export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
 export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [...DEFAULT_LIBRARY_CHART_ORDER, ...DEFAULT_USER_CHART_ORDER];
 
 export const DEFAULT_STATISTICS_FILTERS: StatisticsFilterConfig = {
-  libraryIds: [3, 4],
+  libraryIds: [],
   booksOverTimeRange: "last-5-years",
   booksOverTimeGranularity: "monthly",
 };

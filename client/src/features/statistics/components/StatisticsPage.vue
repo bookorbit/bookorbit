@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Check, ChevronDown, GripVertical, Settings2 } from 'lucide-vue-next'
 import { VueDraggable } from 'vue-draggable-plus'
@@ -43,6 +43,21 @@ const loaded = ref<Set<'library' | 'user'>>(new Set([initialTab]))
 // Called in setup (not onMounted) so filters are populated before chart children mount.
 init()
 onMounted(fetchLibraries)
+
+watch(
+  libraries,
+  (libs) => {
+    if (libs.length === 0) return
+    const allowedIds = new Set(libs.map((lib) => lib.id))
+    const selectedIds = filters.value.libraryIds
+    if (selectedIds.length === 0) return
+    const validSelectedIds = selectedIds.filter((id) => allowedIds.has(id))
+    if (validSelectedIds.length !== selectedIds.length) {
+      setLibraryFilter(validSelectedIds.length === libs.length ? [] : validSelectedIds)
+    }
+  },
+  { immediate: true },
+)
 
 const activeVisibleCount = computed(() => (activeTab.value === 'library' ? visibleLibraryChartCount.value : visibleUserChartCount.value))
 const activeTotalCount = computed(() => (activeTab.value === 'library' ? libraryChartCount.value : userChartCount.value))
