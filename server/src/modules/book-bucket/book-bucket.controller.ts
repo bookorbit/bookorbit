@@ -26,6 +26,7 @@ import { AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookBucketService } from './book-bucket.service';
@@ -96,7 +97,7 @@ export class BookBucketController {
     if (!exists) throw new NotFoundException('Cover file not found on disk');
 
     const stream = createReadStream(row.coverPath);
-    const contentType = row.coverPath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const contentType = imageContentTypeFromPath(row.coverPath);
     reply.header('Content-Type', contentType);
     reply.header('Cache-Control', 'private, max-age=3600');
     return reply.send(stream);

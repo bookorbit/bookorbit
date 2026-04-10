@@ -108,6 +108,23 @@ describe('parseOpf', () => {
       expect(r.authors[0].sortName).toBe('Pratchett, Terry');
     });
 
+    it('accepts EPUB3 role values in full relator URI form', () => {
+      const xml = epub3Opf(`
+        <dc:creator id="cr1">Ursula Le Guin</dc:creator>
+        <meta refines="#cr1" property="role">http://id.loc.gov/vocabulary/relators/aut</meta>
+      `);
+      const r = parseOpf(xml);
+      expect(r.authors).toHaveLength(1);
+      expect(r.authors[0].name).toBe('Ursula Le Guin');
+    });
+
+    it('treats uppercase EPUB2 role codes as authors', () => {
+      const xml = epub2Opf(`<dc:creator opf:role="AUT">Octavia Butler</dc:creator>`);
+      const r = parseOpf(xml);
+      expect(r.authors).toHaveLength(1);
+      expect(r.authors[0].name).toBe('Octavia Butler');
+    });
+
     it('returns empty authors array when no creators', () => {
       const r = parseOpf(epub2Opf('<dc:title>Book</dc:title>'));
       expect(r.authors).toHaveLength(0);

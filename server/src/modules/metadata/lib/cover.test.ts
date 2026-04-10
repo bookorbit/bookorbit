@@ -60,8 +60,20 @@ describe('imageExt', () => {
     expect(imageExt(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).toBe('jpg');
   });
 
-  it('returns "jpg" as default for unknown magic bytes (GIF)', () => {
-    expect(imageExt(Buffer.from([0x47, 0x49, 0x46, 0x38]))).toBe('jpg');
+  it('returns "gif" for GIF magic bytes (GIF8)', () => {
+    expect(imageExt(Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))).toBe('gif');
+  });
+
+  it('returns "webp" for RIFF/WEBP magic bytes', () => {
+    expect(imageExt(Buffer.from([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]))).toBe('webp');
+  });
+
+  it('returns "bmp" for BMP magic bytes (BM)', () => {
+    expect(imageExt(Buffer.from([0x42, 0x4d, 0x00, 0x00]))).toBe('bmp');
+  });
+
+  it('returns "jpg" as default for unknown magic bytes', () => {
+    expect(imageExt(Buffer.from([0x00, 0x11, 0x22, 0x33]))).toBe('jpg');
   });
 
   it('returns "jpg" when first byte is 0x89 but second byte is not 0x50', () => {

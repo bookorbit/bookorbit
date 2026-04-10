@@ -187,6 +187,44 @@ describe('parsePdfFile', () => {
     expect(parsed?.pageCount).toBe(123);
   });
 
+  it('does not fall back to Info dictionary publisher/pageCount for projectx-authored PDFs when XMP is present', async () => {
+    mockPdfLoad.mockResolvedValue(
+      makePdfDoc({
+        getCreator: () => 'projectx',
+        getProducer: () => 'Legacy Publisher',
+      }) as never,
+    );
+    mockExtractXmpXml.mockReturnValue('<xmp/>');
+    mockParseXmp.mockReturnValue({
+      title: 'XMP Title',
+      subtitle: null,
+      description: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      authors: [],
+      genres: [],
+      tags: [],
+      isbn10: null,
+      isbn13: null,
+      seriesName: null,
+      seriesIndex: null,
+      rating: null,
+      pageCount: null,
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      openLibraryId: null,
+      itunesId: null,
+    });
+
+    const parsed = await parsePdfFile('/books/book.pdf');
+
+    expect(parsed?.publisher).toBeNull();
+    expect(parsed?.pageCount).toBeNull();
+  });
+
   it('falls back to legacy ProjectX producer metadata when XMP publisher is absent', async () => {
     mockPdfLoad.mockResolvedValue(
       makePdfDoc({

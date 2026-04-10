@@ -11,6 +11,11 @@ const parser = new XMLParser({
 function text(val: unknown): string | null {
   if (typeof val === 'string') return val.trim() || null;
   if (typeof val === 'number') return String(val);
+  if (typeof val === 'object' && val !== null && '#text' in val) {
+    const textNode = (val as Record<string, unknown>)['#text'];
+    if (typeof textNode === 'string') return textNode.trim() || null;
+    if (typeof textNode === 'number') return String(textNode);
+  }
   return null;
 }
 
@@ -37,6 +42,27 @@ function extractAnnotationText(val: unknown): string {
       .join(' ');
   }
   return '';
+}
+
+function parseFb2YearNode(val: unknown): number | null {
+  const candidates: string[] = [];
+  const direct = text(val);
+  if (direct) candidates.push(direct);
+
+  if (typeof val === 'object' && val !== null) {
+    const objectNode = val as Record<string, unknown>;
+    const valueAttr = text(objectNode['@_value']);
+    if (valueAttr) candidates.push(valueAttr);
+  }
+
+  for (const candidate of candidates) {
+    const match = candidate.match(/(\d{4})/);
+    if (!match) continue;
+    const year = parseInt(match[1], 10);
+    if (!isNaN(year) && year > 1000 && year < 2200) return year;
+  }
+
+  return null;
 }
 
 export interface Fb2Metadata {
@@ -107,10 +133,7 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
     let publishedYear: number | null = null;
     const publishInfo = description?.['publish-info'] as Record<string, unknown> | undefined;
     const yearRaw = publishInfo?.['year'] ?? titleInfo['date'];
-    if (typeof yearRaw === 'string' || typeof yearRaw === 'number') {
-      const y = parseInt(String(yearRaw), 10);
-      if (!isNaN(y) && y > 1000 && y < 2200) publishedYear = y;
-    }
+    publishedYear = parseFb2YearNode(yearRaw);
 
     // Annotation (description)
     let annotationDescription: string | null = null;

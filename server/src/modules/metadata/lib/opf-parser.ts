@@ -82,6 +82,16 @@ function parseProjectxTags(raw: string | null): string[] {
   }
 }
 
+function normalizeCreatorRole(role: string | null | undefined): string {
+  if (!role) return '';
+  const trimmed = role.trim().toLowerCase();
+  if (!trimmed) return '';
+  const pathParts = trimmed.split('/');
+  const withoutPath = pathParts[pathParts.length - 1] ?? trimmed;
+  const colonParts = withoutPath.split(':');
+  return colonParts[colonParts.length - 1] ?? withoutPath;
+}
+
 // Build a map of id → array of refining meta nodes (EPUB 3).
 function buildRefineMap(metas: unknown[]): Map<string, unknown[]> {
   const map = new Map<string, unknown[]>();
@@ -173,7 +183,7 @@ export function parseOpf(xml: string): ParsedOpf {
     const role3 = id ? getRefineValue(refineMap, id, 'role') : null;
     // EPUB 2: opf:role attribute
     const role2 = (mo['@_opf:role'] ?? mo['@_role']) as string | undefined;
-    const role = role3 ?? role2 ?? 'aut';
+    const role = normalizeCreatorRole(role3 ?? role2 ?? 'aut');
     if (role !== 'aut' && role !== '') continue; // skip editors, illustrators, etc.
 
     // EPUB 3: file-as via refines; EPUB 2: opf:file-as attribute

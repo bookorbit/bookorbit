@@ -8,6 +8,8 @@ const BLOCK_SIZE = 1024;
  * Partial MD5 fingerprint — reads 1 KB blocks from exponentially spaced positions
  * (1 KB, 4 KB, 16 KB, … up to 1 GB) rather than the entire file.
  * Used only when path and inode lookups both fail (cross-filesystem move detection).
+ * For files too small to reach the first sample offset, fall back to the first
+ * 1 KB so tiny files do not collapse to the same empty hash.
  */
 export async function fingerprintFile(absolutePath: string): Promise<string> {
   const fh = await open(absolutePath, 'r');
@@ -15,12 +17,24 @@ export async function fingerprintFile(absolutePath: string): Promise<string> {
     const { size } = await fh.stat();
     const hash = createHash('md5');
     const buf = Buffer.allocUnsafe(BLOCK_SIZE);
+    let sampled = false;
 
     for (let i = 0; i <= 10; i++) {
       const position = BASE << (2 * i);
       if (position >= size) break;
       const { bytesRead } = await fh.read(buf, 0, BLOCK_SIZE, position);
-      if (bytesRead > 0) hash.update(buf.subarray(0, bytesRead));
+      if (bytesRead > 0) {
+        hash.update(buf.subarray(0, bytesRead));
+        sampled = true;
+      }
+    }
+
+    if (!sampled && size > 0) {
+      const readLength = Math.min(BLOCK_SIZE, size);
+      const { bytesRead } = await fh.read(buf, 0, readLength, 0);
+      if (bytesRead > 0) {
+        hash.update(buf.subarray(0, bytesRead));
+      }
     }
 
     return hash.digest('hex');

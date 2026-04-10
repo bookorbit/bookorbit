@@ -5,6 +5,7 @@ import { readFile } from 'fs/promises';
 import { createInflateRaw } from 'zlib';
 import { createExtractorFromData } from 'node-unrar-js';
 import { getSevenZip } from '../../../common/sevenzip';
+import { imageContentTypeFromPath } from '../../../common/image-content-type';
 
 import type { RequestUser } from '../../../common/types/request-user';
 import { BookService } from '../../book/book.service';
@@ -27,10 +28,7 @@ function naturalSort(a: string, b: string): number {
 }
 
 function mimeForExt(name: string): string {
-  const ext = name.substring(name.lastIndexOf('.')).toLowerCase();
-  if (ext === '.png') return 'image/png';
-  if (ext === '.webp') return 'image/webp';
-  return 'image/jpeg';
+  return imageContentTypeFromPath(name);
 }
 
 // ── CBZ: ZIP byte-offset scan ──────────────────────────────────────────────────

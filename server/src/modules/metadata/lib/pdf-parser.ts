@@ -83,8 +83,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
     }
     const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
 
-    // XMP is the authoritative source — richer and semantically correct.
-    // Info Dictionary is used only as fallback for fields XMP doesn't cover.
+    // XMP is the authoritative source; Info Dictionary is fallback-only.
     const xmpXml = extractXmpXml(doc);
     const xmp: XmpParsed | null = xmpXml ? parseXmp(xmpXml) : null;
     const hasXmp = xmp !== null;
@@ -95,6 +94,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
     const infoProducer = clean(doc.getProducer());
     const infoSubject = clean(doc.getSubject());
     const infoKeywords = splitCommaList(clean(doc.getKeywords()));
+    const isProjectXInfo = infoCreator === PROJECTX_NS_PREFIX;
 
     const infoAuthors = infoAuthorRaw
       ? infoAuthorRaw
@@ -118,18 +118,18 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       subtitle: xmp?.subtitle ?? null,
       authors: hasXmp ? xmp.authors : infoAuthors,
       description: hasXmp ? xmp.description : infoSubject,
-      publisher: xmp?.publisher ?? (infoCreator === PROJECTX_NS_PREFIX ? infoProducer : null),
+      publisher: hasXmp ? (xmp.publisher ?? null) : isProjectXInfo ? infoProducer : null,
       publishedYear: xmp?.publishedYear ?? null,
       language: xmp?.language ?? null,
       genres: xmp?.genres?.length ? xmp.genres : [],
-      // Info Dict keywords are genres+tags mixed — only use as tags when XMP is absent
+      // Info Dict keywords are genres+tags mixed; only use as tags when XMP is absent.
       tags: hasXmp ? xmp.tags : infoKeywords,
       isbn10: xmp?.isbn10 ?? null,
       isbn13: xmp?.isbn13 ?? null,
       seriesName: xmp?.seriesName ?? null,
       seriesIndex: xmp?.seriesIndex ?? null,
       rating: xmp?.rating ?? null,
-      pageCount: xmp?.pageCount ?? doc.getPageCount(),
+      pageCount: hasXmp ? (xmp.pageCount ?? (isProjectXInfo ? null : doc.getPageCount())) : doc.getPageCount(),
       googleBooksId: xmp?.googleBooksId ?? null,
       goodreadsId: xmp?.goodreadsId ?? null,
       amazonId: xmp?.amazonId ?? null,

@@ -5,6 +5,7 @@ import { createReadStream } from 'fs';
 import { join } from 'path';
 import type { FastifyReply } from 'fastify';
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../../common/book-cover-storage';
+import { imageContentTypeFromPath } from '../../../common/image-content-type';
 import { KoboBookAccessService } from './kobo-book-access.service';
 
 @Injectable()
@@ -51,10 +52,9 @@ export class KoboThumbnailService {
         reply.status(304).send();
         return;
       }
-      const ext = cover.split('.').pop()?.toLowerCase();
       reply.header('Cache-Control', 'max-age=86400');
       reply.header('ETag', etag);
-      reply.type(ext === 'png' ? 'image/png' : 'image/jpeg');
+      reply.type(imageContentTypeFromPath(coverPath));
       reply.send(createReadStream(coverPath));
     } catch {
       throw new NotFoundException('No cover image');

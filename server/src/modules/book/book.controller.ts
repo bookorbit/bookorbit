@@ -23,6 +23,7 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteService } from '../file-write/file-write.service';
 import { BookService } from './book.service';
@@ -297,8 +298,7 @@ export class BookController {
       return;
     }
 
-    const ext = coverPath.split('.').pop()?.toLowerCase();
-    const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
+    const contentType = imageContentTypeFromPath(coverPath);
     reply.header('Cache-Control', 'private, max-age=86400');
     reply.header('ETag', etag);
     reply.type(contentType);

@@ -19,13 +19,13 @@ import {
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
-import { extname } from 'path';
 import { map, Observable } from 'rxjs';
 
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import type { AuthorMetadataCandidate } from '@projectx/types';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
@@ -228,8 +228,7 @@ export class AuthorsController {
     reply.header('Cache-Control', 'no-cache');
     reply.header('ETag', `"${Math.floor(mtimeMs)}"`);
 
-    const ext = extname(imagePath).toLowerCase();
-    reply.type(ext === '.png' ? 'image/png' : 'image/jpeg');
+    reply.type(imageContentTypeFromPath(imagePath));
     reply.send(createReadStream(imagePath));
   }
 

@@ -235,24 +235,42 @@ export async function waitForScanCompletion(db: Db, jobId: number, timeoutMs = 3
 }
 
 export async function locateBookFileByRelPath(ctx: MetadataWriteE2EContext, libraryId: number, relPath: string): Promise<LocatedBookFile> {
-  const [row] = await ctx.db
-    .select({
-      bookId: books.id,
-      bookFileId: bookFiles.id,
-      absolutePath: bookFiles.absolutePath,
-      relPath: bookFiles.relPath,
-      format: bookFiles.format,
-    })
-    .from(bookFiles)
-    .innerJoin(books, eq(books.id, bookFiles.bookId))
-    .where(and(eq(books.libraryId, libraryId), eq(bookFiles.relPath, relPath), eq(books.status, 'present')))
-    .limit(1);
+  const query = async (): Promise<LocatedBookFile | null> => {
+    const [row] = await ctx.db
+      .select({
+        bookId: books.id,
+        bookFileId: bookFiles.id,
+        absolutePath: bookFiles.absolutePath,
+        relPath: bookFiles.relPath,
+        format: bookFiles.format,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(and(eq(books.libraryId, libraryId), eq(bookFiles.relPath, relPath), eq(books.status, 'present')))
+      .limit(1);
+    return row ?? null;
+  };
 
-  if (!row) {
-    throw new Error(`No present book file found for relPath "${relPath}" in library ${libraryId}`);
-  }
+  const waitForRow = async (timeoutMs: number): Promise<LocatedBookFile | null> => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const row = await query();
+      if (row) return row;
+      await sleep(100);
+    }
+    return query();
+  };
 
-  return row;
+  const initial = await waitForRow(2_000);
+  if (initial) return initial;
+
+  // In CI and shared dev environments, fixture writes can occasionally race the
+  // first scan trigger. Perform one recovery scan before failing hard.
+  await triggerAndWaitForLibraryScan(ctx, libraryId);
+  const recovered = await waitForRow(2_000);
+  if (recovered) return recovered;
+
+  throw new Error(`No present book file found for relPath "${relPath}" in library ${libraryId}`);
 }
 
 export async function getLatestWriteLogEntry(db: Db, bookId: number, triggeredBy?: 'auto' | 'sync') {

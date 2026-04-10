@@ -20,6 +20,7 @@ import type { FastifyReply } from 'fastify';
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
+import { imageContentTypeFromPath } from '../../common/image-content-type';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import type { OpdsRequestUser } from './opds-auth.guard';
@@ -215,10 +216,9 @@ export class OpdsController {
         reply.status(304).send();
         return;
       }
-      const ext = cover.split('.').pop()?.toLowerCase();
       reply.header('Cache-Control', 'no-cache');
       reply.header('ETag', etag);
-      reply.type(ext === 'png' ? 'image/png' : 'image/jpeg');
+      reply.type(imageContentTypeFromPath(coverPath));
       reply.send(createReadStream(coverPath));
     } catch {
       throw new NotFoundException('No cover');

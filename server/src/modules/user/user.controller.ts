@@ -79,9 +79,25 @@ export class UserController {
     description: () => 'User uploaded a profile picture',
   })
   async uploadMyAvatar(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
-    const data = await req.file({ limits: { fileSize: MAX_USER_AVATAR_BYTES } });
+    let data;
+    try {
+      data = await req.file({ limits: { fileSize: MAX_USER_AVATAR_BYTES } });
+    } catch (error) {
+      if (isMultipartFileTooLargeError(error)) {
+        throw new BadRequestException('Image exceeds 5 MB limit');
+      }
+      throw error;
+    }
     if (!data) throw new BadRequestException('No file provided');
-    const buffer = await data.toBuffer();
+    let buffer: Buffer;
+    try {
+      buffer = await data.toBuffer();
+    } catch (error) {
+      if (isMultipartFileTooLargeError(error)) {
+        throw new BadRequestException('Image exceeds 5 MB limit');
+      }
+      throw error;
+    }
     return this.userAvatarService.uploadOwnAvatar(user, buffer, data.mimetype);
   }
 
@@ -229,4 +245,15 @@ export class UserController {
   adminResetPassword(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestingUser: RequestUser) {
     return this.userService.adminResetPassword(id, requestingUser);
   }
+}
+
+function isMultipartFileTooLargeError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const value = error as { code?: unknown; statusCode?: unknown; message?: unknown };
+  if (value.code === 'FST_REQ_FILE_TOO_LARGE') {
+    return true;
+  }
+  return value.statusCode === 413 && typeof value.message === 'string' && value.message.toLowerCase().includes('file too large');
 }

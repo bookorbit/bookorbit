@@ -2,6 +2,7 @@ import { join } from 'path';
 
 export const COVER_CUSTOM_FILE_PREFIX = 'cover_custom.';
 export const COVER_EXTRACTED_FILE_PREFIX = 'cover_extracted.';
+export const COVER_LEGACY_FILE_PREFIX = 'cover.';
 export const COVER_THUMBNAIL_FILE_NAME = 'thumbnail.jpg';
 
 export function bookCoverDirPath(appDataPath: string, bookId: number): string {
@@ -21,9 +22,13 @@ export function isExtractedBookCoverFileName(fileName: string): boolean {
 }
 
 export function findPreferredBookCoverFileName(files: readonly string[]): string | null {
-  return files.find(isCustomBookCoverFileName) ?? files.find(isExtractedBookCoverFileName) ?? null;
+  return files.find(isCustomBookCoverFileName) ?? files.find(isExtractedBookCoverFileName) ?? files.find(isLegacyBookCoverFileName) ?? null;
 }
 
 export function findExtractedBookCoverFileName(files: readonly string[]): string | null {
   return files.find(isExtractedBookCoverFileName) ?? null;
+}
+
+function isLegacyBookCoverFileName(fileName: string): boolean {
+  return fileName.startsWith(COVER_LEGACY_FILE_PREFIX);
 }

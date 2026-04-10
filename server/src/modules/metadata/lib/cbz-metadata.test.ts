@@ -151,6 +151,22 @@ describe('extractCbzMetadata', () => {
       expect(r?.description).toBe('Watchmen summary.');
     });
 
+    it('maps CommunityRating from 0-5 scale into 0-10 scale', async () => {
+      const xml = `<ComicInfo><CommunityRating>4.5</CommunityRating></ComicInfo>`;
+      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.rating).toBe(9);
+    });
+
+    it('clamps CommunityRating to a maximum of 10 after scaling', async () => {
+      const xml = `<ComicInfo><CommunityRating>8</CommunityRating></ComicInfo>`;
+      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.rating).toBe(10);
+    });
+
     it('truncates fractional year to integer', async () => {
       const xml = `<ComicInfo><Year>1986.5</Year></ComicInfo>`;
       mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);

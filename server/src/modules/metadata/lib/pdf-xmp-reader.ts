@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
+import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
 
 import { PROJECTX_NS_PREFIX } from '../../../common/projectx-ns';
 
@@ -41,7 +41,12 @@ export function extractXmpXml(doc: PDFDocument): string | null {
   if (!ref) return null;
   const stream = ref instanceof PDFRef ? doc.context.lookup(ref) : ref;
   if (!(stream instanceof PDFRawStream)) return null;
-  return Buffer.from(stream.contents).toString('utf-8');
+  try {
+    const decoded = decodePDFRawStream(stream).decode();
+    return Buffer.from(decoded).toString('utf-8');
+  } catch {
+    return Buffer.from(stream.contents).toString('utf-8');
+  }
 }
 
 // Handles plain text, rdf:Alt (Calibre-style i18n), and rdf:Seq/Bag first-item fallback.

@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import { fingerprintFile } from './hash';
 
 const EMPTY_MD5 = 'd41d8cd98f00b204e9800998ecf8427e';
-// 1 KB = 1024 bytes. The first read position is BASE (1024), so files <= 1024 bytes produce empty hash.
+// 1 KB = 1024 bytes. The first sampled offset is BASE (1024).
 const FIRST_READ_POSITION = 1024;
 
 let tmpDir: string;
@@ -27,11 +27,22 @@ describe('files smaller than the first read position', () => {
     expect(hash).toBe(EMPTY_MD5);
   });
 
-  it('returns MD5 of empty string for a file with exactly 1024 bytes', async () => {
-    // Position 1024 >= size 1024 → no read
+  it('falls back to hashing from byte 0 for a file with exactly 1024 bytes', async () => {
     await writeFile(join(tmpDir, 'exact.epub'), Buffer.alloc(FIRST_READ_POSITION, 'A'));
     const hash = await fingerprintFile(join(tmpDir, 'exact.epub'));
-    expect(hash).toBe(EMPTY_MD5);
+    expect(hash).not.toBe(EMPTY_MD5);
+  });
+
+  it('produces different fingerprints for different tiny files', async () => {
+    const a = Buffer.alloc(900, 'A');
+    const b = Buffer.alloc(900, 'A');
+    b.write('Z', 0, 'ascii');
+
+    await writeFile(join(tmpDir, 'a.epub'), a);
+    await writeFile(join(tmpDir, 'b.epub'), b);
+
+    const [h1, h2] = await Promise.all([fingerprintFile(join(tmpDir, 'a.epub')), fingerprintFile(join(tmpDir, 'b.epub'))]);
+    expect(h1).not.toBe(h2);
   });
 });
 

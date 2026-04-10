@@ -1,5 +1,6 @@
+import { PDFDocument, PDFName } from 'pdf-lib';
 import { PROJECTX_NS_PREFIX, PROJECTX_NS_URI } from '../../../common/projectx-ns';
-import { parseXmp } from './pdf-xmp-reader';
+import { extractXmpXml, parseXmp } from './pdf-xmp-reader';
 
 // Wraps XMP content in standard RDF envelope
 function xmpDoc(body: string): string {
@@ -248,5 +249,36 @@ describe('parseXmp', () => {
       const r = parseXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><other/></x:xmpmeta>');
       expect(r).toBeNull();
     });
+  });
+});
+
+describe('extractXmpXml', () => {
+  it('decodes compressed metadata streams', async () => {
+    const xmp = xmpDoc('<dc:title>Compressed title</dc:title>');
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+
+    const metadata = doc.context.flateStream(Buffer.from(xmp, 'utf-8'), {
+      Type: PDFName.of('Metadata'),
+      Subtype: PDFName.of('XML'),
+    });
+    const metadataRef = doc.context.register(metadata);
+    doc.catalog.set(PDFName.of('Metadata'), metadataRef);
+
+    const bytes = await doc.save();
+    const loaded = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    const xml = extractXmpXml(loaded);
+
+    expect(xml).toContain('<dc:title>Compressed title</dc:title>');
+  });
+
+  it('returns null when the PDF has no metadata stream', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+
+    const bytes = await doc.save();
+    const loaded = await PDFDocument.load(bytes, { ignoreEncryption: true });
+
+    expect(extractXmpXml(loaded)).toBeNull();
   });
 });

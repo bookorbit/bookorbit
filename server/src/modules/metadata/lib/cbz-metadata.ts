@@ -180,7 +180,7 @@ function parseCbxRating(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
-  return Math.min(5, Math.max(0, parsed * 2));
+  return Math.min(10, Math.max(0, parsed * 2));
 }
 
 function parseIsbn13(value: string | null): string | null {

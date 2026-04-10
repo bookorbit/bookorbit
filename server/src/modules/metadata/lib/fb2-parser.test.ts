@@ -163,6 +163,11 @@ describe('parseFb2File', () => {
       mockReadFile.mockResolvedValue(makeFb2('<book-title>Book</book-title><date>1984</date>') as unknown as Buffer);
       expect((await parseFb2File('/book.fb2'))?.publishedYear).toBe(1984);
     });
+
+    it('parses year from title-info/date value attribute', async () => {
+      mockReadFile.mockResolvedValue(makeFb2('<book-title>Book</book-title><date value="1984-01-01"/>') as unknown as Buffer);
+      expect((await parseFb2File('/book.fb2'))?.publishedYear).toBe(1984);
+    });
   });
 
   describe('description (annotation)', () => {

@@ -22,9 +22,11 @@ describe('book-cover-storage', () => {
     expect(isExtractedBookCoverFileName('cover_custom.jpg')).toBe(false);
   });
 
-  it('prefers custom covers over extracted covers', () => {
+  it('prefers custom and extracted covers over legacy cover files', () => {
     expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover_extracted.jpg', 'cover_custom.png'])).toBe('cover_custom.png');
     expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover_extracted.jpg'])).toBe('cover_extracted.jpg');
+    expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover.jpg'])).toBe('cover.jpg');
+    expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover.png'])).toBe('cover.png');
     expect(findPreferredBookCoverFileName(['thumbnail.jpg'])).toBeNull();
   });
 
