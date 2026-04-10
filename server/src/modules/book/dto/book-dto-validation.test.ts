@@ -11,6 +11,7 @@ import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
 import { UpdateBookMetadataDto } from './update-book-metadata.dto';
 import { UpdateRatingDto } from './update-rating.dto';
+import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
 
 async function errorsFor<T extends object>(cls: new () => T, value: Record<string, unknown>) {
   const dto = plainToInstance(cls, value);
@@ -122,5 +123,15 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateRatingDto, { rating: 3 })).length).toBe(0);
     expect((await errorsFor(UpdateRatingDto, { rating: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateRatingDto, { rating: 6 })).length).toBeGreaterThan(0);
+  });
+
+  it('validates audiobook progress bounds for percentage and position', async () => {
+    expect((await errorsFor(UpsertAudioProgressDto, { percentage: 0, currentFileId: 1, positionSeconds: 0 })).length).toBe(0);
+    expect((await errorsFor(UpsertAudioProgressDto, { percentage: 100, currentFileId: 2, positionSeconds: 120.5 })).length).toBe(0);
+
+    expect((await errorsFor(UpsertAudioProgressDto, { percentage: -1, currentFileId: 1, positionSeconds: 0 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpsertAudioProgressDto, { percentage: 101, currentFileId: 1, positionSeconds: 0 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpsertAudioProgressDto, { percentage: 10, currentFileId: 0, positionSeconds: 0 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpsertAudioProgressDto, { percentage: 10, currentFileId: 1, positionSeconds: -5 })).length).toBeGreaterThan(0);
   });
 });

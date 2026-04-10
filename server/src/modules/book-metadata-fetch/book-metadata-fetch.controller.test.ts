@@ -88,4 +88,55 @@ describe('BookMetadataFetchController', () => {
     );
     expect(result).toEqual({ count: 12 });
   });
+
+  it('gets and updates global config through config service', async () => {
+    configService.getGlobalConfig.mockResolvedValueOnce({ enabled: false }).mockResolvedValueOnce({ enabled: true });
+    configService.setGlobalConfig.mockResolvedValue(undefined);
+
+    await expect(controller.getConfig()).resolves.toEqual({ enabled: false });
+    await expect(controller.updateConfig({ enabled: true } as never)).resolves.toEqual({ enabled: true });
+    expect(configService.setGlobalConfig).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it('gets library config and writes null override for empty payloads', async () => {
+    configService.getLibraryConfigWithLastRun.mockResolvedValue({ enabled: true });
+    configService.getEffectiveConfig.mockResolvedValue({ enabled: false });
+    configService.setLibraryOverride.mockResolvedValue(undefined);
+
+    await expect(controller.getLibraryConfig(22)).resolves.toEqual({ enabled: true });
+    await expect(controller.updateLibraryConfig(22, {} as never)).resolves.toEqual({ enabled: false });
+    expect(configService.setLibraryOverride).toHaveBeenCalledWith(22, null);
+  });
+
+  it('returns status summary merged with paused state and session snapshot', async () => {
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, failed: 2 });
+    configService.isPaused.mockResolvedValue(true);
+    session.getSnapshot.mockReturnValue({ sessionTotal: 7, sessionDone: 3, currentItemName: 'Book' });
+
+    await expect(controller.getStatus()).resolves.toEqual({
+      queued: 3,
+      processing: 1,
+      failed: 2,
+      paused: true,
+      sessionTotal: 7,
+      sessionDone: 3,
+      currentItemName: 'Book',
+    });
+  });
+
+  it('run and control endpoints proxy orchestrator return shapes', async () => {
+    orchestrator.triggerGlobal.mockResolvedValue(5);
+    orchestrator.triggerForLibrary.mockResolvedValue(2);
+    orchestrator.requeueFailed.mockResolvedValue(4);
+    orchestrator.pause.mockResolvedValue(undefined);
+    orchestrator.resume.mockResolvedValue(undefined);
+    orchestrator.cancelPending.mockResolvedValue(undefined);
+
+    await expect(controller.triggerGlobal()).resolves.toEqual({ queued: 5 });
+    await expect(controller.triggerForLibrary(9)).resolves.toEqual({ queued: 2 });
+    await expect(controller.pause()).resolves.toEqual({ paused: true });
+    await expect(controller.resume()).resolves.toEqual({ paused: false });
+    await expect(controller.cancel()).resolves.toEqual({ cancelled: true });
+    await expect(controller.retryFailed()).resolves.toEqual({ requeued: 4 });
+  });
 });

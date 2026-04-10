@@ -55,15 +55,24 @@ describe('AuthorEnrichmentRepository', () => {
     updateBuilder.where.mockReturnValue(updateBuilder);
     updateBuilder.returning.mockResolvedValue([]);
 
+    const deleteBuilder = {
+      where: vi.fn(),
+      returning: vi.fn(),
+    };
+    deleteBuilder.where.mockReturnValue(deleteBuilder);
+    deleteBuilder.returning.mockResolvedValue([]);
+
     return {
       insertBuilder,
       selectBuilder,
       updateBuilder,
+      deleteBuilder,
       db: {
         insert: vi.fn().mockReturnValue(insertBuilder),
         select: vi.fn().mockReturnValue(selectBuilder),
         selectDistinct: vi.fn().mockReturnValue(selectBuilder),
         update: vi.fn().mockReturnValue(updateBuilder),
+        delete: vi.fn().mockReturnValue(deleteBuilder),
       },
     };
   };
@@ -235,6 +244,90 @@ describe('AuthorEnrichmentRepository', () => {
       failed: 3,
       done: 0,
       total: 10,
+    });
+  });
+
+  it('filterEligibleAuthorIds short-circuits empty ids or disabled conditions', async () => {
+    const { db } = makeDb();
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    await expect(repo.filterEligibleAuthorIds([], { neverEnriched: true, missingBio: false, missingPhoto: false })).resolves.toEqual([]);
+    await expect(repo.filterEligibleAuthorIds([1, 2], { neverEnriched: false, missingBio: false, missingPhoto: false })).resolves.toEqual([]);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('filterEligibleAuthorIds returns only ids matching built predicates', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ id: 2 }, { id: 5 }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    await expect(repo.filterEligibleAuthorIds([1, 2, 5], { neverEnriched: true, missingBio: false, missingPhoto: false })).resolves.toEqual([2, 5]);
+  });
+
+  it('enqueueAllLinkedAuthors schedules distinct linked author ids', async () => {
+    const { db, selectBuilder, insertBuilder } = makeDb();
+    selectBuilder.from.mockResolvedValueOnce([{ authorId: 11 }, { authorId: 12 }]);
+    insertBuilder.returning.mockResolvedValueOnce([{ authorId: 11 }, { authorId: 12 }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    await expect(repo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL)).resolves.toBe(2);
+    expect(db.selectDistinct).toHaveBeenCalled();
+  });
+
+  it('markDone clears queue row and updates author enrichment fields', async () => {
+    const { db, deleteBuilder, updateBuilder } = makeDb();
+    const repo = new AuthorEnrichmentRepository(db as never);
+    deleteBuilder.where.mockResolvedValueOnce(undefined);
+    updateBuilder.where.mockResolvedValueOnce(undefined);
+
+    await repo.markDone(44, true);
+
+    expect(db.delete).toHaveBeenCalled();
+    expect(updateBuilder.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastEnrichedAt: expect.any(Date),
+        hasPhoto: true,
+      }),
+    );
+  });
+
+  it('cancelPending, requeueFailed, and resetAllProcessingOnBoot return affected counts', async () => {
+    const { db, deleteBuilder, updateBuilder } = makeDb();
+    const repo = new AuthorEnrichmentRepository(db as never);
+    deleteBuilder.returning.mockResolvedValueOnce([{ authorId: 1 }]);
+    updateBuilder.returning.mockResolvedValueOnce([{ authorId: 2 }, { authorId: 3 }]).mockResolvedValueOnce([{ authorId: 4 }]);
+
+    await expect(repo.cancelPending()).resolves.toBe(1);
+    await expect(repo.requeueFailed()).resolves.toBe(2);
+    await expect(repo.resetAllProcessingOnBoot()).resolves.toBe(1);
+  });
+
+  it('getFailedItems maps failed rows and total count', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ cnt: 1 }]);
+    selectBuilder.limit.mockReturnValueOnce(selectBuilder);
+    selectBuilder.offset.mockResolvedValueOnce([
+      {
+        authorId: 7,
+        name: 'Author Seven',
+        error: 'provider timeout',
+        httpStatus: 504,
+        failedAt: new Date('2026-01-01T00:00:00Z'),
+      },
+    ]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    await expect(repo.getFailedItems(1, 20)).resolves.toEqual({
+      items: [
+        {
+          authorId: 7,
+          name: 'Author Seven',
+          error: 'provider timeout',
+          httpStatus: 504,
+          failedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      total: 1,
     });
   });
 });

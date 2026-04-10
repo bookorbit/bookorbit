@@ -168,7 +168,7 @@ jobs:
           JUNIT_OUTPUT: ${{ github.workspace }}/test-results/${{ matrix.package }}/junit.xml
         run: |
           if [[ "$PACKAGE" == "server" ]]; then
-            pnpm --filter server exec vitest --run --reporter=default --reporter=github-actions --reporter=junit --outputFile.junit="$JUNIT_OUTPUT"
+            pnpm --filter server exec vitest --run --coverage --reporter=default --reporter=github-actions --reporter=junit --outputFile.junit="$JUNIT_OUTPUT"
           else
             pnpm --filter client exec vitest --run --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
           fi

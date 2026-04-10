@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -11,7 +11,7 @@ export class EpubController {
 
   @Get(':bookId/info')
   getBookInfo(@Param('bookId', ParseIntPipe) bookId: number, @Query('fileId') fileId: string | undefined, @CurrentUser() user: RequestUser) {
-    return this.epubService.getBookInfo(bookId, fileId != null ? Number(fileId) : undefined, user);
+    return this.epubService.getBookInfo(bookId, this.parseFileId(fileId), user);
   }
 
   @Get(':bookId/file/*')
@@ -22,16 +22,38 @@ export class EpubController {
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
-    const filePath = encodedPath
-      .split('/')
-      .map((s) => decodeURIComponent(s))
-      .join('/');
+    const filePath = this.decodePathParam(encodedPath);
 
-    const { stream, contentType, size } = await this.epubService.streamFile(bookId, filePath, fileId != null ? Number(fileId) : undefined, user);
+    const { stream, contentType, size } = await this.epubService.streamFile(bookId, filePath, this.parseFileId(fileId), user);
 
     reply.header('Content-Type', contentType);
     if (size > 0) reply.header('Content-Length', size);
     reply.header('Cache-Control', 'public, max-age=3600');
     reply.send(stream);
+  }
+
+  private parseFileId(fileId: string | undefined): number | undefined {
+    if (fileId === undefined) return undefined;
+    const value = fileId.trim();
+    if (!/^\d+$/.test(value)) {
+      throw new BadRequestException('Invalid fileId');
+    }
+
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException('Invalid fileId');
+    }
+    return parsed;
+  }
+
+  private decodePathParam(encodedPath: string): string {
+    try {
+      return encodedPath
+        .split('/')
+        .map((segment) => decodeURIComponent(segment))
+        .join('/');
+    } catch {
+      throw new BadRequestException('Invalid file path');
+    }
   }
 }

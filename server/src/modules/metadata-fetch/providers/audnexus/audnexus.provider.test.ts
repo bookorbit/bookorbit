@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MetadataProviderKey, ProviderConfigurations } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { ProviderThrottleError } from '../../provider-throttle.error';
 import { AudnexusProvider } from './audnexus.provider';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -116,5 +117,88 @@ describe('AudnexusProvider', () => {
     expect(global.fetch).toHaveBeenCalledTimes(3);
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('https://api.audible.com/1.0/catalog/products'), expect.any(Object));
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('keywords=Artificial+Condition+Martha+Wells'), expect.any(Object));
+  });
+
+  it('returns empty results when title/author cannot produce an Audible query', async () => {
+    global.fetch = vi.fn();
+
+    const result = await provider.search({
+      title: '   ',
+      author: '   ',
+      isAudiobook: true,
+    });
+
+    expect(result).toEqual([]);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('returns empty results for non-ok Audible or AudNexus book responses', async () => {
+    global.fetch = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({ products: [] }, 503)))
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({ products: [{ asin: 'B0BROKEN001' }] })))
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({}, 404)))
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({}, 200)));
+
+    const resolveFailure = await provider.search({
+      title: 'Failure One',
+      isAudiobook: true,
+    });
+    const lookupFailure = await provider.search({
+      title: 'Failure Two',
+      isAudiobook: true,
+    });
+
+    expect(resolveFailure).toEqual([]);
+    expect(lookupFailure).toEqual([]);
+  });
+
+  it('returns metadata even when chapters lookup fails, and propagates throttle errors', async () => {
+    global.fetch = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({ products: [{ asin: 'B0CHAPTERS01' }] })))
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({ asin: 'B0CHAPTERS01', name: 'Book without chapters' })))
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({}, 500)))
+      .mockImplementationOnce(() => Promise.reject(new ProviderThrottleError(30)));
+
+    const result = await provider.search({
+      title: 'Book without chapters',
+      isAudiobook: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].providerId).toBe('B0CHAPTERS01');
+
+    await expect(
+      provider.search({
+        title: 'Throttle me',
+        isAudiobook: true,
+      }),
+    ).rejects.toThrow(ProviderThrottleError);
+  });
+
+  it('returns empty results when Audible ASIN resolution throws a non-throttle error', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('audible unavailable'));
+
+    const result = await provider.search({
+      title: 'Transient Audible failure',
+      isAudiobook: true,
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty results when internal AudNexus lookup throws an unexpected error', async () => {
+    const fetchByAsinSpy = vi.spyOn(provider as any, 'fetchByAsin').mockRejectedValue(new Error('unexpected lookup crash'));
+
+    const result = await provider.search({
+      title: 'Use stored ASIN',
+      isAudiobook: true,
+      existingProviderIds: {
+        [MetadataProviderKey.AUDIBLE]: 'B0INTERNAL01',
+      },
+    });
+
+    expect(result).toEqual([]);
+    expect(fetchByAsinSpy).toHaveBeenCalledWith('B0INTERNAL01', undefined);
   });
 });

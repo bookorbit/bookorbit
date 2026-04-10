@@ -256,8 +256,8 @@ export class AuthorsController {
     action: AuditAction.AuthorMerge,
     resource: AuditResource.Author,
     description: (req) => {
-      const body = req.body as { sourceIds?: number[]; targetId?: number };
-      return `Merged ${body?.sourceIds?.length ?? 0} author(s) into author #${body?.targetId ?? 'unknown'}`;
+      const body = req.body as { sourceAuthorIds?: number[]; targetAuthorId?: number };
+      return `Merged ${body?.sourceAuthorIds?.length ?? 0} author(s) into author #${body?.targetAuthorId ?? 'unknown'}`;
     },
   })
   merge(@CurrentUser() user: RequestUser, @Body() dto: MergeAuthorsDto) {

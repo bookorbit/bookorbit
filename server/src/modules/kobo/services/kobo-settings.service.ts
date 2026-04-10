@@ -65,6 +65,10 @@ export class KoboSettingsService {
       .where(eq(schema.koboSyncSettings.userId, userId))
       .returning();
 
+    if (!updated) {
+      throw new InternalServerErrorException('Failed to update kobo settings row');
+    }
+
     return {
       readingThreshold: updated.readingThreshold,
       finishedThreshold: updated.finishedThreshold,

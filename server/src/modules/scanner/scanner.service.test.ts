@@ -21,6 +21,7 @@ import { DEFAULT_FORMAT_PRIORITY } from './lib/classify';
 import type { BookCandidate, FileStat } from './lib/walk';
 import { findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
 import { fingerprintFile } from './lib/hash';
+import * as assembleBookCardsModule from '../book/utils/assemble-book-cards';
 
 const mockFindCandidates = findBookCandidates as MockedFunction<typeof findBookCandidates>;
 const mockFindLooseCandidates = findLooseFileCandidates as MockedFunction<typeof findLooseFileCandidates>;
@@ -115,6 +116,7 @@ const mockGateway = {
   emitBookMissing: vi.fn(),
   emitBookRestored: vi.fn(),
   emitBookMoved: vi.fn(),
+  emitBooksAdded: vi.fn(),
   emitCoverRefreshed: vi.fn(),
   emitCoverRefreshProgress: vi.fn(),
 };
@@ -1575,5 +1577,138 @@ describe('book_per_file mode — scanBookFolder', () => {
 
     // Normal path: buildSingleBookCandidate is called for the folder
     expect(mockBuildSingleCandidate).toHaveBeenCalledWith('/library/Author/Book', '/library', expect.any(Array), expect.any(Function));
+  });
+});
+
+describe('bootstrap, wrappers, and cover refresh', () => {
+  it('marks running scan jobs as failed on application bootstrap', async () => {
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+
+    await service.onApplicationBootstrap();
+
+    expect(repo.failAllRunningJobs).toHaveBeenCalledWith('Server restarted during scan');
+  });
+
+  it('does not start another async scan when one is already running', () => {
+    const repo = makeRepo();
+    const { service, jobStore } = makeService(repo);
+    const startScanSpy = vi.spyOn(service, 'startScan');
+    jobStore.create(500, 1, 0);
+
+    service.startScanAsync(1);
+
+    expect(startScanSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs async start failures from startScanAsync', async () => {
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+    vi.spyOn(service, 'startScan').mockRejectedValue(new Error('queue failed'));
+
+    service.startScanAsync(4);
+    await Promise.resolve();
+
+    expect(Logger.prototype.error).toHaveBeenCalledWith(expect.stringContaining('[scanner.start_scan] [fail] libraryId=4'));
+  });
+
+  it('reports scan running state from ScanJobStore', () => {
+    const repo = makeRepo();
+    const { service, jobStore } = makeService(repo);
+
+    expect(service.isScanRunning(8)).toBe(false);
+    jobStore.create(900, 8, 0);
+    expect(service.isScanRunning(8)).toBe(true);
+  });
+
+  it('logs targeted scan failures from scanBookFolderAsync wrapper', async () => {
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+    vi.spyOn(service as any, 'scanBookFolder').mockRejectedValue(new Error('targeted scan failed'));
+
+    service.scanBookFolderAsync('/library/Author/Book/book.epub', 1);
+    await Promise.resolve();
+
+    expect(Logger.prototype.error).toHaveBeenCalledWith(expect.stringContaining('[scanner.scan_book_folder] [fail]'));
+  });
+
+  it('refreshes covers in the background and emits progress/completion events', async () => {
+    const repo = makeRepo({
+      findPrimaryBookFilesByLibrary: vi.fn().mockResolvedValue([
+        { bookId: 1, absolutePath: '/library/Book/book.epub', format: 'epub' },
+        { bookId: 2, absolutePath: '/library/Book/readme.txt', format: 'txt' },
+        { bookId: 3, absolutePath: '/library/Book/book.pdf', format: 'pdf' },
+      ]),
+    });
+    mockMetadata.refreshCoverForBook.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const { service } = makeService(repo);
+
+    await expect(service.refreshCovers(1)).resolves.toEqual({ queued: 2 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockMetadata.refreshCoverForBook).toHaveBeenNthCalledWith(1, 1, '/library/Book/book.epub', 'epub');
+    expect(mockMetadata.refreshCoverForBook).toHaveBeenNthCalledWith(2, 3, '/library/Book/book.pdf', 'pdf');
+    expect(mockGateway.emitCoverRefreshed).toHaveBeenCalledWith({ bookId: 1, libraryId: 1 });
+    expect(mockGateway.emitCoverRefreshProgress).toHaveBeenNthCalledWith(1, { libraryId: 1, processed: 0, total: 2, status: 'running' });
+    expect(mockGateway.emitCoverRefreshProgress).toHaveBeenNthCalledWith(2, { libraryId: 1, processed: 1, total: 2, status: 'running' });
+    expect(mockGateway.emitCoverRefreshProgress).toHaveBeenNthCalledWith(3, { libraryId: 1, processed: 2, total: 2, status: 'completed' });
+  });
+
+  it('rethrows refreshCovers query failures', async () => {
+    const repo = makeRepo({
+      findPrimaryBookFilesByLibrary: vi.fn().mockRejectedValue(new Error('lookup failed')),
+    });
+    const { service } = makeService(repo);
+
+    await expect(service.refreshCovers(9)).rejects.toThrow('lookup failed');
+    expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('[scanner.refresh_covers] [fail]'));
+  });
+
+  it('logs refreshCovers background failures without failing the initial request', async () => {
+    const repo = makeRepo({
+      findPrimaryBookFilesByLibrary: vi.fn().mockResolvedValue([{ bookId: 7, absolutePath: '/library/Book/book.epub', format: 'epub' }]),
+    });
+    mockMetadata.refreshCoverForBook.mockRejectedValueOnce(new Error('provider timeout'));
+    const { service } = makeService(repo);
+
+    await expect(service.refreshCovers(5)).resolves.toEqual({ queued: 1 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('[scanner.refresh_covers] [fail]'));
+  });
+
+  it('flushes buffered added books immediately at threshold and emits built cards', async () => {
+    vi.useFakeTimers();
+    const repo = makeRepo({
+      findBookCardData: vi.fn().mockResolvedValue({ rows: [{ id: 1 }], authorRows: [], fileRows: [], genreRows: [] }),
+    });
+    const assembleSpy = vi.spyOn(assembleBookCardsModule, 'assembleBookCards').mockReturnValue([{ id: 1 }] as any);
+    const { service } = makeService(repo);
+    const flushSpy = vi.spyOn(service as any, 'flushBookEmitBuffer');
+
+    for (let i = 0; i < 20; i++) {
+      (service as any).bufferBookForEmit(3, i + 1);
+    }
+
+    expect(flushSpy).toHaveBeenCalledWith(3);
+    await (service as any).buildAndEmitBookCards(3, [1]);
+    expect(mockGateway.emitBooksAdded).toHaveBeenCalledWith({ libraryId: 3, books: [{ id: 1 }] });
+    expect(assembleSpy).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('schedules a delayed book buffer flush before the threshold is reached', () => {
+    vi.useFakeTimers();
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+    const flushSpy = vi.spyOn(service as any, 'flushBookEmitBuffer').mockImplementation(() => undefined);
+
+    (service as any).bufferBookForEmit(6, 42);
+    vi.runOnlyPendingTimers();
+
+    expect(flushSpy).toHaveBeenCalledWith(6);
+    vi.useRealTimers();
   });
 });

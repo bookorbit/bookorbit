@@ -1,192 +1,321 @@
+import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MigrationSourceService, resolveConnectionConfig } from './migration-source.service';
 
 const noopEncryption = {
-  encryptConfig: (c: Record<string, unknown>) => c,
-  decryptConfig: (c: unknown) => c as Record<string, unknown>,
+  encryptConfig: vi.fn((c: Record<string, unknown>) => c),
+  decryptConfig: vi.fn((c: unknown) => c as Record<string, unknown>),
   isConfigured: () => false,
 } as never;
 
+function buildSource(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 1,
+    type: 'booklore',
+    name: 'Existing Source',
+    connectionConfig: { host: 'db.example.com', user: 'admin', password: 'real-secret-password', database: 'booklore' },
+    capabilities: null,
+    lastValidatedAt: new Date(),
+    createdByUserId: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+function validationResult(ok: boolean) {
+  return {
+    ok,
+    sourceType: 'booklore',
+    sourceVersion: '1.0',
+    warnings: ok ? [] : ['warning'],
+    counts: { books: 12 },
+    missingTables: ok ? [] : ['books'],
+  };
+}
+
+function createService(overrides: Partial<Record<string, unknown>> = {}) {
+  const adapter = {
+    validate: vi.fn(() => Promise.resolve(validationResult(true))),
+    fetchPathPrefixes: vi.fn(() => Promise.resolve(['/library'])),
+  };
+  const repo = {
+    findSourceById: vi.fn(() => Promise.resolve(buildSource())),
+    listRuns: vi.fn(() => Promise.resolve([])),
+    listSources: vi.fn(() => Promise.resolve([buildSource()])),
+    updateSource: vi.fn((id: number, values: Record<string, unknown>) => Promise.resolve({ ...buildSource(), ...values, id })),
+    createSource: vi.fn((values: Record<string, unknown>) => Promise.resolve({ ...buildSource({ id: 5 }), ...values })),
+    updateSourceValidation: vi.fn(() => Promise.resolve(buildSource())),
+    purgeRunState: vi.fn(() => Promise.resolve()),
+    ...overrides,
+  };
+  const adapterRegistry = {
+    listTypes: vi.fn(() => ['booklore']),
+    get: vi.fn(() => adapter),
+  };
+  const service = new MigrationSourceService(repo as never, adapterRegistry as never, noopEncryption);
+  return { service, repo, adapterRegistry, adapter };
+}
+
 describe('MigrationSourceService', () => {
-  describe('createSource - password sentinel', () => {
-    it('preserves existing password when sentinel is sent back', async () => {
-      const existingSource = {
-        id: 1,
-        type: 'booklore',
-        name: 'Existing Source',
-        connectionConfig: { host: 'db.example.com', user: 'admin', password: 'real-secret-password', database: 'booklore' },
-        capabilities: null,
-        lastValidatedAt: new Date(),
-        createdByUserId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+  it('lists supported source types from the adapter registry', () => {
+    const { service } = createService();
+    expect(service.listSupportedSourceTypes()).toEqual(['booklore']);
+  });
 
-      const updateSource = vi.fn((id: number, values: Record<string, unknown>) => {
-        return Promise.resolve({ ...existingSource, ...values, id });
-      });
+  it('tests a source through the matching adapter', async () => {
+    const { service, adapterRegistry, adapter } = createService();
+    const result = await service.testSource({
+      type: 'booklore',
+      connectionConfig: { host: 'db.local', user: 'u', password: 'pw', database: 'booklore' },
+    });
 
-      const validate = vi.fn(() =>
-        Promise.resolve({
+    expect(adapterRegistry.get).toHaveBeenCalledWith('booklore');
+    expect(adapter.validate).toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+  });
+
+  it('validateSourceById persists successful validation payload and clears stale run state', async () => {
+    const updateSourceValidation = vi.fn(() => Promise.resolve(buildSource()));
+    const { service, repo } = createService({ updateSourceValidation });
+
+    const result = await service.validateSourceById(1);
+
+    expect(result.ok).toBe(true);
+    expect(updateSourceValidation).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        capabilities: expect.objectContaining({
           ok: true,
           sourceType: 'booklore',
           sourceVersion: '1.0',
-          warnings: [],
-          counts: {},
-          missingTables: [],
         }),
-      );
+        lastValidatedAt: expect.any(Date),
+      }),
+    );
+    expect(repo.purgeRunState).toHaveBeenCalledWith(1);
+  });
 
-      const repo = {
-        findSourceById: vi.fn(() => Promise.resolve(existingSource)),
-        listRuns: vi.fn(() => Promise.resolve([])),
-        listSources: vi.fn(() => Promise.resolve([existingSource])),
-        updateSource,
-        createSource: vi.fn(),
-        purgeRunState: vi.fn(() => Promise.resolve()),
-      };
+  it('validateSourceById stores null lastValidatedAt when validation fails', async () => {
+    const updateSourceValidation = vi.fn(() => Promise.resolve(buildSource()));
+    const { service, adapter, repo } = createService({ updateSourceValidation });
+    adapter.validate.mockResolvedValue(validationResult(false));
 
-      const service = new MigrationSourceService(repo as never, { listTypes: vi.fn(), get: () => ({ validate }) } as never, noopEncryption);
+    const result = await service.validateSourceById(1);
 
-      await service.createSource(
-        {
-          type: 'booklore',
-          name: 'Existing Source',
-          connectionConfig: { host: 'db.example.com', user: 'admin', password: '********', database: 'booklore' },
-        },
-        1,
-      );
+    expect(result.ok).toBe(false);
+    expect(updateSourceValidation).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        capabilities: expect.objectContaining({
+          ok: false,
+          missingTables: ['books'],
+        }),
+        lastValidatedAt: null,
+      }),
+    );
+    expect(repo.purgeRunState).toHaveBeenCalledWith(1);
+  });
 
-      const calledConfig = updateSource.mock.calls[0][1].connectionConfig as Record<string, unknown>;
-      expect(calledConfig.password).toBe('real-secret-password');
+  it('throws NotFoundException when validateSourceById source is missing', async () => {
+    const { service } = createService({
+      findSourceById: vi.fn(() => Promise.resolve(null)),
     });
 
-    it('uses new password when non-sentinel value is sent', async () => {
-      const existingSource = {
-        id: 1,
+    await expect(service.validateSourceById(999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('createSource updates existing source and preserves sentinel password', async () => {
+    const existingSource = buildSource({
+      id: 7,
+      connectionConfig: {
+        host: 'db.example.com',
+        user: 'admin',
+        password: 'keep-this',
+        database: 'booklore',
+      },
+    });
+    const updateSource = vi.fn((id: number, values: Record<string, unknown>) => Promise.resolve({ ...existingSource, ...values, id }));
+    const { service } = createService({
+      listSources: vi.fn(() =>
+        Promise.resolve([
+          existingSource,
+          buildSource({
+            id: 8,
+            name: 'Existing Source 2',
+            connectionConfig: { host: 'db.example.com', user: 'admin', password: 'x', database: 'booklore' },
+          }),
+        ]),
+      ),
+      updateSource,
+    });
+
+    const result = await service.createSource(
+      {
         type: 'booklore',
-        name: 'Existing Source',
-        connectionConfig: { host: 'db.example.com', user: 'admin', password: 'old-password', database: 'booklore' },
-        capabilities: null,
-        lastValidatedAt: new Date(),
-        createdByUserId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+        name: 'Existing Source 2',
+        connectionConfig: {
+          host: 'db.example.com',
+          user: 'admin',
+          password: '********',
+          database: 'booklore',
+        },
+      },
+      42,
+    );
 
-      const updateSource = vi.fn((id: number, values: Record<string, unknown>) => {
-        return Promise.resolve({ ...existingSource, ...values, id });
-      });
+    const calledConfig = updateSource.mock.calls[0][1].connectionConfig as Record<string, unknown>;
+    expect(calledConfig.password).toBe('keep-this');
+    expect(updateSource).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        type: 'booklore',
+        name: 'Existing Source 2 2',
+        createdByUserId: 42,
+      }),
+    );
+    expect((result.connectionConfig as Record<string, unknown>).password).toBe('********');
+  });
 
-      const validate = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          sourceType: 'booklore',
-          sourceVersion: '1.0',
-          warnings: [],
-          counts: {},
-          missingTables: [],
-        }),
-      );
+  it('createSource inserts a new source when no existing source exists', async () => {
+    const createSource = vi.fn((values: Record<string, unknown>) => Promise.resolve({ ...buildSource({ id: 11 }), ...values }));
+    const { service, repo } = createService({
+      listSources: vi.fn(() => Promise.resolve([])),
+      createSource,
+    });
 
-      const repo = {
-        findSourceById: vi.fn(() => Promise.resolve(existingSource)),
-        listRuns: vi.fn(() => Promise.resolve([])),
-        listSources: vi.fn(() => Promise.resolve([existingSource])),
-        updateSource,
-        createSource: vi.fn(),
-        purgeRunState: vi.fn(() => Promise.resolve()),
-      };
+    const result = await service.createSource(
+      {
+        type: '  BOOKLORE  ',
+        name: ' New Source ',
+        connectionConfig: {
+          host: 'db.example.com',
+          user: 'admin',
+          password: 'new-password',
+          database: 'booklore',
+        },
+      },
+      2,
+    );
 
-      const service = new MigrationSourceService(repo as never, { listTypes: vi.fn(), get: () => ({ validate }) } as never, noopEncryption);
+    expect(createSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'booklore',
+        name: 'New Source',
+        createdByUserId: 2,
+      }),
+    );
+    expect(repo.purgeRunState).toHaveBeenCalledWith(11);
+    expect((result.connectionConfig as Record<string, unknown>).password).toBe('********');
+  });
 
-      await service.createSource(
+  it('createSource rejects invalid adapter validation results', async () => {
+    const { service, adapter } = createService({
+      listSources: vi.fn(() => Promise.resolve([])),
+    });
+    adapter.validate.mockResolvedValue(validationResult(false));
+
+    await expect(
+      service.createSource(
         {
           type: 'booklore',
-          name: 'Existing Source',
-          connectionConfig: { host: 'db.example.com', user: 'admin', password: 'new-password', database: 'booklore' },
+          name: 'Source',
+          connectionConfig: {
+            host: 'db.example.com',
+            user: 'admin',
+            password: 'pw',
+            database: 'booklore',
+          },
         },
         1,
-      );
-
-      const calledConfig = updateSource.mock.calls[0][1].connectionConfig as Record<string, unknown>;
-      expect(calledConfig.password).toBe('new-password');
-    });
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  describe('resolveConnectionConfig - adapter-agnostic sentinel', () => {
-    it('resolves sentinel in any field named with password-like keys', async () => {
-      const existingSource = {
-        id: 1,
-        type: 'custom_source',
-        name: 'Custom Source',
-        connectionConfig: { host: 'db.example.com', user: 'admin', password: 'real-secret', apiKey: 'real-api-key', database: 'mydb' },
-        capabilities: null,
-        lastValidatedAt: new Date(),
-        createdByUserId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+  it('createSource blocks when a migration run is already active', async () => {
+    const { service } = createService({
+      listRuns: vi.fn(() => Promise.resolve([{ id: 99, state: 'running' }])),
+    });
 
-      const updateSource = vi.fn((id: number, values: Record<string, unknown>) => {
-        return Promise.resolve({ ...existingSource, ...values, id });
-      });
-
-      const validate = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          sourceType: 'custom',
-          sourceVersion: '1.0',
-          warnings: [],
-          counts: {},
-          missingTables: [],
-        }),
-      );
-
-      const repo = {
-        findSourceById: vi.fn(() => Promise.resolve(existingSource)),
-        listRuns: vi.fn(() => Promise.resolve([])),
-        listSources: vi.fn(() => Promise.resolve([existingSource])),
-        updateSource,
-        createSource: vi.fn(),
-        purgeRunState: vi.fn(() => Promise.resolve()),
-      };
-
-      const service = new MigrationSourceService(repo as never, { listTypes: vi.fn(), get: () => ({ validate }) } as never, noopEncryption);
-
-      await service.createSource(
+    await expect(
+      service.createSource(
         {
-          type: 'custom_source',
-          name: 'Custom Source',
-          connectionConfig: { host: 'db.example.com', user: 'admin', password: '********', apiKey: '********', database: 'mydb' },
+          type: 'booklore',
+          name: 'Source',
+          connectionConfig: {
+            host: 'db.example.com',
+            user: 'admin',
+            password: 'pw',
+            database: 'booklore',
+          },
         },
         1,
-      );
-
-      const calledConfig = updateSource.mock.calls[0][1].connectionConfig as Record<string, unknown>;
-      expect(calledConfig.password).toBe('real-secret');
-      expect(calledConfig.apiKey).toBe('real-api-key');
-      expect(calledConfig.host).toBe('db.example.com');
-    });
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  describe('resolveConnectionConfig (standalone)', () => {
+  it('createSource throws InternalServerErrorException when persistence returns null', async () => {
+    const { service } = createService({
+      listSources: vi.fn(() => Promise.resolve([])),
+      createSource: vi.fn(() => Promise.resolve(null)),
+    });
+
+    await expect(
+      service.createSource(
+        {
+          type: 'booklore',
+          name: 'Source',
+          connectionConfig: {
+            host: 'db.example.com',
+            user: 'admin',
+            password: 'pw',
+            database: 'booklore',
+          },
+        },
+        1,
+      ),
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+
+  it('getSourcePathPrefixes returns empty prefixes when adapter does not support path fetching', async () => {
+    const { service, adapterRegistry } = createService();
+    adapterRegistry.get.mockReturnValue({
+      validate: vi.fn(() => Promise.resolve(validationResult(true))),
+    });
+
+    await expect(service.getSourcePathPrefixes(1)).resolves.toEqual({ prefixes: [] });
+  });
+
+  it('getSourcePathPrefixes fetches prefixes through adapter when supported', async () => {
+    const { service } = createService();
+
+    await expect(service.getSourcePathPrefixes(1)).resolves.toEqual({ prefixes: ['/library'] });
+  });
+
+  it('getSourcePathPrefixes throws NotFoundException for missing source', async () => {
+    const { service } = createService({
+      findSourceById: vi.fn(() => Promise.resolve(null)),
+    });
+
+    await expect(service.getSourcePathPrefixes(404)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('resolveConnectionConfig', () => {
     it('returns incoming config when no existing source', () => {
       const result = resolveConnectionConfig({ host: 'localhost', password: 'secret' }, null, noopEncryption);
       expect(result).toEqual({ host: 'localhost', password: 'secret' });
     });
 
-    it('replaces sentinel values from existing config', () => {
-      const existing = {
-        id: 1,
-        type: 'booklore',
-        name: 'test',
+    it('replaces sentinels from existing config and uses empty string when key is missing', () => {
+      const existing = buildSource({
         connectionConfig: { host: 'db.local', password: 'real-pw' },
-      } as never;
+      }) as never;
 
-      const result = resolveConnectionConfig({ host: 'db.local', password: '********' }, existing, noopEncryption);
+      const result = resolveConnectionConfig({ host: 'db.local', password: '********', apiKey: '********' }, existing, noopEncryption);
+
       expect(result.password).toBe('real-pw');
+      expect(result.apiKey).toBe('');
       expect(result.host).toBe('db.local');
     });
   });

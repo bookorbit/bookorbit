@@ -70,6 +70,34 @@ describe('UserService', () => {
     );
   });
 
+  it('delegates basic repository passthrough methods', async () => {
+    await service.findByUsername('alice');
+    await service.findByEmail('alice@example.com');
+    await service.findByOidcSubject('subject', 'issuer');
+    await service.linkOidcIdentity(7, 'subject', 'issuer', 'https://img.example/a.jpg');
+    await service.createOidcUser({ username: 'oidc', name: 'OIDC', email: 'oidc@example.com', oidcSubject: 'sub', oidcIssuer: 'iss' });
+    await service.generatePasswordResetToken(7);
+    await service.incrementTokenVersion(7);
+    await service.findByIdWithPermissions(7);
+    await service.create({ username: 'new' } as any);
+    await service.findAll(1, 20);
+    await service.findAssignable();
+    await service.setPermissionsDirectly(7, [Permission.LibraryDownload]);
+
+    expect(userRepo.findByUsername).toHaveBeenCalledWith('alice');
+    expect(userRepo.findByEmail).toHaveBeenCalledWith('alice@example.com');
+    expect(userRepo.findByOidcSubject).toHaveBeenCalledWith('subject', 'issuer');
+    expect(userRepo.linkOidcIdentity).toHaveBeenCalledWith(7, 'subject', 'issuer', 'https://img.example/a.jpg');
+    expect(userRepo.createOidcUser).toHaveBeenCalled();
+    expect(userRepo.generateResetToken).toHaveBeenCalledWith(7);
+    expect(userRepo.incrementTokenVersion).toHaveBeenCalledWith(7);
+    expect(userRepo.findByIdWithPermissions).toHaveBeenCalledWith(7);
+    expect(userRepo.create).toHaveBeenCalledWith({ username: 'new' });
+    expect(userRepo.findAll).toHaveBeenCalledWith(1, 20);
+    expect(userRepo.findAssignable).toHaveBeenCalled();
+    expect(userRepo.setPermissions).toHaveBeenCalledWith(7, [Permission.LibraryDownload]);
+  });
+
   it('createUser rejects duplicate emails', async () => {
     userRepo.findByUsername.mockResolvedValue(null);
     userRepo.findByEmail.mockResolvedValue({ id: 3 });
@@ -118,6 +146,30 @@ describe('UserService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('createUser skips permission/library writes when lists are empty', async () => {
+    userRepo.findByUsername.mockResolvedValue(null);
+    config.get.mockReturnValue(undefined);
+
+    const result = await service.createUser({
+      username: 'newuser',
+      name: 'New User',
+      email: 'new@example.com',
+      permissionNames: [],
+      libraryIds: [],
+    } as any);
+
+    expect(userRepo.setPermissions).not.toHaveBeenCalled();
+    expect(userRepo.assignViewerLibraries).not.toHaveBeenCalled();
+    expect(result.resetUrl).toBe('http://localhost:5173/reset-password?token=reset-token');
+  });
+
+  it('findById returns user and throws when missing', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValueOnce({ id: 4 }).mockResolvedValueOnce(null);
+
+    await expect(service.findById(4)).resolves.toEqual({ id: 4 });
+    await expect(service.findById(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('updateUser blocks self-deactivation', async () => {
     await expect(service.updateUser(1, { active: false }, reqUser({ id: 1 }))).rejects.toBeInstanceOf(ConflictException);
   });
@@ -126,6 +178,12 @@ describe('UserService', () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
 
     await expect(service.updateUser(2, { name: 'x' }, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('updateUser throws when target user does not exist', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue(null);
+
+    await expect(service.updateUser(2, { name: 'x' }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('updateUser prevents deactivating the last administrator', async () => {
@@ -142,10 +200,28 @@ describe('UserService', () => {
     await expect(service.updateUser(2, { email: 'dup@example.com' }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('updateUser throws if repository update returns null after checks', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
+    userRepo.update.mockResolvedValue(null);
+
+    await expect(service.updateUser(2, { name: 'x' }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('updateMe rejects duplicate email conflicts explicitly', async () => {
     userRepo.findByEmail.mockResolvedValue({ id: 9 });
 
     await expect(service.updateMe(2, { email: 'dup@example.com' })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('updateMe throws when repository update returns null', async () => {
+    userRepo.findByEmail.mockResolvedValue(null);
+    userRepo.update.mockResolvedValue(null);
+
+    await expect(service.updateMe(2, { name: 'x' })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deleteUser blocks deleting your own account', async () => {
+    await expect(service.deleteUser(1, reqUser({ id: 1, isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('deleteUser throws when target user does not exist', async () => {
@@ -153,6 +229,28 @@ describe('UserService', () => {
     userRepo.countOtherSuperusers.mockResolvedValue(0);
 
     await expect(service.deleteUser(88, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deleteUser blocks non-superusers from deleting superuser accounts', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
+    userRepo.countOtherSuperusers.mockResolvedValue(1);
+
+    await expect(service.deleteUser(2, reqUser({ isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('deleteUser blocks deleting the last superuser', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
+    userRepo.countOtherSuperusers.mockResolvedValue(0);
+
+    await expect(service.deleteUser(2, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('deleteUser deletes non-superuser targets', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
+    userRepo.countOtherSuperusers.mockResolvedValue(3);
+
+    await expect(service.deleteUser(2, reqUser({ isSuperuser: false }))).resolves.toBeUndefined();
+    expect(userRepo.delete).toHaveBeenCalledWith(2);
   });
 
   it('setPermissions blocks modifying own permissions', async () => {
@@ -163,6 +261,14 @@ describe('UserService', () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
 
     await expect(service.setPermissions(2, { permissionNames: [Permission.LibraryDownload] }, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('setPermissions throws when target user does not exist', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue(null);
+
+    await expect(service.setPermissions(2, { permissionNames: [Permission.LibraryDownload] }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('setPermissions deduplicates permission names', async () => {
@@ -198,6 +304,13 @@ describe('UserService', () => {
     await expect(service.setSuperuser(2, false, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('setSuperuser writes the target superuser flag when allowed', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
+
+    await expect(service.setSuperuser(2, true, reqUser({ isSuperuser: true }))).resolves.toBeUndefined();
+    expect(userRepo.setSuperuser).toHaveBeenCalledWith(2, true);
+  });
+
   it('setSuperuser skips last-admin check when target is already non-superuser', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
 
@@ -227,6 +340,12 @@ describe('UserService', () => {
     await expect(service.setLibraries(2, [3, 7], reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('setLibraries blocks non-superuser updates to superuser targets', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
+
+    await expect(service.setLibraries(2, [3], reqUser({ isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('setLibraries deduplicates IDs before replacing access rows', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
     userRepo.findExistingLibraryIds.mockResolvedValue([3, 7]);
@@ -252,5 +371,15 @@ describe('UserService', () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false, provisioningMethod: 'oidc' });
 
     await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('adminResetPassword returns default app URL when config is missing', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false, provisioningMethod: 'local' });
+    userRepo.generateResetToken.mockResolvedValue('token-2');
+    config.get.mockReturnValue(undefined);
+
+    await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).resolves.toEqual({
+      resetUrl: 'http://localhost:5173/reset-password?token=token-2',
+    });
   });
 });

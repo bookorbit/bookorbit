@@ -4,7 +4,9 @@ import { ComicVineIssue, ComicVinePersonCredit } from './comicvine.types';
 
 function parseYear(dateStr: string | null | undefined): number | undefined {
   if (!dateStr) return undefined;
-  const year = parseInt(dateStr.substring(0, 4), 10);
+  const yearToken = dateStr.substring(0, 4);
+  if (!/^\d{4}$/.test(yearToken)) return undefined;
+  const year = parseInt(yearToken, 10);
   return Number.isNaN(year) ? undefined : year;
 }
 

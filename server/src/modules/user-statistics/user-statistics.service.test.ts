@@ -390,4 +390,170 @@ describe('UserStatisticsService', () => {
     ).rejects.toThrow('duration cannot change');
     expect(repo.moveSessionTimelineSessionAtomic).not.toHaveBeenCalled();
   });
+
+  it('rejects invalid session timestamp payloads and missing sessions', async () => {
+    const repo = {
+      getSessionTimelineSessionById: vi.fn().mockResolvedValue(null),
+      moveSessionTimelineSessionAtomic: vi.fn(),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    await expect(
+      service.updateSessionTimelineSession(
+        { id: 123, isSuperuser: false } as any,
+        52,
+        {
+          startedAt: 'not-a-date',
+          endedAt: '2026-04-07T10:36:00.000Z',
+        },
+        { libraryIds: [5] },
+      ),
+    ).rejects.toThrow('Invalid session timestamps');
+
+    await expect(
+      service.updateSessionTimelineSession(
+        { id: 123, isSuperuser: false } as any,
+        52,
+        {
+          startedAt: '2026-04-07T10:36:00.000Z',
+          endedAt: '2026-04-07T10:35:00.000Z',
+        },
+        { libraryIds: [5] },
+      ),
+    ).rejects.toThrow('must be after start time');
+
+    await expect(
+      service.updateSessionTimelineSession(
+        { id: 123, isSuperuser: false } as any,
+        52,
+        {
+          startedAt: '2026-04-07T10:00:00.000Z',
+          endedAt: '2026-04-07T10:30:00.000Z',
+        },
+        { libraryIds: [5] },
+      ),
+    ).rejects.toThrow('Reading session not found');
+  });
+
+  it('rejects when atomic move reports missing updated row', async () => {
+    const existing = {
+      sessionId: 91,
+      libraryId: 5,
+      bookId: 90,
+      bookTitle: 'Ultralearning',
+      bookFormat: 'EPUB',
+      startedAt: new Date('2026-04-07T10:00:00.000Z'),
+      endedAt: new Date('2026-04-07T10:30:00.000Z'),
+      durationSeconds: 1800,
+    };
+    const repo = {
+      getSessionTimelineSessionById: vi.fn().mockResolvedValue(existing),
+      moveSessionTimelineSessionAtomic: vi.fn().mockResolvedValue({
+        updated: null,
+        conflict: null,
+      }),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    await expect(
+      service.updateSessionTimelineSession(
+        { id: 123, isSuperuser: false } as any,
+        91,
+        {
+          startedAt: '2026-04-08T10:00:00.000Z',
+          endedAt: '2026-04-08T10:30:00.000Z',
+        },
+        { libraryIds: [5] },
+      ),
+    ).rejects.toThrow('Reading session not found');
+  });
+
+  it('rounds progress deltas in daily reading and returns empty latency stats when no data', async () => {
+    const repo = {
+      getDailyReadingStats: vi.fn().mockResolvedValue([{ day: '2026-04-08', readingSeconds: 10, progressDelta: 1.234567, eventsCount: 1 }]),
+      getCompletionLatencyDays: vi.fn().mockResolvedValue([]),
+    };
+    const service = new UserStatisticsService(repo as any);
+
+    await expect(service.getDailyReading({ id: 11, isSuperuser: false } as any, { days: 1, libraryIds: [] })).resolves.toEqual([
+      { day: '2026-04-08', readingSeconds: 10, progressDelta: 1.2346, eventsCount: 1 },
+    ]);
+    await expect(service.getCompletionLatency({ id: 11, isSuperuser: false } as any, { days: 30, libraryIds: [] })).resolves.toEqual(
+      expect.objectContaining({
+        totalCompletions: 0,
+        medianDays: null,
+        percentile75Days: null,
+        percentile90Days: null,
+      }),
+    );
+  });
+
+  it('computes reading survival percentages and completion race trajectories', async () => {
+    const repo = {
+      getReadingSurvivalMaxProgress: vi.fn().mockResolvedValue([100, 65, 30]),
+      getCompletionRaceRawSessions: vi.fn().mockResolvedValue([
+        {
+          bookId: 1,
+          title: 'A Very Long Book Title That Should Be Truncated For The Chart',
+          startedAt: new Date('2026-04-01T00:00:00.000Z'),
+          endProgress: 5.25,
+        },
+        {
+          bookId: 1,
+          title: 'A Very Long Book Title That Should Be Truncated For The Chart',
+          startedAt: new Date('2026-04-03T00:00:00.000Z'),
+          endProgress: 45.51,
+        },
+        { bookId: 2, title: 'Single Session', startedAt: new Date('2026-04-02T00:00:00.000Z'), endProgress: 90 },
+      ]),
+    };
+    const service = new UserStatisticsService(repo as any);
+
+    const survival = await service.getReadingSurvival({ id: 11, isSuperuser: false } as any, { days: 365, libraryIds: [] });
+    expect(survival.find((point) => point.threshold === 50)).toEqual({
+      threshold: 50,
+      survivedCount: 2,
+      survivedPct: 66.7,
+    });
+
+    const race = await service.getCompletionRace({ id: 11, isSuperuser: false } as any, { days: 365, libraryIds: [] });
+    expect(race).toHaveLength(1);
+    expect(race[0]).toEqual({
+      bookId: 1,
+      title: 'A Very Long Book Title That Should Be...',
+      points: [
+        { daysSinceStart: 0, progress: 5.3 },
+        { daysSinceStart: 2, progress: 45.5 },
+      ],
+    });
+  });
+
+  it('delegates and caches archetype/genre/pace/chord queries', async () => {
+    const repo = {
+      getSessionArchetypePoints: vi.fn().mockResolvedValue([{ hour: 9, durationMinutes: 20, dayOfWeek: 2 }]),
+      getGenreReadingTime: vi.fn().mockResolvedValue([{ genre: 'Sci-Fi', readingSeconds: 300 }]),
+      getReadingPacePoints: vi.fn().mockResolvedValue([{ durationSeconds: 240, progressDelta: 1.4 }]),
+      getAuthorGenreChord: vi.fn().mockResolvedValue({ nodes: [{ name: 'A' }, { name: 'G' }], links: [{ source: 'A', target: 'G', value: 10 }] }),
+    };
+    const service = new UserStatisticsService(repo as any);
+    const user = { id: 9, isSuperuser: false } as any;
+
+    await expect(service.getSessionArchetypes(user, { libraryIds: [1] })).resolves.toEqual([{ hour: 9, durationMinutes: 20, dayOfWeek: 2 }]);
+    await expect(service.getGenreReadingTime(user, { libraryIds: [1] })).resolves.toEqual([{ genre: 'Sci-Fi', readingSeconds: 300 }]);
+    await expect(service.getReadingPace(user, { libraryIds: [1] })).resolves.toEqual([{ durationSeconds: 240, progressDelta: 1.4 }]);
+    await expect(service.getAuthorGenreChord(user, { libraryIds: [1] })).resolves.toEqual({
+      nodes: [{ name: 'A' }, { name: 'G' }],
+      links: [{ source: 'A', target: 'G', value: 10 }],
+    });
+
+    await service.getSessionArchetypes(user, { libraryIds: [1] });
+    await service.getGenreReadingTime(user, { libraryIds: [1] });
+    await service.getReadingPace(user, { libraryIds: [1] });
+    await service.getAuthorGenreChord(user, { libraryIds: [1] });
+
+    expect(repo.getSessionArchetypePoints).toHaveBeenCalledTimes(1);
+    expect(repo.getGenreReadingTime).toHaveBeenCalledTimes(1);
+    expect(repo.getReadingPacePoints).toHaveBeenCalledTimes(1);
+    expect(repo.getAuthorGenreChord).toHaveBeenCalledTimes(1);
+  });
 });

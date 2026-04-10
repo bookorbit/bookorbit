@@ -1,3 +1,6 @@
+import { AuditAction, AuditResource } from '@projectx/types';
+
+import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientController } from './email-recipient.controller';
 import type { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
@@ -66,5 +69,30 @@ describe('EmailRecipientController', () => {
 
     expect(service.remove).toHaveBeenCalledWith(4, user);
     expect(service.setDefault).toHaveBeenCalledWith(4, user);
+  });
+
+  it('defines audit metadata for recipient mutation routes', () => {
+    const createAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailRecipientController.prototype.create) as {
+      action: AuditAction;
+      resource: AuditResource;
+      description: (req: unknown, res: { email?: string }) => string;
+    };
+    expect(createAudit.action).toBe(AuditAction.EmailRecipientCreate);
+    expect(createAudit.resource).toBe(AuditResource.EmailRecipient);
+    expect(createAudit.description({} as never, { email: 'kindle@example.com' })).toBe("Created email recipient 'kindle@example.com'");
+
+    const updateAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailRecipientController.prototype.update) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }, res: unknown) => string;
+    };
+    expect(updateAudit.getResourceId({ params: { id: '3' } })).toBe(3);
+    expect(updateAudit.description({ params: { id: '3' } }, null)).toBe('Updated email recipient #3');
+
+    const removeAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailRecipientController.prototype.remove) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }, res: unknown) => string;
+    };
+    expect(removeAudit.getResourceId({ params: { id: '3' } })).toBe(3);
+    expect(removeAudit.description({ params: { id: '3' } }, null)).toBe('Deleted email recipient #3');
   });
 });

@@ -48,6 +48,8 @@ const BOOK_METADATA_COLUMN_BY_PROPERTY = {
   hardcoverId: 'hardcover_id',
   audibleId: 'audible_id',
   comicvineId: 'comicvine_id',
+  openLibraryId: 'open_library_id',
+  itunesId: 'itunes_id',
   durationSeconds: 'duration_seconds',
   abridged: 'abridged',
 } as const;

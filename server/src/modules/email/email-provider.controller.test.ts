@@ -1,11 +1,12 @@
 import 'reflect-metadata';
 import type { RequestUser } from '../../common/types/request-user';
 import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
-import { Permission } from '@projectx/types';
+import { AuditAction, AuditResource, Permission } from '@projectx/types';
 import { EmailProviderController } from './email-provider.controller';
 import type { CreateEmailProviderDto } from './dto/create-email-provider.dto';
 import type { UpdateEmailProviderDto } from './dto/update-email-provider.dto';
 import { EmailProviderService } from './email-provider.service';
+import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 
 describe('EmailProviderController', () => {
   const user: RequestUser = {
@@ -144,6 +145,60 @@ describe('EmailProviderController', () => {
 
     it('requires ManageEmail to clear the system provider', () => {
       expect(getPermission('clearSystemProvider')).toBe(Permission.ManageEmail);
+    });
+  });
+
+  describe('auditing metadata', () => {
+    function getAudit(method: keyof EmailProviderController) {
+      return Reflect.getMetadata(AUDITABLE_KEY, EmailProviderController.prototype[method as string]) as {
+        action: AuditAction;
+        resource: AuditResource;
+        getResourceId?: (req: { params: Record<string, string> }) => number;
+        description: ((req: { params: Record<string, string> }, res: unknown) => string) | string;
+      };
+    }
+
+    it('defines audit resource ids and descriptions for mutation routes', () => {
+      const createAudit = getAudit('create');
+      expect(createAudit.action).toBe(AuditAction.EmailProviderCreate);
+      expect(createAudit.resource).toBe(AuditResource.EmailProvider);
+      expect((createAudit.description as (req: unknown, res: { name?: string }) => string)({} as never, { name: 'SMTP' })).toBe(
+        "Created email provider 'SMTP'",
+      );
+
+      const updateAudit = getAudit('update');
+      expect(updateAudit.getResourceId?.({ params: { id: '12' } })).toBe(12);
+      expect((updateAudit.description as (req: { params: Record<string, string> }, res: unknown) => string)({ params: { id: '12' } }, null)).toBe(
+        'Updated email provider #12',
+      );
+
+      const deleteAudit = getAudit('remove');
+      expect(deleteAudit.getResourceId?.({ params: { id: '13' } })).toBe(13);
+      expect((deleteAudit.description as (req: { params: Record<string, string> }, res: unknown) => string)({ params: { id: '13' } }, null)).toBe(
+        'Deleted email provider #13',
+      );
+
+      const setDefaultAudit = getAudit('setDefault');
+      expect(setDefaultAudit.getResourceId?.({ params: { id: '7' } })).toBe(7);
+      expect((setDefaultAudit.description as (req: { params: Record<string, string> }, res: unknown) => string)({ params: { id: '7' } }, null)).toBe(
+        'Set email provider #7 as default',
+      );
+
+      const toggleAudit = getAudit('toggleShared');
+      expect(toggleAudit.getResourceId?.({ params: { id: '6' } })).toBe(6);
+      expect((toggleAudit.description as (req: { params: Record<string, string> }, res: unknown) => string)({ params: { id: '6' } }, null)).toBe(
+        'Toggled sharing for email provider #6',
+      );
+
+      const setSystemAudit = getAudit('setSystemProvider');
+      expect(setSystemAudit.getResourceId?.({ params: { id: '9' } })).toBe(9);
+      expect((setSystemAudit.description as (req: { params: Record<string, string> }, res: unknown) => string)({ params: { id: '9' } }, null)).toBe(
+        'Set email provider #9 as system mail provider',
+      );
+
+      const clearSystemAudit = getAudit('clearSystemProvider');
+      expect(clearSystemAudit.action).toBe(AuditAction.EmailProviderClearSystem);
+      expect((clearSystemAudit.description as () => string)()).toBe('Cleared system mail provider');
     });
   });
 });

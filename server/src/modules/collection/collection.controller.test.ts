@@ -1,6 +1,9 @@
+import 'reflect-metadata';
+
 import { BadRequestException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { CollectionController } from './collection.controller';
 
 const USER: RequestUser = {
@@ -90,5 +93,66 @@ describe('CollectionController', () => {
       await expectBadRequest(() => controller.getBooks(10, USER, 0, 101));
       expect(service.getBooks).not.toHaveBeenCalled();
     });
+
+    it('rejects excessively deep pagination windows', async () => {
+      const { controller, service } = makeController();
+
+      await expectBadRequest(() => controller.getBooks(10, USER, 2_000_000, 100));
+      expect(service.getBooks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('mutation endpoints', () => {
+    it('delegates create, update, remove, reorder, and membership mutations', async () => {
+      const { controller, service } = makeController();
+
+      await controller.create({ name: 'Favorites', icon: '⭐' } as any, USER);
+      await controller.update(11, { name: 'Updated' } as any, USER);
+      await controller.remove(11, USER);
+      await controller.reorder({ order: [{ id: 1, displayOrder: 0 }] } as any, USER);
+      await controller.addBooks(11, { bookIds: [7, 8] }, USER);
+      await controller.removeBooks(11, { bookIds: [7] }, USER);
+      await controller.findOne(11, USER);
+
+      expect(service.create).toHaveBeenCalledWith({ name: 'Favorites', icon: '⭐' }, USER);
+      expect(service.update).toHaveBeenCalledWith(11, { name: 'Updated' }, USER);
+      expect(service.remove).toHaveBeenCalledWith(11, USER);
+      expect(service.reorder).toHaveBeenCalledWith({ order: [{ id: 1, displayOrder: 0 }] }, USER);
+      expect(service.addBooks).toHaveBeenCalledWith(11, { bookIds: [7, 8] }, USER);
+      expect(service.removeBooks).toHaveBeenCalledWith(11, { bookIds: [7] }, USER);
+      expect(service.findOne).toHaveBeenCalledWith(11, USER);
+    });
+  });
+
+  it('exposes auditable metadata callbacks for resource ids and descriptions', () => {
+    const createMeta = Reflect.getMetadata(AUDITABLE_KEY, CollectionController.prototype.create) as {
+      description: (req: unknown, res: { name?: string }) => string;
+    };
+    const updateMeta = Reflect.getMetadata(AUDITABLE_KEY, CollectionController.prototype.update) as {
+      getResourceId: (req: { params: { id: string } }) => number;
+      description: (req: { params: { id: string } }) => string;
+    };
+    const removeMeta = Reflect.getMetadata(AUDITABLE_KEY, CollectionController.prototype.remove) as {
+      getResourceId: (req: { params: { id: string } }) => number;
+      description: (req: { params: { id: string } }) => string;
+    };
+    const addBooksMeta = Reflect.getMetadata(AUDITABLE_KEY, CollectionController.prototype.addBooks) as {
+      getResourceId: (req: { params: { id: string } }) => number;
+      description: (req: { params: { id: string }; body: { bookIds?: number[] } }) => string;
+    };
+    const removeBooksMeta = Reflect.getMetadata(AUDITABLE_KEY, CollectionController.prototype.removeBooks) as {
+      getResourceId: (req: { params: { id: string } }) => number;
+      description: (req: { params: { id: string }; body: { bookIds?: number[] } }) => string;
+    };
+
+    expect(createMeta.description({} as never, { name: 'Favorites' })).toBe("Created collection 'Favorites'");
+    expect(updateMeta.getResourceId({ params: { id: '10' } })).toBe(10);
+    expect(updateMeta.description({ params: { id: '10' } })).toBe('Updated collection #10');
+    expect(removeMeta.getResourceId({ params: { id: '10' } })).toBe(10);
+    expect(removeMeta.description({ params: { id: '10' } })).toBe('Deleted collection #10');
+    expect(addBooksMeta.getResourceId({ params: { id: '10' } })).toBe(10);
+    expect(addBooksMeta.description({ params: { id: '10' }, body: { bookIds: [1, 2] } })).toBe('Added 2 books to collection #10');
+    expect(removeBooksMeta.getResourceId({ params: { id: '10' } })).toBe(10);
+    expect(removeBooksMeta.description({ params: { id: '10' }, body: { bookIds: [1] } })).toBe('Removed 1 book from collection #10');
   });
 });

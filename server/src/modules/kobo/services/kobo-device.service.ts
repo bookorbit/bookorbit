@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -46,7 +46,6 @@ export class KoboDeviceService {
       .limit(1);
 
     if (!device) throw new NotFoundException('Device not found');
-    if (device.userId !== userId) throw new ForbiddenException('Not your device');
 
     const [updated] = await this.db
       .update(schema.koboDevices)

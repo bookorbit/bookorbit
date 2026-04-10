@@ -57,7 +57,9 @@ export class DuckDuckGoCoverProvider implements CoverProvider {
 
       return combined;
     } catch (error) {
-      this.logger.error(`Error searching DuckDuckGo: ${error.message}`, error.stack);
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Error searching DuckDuckGo: ${message}`, stack);
       return [];
     }
   }

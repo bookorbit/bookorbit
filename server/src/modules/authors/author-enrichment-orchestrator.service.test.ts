@@ -10,6 +10,9 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     enqueueAllLinkedAuthors: vi.fn(),
     enqueueEligibleLinkedAuthors: vi.fn(),
     filterEligibleAuthorIds: vi.fn(),
+    cancelPending: vi.fn(),
+    requeueFailed: vi.fn(),
+    getFailedItems: vi.fn(),
     getStatusSummary: vi.fn(),
     recoverStuckProcessing: vi.fn(),
     resetAllProcessingOnBoot: vi.fn(),
@@ -53,6 +56,9 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     queueRepo.enqueueAllLinkedAuthors.mockResolvedValue(0);
     queueRepo.enqueueEligibleLinkedAuthors.mockResolvedValue(0);
     queueRepo.filterEligibleAuthorIds.mockImplementation((ids: number[]) => Promise.resolve(ids));
+    queueRepo.cancelPending.mockResolvedValue(0);
+    queueRepo.requeueFailed.mockResolvedValue(0);
+    queueRepo.getFailedItems.mockResolvedValue({ items: [], total: 0 });
     queueRepo.resetAllProcessingOnBoot.mockResolvedValue(0);
     queueRepo.recoverStuckProcessing.mockResolvedValue(0);
     queueRepo.getStatusSummary.mockResolvedValue({
@@ -178,5 +184,69 @@ describe('AuthorEnrichmentOrchestratorService', () => {
 
     expect(queueRepo.resetAllProcessingOnBoot).toHaveBeenCalled();
     expect(enrichmentConfig.isPaused).toHaveBeenCalled();
+  });
+
+  it('scheduleMany skips queueing when orchestrator is paused and request is not manual override', async () => {
+    (service as any).paused = true;
+
+    const queued = await service.scheduleMany([1, 2], AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);
+
+    expect(queued).toBe(0);
+    expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
+  });
+
+  it('metadata_replace queueing stays silent in session status', async () => {
+    queueRepo.upsertSchedule.mockResolvedValue(2);
+
+    const queued = await service.scheduleMany([1, 2], AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE, { ignoreEnabled: true });
+
+    expect(queued).toBe(2);
+    expect(session.getSnapshot().sessionTotal).toBe(0);
+    expect(gateway.emitStatus).not.toHaveBeenCalled();
+  });
+
+  it('manual queueing increments session total and emits status', async () => {
+    queueRepo.upsertSchedule.mockResolvedValue(3);
+
+    const queued = await service.scheduleMany([1, 2, 3], AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME, { ignoreEnabled: true });
+
+    expect(queued).toBe(3);
+    expect(session.getSnapshot().sessionTotal).toBe(3);
+    expect(gateway.emitStatus).toHaveBeenCalled();
+  });
+
+  it('backfillLinkedAuthors unpauses orchestrator when work is queued', async () => {
+    (service as any).paused = true;
+    queueRepo.enqueueEligibleLinkedAuthors.mockResolvedValue(5);
+
+    const queued = await service.backfillLinkedAuthors();
+
+    expect(queued).toBe(5);
+    expect(enrichmentConfig.setPaused).toHaveBeenCalledWith(false);
+    expect(gateway.emitStatus).toHaveBeenCalled();
+  });
+
+  it('cancelPending pauses and resets session counters', async () => {
+    session.sessionTotal = 10;
+    session.sessionDone = 4;
+    session.currentItemName = 'Someone';
+
+    await service.cancelPending();
+
+    expect(queueRepo.cancelPending).toHaveBeenCalled();
+    expect(enrichmentConfig.setPaused).toHaveBeenCalledWith(true);
+    expect(session.getSnapshot()).toEqual({
+      sessionTotal: 0,
+      sessionDone: 0,
+      currentItemName: null,
+    });
+  });
+
+  it('requeueFailed increments session total when rows are requeued', async () => {
+    queueRepo.requeueFailed.mockResolvedValue(4);
+
+    await expect(service.requeueFailed()).resolves.toBe(4);
+    expect(session.getSnapshot().sessionTotal).toBe(4);
+    expect(gateway.emitStatus).toHaveBeenCalled();
   });
 });

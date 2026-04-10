@@ -1,3 +1,6 @@
+import { AuditAction, AuditResource } from '@projectx/types';
+
+import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailTemplateController } from './email-template.controller';
 import type { CreateEmailTemplateDto } from './dto/create-email-template.dto';
@@ -70,5 +73,37 @@ describe('EmailTemplateController', () => {
     await controller.preview(2, dto, user);
 
     expect(service.preview).toHaveBeenCalledWith(2, 77, null, user);
+  });
+
+  it('defines audit metadata for template mutation endpoints', () => {
+    const createAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailTemplateController.prototype.create) as {
+      action: AuditAction;
+      resource: AuditResource;
+      description: (req: unknown, res: { name?: string }) => string;
+    };
+    expect(createAudit.action).toBe(AuditAction.EmailTemplateCreate);
+    expect(createAudit.resource).toBe(AuditResource.EmailTemplate);
+    expect(createAudit.description({} as never, { name: 'Default' })).toBe("Created email template 'Default'");
+
+    const updateAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailTemplateController.prototype.update) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }, res: unknown) => string;
+    };
+    expect(updateAudit.getResourceId({ params: { id: '5' } })).toBe(5);
+    expect(updateAudit.description({ params: { id: '5' } }, null)).toBe('Updated email template #5');
+
+    const removeAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailTemplateController.prototype.remove) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }, res: unknown) => string;
+    };
+    expect(removeAudit.getResourceId({ params: { id: '5' } })).toBe(5);
+    expect(removeAudit.description({ params: { id: '5' } }, null)).toBe('Deleted email template #5');
+
+    const setDefaultAudit = Reflect.getMetadata(AUDITABLE_KEY, EmailTemplateController.prototype.setDefault) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }, res: unknown) => string;
+    };
+    expect(setDefaultAudit.getResourceId({ params: { id: '5' } })).toBe(5);
+    expect(setDefaultAudit.description({ params: { id: '5' } }, null)).toBe('Set email template #5 as default');
   });
 });

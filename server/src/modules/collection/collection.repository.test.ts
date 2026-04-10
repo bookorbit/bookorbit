@@ -3,7 +3,12 @@ vi.mock('drizzle-orm', () => ({
   count: vi.fn(() => ({ op: 'count' })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   inArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'inArray', left, right })),
-  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
+  sql: Object.assign(
+    vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
+    {
+      join: vi.fn((chunks: unknown[], separator: unknown) => ({ op: 'sql.join', chunks, separator })),
+    },
+  ),
 }));
 
 import { CollectionRepository } from './collection.repository';
@@ -73,5 +78,53 @@ describe('CollectionRepository', () => {
     expect(firstLimit).toHaveBeenCalledWith(2);
     expect(firstOffset).toHaveBeenCalledWith(2);
     expect(result).toEqual({ bookIds: [7, 9], total: 2, page: 1, size: 2 });
+  });
+
+  it('findAllForUserWithMembership builds membership projection for provided book ids', async () => {
+    const orderBy = vi.fn().mockResolvedValue([{ id: 1, memberCount: 2 }]);
+    const groupBy = vi.fn().mockReturnValue({ orderBy });
+    const where = vi.fn().mockReturnValue({ groupBy });
+    const leftJoin = vi.fn().mockReturnValue({ where });
+    const from = vi.fn().mockReturnValue({ leftJoin });
+    db.select.mockReturnValueOnce({ from } as never);
+
+    const rows = await repo.findAllForUserWithMembership(5, [100, 101]);
+
+    expect(rows).toEqual([{ id: 1, memberCount: 2 }]);
+    expect(db.select).toHaveBeenCalledWith(expect.objectContaining({ memberCount: expect.anything() }));
+  });
+
+  it('addBooks and removeBooks issue membership writes with expected payloads', async () => {
+    const insertChain = {
+      values: vi.fn(),
+      onConflictDoNothing: vi.fn(),
+      returning: vi.fn(),
+    };
+    insertChain.values.mockReturnValue(insertChain);
+    insertChain.onConflictDoNothing.mockReturnValue(insertChain);
+    insertChain.returning.mockResolvedValue([{ collectionId: 10, bookId: 1 }]);
+
+    const deleteChain = {
+      where: vi.fn(),
+      returning: vi.fn(),
+    };
+    deleteChain.where.mockReturnValue(deleteChain);
+    deleteChain.returning.mockResolvedValue([{ collectionId: 10, bookId: 1 }]);
+
+    const localDb = {
+      insert: vi.fn().mockReturnValue(insertChain),
+      delete: vi.fn().mockReturnValue(deleteChain),
+    };
+    const localRepo = new CollectionRepository(localDb as never);
+
+    await localRepo.addBooks(10, [1, 2]);
+    await localRepo.removeBooks(10, [1]);
+
+    expect(insertChain.values).toHaveBeenCalledWith([
+      { collectionId: 10, bookId: 1 },
+      { collectionId: 10, bookId: 2 },
+    ]);
+    expect(insertChain.onConflictDoNothing).toHaveBeenCalled();
+    expect(deleteChain.where).toHaveBeenCalled();
   });
 });

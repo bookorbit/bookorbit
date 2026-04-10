@@ -89,6 +89,9 @@ describe('UserRepository', () => {
     const hashState = { update: vi.fn().mockReturnThis(), digest: vi.fn().mockReturnValue('token-hash') };
     mockCreateHash.mockReturnValue(hashState as any);
     mockHash.mockResolvedValue('oidc-password-hash');
+
+    db.delete.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    db.query.users.findFirst.mockResolvedValue(null);
   });
 
   it('findAll returns normalized count and skips user query when no ids are on the page', async () => {
@@ -312,5 +315,149 @@ describe('UserRepository', () => {
         isDefaultPassword: false,
       }),
     );
+  });
+
+  it('delete and setSuperuser issue scoped user updates', async () => {
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    db.delete.mockReturnValue({ where: deleteWhere });
+
+    await repo.delete(12);
+    expect(db.delete).toHaveBeenCalledWith(schema.users);
+    expect(deleteWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
+
+    await repo.setSuperuser(12, true);
+    expect(db.update).toHaveBeenCalledWith(schema.users);
+    expect(updateSet).toHaveBeenCalledWith({ isSuperuser: true });
+    expect(updateWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
+  });
+
+  it('setPermissions replaces permission rows in one transaction', async () => {
+    const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const txDelete = vi.fn().mockReturnValue({ where: txDeleteWhere });
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    const txInsert = vi.fn().mockReturnValue({ values: txInsertValues });
+
+    db.transaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) =>
+      cb({
+        delete: txDelete,
+        insert: txInsert,
+      }),
+    );
+
+    await repo.setPermissions(7, []);
+    expect(txDelete).toHaveBeenCalledWith(schema.userPermissions);
+    expect(txDeleteWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.userPermissions.userId, right: 7 }));
+    expect(txInsert).not.toHaveBeenCalled();
+
+    await repo.setPermissions(7, ['library_download' as never, 'kobo_sync' as never]);
+    expect(txInsertValues).toHaveBeenCalledWith([
+      { userId: 7, permissionName: 'library_download' },
+      { userId: 7, permissionName: 'kobo_sync' },
+    ]);
+  });
+
+  it('incrementTokenVersion updates with SQL expression', async () => {
+    await repo.incrementTokenVersion(4);
+
+    expect(db.update).toHaveBeenCalledWith(schema.users);
+    expect(updateSet).toHaveBeenCalledWith({ tokenVersion: expect.objectContaining({ op: 'sql' }) });
+    expect(updateWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 4 }));
+  });
+
+  it('findByEmail and findByOidcSubject delegate to query helpers', async () => {
+    await repo.findByEmail('alice@example.com');
+    await repo.findByOidcSubject('sub', 'iss');
+
+    expect(db.query.users.findFirst).toHaveBeenCalledTimes(2);
+    expect(db.query.users.findFirst).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: expect.objectContaining({ op: 'eq', left: schema.users.email, right: 'alice@example.com' }),
+      }),
+    );
+    expect(db.query.users.findFirst).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          op: 'and',
+          clauses: [
+            { op: 'eq', left: schema.users.oidcSubject, right: 'sub' },
+            { op: 'eq', left: schema.users.oidcIssuer, right: 'iss' },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('findAvatarStateById selects avatar state columns only', async () => {
+    await repo.findAvatarStateById(9);
+
+    expect(db.query.users.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({ op: 'eq', left: schema.users.id, right: 9 }),
+      columns: {
+        id: true,
+        avatarUrl: true,
+        avatarSource: true,
+        avatarVersion: true,
+      },
+    });
+  });
+
+  it('setAvatarSourceAndBumpVersion updates avatar source and increments version', async () => {
+    await repo.setAvatarSourceAndBumpVersion(3, 'uploaded');
+
+    expect(db.update).toHaveBeenCalledWith(schema.users);
+    expect(updateSet).toHaveBeenCalledWith({
+      avatarSource: 'uploaded',
+      avatarVersion: expect.objectContaining({ op: 'sql' }),
+    });
+    expect(updateWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 3 }));
+  });
+
+  it('assignViewerLibraries short-circuits empty lists and inserts viewer rows for non-empty input', async () => {
+    const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+    db.insert.mockReturnValue({ values });
+
+    await repo.assignViewerLibraries(5, []);
+    expect(db.insert).not.toHaveBeenCalled();
+
+    await repo.assignViewerLibraries(5, [1, 2]);
+    expect(db.insert).toHaveBeenCalledWith(schema.userLibraryAccess);
+    expect(values).toHaveBeenCalledWith([
+      { userId: 5, libraryId: 1, accessLevel: 'viewer' },
+      { userId: 5, libraryId: 2, accessLevel: 'viewer' },
+    ]);
+    expect(onConflictDoNothing).toHaveBeenCalled();
+  });
+
+  it('findLibraryIdsByUserId and replaceViewerLibraries manage user-library rows', async () => {
+    const where = vi.fn().mockResolvedValue([{ libraryId: 10 }, { libraryId: 11 }]);
+    const from = vi.fn().mockReturnValue({ where });
+    select.mockReturnValue({ from });
+
+    await expect(repo.findLibraryIdsByUserId(2)).resolves.toEqual([10, 11]);
+
+    const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const txDelete = vi.fn().mockReturnValue({ where: txDeleteWhere });
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    const txInsert = vi.fn().mockReturnValue({ values: txInsertValues });
+    db.transaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) =>
+      cb({
+        delete: txDelete,
+        insert: txInsert,
+      }),
+    );
+
+    await repo.replaceViewerLibraries(2, []);
+    expect(txDelete).toHaveBeenCalledWith(schema.userLibraryAccess);
+    expect(txDeleteWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.userLibraryAccess.userId, right: 2 }));
+    expect(txInsert).not.toHaveBeenCalled();
+
+    await repo.replaceViewerLibraries(2, [10, 11]);
+    expect(txInsertValues).toHaveBeenCalledWith([
+      { userId: 2, libraryId: 10, accessLevel: 'viewer' },
+      { userId: 2, libraryId: 11, accessLevel: 'viewer' },
+    ]);
   });
 });

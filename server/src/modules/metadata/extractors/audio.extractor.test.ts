@@ -5,10 +5,26 @@ vi.mock('music-metadata', () => ({
   parseFile: vi.fn(),
 }));
 
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actual,
+    open: vi.fn(),
+  };
+});
+
+vi.mock('mediainfo.js', () => ({
+  default: vi.fn(),
+}));
+
 import * as mm from 'music-metadata';
+import { open } from 'fs/promises';
+import mediaInfoFactory from 'mediainfo.js';
 import { extractAudioMetadata, parseAudioDuration } from './audio.extractor';
 
 const mockParseFile = mm.parseFile as ReturnType<typeof vi.fn>;
+const mockOpen = open as unknown as ReturnType<typeof vi.fn>;
+const mockMediaInfoFactory = mediaInfoFactory as unknown as ReturnType<typeof vi.fn>;
 
 function makeMetadata(overrides: Partial<IAudioMetadata> = {}): IAudioMetadata {
   const base = {
@@ -33,10 +49,19 @@ function makeMetadata(overrides: Partial<IAudioMetadata> = {}): IAudioMetadata {
   } as unknown as IAudioMetadata;
 }
 
+function resetAudioMocks() {
+  vi.resetAllMocks();
+  mockOpen.mockRejectedValue(new Error('no mediainfo file handle'));
+  mockMediaInfoFactory.mockResolvedValue({
+    analyzeData: vi.fn().mockResolvedValue({ media: { track: [] } }),
+    close: vi.fn(),
+  });
+}
+
 // ── AUTHOR / NARRATOR SPLIT ───────────────────────────────────────────────────
 
 describe('extractAudioMetadata — author/narrator split', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('uses albumartist as author and artists as narrators', async () => {
     mockParseFile.mockResolvedValue(
@@ -106,7 +131,7 @@ describe('extractAudioMetadata — author/narrator split', () => {
 // ── TITLE RESOLUTION ─────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — title', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('prefers album tag over track title', async () => {
     mockParseFile.mockResolvedValue(
@@ -145,7 +170,7 @@ describe('extractAudioMetadata — title', () => {
 // ── DURATION ─────────────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — duration', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('rounds duration to integer seconds', async () => {
     mockParseFile.mockResolvedValue(
@@ -168,7 +193,38 @@ describe('extractAudioMetadata — duration', () => {
 // ── CHAPTERS ─────────────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — chapters', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
+
+  it('prefers chapter markers extracted by mediainfo and sorts them by timestamp', async () => {
+    const close = vi.fn();
+    const read = vi.fn().mockResolvedValue(undefined);
+    const stat = vi.fn().mockResolvedValue({ size: 4096 });
+    mockOpen.mockResolvedValue({ stat, read, close });
+    mockMediaInfoFactory.mockResolvedValue({
+      analyzeData: vi.fn().mockResolvedValue({
+        media: {
+          track: [
+            {
+              '@type': 'Menu',
+              extra: {
+                _00_00_10_500: 'Chapter 2',
+                _00_00_00_000: 'Introduction',
+              },
+            },
+          ],
+        },
+      }),
+      close: vi.fn(),
+    });
+    mockParseFile.mockResolvedValue(makeMetadata());
+
+    const result = await extractAudioMetadata('/path/mediainfo.m4b');
+    expect(result.chapters).toEqual([
+      { title: 'Introduction', startMs: 0 },
+      { title: 'Chapter 2', startMs: 10500 },
+    ]);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
 
   it('converts chapter sampleOffset to startMs using sampleRate', async () => {
     mockParseFile.mockResolvedValue(
@@ -214,7 +270,7 @@ describe('extractAudioMetadata — chapters', () => {
 // ── COVER ─────────────────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — cover', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('extracts cover bytes from embedded picture', async () => {
     const imageData = Buffer.from('fake-image-data');
@@ -241,7 +297,7 @@ describe('extractAudioMetadata — cover', () => {
 // ── OTHER FIELDS ─────────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — misc fields', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('maps publisher, publishedYear, description, language', async () => {
     mockParseFile.mockResolvedValue(
@@ -261,12 +317,35 @@ describe('extractAudioMetadata — misc fields', () => {
     expect(result.description).toBe('An epic sci-fi audiobook');
     expect(result.language).toBe('eng');
   });
+
+  it('reads description from object comments and returns null when comment entries are blank', async () => {
+    mockParseFile.mockResolvedValueOnce(
+      makeMetadata({
+        common: {
+          comment: [{ text: 'Object-based comment' }],
+        } as unknown as IAudioMetadata['common'],
+      }),
+    );
+    mockParseFile.mockResolvedValueOnce(
+      makeMetadata({
+        common: {
+          comment: ['  ', { text: '   ' }],
+        } as unknown as IAudioMetadata['common'],
+      }),
+    );
+
+    const withObjectComment = await extractAudioMetadata('/path/object-comment.m4b');
+    const withBlankComments = await extractAudioMetadata('/path/blank-comment.m4b');
+
+    expect(withObjectComment.description).toBe('Object-based comment');
+    expect(withBlankComments.description).toBeNull();
+  });
 });
 
 // ── FAILURE TOLERANCE ────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — failure tolerance', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('returns safe empty result when parseFile throws', async () => {
     mockParseFile.mockRejectedValue(new Error('Cannot read file'));
@@ -292,7 +371,7 @@ describe('extractAudioMetadata — failure tolerance', () => {
 // ── parseAudioDuration ────────────────────────────────────────────────────────
 
 describe('parseAudioDuration', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => resetAudioMocks());
 
   it('returns rounded duration in seconds', async () => {
     mockParseFile.mockResolvedValue(

@@ -426,3 +426,128 @@ describe('UserStateImporter collection import', () => {
     );
   });
 });
+
+describe('SharedOverlaysImporter domain gating', () => {
+  it('marks all shared overlay stages skipped when source domains are unavailable', async () => {
+    const repo = createRepoMock();
+    const importRepo = createImportRepoMock();
+    const importer = new SharedOverlaysImporter(repo as never, importRepo as never);
+
+    const planned = {
+      execution: {
+        matchedBooks: [{ sourceBookId: 'b1', targetBookId: 901 }],
+        sourceData: {
+          availableDomains: {
+            metadata: false,
+            authors: false,
+            narrators: false,
+            genres: false,
+            tags: false,
+          },
+          books: [],
+        },
+      },
+    };
+
+    await importer.import(120, planned as never, async () => {});
+
+    expect(repo.setRunMetric).toHaveBeenCalledWith(120, 'shared_overlays', 'book_metadata', expect.objectContaining({ processed: 1, skipped: 1 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(120, 'shared_overlays', 'book_authors', expect.objectContaining({ processed: 1, skipped: 1 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(120, 'shared_overlays', 'book_narrators', expect.objectContaining({ processed: 1, skipped: 1 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(120, 'shared_overlays', 'book_genres', expect.objectContaining({ processed: 1, skipped: 1 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(120, 'shared_overlays', 'book_tags', expect.objectContaining({ processed: 1, skipped: 1 }));
+    expect(importRepo.batchUpsertBookMetadata).not.toHaveBeenCalled();
+  });
+});
+
+describe('UserStateImporter progress and bookmark edge cases', () => {
+  it('marks user-state stages skipped when unavailable', async () => {
+    const repo = createRepoMock();
+    const importRepo = createImportRepoMock();
+    const importer = new UserStateImporter(repo as never, importRepo as never);
+
+    const planned = {
+      plan: {
+        userMappings: [],
+        pathMappings: [],
+      },
+      execution: {
+        matchedBooks: [],
+        sourceData: {
+          availableDomains: {
+            userBookStatuses: false,
+            readingProgress: false,
+            bookmarks: false,
+            annotations: false,
+            shelves: false,
+          },
+          books: [],
+          userBookStatuses: [],
+          userFileProgress: [],
+          bookmarks: [],
+          annotations: [],
+          shelves: [],
+          shelfBooks: [],
+        },
+      },
+    };
+
+    await importer.import(121, planned as never, async () => {});
+
+    expect(repo.setRunMetric).toHaveBeenCalledWith(121, 'user_state', 'user_book_status', expect.objectContaining({ processed: 0, skipped: 0 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(121, 'user_state', 'reading_progress', expect.objectContaining({ processed: 0, skipped: 0 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(121, 'user_state', 'audiobook_progress', expect.objectContaining({ processed: 0, skipped: 0 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(121, 'user_state', 'bookmarks', expect.objectContaining({ processed: 0, skipped: 0 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(121, 'user_state', 'annotations', expect.objectContaining({ processed: 0, skipped: 0 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(121, 'user_state', 'collections', expect.objectContaining({ processed: 0, skipped: 0 }));
+  });
+
+  it('derives bookmark position from track index when source file id is missing', async () => {
+    const repo = createRepoMock();
+    const importRepo = createImportRepoMock();
+    const importer = new UserStateImporter(repo as never, importRepo as never);
+
+    const planned = {
+      execution: {
+        sourceData: {
+          availableDomains: {
+            bookmarks: true,
+          },
+          books: [
+            {
+              sourceBookId: 'source-1',
+              files: [
+                { sourceFileId: 'f1', durationSeconds: 30 },
+                { sourceFileId: 'f2', durationSeconds: 45 },
+              ],
+            },
+          ],
+          bookmarks: [
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'source-1',
+              sourceFileId: null,
+              title: 'Chapter mark',
+              cfi: '/6/2',
+              positionSeconds: 15,
+              trackIndex: 2,
+              createdAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+        },
+      },
+    };
+
+    await (importer as any).importBookmarks(122, planned, new Map([['u1', 10]]), new Map([['source-1', 200]]), async () => {});
+
+    const inserted = (importRepo.batchInsertBookmarks.mock.calls as unknown[][])[0][0] as Array<Record<string, unknown>>;
+    expect(inserted[0]).toEqual(
+      expect.objectContaining({
+        userId: 10,
+        bookId: 200,
+        positionSeconds: 45,
+      }),
+    );
+    expect(repo.setRunMetric).toHaveBeenCalledWith(122, 'user_state', 'bookmarks', expect.objectContaining({ processed: 1, imported: 1 }));
+  });
+});

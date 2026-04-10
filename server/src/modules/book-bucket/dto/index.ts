@@ -313,6 +313,7 @@ export class BulkEditBookBucketDto {
   search?: string;
 
   @ValidateNested()
+  @IsObject()
   @Type(() => BookBucketMetadataFieldsDto)
   fields: BookBucketMetadataFieldsDto;
 

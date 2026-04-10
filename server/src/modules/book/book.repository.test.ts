@@ -20,6 +20,11 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
     chain.where.mockResolvedValue(terminalResult);
     chain.orderBy.mockReturnValue(chain);
     chain.limit.mockReturnValue(chain);
+  } else if (terminalMethod === 'offset') {
+    chain.where.mockReturnValue(chain);
+    chain.orderBy.mockReturnValue(chain);
+    chain.limit.mockReturnValue(chain);
+    chain.offset.mockResolvedValue(terminalResult);
   } else if (terminalMethod === 'orderBy') {
     chain.where.mockReturnValue(chain);
     chain.orderBy.mockResolvedValue(terminalResult);
@@ -34,6 +39,245 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
 }
 
 describe('BookRepository', () => {
+  it('runs callbacks inside db transactions', async () => {
+    const db = {
+      transaction: vi.fn((callback: (tx: { id: string }) => Promise<string>) => callback({ id: 'tx-1' })),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.withTransaction((tx: { id: string }) => Promise.resolve(`seen-${tx.id}`))).resolves.toBe('seen-tx-1');
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('findCards loads card rows and related collections for the current user', async () => {
+    const rows = [{ id: 10, primaryFileId: 1001 }];
+    const totals = [{ total: '1' }];
+    const authorRows = [{ bookId: 10, name: 'Frank Herbert' }];
+    const fileRows = [{ bookId: 10, id: 1001, format: 'epub', role: 'primary' }];
+    const genreRows = [{ bookId: 10, name: 'Sci-Fi' }];
+    const progressRows = [{ bookFileId: 1001, percentage: 45 }];
+    const statusRows = [{ bookId: 10, status: 'reading', source: 'manual', startedAt: null, finishedAt: null, updatedAt: null }];
+
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('offset', rows))
+        .mockReturnValueOnce(makeSelectChain('where', totals))
+        .mockReturnValueOnce(makeSelectChain('orderBy', authorRows))
+        .mockReturnValueOnce(makeSelectChain('where', fileRows))
+        .mockReturnValueOnce(makeSelectChain('where', genreRows))
+        .mockReturnValueOnce(makeSelectChain('where', progressRows))
+        .mockReturnValueOnce(makeSelectChain('where', statusRows)),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.findCards({ where: undefined as never, orderBy: [] as never, limit: 25, offset: 0, userId: 7 });
+
+    expect(result).toEqual({
+      rows,
+      authorRows,
+      fileRows,
+      genreRows,
+      progressRows,
+      statusRows,
+      total: 1,
+    });
+  });
+
+  it('findCardsByBookIds returns empty payload when no ids are requested', async () => {
+    const db = { select: vi.fn() };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.findCardsByBookIds([], 1)).resolves.toEqual({
+      rows: [],
+      authorRows: [],
+      fileRows: [],
+      genreRows: [],
+      progressRows: [],
+      statusRows: [],
+      total: 0,
+    });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('findCardsByBookIds delegates to findCards with fixed pagination bounds', async () => {
+    const repo = new BookRepository({} as never);
+    const findCardsSpy = vi.spyOn(repo, 'findCards').mockResolvedValue({} as never);
+
+    await repo.findCardsByBookIds([10, 20], 7);
+
+    expect(findCardsSpy).toHaveBeenCalledWith({
+      where: expect.anything(),
+      orderBy: [],
+      limit: 2,
+      offset: 0,
+      userId: 7,
+    });
+  });
+
+  it('findById returns null when no matching book exists', async () => {
+    const db = {
+      select: vi.fn().mockReturnValue(makeSelectChain('limit', [])),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.findById(99)).resolves.toBeNull();
+  });
+
+  it('findById returns full joined payload when the book exists', async () => {
+    const joinedBook = [{ books: { id: 10 }, book_metadata: { title: 'Dune' }, libraries: { name: 'Main' } }];
+    const authorRows = [{ id: 1, name: 'Frank Herbert', sortName: 'Herbert, Frank' }];
+    const genreRows = [{ name: 'Sci-Fi' }];
+    const tagRows = [{ name: 'classic' }];
+    const fileRows = [
+      { id: 99, format: 'epub', role: 'primary', sizeBytes: 1, absolutePath: '/books/dune.epub', createdAt: new Date(), durationSeconds: null },
+    ];
+    const narratorRows = [{ id: 4, name: 'Narrator', sortName: null, displayOrder: 0 }];
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', joinedBook))
+        .mockReturnValueOnce(makeSelectChain('orderBy', authorRows))
+        .mockReturnValueOnce(makeSelectChain('where', genreRows))
+        .mockReturnValueOnce(makeSelectChain('where', tagRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', fileRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows)),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.findById(10);
+
+    expect(result).toEqual({
+      book: joinedBook[0],
+      authorRows,
+      genreRows,
+      tagRows,
+      fileRows,
+      narratorRows,
+    });
+  });
+
+  it('fetches per-book and per-file progress helpers with null-safe fallbacks', async () => {
+    const findCollectionsChain = makeSelectChain('orderBy', [{ id: 1, name: 'Favorites' }]);
+    const libraryIdChain = makeSelectChain('limit', [{ libraryId: 5 }]);
+    const missingLibraryChain = makeSelectChain('limit', []);
+    const fileByIdChain = makeSelectChain('limit', [{ id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2 }]);
+    const missingFileChain = makeSelectChain('limit', []);
+    const progressChain = makeSelectChain('limit', [{ percentage: 12 }]);
+    const missingProgressChain = makeSelectChain('limit', []);
+    const progressByBookChain = makeSelectChain('orderBy', [{ fileId: 1, cfi: null, pageNumber: null, percentage: 0, updatedAt: null }]);
+    const koboReadingChain = makeSelectChain('limit', [{ createdAtKobo: null }]);
+    const koboSnapshotChain = makeSelectChain('limit', [{ snapshotId: 8 }]);
+    const koboCollectionsChain = makeSelectChain('where', [{ name: 'Sync Me' }]);
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(findCollectionsChain)
+        .mockReturnValueOnce(libraryIdChain)
+        .mockReturnValueOnce(missingLibraryChain)
+        .mockReturnValueOnce(fileByIdChain)
+        .mockReturnValueOnce(missingFileChain)
+        .mockReturnValueOnce(progressChain)
+        .mockReturnValueOnce(missingProgressChain)
+        .mockReturnValueOnce(progressByBookChain)
+        .mockReturnValueOnce(koboReadingChain)
+        .mockReturnValueOnce(koboSnapshotChain)
+        .mockReturnValueOnce(koboCollectionsChain),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.findCollectionsByBookId(10, 1)).resolves.toEqual([{ id: 1, name: 'Favorites' }]);
+    await expect(repo.findLibraryIdByBookId(10)).resolves.toBe(5);
+    await expect(repo.findLibraryIdByBookId(11)).resolves.toBeNull();
+    await expect(repo.findFileById(9)).resolves.toEqual({ id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2 });
+    await expect(repo.findFileById(10)).resolves.toBeNull();
+    await expect(repo.findProgress(1, 9)).resolves.toEqual({ percentage: 12 });
+    await expect(repo.findProgress(1, 10)).resolves.toBeNull();
+    await expect(repo.findProgressByBook(1, 10)).resolves.toEqual([{ fileId: 1, cfi: null, pageNumber: null, percentage: 0, updatedAt: null }]);
+    await expect(repo.findKoboReadingState(1, 10)).resolves.toEqual({ createdAtKobo: null });
+    await expect(repo.findKoboSnapshotState(1, 10)).resolves.toEqual({ snapshotId: 8 });
+    await expect(repo.findKoboSyncCollectionNamesForBook(1, 10)).resolves.toEqual(['Sync Me']);
+  });
+
+  it('returns empty arrays for id-list helpers when input is empty', async () => {
+    const db = { select: vi.fn() };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.findLibraryIdsByBookIds([])).resolves.toEqual([]);
+    await expect(repo.findRecommendationTitlesByBookIds([])).resolves.toEqual([]);
+    await expect(repo.findPrimaryFilesByBookIds([])).resolves.toEqual([]);
+    await expect(repo.findAllFilesByBookIds([])).resolves.toEqual([]);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('maps id-list helper rows and primary-file lookups', async () => {
+    const libraryRows = [{ id: 1, libraryId: 7 }];
+    const recommendationRows = [{ id: 1, title: 'Dune' }];
+    const allIdsRows = [{ id: 3 }, { id: 4 }];
+    const primaryFileRows = [{ absolutePath: '/books/a.epub', format: 'epub' }];
+    const missingPrimaryRows: unknown[] = [];
+    const primaryFilesByIds = [{ bookId: 1, absolutePath: '/books/a.epub', format: 'epub', sizeBytes: 10 }];
+    const allFilesByIds = [{ bookId: 1, absolutePath: '/books/a.epub', format: 'epub', sizeBytes: 10, sortOrder: 0 }];
+    const allIdsChain = {
+      from: vi.fn().mockResolvedValue(allIdsRows),
+    };
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('where', libraryRows))
+        .mockReturnValueOnce(makeSelectChain('where', recommendationRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', primaryFilesByIds))
+        .mockReturnValueOnce(makeSelectChain('orderBy', allFilesByIds))
+        .mockReturnValueOnce(allIdsChain)
+        .mockReturnValueOnce(makeSelectChain('limit', primaryFileRows))
+        .mockReturnValueOnce(makeSelectChain('limit', missingPrimaryRows)),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.findLibraryIdsByBookIds([1])).resolves.toEqual(libraryRows);
+    await expect(repo.findRecommendationTitlesByBookIds([1])).resolves.toEqual(recommendationRows);
+    await expect(repo.findPrimaryFilesByBookIds([1])).resolves.toEqual(primaryFilesByIds);
+    await expect(repo.findAllFilesByBookIds([1])).resolves.toEqual(allFilesByIds);
+    await expect(repo.findAllIds()).resolves.toEqual([3, 4]);
+    await expect(repo.findPrimaryFile(1)).resolves.toEqual({ absolutePath: '/books/a.epub', format: 'epub' });
+    await expect(repo.findPrimaryFile(2)).resolves.toBeNull();
+  });
+
+  it('writes deletion, metadata updates, and audio progress rows', async () => {
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteBuilder = { where: deleteWhere };
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
+    const audioInsert = {
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ bookId: 10, percentage: 33 }]),
+        }),
+      }),
+    };
+    const audioProgressSelect = makeSelectChain('limit', [{ percentage: 22 }]);
+    const missingAudioProgressSelect = makeSelectChain('limit', []);
+    const db = {
+      delete: vi.fn().mockReturnValue(deleteBuilder),
+      update: vi.fn().mockReturnValue(updateBuilder),
+      insert: vi.fn().mockReturnValue(audioInsert),
+      select: vi.fn().mockReturnValueOnce(audioProgressSelect).mockReturnValueOnce(missingAudioProgressSelect),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.deleteByIds([10, 11]);
+    await repo.updateMetadataFields(10, { title: 'Updated' });
+    await expect(repo.findAudioProgress(1, 10)).resolves.toEqual({ percentage: 22 });
+    await expect(repo.findAudioProgress(1, 11)).resolves.toBeNull();
+    await expect(repo.upsertAudioProgress(1, 10, 4, 120, 33)).resolves.toEqual({ bookId: 10, percentage: 33 });
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(deleteWhere).toHaveBeenCalledTimes(1);
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(updateWhere).toHaveBeenCalledTimes(1);
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
   it('returns empty pattern metadata without hitting DB when no book ids are provided', async () => {
     const db = { select: vi.fn() };
     const repo = new BookRepository(db as never);

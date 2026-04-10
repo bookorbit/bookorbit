@@ -7,6 +7,9 @@ vi.mock('../library/library.module', () => ({ LibraryModule: class LibraryModule
 vi.mock('../metadata/metadata.module', () => ({ MetadataModule: class MetadataModule {} }));
 vi.mock('../metadata-fetch/metadata-fetch.module', () => ({ MetadataFetchModule: class MetadataFetchModule {} }));
 
+import { MODULE_METADATA } from '@nestjs/common/constants';
+
+import { LibraryModule } from '../library/library.module';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookReadService } from './book-read.service';
 import { BookController } from './book.controller';
@@ -19,5 +22,13 @@ describe('BookModule', () => {
     expect(Reflect.getMetadata('controllers', BookModule)).toEqual([BookController]);
     expect(Reflect.getMetadata('providers', BookModule)).toEqual([BookService, BookRepository, BookReadService, BookQueryBuilder]);
     expect(Reflect.getMetadata('exports', BookModule)).toEqual([BookService, BookReadService, BookQueryBuilder]);
+  });
+
+  it('keeps library module in forwardRef imports', () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, BookModule) as Array<{ forwardRef?: () => unknown }>;
+    const forwardRefImport = imports.find((entry) => typeof entry?.forwardRef === 'function');
+
+    expect(forwardRefImport).toBeDefined();
+    expect(forwardRefImport?.forwardRef?.()).toBe(LibraryModule);
   });
 });

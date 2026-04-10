@@ -78,6 +78,8 @@ describe('BookMetadataFetchQueueRepository', () => {
       },
       insertBuilder,
       selectBuilder,
+      updateBuilder,
+      deleteBuilder,
     };
   };
 
@@ -153,5 +155,167 @@ describe('BookMetadataFetchQueueRepository', () => {
 
     await expect(repo.countEligibleBooks(config)).resolves.toBe(3);
     expect(and).toHaveBeenCalled();
+  });
+
+  it('markProcessing returns true when queue row is claimed', async () => {
+    const { db, updateBuilder } = makeDb();
+    updateBuilder.returning.mockResolvedValueOnce([{ bookId: 44 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.markProcessing(44)).resolves.toBe(true);
+  });
+
+  it('markProcessing returns false on unique-violation races and throws unknown errors', async () => {
+    const { db, updateBuilder } = makeDb();
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    updateBuilder.returning.mockRejectedValueOnce({ code: '23505' });
+    await expect(repo.markProcessing(44)).resolves.toBe(false);
+
+    updateBuilder.returning.mockRejectedValueOnce(new Error('db down'));
+    await expect(repo.markProcessing(44)).rejects.toThrow('db down');
+  });
+
+  it('markFailed truncates long error text and normalizes http status', async () => {
+    const { db, updateBuilder } = makeDb();
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await repo.markFailed(10, 'x'.repeat(3000));
+
+    expect(updateBuilder.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        lastError: 'x'.repeat(2000),
+        lastHttpStatus: null,
+      }),
+    );
+  });
+
+  it('cancelPending and requeueFailed return row counts from write results', async () => {
+    const { db, deleteBuilder, updateBuilder } = makeDb();
+    deleteBuilder.returning.mockResolvedValueOnce([{ bookId: 1 }, { bookId: 2 }]);
+    updateBuilder.returning.mockResolvedValueOnce([{ bookId: 9 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.cancelPending()).resolves.toBe(2);
+    await expect(repo.requeueFailed()).resolves.toBe(1);
+  });
+
+  it('getStatusSummary maps grouped counts by queue status', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.groupBy.mockResolvedValue([
+      { status: 'queued', cnt: '5' },
+      { status: 'processing', cnt: '2' },
+      { status: 'failed', cnt: '1' },
+    ]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.getStatusSummary()).resolves.toEqual({
+      queued: 5,
+      processing: 2,
+      failed: 1,
+    });
+  });
+
+  it('resetAllProcessingOnBoot and recoverStuckProcessing return recovered row counts', async () => {
+    const { db, updateBuilder } = makeDb();
+    updateBuilder.returning.mockResolvedValueOnce([{ bookId: 1 }, { bookId: 2 }]).mockResolvedValueOnce([{ bookId: 4 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.resetAllProcessingOnBoot()).resolves.toBe(2);
+    await expect(repo.recoverStuckProcessing()).resolves.toBe(1);
+  });
+
+  it('scheduleEligibleBooksInBatches walks cursor pages and accumulates queued totals', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.limit.mockResolvedValueOnce([{ bookId: 2 }, { bookId: 5 }]).mockResolvedValueOnce([]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+    vi.spyOn(repo, 'upsertSchedule').mockResolvedValueOnce(2);
+    const config = baseConfig();
+    config.conditions.neverFetched.enabled = true;
+
+    await expect(repo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, 2)).resolves.toBe(2);
+    expect(repo.upsertSchedule).toHaveBeenCalledWith([2, 5], 'manual_trigger');
+  });
+
+  it('fetchDue short-circuits for non-positive limits', async () => {
+    const { db } = makeDb();
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.fetchDue(0)).resolves.toEqual([]);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('markDone deletes queue rows by book id', async () => {
+    const { db, deleteBuilder } = makeDb();
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.markDone(9)).resolves.toBeUndefined();
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(deleteBuilder.where).toHaveBeenCalledTimes(1);
+  });
+
+  it('scheduleEligibleBooksInBatches returns 0 for non-positive batch sizes', async () => {
+    const { db } = makeDb();
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+    const config = baseConfig();
+    config.conditions.neverFetched.enabled = true;
+
+    await expect(repo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, 0)).resolves.toBe(0);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('getFailedItems maps nullable fields and returns total count', async () => {
+    const failedRows = [
+      {
+        bookId: 10,
+        title: null,
+        libraryName: 'Main',
+        error: 'provider timeout',
+        httpStatus: 503,
+        failedAt: new Date('2026-01-05T00:00:00.000Z'),
+      },
+    ];
+    const totalRows = [{ cnt: '4' }];
+    const failedItemsChain = {
+      from: vi.fn(),
+      leftJoin: vi.fn(),
+      where: vi.fn(),
+      orderBy: vi.fn(),
+      limit: vi.fn(),
+      offset: vi.fn(),
+    };
+    failedItemsChain.from.mockReturnValue(failedItemsChain);
+    failedItemsChain.leftJoin.mockReturnValue(failedItemsChain);
+    failedItemsChain.where.mockReturnValue(failedItemsChain);
+    failedItemsChain.orderBy.mockReturnValue(failedItemsChain);
+    failedItemsChain.limit.mockReturnValue(failedItemsChain);
+    failedItemsChain.offset.mockResolvedValue(failedRows);
+
+    const totalChain = {
+      from: vi.fn(),
+      where: vi.fn(),
+    };
+    totalChain.from.mockReturnValue(totalChain);
+    totalChain.where.mockResolvedValue(totalRows);
+
+    const db = {
+      select: vi.fn().mockReturnValueOnce(failedItemsChain).mockReturnValueOnce(totalChain),
+    };
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.getFailedItems(2, 10)).resolves.toEqual({
+      items: [
+        {
+          bookId: 10,
+          title: null,
+          libraryName: 'Main',
+          error: 'provider timeout',
+          httpStatus: 503,
+          failedAt: '2026-01-05T00:00:00.000Z',
+        },
+      ],
+      total: 4,
+    });
   });
 });

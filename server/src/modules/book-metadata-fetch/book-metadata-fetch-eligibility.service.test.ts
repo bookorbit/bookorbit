@@ -119,4 +119,25 @@ describe('BookMetadataFetchEligibilityService', () => {
 
     expect(service.isEligible(book, config)).toBe(false);
   });
+
+  it('handles remaining missing-field cases and ignores unknown fields', () => {
+    const config = baseConfig();
+    config.conditions.missingFields.enabled = true;
+
+    const cases: Array<{ field: string; book: BookEligibilityData; eligible: boolean }> = [
+      { field: 'authors', book: { ...baseBook(), hasAuthors: false }, eligible: true },
+      { field: 'genres', book: { ...baseBook(), hasGenres: false }, eligible: true },
+      { field: 'subtitle', book: { ...baseBook(), subtitle: '' }, eligible: true },
+      { field: 'publisher', book: { ...baseBook(), publisher: '' }, eligible: true },
+      { field: 'publishedYear', book: { ...baseBook(), publishedYear: null }, eligible: true },
+      { field: 'language', book: { ...baseBook(), language: '' }, eligible: true },
+      { field: 'seriesName', book: { ...baseBook(), seriesName: '' }, eligible: true },
+      { field: 'unknown_field', book: baseBook(), eligible: false },
+    ];
+
+    for (const testCase of cases) {
+      config.conditions.missingFields.fields = [testCase.field as never];
+      expect(service.isEligible(testCase.book, config)).toBe(testCase.eligible);
+    }
+  });
 });

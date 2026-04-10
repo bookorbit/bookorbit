@@ -151,6 +151,50 @@ describe('CollectionService', () => {
       expect(collectionRepo.findById).toHaveBeenCalledTimes(2);
       expect(result).toEqual(hydrated);
     });
+
+    it('maps unique constraint errors to ConflictException semantics', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      collectionRepo.update.mockRejectedValue({ code: '23505' });
+
+      await expect(service.update(10, { name: 'Favorites' }, makeUser())).rejects.toThrow('A collection with this name already exists');
+    });
+  });
+
+  describe('create/remove', () => {
+    it('creates collection for current user and returns hydrated row', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.insert.mockResolvedValue([{ id: 25 }]);
+      collectionRepo.findById.mockResolvedValue([makeCollection({ id: 25, name: 'New Collection' })]);
+
+      const result = await service.create({ name: 'New Collection', icon: '⭐' } as any, makeUser({ id: 9 }));
+
+      expect(collectionRepo.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 9,
+          name: 'New Collection',
+          icon: '⭐',
+          syncToKobo: false,
+        }),
+      );
+      expect(result).toEqual(expect.objectContaining({ id: 25, name: 'New Collection' }));
+    });
+
+    it('propagates ownership checks on remove and deletes using owner id', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection({ id: 12, userId: 4 })]);
+
+      await service.remove(12, makeUser({ id: 4 }));
+      expect(collectionRepo.delete).toHaveBeenCalledWith(12, 4);
+    });
+
+    it('rejects non-owner remove attempts', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection({ userId: 9 })]);
+
+      await expect(service.remove(12, makeUser({ id: 4 }))).rejects.toThrow(ForbiddenException);
+      expect(collectionRepo.delete).not.toHaveBeenCalled();
+    });
   });
 
   describe('addBooks', () => {
@@ -327,6 +371,26 @@ describe('CollectionService', () => {
         { id: 1, displayOrder: 2 },
         { id: 2, displayOrder: 3 },
       ]);
+    });
+
+    it('rethrows repository errors from reorder operations', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.updateDisplayOrders.mockRejectedValue(new Error('db unavailable'));
+
+      await expect(service.reorder({ order: [{ id: 1, displayOrder: 0 }] }, makeUser({ id: 1 }))).rejects.toThrow('db unavailable');
+    });
+  });
+
+  describe('removeBooks', () => {
+    it('updates collection membership and returns hydrated collection', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValueOnce([makeCollection()]).mockResolvedValueOnce([makeCollection({ bookCount: 1 })]);
+      collectionRepo.removeBooks.mockResolvedValue([{ collectionId: 10, bookId: 7 }]);
+
+      const result = await service.removeBooks(10, { bookIds: [7] }, makeUser());
+
+      expect(collectionRepo.removeBooks).toHaveBeenCalledWith(10, [7]);
+      expect(result).toEqual(expect.objectContaining({ bookCount: 1 }));
     });
   });
 });

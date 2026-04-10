@@ -5,6 +5,7 @@ import { validate } from 'class-validator';
 import { Permission } from '@projectx/types';
 
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -31,6 +32,12 @@ describe('User DTO validation', () => {
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [1, 2] }))).toBe(true);
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [Permission.LibraryDownload] }))).toBe(false);
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [] }))).toBe(false);
+  });
+
+  it('SetLibrariesDto requires positive integer IDs', async () => {
+    expect(await hasErrors(plainToInstance(SetLibrariesDto, { libraryIds: [1, 2] }))).toBe(false);
+    expect(await hasErrors(plainToInstance(SetLibrariesDto, { libraryIds: [0] }))).toBe(true);
+    expect(await hasErrors(plainToInstance(SetLibrariesDto, { libraryIds: ['2'] }))).toBe(true);
   });
 
   it('UpdateMeDto requires settings to be an object when provided', async () => {
