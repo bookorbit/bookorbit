@@ -67,6 +67,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           pnpm-version: ${{ env.PNPM_VERSION }}
+          prefetch: "true"
 
       - name: Run e2e suite
         shell: bash

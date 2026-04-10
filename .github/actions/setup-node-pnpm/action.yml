@@ -22,6 +22,10 @@ inputs:
     description: Path(s) used to generate the cache key.
     required: false
     default: "pnpm-lock.yaml"
+  prefetch:
+    description: Whether to run pnpm fetch before installation.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -53,6 +57,11 @@ runs:
         key: ${{ runner.os }}-pnpm-${{ inputs.pnpm-version }}-store-${{ hashFiles(inputs.cache-dependency-path) }}
         restore-keys: |
           ${{ runner.os }}-pnpm-${{ inputs.pnpm-version }}-store-
+
+    - name: Prefetch dependencies
+      if: ${{ inputs.prefetch == 'true' }}
+      shell: bash
+      run: pnpm fetch --frozen-lockfile
 
     - name: Install dependencies
       if: ${{ inputs.install == 'true' }}

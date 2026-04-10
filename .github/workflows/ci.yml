@@ -1,9 +1,11 @@
 name: CI
 run-name: >-
-  ${{ (github.event_name == 'push' && format('CI - {0} ({1})', github.event.head_commit.message, github.ref_name)) || (github.event_name == 'pull_request' && format('CI - PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title)) || 'CI - manual' }}
+  ${{ (github.event_name == 'push' && format('CI - {0} ({1})', github.event.head_commit.message, github.ref_name)) || (github.event_name == 'pull_request' && format('CI - PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title)) || (github.event_name == 'schedule' && 'CI - nightly') || 'CI - manual' }}
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
   pull_request:
     branches: [main]
   push:
@@ -48,9 +50,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Manual dispatch runs all scopes
+      - name: Manual and nightly runs include all scopes
         id: manual
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         shell: bash
         run: |
           echo "server=true" >> "$GITHUB_OUTPUT"
@@ -61,7 +63,7 @@ jobs:
       # Force-push edge cases (before SHA no longer reachable) may mark all files changed too.
       - name: Compute changed scopes
         id: changes
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' && github.event_name != 'schedule'
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
         with:
           filters: |
@@ -88,27 +90,159 @@ jobs:
           echo "server=${{ steps.manual.outputs.server || steps.changes.outputs.server }}"
           echo "client=${{ steps.manual.outputs.client || steps.changes.outputs.client }}"
 
-  checks:
-    name: ${{ matrix.check }} (${{ matrix.package }})
+  lint:
+    name: Lint (${{ matrix.package_label }})
     runs-on: ubuntu-latest
     needs: [dependency-review, detect-changes]
-    timeout-minutes: 20
-    # matrix context is not available in job-level if; per-package change filtering
-    # is done via the has-changes gate step below.
+    timeout-minutes: 10
     if: >
       always() &&
       (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
       needs.detect-changes.result == 'success'
     strategy:
-      # All matrix cells run independently so all failures are visible in one pass.
       fail-fast: false
       matrix:
         package: [server, client]
-        check: [lint, typecheck, test]
+        include:
+          - package: server
+            package_label: Server
+          - package: client
+            package_label: Client
     permissions:
       contents: read
-      # checks: write is only used by publish-unit-test-result-action in test matrix cells.
-      # Lint and typecheck cells receive this permission too due to the shared job definition.
+    steps:
+      - name: Check for package changes
+        id: has-changes
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+          SERVER_CHANGED: ${{ needs.detect-changes.outputs.server }}
+          CLIENT_CHANGED: ${{ needs.detect-changes.outputs.client }}
+        run: |
+          if [[ "$PACKAGE" == "server" && "$SERVER_CHANGED" == "true" ]] || \
+             [[ "$PACKAGE" == "client" && "$CLIENT_CHANGED" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.has-changes.outputs.run == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js and pnpm
+        if: steps.has-changes.outputs.run == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+          prefetch: "true"
+
+      - name: Run lint checks
+        if: steps.has-changes.outputs.run == 'true'
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          if [[ "$PACKAGE" == "server" ]]; then
+            pnpm --filter server lint:check
+          else
+            pnpm --filter client lint:check
+          fi
+
+      - name: Run format checks
+        if: steps.has-changes.outputs.run == 'true'
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          if [[ "$PACKAGE" == "server" ]]; then
+            pnpm --filter server format:check
+          else
+            pnpm --filter client format:check
+          fi
+
+  typecheck:
+    name: Type Check (${{ matrix.package_label }})
+    runs-on: ubuntu-latest
+    needs: [dependency-review, detect-changes]
+    timeout-minutes: 10
+    if: >
+      always() &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
+      needs.detect-changes.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [server, client]
+        include:
+          - package: server
+            package_label: Server
+          - package: client
+            package_label: Client
+    permissions:
+      contents: read
+    steps:
+      - name: Check for package changes
+        id: has-changes
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+          SERVER_CHANGED: ${{ needs.detect-changes.outputs.server }}
+          CLIENT_CHANGED: ${{ needs.detect-changes.outputs.client }}
+        run: |
+          if [[ "$PACKAGE" == "server" && "$SERVER_CHANGED" == "true" ]] || \
+             [[ "$PACKAGE" == "client" && "$CLIENT_CHANGED" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.has-changes.outputs.run == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js and pnpm
+        if: steps.has-changes.outputs.run == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+          prefetch: "true"
+
+      - name: Run typecheck
+        if: steps.has-changes.outputs.run == 'true'
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          if [[ "$PACKAGE" == "server" ]]; then
+            pnpm --filter server type-check
+          else
+            pnpm --filter @projectx/types build
+            pnpm --filter client type-check
+          fi
+
+  tests:
+    name: Tests (${{ matrix.package_label }})
+    runs-on: ubuntu-latest
+    needs: [dependency-review, detect-changes]
+    timeout-minutes: 20
+    if: >
+      always() &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
+      needs.detect-changes.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [server, client]
+        include:
+          - package: server
+            package_label: Server
+          - package: client
+            package_label: Client
+    permissions:
+      contents: read
       checks: write
     steps:
       - name: Check for package changes
@@ -136,32 +270,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           pnpm-version: ${{ env.PNPM_VERSION }}
-
-      - name: Run lint
-        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'lint'
-        shell: bash
-        run: pnpm --filter "${{ matrix.package }}" lint:check
-
-      - name: Run typecheck
-        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'typecheck'
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-        run: |
-          if [[ "$PACKAGE" == "server" ]]; then
-            pnpm --filter server type-check
-          else
-            pnpm --filter @projectx/types build
-            pnpm --filter client type-check
-          fi
+          prefetch: "true"
 
       - name: Prepare test report directory
-        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'test'
+        if: steps.has-changes.outputs.run == 'true'
         shell: bash
         run: mkdir -p "$GITHUB_WORKSPACE/test-results/${{ matrix.package }}"
 
       - name: Run tests
-        if: steps.has-changes.outputs.run == 'true' && matrix.check == 'test'
+        if: steps.has-changes.outputs.run == 'true'
         shell: bash
         env:
           PACKAGE: ${{ matrix.package }}
@@ -177,7 +294,7 @@ jobs:
         if: >
           always() &&
           steps.has-changes.outputs.run == 'true' &&
-          matrix.check == 'test' &&
+          hashFiles(format('test-results/{0}/junit.xml', matrix.package)) != '' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2
         with:
@@ -190,7 +307,7 @@ jobs:
         if: >
           always() &&
           steps.has-changes.outputs.run == 'true' &&
-          matrix.check == 'test' &&
+          hashFiles(format('test-results/{0}/junit.xml', matrix.package)) != '' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -201,7 +318,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [dependency-review, detect-changes, checks]
+    needs: [dependency-review, detect-changes, lint, typecheck, tests]
     timeout-minutes: 5
     if: always()
     steps:
@@ -215,14 +332,16 @@ jobs:
         run: |
           echo "dependency-review=${{ needs.dependency-review.result }}"
           echo "detect-changes=${{ needs.detect-changes.result }}"
-          echo "checks=${{ needs.checks.result }}"
+          echo "lint=${{ needs.lint.result }}"
+          echo "typecheck=${{ needs.typecheck.result }}"
+          echo "tests=${{ needs.tests.result }}"
 
   e2e-setup:
     name: Detect E2E Suites
     runs-on: ubuntu-latest
     needs: [quality-gate]
     if: needs.quality-gate.result == 'success'
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
     steps:
@@ -230,195 +349,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-
-      - name: Detect path changes per suite
-        id: changes
-        if: github.event_name != 'workflow_dispatch'
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
-        with:
-          filters: |
-            workflow-changed:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/e2e.yml'
-              - '.github/workflows/e2e-runner.yml'
-              - 'Dockerfile'
-              - 'docker-compose*.yml'
-              - 'docker/**'
-            app-smoke:
-              - 'server/src/**'
-              - 'server/test/app-smoke.e2e-spec.ts'
-              - 'server/src/db/schema/**'
-              - 'packages/types/src/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            auth-session-security:
-              - 'server/src/modules/auth/**'
-              - 'server/src/modules/user/**'
-              - 'server/src/modules/role/**'
-              - 'server/src/common/guards/**'
-              - 'server/src/common/decorators/**'
-              - 'server/src/common/types/**'
-              - 'server/src/db/schema/**'
-              - 'server/test/auth-session-security.e2e-spec.ts'
-              - 'server/test/e2e/app-harness.ts'
-              - 'packages/types/src/auth.ts'
-              - 'packages/types/src/permissions.ts'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            auth-recovery-oidc-logout:
-              - 'server/src/modules/auth/**'
-              - 'server/src/modules/user/**'
-              - 'server/src/modules/email/**'
-              - 'server/src/modules/metadata/**'
-              - 'server/src/db/schema/**'
-              - 'server/test/auth-recovery-oidc-logout.e2e-spec.ts'
-              - 'server/test/e2e/app-harness.ts'
-              - 'packages/types/src/auth.ts'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            authorization-matrix:
-              - 'server/src/**'
-              - 'server/test/authorization-matrix.e2e-spec.ts'
-              - 'server/test/e2e/authorization-matrix/**'
-              - 'packages/types/src/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            email-lifecycle:
-              - 'server/src/modules/email/**'
-              - 'server/src/modules/book/**'
-              - 'server/src/modules/library/**'
-              - 'server/src/modules/auth/**'
-              - 'server/src/modules/cover/**'
-              - 'server/src/modules/scanner/**'
-              - 'server/src/modules/seed/**'
-              - 'server/src/db/schema/**'
-              - 'packages/types/src/**'
-              - 'server/test/email-lifecycle.e2e-spec.ts'
-              - 'server/test/e2e/email/**'
-              - 'server/test/e2e/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - 'client/src/features/email/**'
-              - 'client/src/router/index.ts'
-              - 'client/src/features/settings/SettingsHeader.vue'
-              - 'client/src/views/HomeView.vue'
-              - 'client/src/views/CollectionView.vue'
-              - 'client/src/views/LensView.vue'
-              - 'client/src/features/book/components/BookCoverCard.vue'
-              - 'client/src/features/book/components/BookListRow.vue'
-            metadata-write:
-              - 'server/src/modules/book/**'
-              - 'server/src/modules/library/**'
-              - 'server/src/modules/file-write/**'
-              - 'server/src/modules/metadata/**'
-              - 'server/src/modules/app-settings/**'
-              - 'server/test/metadata-write.e2e-spec.ts'
-              - 'server/test/e2e/metadata-write/**'
-              - 'server/src/db/schema/**'
-              - 'packages/types/src/file-write.ts'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-            metadata-lock:
-              - 'server/src/modules/book/**'
-              - 'server/src/modules/book-metadata-lock/**'
-              - 'server/src/modules/book-metadata-fetch/**'
-              - 'server/src/modules/metadata-fetch/**'
-              - 'server/src/modules/metadata-preferences/**'
-              - 'server/src/modules/cover/**'
-              - 'server/src/modules/scanner/**'
-              - 'server/src/modules/library/**'
-              - 'server/src/modules/auth/**'
-              - 'server/src/modules/app-settings/**'
-              - 'server/test/metadata-lock.e2e-spec.ts'
-              - 'server/test/e2e/metadata-lock/**'
-              - 'server/src/db/schema/**'
-              - 'packages/types/src/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            migration-booklore:
-              - 'server/src/modules/migration/**'
-              - 'server/test/migration-booklore.e2e-spec.ts'
-              - 'server/test/e2e/migration-booklore/**'
-              - 'server/src/db/schema/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            opds-auth-catalog:
-              - 'server/src/modules/opds/**'
-              - 'server/src/modules/book/**'
-              - 'server/src/modules/library/**'
-              - 'server/src/modules/collection/**'
-              - 'server/src/modules/lens/**'
-              - 'server/src/modules/user/**'
-              - 'server/src/modules/auth/**'
-              - 'server/src/modules/app-settings/**'
-              - 'server/test/opds-auth-catalog.e2e-spec.ts'
-              - 'server/test/e2e/opds/**'
-              - 'server/test/e2e/**'
-              - 'server/src/db/schema/**'
-              - 'packages/types/src/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-            reader-state-isolation:
-              - 'server/src/modules/bookmark/**'
-              - 'server/src/modules/annotation/**'
-              - 'server/src/modules/reader-preferences/**'
-              - 'server/src/modules/reading-session/**'
-              - 'server/src/modules/book/**'
-              - 'server/src/modules/library/**'
-              - 'server/src/modules/scanner/**'
-              - 'server/src/modules/user-book-status/**'
-              - 'server/src/scripts/db-prepare-e2e.ts'
-              - 'server/test/reader-state-isolation.e2e-spec.ts'
-              - 'server/test/e2e/reader-state-isolation/**'
-              - 'server/src/db/schema/**'
-              - 'packages/types/src/reader-settings.ts'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-            scanner-file-operations:
-              - 'server/src/modules/scanner/**'
-              - 'server/test/scanner-file-operations.e2e-spec.ts'
-              - 'server/test/e2e/scanner/**'
-              - 'server/src/db/schema/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            scanner-scenarios:
-              - 'server/src/modules/scanner/**'
-              - 'server/test/scanner-scenarios.e2e-spec.ts'
-              - 'server/test/e2e/scanner/**'
-              - 'server/src/db/schema/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
-            book-bucket-ingest-finalize:
-              - 'server/src/modules/book-bucket/**'
-              - 'server/src/modules/upload/**'
-              - 'server/src/modules/metadata/**'
-              - 'server/test/book-bucket-ingest-finalize.e2e-spec.ts'
-              - 'server/test/e2e/book-bucket/**'
-              - 'server/src/db/schema/**'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-            users-admin-lifecycle:
-              - 'server/src/modules/user/**'
-              - 'server/src/modules/auth/**'
-              - 'server/src/common/guards/**'
-              - 'server/src/common/decorators/**'
-              - 'server/src/common/types/**'
-              - 'server/src/db/schema/**'
-              - 'server/test/users-admin-lifecycle.e2e-spec.ts'
-              - 'server/test/e2e/users-admin-lifecycle/**'
-              - 'packages/types/src/auth.ts'
-              - 'packages/types/src/permissions.ts'
-              - 'scripts/test/**'
-              - 'scripts/db/**'
-              - '.github/workflows/e2e-runner.yml'
 
       - name: Set up Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
@@ -428,24 +358,14 @@ jobs:
       - name: Build suite matrix
         id: build-matrix
         shell: bash
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          GITHUB_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
-          SUITES_DEF=$(node scripts/test/list-suites-json.mjs)
-
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            MATRIX="$SUITES_DEF"
-          elif [ "${{ steps.changes.outputs.workflow-changed }}" == "true" ]; then
-            MATRIX="$SUITES_DEF"
-          else
-            CHANGED='${{ steps.changes.outputs.changes }}'
-            if [ -z "$CHANGED" ] || [ "$CHANGED" == "[]" ]; then
-              MATRIX="[]"
-            else
-              MATRIX=$(echo "$SUITES_DEF" | jq --argjson changed "$CHANGED" \
-                '[.[] | select(.id as $id | $changed | index($id) != null)]')
-            fi
-          fi
-
+          MATRIX=$(node scripts/test/select-e2e-suites-json.mjs)
           echo "matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
+          echo "selected_suites=$(echo "$MATRIX" | jq -c .)"
 
   e2e:
     needs: [e2e-setup]
@@ -482,3 +402,51 @@ jobs:
           echo "quality-gate=${{ needs.quality-gate.result }}"
           echo "e2e-setup=${{ needs.e2e-setup.result }}"
           echo "e2e=${{ needs.e2e.result }}"
+
+  ci-performance:
+    name: CI Performance
+    runs-on: ubuntu-latest
+    needs: [ci-gate]
+    if: always()
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Compare duration with previous successful run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          CURRENT_JSON=$(gh api "repos/${GH_REPO}/actions/runs/${RUN_ID}")
+          CURRENT_STARTED=$(echo "$CURRENT_JSON" | jq -r '.run_started_at // .created_at')
+          CURRENT_UPDATED=$(echo "$CURRENT_JSON" | jq -r '.updated_at')
+          CURRENT_DURATION=$(node -e 'const [start, end] = process.argv.slice(1); console.log(Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 1000)));' "$CURRENT_STARTED" "$CURRENT_UPDATED")
+
+          PREVIOUS_JSON=$(gh api "repos/${GH_REPO}/actions/workflows/ci.yml/runs?per_page=30&event=${EVENT_NAME}&status=completed")
+          PREVIOUS_STARTED=$(echo "$PREVIOUS_JSON" | jq -r --arg run_id "${RUN_ID}" '.workflow_runs[] | select((.id | tostring) != $run_id and .conclusion == "success") | (.run_started_at // .created_at)' | head -n1)
+          PREVIOUS_UPDATED=$(echo "$PREVIOUS_JSON" | jq -r --arg run_id "${RUN_ID}" '.workflow_runs[] | select((.id | tostring) != $run_id and .conclusion == "success") | .updated_at' | head -n1)
+
+          {
+            echo "## CI Runtime"
+            echo ""
+            echo "- Event: \`${EVENT_NAME}\`"
+            echo "- Current run duration: \`${CURRENT_DURATION}s\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -z "$PREVIOUS_STARTED" || -z "$PREVIOUS_UPDATED" ]]; then
+            echo "- Baseline: unavailable (no previous successful run for this event)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          PREVIOUS_DURATION=$(node -e 'const [start, end] = process.argv.slice(1); console.log(Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 1000)));' "$PREVIOUS_STARTED" "$PREVIOUS_UPDATED")
+          RATIO=$(node -e 'const [current, previous] = process.argv.slice(1).map(Number); if (previous === 0) { console.log("N/A"); process.exit(0); } console.log((current / previous).toFixed(2));' "$CURRENT_DURATION" "$PREVIOUS_DURATION")
+          echo "- Previous successful run: \`${PREVIOUS_DURATION}s\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ratio (current/previous): \`${RATIO}\`" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$RATIO" != "N/A" ]] && node -e 'process.exit(Number(process.argv[1]) > 1.2 ? 0 : 1)' "$RATIO"; then
+            echo "::warning::CI duration regression detected: current=${CURRENT_DURATION}s previous=${PREVIOUS_DURATION}s ratio=${RATIO}"
+          fi
