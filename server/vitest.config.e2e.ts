@@ -14,6 +14,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
+    setupFiles: ['test/e2e.setup.ts'],
     include: ['test/**/*.e2e-spec.ts'],
     passWithNoTests: true,
     reporters: process.env.CI ? ['default', 'github-actions'] : ['default'],

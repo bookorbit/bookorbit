@@ -1,7 +1,3 @@
-vi.mock('../src/modules/scanner/lib/stability', () => ({
-  waitForStability: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 

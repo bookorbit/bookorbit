@@ -1,7 +1,3 @@
-vi.mock('../src/modules/scanner/lib/stability', () => ({
-  waitForStability: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { randomUUID } from 'crypto';
 import { mkdir, realpath, rename, rm, stat, writeFile } from 'fs/promises';
 import { dirname, join, relative } from 'path';
