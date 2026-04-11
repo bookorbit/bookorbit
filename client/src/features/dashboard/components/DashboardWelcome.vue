@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { BookOpen, Plus, Users } from 'lucide-vue-next'
+import type { Library } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
-import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 
 defineProps<{ canCreate: boolean }>()
 
-const { refreshLibraries } = useLibraries()
+const { handleLibraryCreated } = useLibraryCreationRedirect()
 const createOpen = ref(false)
 
 function handleOpenCreate() {
@@ -17,9 +18,9 @@ function handleClose() {
   createOpen.value = false
 }
 
-async function handleSaved() {
+async function handleSaved(library: Library) {
   createOpen.value = false
-  await refreshLibraries()
+  await handleLibraryCreated(library)
 }
 </script>
 

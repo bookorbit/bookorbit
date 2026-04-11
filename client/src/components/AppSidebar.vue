@@ -26,6 +26,7 @@ import type { Library } from '@projectx/types'
 import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
+import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import { useThemeStore } from '@/stores/theme'
 
 function resolveIcon(name: string | null | undefined, fallback: Component): Component {
@@ -49,6 +50,7 @@ const { lenses, fetchLenses, reorderLenses } = useLenses()
 const { collections, fetchCollections, reorderCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
+const { handleLibraryCreated } = useLibraryCreationRedirect()
 const themeStore = useThemeStore()
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
@@ -119,15 +121,10 @@ function scanPct(libraryId: number): number {
   return Math.floor((p.processed / p.total) * 100)
 }
 
-function onLibrarySaved(library: Library) {
+async function onLibrarySaved(library: Library) {
   createLibraryOpen.value = false
   subscribeLibrary(library.id)
-  refreshLibraries()
-
-  const sortKey = `projectx:sort:library:${library.id}`
-  localStorage.setItem(sortKey, JSON.stringify([{ field: 'addedAt', dir: 'desc' }]))
-
-  router.push({ name: 'library', params: { id: library.id } })
+  await handleLibraryCreated(library)
 }
 
 onMounted(async () => {

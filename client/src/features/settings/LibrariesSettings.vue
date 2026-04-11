@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@projectx/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -23,6 +24,7 @@ if (!hasPermission('manage_libraries')) {
 }
 
 const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
+const { handleLibraryCreated } = useLibraryCreationRedirect()
 const { subscribeLibrary, getProgress, isScanning, progressMap, getCoverRefreshProgress, isRefreshingCovers } = useScanProgress()
 
 const stats = ref<Record<number, LibraryStats>>({})
@@ -165,13 +167,11 @@ async function onSaved(library: LibraryType) {
   subscribeLibrary(library.id)
   if (isNew) {
     toast.success(`Library "${library.name}" created`)
-    const sortKey = `projectx:sort:library:${library.id}`
-    localStorage.setItem(sortKey, JSON.stringify([{ field: 'addedAt', dir: 'desc' }]))
-    router.push({ name: 'library', params: { id: library.id } })
+    await handleLibraryCreated(library)
   } else {
     toast.success(`Library "${library.name}" updated`)
+    await refreshLibraries()
   }
-  await refreshLibraries()
   loadAllStats()
 }
 
