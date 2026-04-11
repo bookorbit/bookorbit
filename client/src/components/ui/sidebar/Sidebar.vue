@@ -24,7 +24,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
   <div
     v-if="collapsible === 'none'"
     data-slot="sidebar"
-    :class="cn('bg-sidebar/80 backdrop-blur-xl backdrop-saturate-150 text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col', props.class)"
+    :class="cn('bg-sidebar text-sidebar-foreground saturate-150 flex h-full w-(--sidebar-width) flex-col', props.class)"
     v-bind="$attrs"
   >
     <slot />
@@ -36,7 +36,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
       data-slot="sidebar"
       data-mobile="true"
       :side="side"
-      class="bg-sidebar/90 backdrop-blur-xl backdrop-saturate-150 text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+      class="bg-sidebar text-sidebar-foreground saturate-150 w-(--sidebar-width) p-0 [&>button]:hidden"
       :style="{
         '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
       }"
@@ -80,7 +80,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     >
       <div
         data-sidebar="sidebar"
-        class="bg-sidebar/55 backdrop-blur-2xl backdrop-saturate-200 border-r border-sidebar-border/60 shadow-[1px_0_0_0_oklch(1_0_0/0.04)] group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-xl group-data-[variant=floating]:border group-data-[variant=floating]:shadow-xl group-data-[variant=floating]:shadow-black/5"
+        class="relative bg-sidebar saturate-[1.5] border-r border-sidebar-border/60 shadow-[1px_0_0_0_oklch(1_0_0/0.04)] group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-xl group-data-[variant=floating]:border group-data-[variant=floating]:shadow-xl group-data-[variant=floating]:shadow-black/5"
       >
         <slot />
       </div>

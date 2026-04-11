@@ -241,7 +241,7 @@ onUnmounted(() => stopLibraryUploadListener())
                 :is-active="activeLibraryId === lib.id"
                 :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
                 :icon="resolveIcon(lib.icon, Icons.BookCopy)"
-                :icon-class="getProgress(lib.id)?.status === 'running' ? 'animate-pulse' : ''"
+                :icon-class="''"
                 :label="lib.name"
                 @click="router.push({ name: 'library', params: { id: lib.id } })"
               >
@@ -269,10 +269,10 @@ onUnmounted(() => stopLibraryUploadListener())
                     <div v-if="getProgress(lib.id)?.status === 'running'" class="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
                       <div class="h-0.5 w-full rounded-full bg-sidebar-foreground/10 overflow-hidden">
                         <div
-                          class="h-full rounded-full bg-primary transition-all duration-300"
+                          class="h-full rounded-full bg-primary"
                           :style="{
                             width: getProgress(lib.id)!.total > 0 ? `${scanPct(lib.id)}%` : '30%',
-                            animation: getProgress(lib.id)!.total === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                            animation: 'none',
                           }"
                         />
                       </div>
