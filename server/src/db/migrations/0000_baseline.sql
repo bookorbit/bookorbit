@@ -252,7 +252,7 @@ CREATE TABLE "book_files" (
 	"duration_seconds" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "book_files_role_chk" CHECK ("book_files"."role" in ('content', 'cover', 'supplement')),
+	CONSTRAINT "book_files_role_chk" CHECK ("book_files"."role" in ('content', 'cover', 'metadata', 'supplement')),
 	CONSTRAINT "book_files_size_bytes_nonnegative_chk" CHECK ("book_files"."size_bytes" is null or "book_files"."size_bytes" >= 0),
 	CONSTRAINT "book_files_duration_seconds_nonnegative_chk" CHECK ("book_files"."duration_seconds" is null or "book_files"."duration_seconds" >= 0)
 );

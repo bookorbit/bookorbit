@@ -1,4 +1,4 @@
-import { classifyFile, isPrimaryFormat, isAudioFormat, AUDIO_FORMATS, DEFAULT_FORMAT_PRIORITY } from './classify';
+import { classifyFile, isPrimaryFormat, isAudioFormat, AUDIO_FORMATS, DEFAULT_FORMAT_PRIORITY, FILE_ROLES } from './classify';
 
 // ── PRIMARY FORMATS ───────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ describe('classifyFile — cover images', () => {
 
   it('classifies image with unrecognised basename as supplementary', () => {
     const result = classifyFile('/books/Book/myimage.jpg');
-    expect(result.role).toBe('supplementary');
+    expect(result.role).toBe('supplement');
     expect(result.format).toBe('jpg');
   });
 
@@ -63,20 +63,20 @@ describe('classifyFile — metadata files', () => {
 
 describe('classifyFile — supplementary', () => {
   it('classifies unknown extensions as supplementary', () => {
-    expect(classifyFile('/books/Book/readme.txt').role).toBe('supplementary');
-    expect(classifyFile('/books/Book/notes.md').role).toBe('supplementary');
-    expect(classifyFile('/books/Book/data.xml').role).toBe('supplementary');
+    expect(classifyFile('/books/Book/readme.txt').role).toBe('supplement');
+    expect(classifyFile('/books/Book/notes.md').role).toBe('supplement');
+    expect(classifyFile('/books/Book/data.xml').role).toBe('supplement');
   });
 
   it('returns null format for files with no extension', () => {
     const result = classifyFile('/books/Book/RELEASE');
-    expect(result.role).toBe('supplementary');
+    expect(result.role).toBe('supplement');
     expect(result.format).toBeNull();
   });
 
   it('handles files with dots in the name but unknown final extension', () => {
     const result = classifyFile('/books/Book/my.archive.rar');
-    expect(result.role).toBe('supplementary');
+    expect(result.role).toBe('supplement');
     expect(result.format).toBe('rar');
   });
 });
@@ -162,5 +162,29 @@ describe('DEFAULT_FORMAT_PRIORITY — audio ordering', () => {
     for (const fmt of AUDIO_FORMATS) {
       expect(DEFAULT_FORMAT_PRIORITY).toContain(fmt);
     }
+  });
+});
+
+// ── FILE_ROLES contract ───────────────────────────────────────────────────────
+
+describe('FILE_ROLES contract', () => {
+  it('defines exactly the four expected roles', () => {
+    expect([...FILE_ROLES].sort()).toEqual(['content', 'cover', 'metadata', 'supplement']);
+  });
+
+  const probes: Array<[string, string]> = [
+    ['primary', '/books/Book/book.epub'],
+    ['audio primary', '/books/Book/book.m4b'],
+    ['metadata opf', '/books/Book/metadata.opf'],
+    ['metadata nfo', '/books/Book/info.nfo'],
+    ['named cover', '/books/Book/cover.jpg'],
+    ['unnamed image', '/books/Book/photo.jpg'],
+    ['unknown extension', '/books/Book/readme.txt'],
+    ['no extension', '/books/Book/RELEASE'],
+  ];
+
+  it.each(probes)('role returned for %s is a valid FILE_ROLES member', (_label, path) => {
+    const { role } = classifyFile(path);
+    expect(FILE_ROLES as readonly string[]).toContain(role);
   });
 });

@@ -103,7 +103,7 @@ describe('handleUnlink', () => {
 
   it('deletes non-selected file record and returns noop without marking book missing', async () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
-      file: { id: 55, bookId: 12, role: 'supplementary' },
+      file: { id: 55, bookId: 12, role: 'supplement' },
       libraryId: 5,
       primaryFileId: 99,
     } as any);

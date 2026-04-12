@@ -1,5 +1,5 @@
 {
-  "id": "450f16cf-cf5a-4969-8f2c-7df4b18fd52e",
+  "id": "7d462c3d-9524-40b8-95e1-afda1b364a68",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2322,7 +2322,7 @@
       "checkConstraints": {
         "book_files_role_chk": {
           "name": "book_files_role_chk",
-          "value": "\"book_files\".\"role\" in ('content', 'cover', 'supplement')"
+          "value": "\"book_files\".\"role\" in ('content', 'cover', 'metadata', 'supplement')"
         },
         "book_files_size_bytes_nonnegative_chk": {
           "name": "book_files_size_bytes_nonnegative_chk",

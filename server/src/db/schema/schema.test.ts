@@ -13,6 +13,8 @@ import { koboSyncSettings, koboLibrarySnapshots, koboReadingStates } from './kob
 import { emailRecipients, emailRecipientGroups } from './email-recipients';
 import { readerDefaultPreferences, readerPreferences, readingProgress, annotations, userReadingDailyStats } from './reader';
 import { migrationSources, migrationProfiles, migrationPlanArtifacts, migrationRuns, migrationRunMetrics } from './migration';
+import { getTableConfig } from 'drizzle-orm/pg-core';
+import { FILE_ROLES } from '../../modules/scanner/lib/classify';
 
 describe('Database Schema Logic', () => {
   beforeAll(() => {
@@ -102,5 +104,25 @@ describe('Database Schema Logic', () => {
     testOnUpdate('migrationPlanArtifacts.updatedAt', migrationPlanArtifacts.updatedAt);
     testOnUpdate('migrationRuns.updatedAt', migrationRuns.updatedAt);
     testOnUpdate('migrationRunMetrics.updatedAt', migrationRunMetrics.updatedAt);
+  });
+
+  describe('book_files role constraint', () => {
+    it('book_files_role_chk exists and covers every FILE_ROLES value', () => {
+      const config = getTableConfig(bookFiles);
+      const roleCheck = config.checks.find((c) => c.name === 'book_files_role_chk');
+      expect(roleCheck).toBeDefined();
+
+      // Drizzle SQL queryChunks are StringChunk objects ({ value: string[] }) or Column references.
+      // Join all string portions to get the constraint SQL text.
+      const constraintSql = roleCheck!.value.queryChunks.map((chunk: any) => (Array.isArray(chunk?.value) ? chunk.value.join('') : '')).join('');
+
+      for (const role of FILE_ROLES) {
+        expect(constraintSql).toContain(`'${role}'`);
+      }
+    });
+
+    it('role column default is a valid FILE_ROLES member', () => {
+      expect(FILE_ROLES as readonly string[]).toContain(bookFiles.role.default);
+    });
   });
 });

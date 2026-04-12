@@ -14,7 +14,8 @@ const COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
 const COVER_BASENAMES = new Set(['cover', 'folder', 'thumbnail', 'artwork', 'front']);
 const METADATA_EXTENSIONS = new Set(['opf', 'nfo']);
 
-export type FileRole = 'content' | 'cover' | 'metadata' | 'supplementary';
+export const FILE_ROLES = ['content', 'cover', 'metadata', 'supplement'] as const;
+export type FileRole = (typeof FILE_ROLES)[number];
 
 export interface Classification {
   format: string | null;
@@ -27,9 +28,9 @@ export function classifyFile(absolutePath: string): Classification {
 
   if (PRIMARY_FORMATS.has(ext)) return { format: ext, role: 'content' };
   if (METADATA_EXTENSIONS.has(ext)) return { format: ext, role: 'metadata' };
-  if (COVER_EXTENSIONS.has(ext)) return { format: ext, role: COVER_BASENAMES.has(stem) ? 'cover' : 'supplementary' };
+  if (COVER_EXTENSIONS.has(ext)) return { format: ext, role: COVER_BASENAMES.has(stem) ? 'cover' : 'supplement' };
 
-  return { format: ext || null, role: 'supplementary' };
+  return { format: ext || null, role: 'supplement' };
 }
 
 export function isPrimaryFormat(absolutePath: string): boolean {
