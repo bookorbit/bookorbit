@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useWindowSize } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft } from 'lucide-vue-next'
@@ -22,8 +23,9 @@ import EntityNotFound from '@/components/EntityNotFound.vue'
 const route = useRoute()
 const router = useRouter()
 const { hasPermission, isSuperuser } = usePermissions()
+const { width: windowWidth } = useWindowSize()
 
-const { coverSize, gridGap, viewMode } = useDisplaySettings()
+const { portraitCoverSize, gridGap, viewMode } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
 
 const authorId = computed(() => Number(route.params.id))
@@ -247,6 +249,25 @@ const mergeDialogDescription = computed(() => {
   return 'This will merge selected authors into the current author and re-link associated books. This action cannot be undone.'
 })
 
+const isMobileLayout = computed(() => windowWidth.value < 640)
+const authorBookCoverSize = computed(() => {
+  const configuredSize = Number(portraitCoverSize.value)
+  const normalizedSize = Number.isFinite(configuredSize) && configuredSize > 0 ? configuredSize : 130
+  if (!isMobileLayout.value) return normalizedSize
+  return Math.min(normalizedSize, 110)
+})
+const authorBookGridGap = computed(() => {
+  const configuredGap = Number(gridGap.value)
+  const normalizedGap = Number.isFinite(configuredGap) && configuredGap > 0 ? configuredGap : 20
+  if (!isMobileLayout.value) return normalizedGap
+  return Math.min(normalizedGap, 12)
+})
+
+function onLibraryFilterChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  libraryId.value = value ? Number(value) : null
+}
+
 async function refreshMetadata() {
   if (!author.value || refreshingMetadata.value) return
   refreshingMetadata.value = true
@@ -426,10 +447,10 @@ watch(authorName, () => {
       <section class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3">
         <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <h2 class="text-sm font-semibold text-foreground">Books</h2>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <select
               v-model="sort"
-              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+              class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
             >
               <option value="addedAt">Recently Added</option>
               <option value="title">Title</option>
@@ -438,7 +459,7 @@ watch(authorName, () => {
 
             <select
               v-model="order"
-              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
+              class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
             >
               <option value="desc">Descending</option>
               <option value="asc">Ascending</option>
@@ -446,8 +467,8 @@ watch(authorName, () => {
 
             <select
               :value="libraryId ?? ''"
-              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
-              @change="libraryId = ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null"
+              class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
+              @change="onLibraryFilterChange"
             >
               <option value="">All Libraries</option>
               <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
@@ -467,8 +488,8 @@ watch(authorName, () => {
         <VirtualBookGrid
           v-if="viewMode === 'grid' && books.length > 0"
           :books="books"
-          :cover-size="coverSize"
-          :grid-gap="gridGap"
+          :cover-size="authorBookCoverSize"
+          :grid-gap="authorBookGridGap"
           @action="handleBookAction"
         />
 

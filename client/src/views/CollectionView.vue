@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderOpen, Pencil } from 'lucide-vue-next'
+import { FolderOpen, Pencil, SlidersHorizontal, X } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
@@ -22,6 +22,7 @@ import { useBookBulkActions } from '@/features/book/composables/useBookBulkActio
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
+import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import type { BookCard } from '@projectx/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
@@ -30,7 +31,8 @@ const router = useRouter()
 const { viewMode } = useDisplaySettings()
 
 const collectionId = computed(() => Number(route.params.id))
-const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId)
+const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
+const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId, coverAspectRatio)
 const { collections, fetchCollections, removeBooksFromCollection } = useCollections()
 const collectionNotFound = ref(false)
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
@@ -81,6 +83,7 @@ function toggleSelectionMode() {
 const addToCollectionOpen = ref(false)
 const sendBookOpen = ref(false)
 const editCollectionOpen = ref(false)
+const mobileControlsExpanded = ref(false)
 let removingInProgress = false
 const {
   pendingId: deleteBookId,
@@ -130,6 +133,29 @@ function handleCollectionDeleted(deletedId: number) {
   toast.success('Collection deleted')
 }
 
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 640
+}
+
+function closeMobileControls() {
+  mobileControlsExpanded.value = false
+}
+
+function collapseMobileControlsIfNeeded() {
+  if (!mobileControlsExpanded.value) return
+  if (!isMobileViewport()) return
+  closeMobileControls()
+}
+
+function toggleMobileControls() {
+  mobileControlsExpanded.value = !mobileControlsExpanded.value
+}
+
+function openCollectionEditor() {
+  editCollectionOpen.value = true
+  collapseMobileControlsIfNeeded()
+}
+
 function handleEditSelected() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
@@ -151,6 +177,12 @@ function handleBookAction(book: BookCard, action: 'quick-view' | 'edit-metadata'
 
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
+function checkSentinel() {
+  if (!hasMore.value || loading.value) return
+  const el = sentinel.value
+  if (!el) return
+  if (el.getBoundingClientRect().top < window.innerHeight + 300) load()
+}
 
 onMounted(async () => {
   await fetchCollections()
@@ -166,18 +198,19 @@ onMounted(async () => {
     { rootMargin: '300px' },
   )
   if (sentinel.value) observer.observe(sentinel.value)
+  window.addEventListener('resize', checkSentinel, { passive: true })
 })
 
-onUnmounted(() => observer?.disconnect())
+onUnmounted(() => {
+  observer?.disconnect()
+  window.removeEventListener('resize', checkSentinel)
+})
 
 watch(collectionId, () => load(true))
 watch(
   loading,
   (isLoading) => {
-    if (!isLoading && hasMore.value && sentinel.value) {
-      const rect = sentinel.value.getBoundingClientRect()
-      if (rect.top < window.innerHeight + 300) load()
-    }
+    if (!isLoading) checkSentinel()
   },
   { flush: 'post' },
 )
@@ -239,16 +272,43 @@ watch(
           <TooltipTrigger as-child>
             <button
               v-if="collection"
-              class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              @click="editCollectionOpen = true"
+              class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="openCollectionEditor"
             >
               <Pencil :size="14" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Edit collection</TooltipContent>
         </Tooltip>
+
+        <button
+          class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="toggleMobileControls"
+        >
+          <SlidersHorizontal :size="14" />
+        </button>
       </template>
     </ViewHeader>
+
+    <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          v-if="collection"
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="openCollectionEditor"
+        >
+          <Pencil :size="13" />
+          <span>Edit</span>
+        </button>
+        <button
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="closeMobileControls"
+        >
+          <X :size="13" />
+          <span>Close</span>
+        </button>
+      </div>
+    </section>
 
     <main class="flex-1 min-h-0">
       <EntityNotFound v-if="collectionNotFound" entity="Collection" />

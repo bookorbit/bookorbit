@@ -84,11 +84,11 @@ export class CoverService {
 
   async proxyImage(url: string): Promise<{ buffer: Buffer; contentType: string }> {
     const startedAt = Date.now();
-    this.logger.log(`[cover.proxy_image] [start] urlHost=${hostForLog(url)} - cover image proxy started`);
+    this.logger.debug(`[cover.proxy_image] [start] urlHost=${hostForLog(url)} - cover image proxy started`);
 
     try {
       const image = await this.fetchRemoteImage(url);
-      this.logger.log(
+      this.logger.debug(
         `[cover.proxy_image] [end] urlHost=${hostForLog(url)} durationMs=${Date.now() - startedAt} bytes=${image.buffer.length} contentType=${image.contentType} - cover image proxy completed`,
       );
       return image;

@@ -12,6 +12,7 @@ import {
   SidebarMenu,
   SidebarRail,
   SidebarSeparator,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import SidebarNavItem from '@/components/sidebar/SidebarNavItem.vue'
 import SidebarSectionHeader from '@/components/sidebar/SidebarSectionHeader.vue'
@@ -45,6 +46,7 @@ function useSidebarSection(key: string) {
 
 const router = useRouter()
 const route = useRoute()
+const { isMobile, setOpenMobile } = useSidebar()
 const { libraries, fetchLibraries, refreshLibraries, reorderLibraries } = useLibraries()
 const { lenses, fetchLenses, reorderLenses } = useLenses()
 const { collections, fetchCollections, reorderCollections } = useCollections()
@@ -121,6 +123,11 @@ function scanPct(libraryId: number): number {
   return Math.floor((p.processed / p.total) * 100)
 }
 
+function navigateFromSidebar(to: { name: string; params?: Record<string, string | number> }) {
+  void router.push(to)
+  if (isMobile.value) setOpenMobile(false)
+}
+
 async function onLibrarySaved(library: Library) {
   createLibraryOpen.value = false
   subscribeLibrary(library.id)
@@ -194,14 +201,14 @@ onUnmounted(() => stopLibraryUploadListener())
               tooltip="Dashboard"
               :icon="Icons.LayoutDashboard"
               label="Dashboard"
-              @click="router.push({ name: 'dashboard' })"
+              @click="navigateFromSidebar({ name: 'dashboard' })"
             />
             <SidebarNavItem
               :is-active="isAuthorsActive"
               tooltip="Authors"
               :icon="Icons.Users"
               label="Authors"
-              @click="router.push({ name: 'authors' })"
+              @click="navigateFromSidebar({ name: 'authors' })"
             />
           </SidebarMenu>
         </SidebarGroupContent>
@@ -243,7 +250,7 @@ onUnmounted(() => stopLibraryUploadListener())
                 :icon="resolveIcon(lib.icon, Icons.BookCopy)"
                 :icon-class="''"
                 :label="lib.name"
-                @click="router.push({ name: 'library', params: { id: lib.id } })"
+                @click="navigateFromSidebar({ name: 'library', params: { id: lib.id } })"
               >
                 <template #badge>
                   <span
@@ -323,7 +330,7 @@ onUnmounted(() => stopLibraryUploadListener())
                 :tooltip="lens.name"
                 :icon="resolveIcon(lens.icon, Icons.Aperture)"
                 :label="lens.name"
-                @click="router.push({ name: 'lens', params: { id: lens.id } })"
+                @click="navigateFromSidebar({ name: 'lens', params: { id: lens.id } })"
               >
                 <template #badge>
                   <span
@@ -382,7 +389,7 @@ onUnmounted(() => stopLibraryUploadListener())
                 :tooltip="collection.name"
                 :icon="resolveIcon(collection.icon, Icons.FolderOpen)"
                 :label="collection.name"
-                @click="router.push({ name: 'collection', params: { id: collection.id } })"
+                @click="navigateFromSidebar({ name: 'collection', params: { id: collection.id } })"
               >
                 <template #badge>
                   <span

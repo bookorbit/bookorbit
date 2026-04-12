@@ -51,7 +51,7 @@ async function onResetLibrary(libraryId: number) {
 
 <template>
   <div class="space-y-6">
-    <div class="p-4 rounded-xl bg-primary/5 border border-primary/10 max-w-5xl">
+    <div class="p-4 rounded-xl bg-primary/5 border border-primary/10 max-w-6xl">
       <div class="flex items-start gap-3 mb-3">
         <Info :size="18" class="text-primary shrink-0 mt-0.5" />
         <p class="text-sm font-medium text-foreground">How Field Rules Work</p>

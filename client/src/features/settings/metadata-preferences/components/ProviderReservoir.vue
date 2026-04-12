@@ -52,7 +52,7 @@ function providerTitle(provider: ReservoirProviderItem) {
       v-for="provider in reservoirProviders"
       :key="provider.key"
       :title="providerTitle(provider)"
-      class="flex items-center gap-1.5 h-7 px-3 rounded text-[10px] font-bold uppercase tracking-tight select-none transition-all shadow-xs"
+      class="flex items-center gap-1 h-6 pl-1.5 pr-2 rounded text-xs font-medium select-none transition-all"
       :style="providerChipStyle(provider.key, !provider.usable)"
       :class="
         provider.usable
@@ -60,7 +60,7 @@ function providerTitle(provider: ReservoirProviderItem) {
           : 'cursor-not-allowed opacity-40'
       "
     >
-      <GripVertical v-if="provider.usable" :size="10" class="shrink-0 -ml-1 opacity-50" />
+      <GripVertical v-if="provider.usable" :size="10" class="shrink-0 opacity-50" />
       <span>{{ PROVIDER_SHORT_LABELS[provider.key] ?? provider.key }}</span>
     </div>
   </VueDraggable>

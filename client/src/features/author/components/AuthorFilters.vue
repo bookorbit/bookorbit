@@ -7,6 +7,7 @@ defineProps<{
   hasPhoto: boolean | null
   minBookCount: number | null
   activeCount?: number
+  closable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,7 +15,16 @@ const emit = defineEmits<{
   'update:hasPhoto': [value: boolean | null]
   'update:minBookCount': [value: number | null]
   clear: []
+  close: []
 }>()
+
+function onClear() {
+  emit('clear')
+}
+
+function onClose() {
+  emit('close')
+}
 
 function onLibraryChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
@@ -39,13 +49,22 @@ function onMinBookCountChange(event: Event) {
   <section class="mb-4 rounded-md border border-border bg-card p-3">
     <div class="mb-3 flex items-center justify-between">
       <span class="text-xs font-medium text-muted-foreground">Author Filters</span>
-      <button
-        v-if="(activeCount ?? 0) > 0"
-        class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        @click="emit('clear')"
-      >
-        Clear all
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          v-if="(activeCount ?? 0) > 0"
+          class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="onClear"
+        >
+          Clear all
+        </button>
+        <button
+          v-if="closable"
+          class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="onClose"
+        >
+          Close
+        </button>
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-2">

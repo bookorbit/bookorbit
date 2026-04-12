@@ -588,6 +588,35 @@ describe('collectionRuleToSql', () => {
   });
 });
 
+describe('libraryRuleToSql', () => {
+  it('includesAny produces an EXISTS subquery scoped by library name', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'library', operator: 'includesAny', value: ['Main'] }) as never,
+      USER_CTX,
+    ) as any;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
+  });
+
+  it('excludesAll with values produces not(EXISTS)', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'library', operator: 'excludesAll', value: ['Archive'] }) as never,
+      USER_CTX,
+    ) as any;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
+  });
+
+  it('includesAny with empty array produces always-false branch', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'library', operator: 'includesAny', value: [] }) as never, USER_CTX) as any;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql', text: '1 = 0' });
+  });
+});
+
 describe('formatRuleToSql', () => {
   it('includesAny produces EXISTS subquery with format filter', () => {
     const { builder } = makeBuilder();

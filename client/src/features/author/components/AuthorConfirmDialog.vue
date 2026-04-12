@@ -24,7 +24,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div v-if="open" class="fixed inset-0 z-[70] flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="emit('cancel')" />
       <div class="relative z-10 mx-4 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
         <div class="mb-5 flex items-start gap-4">

@@ -17,6 +17,7 @@ import {
   collections,
   readingProgress,
   genres,
+  libraries,
   tags,
 } from '../../db/schema';
 
@@ -150,6 +151,8 @@ export class BookQueryBuilder {
         return this.tagRuleToSql(operator, value as string[]);
       case 'collection':
         return this.collectionRuleToSql(operator, value as string[], userId);
+      case 'library':
+        return this.libraryRuleToSql(operator, value as string[]);
       case 'format':
         return this.formatRuleToSql(operator, value as string[]);
       case 'addedAt':
@@ -456,6 +459,29 @@ export class BookQueryBuilder {
         return existsCollection();
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for collection field`);
+    }
+  }
+
+  private libraryRuleToSql(operator: string, values?: string[]): SQL {
+    const existsLibrary = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(libraries.id, books.libraryId)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(libraries)
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
+
+    switch (operator) {
+      case 'includesAny':
+        if (!values?.length) return sql`1 = 0`;
+        return existsLibrary(or(...values.map((v) => eq(libraries.name, v)))!);
+      case 'excludesAll':
+        if (!values?.length) return sql`1 = 1`;
+        return not(existsLibrary(or(...values.map((v) => eq(libraries.name, v)))!));
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for library field`);
     }
   }
 

@@ -108,7 +108,7 @@ export function buildMetadataPatch(sourceBook: {
     googleBooksId: field('googleBooksId', truncateNullableText(sourceBook.googleBooksId, 50)),
     goodreadsId: field('goodreadsId', truncateNullableText(sourceBook.goodreadsId, 50)),
     amazonId: field('amazonId', truncateNullableText(sourceBook.amazonId, 20)),
-    hardcoverId: field('hardcoverId', truncateNullableText(sourceBook.hardcoverId, 50)),
+    hardcoverId: field('hardcoverId', truncateNullableText(sourceBook.hardcoverId, 255)),
     audibleId: field('audibleId', truncateNullableText(sourceBook.audibleId, 20)),
     comicvineId: field('comicvineId', truncateNullableText(sourceBook.comicvineId, 50)),
     durationSeconds: field('durationSeconds', sanitizeNonNegativeInteger(sourceBook.durationSeconds)),

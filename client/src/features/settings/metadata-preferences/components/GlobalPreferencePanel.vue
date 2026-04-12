@@ -72,12 +72,12 @@ function handleResetToDefault() {
 
 <template>
   <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
-    <div class="px-5 py-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30">
+    <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30">
       <div>
         <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Defaults</span>
         <p class="settings-hint">Default rules applied to every library. Override per-library below.</p>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="hidden md:flex items-center gap-2 flex-wrap">
         <button
           class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-destructive hover:border-destructive/50 hover:bg-destructive/5 transition-colors disabled:opacity-40"
           :disabled="saving || !draft"
@@ -95,6 +95,33 @@ function handleResetToDefault() {
           <span>Reset to Default</span>
         </button>
         <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
+          <Loader2 v-if="saving" :size="14" class="animate-spin" />
+          <Save v-else :size="14" />
+          <span>Save Defaults</span>
+        </button>
+      </div>
+    </div>
+    <div
+      class="md:hidden sticky top-[5.25rem] z-10 mb-0 px-3 py-2 border-b border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+    >
+      <div class="flex items-center gap-2 flex-wrap">
+        <button
+          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-destructive hover:border-destructive/50 hover:bg-destructive/5 transition-colors disabled:opacity-40"
+          :disabled="saving || !draft"
+          @click="handleClearAll"
+        >
+          <Trash2 :size="13" />
+          <span>Clear All</span>
+        </button>
+        <button
+          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
+          :disabled="saving"
+          @click="handleResetToDefault"
+        >
+          <RotateCcw :size="13" />
+          <span>Reset</span>
+        </button>
+        <button class="settings-btn-primary h-8 px-3 justify-center ml-auto" :disabled="saving || !draft" @click="save">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
           <span>Save Defaults</span>

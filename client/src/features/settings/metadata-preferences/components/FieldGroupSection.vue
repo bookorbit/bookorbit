@@ -1,24 +1,38 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ChevronDown, ChevronRight } from 'lucide-vue-next'
 import type { FieldPreference, MetadataField, ProviderStatus } from '@projectx/types'
 import FieldRow from './FieldRow.vue'
 
-defineProps<{
-  label: string
-  fields: MetadataField[]
-  preferences: Record<MetadataField, FieldPreference>
-  statuses: ProviderStatus[]
-  overriddenFields?: Set<MetadataField>
-  saving?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    label: string
+    fields: MetadataField[]
+    preferences: Record<MetadataField, FieldPreference>
+    statuses: ProviderStatus[]
+    overriddenFields?: Set<MetadataField>
+    saving?: boolean
+    defaultOpen?: boolean
+  }>(),
+  {
+    defaultOpen: true,
+  },
+)
 
 const emit = defineEmits<{
   change: [field: MetadataField, pref: FieldPreference]
   revert: [field: MetadataField]
 }>()
 
-const open = ref(true)
+const open = ref(props.defaultOpen)
+
+const summary = computed(() => {
+  const enabled = props.fields.filter((field) => props.preferences[field]?.enabled).length
+  const overrides = props.overriddenFields ? props.fields.filter((field) => props.overriddenFields?.has(field)).length : 0
+  const base = `${props.fields.length} fields · ${enabled} enabled`
+  if (!props.overriddenFields) return base
+  return `${base} · ${overrides} overrides`
+})
 </script>
 
 <template>
@@ -29,6 +43,7 @@ const open = ref(true)
     >
       <component :is="open ? ChevronDown : ChevronRight" :size="12" class="transition-transform duration-200 group-hover:scale-110" />
       {{ label }}
+      <span class="ml-auto text-[10px] font-medium normal-case tracking-normal text-muted-foreground md:hidden">{{ summary }}</span>
     </button>
 
     <div v-if="open" class="divide-y divide-border/60 animate-in fade-in slide-in-from-top-1 duration-200">

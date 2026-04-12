@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { X } from 'lucide-vue-next'
+import { ChevronDown, X } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import { Permission, PERMISSION_LABELS } from '@projectx/types'
 import type { AuthUser } from '@projectx/types'
+import { useMediaQuery } from '@vueuse/core'
 
 interface Library {
   id: number
@@ -47,8 +48,17 @@ const selectedPermissionNames = ref<Set<string>>(new Set())
 const selectedLibraryIds = ref<Set<number>>(new Set())
 const error = ref<string | null>(null)
 const loading = ref(false)
+const libraryAccessOpen = ref(true)
+const permissionGroupOpen = ref<Record<string, boolean>>({})
 
 const isEdit = computed(() => !!props.user?.id)
+const isMobile = useMediaQuery('(max-width: 767px)')
+
+const selectedCountByGroup = computed<Record<string, number>>(() =>
+  Object.fromEntries(
+    PERMISSION_GROUPS.map((group) => [group.label, group.permissions.filter((permName) => selectedPermissionNames.value.has(permName)).length]),
+  ),
+)
 
 watch(
   () => props.user,
@@ -68,9 +78,17 @@ watch(
         selectedLibraryIds.value = new Set(ids)
       }
     }
+
+    libraryAccessOpen.value = !isMobile.value
+    permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.label, !isMobile.value]))
   },
   { immediate: true },
 )
+
+watch(isMobile, (mobile) => {
+  libraryAccessOpen.value = !mobile
+  permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.label, !mobile]))
+})
 
 function togglePermission(permName: string) {
   if (selectedPermissionNames.value.has(permName)) {
@@ -86,6 +104,10 @@ function toggleLibrary(libraryId: number) {
   } else {
     selectedLibraryIds.value.add(libraryId)
   }
+}
+
+function toggleGroup(label: string) {
+  permissionGroupOpen.value[label] = !permissionGroupOpen.value[label]
 }
 
 async function handleSubmit() {
@@ -211,21 +233,52 @@ async function handleSubmit() {
 
         <!-- Library access -->
         <div v-if="libraries.length > 0" class="space-y-2">
-          <p class="settings-label">Library access</p>
-          <div class="space-y-1.5">
-            <label v-for="lib in libraries" :key="lib.id" class="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" :checked="selectedLibraryIds.has(lib.id)" @change="toggleLibrary(lib.id)" class="h-4 w-4 rounded border-input" />
-              <span class="text-sm text-foreground">{{ lib.name }}</span>
-            </label>
+          <div class="rounded-md border border-border">
+            <button
+              type="button"
+              class="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
+              @click="libraryAccessOpen = !libraryAccessOpen"
+            >
+              <div>
+                <p class="settings-label">Library access</p>
+                <p class="text-xs text-muted-foreground">{{ selectedLibraryIds.size }} selected</p>
+              </div>
+              <ChevronDown :size="15" class="text-muted-foreground transition-transform" :class="libraryAccessOpen ? 'rotate-180' : ''" />
+            </button>
+            <div v-if="libraryAccessOpen" class="px-3 pb-3 space-y-1.5">
+              <label v-for="lib in libraries" :key="lib.id" class="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  :checked="selectedLibraryIds.has(lib.id)"
+                  @change="toggleLibrary(lib.id)"
+                  class="h-4 w-4 rounded border-input"
+                />
+                <span class="text-sm text-foreground">{{ lib.name }}</span>
+              </label>
+            </div>
           </div>
         </div>
 
         <!-- Permissions grouped -->
         <div class="space-y-4">
           <p class="settings-label">Permissions</p>
-          <div v-for="group in PERMISSION_GROUPS" :key="group.label" class="space-y-1.5">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ group.label }}</p>
-            <div class="space-y-1">
+          <div v-for="group in PERMISSION_GROUPS" :key="group.label" class="rounded-md border border-border">
+            <button
+              type="button"
+              class="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
+              @click="toggleGroup(group.label)"
+            >
+              <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ group.label }}</p>
+                <p class="text-xs text-muted-foreground">{{ selectedCountByGroup[group.label] ?? 0 }} selected</p>
+              </div>
+              <ChevronDown
+                :size="15"
+                class="text-muted-foreground transition-transform"
+                :class="permissionGroupOpen[group.label] ? 'rotate-180' : ''"
+              />
+            </button>
+            <div v-if="permissionGroupOpen[group.label]" class="px-3 pb-3 space-y-1">
               <label v-for="permName in group.permissions" :key="permName" class="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"

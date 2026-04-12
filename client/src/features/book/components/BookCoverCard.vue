@@ -3,7 +3,7 @@ import type { BookCard, BookFileRef } from '@projectx/types'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { getFormatColor } from '../lib/format-colors'
-import { computed, inject, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, inject, ref, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -17,6 +17,7 @@ import {
   MoreVertical,
   PanelRight,
   Pencil,
+  Play,
   RefreshCw,
   Send,
   Star,
@@ -133,6 +134,10 @@ const ratingColor = computed(() => {
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
 const isMissing = computed(() => props.book.status === 'missing')
+const showMobileOverlay = ref(false)
+const root = ref<HTMLElement | null>(null)
+
+const isTouch = computed(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -158,8 +163,29 @@ function handleCardClick(event: MouseEvent) {
     emit('select', event)
     return
   }
+
+  if (isTouch.value) {
+    showMobileOverlay.value = !showMobileOverlay.value
+    return
+  }
+
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
 }
+
+function handleClickOutside(event: MouseEvent) {
+  if (!showMobileOverlay.value) return
+  if (!root.value?.contains(event.target as Node)) {
+    showMobileOverlay.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleClickOutside)
+})
 
 function openQuickView() {
   emit('action', 'quick-view')
@@ -209,9 +235,11 @@ async function handleSetStatus(status: ReadStatus) {
 
 <template>
   <div
+    ref="root"
     class="group flex flex-col @container"
     :class="[selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
     @click="handleCardClick"
+    @contextmenu.prevent
   >
     <!-- Cover -->
     <div
@@ -371,17 +399,27 @@ async function handleSetStatus(status: ReadStatus) {
       <!-- Hover overlay -->
       <div
         v-if="!selectionMode"
-        class="absolute inset-0 flex flex-col p-2 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-        @click.stop="handleCardClick"
+        class="absolute inset-0 flex flex-col p-2 bg-black/70 transition-opacity duration-150"
+        :class="[showMobileOverlay || 'group-hover:opacity-100 group-active:opacity-100', showMobileOverlay ? 'opacity-100' : 'opacity-0']"
       >
         <!-- Top row: Quick View -->
         <div class="shrink-0 flex justify-end">
-          <button class="p-1 rounded bg-primary/70 hover:bg-primary transition-colors text-white" @click="openQuickView">
-            <PanelRight class="size-4" />
+          <button class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white" @click="openQuickView">
+            <PanelRight class="size-[12cqi]" />
           </button>
         </div>
 
-        <div class="flex-1 min-h-0" />
+        <!-- Center: Play/Read button -->
+        <div class="flex-1 flex items-center justify-center">
+          <button
+            v-if="primaryFile && !isMissing"
+            class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
+            :class="[showMobileOverlay || 'group-hover:scale-100 group-active:scale-100', showMobileOverlay ? 'scale-100' : '']"
+            @click.stop="openFile(primaryFile)"
+          >
+            <component :is="isAudiobook ? Play : BookOpen" class="size-[16cqi]" :class="{ 'ml-[2cqi]': isAudiobook }" />
+          </button>
+        </div>
 
         <!-- Bottom: title/author -->
         <div class="shrink-0 flex flex-col pr-10">
@@ -403,7 +441,7 @@ async function handleSetStatus(status: ReadStatus) {
         <div class="absolute bottom-2 right-2 z-20">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
-              <button class="px-1 py-2 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0">
+              <button class="px-0.75 py-1.5 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0">
                 <MoreVertical class="size-3.5" />
               </button>
             </DropdownMenuTrigger>

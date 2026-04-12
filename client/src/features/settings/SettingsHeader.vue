@@ -64,11 +64,11 @@ const sections = computed<Section[]>(() => {
 </script>
 
 <template>
-  <div class="flex items-stretch h-11 px-6 border-b overflow-x-auto shrink-0 scrollbar-none">
+  <div class="flex items-stretch h-11 px-6 border-b overflow-x-auto shrink-0 scrollbar-none snap-x snap-mandatory md:snap-none">
     <button
       v-for="section in sections"
       :key="section.routeName"
-      class="px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0"
+      class="px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 snap-start"
       :class="route.name === section.routeName ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
       @click="router.push({ name: section.routeName })"
     >

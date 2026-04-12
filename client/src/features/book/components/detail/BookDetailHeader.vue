@@ -31,10 +31,12 @@ async function navigateToBook(id: number) {
 </script>
 
 <template>
-  <div class="flex items-stretch border-b shrink-0 h-11 px-3">
+  <div
+    class="flex items-stretch border-b shrink-0 h-12 md:h-11 px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-3"
+  >
     <BookDetailTabs :book-id="bookId" />
 
-    <div v-if="hasContext" class="flex items-center gap-1 ml-4 border-l pl-4">
+    <div v-if="hasContext" class="hidden sm:flex items-center gap-1 ml-4 border-l pl-4">
       <span v-if="index !== -1" class="text-xs text-muted-foreground mr-2 font-medium tabular-nums">
         {{ index + 1 }} <span class="opacity-50">/</span> {{ total }}
       </span>

@@ -44,7 +44,7 @@ async function save() {
   <div class="space-y-5">
     <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email Preferences</p>
 
-    <div class="border border-border rounded-lg p-5 bg-card space-y-5">
+    <div class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-5">
       <div>
         <label class="block text-sm font-medium text-foreground mb-1">Default provider</label>
         <p class="text-xs text-muted-foreground mb-2">Used when no provider is specified. If empty, the account default is used.</p>
@@ -82,12 +82,17 @@ async function save() {
       </div>
 
       <button
-        class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+        class="hidden md:inline-flex px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
         :disabled="saving"
         @click="save()"
       >
         {{ saving ? 'Saving...' : 'Save preferences' }}
       </button>
+      <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
+        <button class="settings-btn-primary w-full min-h-10 justify-center" :disabled="saving" @click="save()">
+          {{ saving ? 'Saving...' : 'Save preferences' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>

@@ -11,6 +11,7 @@ const loading = ref(true)
 const page = ref(0)
 const PAGE_SIZE = 20
 const resending = ref<number | null>(null)
+const deleteConfirm = ref<EmailSendLogEntry | null>(null)
 
 onMounted(async () => {
   try {
@@ -32,6 +33,17 @@ async function remove(entry: EmailSendLogEntry) {
   } catch {
     toast.error('Failed to delete')
   }
+}
+
+function requestRemove(entry: EmailSendLogEntry) {
+  deleteConfirm.value = entry
+}
+
+async function confirmRemove() {
+  if (!deleteConfirm.value) return
+  const entry = deleteConfirm.value
+  deleteConfirm.value = null
+  await remove(entry)
 }
 
 async function resend(entry: EmailSendLogEntry) {
@@ -68,7 +80,7 @@ function statusClass(status: string): string {
     </div>
 
     <div v-else class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div v-for="entry in logEntries" :key="entry.id" class="px-4 py-3 bg-card flex items-start gap-3">
+      <div v-for="entry in logEntries" :key="entry.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-start gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-0.5">
             <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide" :class="statusClass(entry.status)">
@@ -76,14 +88,14 @@ function statusClass(status: string): string {
             </span>
             <span class="text-sm text-foreground truncate">{{ entry.toName || entry.toEmail }}</span>
           </div>
-          <p class="text-xs text-muted-foreground truncate">
+          <p class="text-xs text-muted-foreground line-clamp-2">
             {{ entry.subject ?? '(no subject)' }}
           </p>
           <p class="text-xs text-muted-foreground mt-0.5">{{ formatDate(entry.createdAt) }}</p>
-          <p v-if="entry.errorMessage" class="text-xs text-destructive mt-0.5 truncate">{{ entry.errorMessage }}</p>
+          <p v-if="entry.errorMessage" class="text-xs text-destructive mt-0.5 line-clamp-2">{{ entry.errorMessage }}</p>
         </div>
 
-        <div class="flex items-center gap-1 shrink-0">
+        <div class="flex items-center gap-1 shrink-0 self-end md:self-auto">
           <Tooltip v-if="entry.status === 'failed'">
             <TooltipTrigger as-child>
               <button
@@ -100,7 +112,7 @@ function statusClass(status: string): string {
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="remove(entry)"
+                @click="requestRemove(entry)"
               >
                 <Trash2 :size="13" />
               </button>
@@ -118,5 +130,27 @@ function statusClass(status: string): string {
     >
       Load more
     </button>
+
+    <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
+      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+        <p class="text-base font-semibold text-foreground">Delete history entry?</p>
+        <p class="mt-1 text-sm text-muted-foreground line-clamp-2">{{ deleteConfirm.subject ?? '(no subject)' }}</p>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="deleteConfirm = null"
+          >
+            Cancel
+          </button>
+          <button
+            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+            @click="confirmRemove"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

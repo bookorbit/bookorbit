@@ -16,6 +16,7 @@ const createError = ref<string | null>(null)
 const expandedGroupId = ref<number | null>(null)
 const addingToGroupId = ref<number | null>(null)
 const selectedRecipientId = ref<number | null>(null)
+const deleteConfirm = ref<EmailGroup | null>(null)
 
 async function submitCreate() {
   if (!newGroupName.value.trim()) return
@@ -34,13 +35,23 @@ async function submitCreate() {
 }
 
 async function remove(g: EmailGroup) {
-  if (!confirm(`Delete group "${g.name}"?`)) return
   try {
     await deleteGroup(g.id)
     toast.success(`"${g.name}" deleted`)
   } catch (e) {
     toast.error(e instanceof Error ? e.message : 'Failed to delete')
   }
+}
+
+function requestRemove(g: EmailGroup) {
+  deleteConfirm.value = g
+}
+
+async function confirmRemove() {
+  if (!deleteConfirm.value) return
+  const group = deleteConfirm.value
+  deleteConfirm.value = null
+  await remove(group)
 }
 
 function cancelCreate() {
@@ -87,7 +98,7 @@ function availableRecipients(group: EmailGroup) {
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="hidden md:flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recipient Groups</p>
       <button
         v-if="!showCreate"
@@ -95,6 +106,18 @@ function availableRecipients(group: EmailGroup) {
         @click="showCreate = true"
       >
         <Plus :size="12" />
+        Create group
+      </button>
+    </div>
+    <div class="md:hidden flex items-center justify-between">
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recipient Groups</p>
+    </div>
+    <div v-if="!showCreate" class="md:hidden sticky top-[8.9rem] z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
+      <button
+        class="w-full min-h-10 flex items-center justify-center gap-1.5 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        @click="showCreate = true"
+      >
+        <Plus :size="13" />
         Create group
       </button>
     </div>
@@ -115,7 +138,7 @@ function availableRecipients(group: EmailGroup) {
         />
       </div>
       <div v-if="createError" class="text-xs text-destructive">{{ createError }}</div>
-      <div class="flex items-center gap-2">
+      <div class="hidden md:flex items-center gap-2">
         <button
           class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
           :disabled="creating || !newGroupName.trim()"
@@ -129,6 +152,19 @@ function availableRecipients(group: EmailGroup) {
         >
           Cancel
         </button>
+      </div>
+      <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
+        <div class="flex items-center gap-2">
+          <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="creating || !newGroupName.trim()" @click="submitCreate()">
+            {{ creating ? 'Creating...' : 'Create' }}
+          </button>
+          <button
+            class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="cancelCreate"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
 
@@ -154,7 +190,7 @@ function availableRecipients(group: EmailGroup) {
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="remove(g)"
+                @click="requestRemove(g)"
               >
                 <Trash2 :size="13" />
               </button>
@@ -166,10 +202,10 @@ function availableRecipients(group: EmailGroup) {
         <!-- Expanded members -->
         <div v-if="expandedGroupId === g.id" class="border-t border-border bg-background/50">
           <div v-if="g.members.length === 0" class="px-8 py-3 text-xs text-muted-foreground">No members yet.</div>
-          <div v-for="m in g.members" :key="m.id" class="flex items-center gap-3 px-8 py-2">
+          <div v-for="m in g.members" :key="m.id" class="flex items-start md:items-center gap-3 px-4 md:px-8 py-2">
             <div class="flex-1 min-w-0">
               <span class="text-sm text-foreground">{{ m.name }}</span>
-              <span class="text-xs text-muted-foreground ml-2">{{ m.email }}</span>
+              <span class="text-xs text-muted-foreground ml-2 line-clamp-1">{{ m.email }}</span>
             </div>
             <button
               class="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
@@ -181,7 +217,7 @@ function availableRecipients(group: EmailGroup) {
           </div>
 
           <!-- Add member -->
-          <div class="px-8 py-3 border-t border-border/60">
+          <div class="px-4 md:px-8 py-3 border-t border-border/60">
             <div v-if="addingToGroupId === g.id" class="flex items-center gap-2">
               <select
                 v-model="selectedRecipientId"
@@ -214,6 +250,28 @@ function availableRecipients(group: EmailGroup) {
             </button>
             <p v-else class="text-xs text-muted-foreground/80">All recipients are already in this group.</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
+      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+        <p class="text-base font-semibold text-foreground">Delete group?</p>
+        <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirm.name }}". This action cannot be undone.</p>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="deleteConfirm = null"
+          >
+            Cancel
+          </button>
+          <button
+            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+            @click="confirmRemove"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>

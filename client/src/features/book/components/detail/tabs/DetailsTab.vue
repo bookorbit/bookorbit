@@ -58,8 +58,11 @@ const router = useRouter()
 
 const addToCollectionOpen = ref(false)
 const scoreBreakdownOpen = ref(false)
+const mobileScoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
+const mobileMoreMenuOpen = ref(false)
 const readMenuOpen = ref(false)
+const mobileReadMenuOpen = ref(false)
 
 const { weights: scoreWeights, fetchWeights } = useMetadataScoreWeights()
 
@@ -537,6 +540,7 @@ function handleEditMetadataFromScore() {
 
 function handleDeleteFromMenu() {
   moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
   promptDelete(props.book.id)
 }
 
@@ -559,6 +563,7 @@ function openBook() {
 
 function openBookFile(file: BookDetail['files'][number]) {
   readMenuOpen.value = false
+  mobileReadMenuOpen.value = false
   router.push({
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
@@ -675,9 +680,209 @@ watch(
     </div>
   </div>
 
+  <!-- Mobile-only hero: compact cover thumbnail + identity info + action buttons -->
+  <div class="md:hidden mb-6">
+    <div class="flex gap-4 mb-4 items-start">
+      <!-- Cover thumbnail -->
+      <div class="w-28 shrink-0">
+        <div
+          class="relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
+          :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
+          @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
+        >
+          <img
+            v-if="!coverFailed"
+            :src="coverSrc"
+            class="absolute inset-0 w-full h-full object-cover scale-110 blur-lg brightness-50 transition-opacity duration-200"
+            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+            aria-hidden="true"
+          />
+          <img
+            v-if="!coverFailed"
+            :src="coverSrc"
+            class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
+            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+            :alt="book.title ?? ''"
+            @load="handleCoverLoad"
+            @error="coverFailed = true"
+          />
+        </div>
+      </div>
+      <!-- Identity info -->
+      <div class="flex-1 min-w-0">
+        <h1 class="text-base font-bold leading-snug break-words">{{ book.title ?? 'Untitled' }}</h1>
+        <p v-if="book.subtitle" class="text-sm text-muted-foreground mt-1 leading-snug break-words">{{ book.subtitle }}</p>
+
+        <div class="mt-2">
+          <Popover :open="mobileScoreBreakdownOpen" @update:open="(v) => (mobileScoreBreakdownOpen = v)">
+            <PopoverTrigger as-child>
+              <MetadataScoreBadge :score="book.metadataScore" />
+            </PopoverTrigger>
+            <PopoverContent class="w-72 p-4" align="start">
+              <p class="text-sm font-semibold mb-3">Metadata Score</p>
+              <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <!-- Author / narrator / series -->
+        <div class="mt-2 space-y-1 min-w-0">
+          <p v-if="authorLine" class="text-xs break-words">
+            <span class="text-muted-foreground">by</span>
+            <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
+          </p>
+          <p v-if="narratorLine" class="text-xs break-words">
+            <span class="text-muted-foreground">narrated by</span>
+            <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
+          </p>
+          <span v-if="seriesLine" class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+        </div>
+        <!-- Stars: own row -->
+        <div class="mt-2 flex items-center gap-0.5" @mouseleave="hoverRating = null">
+          <div class="flex items-center gap-0.5">
+            <template v-if="canEditMetadata">
+              <Tooltip v-for="star in ratingStars" :key="star">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="p-1 transition-colors"
+                    :class="isRatingLocked ? 'pointer-events-none' : 'disabled:opacity-50'"
+                    :disabled="isRatingLocked"
+                    @mouseenter="hoverRating = star"
+                    @click="setRating(star)"
+                  >
+                    <Star class="size-4" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ isRatingLocked ? 'Rating is locked' : `Rate ${star}` }}</TooltipContent>
+              </Tooltip>
+            </template>
+            <template v-else>
+              <Star
+                v-for="star in ratingStars"
+                :key="star"
+                class="size-4"
+                :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
+              />
+            </template>
+          </div>
+          <template v-if="isRatingLocked">
+            <div class="ml-1 p-1 rounded-full bg-primary/10 text-primary">
+              <Lock class="size-3" />
+            </div>
+          </template>
+        </div>
+        <!-- Read status: own row -->
+        <div class="mt-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <button class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
+                <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-3.5" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
+                {{ STATUS_OPTIONS.find((o) => o.value === (localReadStatus ?? 'unread'))?.label }}
+                <ChevronDown class="size-3 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
+                <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+                {{ opt.label }}
+                <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile action buttons: single row -->
+    <div class="flex gap-2 mt-3 pt-3 border-t border-border">
+      <div v-if="hasMultipleFiles" class="flex flex-1 h-9 rounded-md overflow-hidden">
+        <button
+          class="flex flex-1 items-center justify-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          :disabled="!primaryFile"
+          @click="openBook"
+        >
+          <Headphones v-if="isPrimaryAudio" class="size-4" />
+          <BookOpen v-else class="size-4" />
+          {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+        </button>
+        <div class="w-px bg-primary-foreground/20 shrink-0" />
+        <Popover :open="mobileReadMenuOpen" @update:open="(v) => (mobileReadMenuOpen = v)">
+          <PopoverTrigger as-child>
+            <button
+              class="w-8 shrink-0 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              title="Choose format"
+            >
+              <ChevronDown class="size-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent class="w-52 p-1" align="end">
+            <button
+              v-for="file in openableFiles"
+              :key="file.id"
+              class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+              @click="openBookFile(file)"
+            >
+              <span
+                class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0"
+                :style="formatBadgeStyle(file.format ?? '?')"
+                >{{ file.format ?? '?' }}</span
+              >
+              <span class="flex-1 text-left text-muted-foreground text-xs truncate">
+                <template v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</template>
+                <template v-else>{{ formatFileSize(file.sizeBytes) }}</template>
+              </span>
+              <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
+            </button>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <button
+        v-else
+        class="flex flex-1 items-center justify-center gap-1.5 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+        :disabled="!primaryFile"
+        @click="openBook"
+      >
+        <Headphones v-if="isPrimaryAudio" class="size-4" />
+        <BookOpen v-else class="size-4" />
+        {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+      </button>
+      <div v-if="hasPermission('library_download')" class="w-12 shrink-0">
+        <BookDownloadButton :files="book.files" :book-id="book.id" />
+      </div>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            class="flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+            @click="addToCollectionOpen = true"
+          >
+            <FolderPlus class="size-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Add to collection</TooltipContent>
+      </Tooltip>
+      <Popover v-if="hasPermission('library_delete_books')" :open="mobileMoreMenuOpen" @update:open="(v) => (mobileMoreMenuOpen = v)">
+        <PopoverTrigger as-child>
+          <button class="flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-muted transition-colors">
+            <MoreHorizontal class="size-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent class="w-36 p-1" align="end">
+          <button
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            @click="handleDeleteFromMenu"
+          >
+            <Trash2 class="size-3.5" />
+            Delete
+          </button>
+        </PopoverContent>
+      </Popover>
+    </div>
+  </div>
+
   <div class="flex flex-col md:flex-row gap-8">
-    <!-- Left column: cover + actions -->
-    <div class="md:w-56 shrink-0 md:sticky md:top-0 md:self-start">
+    <!-- Left column: cover + actions (desktop only) -->
+    <div class="hidden md:block md:w-56 shrink-0 md:sticky md:top-0 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
           class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
@@ -851,98 +1056,100 @@ watch(
 
     <!-- Right column -->
     <div class="flex-1 min-w-0">
-      <!-- Identity block -->
-      <div class="flex items-center flex-wrap gap-x-3 gap-y-2 -mt-1">
-        <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
-        <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
-          <PopoverTrigger as-child>
-            <MetadataScoreBadge :score="book.metadataScore" />
-          </PopoverTrigger>
-          <PopoverContent class="w-72 p-4" align="start">
-            <p class="text-sm font-semibold mb-3">Metadata Score</p>
-            <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
-          </PopoverContent>
-        </Popover>
-      </div>
-      <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
+      <div class="hidden md:block">
+        <!-- Identity block -->
+        <div class="flex items-center flex-wrap gap-x-3 gap-y-2 -mt-1">
+          <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
+          <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
+            <PopoverTrigger as-child>
+              <MetadataScoreBadge :score="book.metadataScore" />
+            </PopoverTrigger>
+            <PopoverContent class="w-72 p-4" align="start">
+              <p class="text-sm font-semibold mb-3">Metadata Score</p>
+              <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
+            </PopoverContent>
+          </Popover>
+        </div>
+        <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
 
-      <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
-        <p v-if="authorLine" class="text-sm">
-          <span class="text-muted-foreground">by</span>
-          <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
-        </p>
-        <p v-if="narratorLine" class="text-sm">
-          <span class="text-muted-foreground">narrated by</span>
-          <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
-        </p>
-        <template v-if="seriesLine">
-          <span class="text-muted-foreground/60 text-xs">·</span>
-          <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
-        </template>
-      </div>
-
-      <div class="mt-3 flex items-center gap-1" @mouseleave="hoverRating = null">
-        <div class="flex items-center gap-1">
-          <template v-if="canEditMetadata">
-            <Tooltip v-for="star in ratingStars" :key="star">
-              <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="p-0.5 transition-colors"
-                  :class="isRatingLocked ? 'pointer-events-none' : 'disabled:opacity-50'"
-                  :disabled="isRatingLocked"
-                  @mouseenter="hoverRating = star"
-                  @click="setRating(star)"
-                >
-                  <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ isRatingLocked ? 'Rating is locked' : `Rate ${star}` }}</TooltipContent>
-            </Tooltip>
-          </template>
-          <template v-else>
-            <Star
-              v-for="star in ratingStars"
-              :key="star"
-              class="size-3.5"
-              :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
-            />
+        <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
+          <p v-if="authorLine" class="text-sm">
+            <span class="text-muted-foreground">by</span>
+            <span class="ml-1 font-medium text-foreground">{{ authorLine }}</span>
+          </p>
+          <p v-if="narratorLine" class="text-sm">
+            <span class="text-muted-foreground">narrated by</span>
+            <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
+          </p>
+          <template v-if="seriesLine">
+            <span class="text-muted-foreground/60 text-xs">·</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
           </template>
         </div>
 
-        <template v-if="isRatingLocked">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <div class="ml-1 p-1 rounded-full bg-primary/10 text-primary">
-                <Lock class="size-3" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>Rating is locked</TooltipContent>
-          </Tooltip>
-        </template>
+        <div class="mt-3 flex items-center gap-1" @mouseleave="hoverRating = null">
+          <div class="flex items-center gap-1">
+            <template v-if="canEditMetadata">
+              <Tooltip v-for="star in ratingStars" :key="star">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="p-0.5 transition-colors"
+                    :class="isRatingLocked ? 'pointer-events-none' : 'disabled:opacity-50'"
+                    :disabled="isRatingLocked"
+                    @mouseenter="hoverRating = star"
+                    @click="setRating(star)"
+                  >
+                    <Star class="size-3.5" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ isRatingLocked ? 'Rating is locked' : `Rate ${star}` }}</TooltipContent>
+              </Tooltip>
+            </template>
+            <template v-else>
+              <Star
+                v-for="star in ratingStars"
+                :key="star"
+                class="size-3.5"
+                :class="(localRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
+              />
+            </template>
+          </div>
 
-        <div class="w-px h-3.5 bg-border mx-1.5" />
+          <template v-if="isRatingLocked">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <div class="ml-1 p-1 rounded-full bg-primary/10 text-primary">
+                  <Lock class="size-3" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Rating is locked</TooltipContent>
+            </Tooltip>
+          </template>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <button class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-3.5" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
-              {{ STATUS_OPTIONS.find((o) => o.value === (localReadStatus ?? 'unread'))?.label }}
-              <ChevronDown class="size-3 opacity-60" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
-              <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-              {{ opt.label }}
-              <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <div class="w-px h-3.5 bg-border mx-1.5" />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <button class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-3.5" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
+                {{ STATUS_OPTIONS.find((o) => o.value === (localReadStatus ?? 'unread'))?.label }}
+                <ChevronDown class="size-3 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
+                <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+                {{ opt.label }}
+                <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <!-- Format badges + provider links -->
-      <div v-if="formats.length || providerLinks.length" class="flex items-center flex-wrap gap-2 mt-4">
+      <div v-if="formats.length || providerLinks.length" class="flex items-center flex-wrap gap-2 mt-0 md:mt-4">
         <span
           v-for="fmt in formats"
           :key="fmt"
@@ -957,8 +1164,8 @@ watch(
           </Tooltip>
           {{ fmt }}
         </span>
-        <div v-if="providerLinks.length" class="flex items-center gap-2 shrink-0">
-          <div class="w-px h-3.5 bg-border" />
+        <div v-if="providerLinks.length" class="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
+          <div class="hidden sm:block w-px h-3.5 bg-border" />
           <a
             v-for="link in providerLinks"
             :key="link.key"
@@ -1030,7 +1237,7 @@ watch(
       </div>
 
       <!-- Metadata grid -->
-      <dl class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-4">
+      <dl class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-4">
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Publisher</dt>
           <template v-if="book.publisher">
@@ -1092,6 +1299,53 @@ watch(
           <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
       </dl>
+
+      <!-- Mobile-only: reading progress + collections (relocated from left column) -->
+      <div v-if="leftColumnProgressVisible.length || koboAnomaly || collections.length" class="md:hidden mt-6 pt-5 border-t border-border space-y-3">
+        <div v-if="leftColumnProgressVisible.length" class="space-y-2">
+          <Tooltip v-for="row in leftColumnProgressVisible" :key="row.label">
+            <TooltipTrigger as-child>
+              <div class="flex items-center gap-2 cursor-default">
+                <span
+                  class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                  :style="row.badgeStyle"
+                  >{{ row.label }}</span
+                >
+                <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    class="h-full rounded-full"
+                    :style="{
+                      width: `${Math.min(100, row.percentage)}%`,
+                      backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
+                      opacity: row.finished ? '1' : '0.75',
+                    }"
+                  />
+                </div>
+                <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
+                <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>{{ row.tooltipText }}</TooltipContent>
+          </Tooltip>
+          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
+        </div>
+        <div v-if="koboAnomaly" class="flex items-center gap-1.5">
+          <TriangleAlert class="size-3 text-amber-500 shrink-0" />
+          <p class="text-[11px] text-amber-500">{{ koboAnomaly }}</p>
+        </div>
+        <div v-if="collections.length">
+          <span class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground block mb-1.5">Collections</span>
+          <div class="flex flex-wrap gap-1">
+            <span
+              v-for="col in collections"
+              :key="col.id"
+              class="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border"
+            >
+              {{ col.name }}
+            </span>
+          </div>
+        </div>
+      </div>
 
       <!-- Synopsis -->
       <div class="mt-6 pt-5 border-t border-border">

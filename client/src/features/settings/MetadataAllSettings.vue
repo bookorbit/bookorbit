@@ -49,14 +49,27 @@ function selectTab(tab: Tab) {
 </script>
 
 <template>
-  <div>
-    <SettingsPageHeader :title="activeTabInfo.titleLabel" :subtitle="activeTabInfo.subtitle" />
+  <div class="metadata-mobile-hints">
+    <div class="md:hidden mb-3">
+      <h2 class="settings-title">{{ activeTabInfo.titleLabel }}</h2>
+      <p class="settings-subtitle overflow-hidden" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2">
+        {{ activeTabInfo.subtitle }}
+      </p>
+    </div>
+    <div class="hidden md:block">
+      <SettingsPageHeader :title="activeTabInfo.titleLabel" :subtitle="activeTabInfo.subtitle" />
+    </div>
 
-    <div class="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+    <div
+      :class="[
+        tabWidths[activeTab],
+        'flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-[5.25rem] z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x',
+      ]"
+    >
       <button
         v-for="tab in tabs"
         :key="tab.id"
-        class="px-3 py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors"
+        class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
         :class="
           activeTab === tab.id
             ? 'border-primary text-foreground'

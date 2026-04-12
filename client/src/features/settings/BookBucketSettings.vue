@@ -130,39 +130,52 @@ async function onMetadataModeChange(event: Event) {
 </script>
 
 <template>
-  <SettingsPageHeader title="Book Bucket" subtitle="Configure how files are processed when they enter Book Bucket." />
+  <SettingsPageHeader class="hidden md:flex" title="Book Bucket" subtitle="Configure how files are processed when they enter Book Bucket." />
+  <div class="md:hidden px-1">
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">Book Bucket</h1>
+    <p
+      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+    >
+      Configure how files are processed when they enter Book Bucket.
+    </p>
+  </div>
 
-  <div v-if="loading" class="flex items-center justify-center py-8">
+  <div v-if="loading" class="mt-5 md:mt-0 flex items-center justify-center py-8">
     <Loader2 class="size-5 animate-spin text-muted-foreground" />
   </div>
 
-  <div v-else class="space-y-6">
+  <div v-else class="mt-5 md:mt-0 space-y-6">
     <p class="settings-group-label">Metadata</p>
 
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div class="flex items-center justify-between px-5 py-4 bg-card">
-        <div>
+      <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+        <div class="min-w-0">
           <p class="settings-label">Auto-fetch metadata from providers</p>
           <p class="settings-hint">
             Automatically fetch metadata from configured providers (Google Books, iTunes, Open Library, etc.) after a file is added to Book Bucket.
           </p>
         </div>
-        <ToggleSwitch :model-value="autoFetch" :disabled="saving" class="ml-4" @update:model-value="() => toggle()" />
+        <ToggleSwitch :model-value="autoFetch" :disabled="saving" class="self-start md:self-auto md:ml-4" @update:model-value="() => toggle()" />
       </div>
     </div>
 
     <div class="mt-6 space-y-4">
       <p class="settings-group-label">Auto-finalize</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-        <div class="flex items-center justify-between px-5 py-4 bg-card">
-          <div>
+        <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+          <div class="min-w-0">
             <p class="settings-label">Enable auto-finalize</p>
             <p class="settings-hint">Files with a metadata confidence score at or above the threshold will be finalized automatically.</p>
           </div>
-          <ToggleSwitch :model-value="autoFinalizeEnabled" :disabled="saving" class="ml-4" @update:model-value="() => toggleAutoFinalize()" />
+          <ToggleSwitch
+            :model-value="autoFinalizeEnabled"
+            :disabled="saving"
+            class="self-start md:self-auto md:ml-4"
+            @update:model-value="() => toggleAutoFinalize()"
+          />
         </div>
 
-        <div v-if="autoFinalizeEnabled" class="px-5 py-4 bg-card space-y-4">
+        <div v-if="autoFinalizeEnabled" class="px-4 py-3.5 bg-card space-y-4 md:px-5 md:py-4">
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">
               Confidence threshold: {{ autoFinalizeThreshold }}%

@@ -373,4 +373,12 @@
            border border-border bg-background text-foreground hover:bg-muted
            disabled:opacity-50 transition-colors;
   }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

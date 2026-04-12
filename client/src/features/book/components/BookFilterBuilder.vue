@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Plus, Trash2, X } from 'lucide-vue-next'
 import { FIELD_OPERATORS, RULE_FIELDS, type GroupRule, type Rule, type RuleField, type RuleOperator } from '@projectx/types'
 import { FIELD_LABELS, OPERATOR_LABELS } from '@/features/book/lib/filter-labels'
+import { useLibraries } from '@/features/library/composables/useLibraries'
 import FilterChipTypeahead from './FilterChipTypeahead.vue'
 import FilterFormatPicker from './FilterFormatPicker.vue'
 import FilterTextTypeahead from './FilterTextTypeahead.vue'
@@ -42,6 +43,13 @@ const ENDPOINT_BY_FIELD: Partial<Record<RuleField, string>> = {
   series: '/api/v1/metadata/series',
   language: '/api/v1/metadata/languages',
 }
+
+const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
+const libraryOptions = computed(() => libraries.value.map((library) => library.name).sort((a, b) => a.localeCompare(b)))
+
+onMounted(() => {
+  void fetchLibraries()
+})
 
 type WithinLastUnit = 'days' | 'weeks' | 'months'
 
@@ -228,6 +236,26 @@ function applyScorePreset(index: number, preset: (typeof SCORE_PRESETS)[number])
   emitUpdate()
 }
 
+function addLibraryChip(index: number, event: Event) {
+  const select = event.target as HTMLSelectElement
+  const name = select.value
+  select.value = ''
+  if (!name) return
+
+  const node = nodes.value[index]
+  if (node?.kind !== 'rule') return
+  if (node.rule.valueChips.includes(name)) return
+  node.rule.valueChips = [...node.rule.valueChips, name]
+  emitUpdate()
+}
+
+function removeLibraryChip(index: number, name: string) {
+  const node = nodes.value[index]
+  if (node?.kind !== 'rule') return
+  node.rule.valueChips = node.rule.valueChips.filter((value) => value !== name)
+  emitUpdate()
+}
+
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
   if (DATE_FIELDS.includes(field)) return operator === 'withinLast' ? 'number' : 'date'
@@ -295,6 +323,38 @@ function showValueToInput(operator: RuleOperator): boolean {
         />
         <!-- Format inline toggle picker -->
         <FilterFormatPicker v-else-if="node.rule.field === 'format'" v-model="node.rule.valueChips" @update:model-value="emitUpdate" />
+        <!-- Library dropdown -->
+        <template v-else-if="node.rule.field === 'library' && COLLECTION_OPERATORS.includes(node.rule.operator)">
+          <div class="flex flex-wrap items-center gap-1 min-w-48 flex-1 rounded-md border border-input bg-background px-2 py-1.5">
+            <span
+              v-for="libraryName in node.rule.valueChips"
+              :key="libraryName"
+              class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+            >
+              {{ libraryName }}
+              <button type="button" class="text-primary/60 hover:text-primary leading-none" @click="removeLibraryChip(index, libraryName)">
+                <X :size="10" />
+              </button>
+            </span>
+            <select
+              :value="''"
+              class="h-7 flex-1 min-w-32 bg-transparent text-foreground text-sm outline-none"
+              @change="addLibraryChip(index, $event)"
+            >
+              <option value="" disabled>
+                {{ librariesLoading ? 'Loading libraries...' : libraryOptions.length === 0 ? 'No libraries available' : 'Select library...' }}
+              </option>
+              <option
+                v-for="libraryName in libraryOptions"
+                :key="libraryName"
+                :value="libraryName"
+                :disabled="node.rule.valueChips.includes(libraryName)"
+              >
+                {{ libraryName }}
+              </option>
+            </select>
+          </div>
+        </template>
         <!-- withinLast: number + unit selector -->
         <template v-else-if="node.rule.operator === 'withinLast'">
           <input

@@ -30,6 +30,7 @@ export const FIELD_LABELS: Record<RuleField, string> = {
   genre: 'Genre',
   tag: 'Tag',
   collection: 'Collection',
+  library: 'Library',
   format: 'Format',
   addedAt: 'Added Date',
   fileAvailability: 'File Availability',

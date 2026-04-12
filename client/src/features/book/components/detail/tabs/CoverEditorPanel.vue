@@ -94,10 +94,10 @@ onUnmounted(() => clearTimeout(debounceTimer))
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-row gap-5 md:gap-3 lg:flex-col">
     <!-- Cover image -->
     <div
-      class="relative w-full overflow-hidden rounded-xl bg-muted shadow-md cursor-zoom-in"
+      class="relative w-36 shrink-0 lg:w-full overflow-hidden rounded-xl bg-muted shadow-md cursor-zoom-in"
       :style="{ aspectRatio: coverAspectRatio }"
       @click="lightboxOpen = true"
     >
@@ -126,112 +126,115 @@ onUnmounted(() => clearTimeout(debounceTimer))
       </div>
     </Teleport>
 
-    <!-- Mode toggle -->
-    <div class="flex gap-1 p-0.5 rounded-lg bg-muted">
+    <!-- Controls: beside thumbnail on mobile, stacked below on desktop -->
+    <div class="flex-1 flex flex-col gap-3 lg:contents">
+      <!-- Mode toggle -->
+      <div class="flex gap-1 p-0.5 rounded-lg bg-muted">
+        <button
+          class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :class="mode === 'file' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+          :disabled="props.locked"
+          @click="switchMode('file')"
+        >
+          <ImagePlus class="size-3.5" />
+          File
+        </button>
+        <button
+          class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :class="mode === 'url' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+          :disabled="props.locked"
+          @click="switchMode('url')"
+        >
+          <Link class="size-3.5" />
+          URL
+        </button>
+      </div>
+
+      <!-- File input -->
+      <div v-if="mode === 'file'">
+        <label
+          class="flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+          :class="props.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+        >
+          <Upload class="size-3.5 shrink-0" />
+          <span class="truncate">{{ pendingFile ? pendingFile.name : 'Choose image...' }}</span>
+          <input type="file" accept="image/*" class="hidden" :disabled="props.locked" @change="onFileChange" />
+        </label>
+      </div>
+
+      <!-- URL input -->
+      <div v-else class="flex flex-col gap-2">
+        <input
+          v-model="urlInput"
+          class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
+          :disabled="props.locked"
+          @input="onUrlInput"
+        />
+      </div>
+
+      <!-- Search Button -->
       <button
-        class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        :class="mode === 'file' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+        class="flex items-center justify-center gap-2 w-full h-9 rounded-lg border border-input bg-background text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="props.locked"
-        @click="switchMode('file')"
+        @click="isSearchOpen = true"
       >
-        <ImagePlus class="size-3.5" />
-        File
+        <Search class="size-3.5" />
+        Find cover online
       </button>
-      <button
-        class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        :class="mode === 'url' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-        :disabled="props.locked"
-        @click="switchMode('url')"
-      >
-        <Link class="size-3.5" />
-        URL
-      </button>
-    </div>
 
-    <!-- File input -->
-    <div v-if="mode === 'file'">
-      <label
-        class="flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-        :class="props.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
-      >
-        <Upload class="size-3.5 shrink-0" />
-        <span class="truncate">{{ pendingFile ? pendingFile.name : 'Choose image...' }}</span>
-        <input type="file" accept="image/*" class="hidden" :disabled="props.locked" @change="onFileChange" />
-      </label>
-    </div>
+      <!-- Cover Search Drawer -->
+      <Teleport to="body">
+        <CoverSearchDrawer
+          v-if="isSearchOpen"
+          :initial-title="book.title ?? ''"
+          :initial-author="book.authors?.[0]?.name ?? ''"
+          :is-audiobook="isPrimaryAudio"
+          @close="isSearchOpen = false"
+          @select="handleSearchSelect"
+        />
+      </Teleport>
 
-    <!-- URL input -->
-    <div v-else class="flex flex-col gap-2">
-      <input
-        v-model="urlInput"
-        class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
-        :disabled="props.locked"
-        @input="onUrlInput"
-      />
-    </div>
+      <!-- Error -->
+      <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
 
-    <!-- Search Button -->
-    <button
-      class="flex items-center justify-center gap-2 w-full h-9 rounded-lg border border-input bg-background text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      :disabled="props.locked"
-      @click="isSearchOpen = true"
-    >
-      <Search class="size-3.5" />
-      Find cover online
-    </button>
-
-    <!-- Cover Search Drawer -->
-    <Teleport to="body">
-      <CoverSearchDrawer
-        v-if="isSearchOpen"
-        :initial-title="book.title ?? ''"
-        :initial-author="book.authors?.[0]?.name ?? ''"
-        :is-audiobook="isPrimaryAudio"
-        @close="isSearchOpen = false"
-        @select="handleSearchSelect"
-      />
-    </Teleport>
-
-    <!-- Error -->
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-
-    <!-- Actions -->
-    <div class="flex flex-col gap-1.5">
-      <button
-        v-if="hasPending"
-        class="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-        :disabled="uploading || props.locked"
-        @click="handleConfirm"
-      >
-        {{ uploading ? 'Saving...' : 'Save cover' }}
-      </button>
-      <button
-        v-if="hasPending"
-        class="w-full h-8 rounded-lg border border-input bg-background text-xs hover:bg-muted transition-colors disabled:opacity-50"
-        :disabled="uploading || props.locked"
-        @click="cancelPending"
-      >
-        Cancel
-      </button>
-      <button
-        v-if="book.coverSource === 'custom'"
-        class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-        :disabled="uploading || props.locked"
-        @click="handleRevert"
-      >
-        <RotateCcw class="size-3" />
-        Revert to original
-      </button>
-      <button
-        v-if="hasPermission('library_edit_metadata')"
-        class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-        :disabled="reExtractingCover || props.locked"
-        @click="reExtractCover"
-      >
-        <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />
-        <Image v-else class="size-3" />
-        Regenerate Cover
-      </button>
+      <!-- Actions -->
+      <div class="flex flex-col gap-1.5">
+        <button
+          v-if="hasPending"
+          class="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          :disabled="uploading || props.locked"
+          @click="handleConfirm"
+        >
+          {{ uploading ? 'Saving...' : 'Save cover' }}
+        </button>
+        <button
+          v-if="hasPending"
+          class="w-full h-8 rounded-lg border border-input bg-background text-xs hover:bg-muted transition-colors disabled:opacity-50"
+          :disabled="uploading || props.locked"
+          @click="cancelPending"
+        >
+          Cancel
+        </button>
+        <button
+          v-if="book.coverSource === 'custom'"
+          class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          :disabled="uploading || props.locked"
+          @click="handleRevert"
+        >
+          <RotateCcw class="size-3" />
+          Revert to original
+        </button>
+        <button
+          v-if="hasPermission('library_edit_metadata')"
+          class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          :disabled="reExtractingCover || props.locked"
+          @click="reExtractCover"
+        >
+          <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />
+          <Image v-else class="size-3" />
+          Regenerate Cover
+        </button>
+      </div>
     </div>
   </div>
 </template>

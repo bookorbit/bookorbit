@@ -172,7 +172,7 @@ function onSecretFieldFocus(event: FocusEvent) {
 <template>
   <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
     <!-- Card Header -->
-    <div class="px-5 py-4 border-b border-border flex items-center justify-between bg-muted/30">
+    <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex items-center justify-between bg-muted/30">
       <div class="flex items-center gap-2">
         <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Available Sources</span>
       </div>
@@ -187,10 +187,10 @@ function onSecretFieldFocus(event: FocusEvent) {
       <div
         v-for="row in rows"
         :key="row.key"
-        class="px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card transition-colors hover:bg-muted/30"
+        class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6 bg-card transition-colors hover:bg-muted/30"
       >
         <!-- Left: Provider Info -->
-        <div class="space-y-1">
+        <div class="space-y-1 min-w-0">
           <div class="flex items-center gap-3">
             <span class="settings-label">{{ row.label }}</span>
             <template v-if="statusFor(row.key)">
@@ -222,15 +222,15 @@ function onSecretFieldFocus(event: FocusEvent) {
         </div>
 
         <!-- Right: Config & Toggle -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div class="flex flex-col items-start gap-3 w-full md:ml-auto md:w-auto md:min-w-[18rem]">
           <!-- Fields -->
-          <div v-if="row.fields.length" class="flex flex-wrap items-center gap-2">
-            <div v-for="field in row.fields" :key="field.key" class="relative">
+          <div v-if="row.fields.length" class="flex flex-wrap items-center gap-2 w-full md:justify-end">
+            <div v-for="field in row.fields" :key="field.key" class="relative w-full sm:w-auto">
               <select
                 v-if="field.type === 'select'"
                 v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
                 :disabled="!draft[row.key].enabled"
-                class="h-9 rounded-md border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+                class="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
               >
                 <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
               </select>
@@ -250,26 +250,31 @@ function onSecretFieldFocus(event: FocusEvent) {
                 :data-1p-ignore="field.type === 'password' ? 'true' : undefined"
                 :data-form-type="field.type === 'password' ? 'other' : undefined"
                 :style="field.type === 'password' ? '--webkit-text-security: disc' : undefined"
-                class="h-9 w-64 lg:w-80 rounded-md border border-input bg-background px-3 text-xs font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
+                class="h-9 w-full sm:w-64 lg:w-80 rounded-md border border-input bg-background px-3 text-xs font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
                 @focus="field.type === 'password' ? onSecretFieldFocus($event) : undefined"
               />
             </div>
           </div>
 
           <!-- Switch -->
-          <button
-            type="button"
-            role="switch"
-            :aria-checked="draft[row.key].enabled"
-            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none"
-            :class="draft[row.key].enabled ? 'bg-primary' : 'bg-muted border border-border'"
-            @click="draft[row.key].enabled = !draft[row.key].enabled"
+          <div
+            class="flex items-center justify-between w-full md:justify-end gap-3 rounded-md border border-border/70 bg-muted/20 px-2.5 py-2 md:border-none md:bg-transparent md:px-0 md:py-0"
           >
-            <span
-              class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
-              :class="draft[row.key].enabled ? 'translate-x-4.5' : 'translate-x-0.5'"
-            />
-          </button>
+            <span class="text-xs text-muted-foreground md:hidden">Enabled</span>
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="draft[row.key].enabled"
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none"
+              :class="draft[row.key].enabled ? 'bg-primary' : 'bg-muted border border-border'"
+              @click="draft[row.key].enabled = !draft[row.key].enabled"
+            >
+              <span
+                class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
+                :class="draft[row.key].enabled ? 'translate-x-4.5' : 'translate-x-0.5'"
+              />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ChevronDown, HardDriveUpload, Loader2, RefreshCw, Sparkles, Star } from 'lucide-vue-next'
+import { Check, ChevronDown, HardDriveUpload, Loader2, Lock, LockOpen, RefreshCw, Sparkles, Star, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import type { BookDetail, BookMetadataLockField } from '@projectx/types'
 import { FORMAT_TO_GROUP } from '@projectx/types'
@@ -89,6 +89,7 @@ const searchComicMetadata = async (q: string): Promise<string[]> => (q.trim() ? 
 
 const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 const searchOpen = ref(false)
+const providerIdsOpen = ref(true)
 
 const providerIdFields = [
   { field: 'googleBooksId' as const, label: 'Google Books' },
@@ -371,9 +372,9 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
+  <div class="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start">
     <!-- Left: Cover panel -->
-    <div class="w-full lg:w-48 lg:shrink-0 lg:sticky lg:top-6">
+    <div class="w-full pb-3 border-b border-border lg:border-b-0 lg:pb-0 lg:w-48 lg:shrink-0 lg:sticky lg:top-6">
       <CoverEditorPanel
         ref="coverPanel"
         :book="props.book"
@@ -384,22 +385,22 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
     </div>
 
     <!-- Right: Form -->
-    <div class="flex-1 min-w-0 space-y-3">
+    <div class="flex-1 min-w-0 space-y-2.5 sm:space-y-3.5">
       <!-- Action bar -->
-      <div class="flex items-center justify-between min-h-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-h-8">
         <p v-if="combinedError" class="text-sm text-destructive">{{ combinedError }}</p>
-        <span v-else />
-        <div class="flex items-center gap-2">
+        <span v-else class="hidden sm:inline" />
+        <div class="flex items-center justify-center sm:justify-start gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 py-0.5">
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+                class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
                 :disabled="loadingFromFile || !primaryFile"
                 @click="handleLoadFromFile"
               >
                 <Loader2 v-if="loadingFromFile" class="size-3.5 animate-spin" />
                 <HardDriveUpload v-else class="size-3.5" />
-                Load from file
+                <span class="hidden sm:inline">Load from file</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>{{
@@ -407,20 +408,21 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             }}</TooltipContent>
           </Tooltip>
 
-          <div class="w-px h-4 bg-border mx-0.5" />
+          <div class="flex-none w-px h-4 bg-border mx-0.5" />
 
           <button
-            class="search-online-btn flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
+            class="flex-none search-online-btn flex items-center gap-1.5 h-8 px-3 sm:px-3.5 rounded-lg text-primary-foreground text-sm font-medium transition-all"
             @click="searchOpen = true"
           >
             <Sparkles class="size-3.5" />
-            Search online
+            <span class="lg:hidden">Search</span>
+            <span class="hidden lg:inline">Search online</span>
           </button>
 
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="auto-fill-btn flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
+                class="flex-none auto-fill-btn flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-40"
                 :disabled="autoFilling || areAllLocked"
                 @click="autoFill"
               >
@@ -434,37 +436,53 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             }}</TooltipContent>
           </Tooltip>
 
-          <div class="w-px h-4 bg-border mx-0.5" />
+          <div class="flex-none w-px h-4 bg-border mx-0.5" />
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+                :disabled="updatingLocks || areAllLocked"
+                @click="handleLockAll"
+              >
+                <Lock class="size-3.5" />
+                <span class="hidden sm:inline">Lock all</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Lock all fields</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+                :disabled="updatingLocks || !hasLockedFields"
+                @click="handleUnlockAll"
+              >
+                <LockOpen class="size-3.5" />
+                <span class="hidden sm:inline">Unlock all</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Unlock all fields</TooltipContent>
+          </Tooltip>
+
+          <div class="hidden lg:flex flex-none w-px h-4 bg-border mx-0.5" />
 
           <button
-            class="h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
-            :disabled="updatingLocks || areAllLocked"
-            @click="handleLockAll"
-          >
-            Lock all
-          </button>
-          <button
-            class="h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
-            :disabled="updatingLocks || !hasLockedFields"
-            @click="handleUnlockAll"
-          >
-            Unlock all
-          </button>
-
-          <div class="w-px h-4 bg-border mx-0.5" />
-
-          <button
-            class="h-8 px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+            class="hidden lg:flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
             :disabled="!isDirty || saving"
             @click="reset"
           >
+            <X class="size-3.5" />
             Cancel
           </button>
           <button
-            class="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+            class="hidden lg:flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
             :disabled="!isDirty || saving"
             @click="submit"
           >
+            <Loader2 v-if="saving" class="size-3.5 animate-spin" />
+            <Check v-else class="size-3.5" />
             {{ saving ? 'Saving...' : 'Save' }}
           </button>
         </div>
@@ -518,9 +536,9 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       </MetadataFieldLabel>
 
       <!-- Tags | Rating -->
-      <div class="flex items-start gap-3">
+      <div class="flex flex-col sm:flex-row items-start gap-3">
         <MetadataFieldLabel
-          class="flex-1"
+          class="w-full sm:flex-1"
           label="Tags"
           field="tags"
           :locked="isLocked('tags')"
@@ -530,7 +548,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           <ChipInput v-model="form.tags" :search-fn="searchTags" :disabled="isLocked('tags')" control-class="pr-10" />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="shrink-0"
+          class="w-full sm:w-auto sm:shrink-0"
           label="Rating"
           field="rating"
           :locked="isLocked('rating')"
@@ -538,7 +556,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           @toggle="handleLockToggle"
         >
           <div
-            class="flex min-h-10 items-center gap-0.5 rounded-lg border border-input bg-background px-2 py-2 pr-10"
+            class="flex h-8 items-center gap-0.5 rounded-lg border border-input bg-background px-2 py-2 pr-10"
             :class="isLocked('rating') ? 'opacity-50 cursor-not-allowed' : ''"
             @mouseleave="hoverRating = null"
           >
@@ -546,12 +564,15 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               <TooltipTrigger as-child>
                 <button
                   type="button"
-                  class="p-0.5 transition-colors disabled:opacity-50"
+                  class="p-1.5 sm:p-0.5 transition-colors disabled:opacity-50"
                   :disabled="isLocked('rating')"
                   @mouseenter="hoverRating = star"
                   @click="setRating(star)"
                 >
-                  <Star class="size-4" :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'" />
+                  <Star
+                    class="size-5 sm:size-4"
+                    :class="(displayRating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Rate {{ star }}</TooltipContent>
@@ -570,9 +591,9 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       </div>
 
       <!-- Series | Index | Publisher -->
-      <div class="flex flex-wrap gap-3">
+      <div class="grid grid-cols-[1fr_7rem] sm:flex sm:flex-wrap gap-3">
         <MetadataFieldLabel
-          class="flex-1 min-w-35"
+          class="min-w-0 sm:flex-1 sm:min-w-35"
           label="Series"
           field="seriesName"
           :locked="isLocked('seriesName')"
@@ -586,7 +607,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="w-28 shrink-0"
+          class="sm:w-28 sm:shrink-0"
           label="Index"
           field="seriesIndex"
           :locked="isLocked('seriesIndex')"
@@ -604,7 +625,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="flex-1 min-w-30"
+          class="col-span-2 sm:flex-1 sm:min-w-30"
           label="Publisher"
           field="publisher"
           :locked="isLocked('publisher')"
@@ -619,10 +640,25 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
       </div>
 
-      <!-- Year | Language | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
-      <div class="flex flex-wrap gap-3">
+      <!-- Language | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
+      <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
         <MetadataFieldLabel
-          class="w-28 shrink-0"
+          class="col-span-2 sm:w-32 sm:shrink-0"
+          label="Language"
+          field="language"
+          :locked="isLocked('language')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
+          <input
+            v-model="form.language"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            maxlength="10"
+            :disabled="isLocked('language')"
+          />
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="sm:w-28 sm:shrink-0"
           label="Year"
           field="publishedYear"
           :locked="isLocked('publishedYear')"
@@ -640,22 +676,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="w-32 shrink-0"
-          label="Language"
-          field="language"
-          :locked="isLocked('language')"
-          :is-updating="isUpdatingLock"
-          @toggle="handleLockToggle"
-        >
-          <input
-            v-model="form.language"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-            maxlength="10"
-            :disabled="isLocked('language')"
-          />
-        </MetadataFieldLabel>
-        <MetadataFieldLabel
-          class="w-28 shrink-0"
+          class="sm:w-28 sm:shrink-0"
           label="Page Count"
           field="pageCount"
           :locked="isLocked('pageCount')"
@@ -672,7 +693,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="flex-1 min-w-22.5"
+          class="sm:flex-1 sm:min-w-22.5"
           label="ISBN-13"
           field="isbn13"
           :locked="isLocked('isbn13')"
@@ -687,7 +708,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="flex-1 min-w-21.25"
+          class="sm:flex-1 sm:min-w-21.25"
           label="ISBN-10"
           field="isbn10"
           :locked="isLocked('isbn10')"
@@ -703,7 +724,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           v-if="isPrimaryAudio"
-          class="w-24 shrink-0"
+          class="sm:w-24 sm:shrink-0"
           label="Duration (s)"
           field="durationSeconds"
           :locked="isLocked('durationSeconds')"
@@ -721,7 +742,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           v-if="isPrimaryAudio"
-          class="w-20 shrink-0"
+          class="sm:w-20 sm:shrink-0"
           label="Abridged"
           field="abridged"
           :locked="isLocked('abridged')"
@@ -745,17 +766,26 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       </div>
 
       <!-- Provider IDs -->
-      <div class="space-y-1">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Provider IDs</label>
-        <div class="rounded-lg border border-border bg-muted/30 p-3 flex gap-3 overflow-x-auto">
-          <div v-for="{ field, label } in providerIdFields" :key="field" class="min-w-30 flex-1">
-            <MetadataFieldLabel :label="label" :field="field" :locked="isLocked(field)" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
-              <input
-                v-model="form[field]"
-                class="w-full h-8 rounded-md border border-input bg-background px-2.5 pr-10 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="isLocked(field)"
-              />
-            </MetadataFieldLabel>
+      <div class="rounded-lg border border-border overflow-hidden">
+        <button
+          type="button"
+          class="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/70 transition-colors"
+          @click="providerIdsOpen = !providerIdsOpen"
+        >
+          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Provider IDs</span>
+          <ChevronDown class="size-3.5 text-muted-foreground transition-transform" :class="providerIdsOpen ? 'rotate-180' : ''" />
+        </button>
+        <div v-if="providerIdsOpen" class="p-3">
+          <div class="grid grid-cols-2 sm:flex sm:gap-3 sm:overflow-x-auto gap-2">
+            <div v-for="{ field, label } in providerIdFields" :key="field" class="min-w-0 sm:min-w-30 sm:flex-1">
+              <MetadataFieldLabel :label="label" :field="field" :locked="isLocked(field)" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
+                <input
+                  v-model="form[field]"
+                  class="w-full h-8 rounded-md border border-input bg-background px-2.5 pr-10 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                  :disabled="isLocked(field)"
+                />
+              </MetadataFieldLabel>
+            </div>
           </div>
         </div>
       </div>
@@ -937,6 +967,27 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           :disabled="isLocked('description')"
         />
       </MetadataFieldLabel>
+
+      <!-- Mobile: sticky Save/Cancel bar -->
+      <div class="lg:hidden sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex gap-2">
+        <button
+          class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+          :disabled="!isDirty || saving"
+          @click="reset"
+        >
+          <X class="size-3.5" />
+          Cancel
+        </button>
+        <button
+          class="flex flex-1 items-center justify-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+          :disabled="!isDirty || saving"
+          @click="submit"
+        >
+          <Loader2 v-if="saving" class="size-3.5 animate-spin" />
+          <Check v-else class="size-3.5" />
+          {{ saving ? 'Saving...' : 'Save' }}
+        </button>
+      </div>
     </div>
   </div>
 

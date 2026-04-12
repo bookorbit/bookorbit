@@ -51,7 +51,7 @@ function getIconComponent(name: string) {
     </div>
 
     <!-- Right -->
-    <div class="flex items-center gap-1 shrink-0">
+    <div class="flex items-center gap-2 shrink-0">
       <slot name="toolbar" />
       <slot name="actions" />
 
@@ -119,7 +119,7 @@ function getIconComponent(name: string) {
                 :value="coverSize"
                 @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
                 type="range"
-                min="80"
+                min="100"
                 max="280"
                 step="10"
                 class="w-full accent-primary cursor-pointer"
@@ -215,7 +215,7 @@ function getIconComponent(name: string) {
             :value="coverSize"
             @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
             type="range"
-            min="80"
+            min="100"
             max="280"
             step="10"
             class="w-full accent-primary cursor-pointer"

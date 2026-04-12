@@ -75,14 +75,22 @@ function formatDate(iso: string | null | undefined): string {
 
 <template>
   <MigrationModal v-if="showMigrationModal" @close="onMigrationModalClose" />
-  <SettingsPageHeader title="Maintenance" subtitle="Manage background tasks, system indices, and maintenance operations." />
+  <SettingsPageHeader class="hidden md:flex" title="Maintenance" subtitle="Manage background tasks, system indices, and maintenance operations." />
+  <div class="md:hidden px-1">
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">Maintenance</h1>
+    <p
+      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+    >
+      Manage background tasks, system indices, and maintenance operations.
+    </p>
+  </div>
 
-  <div class="space-y-6">
+  <div class="mt-5 md:mt-0 space-y-6">
     <!-- Booklore Import -->
     <div>
       <p class="settings-group-label">Import</p>
-      <div class="border border-border rounded-lg bg-card px-5 py-5">
-        <div class="flex items-start justify-between gap-6">
+      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
           <div class="flex items-start gap-3">
             <div
               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
@@ -107,7 +115,7 @@ function formatDate(iso: string | null | undefined): string {
               <ArrowUpFromLine v-else :size="16" class="text-primary" />
             </div>
 
-            <div>
+            <div class="min-w-0">
               <p class="settings-label">
                 <template v-if="migrationCardState === 'none' || migrationCardState === 'loading'">Import from Booklore</template>
                 <template v-else-if="migrationCardState === 'configured'">Booklore import configured</template>
@@ -116,7 +124,9 @@ function formatDate(iso: string | null | undefined): string {
                 <template v-else-if="migrationCardState === 'failed'">Migration failed</template>
               </p>
 
-              <p class="settings-hint leading-relaxed max-w-sm mt-0.5">
+              <p
+                class="settings-hint leading-relaxed max-w-sm mt-0.5 md:[display:block] overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+              >
                 <template v-if="migrationCardState === 'none' || migrationCardState === 'loading'">
                   One-time import of books, metadata, and reading progress from a previous Booklore installation.
                 </template>
@@ -139,7 +149,7 @@ function formatDate(iso: string | null | undefined): string {
 
           <button
             v-if="migrationCardState !== 'loading'"
-            class="shrink-0"
+            class="self-start md:w-auto md:shrink-0"
             :class="migrationCardState === 'none' ? 'settings-btn-primary' : 'settings-btn-outline'"
             @click="goToMigration"
           >
@@ -157,15 +167,17 @@ function formatDate(iso: string | null | undefined): string {
     <!-- Recommendations -->
     <div>
       <p class="settings-group-label">Recommendations</p>
-      <div class="border border-border rounded-lg bg-card px-5 py-5">
-        <div class="flex items-start justify-between gap-6">
+      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
           <div class="flex items-start gap-3">
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <Sparkles :size="16" class="text-primary" />
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="settings-label">Refresh recommendation index</p>
-              <p class="settings-hint leading-relaxed max-w-sm">
+              <p
+                class="settings-hint leading-relaxed max-w-sm md:[display:block] overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+              >
                 Update the recommendations engine with your latest library changes. This process runs in the background.
               </p>
               <p v-if="queued !== null" class="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 mt-2">
@@ -175,7 +187,7 @@ function formatDate(iso: string | null | undefined): string {
               <p v-if="embeddingError" class="text-xs text-destructive mt-2">{{ embeddingError }}</p>
             </div>
           </div>
-          <button class="settings-btn-outline shrink-0" :disabled="running" @click="rebuildEmbeddings">
+          <button class="settings-btn-outline self-start md:w-auto md:shrink-0" :disabled="running" @click="rebuildEmbeddings">
             <RefreshCw :size="13" :class="running ? 'animate-spin' : ''" />
             {{ running ? 'Running...' : 'Run' }}
           </button>

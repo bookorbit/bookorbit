@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { Settings2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
@@ -11,7 +10,6 @@ import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSet
 import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
 
-const { user } = useAuth()
 const { hasPermission } = usePermissions()
 const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
 const { scrollers } = useDashboardConfig()
@@ -22,41 +20,32 @@ const enabledScrollers = computed(() => scrollers.value.filter((s) => s.enabled)
 
 const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
 
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  const base = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-  const firstName = user.value?.name?.split(' ')[0] || user.value?.username
-  return firstName ? `${base}, ${firstName}` : base
-})
-
 onMounted(() => {
   fetchLibraries()
 })
 </script>
 
 <template>
-  <main class="flex-none">
-    <!-- Greeting -->
-    <div class="flex items-center justify-between px-1 h-10 pt-4 mr-4 mb-2 sticky top-0 z-20 transition-all duration-300">
-      <div class="flex items-center gap-2.5">
-        <div class="w-1 h-4 bg-primary/40 rounded-full" />
-        <h1 class="text-[17px] font-bold text-foreground/90 tracking-tight">{{ greeting }}</h1>
+  <main class="relative flex-none">
+    <!-- Floating Settings Button -->
+    <div class="pointer-events-none fixed bottom-6 right-6 z-50">
+      <div class="pointer-events-auto transition-all duration-300">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="flex h-11 w-11 items-center justify-center rounded-full border-2 border-primary/40 bg-background/90 text-primary shadow-2xl backdrop-blur-md transition-all hover:bg-primary hover:text-primary-foreground active:scale-95"
+              @click="settingsOpen = true"
+            >
+              <Settings2 :size="18" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left" align="center">Customize dashboard</TooltipContent>
+        </Tooltip>
       </div>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button
-            class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            @click="settingsOpen = true"
-          >
-            <Settings2 :size="15" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>Customize dashboard</TooltipContent>
-      </Tooltip>
     </div>
 
     <!-- Scrollers / Welcome -->
-    <div class="space-y-5 pb-8 pt-2 sm:pr-2">
+    <div class="space-y-5 pb-8 pt-4 sm:pr-2">
       <DashboardWelcome v-if="hasNoLibraries" :can-create="hasPermission('manage_libraries')" />
       <template v-else>
         <DashboardScroller

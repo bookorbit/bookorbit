@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { Plus, Pencil, Trash2, Star, Share2, Wifi, Server } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Plus, Pencil, Trash2, Star, Share2, Wifi, Server } from 'lucide-vue-next'
 import { Permission } from '@projectx/types'
 import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useMediaQuery } from '@vueuse/core'
 
 const {
   providers,
@@ -27,6 +28,9 @@ const showForm = ref(false)
 const editingId = ref<number | null>(null)
 const saving = ref(false)
 const testing = ref<number | null>(null)
+const deleteConfirm = ref<EmailProvider | null>(null)
+const helpOpen = ref(true)
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const emptyForm = (): EmailProviderForm => ({
   name: '',
@@ -101,7 +105,6 @@ async function submitForm() {
 }
 
 async function remove(p: EmailProvider) {
-  if (!confirm(`Delete provider "${p.name}"?`)) return
   try {
     await deleteProvider(p.id)
     toast.success(`"${p.name}" deleted`)
@@ -157,11 +160,30 @@ async function test(p: EmailProvider) {
     testing.value = null
   }
 }
+
+function requestRemove(p: EmailProvider) {
+  deleteConfirm.value = p
+}
+
+async function confirmRemove() {
+  if (!deleteConfirm.value) return
+  const provider = deleteConfirm.value
+  deleteConfirm.value = null
+  await remove(provider)
+}
+
+watch(
+  isMobile,
+  (mobile) => {
+    helpOpen.value = !mobile
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="hidden md:flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SMTP Providers</p>
       <button
         v-if="canManageEmail && !showForm"
@@ -172,11 +194,26 @@ async function test(p: EmailProvider) {
         Add provider
       </button>
     </div>
+    <div class="md:hidden flex items-center justify-between">
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SMTP Providers</p>
+    </div>
+    <div
+      v-if="canManageEmail && !showForm"
+      class="md:hidden sticky top-[8.9rem] z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2"
+    >
+      <button
+        class="w-full min-h-10 flex items-center justify-center gap-1.5 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        @click="openCreate()"
+      >
+        <Plus :size="13" />
+        Add provider
+      </button>
+    </div>
 
     <!-- Add/Edit form -->
-    <div v-if="canManageEmail && showForm" class="border border-border rounded-lg p-5 bg-card space-y-4">
+    <div v-if="canManageEmail && showForm" class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-4">
       <p class="text-sm font-semibold text-foreground">{{ editingId ? 'Edit Provider' : 'New Provider' }}</p>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="col-span-2">
           <label class="block text-xs font-medium text-muted-foreground mb-1.5">Name</label>
           <input
@@ -243,7 +280,7 @@ async function test(p: EmailProvider) {
         </div>
       </div>
 
-      <div class="flex items-center gap-6">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
         <label class="flex items-center gap-2 cursor-pointer">
           <input v-model="form.auth" type="checkbox" class="rounded border-border" />
           <span class="text-xs text-foreground">Authentication</span>
@@ -260,7 +297,7 @@ async function test(p: EmailProvider) {
 
       <div v-if="formError" class="text-xs text-destructive">{{ formError }}</div>
 
-      <div class="flex items-center gap-2">
+      <div class="hidden md:flex items-center gap-2">
         <button
           class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
           :disabled="saving"
@@ -274,6 +311,19 @@ async function test(p: EmailProvider) {
         >
           Cancel
         </button>
+      </div>
+      <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
+        <div class="flex items-center gap-2">
+          <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="saving" @click="submitForm()">
+            {{ saving ? 'Saving...' : editingId ? 'Update' : 'Create' }}
+          </button>
+          <button
+            class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="cancelForm()"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
 
@@ -290,7 +340,7 @@ async function test(p: EmailProvider) {
 
     <!-- List -->
     <div v-else-if="providers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div v-for="p in providers" :key="p.id" class="px-4 py-3 bg-card flex items-center gap-3">
+      <div v-for="p in providers" :key="p.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium text-foreground">{{ p.name }}</span>
@@ -300,10 +350,12 @@ async function test(p: EmailProvider) {
               >System</span
             >
           </div>
-          <p class="text-xs text-muted-foreground mt-0.5">{{ p.host }}:{{ p.port }} · {{ p.fromAddress || p.username || 'no from address' }}</p>
+          <p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+            {{ p.host }}:{{ p.port }} · {{ p.fromAddress || p.username || 'no from address' }}
+          </p>
         </div>
 
-        <div class="flex items-center gap-1 shrink-0">
+        <div class="flex items-center gap-1 shrink-0 self-end md:self-auto">
           <Tooltip v-if="isSuperuser">
             <TooltipTrigger as-child>
               <button
@@ -367,7 +419,7 @@ async function test(p: EmailProvider) {
             <TooltipTrigger as-child>
               <button
                 class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="remove(p)"
+                @click="requestRemove(p)"
               >
                 <Trash2 :size="13" />
               </button>
@@ -378,11 +430,38 @@ async function test(p: EmailProvider) {
       </div>
     </div>
 
-    <div class="border border-border rounded-lg p-4 bg-card/50">
-      <p class="text-xs text-muted-foreground">
+    <div class="border border-border rounded-lg bg-card/50">
+      <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="helpOpen = !helpOpen">
+        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Provider Notes</p>
+        <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground" />
+        <ChevronDown v-else :size="14" class="text-muted-foreground" />
+      </button>
+      <p v-if="helpOpen" class="px-4 pb-4 text-xs text-muted-foreground">
         The <strong>System</strong> provider (superuser only) is used for password reset emails. The <strong>Default</strong> provider is used when
         sending books with no explicit provider selected. Providers marked <strong>Shared</strong> are available to all users.
       </p>
+    </div>
+
+    <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
+      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+        <p class="text-base font-semibold text-foreground">Delete provider?</p>
+        <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirm.name }}". This action cannot be undone.</p>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="deleteConfirm = null"
+          >
+            Cancel
+          </button>
+          <button
+            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+            @click="confirmRemove"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, Filter, Telescope, X } from 'lucide-vue-next'
+import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, Filter, SlidersHorizontal, Telescope, X } from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -41,9 +41,10 @@ const { viewMode } = useDisplaySettings()
 const { libraries, loaded: librariesLoaded } = useLibraries()
 
 const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
-const { coverSize, gridGap } = useViewDisplaySettings('library', libraryId)
-
 const currentLibrary = computed(() => libraries.value.find((l) => l.id === libraryId.value))
+const currentCoverAspectRatio = computed(() => currentLibrary.value?.coverAspectRatio ?? DEFAULT_COVER_ASPECT_RATIO)
+const { coverSize, gridGap } = useViewDisplaySettings('library', libraryId, currentCoverAspectRatio)
+
 const libraryNotFound = computed(() => librariesLoaded.value && libraryId.value !== null && !currentLibrary.value)
 const title = computed(() => currentLibrary.value?.name ?? 'Library')
 const libraryIcon = computed(() => currentLibrary.value?.icon ?? 'BookOpen')
@@ -53,10 +54,7 @@ const pageTitle = computed(() => {
 })
 usePageTitle(pageTitle)
 
-provide(
-  COVER_ASPECT_RATIO_KEY,
-  computed(() => currentLibrary.value?.coverAspectRatio ?? DEFAULT_COVER_ASPECT_RATIO),
-)
+provide(COVER_ASPECT_RATIO_KEY, currentCoverAspectRatio)
 
 const { items: books, total, loading, initialized: booksInitialized, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
@@ -171,6 +169,7 @@ onBookMoved((bookIds) => {
 })
 
 const filterOpen = ref(false)
+const mobileControlsExpanded = ref(false)
 
 function saveSort() {
   if (libraryId.value === null) return
@@ -187,6 +186,7 @@ const sortModel = computed({
     sort.value = v.length > 0 ? v : [{ field: 'title', dir: 'asc' }]
     saveSort()
     load(true)
+    collapseMobileControlsIfNeeded()
   },
 })
 
@@ -194,17 +194,49 @@ function resetSort() {
   sort.value = [{ field: 'title', dir: 'asc' }]
   if (libraryId.value !== null) localStorage.removeItem(getSortKey(libraryId.value))
   load(true)
+  collapseMobileControlsIfNeeded()
 }
 
 const activeFilterCount = computed(() => filter.value?.rules?.length ?? 0)
+const mobileControlsBadgeCount = computed(() => activeFilterCount.value + (!isDefaultSort.value ? 1 : 0))
 
 function clearFilters() {
   filter.value = undefined
   forgetSavedFilter()
+  collapseMobileControlsIfNeeded()
+}
+
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 640
+}
+
+function collapseMobileControlsIfNeeded() {
+  if (!mobileControlsExpanded.value) return
+  if (!isMobileViewport()) return
+  mobileControlsExpanded.value = false
+}
+
+function toggleMobileControls() {
+  mobileControlsExpanded.value = !mobileControlsExpanded.value
+}
+
+function toggleFilterPanel() {
+  filterOpen.value = !filterOpen.value
+  if (filterOpen.value) collapseMobileControlsIfNeeded()
+}
+
+function closeFilterPanel() {
+  filterOpen.value = false
 }
 
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
+function checkSentinel() {
+  if (!hasMore.value || loading.value) return
+  const el = sentinel.value
+  if (!el) return
+  if (el.getBoundingClientRect().top < window.innerHeight + 300) load()
+}
 
 onMounted(() => {
   load(true)
@@ -216,9 +248,13 @@ onMounted(() => {
     { rootMargin: '300px' },
   )
   if (sentinel.value) observer.observe(sentinel.value)
+  window.addEventListener('resize', checkSentinel, { passive: true })
 })
 
-onUnmounted(() => observer?.disconnect())
+onUnmounted(() => {
+  observer?.disconnect()
+  window.removeEventListener('resize', checkSentinel)
+})
 
 const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
   if (event.uploadedCount === 0) return
@@ -234,6 +270,13 @@ watch(libraryId, (newId) => {
 })
 
 watch(filter, () => load(true), { deep: true })
+watch(
+  loading,
+  (isLoading) => {
+    if (!isLoading) checkSentinel()
+  },
+  { flush: 'post' },
+)
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 const {
@@ -315,7 +358,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       @toggle-selection="toggleSelectionMode"
     >
       <template #toolbar>
-        <div class="flex items-center gap-1">
+        <div class="hidden sm:flex items-center gap-1">
           <Popover>
             <PopoverTrigger as-child>
               <button
@@ -350,10 +393,10 @@ function handleBookAction(book: BookCard, action: BookActionType) {
             <TooltipContent>Reset sort to default</TooltipContent>
           </Tooltip>
         </div>
-        <div class="w-px h-5 bg-border shrink-0" />
+        <div class="hidden sm:block w-px h-5 bg-border shrink-0" />
         <button
-          @click="filterOpen = !filterOpen"
-          class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
+          @click="toggleFilterPanel"
+          class="hidden sm:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
           :class="
             activeFilterCount > 0
               ? 'border-primary text-primary bg-primary/10'
@@ -369,7 +412,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
             <button
               v-if="activeFilterCount > 0"
               @click="clearFilters"
-              class="flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
+              class="hidden sm:flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
             >
               <X :size="13" />
               Clear
@@ -377,8 +420,82 @@ function handleBookAction(book: BookCard, action: BookActionType) {
           </TooltipTrigger>
           <TooltipContent>Clear all filters</TooltipContent>
         </Tooltip>
+
+        <button
+          class="sm:hidden relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+          :class="
+            mobileControlsExpanded
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+          "
+          @click="toggleMobileControls"
+        >
+          <SlidersHorizontal :size="14" />
+          <span
+            v-if="mobileControlsBadgeCount > 0"
+            class="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+          >
+            {{ mobileControlsBadgeCount }}
+          </span>
+        </button>
       </template>
     </ViewHeader>
+
+    <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
+      <div class="flex flex-wrap items-center gap-2">
+        <Popover>
+          <PopoverTrigger as-child>
+            <button
+              class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+              :class="
+                !isDefaultSort
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+              "
+            >
+              <ArrowUpDown :size="13" />
+              <span>Sort</span>
+              <span v-if="!isDefaultSort" class="rounded-full border border-primary/40 px-1 py-0.5 text-[10px] font-semibold leading-none">On</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" class="w-80 p-3">
+            <BookSortBuilder v-model="sortModel" />
+          </PopoverContent>
+        </Popover>
+
+        <button
+          v-if="!isDefaultSort"
+          class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:text-destructive hover:bg-destructive/10"
+          @click="resetSort"
+        >
+          <X :size="13" />
+        </button>
+
+        <button
+          @click="toggleFilterPanel"
+          class="flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-sm transition-colors"
+          :class="
+            activeFilterCount > 0
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+          "
+        >
+          <Filter :size="13" />
+          <span>Filters</span>
+          <span v-if="activeFilterCount > 0" class="rounded-full bg-primary/10 px-1 py-0.5 text-[10px] font-semibold leading-none">
+            {{ activeFilterCount }}
+          </span>
+        </button>
+
+        <button
+          v-if="activeFilterCount > 0"
+          @click="clearFilters"
+          class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
+        >
+          Clear
+        </button>
+      </div>
+    </section>
 
     <main class="flex-1 min-h-0">
       <EntityNotFound v-if="libraryNotFound" entity="Library" />
@@ -437,6 +554,12 @@ function handleBookAction(book: BookCard, action: BookActionType) {
                 </TooltipTrigger>
                 <TooltipContent>Remove saved filter</TooltipContent>
               </Tooltip>
+              <button
+                class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                @click="closeFilterPanel"
+              >
+                Close
+              </button>
             </div>
           </div>
           <BookFilterBuilder v-model="filter" />

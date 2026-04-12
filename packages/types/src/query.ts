@@ -10,6 +10,7 @@ export type RuleField =
   | "genre"
   | "tag"
   | "collection"
+  | "library"
   | "format"
   | "addedAt"
   | "fileAvailability"
@@ -54,6 +55,7 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   genre: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   tag: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   collection: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
+  library: ["includesAny", "excludesAll"],
   format: ["includesAny", "excludesAll"],
   publishedYear: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   seriesIndex: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],

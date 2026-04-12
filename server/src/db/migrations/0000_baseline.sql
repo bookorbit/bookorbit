@@ -358,7 +358,7 @@ CREATE TABLE "book_metadata" (
 	"google_books_id" varchar(50),
 	"goodreads_id" varchar(50),
 	"amazon_id" varchar(20),
-	"hardcover_id" varchar(50),
+	"hardcover_id" varchar(255),
 	"open_library_id" varchar(50),
 	"itunes_id" varchar(50),
 	"metadata_score" integer,

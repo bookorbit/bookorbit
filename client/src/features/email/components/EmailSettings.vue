@@ -85,17 +85,27 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SettingsPageHeader title="Email" subtitle="Send books to your e-reader via email." />
+  <SettingsPageHeader class="hidden md:flex" title="Email" subtitle="Send books to your e-reader via email." />
+  <div class="md:hidden px-1">
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">Email</h1>
+    <p
+      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+    >
+      Send books to your e-reader via email.
+    </p>
+  </div>
 
-  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">Loading...</div>
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
   <template v-else>
     <!-- Tab bar -->
-    <div class="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+    <div
+      class="flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-[5.25rem] z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x"
+    >
       <button
         v-for="tab in tabs"
         :key="tab.id"
-        class="px-3 py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors"
+        class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
         :class="
           activeTab === tab.id
             ? 'border-primary text-foreground'

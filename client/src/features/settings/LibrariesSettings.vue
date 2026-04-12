@@ -244,7 +244,28 @@ function coverRefreshLabel(libraryId: number): string {
 </script>
 
 <template>
-  <SettingsPageHeader title="Libraries" subtitle="Manage your media libraries and trigger content scans.">
+  <div class="md:hidden mb-3">
+    <h2 class="settings-title">Libraries</h2>
+    <p class="settings-subtitle overflow-hidden" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2">
+      Manage your media libraries and trigger content scans.
+    </p>
+  </div>
+  <div
+    class="md:hidden sticky top-0 z-20 mb-4 -mx-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+  >
+    <div class="grid grid-cols-2 gap-2">
+      <button class="settings-btn-outline w-full justify-center" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
+        <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
+        {{ scanningAll ? 'Scanning...' : 'Scan All' }}
+      </button>
+      <button class="settings-btn-primary w-full justify-center" @click="openCreate">
+        <Plus :size="14" />
+        Add Library
+      </button>
+    </div>
+  </div>
+
+  <SettingsPageHeader title="Libraries" subtitle="Manage your media libraries and trigger content scans." class="hidden md:flex">
     <button class="settings-btn-outline" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
       <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
       {{ scanningAll ? 'Scanning...' : 'Scan All' }}
@@ -256,9 +277,9 @@ function coverRefreshLabel(libraryId: number): string {
   </SettingsPageHeader>
 
   <!-- Library cards -->
-  <div class="space-y-3">
+  <div class="space-y-2 md:space-y-3">
     <div v-for="lib in libraries" :key="lib.id" class="rounded-xl border border-border bg-card overflow-hidden">
-      <div class="px-5 py-4">
+      <div class="px-4 py-3.5 md:px-5 md:py-4">
         <div class="flex items-center gap-3">
           <!-- Icon -->
           <RouterLink
@@ -305,7 +326,7 @@ function coverRefreshLabel(libraryId: number): string {
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <button
-                  class="flex items-center justify-center px-2 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  class="flex h-11 w-11 md:h-auto md:w-auto md:px-2 md:py-1.5 items-center justify-center rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                 >
                   <MoreHorizontal :size="16" />
                 </button>
@@ -335,10 +356,16 @@ function coverRefreshLabel(libraryId: number): string {
       </div>
 
       <!-- Progress bars (shown below the main row, full width) -->
-      <div v-if="getProgress(lib.id) || getCoverRefreshProgress(lib.id)" class="border-t border-border px-5 py-3 space-y-2.5">
+      <div
+        v-if="getProgress(lib.id) || getCoverRefreshProgress(lib.id)"
+        class="border-t border-border px-4 py-2.5 space-y-2 md:px-5 md:py-3 md:space-y-2.5"
+      >
         <div v-if="getProgress(lib.id)">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-xs font-medium" :class="getProgress(lib.id)?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'">
+          <div class="flex items-center justify-between mb-1.5 min-w-0">
+            <span
+              class="block min-w-0 text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible"
+              :class="getProgress(lib.id)?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'"
+            >
               {{ scanProgressLabel(lib.id) }}
             </span>
           </div>
@@ -354,8 +381,12 @@ function coverRefreshLabel(libraryId: number): string {
           </div>
         </div>
         <div v-if="getCoverRefreshProgress(lib.id)">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-xs font-medium text-muted-foreground">{{ coverRefreshLabel(lib.id) }}</span>
+          <div class="flex items-center justify-between mb-1.5 min-w-0">
+            <span
+              class="block min-w-0 text-xs font-medium text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible"
+            >
+              {{ coverRefreshLabel(lib.id) }}
+            </span>
           </div>
           <div v-if="getCoverRefreshProgress(lib.id)?.status === 'running'" class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div

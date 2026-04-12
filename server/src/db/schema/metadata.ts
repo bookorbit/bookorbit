@@ -53,7 +53,7 @@ export const bookMetadata = pgTable(
     googleBooksId: varchar('google_books_id', { length: 50 }),
     goodreadsId: varchar('goodreads_id', { length: 50 }),
     amazonId: varchar('amazon_id', { length: 20 }),
-    hardcoverId: varchar('hardcover_id', { length: 50 }),
+    hardcoverId: varchar('hardcover_id', { length: 255 }),
     openLibraryId: varchar('open_library_id', { length: 50 }),
     itunesId: varchar('itunes_id', { length: 50 }),
     metadataScore: integer('metadata_score'),

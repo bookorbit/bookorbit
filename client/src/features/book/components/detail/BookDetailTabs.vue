@@ -26,11 +26,11 @@ function navigate(tab: BookDetailTab) {
 </script>
 
 <template>
-  <div class="flex items-stretch gap-0 overflow-x-auto flex-1 min-w-0">
+  <div class="flex items-stretch gap-0 overflow-x-auto scrollbar-none flex-1 min-w-0">
     <button
       v-for="t in tabs"
       :key="t.tab"
-      class="px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+      class="px-3.5 sm:px-3 h-full text-[15px] sm:text-sm font-semibold sm:font-medium border-b-2 transition-colors whitespace-nowrap"
       :class="activeTab === t.tab ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
       @click="navigate(t.tab)"
     >

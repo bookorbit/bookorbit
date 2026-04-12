@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown, Aperture } from 'lucide-vue-next'
+import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown, Aperture, SlidersHorizontal, X } from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -21,6 +21,7 @@ import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { usePageTitle } from '@/composables/usePageTitle'
 import type { BookCard, GroupRule, SortField } from '@projectx/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
@@ -30,7 +31,8 @@ const router = useRouter()
 const { viewMode, lensFilterExpanded } = useDisplaySettings()
 
 const lensId = computed(() => Number(route.params.id))
-const { coverSize, gridGap } = useViewDisplaySettings('lens', lensId)
+const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
+const { coverSize, gridGap } = useViewDisplaySettings('lens', lensId, coverAspectRatio)
 
 const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useLens(lensId)
 const { setBookContext, registerLoadMore } = useBookNavigation()
@@ -70,6 +72,7 @@ const sortChip = computed(() => {
 })
 
 const filterExpanded = lensFilterExpanded
+const mobileControlsExpanded = ref(false)
 
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
 
@@ -155,9 +158,34 @@ async function handleDelete() {
   }
 }
 
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 640
+}
+
+function closeMobileControls() {
+  mobileControlsExpanded.value = false
+  confirmLensDelete.value = false
+}
+
+function collapseMobileControlsIfNeeded() {
+  if (!mobileControlsExpanded.value) return
+  if (!isMobileViewport()) return
+  closeMobileControls()
+}
+
+function toggleMobileControls() {
+  mobileControlsExpanded.value = !mobileControlsExpanded.value
+}
+
+function toggleFilterSummary() {
+  filterExpanded.value = !filterExpanded.value
+  collapseMobileControlsIfNeeded()
+}
+
 function openEditor() {
   editorOpen.value = true
   confirmLensDelete.value = false
+  collapseMobileControlsIfNeeded()
 }
 
 function onSaved() {
@@ -182,6 +210,7 @@ onMounted(async () => {
     { rootMargin: '300px' },
   )
   if (sentinel.value) observer.observe(sentinel.value)
+  window.addEventListener('resize', checkSentinel, { passive: true })
 
   await fetchLenses()
   if (!lens.value) {
@@ -191,7 +220,10 @@ onMounted(async () => {
   load(true)
 })
 
-onUnmounted(() => observer?.disconnect())
+onUnmounted(() => {
+  observer?.disconnect()
+  window.removeEventListener('resize', checkSentinel)
+})
 
 watch(
   loading,
@@ -248,6 +280,13 @@ watch(
     >
       <template #actions>
         <button
+          class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="toggleMobileControls"
+        >
+          <SlidersHorizontal :size="14" />
+        </button>
+
+        <button
           v-if="lens?.filter || sortChip"
           @click="filterExpanded = !filterExpanded"
           class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -278,6 +317,46 @@ watch(
         </button>
       </template>
     </ViewHeader>
+
+    <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          v-if="lens?.filter || sortChip"
+          @click="toggleFilterSummary"
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
+          <span>{{ filterExpanded ? 'Hide Filter' : 'Show Filter' }}</span>
+        </button>
+        <button
+          @click="openEditor"
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Settings2 :size="13" />
+          <span>Edit</span>
+        </button>
+        <button
+          @click="handleDelete"
+          :disabled="deleting"
+          class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+          :class="
+            confirmLensDelete
+              ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
+              : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
+          "
+        >
+          <Trash2 :size="13" />
+          <span>{{ confirmLensDelete ? 'Confirm?' : 'Delete' }}</span>
+        </button>
+        <button
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="closeMobileControls"
+        >
+          <X :size="13" />
+          <span>Close</span>
+        </button>
+      </div>
+    </section>
 
     <main class="flex-1 min-h-0">
       <EntityNotFound v-if="lensNotFound" entity="Lens" />

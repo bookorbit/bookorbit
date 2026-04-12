@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut, PackageOpen, BarChart3, User } from 'lucide-vue-next'
+import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut, PackageOpen, BarChart3, User, MoreVertical } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -14,6 +14,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import AccentPicker from '@/components/AccentPicker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -424,6 +427,76 @@ function formatBadgeClass(fmt: string): string {
           </TooltipTrigger>
           <TooltipContent>Search</TooltipContent>
         </Tooltip>
+
+        <!-- Mobile: Kebab Menu -->
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              :class="[
+                'md:hidden h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
+                iconRadiusClass,
+              ]"
+            >
+              <MoreVertical :size="15" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-44">
+            <DropdownMenuItem v-if="hasPermission('book_bucket_access')" @click="navigateToBookBucket">
+              <PackageOpen :size="15" class="mr-2 text-muted-foreground" />
+              Book Bucket
+              <span
+                v-if="bookBucketSummary.total > 0"
+                class="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
+              >
+                {{ bookBucketSummary.total }}
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="navigateToStatistics">
+              <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
+              Statistics
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="hasPermission('library_upload')" @click="uploadOpen = true">
+              <Upload :size="15" class="mr-2 text-muted-foreground" />
+              Upload books
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Palette :size="15" class="mr-2 text-muted-foreground" />
+                Appearance
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent class="w-72 p-4">
+                <div class="space-y-4">
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Theme</span>
+                    <ThemePicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Accent</span>
+                    <AccentPicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Radius</span>
+                    <RadiusPicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-xs text-muted-foreground">Background</span>
+                    <BackgroundPicker />
+                  </div>
+                </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuItem @click="navigateToSettings">
+              <Settings :size="15" class="mr-2 text-muted-foreground" />
+              Settings
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <!-- Group 1: Content (Book Bucket, Statistics, Upload) -->
         <div class="hidden md:flex items-center gap-2.5">

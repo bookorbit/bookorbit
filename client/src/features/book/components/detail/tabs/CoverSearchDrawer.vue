@@ -75,40 +75,52 @@ onMounted(() => {
 
       <!-- Search Bar (Sticky) -->
       <div class="p-4 bg-muted/30 border-b space-y-3">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
           <div class="space-y-1">
-            <label class="text-[10px] font-bold text-muted-foreground ml-1 uppercase">Title</label>
+            <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Title</label>
             <input
               ref="titleInput"
               v-model="searchTitle"
-              class="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-              placeholder="e.g. Angelmaker"
+              class="w-full h-9 md:h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              placeholder="Title"
               @keyup.enter="performSearch"
             />
           </div>
           <div class="space-y-1">
-            <label class="text-[10px] font-bold text-muted-foreground ml-1 uppercase">Author</label>
+            <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Author</label>
             <input
               v-model="searchAuthor"
-              class="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-              placeholder="e.g. Nick Harkaway"
+              class="w-full h-9 md:h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              placeholder="Author"
               @keyup.enter="performSearch"
             />
           </div>
-          <div class="space-y-1">
-            <label class="text-[10px] font-bold text-muted-foreground ml-1 uppercase">Source</label>
-            <select
-              v-model="searchProvider"
-              class="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+          <div class="col-span-2 md:col-span-1 flex gap-2 md:block md:space-y-1">
+            <div class="flex-1 md:space-y-1">
+              <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Source</label>
+              <select
+                v-model="searchProvider"
+                class="w-full h-9 md:h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              >
+                <option value="duckduckgo">DuckDuckGo</option>
+                <option value="itunes">iTunes</option>
+                <option value="all">All Sources</option>
+              </select>
+            </div>
+            <!-- Icon-only search button on mobile, inline with Source -->
+            <button
+              class="md:hidden flex items-center justify-center h-9 aspect-square rounded-xl bg-primary text-primary-foreground transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 shrink-0"
+              :disabled="isSearching"
+              @click="performSearch"
             >
-              <option value="duckduckgo">DuckDuckGo</option>
-              <option value="itunes">iTunes</option>
-              <option value="all">All Sources</option>
-            </select>
+              <Loader2 v-if="isSearching" class="size-4 animate-spin" />
+              <Search v-else class="size-4" />
+            </button>
           </div>
         </div>
+        <!-- Full-width button on md+ -->
         <button
-          class="flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm active:scale-[0.98]"
+          class="hidden md:flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm active:scale-[0.98]"
           :disabled="isSearching"
           @click="performSearch"
         >

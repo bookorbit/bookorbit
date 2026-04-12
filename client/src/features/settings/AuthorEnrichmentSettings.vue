@@ -101,40 +101,58 @@ async function runAuthorBackfillAll() {
 
 <template>
   <p class="settings-group-label">Configuration</p>
+  <div
+    class="md:hidden sticky top-[5.25rem] z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+  >
+    <div class="flex items-center gap-2 flex-wrap">
+      <button class="settings-btn-primary flex-1 justify-center" :disabled="saving" @click="saveConfig">
+        <Save class="size-3.5" />
+        {{ saving ? 'Saving...' : 'Save' }}
+      </button>
+      <button class="settings-btn-outline" :disabled="authorBackfillRunning" @click="runAuthorBackfill">
+        <RefreshCw :size="13" :class="authorBackfillRunning ? 'animate-spin' : ''" />
+        {{ authorBackfillRunning ? 'Running...' : 'Run eligible' }}
+      </button>
+      <button class="settings-btn-outline" :disabled="authorBackfillAllRunning" @click="runAuthorBackfillAll">
+        <RefreshCw :size="13" :class="authorBackfillAllRunning ? 'animate-spin' : ''" />
+        {{ authorBackfillAllRunning ? 'Running...' : 'Run all' }}
+      </button>
+    </div>
+  </div>
   <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-    <div class="px-5 py-4 flex items-center justify-between gap-6 bg-card">
+    <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
       <div>
         <p class="settings-label">Enable auto author enrichment</p>
         <p class="settings-hint">Automatically fetch author biographies and profile photos when books are added or updated.</p>
       </div>
-      <ToggleSwitch :model-value="config.enabled" :disabled="saving" @update:model-value="toggleEnabled" />
+      <ToggleSwitch class="self-start" :model-value="config.enabled" :disabled="saving" @update:model-value="toggleEnabled" />
     </div>
 
-    <div class="px-5 py-4 flex items-center justify-between gap-6 bg-card">
+    <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
       <div>
         <p class="settings-label">Update strategy</p>
         <p class="settings-hint">What to do when an author already has a biography or photo.</p>
       </div>
-      <select class="select-field w-64" :value="config.writeMode" :disabled="saving" @change="onWriteModeChange">
+      <select class="select-field w-full md:w-64" :value="config.writeMode" :disabled="saving" @change="onWriteModeChange">
         <option value="missing_only">Only fill missing data (recommended)</option>
         <option value="always_refetch">Always refresh existing data</option>
       </select>
     </div>
 
     <template v-if="config.enabled">
-      <div class="px-5 py-4 flex items-center justify-between gap-6 bg-card">
+      <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
         <div>
           <p class="settings-label">Trigger on import</p>
           <p class="settings-hint">Queue authors for enrichment when books are first added to a library.</p>
         </div>
-        <ToggleSwitch :model-value="config.triggerOnImport" :disabled="saving" @update:model-value="toggleTriggerOnImport" />
+        <ToggleSwitch class="self-start" :model-value="config.triggerOnImport" :disabled="saving" @update:model-value="toggleTriggerOnImport" />
       </div>
     </template>
 
-    <div class="px-5 py-4 bg-card">
+    <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
       <p class="settings-label mb-1">Eligibility conditions</p>
       <p class="settings-hint mb-3">An author is eligible if it matches any enabled condition.</p>
-      <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-4">
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -177,7 +195,7 @@ async function runAuthorBackfillAll() {
       </div>
     </div>
 
-    <div class="flex items-center gap-3 px-5 py-4 bg-card">
+    <div class="hidden md:flex items-center gap-3 px-5 py-4 bg-card">
       <button class="settings-btn-primary" :disabled="saving" @click="saveConfig">
         <Save class="size-3.5" />
         {{ saving ? 'Saving...' : 'Save' }}

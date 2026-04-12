@@ -100,16 +100,41 @@ function handleResetClick() {
 </script>
 
 <template>
-  <div class="flex items-center justify-between mb-4">
-    <div>
-      <p class="settings-group-label !mb-0">Score Weights</p>
-      <p class="settings-hint mt-0.5">
-        Assign a weight to each field. Total weight:
-        <span class="font-medium text-foreground">{{ totalWeight }}</span
-        >.
-      </p>
+  <div class="mb-4">
+    <div class="md:flex md:items-start md:justify-between md:gap-4">
+      <div>
+        <p class="settings-group-label !mb-0">Score Weights</p>
+        <p class="settings-hint mt-0.5">
+          Assign a weight to each field. Total weight:
+          <span class="font-medium text-foreground">{{ totalWeight }}</span
+          >.
+        </p>
+      </div>
+      <div class="hidden md:flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          class="settings-btn-outline"
+          :class="resetConfirming ? '!border-destructive !text-destructive hover:!bg-destructive/10' : ''"
+          @click="handleResetClick"
+        >
+          <RotateCcw class="size-3.5" />
+          {{ resetConfirming ? 'Are you sure?' : 'Reset to defaults' }}
+        </button>
+        <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
+          <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
+          Recalculate all
+        </button>
+        <button type="button" class="settings-btn-primary" :disabled="saving" @click="saveWeights">
+          <Save class="size-3.5" />
+          Save
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2 shrink-0">
+  </div>
+  <div
+    class="md:hidden sticky top-[5.25rem] z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+  >
+    <div class="flex items-center gap-2 flex-wrap">
       <button
         type="button"
         class="settings-btn-outline"
@@ -117,13 +142,13 @@ function handleResetClick() {
         @click="handleResetClick"
       >
         <RotateCcw class="size-3.5" />
-        {{ resetConfirming ? 'Are you sure?' : 'Reset to defaults' }}
+        {{ resetConfirming ? 'Confirm reset' : 'Reset' }}
       </button>
       <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
         <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
-        Recalculate all
+        Recalculate
       </button>
-      <button type="button" class="settings-btn-primary" :disabled="saving" @click="saveWeights">
+      <button type="button" class="settings-btn-primary flex-1 justify-center" :disabled="saving" @click="saveWeights">
         <Save class="size-3.5" />
         Save
       </button>
@@ -136,8 +161,8 @@ function handleResetClick() {
         <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{{ group.label }}</p>
         <span class="text-xs text-muted-foreground">subtotal: {{ groupTotal(group) }}</span>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2.5">
-        <div v-for="entry in group.fields" :key="entry.field" class="flex items-center gap-2">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
+        <div v-for="entry in group.fields" :key="entry.field" class="flex items-start md:items-center gap-2">
           <input
             :id="`weight-${entry.field}`"
             v-model.number="weights[entry.field]"
@@ -145,7 +170,7 @@ function handleResetClick() {
             min="0"
             class="w-14 h-7 px-2 text-xs text-center rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
           />
-          <label :for="`weight-${entry.field}`" class="settings-label truncate">
+          <label :for="`weight-${entry.field}`" class="text-[13px] leading-snug md:truncate">
             {{ entry.label }}
           </label>
         </div>

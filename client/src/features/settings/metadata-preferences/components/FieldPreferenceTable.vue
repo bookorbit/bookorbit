@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core'
 import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@projectx/types'
 import FieldGroupSection from './FieldGroupSection.vue'
 import ProviderReservoir from './ProviderReservoir.vue'
@@ -24,6 +25,8 @@ const GROUPS: { label: string; fields: MetadataField[] }[] = [
   { label: 'Classification', fields: ['genres'] },
   { label: 'Audiobook', fields: ['narrators', 'duration', 'abridged'] },
 ]
+
+const isMobile = useMediaQuery('(max-width: 767px)')
 </script>
 
 <template>
@@ -61,6 +64,7 @@ const GROUPS: { label: string; fields: MetadataField[] }[] = [
         :key="group.label"
         :label="group.label"
         :fields="group.fields"
+        :default-open="!isMobile"
         :preferences="preferences.fields"
         :statuses="statuses"
         :overridden-fields="overriddenFields"

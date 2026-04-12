@@ -1,5 +1,5 @@
 {
-  "id": "3d7638fa-4c77-4988-a03b-15e20345198d",
+  "id": "5e7847b4-0c76-43ea-8030-9d4b4e1cb352",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3284,7 +3284,7 @@
         },
         "hardcover_id": {
           "name": "hardcover_id",
-          "type": "varchar(50)",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },

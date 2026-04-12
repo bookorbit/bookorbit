@@ -6,7 +6,6 @@ import MergeStrategyPicker from './MergeStrategyPicker.vue'
 import ProviderChipList from './ProviderChipList.vue'
 import FieldConfigSheet from './FieldConfigSheet.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
@@ -88,18 +87,15 @@ function onSheetChange(pref: FieldPreference) {
       </div>
     </div>
 
-    <!-- Mobile: chip preview + configure button -->
+    <!-- Mobile: draggable chips + configure button -->
     <div class="flex items-center gap-3 md:hidden">
-      <div class="flex flex-wrap gap-1.5 flex-1 min-w-0">
-        <span
-          v-for="key in preference.providers"
-          :key="key"
-          class="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight"
-          :style="providerChipStyle(key)"
-        >
-          {{ PROVIDER_SHORT_LABELS[key] ?? key }}
-        </span>
-        <span v-if="preference.providers.length === 0 && !preference.enabled" class="text-xs text-muted-foreground/60 italic">Not fetched</span>
+      <div class="flex-1 min-w-0">
+        <ProviderChipList
+          :providers="preference.providers"
+          :statuses="statuses"
+          :disabled="!preference.enabled || saving"
+          @update:providers="update({ providers: $event })"
+        />
         <span v-if="noProviders" class="flex items-center gap-1.5 text-xs text-amber-500 font-bold uppercase tracking-tight">
           <AlertTriangle :size="12" />
           Empty

@@ -1,13 +1,24 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Circle, Moon, Square, Sun } from 'lucide-vue-next'
-import { useDisplaySettings, type CardOverlayKey } from '@/composables/useDisplaySettings'
+import { useDisplaySettings, type CardOverlayKey, type CoverSizeScope } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
 const themeStore = useThemeStore()
-const { coverSize, gridGap, cardOverlays, lensFilterExpanded, authorCoverSize, authorCoverShape } = useDisplaySettings()
+const {
+  portraitCoverSize,
+  squareCoverSize,
+  coverSizeScope,
+  portraitGridGap,
+  squareGridGap,
+  cardOverlays,
+  lensFilterExpanded,
+  authorCoverSize,
+  authorCoverShape,
+} = useDisplaySettings()
 
 const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
   { key: 'series', label: 'Series name', hint: 'Series title and index badge at top-left' },
@@ -19,27 +30,50 @@ const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = 
   { key: 'read-status', label: 'Read status', hint: 'Color icon showing the current reading status' },
 ]
 
+const BACKGROUND_GROUPS: { label: string; ids: string[] }[] = [
+  { label: 'Fundamental', ids: ['none', 'dots', 'cross', 'terminal', 'millimeter'] },
+  { label: 'Structural', ids: ['blueprint', 'brushed', 'scanlines', 'vinyl', 'carbon', 'perforated'] },
+  { label: 'Ambient', ids: ['aurora', 'horizon', 'glow', 'mesh', 'elevation'] },
+  { label: 'Refractive', ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse', 'nova', 'golden-ratio'] },
+]
+
+const accentLabel = computed(() => [...ACCENT_VIVID, ...ACCENT_PASTEL].find((opt) => opt.id === themeStore.accent)?.label ?? themeStore.accent)
+const backgroundLabel = computed(() => BACKGROUND_OPTIONS.find((opt) => opt.id === themeStore.background)?.label ?? themeStore.background)
+
 function toggleOverlay(key: CardOverlayKey) {
   const idx = cardOverlays.value.indexOf(key)
   if (idx === -1) cardOverlays.value = [...cardOverlays.value, key]
   else cardOverlays.value = cardOverlays.value.filter((k) => k !== key)
 }
+
+function setCoverSizeScope(mode: CoverSizeScope) {
+  coverSizeScope.value = mode
+}
+
+const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
 </script>
 
 <template>
   <SettingsPageHeader title="Appearance" subtitle="Customize how the app looks and feels." />
+  <div
+    class="md:hidden sticky top-0 z-20 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+  >
+    <p class="text-[11px] font-medium text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+      Theme: {{ themeStore.theme === 'dark' ? 'Dark' : 'Light' }} • Accent: {{ accentLabel }} • Background: {{ backgroundLabel }}
+    </p>
+  </div>
 
   <!-- Theme & colors -->
   <div class="mb-6">
     <p class="settings-group-label">Theme</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
       <!-- Light / dark -->
-      <div class="flex items-center justify-between px-5 py-4 bg-card">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>
           <p class="settings-label">Color scheme</p>
           <p class="settings-hint">Light or dark interface</p>
         </div>
-        <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
+        <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             :class="themeStore.theme === 'light' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
@@ -58,7 +92,7 @@ function toggleOverlay(key: CardOverlayKey) {
       </div>
 
       <!-- Accent color -->
-      <div class="px-5 py-4 bg-card">
+      <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <p class="settings-label mb-0.5">Accent color</p>
         <p class="text-xs text-muted-foreground mb-3">Controls highlights and interactive elements</p>
         <div class="space-y-2">
@@ -66,7 +100,7 @@ function toggleOverlay(key: CardOverlayKey) {
             <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
               <TooltipTrigger as-child>
                 <button
-                  class="w-5 h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                  class="w-7 h-7 md:w-5 md:h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
                   :style="{
                     backgroundColor: opt.color,
                     outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
@@ -83,7 +117,7 @@ function toggleOverlay(key: CardOverlayKey) {
             <Tooltip v-for="opt in ACCENT_PASTEL" :key="opt.id">
               <TooltipTrigger as-child>
                 <button
-                  class="w-5 h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
+                  class="w-7 h-7 md:w-5 md:h-5 rounded-full transition-all hover:scale-110 focus:outline-none shrink-0"
                   :style="{
                     backgroundColor: opt.color,
                     outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
@@ -100,12 +134,12 @@ function toggleOverlay(key: CardOverlayKey) {
       </div>
 
       <!-- Corner radius -->
-      <div class="flex items-center justify-between px-5 py-4 bg-card">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>
           <p class="settings-label">Corner radius</p>
           <p class="settings-hint">Roundness of cards and UI elements</p>
         </div>
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 self-start">
           <button
             v-for="opt in RADIUS_OPTIONS"
             :key="opt.id"
@@ -124,19 +158,25 @@ function toggleOverlay(key: CardOverlayKey) {
       </div>
 
       <!-- Dark mode brightness -->
-      <div v-if="themeStore.theme === 'dark'" class="px-5 py-4 bg-card">
-        <div class="flex items-center justify-between mb-3">
-          <div>
+      <div v-if="themeStore.theme === 'dark'" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="mb-3">
+          <div class="flex items-center justify-between gap-3 mb-0.5">
             <p class="settings-label">Surface brightness</p>
-            <p class="settings-hint">Lighten dark mode surfaces</p>
+            <div class="flex items-center gap-2">
+              <span class="settings-value md:hidden">{{ themeStore.brightness }}%</span>
+              <button
+                v-if="themeStore.brightness > 0"
+                class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                @click="themeStore.setBrightness(0)"
+              >
+                Reset
+              </button>
+            </div>
           </div>
-          <button
-            v-if="themeStore.brightness > 0"
-            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            @click="themeStore.setBrightness(0)"
-          >
-            Reset
-          </button>
+          <p class="settings-hint">Lighten dark mode surfaces</p>
+          <div>
+            <span class="settings-value hidden md:inline">{{ themeStore.brightness }}%</span>
+          </div>
         </div>
         <input
           :value="themeStore.brightness"
@@ -157,30 +197,24 @@ function toggleOverlay(key: CardOverlayKey) {
 
     <!-- Background pattern -->
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4">
-      <div class="px-5 py-4 bg-card">
-        <div class="flex items-center justify-between mb-3">
+      <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="mb-3">
           <div>
             <p class="settings-label">Background pattern</p>
             <p class="settings-hint">Pattern shown behind the book grid</p>
           </div>
         </div>
-        <div class="space-y-6">
-          <div
-            v-for="group in [
-              { label: 'Fundamental', ids: ['none', 'dots', 'cross', 'terminal', 'millimeter'] },
-              { label: 'Structural', ids: ['blueprint', 'brushed', 'scanlines', 'vinyl', 'carbon', 'perforated'] },
-              { label: 'Ambient', ids: ['aurora', 'horizon', 'glow', 'mesh', 'elevation'] },
-              { label: 'Refractive', ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse', 'nova', 'golden-ratio'] },
-            ]"
-            :key="group.label"
-          >
+        <div class="space-y-5 md:space-y-6">
+          <div v-for="group in BACKGROUND_GROUPS" :key="group.label">
             <p class="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest mb-2.5 ml-0.5">{{ group.label }}</p>
-            <div class="flex items-center gap-4 flex-wrap">
+            <div
+              class="flex items-center gap-3 md:gap-4 overflow-x-auto md:overflow-visible md:flex-wrap pb-1 pt-0.5 px-0.5 md:pt-0 md:px-0 md:pb-0 no-scrollbar"
+            >
               <Tooltip v-for="opt in BACKGROUND_OPTIONS.filter((o) => group.ids.includes(o.id))" :key="opt.id">
                 <TooltipTrigger as-child>
                   <button
                     type="button"
-                    class="w-18 h-12 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
+                    class="w-14 h-10 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
                     :class="
                       themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
                     "
@@ -197,44 +231,137 @@ function toggleOverlay(key: CardOverlayKey) {
       </div>
     </div>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <!-- Cover size -->
-      <div class="px-5 py-4 bg-card">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <p class="settings-label">Cover size</p>
-            <p class="settings-hint">Width of book covers in the grid</p>
-          </div>
-          <span class="settings-value">{{ coverSize }}px</span>
+      <!-- Cover size behavior -->
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div>
+          <p class="settings-label">Cover size behavior</p>
+          <p class="settings-hint">Control whether portrait/square sizes and grid spacing are shared across all views or kept per-view</p>
+          <p v-if="!syncModeEnabled" class="settings-hint mt-1">Per-view mode: adjust cover size and spacing from each view’s Display panel.</p>
         </div>
-        <input
-          :value="coverSize"
-          @input="coverSize = Number(($event.target as HTMLInputElement).value)"
-          type="range"
-          min="80"
-          max="280"
-          step="10"
-          class="w-full accent-primary cursor-pointer"
-        />
+        <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
+          <button
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            :class="coverSizeScope === 'synced' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            @click="setCoverSizeScope('synced')"
+          >
+            Sync all views
+          </button>
+          <button
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            :class="coverSizeScope === 'per-view' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            @click="setCoverSizeScope('per-view')"
+          >
+            Per-view sizes
+          </button>
+        </div>
       </div>
 
-      <!-- Grid gap -->
-      <div class="px-5 py-4 bg-card">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <p class="settings-label">Grid spacing</p>
-            <p class="settings-hint">Gap between covers in the grid</p>
-          </div>
-          <span class="settings-value">{{ gridGap }}px</span>
+      <!-- Portrait cover size -->
+      <div
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card"
+        :class="{ 'opacity-60': !syncModeEnabled }"
+      >
+        <div>
+          <p class="settings-label">Portrait cover size</p>
+          <p class="settings-hint">Used for portrait libraries and views</p>
         </div>
-        <input
-          :value="gridGap"
-          @input="gridGap = Number(($event.target as HTMLInputElement).value)"
-          type="range"
-          min="4"
-          max="40"
-          step="4"
-          class="w-full accent-primary cursor-pointer"
-        />
+        <div class="w-full md:w-56">
+          <div class="mb-1.5 flex items-center justify-between gap-3">
+            <span class="text-xs text-muted-foreground">Cover size</span>
+            <span class="text-xs font-medium tabular-nums text-foreground">{{ portraitCoverSize }}px</span>
+          </div>
+          <input
+            :value="portraitCoverSize"
+            @input="portraitCoverSize = Number(($event.target as HTMLInputElement).value)"
+            type="range"
+            min="100"
+            max="280"
+            step="10"
+            class="w-full accent-primary cursor-pointer"
+            :disabled="!syncModeEnabled"
+          />
+        </div>
+      </div>
+
+      <!-- Square cover size -->
+      <div
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card"
+        :class="{ 'opacity-60': !syncModeEnabled }"
+      >
+        <div>
+          <p class="settings-label">Square cover size</p>
+          <p class="settings-hint">Used for square libraries and views</p>
+        </div>
+        <div class="w-full md:w-56">
+          <div class="mb-1.5 flex items-center justify-between gap-3">
+            <span class="text-xs text-muted-foreground">Cover size</span>
+            <span class="text-xs font-medium tabular-nums text-foreground">{{ squareCoverSize }}px</span>
+          </div>
+          <input
+            :value="squareCoverSize"
+            @input="squareCoverSize = Number(($event.target as HTMLInputElement).value)"
+            type="range"
+            min="100"
+            max="280"
+            step="10"
+            class="w-full accent-primary cursor-pointer"
+            :disabled="!syncModeEnabled"
+          />
+        </div>
+      </div>
+
+      <!-- Portrait grid gap -->
+      <div
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card"
+        :class="{ 'opacity-60': !syncModeEnabled }"
+      >
+        <div>
+          <p class="settings-label">Portrait grid spacing</p>
+          <p class="settings-hint">Gap between portrait covers</p>
+        </div>
+        <div class="w-full md:w-56">
+          <div class="mb-1.5 flex items-center justify-between gap-3">
+            <span class="text-xs text-muted-foreground">Grid spacing</span>
+            <span class="text-xs font-medium tabular-nums text-foreground">{{ portraitGridGap }}px</span>
+          </div>
+          <input
+            :value="portraitGridGap"
+            @input="portraitGridGap = Number(($event.target as HTMLInputElement).value)"
+            type="range"
+            min="4"
+            max="40"
+            step="4"
+            class="w-full accent-primary cursor-pointer"
+            :disabled="!syncModeEnabled"
+          />
+        </div>
+      </div>
+
+      <!-- Square grid gap -->
+      <div
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card"
+        :class="{ 'opacity-60': !syncModeEnabled }"
+      >
+        <div>
+          <p class="settings-label">Square grid spacing</p>
+          <p class="settings-hint">Gap between square covers</p>
+        </div>
+        <div class="w-full md:w-56">
+          <div class="mb-1.5 flex items-center justify-between gap-3">
+            <span class="text-xs text-muted-foreground">Grid spacing</span>
+            <span class="text-xs font-medium tabular-nums text-foreground">{{ squareGridGap }}px</span>
+          </div>
+          <input
+            :value="squareGridGap"
+            @input="squareGridGap = Number(($event.target as HTMLInputElement).value)"
+            type="range"
+            min="4"
+            max="40"
+            step="4"
+            class="w-full accent-primary cursor-pointer"
+            :disabled="!syncModeEnabled"
+          />
+        </div>
       </div>
     </div>
 
@@ -242,32 +369,35 @@ function toggleOverlay(key: CardOverlayKey) {
     <p class="settings-group-label mt-6">Author Grid</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-6">
       <!-- Author cover size -->
-      <div class="px-5 py-4 bg-card">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <p class="settings-label">Cover size</p>
-            <p class="settings-hint">Width of author covers in the grid</p>
-          </div>
-          <span class="settings-value">{{ authorCoverSize }}px</span>
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div>
+          <p class="settings-label">Cover size</p>
+          <p class="settings-hint">Width of author covers in the grid</p>
         </div>
-        <input
-          :value="authorCoverSize"
-          @input="authorCoverSize = Number(($event.target as HTMLInputElement).value)"
-          type="range"
-          min="80"
-          max="280"
-          step="10"
-          class="w-full accent-primary cursor-pointer"
-        />
+        <div class="w-full md:w-56">
+          <div class="mb-1.5 flex items-center justify-between gap-3">
+            <span class="text-xs text-muted-foreground">Cover size</span>
+            <span class="text-xs font-medium tabular-nums text-foreground">{{ authorCoverSize }}px</span>
+          </div>
+          <input
+            :value="authorCoverSize"
+            @input="authorCoverSize = Number(($event.target as HTMLInputElement).value)"
+            type="range"
+            min="100"
+            max="280"
+            step="10"
+            class="w-full accent-primary cursor-pointer"
+          />
+        </div>
       </div>
 
       <!-- Author cover shape -->
-      <div class="flex items-center justify-between px-5 py-4 bg-card">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>
           <p class="settings-label">Cover shape</p>
           <p class="settings-hint">Shape of author covers in the grid</p>
         </div>
-        <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50">
+        <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             :class="authorCoverShape === 'circle' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
@@ -289,10 +419,10 @@ function toggleOverlay(key: CardOverlayKey) {
     <!-- Card overlays -->
     <p class="settings-group-label">Card Overlays</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div v-for="opt in OVERLAY_OPTIONS" :key="opt.key" class="flex items-center justify-between px-5 py-3.5 bg-card">
-        <div>
+      <div v-for="opt in OVERLAY_OPTIONS" :key="opt.key" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
+        <div class="min-w-0">
           <p class="settings-label">{{ opt.label }}</p>
-          <p class="settings-hint">{{ opt.hint }}</p>
+          <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">{{ opt.hint }}</p>
         </div>
         <ToggleSwitch :model-value="cardOverlays.includes(opt.key)" @update:model-value="toggleOverlay(opt.key)" />
       </div>
@@ -303,10 +433,12 @@ function toggleOverlay(key: CardOverlayKey) {
   <div class="mt-8">
     <p class="settings-group-label">Lenses</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      <div class="flex items-center justify-between px-5 py-3.5 bg-card">
-        <div>
+      <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
+        <div class="min-w-0">
           <p class="settings-label">Show filter preview by default</p>
-          <p class="settings-hint">Expand the active filter and sort summary when opening a lens</p>
+          <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
+            Expand the active filter and sort summary when opening a lens
+          </p>
         </div>
         <ToggleSwitch v-model="lensFilterExpanded" />
       </div>

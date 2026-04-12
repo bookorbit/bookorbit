@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, CheckCheck, ChevronsUpDown, Filter, RefreshCcw, Search, Trash2, X } from 'lucide-vue-next'
+import { ArrowUpDown, CheckCheck, Filter, Lightbulb, RefreshCcw, Search, SlidersHorizontal, Trash2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
@@ -44,10 +44,13 @@ const suppressAutoReload = ref(false)
 const filtersOpen = ref(false)
 const showSecondaryPanels = ref(false)
 const secondarySheetOpen = ref(false)
+const mobileControlsExpanded = ref(false)
+const mobileSearchOpen = ref(false)
 const initialLoadComplete = ref(false)
 const INITIAL_SKELETON_COUNT = 18
 
 const sentinel = ref<HTMLElement | null>(null)
+const mobileSearchInput = ref<HTMLInputElement | null>(null)
 let observer: IntersectionObserver | null = null
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -86,6 +89,7 @@ const activeFilterCount = computed(() => {
   if (minBookCount.value !== null) count += 1
   return count
 })
+const mobileControlsBadgeCount = computed(() => activeFilterCount.value + (!isDefaultSort.value ? 1 : 0))
 
 const secondaryVisible = computed(() => showSecondaryPanels.value || secondarySheetOpen.value)
 
@@ -170,15 +174,73 @@ function openAuthor(authorId: number) {
 function setSortField(field: AuthorListSort) {
   sort.value = field
   order.value = 'asc'
+  collapseMobileControlsIfNeeded()
 }
 
 function setSortOrder(dir: SortDirection) {
   order.value = dir
+  collapseMobileControlsIfNeeded()
 }
 
 function resetSort() {
   sort.value = 'name'
   order.value = 'asc'
+  collapseMobileControlsIfNeeded()
+}
+
+function clearSearchQuery() {
+  q.value = ''
+}
+
+function toggleFiltersOpen() {
+  filtersOpen.value = !filtersOpen.value
+}
+
+function closeFiltersPanel() {
+  filtersOpen.value = false
+}
+
+function toggleSecondaryPanels() {
+  showSecondaryPanels.value = !showSecondaryPanels.value
+}
+
+function openSecondarySheet() {
+  secondarySheetOpen.value = true
+}
+
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 640
+}
+
+function closeMobileControls() {
+  mobileControlsExpanded.value = false
+  mobileSearchOpen.value = false
+}
+
+function collapseMobileControlsIfNeeded() {
+  if (!mobileControlsExpanded.value) return
+  if (!isMobileViewport()) return
+  closeMobileControls()
+}
+
+function toggleMobileControls() {
+  if (mobileControlsExpanded.value) {
+    closeMobileControls()
+    return
+  }
+  mobileControlsExpanded.value = true
+}
+
+function toggleMobileSearch() {
+  mobileSearchOpen.value = !mobileSearchOpen.value
+  if (!mobileSearchOpen.value) return
+  void nextTick(() => {
+    mobileSearchInput.value?.focus()
+  })
+}
+
+function closeMobileSearch() {
+  mobileSearchOpen.value = false
 }
 
 function handleAuthorSelect(authorId: number, event: MouseEvent) {
@@ -221,6 +283,7 @@ async function clearFilters() {
   await load(true)
   await maybeLoadSecondaryPanels()
   filtersOpen.value = false
+  collapseMobileControlsIfNeeded()
 
   await nextTick()
   suppressAutoReload.value = false
@@ -347,9 +410,22 @@ async function maybeLoadSecondaryPanels() {
   await loadPhase4Panels()
 }
 
-function requestQuickMergeSuggestion(suggestion: AuthorDuplicateSuggestion) {
+function waitForTimeout(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+async function requestQuickMergeSuggestion(suggestion: AuthorDuplicateSuggestion) {
   if (quickMerging.value) return
   pendingQuickMerge.value = suggestion
+
+  if (secondarySheetOpen.value) {
+    secondarySheetOpen.value = false
+    await nextTick()
+    await waitForTimeout(320)
+  }
+
   quickMergeDialogOpen.value = true
 }
 
@@ -426,6 +502,7 @@ watch([sort, order, libraryId, hasPhoto, minBookCount], () => {
   syncRouteQuery()
   void load(true)
   void maybeLoadSecondaryPanels()
+  collapseMobileControlsIfNeeded()
 })
 
 watch(q, () => {
@@ -485,14 +562,14 @@ watch(
           placeholder="Search authors"
           class="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
         />
-        <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="q = ''">
+        <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
           <X :size="12" />
         </button>
       </div>
 
-      <div class="h-5 w-px shrink-0 bg-border" />
+      <div class="hidden lg:block h-5 w-px shrink-0 bg-border" />
 
-      <div class="flex items-center gap-1">
+      <div class="hidden sm:flex items-center gap-1">
         <Popover>
           <PopoverTrigger as-child>
             <button
@@ -545,11 +622,11 @@ watch(
         </button>
       </div>
 
-      <div class="h-5 w-px shrink-0 bg-border" />
+      <div class="hidden sm:block h-5 w-px shrink-0 bg-border" />
 
       <button
-        @click="filtersOpen = !filtersOpen"
-        class="flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
+        @click="toggleFiltersOpen"
+        class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
         :class="
           activeFilterCount > 0
             ? 'border-primary text-primary bg-primary/10'
@@ -564,31 +641,158 @@ watch(
       <button
         v-if="activeFilterCount > 0 || !isDefaultSort"
         @click="clearFilters"
-        class="flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
+        class="hidden sm:flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
       >
         <X :size="13" />
         Clear
+      </button>
+
+      <button
+        class="sm:hidden relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+        :class="
+          mobileControlsExpanded
+            ? 'border-primary text-primary bg-primary/10'
+            : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+        "
+        @click="toggleMobileControls"
+      >
+        <SlidersHorizontal :size="14" />
+        <span
+          v-if="mobileControlsBadgeCount > 0"
+          class="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+        >
+          {{ mobileControlsBadgeCount }}
+        </span>
       </button>
     </template>
 
     <template #actions>
       <button
-        class="hidden h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
-        @click="showSecondaryPanels = !showSecondaryPanels"
+        class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+        :class="
+          showSecondaryPanels
+            ? 'border-primary text-primary bg-primary/10'
+            : 'border-input text-muted-foreground hover:bg-muted hover:text-foreground'
+        "
+        @click="toggleSecondaryPanels"
       >
-        <ChevronsUpDown :size="13" />
+        <Lightbulb :size="14" />
+      </button>
+
+      <button
+        class="hidden h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
+        @click="toggleSecondaryPanels"
+      >
+        <Lightbulb :size="13" />
         {{ showSecondaryPanels ? 'Hide Insights' : 'Show Insights' }}
       </button>
 
       <button
-        class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+        class="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex md:hidden"
         title="Author insights"
-        @click="secondarySheetOpen = true"
+        @click="openSecondarySheet"
       >
-        <ChevronsUpDown :size="14" />
+        <Lightbulb :size="14" />
       </button>
     </template>
   </ViewHeader>
+
+  <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        v-if="!mobileSearchOpen"
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        @click="toggleMobileSearch"
+      >
+        <Search :size="13" />
+      </button>
+
+      <div v-else class="flex h-8 flex-1 items-center rounded-md border border-input bg-background px-2.5">
+        <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
+        <input
+          ref="mobileSearchInput"
+          v-model="q"
+          type="search"
+          placeholder="Search authors"
+          class="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+        />
+        <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
+          <X :size="12" />
+        </button>
+        <button class="ml-1 rounded px-1 text-xs text-muted-foreground transition-colors hover:text-foreground" @click="closeMobileSearch">
+          Done
+        </button>
+      </div>
+
+      <Popover>
+        <PopoverTrigger as-child>
+          <button
+            class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+            :class="
+              !isDefaultSort
+                ? 'border-primary text-primary bg-primary/10'
+                : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+            "
+          >
+            <ArrowUpDown :size="13" />
+            <span>Sort</span>
+            <span v-if="!isDefaultSort" class="rounded-full border border-primary/40 px-1 py-0.5 text-[10px] font-semibold leading-none">On</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" class="w-56 p-2">
+          <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">Sort by</div>
+          <div class="flex flex-col gap-0.5">
+            <button
+              v-for="field in ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt'] as const"
+              :key="field"
+              class="flex items-center justify-between rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+              :class="sort === field ? 'text-foreground font-medium' : 'text-muted-foreground'"
+              @click="setSortField(field)"
+            >
+              {{ SORT_LABELS[field] }}
+              <span v-if="sort === field" class="text-xs text-primary">{{ order === 'asc' ? '↑' : '↓' }}</span>
+            </button>
+          </div>
+          <div class="my-2 border-t border-border" />
+          <div class="flex gap-1">
+            <button
+              v-for="dir in ['asc', 'desc'] as const"
+              :key="dir"
+              class="flex-1 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+              :class="order === dir ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'"
+              @click="setSortOrder(dir)"
+            >
+              {{ dir === 'asc' ? 'Ascending' : 'Descending' }}
+            </button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <button
+        class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+        :class="
+          activeFilterCount > 0
+            ? 'border-primary text-primary bg-primary/10'
+            : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+        "
+        @click="toggleFiltersOpen"
+      >
+        <Filter :size="13" />
+        <span>Filters</span>
+        <span v-if="activeFilterCount > 0" class="rounded-full bg-primary/10 px-1 py-0.5 text-[10px] font-semibold leading-none">
+          {{ activeFilterCount }}
+        </span>
+      </button>
+
+      <button
+        v-if="activeFilterCount > 0 || !isDefaultSort"
+        class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
+        @click="clearFilters"
+      >
+        Clear
+      </button>
+    </div>
+  </section>
 
   <main class="flex-none pr-2">
     <AuthorFilters
@@ -597,8 +801,10 @@ watch(
       v-model:has-photo="hasPhoto"
       v-model:min-book-count="minBookCount"
       :active-count="activeFilterCount"
+      closable
       :libraries="libraries.map((library) => ({ id: library.id, name: library.name }))"
       @clear="clearFilters"
+      @close="closeFiltersPanel"
     />
 
     <div v-if="showSecondaryPanels" class="mb-4 space-y-3">

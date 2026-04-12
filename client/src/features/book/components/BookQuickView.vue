@@ -392,18 +392,20 @@ function toggleGenres() {
             <button
               class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
               :disabled="!primaryFile"
+              :aria-label="isPrimaryAudio ? 'Listen' : 'Read'"
               @click="openBook"
             >
               <Headphones v-if="isPrimaryAudio" class="size-4" />
               <BookOpen v-else class="size-4" />
-              {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+              <span class="hidden sm:inline">{{ isPrimaryAudio ? 'Listen' : 'Read' }}</span>
             </button>
             <button
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
+              aria-label="Details"
               @click="openDetails"
             >
               <ExternalLink class="size-4" />
-              Details
+              <span class="hidden sm:inline">Details</span>
             </button>
             <Tooltip v-if="hasPermission('library_edit_metadata')">
               <TooltipTrigger as-child>
