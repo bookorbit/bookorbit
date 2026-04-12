@@ -176,7 +176,11 @@ describe('AuthService', () => {
       ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([]);
 
       await expect(
-        service.setup({ username: 'admin', name: 'Admin', email: 'admin@example.com', password: 'Admin1234' } as never, undefined, makeReply()),
+        service.setup(
+          { username: 'admin', name: 'Admin', email: 'admin@example.com', password: 'Admin1234' } as never,
+          'bootstrap-token',
+          makeReply(),
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -201,7 +205,7 @@ describe('AuthService', () => {
 
       const result = await service.setup(
         { username: 'owner', name: 'Owner', email: 'owner@example.com', password: 'Owner1234' } as never,
-        undefined,
+        'bootstrap-token',
         reply,
       );
 
@@ -275,18 +279,105 @@ describe('AuthService', () => {
       const { service, userService } = makeService();
       userService.findByUsername.mockResolvedValue({
         id: 1,
+        username: 'jdoe',
         active: true,
         passwordHash: '$2b$12$invalidhash',
         tokenVersion: 1,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       });
 
       await expect(service.login({ username: 'jdoe', password: 'wrongpass' }, makeReply())).rejects.toThrow(UnauthorizedException);
     });
 
+    it('rejects login attempts while account is locked', async () => {
+      const { service, db, userService } = makeService();
+      const lockedUntil = new Date(Date.now() + 60_000);
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        passwordHash: 'mock-hash:pass',
+        tokenVersion: 1,
+        failedLoginAttempts: 0,
+        lockedUntil,
+      });
+
+      await expect(service.login({ username: 'jdoe', password: 'pass' }, makeReply())).rejects.toThrow(UnauthorizedException);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('increments failed login attempts for wrong password and non-locked account', async () => {
+      const { service, db, userService } = makeService();
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        passwordHash: 'mock-hash:correct',
+        tokenVersion: 1,
+        failedLoginAttempts: 2,
+        lockedUntil: null,
+      });
+
+      await expect(service.login({ username: 'jdoe', password: 'wrong' }, makeReply())).rejects.toThrow(UnauthorizedException);
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith({ failedLoginAttempts: 3, lockedUntil: null });
+    });
+
+    it('locks account for 15 minutes after five consecutive failed attempts', async () => {
+      const { service, db, userService } = makeService();
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        passwordHash: 'mock-hash:correct',
+        tokenVersion: 1,
+        failedLoginAttempts: 4,
+        lockedUntil: null,
+      });
+
+      await expect(service.login({ username: 'jdoe', password: 'wrong' }, makeReply())).rejects.toThrow(UnauthorizedException);
+
+      const setArg = (db as unknown as Record<string, vi.Mock>).set.mock.calls.at(-1)?.[0] as {
+        failedLoginAttempts: number;
+        lockedUntil: Date | null;
+      };
+      expect(setArg.failedLoginAttempts).toBe(0);
+      expect(setArg.lockedUntil).toBeInstanceOf(Date);
+      expect(setArg.lockedUntil!.getTime()).toBeGreaterThan(Date.now() + 14 * 60_000);
+    });
+
+    it('clears failed login state after successful authentication', async () => {
+      const { service, db, userService } = makeService();
+      const reply = makeReply();
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        passwordHash: 'mock-hash:pass',
+        tokenVersion: 1,
+        failedLoginAttempts: 3,
+        lockedUntil: new Date(Date.now() - 5_000),
+      });
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser());
+
+      await service.login({ username: 'jdoe', password: 'pass' }, reply);
+
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith({ failedLoginAttempts: 0, lockedUntil: null });
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalled();
+    });
+
     it('sets auth cookies with automatic Secure mode', async () => {
       const { service, userService } = makeService();
       const reply = makeReply();
-      userService.findByUsername.mockResolvedValue({ id: 1, active: true, passwordHash: 'mock-hash:pass', tokenVersion: 1, username: 'jdoe' });
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        active: true,
+        passwordHash: 'mock-hash:pass',
+        tokenVersion: 1,
+        username: 'jdoe',
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      });
       userService.findByIdWithPermissions.mockResolvedValue(makeFullUser());
 
       await service.login({ username: 'jdoe', password: 'pass' }, reply);
@@ -294,7 +385,7 @@ describe('AuthService', () => {
       expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
         'access_token',
         'signed-jwt',
-        expect.objectContaining({ path: '/api', secure: 'auto' }),
+        expect.objectContaining({ path: '/api', secure: 'auto', sameSite: 'strict' }),
       );
       expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
         'refresh_token',
@@ -508,6 +599,59 @@ describe('AuthService', () => {
       await service.forgotPassword({ email: 'u@example.com' });
       await new Promise((r) => setImmediate(r));
       expect(systemMailService.sendPasswordReset).not.toHaveBeenCalled();
+    });
+
+    it('SEC-028: masks email address in logs for unknown email (no user enumeration via logs)', async () => {
+      const { service, userService } = makeService();
+      userService.findByEmail.mockResolvedValue(null);
+      const logSpy = vi.spyOn((service as never as { logger: { log: vi.Mock } }).logger, 'log');
+
+      await service.forgotPassword({ email: 'alice@example.com' });
+      await new Promise((r) => setImmediate(r));
+
+      const loggedMessages = logSpy.mock.calls.map((c) => String(c[0]));
+      expect(loggedMessages.some((m) => m.includes('alice@example.com'))).toBe(false);
+      expect(loggedMessages.some((m) => m.includes('a***@example.com'))).toBe(true);
+    });
+
+    it('SEC-028: masks email address in logs for inactive account', async () => {
+      const { service, userService } = makeService();
+      userService.findByEmail.mockResolvedValue({
+        id: 1,
+        email: 'alice@example.com',
+        name: 'Alice',
+        active: false,
+        provisioningMethod: 'local',
+        username: 'alice',
+      });
+      const logSpy = vi.spyOn((service as never as { logger: { log: vi.Mock } }).logger, 'log');
+
+      await service.forgotPassword({ email: 'alice@example.com' });
+      await new Promise((r) => setImmediate(r));
+
+      const loggedMessages = logSpy.mock.calls.map((c) => String(c[0]));
+      expect(loggedMessages.some((m) => m.includes('alice@example.com'))).toBe(false);
+      expect(loggedMessages.some((m) => m.includes('a***@example.com'))).toBe(true);
+    });
+
+    it('SEC-028: masks email address in logs for OIDC account', async () => {
+      const { service, userService } = makeService();
+      userService.findByEmail.mockResolvedValue({
+        id: 1,
+        email: 'alice@example.com',
+        name: 'Alice',
+        active: true,
+        provisioningMethod: 'oidc',
+        username: 'alice',
+      });
+      const logSpy = vi.spyOn((service as never as { logger: { log: vi.Mock } }).logger, 'log');
+
+      await service.forgotPassword({ email: 'alice@example.com' });
+      await new Promise((r) => setImmediate(r));
+
+      const loggedMessages = logSpy.mock.calls.map((c) => String(c[0]));
+      expect(loggedMessages.some((m) => m.includes('alice@example.com'))).toBe(false);
+      expect(loggedMessages.some((m) => m.includes('a***@example.com'))).toBe(true);
     });
   });
 

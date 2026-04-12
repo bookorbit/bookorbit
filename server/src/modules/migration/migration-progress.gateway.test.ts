@@ -32,8 +32,11 @@ function makeGateway() {
     findRunById: vi.fn(),
     listRunMetrics: vi.fn(),
   };
+  const configService = {
+    get: vi.fn().mockReturnValue('http://localhost:5173'),
+  };
 
-  const gateway = new MigrationProgressGateway(jwtService as never, authService as never, repo as never);
+  const gateway = new MigrationProgressGateway(jwtService as never, authService as never, repo as never, configService as never);
   return { gateway, jwtService, authService, repo };
 }
 
@@ -49,6 +52,24 @@ function makeClient() {
 }
 
 describe('MigrationProgressGateway', () => {
+  it('afterInit injects runtime cors origin and credentials on socket engine', () => {
+    const { gateway } = makeGateway();
+    const server = { engine: { opts: { cors: { methods: ['GET'] } } } } as any;
+
+    gateway.afterInit(server);
+
+    expect(server.engine.opts.cors).toEqual({
+      methods: ['GET'],
+      origin: 'http://localhost:5173',
+      credentials: true,
+    });
+  });
+
+  it('afterInit safely no-ops when engine options are unavailable', () => {
+    const { gateway } = makeGateway();
+    expect(() => gateway.afterInit({} as any)).not.toThrow();
+  });
+
   it('accepts websocket connections for authorized users', async () => {
     const { gateway, jwtService, authService } = makeGateway();
     const client = makeClient();
@@ -57,7 +78,7 @@ describe('MigrationProgressGateway', () => {
 
     await gateway.handleConnection(client as never);
 
-    expect(jwtService.verify).toHaveBeenCalledWith('token-1');
+    expect(jwtService.verify).toHaveBeenCalledWith('token-1', { algorithms: ['HS256'] });
     expect(authService.validateUser).toHaveBeenCalledWith(7, 1);
     expect(client.disconnect).not.toHaveBeenCalled();
     expect((client.data as { user?: RequestUser }).user?.id).toBe(7);

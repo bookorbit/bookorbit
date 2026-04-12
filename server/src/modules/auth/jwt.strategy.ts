@@ -12,12 +12,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly authService: AuthService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-        (req: any) => req?.cookies?.access_token ?? null,
-        (req: any) => req?.query?.token ?? null,
-      ]),
+      jwtFromRequest: ExtractJwt.fromExtractors([ExtractJwt.fromAuthHeaderAsBearerToken(), (req: any) => req?.cookies?.access_token ?? null]),
       secretOrKey: config.get<string>('auth.jwtSecret')!,
+      algorithms: ['HS256'],
     });
   }
 

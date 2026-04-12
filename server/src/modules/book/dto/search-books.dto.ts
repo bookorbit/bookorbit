@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class SearchBooksDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(500)
   q: string;
 
   @IsOptional()

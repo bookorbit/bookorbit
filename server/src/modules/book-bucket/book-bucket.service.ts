@@ -63,7 +63,15 @@ export class BookBucketService {
     await this.repo.deleteById(id);
   }
 
-  async bulkDiscard(fileIds: number[], selectAll?: boolean, excludedIds?: number[], status?: string, search?: string): Promise<void> {
+  async bulkDiscard(
+    fileIds: number[],
+    selectAll?: boolean,
+    excludedIds?: number[],
+    status?: string,
+    search?: string,
+    userId?: number,
+    isSuperuser?: boolean,
+  ): Promise<void> {
     await this.processSelectionRows(
       {
         fileIds,
@@ -71,6 +79,8 @@ export class BookBucketService {
         excludedIds,
         status,
         search,
+        userId,
+        isSuperuser,
       },
       async (rows) => {
         for (const row of rows) {
@@ -90,6 +100,8 @@ export class BookBucketService {
     mergeArrays: boolean,
     status?: string,
     search?: string,
+    userId?: number,
+    isSuperuser?: boolean,
   ): Promise<{ total: number; updated: number; failed: number }> {
     let updated = 0;
     let failed = 0;
@@ -100,6 +112,8 @@ export class BookBucketService {
         excludedIds,
         status,
         search,
+        userId,
+        isSuperuser,
       },
       async (rows) => {
         for (const row of rows) {
@@ -136,6 +150,8 @@ export class BookBucketService {
     excludedIds?: number[],
     status?: string,
     search?: string,
+    userId?: number,
+    isSuperuser?: boolean,
   ): Promise<{ total: number; applied: number; skipped: number; skippedEdited: number }> {
     let applied = 0;
     let skipped = 0;
@@ -147,6 +163,8 @@ export class BookBucketService {
         excludedIds,
         status,
         search,
+        userId,
+        isSuperuser,
       },
       async (rows) => {
         for (const row of rows) {
@@ -173,6 +191,8 @@ export class BookBucketService {
     excludedIds?: number[],
     status?: string,
     search?: string,
+    userId?: number,
+    isSuperuser?: boolean,
   ): Promise<{ total: number; queued: number }> {
     let queued = 0;
     const total = await this.processSelectionRows(
@@ -182,6 +202,8 @@ export class BookBucketService {
         excludedIds,
         status,
         search,
+        userId,
+        isSuperuser,
       },
       (rows) => {
         const errorRows = rows.filter((row) => row.status === 'error');
@@ -203,6 +225,8 @@ export class BookBucketService {
     targetFolderId?: number | null,
     status?: string,
     search?: string,
+    userId?: number,
+    isSuperuser?: boolean,
   ): Promise<{ total: number; updated: number; failed: number }> {
     await this.assertValidTarget(targetLibraryId, targetFolderId);
     let updated = 0;
@@ -213,6 +237,8 @@ export class BookBucketService {
         excludedIds,
         status,
         search,
+        userId,
+        isSuperuser,
       },
       async (rows) => {
         updated += await this.repo.setTargetsByIds(
@@ -232,6 +258,8 @@ export class BookBucketService {
     excludedIds?: number[],
     status?: string,
     search?: string,
+    userId?: number,
+    isSuperuser?: boolean,
   ): Promise<{ total: number; withDestination: number; withoutDestination: number }> {
     const destinationPairCounts = new Map<string, number>();
     const folderIdSet = new Set<number>();
@@ -242,6 +270,8 @@ export class BookBucketService {
         excludedIds,
         status,
         search,
+        userId,
+        isSuperuser,
       },
       (rows) => {
         for (const row of rows) {
@@ -275,12 +305,12 @@ export class BookBucketService {
     return { total, withDestination, withoutDestination: total - withDestination };
   }
 
-  async getSummary(): Promise<BookBucketSummary> {
-    return this.repo.countsByStatus();
+  async getSummary(userId?: number, isSuperuser?: boolean): Promise<BookBucketSummary> {
+    return this.repo.countsByStatus(userId, isSuperuser);
   }
 
-  async getStatistics() {
-    return this.repo.getStatistics();
+  async getStatistics(userId?: number, isSuperuser?: boolean) {
+    return this.repo.getStatistics(userId, isSuperuser);
   }
 
   private async cleanupFiles(row: BookBucketFileRow): Promise<void> {
@@ -330,10 +360,14 @@ export class BookBucketService {
       excludedIds?: number[];
       status?: string;
       search?: string;
+      userId?: number;
+      isSuperuser?: boolean;
     },
     processBatch: (rows: BookBucketFileRow[]) => Promise<void> | void,
   ): Promise<number> {
     let total = 0;
+    const userId = options.userId ?? 0;
+    const isSuperuser = options.isSuperuser ?? true;
 
     if (options.selectAll) {
       let afterId: number | undefined;
@@ -344,6 +378,8 @@ export class BookBucketService {
           excludedIds: options.excludedIds,
           status: options.status,
           search: options.search,
+          userId,
+          isSuperuser,
         });
         if (rows.length === 0) break;
         await processBatch(rows);

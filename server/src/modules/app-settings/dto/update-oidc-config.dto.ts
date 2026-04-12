@@ -1,17 +1,21 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 
 class ClaimMappingDto {
   @IsString()
+  @MaxLength(256)
   username: string;
 
   @IsString()
+  @MaxLength(256)
   name: string;
 
   @IsString()
+  @MaxLength(256)
   email: string;
 
   @IsString()
+  @MaxLength(256)
   groups: string;
 }
 
@@ -24,6 +28,7 @@ class AutoProvisionDto {
 
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(100, { each: true })
   defaultPermissionNames: string[] = [];
 }
 
@@ -34,22 +39,27 @@ export class UpdateOidcConfigDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   providerName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2048)
   issuerUri?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(256)
   clientId?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(1024)
   clientSecret?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   scopes?: string;
 
   @IsOptional()

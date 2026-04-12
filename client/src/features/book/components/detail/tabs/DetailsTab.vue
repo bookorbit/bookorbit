@@ -25,6 +25,7 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import MetadataScoreBadge from '@/features/metadata-score/components/MetadataScoreBadge.vue'
 import MetadataScoreBreakdown from '@/features/metadata-score/components/MetadataScoreBreakdown.vue'
 import { useMetadataScoreWeights } from '@/features/metadata-score/composables/useMetadataScoreWeights'
+import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 
 type FileProgress = {
   percentage: number
@@ -86,6 +87,7 @@ const genresExpanded = ref(false)
 const genreMeasureContainer = ref<HTMLElement | null>(null)
 const genreHiddenCount = ref(0)
 const visibleGenreCount = ref(0)
+const safeDescription = useSafeHtml(() => props.book.description)
 const displayedGenres = computed(() => {
   if (genresExpanded.value || genreHiddenCount.value === 0) return props.book.genres
   const count = visibleGenreCount.value > 0 ? visibleGenreCount.value : props.book.genres.length
@@ -1354,7 +1356,7 @@ watch(
           <div
             class="text-sm leading-relaxed text-foreground/80 transition-all"
             :class="descriptionExpanded ? '' : 'line-clamp-2'"
-            v-html="book.description"
+            v-html="safeDescription"
           />
           <button
             class="text-xs text-muted-foreground hover:text-foreground mt-2 transition-colors"

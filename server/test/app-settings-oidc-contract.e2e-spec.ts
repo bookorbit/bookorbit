@@ -1,5 +1,10 @@
 import { randomUUID } from 'crypto';
 
+// Mock DNS resolution so ensureSafeUrl passes for the fake issuer.example domain
+vi.mock('dns/promises', () => ({
+  lookup: vi.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
+}));
+
 import fastifyCookie from '@fastify/cookie';
 import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -270,14 +275,54 @@ async function createOidcContractContext(): Promise<OidcContractContext> {
     url: '/api/v1/auth/setup',
     payload: ADMIN_SETUP_DTO,
   });
-  expect(setupResponse.statusCode).toBe(201);
-  const setupBody = setupResponse.json() as { accessToken: string };
+
+  let adminToken: string;
+  if (setupResponse.statusCode === 201) {
+    const body = setupResponse.json() as { accessToken: string };
+    adminToken = body.accessToken;
+  } else if (setupResponse.statusCode === 409) {
+    const db = app.get<Db>(DB);
+    const loginResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { username: ADMIN_SETUP_DTO.username, password: ADMIN_SETUP_DTO.password },
+    });
+    if (loginResponse.statusCode === 200) {
+      const body = loginResponse.json() as { accessToken: string };
+      adminToken = body.accessToken;
+    } else {
+      const suffix = randomUUID().replaceAll('-', '');
+      const fallbackUsername = `app-settings-oidc-e2e-admin-${suffix}`;
+      const passwordHash = await hash(ADMIN_SETUP_DTO.password, 4);
+      await db.insert(schema.users).values({
+        username: fallbackUsername,
+        name: 'App Settings OIDC E2E Admin (fallback)',
+        email: `${fallbackUsername}@example.com`,
+        passwordHash,
+        isSuperuser: true,
+        isDefaultPassword: false,
+        provisioningMethod: 'local',
+      });
+      const fallbackResponse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: { username: fallbackUsername, password: ADMIN_SETUP_DTO.password },
+      });
+      if (fallbackResponse.statusCode !== 200) {
+        throw new Error(`OIDC contract test: fallback admin login failed (${fallbackResponse.statusCode})`);
+      }
+      const body = fallbackResponse.json() as { accessToken: string };
+      adminToken = body.accessToken;
+    }
+  } else {
+    throw new Error(`OIDC contract test: unexpected setup response ${setupResponse.statusCode}: ${setupResponse.body}`);
+  }
 
   const db = app.get<Db>(DB);
   return {
     app,
     db,
-    adminToken: setupBody.accessToken,
+    adminToken,
     fetchMock,
     oidcDiscoveryMock,
     oidcTokenClientMock,
@@ -493,8 +538,8 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         idToken: 'oidc-id-provisioned',
       });
       ctx.oidcTokenValidatorMock.validateIdToken.mockResolvedValueOnce({
-        sub: 'oidc-provisioned-subject',
-        sid: 'oidc-provisioned-sid',
+        sub: `oidc-provisioned-subject-${suffix}`,
+        sid: `oidc-provisioned-sid-${suffix}`,
         preferred_username: username,
         name: 'OIDC Provisioned User',
         email,
@@ -554,7 +599,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
       expect(createdUser).toMatchObject({
         username,
         email,
-        oidcSubject: 'oidc-provisioned-subject',
+        oidcSubject: `oidc-provisioned-subject-${suffix}`,
         oidcIssuer: DEFAULT_ISSUER,
         provisioningMethod: 'oidc',
       });
@@ -568,9 +613,9 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         where: eq(schema.oidcSessions.userId, callbackBody.user.id),
       });
       expect(oidcSession).toMatchObject({
-        oidcSubject: 'oidc-provisioned-subject',
+        oidcSubject: `oidc-provisioned-subject-${suffix}`,
         oidcIssuer: DEFAULT_ISSUER,
-        oidcSessionId: 'oidc-provisioned-sid',
+        oidcSessionId: `oidc-provisioned-sid-${suffix}`,
         idTokenHint: 'oidc-id-provisioned',
         revoked: false,
       });
@@ -605,8 +650,8 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         idToken: 'oidc-id-linked',
       });
       ctx.oidcTokenValidatorMock.validateIdToken.mockResolvedValueOnce({
-        sub: 'oidc-linked-subject',
-        sid: 'oidc-linked-sid',
+        sub: `oidc-linked-subject-${suffix}`,
+        sid: `oidc-linked-sid-${suffix}`,
         preferred_username: linkedUser.username,
         name: 'Linked Local User',
         email: linkedUser.email,
@@ -646,7 +691,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         where: eq(schema.users.id, linkedUser.userId),
       });
       expect(linkedUserAfter).toMatchObject({
-        oidcSubject: 'oidc-linked-subject',
+        oidcSubject: `oidc-linked-subject-${suffix}`,
         oidcIssuer: DEFAULT_ISSUER,
         provisioningMethod: 'local',
       });
@@ -675,8 +720,8 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
       expect(meBeforeMatchedLogout.statusCode).toBe(200);
 
       ctx.oidcTokenValidatorMock.validateLogoutToken.mockResolvedValueOnce({
-        sub: 'oidc-linked-subject',
-        sid: 'oidc-linked-sid',
+        sub: `oidc-linked-subject-${suffix}`,
+        sid: `oidc-linked-sid-${suffix}`,
         jti: `logout-linked-${randomUUID()}`,
       });
 

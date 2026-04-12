@@ -7,7 +7,9 @@ vi.mock('drizzle-orm', () => ({
   gt: vi.fn((left: unknown, right: unknown) => ({ op: 'gt', left, right })),
   ilike: vi.fn((left: unknown, right: unknown) => ({ op: 'ilike', left, right })),
   inArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'inArray', left, right })),
+  isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
   notInArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'notInArray', left, right })),
+  or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: Object.assign(
     vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
     {
@@ -134,10 +136,9 @@ describe('BookBucketRepository', () => {
     selectBuilder.limit.mockResolvedValue([{ id: 11 }, { id: 12 }]);
     const repo = new BookBucketRepository(db as never);
 
-    await expect(repo.findSelectionBatch({ limit: 2, afterId: 10, excludedIds: [3], status: 'error', search: 'foo' })).resolves.toEqual([
-      { id: 11 },
-      { id: 12 },
-    ]);
+    await expect(
+      repo.findSelectionBatch({ limit: 2, afterId: 10, excludedIds: [3], status: 'error', search: 'foo', userId: 1, isSuperuser: false }),
+    ).resolves.toEqual([{ id: 11 }, { id: 12 }]);
     expect(selectBuilder.orderBy).toHaveBeenCalled();
     expect(selectBuilder.limit).toHaveBeenCalledWith(2);
   });
@@ -156,6 +157,8 @@ describe('BookBucketRepository', () => {
         sort: 'fileName',
         order: 'asc',
         search: 'dune',
+        userId: 1,
+        isSuperuser: true,
       }),
     ).resolves.toEqual({
       items: [{ id: 1 }, { id: 2 }],

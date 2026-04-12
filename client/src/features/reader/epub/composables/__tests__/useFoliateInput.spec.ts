@@ -126,21 +126,21 @@ describe('useFoliateInput', () => {
 
     doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
 
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 5 } }))
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 5 }, origin: window.location.origin }))
     vi.advanceTimersByTime(300)
     expect(prev).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(300)
 
     doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 95 } }))
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 95 }, origin: window.location.origin }))
     vi.advanceTimersByTime(300)
     expect(next).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(300)
 
     doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 50 } }))
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 50 }, origin: window.location.origin }))
     vi.advanceTimersByTime(300)
     expect(onMiddleTap).toHaveBeenCalledTimes(1)
 

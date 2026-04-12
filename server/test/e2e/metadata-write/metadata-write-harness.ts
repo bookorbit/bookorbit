@@ -146,6 +146,7 @@ export async function createLibraryWithFolder(
     .insert(libraries)
     .values({
       name: options.name ?? `metadata-write-${randomUUID()}`,
+      icon: '📚',
       watch: false,
       organizationMode: options.mode ?? 'book_per_file',
       allowedFormats: options.allowedFormats ?? [],

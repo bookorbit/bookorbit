@@ -49,6 +49,8 @@ function makeController() {
   return { controller, service, ingestService, finalizeService, watcherService, repo };
 }
 
+const MOCK_USER = { id: 1, isSuperuser: false } as any;
+
 describe('BookBucketController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,7 +60,7 @@ describe('BookBucketController', () => {
     const { controller, service } = makeController();
     service.listFiles.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
 
-    await controller.listFiles({});
+    await controller.listFiles(MOCK_USER, {});
 
     expect(service.listFiles).toHaveBeenCalledWith({
       status: undefined,
@@ -67,6 +69,8 @@ describe('BookBucketController', () => {
       sort: 'createdAt',
       order: 'desc',
       search: undefined,
+      userId: MOCK_USER.id,
+      isSuperuser: MOCK_USER.isSuperuser,
     });
   });
 
@@ -105,7 +109,7 @@ describe('BookBucketController', () => {
       file: vi.fn().mockResolvedValue(null),
     } as any;
 
-    await expect(controller.upload(req)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.upload(MOCK_USER, req)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('upload ingests file and returns hydrated row', async () => {
@@ -119,20 +123,26 @@ describe('BookBucketController', () => {
     ingestService.ingestUpload.mockResolvedValue(44);
     service.getFile.mockResolvedValue({ id: 44, fileName: 'book.epub' });
 
-    await expect(controller.upload(req)).resolves.toEqual({ id: 44, fileName: 'book.epub' });
-    expect(ingestService.ingestUpload).toHaveBeenCalledWith('book.epub', expect.any(Readable));
+    await expect(controller.upload(MOCK_USER, req)).resolves.toEqual({ id: 44, fileName: 'book.epub' });
+    expect(ingestService.ingestUpload).toHaveBeenCalledWith('book.epub', expect.any(Readable), MOCK_USER.id);
     expect(service.getFile).toHaveBeenCalledWith(44);
   });
 
   it('bulk and finalize endpoints delegate payload fields as expected', async () => {
     const { controller, service, finalizeService, watcherService } = makeController();
 
-    await controller.bulkDiscard({ fileIds: [1], selectAll: false, excludedIds: [2], status: 'error', search: 'x' });
-    await controller.applyFetched({ fileIds: [1], selectAll: true, excludedIds: [2], status: 'ready', search: 'x' });
-    await controller.retryFetch({ fileIds: [3], selectAll: false, excludedIds: [4], status: 'error', search: 'y' });
-    await controller.setTarget({ fileIds: [5], selectAll: false, excludedIds: [6], targetLibraryId: undefined, targetFolderId: undefined });
-    await controller.selectionSummary({ fileIds: [7], selectAll: false, excludedIds: [8] });
-    await controller.bulkEdit({
+    await controller.bulkDiscard(MOCK_USER, { fileIds: [1], selectAll: false, excludedIds: [2], status: 'error', search: 'x' });
+    await controller.applyFetched(MOCK_USER, { fileIds: [1], selectAll: true, excludedIds: [2], status: 'ready', search: 'x' });
+    await controller.retryFetch(MOCK_USER, { fileIds: [3], selectAll: false, excludedIds: [4], status: 'error', search: 'y' });
+    await controller.setTarget(MOCK_USER, {
+      fileIds: [5],
+      selectAll: false,
+      excludedIds: [6],
+      targetLibraryId: undefined,
+      targetFolderId: undefined,
+    });
+    await controller.selectionSummary(MOCK_USER, { fileIds: [7], selectAll: false, excludedIds: [8] });
+    await controller.bulkEdit(MOCK_USER, {
       fileIds: [9],
       selectAll: false,
       excludedIds: [],
@@ -147,7 +157,7 @@ describe('BookBucketController', () => {
     );
     await controller.rescan();
 
-    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined);
+    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, MOCK_USER.isSuperuser);
     expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, [1], false, [], 2, 3, [], undefined, undefined);
     expect(watcherService.rescan).toHaveBeenCalled();
   });

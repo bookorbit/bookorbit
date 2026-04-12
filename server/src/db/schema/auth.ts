@@ -31,6 +31,8 @@ export const users = pgTable(
     isSuperuser: boolean('is_superuser').notNull().default(false),
     isDefaultPassword: boolean('is_default_password').notNull().default(false),
     tokenVersion: integer('token_version').notNull().default(1),
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
     settings: jsonb('settings').notNull().default({}),
     oidcSubject: text('oidc_subject'),
     oidcIssuer: text('oidc_issuer'),
@@ -54,6 +56,7 @@ export const users = pgTable(
       .where(sql`${t.oidcSubject} is not null and ${t.oidcIssuer} is not null`),
     check('users_provisioning_method_chk', sql`${t.provisioningMethod} in ('local', 'manual', 'oidc')`),
     check('users_token_version_nonnegative_chk', sql`${t.tokenVersion} >= 0`),
+    check('users_failed_login_attempts_nonnegative_chk', sql`${t.failedLoginAttempts} >= 0`),
     check('users_avatar_version_nonnegative_chk', sql`${t.avatarVersion} >= 0`),
   ],
 );

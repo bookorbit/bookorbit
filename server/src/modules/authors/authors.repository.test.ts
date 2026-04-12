@@ -241,6 +241,24 @@ describe('AuthorsRepository', () => {
     });
   });
 
+  it.each(['name', 'sortName', 'lastEnrichedAt'] as const)('findPage does not use raw SQL for %s sorting', async (sort) => {
+    const { db, selectBuilder } = makeDb();
+    vi.mocked(sql.raw).mockClear();
+    selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ total: '0' }]);
+    selectBuilder.offset.mockResolvedValueOnce([]);
+    const repo = new AuthorsRepository(db as never);
+
+    await repo.findPage({
+      page: 0,
+      size: 10,
+      sort,
+      order: 'desc',
+      libraryIds: [1],
+    });
+
+    expect(sql.raw).not.toHaveBeenCalled();
+  });
+
   it('findById returns a summary row when the author is visible in selected libraries', async () => {
     const { db, selectBuilder } = makeDb();
     selectBuilder.limit.mockResolvedValueOnce([

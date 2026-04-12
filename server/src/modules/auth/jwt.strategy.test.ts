@@ -10,12 +10,39 @@ function makeStrategy() {
     get: vi.fn().mockReturnValue('test-jwt-secret'),
   };
 
-  // Bypass PassportStrategy super() call
-  const strategy = Object.create(JwtStrategy.prototype) as JwtStrategy;
-  (strategy as never as { authService: unknown }).authService = authService;
+  const strategy = new JwtStrategy(config as never, authService as never);
 
   return { strategy, authService, config };
 }
+
+describe('JwtStrategy token extraction', () => {
+  it('SEC-025: accepts only HS256 algorithm (algorithm pinning)', () => {
+    const { strategy } = makeStrategy();
+    const verifyOptions = (strategy as unknown as { _secretOrKey?: unknown; _verifOpts?: { algorithms?: string[] } })._verifOpts;
+    expect(verifyOptions?.algorithms).toEqual(['HS256']);
+  });
+
+  it('extracts token from Authorization bearer header', () => {
+    const { strategy } = makeStrategy();
+    const extractor = (strategy as unknown as { _jwtFromRequest: (req: unknown) => string | null })._jwtFromRequest;
+
+    expect(extractor({ headers: { authorization: 'Bearer header-token' } })).toBe('header-token');
+  });
+
+  it('extracts token from access_token cookie', () => {
+    const { strategy } = makeStrategy();
+    const extractor = (strategy as unknown as { _jwtFromRequest: (req: unknown) => string | null })._jwtFromRequest;
+
+    expect(extractor({ headers: {}, cookies: { access_token: 'cookie-token' } })).toBe('cookie-token');
+  });
+
+  it('does not extract token from query parameters', () => {
+    const { strategy } = makeStrategy();
+    const extractor = (strategy as unknown as { _jwtFromRequest: (req: unknown) => string | null })._jwtFromRequest;
+
+    expect(extractor({ headers: {}, query: { token: 'query-token' } })).toBeNull();
+  });
+});
 
 describe('JwtStrategy.validate', () => {
   it('returns user when validation passes', async () => {

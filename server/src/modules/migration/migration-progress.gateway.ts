@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
 import { Permission, type MigrationProgressEvent, type MigrationRunState } from '@projectx/types';
@@ -9,22 +10,35 @@ import { AuthService } from '../auth/auth.service';
 import { MigrationRepository } from './migration.repository';
 import { sanitizeRunForApi } from './core/api-sanitizers';
 
-@WebSocketGateway({ namespace: '/migration', cors: { origin: '*', credentials: true } })
-export class MigrationProgressGateway implements OnGatewayConnection, OnGatewayDisconnect {
+@WebSocketGateway({ namespace: '/migration', cors: { credentials: true } })
+export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(MigrationProgressGateway.name);
+  private readonly clientOrigin: string;
 
   constructor(
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
     private readonly repo: MigrationRepository,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.clientOrigin = config.get<string>('app.appUrl') ?? 'http://localhost:5173';
+  }
+
+  afterInit(server: Server): void {
+    if (!server.engine?.opts) return;
+    server.engine.opts.cors = {
+      ...(server.engine.opts.cors ?? {}),
+      origin: this.clientOrigin,
+      credentials: true,
+    };
+  }
 
   async handleConnection(client: Socket): Promise<void> {
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new Error('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token);
+      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
       const user = await this.authService.validateUser(payload.sub, payload.ver);
       if (!user) throw new Error('User not found or token revoked');
       this.assertCanViewMigrationProgress(user);

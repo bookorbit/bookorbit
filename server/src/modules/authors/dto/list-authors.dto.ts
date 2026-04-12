@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export const AUTHOR_LIST_SORTS = ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt'] as const;
 export type AuthorListSort = (typeof AUTHOR_LIST_SORTS)[number];
@@ -10,6 +10,7 @@ export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 export class ListAuthorsDto {
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   q?: string;
 
   @IsOptional()

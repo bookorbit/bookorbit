@@ -1,13 +1,15 @@
 import { Permission } from '@projectx/types';
-import { IsArray, IsEmail, IsEnum, IsInt, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
   @MinLength(3)
+  @MaxLength(100)
   username: string;
 
   @IsString()
   @MinLength(1)
+  @MaxLength(255)
   name: string;
 
   @IsEmail()

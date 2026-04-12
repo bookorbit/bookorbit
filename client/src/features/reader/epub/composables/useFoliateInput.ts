@@ -94,7 +94,7 @@ export function useFoliateInput(
             iframeWidth: iframeRect.width,
             eventClientX: touch.clientX,
           },
-          '*',
+          window.location.origin,
         )
       }
     }
@@ -141,7 +141,7 @@ export function useFoliateInput(
             iframeWidth: rect.width,
             eventClientX: e.clientX,
           },
-          '*',
+          window.location.origin,
         )
       },
       true,
@@ -155,6 +155,7 @@ export function useFoliateInput(
   }
 
   function handleWindowMessage(e: MessageEvent) {
+    if (e.origin !== window.location.origin) return
     if (e.data?.type !== 'foliate-click') return
     const view = getViewEl()
     if (!view) return

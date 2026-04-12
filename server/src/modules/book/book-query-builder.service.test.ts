@@ -763,3 +763,47 @@ describe('isbnRuleToSql', () => {
     expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'isbn', operator: 'eq' }) as never, BASE_CTX)).toThrow(BadRequestException);
   });
 });
+
+describe('ILIKE pattern escaping (SEC-013)', () => {
+  it('escapes literal percent signs in contains patterns', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'contains', value: '100%' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.pattern).toBe('%100\\%%');
+  });
+
+  it('escapes literal underscores in contains patterns', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'contains', value: 'a_b' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.pattern).toBe('%a\\_b%');
+  });
+
+  it('escapes backslashes before other special characters', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'contains', value: 'a\\%b' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.pattern).toBe('%a\\\\\\%b%');
+  });
+
+  it('escapes percent signs in startsWith patterns', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'startsWith', value: '50%off' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.pattern).toBe('50\\%off%');
+  });
+
+  it('escapes underscores in endsWith patterns', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'endsWith', value: '_end' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.pattern).toBe('%\\_end');
+  });
+
+  it('does not alter patterns with no special characters', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.pattern).toBe('%Dune%');
+  });
+});

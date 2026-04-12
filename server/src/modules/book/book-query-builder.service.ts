@@ -179,17 +179,17 @@ export class BookQueryBuilder {
     }
     switch (operator) {
       case 'contains':
-        return ilike(col, `%${value}%`);
+        return ilike(col, `%${escapeLikePattern(value!)}%`);
       case 'notContains':
-        return not(ilike(col, `%${value}%`));
+        return not(ilike(col, `%${escapeLikePattern(value!)}%`));
       case 'startsWith':
-        return ilike(col, `${value}%`);
+        return ilike(col, `${escapeLikePattern(value!)}%`);
       case 'endsWith':
-        return ilike(col, `%${value}`);
+        return ilike(col, `%${escapeLikePattern(value!)}`);
       case 'eq':
-        return ilike(col, value!);
+        return ilike(col, escapeLikePattern(value!));
       case 'notEq':
-        return not(ilike(col, value!));
+        return not(ilike(col, escapeLikePattern(value!)));
       case 'isEmpty':
         return or(isNull(col), eq(col, ''))!;
       case 'isNotEmpty':
@@ -498,4 +498,8 @@ export class BookQueryBuilder {
         throw new BadRequestException(`Invalid operator '${operator}' for isbn field`);
     }
   }
+}
+
+function escapeLikePattern(s: string): string {
+  return s.replace(/[\\%_]/g, '\\$&');
 }

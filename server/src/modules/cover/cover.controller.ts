@@ -8,6 +8,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CoverService } from './cover.service';
 import { SearchCoversQueryDto } from './dto/search-covers-query.dto';
 import { UploadCoverFromUrlDto } from './dto/upload-cover-from-url.dto';
+import { ProxyCoverQueryDto } from './dto/proxy-cover-query.dto';
 
 @Controller('books')
 export class CoverController {
@@ -26,8 +27,8 @@ export class CoverController {
 
   @Get('cover/proxy')
   @RequirePermission(Permission.LibraryEditMetadata)
-  async proxyImage(@Query('url') url: string, @Res() res: FastifyReply) {
-    const { buffer, contentType } = await this.coverService.proxyImage(url);
+  async proxyImage(@Query() query: ProxyCoverQueryDto, @Res() res: FastifyReply) {
+    const { buffer, contentType } = await this.coverService.proxyImage(query.url);
     res.type(contentType).send(buffer);
   }
 

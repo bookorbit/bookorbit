@@ -80,4 +80,20 @@ describe('loggerConfig', () => {
     });
     expect(serializers?.res?.({ statusCode: 204 } as never)).toEqual({ statusCode: 204 });
   });
+
+  it('SEC-031: redact config is present and covers sensitive fields', async () => {
+    const config = await loadLoggerConfig('production');
+    const redact = config.pinoHttp?.redact as { paths: string[]; censor: string } | undefined;
+
+    expect(redact).toBeDefined();
+    expect(redact?.paths).toContain('req.headers.authorization');
+    expect(redact?.paths).toContain('req.headers.cookie');
+    expect(redact?.paths).toContain('req.body.password');
+    expect(redact?.paths).toContain('req.body.currentPassword');
+    expect(redact?.paths).toContain('req.body.newPassword');
+    expect(redact?.paths).toContain('req.body.token');
+    expect(redact?.paths).toContain('req.body.clientSecret');
+    expect(redact?.paths).toContain('req.body.codeVerifier');
+    expect(redact?.censor).toBe('[REDACTED]');
+  });
 });

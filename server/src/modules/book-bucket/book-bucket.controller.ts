@@ -60,7 +60,7 @@ export class BookBucketController {
   ) {}
 
   @Get('files')
-  listFiles(@Query() query: ListBookBucketFilesDto) {
+  listFiles(@CurrentUser() user: RequestUser, @Query() query: ListBookBucketFilesDto) {
     return this.service.listFiles({
       status: query.status,
       page: query.page ?? 1,
@@ -68,17 +68,19 @@ export class BookBucketController {
       sort: query.sort ?? 'createdAt',
       order: query.order ?? 'desc',
       search: query.search,
+      userId: user.id,
+      isSuperuser: user.isSuperuser,
     });
   }
 
   @Get('summary')
-  getSummary() {
-    return this.service.getSummary();
+  getSummary(@CurrentUser() user: RequestUser) {
+    return this.service.getSummary(user.id, user.isSuperuser);
   }
 
   @Get('statistics')
-  getStatistics() {
-    return this.service.getStatistics();
+  getStatistics(@CurrentUser() user: RequestUser) {
+    return this.service.getStatistics(user.id, user.isSuperuser);
   }
 
   @Get('files/:id')
@@ -105,11 +107,11 @@ export class BookBucketController {
 
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
-  async upload(@Req() req: MultipartRequest) {
+  async upload(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
     const data = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
     if (!data) throw new BadRequestException('No file provided');
 
-    const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable);
+    const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable, user.id);
     return this.service.getFile(fileId);
   }
 
@@ -126,22 +128,22 @@ export class BookBucketController {
 
   @Post('files/discard')
   @HttpCode(HttpStatus.NO_CONTENT)
-  bulkDiscard(@Body() dto: BulkDiscardDto) {
-    return this.service.bulkDiscard(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search);
+  bulkDiscard(@CurrentUser() user: RequestUser, @Body() dto: BulkDiscardDto) {
+    return this.service.bulkDiscard(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
   }
 
   @Post('files/apply-fetched')
-  applyFetched(@Body() dto: BulkApplyFetchedDto) {
-    return this.service.bulkApplyFetched(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search);
+  applyFetched(@CurrentUser() user: RequestUser, @Body() dto: BulkApplyFetchedDto) {
+    return this.service.bulkApplyFetched(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
   }
 
   @Post('files/retry-fetch')
-  retryFetch(@Body() dto: BulkRetryFetchDto) {
-    return this.service.bulkRetryFetch(dto.fileIds, dto.selectAll, dto.excludedIds, dto.status, dto.search);
+  retryFetch(@CurrentUser() user: RequestUser, @Body() dto: BulkRetryFetchDto) {
+    return this.service.bulkRetryFetch(dto.fileIds, dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
   }
 
   @Post('files/set-target')
-  setTarget(@Body() dto: BulkSetTargetDto) {
+  setTarget(@CurrentUser() user: RequestUser, @Body() dto: BulkSetTargetDto) {
     return this.service.bulkSetTarget(
       dto.fileIds ?? [],
       dto.selectAll,
@@ -150,16 +152,18 @@ export class BookBucketController {
       dto.targetFolderId ?? null,
       dto.status,
       dto.search,
+      user.id,
+      user.isSuperuser,
     );
   }
 
   @Post('files/selection-summary')
-  selectionSummary(@Body() dto: SelectionSummaryDto) {
-    return this.service.selectionSummary(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search);
+  selectionSummary(@CurrentUser() user: RequestUser, @Body() dto: SelectionSummaryDto) {
+    return this.service.selectionSummary(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
   }
 
   @Post('files/bulk-edit')
-  bulkEdit(@Body() dto: BulkEditBookBucketDto) {
+  bulkEdit(@CurrentUser() user: RequestUser, @Body() dto: BulkEditBookBucketDto) {
     return this.service.bulkEdit(
       dto.fileIds,
       dto.selectAll,
@@ -169,6 +173,8 @@ export class BookBucketController {
       dto.mergeArrays,
       dto.status,
       dto.search,
+      user.id,
+      user.isSuperuser,
     );
   }
 

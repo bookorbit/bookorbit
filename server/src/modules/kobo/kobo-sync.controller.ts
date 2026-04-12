@@ -1,4 +1,21 @@
-import { Body, Controller, Delete, Get, Header, Headers, HttpCode, HttpStatus, Logger, Param, Put, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  Put,
+  Req,
+  Res,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { Public } from '../../common/decorators/public.decorator';
@@ -130,6 +147,7 @@ export class KoboSyncController {
   }
 
   @Put('v1/library/:bookId/state')
+  @UsePipes(new ValidationPipe({ transform: false, whitelist: false }))
   async updateReadingState(
     @Param('bookId') bookId: string,
     @Body() body: Record<string, unknown>,

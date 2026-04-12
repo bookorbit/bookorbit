@@ -1,14 +1,13 @@
-import { lookup } from 'dns/promises';
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CoverSearchResult } from '@projectx/types';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
-import { isIP } from 'net';
 import { join } from 'path';
 
 import { bookCoverDirPath, bookThumbnailPath, findExtractedBookCoverFileName } from '../../common/book-cover-storage';
 import type { RequestUser } from '../../common/types/request-user';
+import { ensureSafeRemoteHost } from '../../common/utils/ssrf.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata } from '../../db/schema';
@@ -281,7 +280,7 @@ export class CoverService {
       throw new BadRequestException('URL must use http or https');
     }
 
-    await this.ensureSafeRemoteHost(parsedUrl.hostname);
+    await ensureSafeRemoteHost(parsedUrl.hostname);
     return parsedUrl;
   }
 
@@ -339,40 +338,8 @@ export class CoverService {
       throw new BadRequestException('URL must use http or https');
     }
 
-    await this.ensureSafeRemoteHost(redirectUrl.hostname);
+    await ensureSafeRemoteHost(redirectUrl.hostname);
     return redirectUrl;
-  }
-
-  private async ensureSafeRemoteHost(hostname: string): Promise<void> {
-    const normalizedHost = hostname.trim().toLowerCase();
-    if (!normalizedHost) throw new BadRequestException('URL host is required');
-
-    if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost') || normalizedHost.endsWith('.local')) {
-      throw new BadRequestException('URL host is not allowed');
-    }
-
-    // URL.hostname wraps IPv6 in brackets (e.g. [::1]); strip them for isIP/range checks
-    const bareHost = normalizedHost.startsWith('[') && normalizedHost.endsWith(']') ? normalizedHost.slice(1, -1) : normalizedHost;
-
-    const ipFamily = isIP(bareHost);
-    if (ipFamily > 0) {
-      if (isPrivateOrLocalAddress(bareHost)) {
-        throw new BadRequestException('URL host is not allowed');
-      }
-      return;
-    }
-
-    let resolved;
-    try {
-      resolved = await lookup(normalizedHost, { all: true, verbatim: true });
-    } catch {
-      throw new BadRequestException('Unable to resolve URL host');
-    }
-
-    if (resolved.length === 0) throw new BadRequestException('Unable to resolve URL host');
-    if (resolved.some((entry) => isPrivateOrLocalAddress(entry.address))) {
-      throw new BadRequestException('URL host is not allowed');
-    }
   }
 
   private extractImageContentType(response: Response): string {
@@ -456,48 +423,4 @@ function sanitizeErrorMessage(error: unknown): string {
 
 function errorClass(error: unknown): string {
   return error instanceof Error ? error.name : 'Error';
-}
-
-function isPrivateOrLocalAddress(address: string): boolean {
-  const normalized = address.toLowerCase();
-  const mappedV4Prefix = '::ffff:';
-  const maybeV4 = normalized.startsWith(mappedV4Prefix) ? normalized.slice(mappedV4Prefix.length) : normalized;
-  const family = isIP(maybeV4);
-
-  if (family === 4) {
-    return isPrivateOrLocalV4(maybeV4);
-  }
-
-  if (family === 6) {
-    return (
-      maybeV4 === '::1' ||
-      maybeV4 === '::' ||
-      maybeV4.startsWith('fc') ||
-      maybeV4.startsWith('fd') ||
-      maybeV4.startsWith('fe8') ||
-      maybeV4.startsWith('fe9') ||
-      maybeV4.startsWith('fea') ||
-      maybeV4.startsWith('feb')
-    );
-  }
-
-  return true;
-}
-
-function isPrivateOrLocalV4(address: string): boolean {
-  const octets = address.split('.').map((part) => Number(part));
-  if (octets.length !== 4 || octets.some((octet) => Number.isNaN(octet) || octet < 0 || octet > 255)) {
-    return true;
-  }
-
-  if (octets[0] === 10) return true;
-  if (octets[0] === 127) return true;
-  if (octets[0] === 0) return true;
-  if (octets[0] === 169 && octets[1] === 254) return true;
-  if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
-  if (octets[0] === 192 && octets[1] === 168) return true;
-  if (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) return true;
-  if (octets[0] >= 224) return true;
-
-  return false;
 }

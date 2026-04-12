@@ -40,6 +40,19 @@ export const loggerConfig: Params = {
       req: (req: IncomingMessage & { id?: string }) => ({ id: req.id, method: req.method, url: req.url }),
       res: (res: ServerResponse) => ({ statusCode: res.statusCode }),
     },
+    redact: {
+      paths: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.body.password',
+        'req.body.currentPassword',
+        'req.body.newPassword',
+        'req.body.token',
+        'req.body.clientSecret',
+        'req.body.codeVerifier',
+      ],
+      censor: '[REDACTED]',
+    },
     ...(isDev
       ? {
           transport: {

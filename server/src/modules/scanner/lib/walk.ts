@@ -95,9 +95,9 @@ async function collectByDir(
     if (entry.name.startsWith('.')) continue;
     if (shouldExclude(entry.name)) continue;
 
-    if (entry.isDirectory()) {
+    if (entry.isDirectory() && !entry.isSymbolicLink()) {
       subdirs.push(full);
-    } else if (entry.isFile()) {
+    } else if (entry.isFile() && !entry.isSymbolicLink()) {
       if (full.length > MAX_PATH_LENGTH) {
         logger?.(`Path exceeds ${MAX_PATH_LENGTH} characters, skipping: ${full}`);
         continue;
@@ -296,13 +296,13 @@ export async function buildSingleBookCandidate(
     if (entry.name.startsWith('.')) continue;
     if (shouldExclude(entry.name)) continue;
     const full = join(folderPath, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory() && !entry.isSymbolicLink()) {
       if (isDiscDirectory(entry.name)) {
         discDirs.push(full);
       } else {
         nonDiscDirs.push({ name: entry.name, path: full });
       }
-    } else if (entry.isFile() && full.length <= MAX_PATH_LENGTH) {
+    } else if (entry.isFile() && !entry.isSymbolicLink() && full.length <= MAX_PATH_LENGTH) {
       filePaths.push(full);
     }
   }
@@ -310,7 +310,7 @@ export async function buildSingleBookCandidate(
   for (const discDir of discDirs) {
     const discEntries = await readdir(discDir, { withFileTypes: true }).catch(() => []);
     for (const entry of discEntries) {
-      if (!entry.isFile() || entry.name.startsWith('.')) continue;
+      if (!entry.isFile() || entry.isSymbolicLink() || entry.name.startsWith('.')) continue;
       if (shouldExclude(entry.name)) continue;
       const full = join(discDir, entry.name);
       if (full.length <= MAX_PATH_LENGTH) filePaths.push(full);

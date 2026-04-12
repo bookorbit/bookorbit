@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
@@ -84,30 +85,34 @@ export class GoodreadsProvider implements IdentifiableProvider {
     providerId?: string,
     signal?: AbortSignal,
   ): Promise<string | null> {
+    const safeQuery = query ? sanitizeLogValue(query) : undefined;
+    const safeProviderId = providerId ? sanitizeLogValue(providerId) : undefined;
     const startedAt = Date.now();
-    this.logger.log(`[goodreads] [start] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''}`);
+    this.logger.log(
+      `[goodreads] [start] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''}`,
+    );
     try {
       const res = await fetchWithThrottle(url, { headers: HEADERS, signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.SCRAPE, signal) });
       if (!res.ok) {
         this.logger.warn(
-          `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
       const html = await res.text();
       this.logger.log(
-        `[goodreads] [end] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
+        `[goodreads] [end] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
       );
       return html;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.logger.warn(
-          `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
+          `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
         );
         throw err;
       }
       this.logger.warn(
-        `[goodreads] [fail] op=${op}${query ? ` query="${query}"` : ''}${providerId ? ` providerId="${providerId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return null;
     }

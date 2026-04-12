@@ -1,14 +1,11 @@
-import { IsEmail, IsObject, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateMeDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(255)
   @IsOptional()
   name?: string;
-
-  @IsEmail()
-  @IsOptional()
-  email?: string;
 
   @IsObject()
   @IsOptional()

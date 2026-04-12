@@ -34,7 +34,7 @@ export class BookBucketIngestService {
     this.bookBucketPath = join(appDataPath, 'book-bucket');
   }
 
-  async ingestUpload(rawFilename: string, fileStream: Readable): Promise<number> {
+  async ingestUpload(rawFilename: string, fileStream: Readable, uploadedBy?: number): Promise<number> {
     const filename = this.validator.sanitizeFilename(rawFilename);
     const ext = extname(filename).toLowerCase().slice(1);
 
@@ -56,6 +56,7 @@ export class BookBucketIngestService {
         fileSize: sizeBytes,
         format: ext,
         status: 'pending',
+        uploadedBy: uploadedBy ?? null,
       });
 
       this.extractMetadataAsync(row.id, destPath, ext);

@@ -2,6 +2,11 @@ import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 
 import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
 
+vi.mock('../../common/utils/ssrf.utils', () => ({
+  ensureSafeUrl: vi.fn().mockImplementation((url: string) => Promise.resolve(new URL(url.replace(/\/$/, '')))),
+  ensureSafeRemoteHost: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { AppSettingsRepository } from './app-settings.repository';
 import { AppSettingsService } from './app-settings.service';
 

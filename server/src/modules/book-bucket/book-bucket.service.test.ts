@@ -65,6 +65,8 @@ describe('BookBucketService', () => {
       limit: 25,
       sort: 'createdAt',
       order: 'desc',
+      userId: 1,
+      isSuperuser: false,
     });
 
     expect(result.total).toBe(1);

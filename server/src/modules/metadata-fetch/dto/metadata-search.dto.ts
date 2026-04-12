@@ -6,6 +6,7 @@ import {
   Min,
   IsOptional,
   IsString,
+  MaxLength,
   registerDecorator,
   ValidationArguments,
   ValidationOptions,
@@ -50,14 +51,17 @@ export class MetadataSearchDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   title?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   author?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   isbn?: string;
 
   @IsOptional()

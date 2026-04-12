@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, ilike, inArray, notInArray, sum, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, notInArray, or, sum, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -23,6 +23,8 @@ export interface ListOptions {
   sort: string;
   order: string;
   search?: string;
+  userId: number;
+  isSuperuser: boolean;
 }
 
 export interface SelectionBatchOptions {
@@ -31,6 +33,8 @@ export interface SelectionBatchOptions {
   excludedIds?: number[];
   status?: string;
   search?: string;
+  userId: number;
+  isSuperuser: boolean;
 }
 
 @Injectable()
@@ -38,7 +42,7 @@ export class BookBucketRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findAll(opts: ListOptions): Promise<{ items: BookBucketFileRow[]; total: number }> {
-    const conditions = this.buildSelectionConditions(opts.status, opts.search);
+    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.isSuperuser);
 
     const where = conditions.length ? and(...conditions) : undefined;
 
@@ -93,8 +97,8 @@ export class BookBucketRepository {
     await this.db.delete(bookBucketFiles).where(eq(bookBucketFiles.absolutePath, path));
   }
 
-  async findAllIds(excludedIds?: number[], status?: string, search?: string): Promise<number[]> {
-    const conditions = this.buildSelectionConditions(status, search);
+  async findAllIds(excludedIds?: number[], status?: string, search?: string, userId?: number, isSuperuser?: boolean): Promise<number[]> {
+    const conditions = this.buildSelectionConditions(status, search, userId, isSuperuser ?? true);
     if (excludedIds?.length) conditions.push(notInArray(bookBucketFiles.id, excludedIds));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await this.db.select({ id: bookBucketFiles.id }).from(bookBucketFiles).where(where);
@@ -107,7 +111,7 @@ export class BookBucketRepository {
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookBucketFileRow[]> {
-    const conditions = this.buildSelectionConditions(options.status, options.search);
+    const conditions = this.buildSelectionConditions(options.status, options.search, options.userId, options.isSuperuser);
     if (options.excludedIds?.length) conditions.push(notInArray(bookBucketFiles.id, options.excludedIds));
     if (options.afterId !== undefined) conditions.push(gt(bookBucketFiles.id, options.afterId));
     const where = conditions.length ? and(...conditions) : undefined;
@@ -124,13 +128,15 @@ export class BookBucketRepository {
     return updated.length;
   }
 
-  async countsByStatus(): Promise<{ pending: number; ready: number; error: number; total: number }> {
+  async countsByStatus(userId?: number, isSuperuser?: boolean): Promise<{ pending: number; ready: number; error: number; total: number }> {
+    const visibilityCondition = userId !== undefined ? this.buildVisibilityCondition(userId, isSuperuser ?? true) : undefined;
     const rows = await this.db
       .select({
         status: bookBucketFiles.status,
         cnt: count(),
       })
       .from(bookBucketFiles)
+      .where(visibilityCondition)
       .groupBy(bookBucketFiles.status);
 
     const result = { pending: 0, ready: 0, error: 0, total: 0 };
@@ -144,10 +150,14 @@ export class BookBucketRepository {
     return result;
   }
 
-  async getStatistics(): Promise<{
+  async getStatistics(
+    userId?: number,
+    isSuperuser?: boolean,
+  ): Promise<{
     totalSizeBytes: number;
     byFormat: { format: string; count: number; sizeBytes: number }[];
   }> {
+    const visibilityCondition = userId !== undefined ? this.buildVisibilityCondition(userId, isSuperuser ?? true) : undefined;
     const rows = await this.db
       .select({
         format: bookBucketFiles.format,
@@ -155,6 +165,7 @@ export class BookBucketRepository {
         totalSize: sum(bookBucketFiles.fileSize),
       })
       .from(bookBucketFiles)
+      .where(visibilityCondition)
       .groupBy(bookBucketFiles.format);
 
     let totalSizeBytes = 0;
@@ -167,7 +178,12 @@ export class BookBucketRepository {
     return { totalSizeBytes, byFormat };
   }
 
-  private buildSelectionConditions(status?: string, search?: string): SQL[] {
+  private buildVisibilityCondition(userId: number, isSuperuser: boolean): SQL | undefined {
+    if (isSuperuser) return undefined;
+    return or(eq(bookBucketFiles.uploadedBy, userId), isNull(bookBucketFiles.uploadedBy));
+  }
+
+  private buildSelectionConditions(status?: string, search?: string, userId?: number, isSuperuser?: boolean): SQL[] {
     const conditions: SQL[] = [];
     if (status === 'pending') {
       conditions.push(inArray(bookBucketFiles.status, ['pending', 'extracting', 'fetching']));
@@ -175,6 +191,9 @@ export class BookBucketRepository {
       conditions.push(eq(bookBucketFiles.status, status));
     }
     if (search) conditions.push(ilike(bookBucketFiles.fileName, `%${search}%`));
+    if (userId !== undefined && !isSuperuser) {
+      conditions.push(or(eq(bookBucketFiles.uploadedBy, userId), isNull(bookBucketFiles.uploadedBy))!);
+    }
     return conditions;
   }
 }

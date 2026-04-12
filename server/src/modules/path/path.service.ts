@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { readdir, stat } from 'fs/promises';
+import { lstat, readdir } from 'fs/promises';
 import { join, resolve, sep } from 'path';
 
-const BLOCKED = ['/proc', '/sys', '/dev', '/run', '/var/run'];
+const BLOCKED = ['/proc', '/sys', '/dev', '/run', '/var/run', '/etc', '/root'];
 
 @Injectable()
 export class PathService {
@@ -12,15 +12,18 @@ export class PathService {
       return [];
     }
     try {
+      const rootStat = await lstat(resolved);
+      if (rootStat.isSymbolicLink()) return [];
+
       const entries = await readdir(resolved, { withFileTypes: true });
       const dirs: { name: string; path: string }[] = [];
       for (const entry of entries) {
-        if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+        if (!entry.isDirectory()) continue;
         if (entry.name.startsWith('.')) continue;
         const full = join(resolved, entry.name);
         try {
-          const s = await stat(full);
-          if (s.isDirectory()) dirs.push({ name: entry.name, path: full });
+          const s = await lstat(full);
+          if (s.isDirectory() && !s.isSymbolicLink()) dirs.push({ name: entry.name, path: full });
         } catch {
           // skip inaccessible entries
         }

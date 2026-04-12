@@ -1,9 +1,10 @@
-import { IsEmail, IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { RECIPIENT_DEVICE_TYPES, RECIPIENT_FORMATS } from './email-recipient.constants';
 
 export class CreateEmailRecipientDto {
   @IsString()
+  @MaxLength(255)
   name: string;
 
   @IsEmail()

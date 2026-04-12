@@ -29,7 +29,7 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow<string>('auth.jwtSecret'),
-        signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn') },
+        signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn'), algorithm: 'HS256' },
       }),
     }),
     UserModule,

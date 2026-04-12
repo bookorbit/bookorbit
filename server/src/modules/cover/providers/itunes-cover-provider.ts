@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CoverSearchResult, type ITunesCoverResolution } from '@projectx/types';
 
 import { ProviderConfigService } from '../../metadata-preferences/provider-config.service';
+import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { CoverProvider, CoverSearchParams, ITUNES_PROVIDER_KEY } from './cover-provider';
 
 type ITunesCoverSearchResult = {
@@ -47,7 +48,7 @@ export class ITunesCoverProvider implements CoverProvider {
     try {
       const response = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
       if (!response.ok) {
-        this.logger.warn(`Search failed with status ${response.status} for query "${query}"`);
+        this.logger.warn(`Search failed with status ${response.status} for query "${sanitizeLogValue(query)}"`);
         return [];
       }
 
@@ -68,7 +69,7 @@ export class ITunesCoverProvider implements CoverProvider {
       });
       return mapped.filter((result): result is CoverSearchResult => result !== null);
     } catch (error) {
-      this.logger.warn(`Search failed for query "${query}": ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`Search failed for query "${sanitizeLogValue(query)}": ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }

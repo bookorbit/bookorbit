@@ -15,6 +15,7 @@ import { getFormatColor } from '../lib/format-colors'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
 const { hasPermission } = usePermissions()
@@ -131,6 +132,7 @@ const providerLinks = computed<ProviderLink[]>(() => {
 const descriptionExpanded = ref(false)
 const genresExpanded = ref(false)
 const coverLightboxOpen = ref(false)
+const safeDescription = useSafeHtml(() => detail.value?.description)
 
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
@@ -373,7 +375,7 @@ function toggleGenres() {
                   <div
                     class="text-sm leading-relaxed text-foreground/80 transition-all"
                     :class="descriptionExpanded ? '' : 'line-clamp-4'"
-                    v-html="detail.description"
+                    v-html="safeDescription"
                   />
                   <button
                     class="text-xs text-muted-foreground hover:text-foreground mt-1.5 transition-colors"

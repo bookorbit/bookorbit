@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 const VALID_STATUSES = ['pending', 'ready', 'error'] as const;
@@ -33,5 +33,6 @@ export class ListBookBucketFilesDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   search?: string;
 }

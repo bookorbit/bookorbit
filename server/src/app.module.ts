@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { appConfig, authConfig, dbConfig, emailConfig, fileWriteConfig, migrationConfig, storageConfig } from './config/config';
@@ -61,6 +62,16 @@ import { MigrationModule } from './modules/migration/migration.module';
       load: [appConfig, dbConfig, authConfig, storageConfig, fileWriteConfig, emailConfig, migrationConfig],
     }),
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot({
+      skipIf: () => process.env.NODE_ENV === 'test',
+      throttlers: [
+        {
+          name: 'default',
+          ttl: 60_000,
+          limit: 120,
+        },
+      ],
+    }),
     DbModule,
     CommonModule,
     SeedModule,
@@ -103,6 +114,7 @@ import { MigrationModule } from './modules/migration/migration.module';
     MigrationModule,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },

@@ -45,7 +45,7 @@ export class AuthorEnrichmentGateway implements OnGatewayInit, OnGatewayConnecti
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new Error('No token provided');
 
-      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token);
+      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
       const user = await this.authService.validateUser(payload.sub, payload.ver);
       if (!user) throw new Error('User not found or token revoked');
 

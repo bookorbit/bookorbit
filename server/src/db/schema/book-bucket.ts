@@ -3,6 +3,7 @@ import { bigint, check, index, integer, jsonb, pgTable, serial, text, timestamp,
 import type { BookBucketMetadata } from '@projectx/types';
 
 import { libraries, libraryFolders } from './libraries';
+import { users } from './auth';
 
 export const bookBucketFiles = pgTable(
   'book_bucket_files',
@@ -23,6 +24,7 @@ export const bookBucketFiles = pgTable(
     fetchedMetadataSources: jsonb('fetched_metadata_sources').$type<Partial<Record<keyof BookBucketMetadata, string>>>(),
     errorMessage: text('error_message'),
     metadataEditedAt: timestamp('metadata_edited_at', { withTimezone: true }),
+    uploadedBy: integer('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -31,6 +33,7 @@ export const bookBucketFiles = pgTable(
   },
   (t) => [
     index('book_bucket_files_status_idx').on(t.status),
+    index('book_bucket_files_uploaded_by_idx').on(t.uploadedBy),
     check('book_bucket_files_status_chk', sql`${t.status} in ('pending', 'extracting', 'fetching', 'ready', 'error')`),
     check('book_bucket_files_confidence_range_chk', sql`${t.confidence} is null or (${t.confidence} >= 0 and ${t.confidence} <= 100)`),
   ],

@@ -97,6 +97,7 @@ describe('BookBucketIngestService', () => {
         fileSize: 1024,
         format: 'epub',
         status: 'pending',
+        uploadedBy: null,
       });
     });
 

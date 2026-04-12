@@ -10,6 +10,7 @@ import {
 } from '@projectx/types';
 
 import { APP_SETTING_KEYS, DEFAULT_OIDC_CONFIG, type OidcFullConfig } from '../../common/constants/app-settings.constants';
+import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { AppSettingsRepository } from './app-settings.repository';
 
 const OIDC_TEST_TIMEOUT_MS = 10_000;
@@ -105,13 +106,16 @@ export class AppSettingsService {
       throw new BadRequestException('Issuer URI is not configured');
     }
 
-    const url = `${uri.replace(/\/$/, '')}/.well-known/openid-configuration`;
+    const parsedIssuer = await ensureSafeUrl(uri);
+    const normalizedIssuer = parsedIssuer.href.replace(/\/$/, '');
+    const discoveryUrl = `${normalizedIssuer}/.well-known/openid-configuration`;
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), OIDC_TEST_TIMEOUT_MS);
 
     const start = Date.now();
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(discoveryUrl, { signal: controller.signal, redirect: 'manual' });
       if (!res.ok) {
         throw new BadRequestException(`Provider returned HTTP ${res.status}`);
       }

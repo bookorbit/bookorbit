@@ -92,6 +92,8 @@ export class BookBucketFinalizeService implements OnModuleInit {
           excludedIds,
           status,
           search,
+          userId,
+          isSuperuser,
         });
         if (rows.length === 0) break;
 

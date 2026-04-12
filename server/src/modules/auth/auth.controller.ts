@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Req, Res } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { AuditAction, AuditResource } from '@projectx/types';
@@ -17,6 +18,9 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetupDto } from './dto/setup.dto';
 import { OidcService } from './oidc/oidc.service';
 
+const ONE_MINUTE_MS = 60_000;
+const ONE_HOUR_MS = 3_600_000;
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -25,6 +29,7 @@ export class AuthController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: 3, ttl: ONE_MINUTE_MS } })
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -37,6 +42,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 3, ttl: ONE_MINUTE_MS } })
   @Post('setup')
   @HttpCode(HttpStatus.CREATED)
   setup(@Body() dto: SetupDto, @Headers('x-setup-token') setupToken: string | undefined, @Res({ passthrough: true }) reply: FastifyReply) {
@@ -44,6 +50,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
@@ -88,6 +95,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 3, ttl: ONE_HOUR_MS } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: FastifyRequest) {
@@ -95,6 +103,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   resetPassword(@Body() dto: ResetPasswordDto, @Req() req: FastifyRequest) {

@@ -13,7 +13,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import '@fastify/cookie';
 import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -53,6 +53,16 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+const LOGIN_LOCKOUT_THRESHOLD = 5;
+const LOGIN_LOCKOUT_DURATION_MS = 15 * 60_000;
+const DUMMY_HASH = '$2a$12$LJ3m4ys3Lk0TSwHBbqP8b.3bFfR1oVDMhPzX8KPrPeuMEJBJJPa.G';
+
+function maskEmail(email: string): string {
+  const at = email.indexOf('@');
+  if (at <= 0) return '***';
+  return `${email[0]}***@${email.slice(at + 1)}`;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -82,13 +92,13 @@ export class AuthService {
       const existingUsername = await tx.query.users.findFirst({
         where: eq(sql`lower(${schema.users.username})`, dto.username.toLowerCase()),
       });
-      if (existingUsername) throw new ConflictException('Username already taken');
+      if (existingUsername) throw new ConflictException('Registration failed');
 
       if (dto.email) {
         const existingEmail = await tx.query.users.findFirst({
           where: eq(sql`lower(${schema.users.email})`, dto.email.toLowerCase()),
         });
-        if (existingEmail) throw new ConflictException('Email already in use');
+        if (existingEmail) throw new ConflictException('Registration failed');
       }
 
       const [user] = await tx
@@ -178,19 +188,45 @@ export class AuthService {
 
   async login(dto: LoginDto, reply: FastifyReply, ip?: string) {
     const user = await this.userService.findByUsername(dto.username);
-    if (!user || !user.active || !(await compare(dto.password, user.passwordHash))) {
+    const now = new Date();
+
+    if (user?.lockedUntil && user.lockedUntil > now) {
       this.logger.warn(
-        `[auth.login] [fail] username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="invalid credentials" - login failed`,
+        `[auth.login] [fail] userId=${user.id} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="account locked" - login failed`,
       );
       this.auditEvents.emit(AUDIT_EVENT, {
-        userId: null,
-        actorUsername: 'system',
+        userId: user.id,
+        actorUsername: user.username,
         action: AuditAction.AuthLoginFailed,
         description: `Failed login attempt for username '${dto.username}'`,
         ip,
-        meta: { attemptedUsername: dto.username },
+        meta: { attemptedUsername: dto.username, lockout: true, lockedUntil: user.lockedUntil.toISOString() },
       });
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const passwordHash = user?.passwordHash ?? DUMMY_HASH;
+    const isPasswordValid = await compare(dto.password, passwordHash);
+    if (!user || !user.active || !isPasswordValid) {
+      const lockedUntil = user && user.active ? await this.recordFailedLoginAttempt(user.id, user.failedLoginAttempts ?? 0, now) : null;
+      this.logger.warn(
+        `[auth.login] [fail]${user ? ` userId=${user.id}` : ''} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="${lockedUntil ? 'account locked' : 'invalid credentials'}" - login failed`,
+      );
+      this.auditEvents.emit(AUDIT_EVENT, {
+        userId: user?.id ?? null,
+        actorUsername: user?.username ?? 'system',
+        action: AuditAction.AuthLoginFailed,
+        description: `Failed login attempt for username '${dto.username}'`,
+        ip,
+        meta: lockedUntil
+          ? { attemptedUsername: dto.username, lockout: true, lockedUntil: lockedUntil.toISOString() }
+          : { attemptedUsername: dto.username },
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
+      await this.db.update(schema.users).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(schema.users.id, user.id));
     }
 
     const fullUser = await this.userService.findByIdWithPermissions(user.id);
@@ -395,17 +431,17 @@ export class AuthService {
   private async processPasswordResetAsync(email: string, ip?: string): Promise<void> {
     const user = await this.userService.findByEmail(email);
     if (!user || !user.email) {
-      this.logger.log(`Password reset requested for unknown email: ${email}`);
+      this.logger.log(`Password reset requested for unknown email: ${maskEmail(email)}`);
       return;
     }
 
     if (!user.active) {
-      this.logger.log(`Password reset requested for inactive account: ${email}`);
+      this.logger.log(`Password reset requested for inactive account: ${maskEmail(email)}`);
       return;
     }
 
     if (user.provisioningMethod === 'oidc') {
-      this.logger.log(`Password reset requested for OIDC account: ${email}`);
+      this.logger.log(`Password reset requested for OIDC account: ${maskEmail(email)}`);
       return;
     }
 
@@ -518,13 +554,30 @@ export class AuthService {
   }
 
   private assertSetupToken(setupToken: string | undefined) {
-    const isProduction = this.config.get<string>('app.nodeEnv') === 'production';
-    if (!isProduction) return;
+    const isDevelopment = this.config.get<string>('app.nodeEnv') === 'development';
+    if (isDevelopment) return;
 
     const expected = this.config.get<string>('auth.setupBootstrapToken') ?? '';
-    if (!expected || setupToken !== expected) {
+    const inputDigest = Buffer.from(sha256(setupToken ?? ''), 'hex');
+    const expectedDigest = Buffer.from(sha256(expected), 'hex');
+    if (!timingSafeEqual(inputDigest, expectedDigest)) {
       throw new ForbiddenException('Invalid setup token');
     }
+  }
+
+  private async recordFailedLoginAttempt(userId: number, currentFailedAttempts: number, now: Date): Promise<Date | null> {
+    const nextFailedAttempts = currentFailedAttempts + 1;
+    const lockedUntil = nextFailedAttempts >= LOGIN_LOCKOUT_THRESHOLD ? new Date(now.getTime() + LOGIN_LOCKOUT_DURATION_MS) : null;
+
+    await this.db
+      .update(schema.users)
+      .set({
+        failedLoginAttempts: lockedUntil ? 0 : nextFailedAttempts,
+        lockedUntil,
+      })
+      .where(eq(schema.users.id, userId));
+
+    return lockedUntil;
   }
 
   private setRefreshCookie(reply: FastifyReply, rawToken: string) {
@@ -553,7 +606,7 @@ export class AuthService {
     const ttlSeconds = parseDurationMs(this.config.get<string>('auth.jwtExpiresIn') ?? '15m') / 1000;
     reply.setCookie('access_token', accessToken, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/api',
       maxAge: ttlSeconds,
       secure: 'auto',
@@ -563,7 +616,7 @@ export class AuthService {
   private clearAccessCookie(reply: FastifyReply) {
     reply.setCookie('access_token', '', {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/api',
       maxAge: 0,
       secure: 'auto',

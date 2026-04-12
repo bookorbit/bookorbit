@@ -49,6 +49,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dompurify:
+        specifier: ^3.4.1
+        version: 3.4.1
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
@@ -98,6 +101,9 @@ importers:
       "@tsconfig/node24":
         specifier: ^24.0.4
         version: 24.0.4
+      "@types/dompurify":
+        specifier: ^3.2.0
+        version: 3.2.0
       "@types/jsdom":
         specifier: ^28.0.1
         version: 28.0.1
@@ -224,6 +230,9 @@ importers:
       "@nestjs/terminus":
         specifier: ^11.1.1
         version: 11.1.1(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      "@nestjs/throttler":
+        specifier: ^6.5.0
+        version: 6.5.0(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(reflect-metadata@0.2.2)
       "@nestjs/websockets":
         specifier: ^11.1.19
         version: 11.1.19(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(@nestjs/platform-socket.io@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -2750,6 +2759,16 @@ packages:
       "@nestjs/platform-express":
         optional: true
 
+  "@nestjs/throttler@6.5.0":
+    resolution:
+      {
+        integrity: sha512-9j0ZRfH0QE1qyrj9JjIRDz5gQLPqq9yVC2nHsrosDVAfI5HHw08/aUAWx9DZLSdQf4HDkmhTTEGLrRFHENvchQ==,
+      }
+    peerDependencies:
+      "@nestjs/common": ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
+      "@nestjs/core": ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
+      reflect-metadata: ^0.1.13 || ^0.2.0
+
   "@nestjs/websockets@11.1.19":
     resolution:
       {
@@ -3764,6 +3783,13 @@ packages:
         integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==,
       }
 
+  "@types/dompurify@3.2.0":
+    resolution:
+      {
+        integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==,
+      }
+    deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
+
   "@types/eslint-scope@3.7.7":
     resolution:
       {
@@ -3942,6 +3968,12 @@ packages:
     resolution:
       {
         integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==,
+      }
+
+  "@types/trusted-types@2.0.7":
+    resolution:
+      {
+        integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==,
       }
 
   "@types/unzipper@0.10.11":
@@ -5706,6 +5738,12 @@ packages:
         integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==,
       }
     engines: { node: ">= 4" }
+
+  dompurify@3.4.1:
+    resolution:
+      {
+        integrity: sha512-JahakDAIg1gyOm7dlgWSDjV4n7Ip2PKR55NIT6jrMfIgLFgWo81vdr1/QGqWtFNRqXP9UV71oVePtjqS2ebnPw==,
+      }
 
   domutils@3.2.2:
     resolution:
@@ -11651,6 +11689,12 @@ snapshots:
       "@nestjs/core": 11.1.19(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       tslib: 2.8.1
 
+  "@nestjs/throttler@6.5.0(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(reflect-metadata@0.2.2)":
+    dependencies:
+      "@nestjs/common": 11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      "@nestjs/core": 11.1.19(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata: 0.2.2
+
   "@nestjs/websockets@11.1.19(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(@nestjs/platform-socket.io@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)":
     dependencies:
       "@nestjs/common": 11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -12101,6 +12145,10 @@ snapshots:
 
   "@types/deep-eql@4.0.2": {}
 
+  "@types/dompurify@3.2.0":
+    dependencies:
+      dompurify: 3.4.1
+
   "@types/eslint-scope@3.7.7":
     dependencies:
       "@types/eslint": 9.6.1
@@ -12214,6 +12262,9 @@ snapshots:
       "@types/superagent": 8.1.9
 
   "@types/tough-cookie@4.0.5": {}
+
+  "@types/trusted-types@2.0.7":
+    optional: true
 
   "@types/unzipper@0.10.11":
     dependencies:
@@ -13367,6 +13418,10 @@ snapshots:
   domhandler@5.0.3:
     dependencies:
       domelementtype: 2.3.0
+
+  dompurify@3.4.1:
+    optionalDependencies:
+      "@types/trusted-types": 2.0.7
 
   domutils@3.2.2:
     dependencies:

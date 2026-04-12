@@ -24,13 +24,11 @@ const avatarCardOpen = ref(false)
 const isMobile = useMediaQuery('(max-width: 767px)')
 
 const formName = ref('')
-const formEmail = ref('')
 
 watch(
   () => user.value,
   (current) => {
     formName.value = current?.name ?? ''
-    formEmail.value = current?.email ?? ''
   },
   { immediate: true },
 )
@@ -41,7 +39,7 @@ const profileBusy = computed(() => busy.value || savingProfile.value)
 const profileChanged = computed(() => {
   const current = user.value
   if (!current) return false
-  return formName.value.trim() !== current.name || formEmail.value.trim() !== (current.email ?? '')
+  return formName.value.trim() !== current.name
 })
 const saveFeedback = computed(() => {
   if (profileError.value) return profileError.value
@@ -92,13 +90,11 @@ async function saveProfile() {
 
   savingProfile.value = true
   try {
-    const trimmedEmail = formEmail.value.trim()
     const res = await api('/api/v1/users/me', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: trimmedName,
-        email: trimmedEmail.length > 0 ? trimmedEmail : null,
       }),
     })
 
@@ -120,7 +116,7 @@ async function saveProfile() {
   }
 }
 
-watch([formName, formEmail], () => {
+watch([formName], () => {
   profileState.value = 'idle'
   if (profileError.value) profileError.value = null
 })
@@ -180,11 +176,12 @@ watch(
           <div class="space-y-1.5">
             <label class="settings-label">Email</label>
             <input
-              v-model="formEmail"
+              :value="user?.email ?? ''"
               type="email"
-              autocomplete="email"
-              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              readonly
+              class="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground truncate"
             />
+            <p class="text-xs text-muted-foreground">Contact an administrator to change your email address.</p>
           </div>
         </div>
 

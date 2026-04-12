@@ -67,6 +67,8 @@ CREATE TABLE "users" (
 	"is_superuser" boolean DEFAULT false NOT NULL,
 	"is_default_password" boolean DEFAULT false NOT NULL,
 	"token_version" integer DEFAULT 1 NOT NULL,
+	"failed_login_attempts" integer DEFAULT 0 NOT NULL,
+	"locked_until" timestamp with time zone,
 	"settings" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"oidc_subject" text,
 	"oidc_issuer" text,
@@ -80,6 +82,7 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_email_unique" UNIQUE("email"),
 	CONSTRAINT "users_provisioning_method_chk" CHECK ("users"."provisioning_method" in ('local', 'manual', 'oidc')),
 	CONSTRAINT "users_token_version_nonnegative_chk" CHECK ("users"."token_version" >= 0),
+	CONSTRAINT "users_failed_login_attempts_nonnegative_chk" CHECK ("users"."failed_login_attempts" >= 0),
 	CONSTRAINT "users_avatar_version_nonnegative_chk" CHECK ("users"."avatar_version" >= 0)
 );
 --> statement-breakpoint
@@ -666,6 +669,7 @@ CREATE TABLE "book_bucket_files" (
 	"fetched_metadata_sources" jsonb,
 	"error_message" text,
 	"metadata_edited_at" timestamp with time zone,
+	"uploaded_by" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "book_bucket_files_absolute_path_unique" UNIQUE("absolute_path"),
@@ -868,6 +872,7 @@ ALTER TABLE "kobo_snapshot_books" ADD CONSTRAINT "kobo_snapshot_books_book_id_bo
 ALTER TABLE "kobo_sync_settings" ADD CONSTRAINT "kobo_sync_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_bucket_files" ADD CONSTRAINT "book_bucket_files_target_library_id_libraries_id_fk" FOREIGN KEY ("target_library_id") REFERENCES "public"."libraries"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_bucket_files" ADD CONSTRAINT "book_bucket_files_target_folder_id_library_folders_id_fk" FOREIGN KEY ("target_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_bucket_files" ADD CONSTRAINT "book_bucket_files_uploaded_by_users_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file_write_log" ADD CONSTRAINT "file_write_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -982,6 +987,7 @@ CREATE UNIQUE INDEX "opds_users_username_lower_uidx" ON "opds_users" USING btree
 CREATE INDEX "kobo_devices_user_id_idx" ON "kobo_devices" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "kobo_snapshot_books_snapshot_synced_book_idx" ON "kobo_snapshot_books" USING btree ("snapshot_id","synced","book_id");--> statement-breakpoint
 CREATE INDEX "book_bucket_files_status_idx" ON "book_bucket_files" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "book_bucket_files_uploaded_by_idx" ON "book_bucket_files" USING btree ("uploaded_by");--> statement-breakpoint
 CREATE INDEX "fwl_book_id_written_at_idx" ON "file_write_log" USING btree ("book_id","written_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_one_default_per_user_uidx" ON "email_templates" USING btree ("user_id") WHERE "email_templates"."is_default" = true and "email_templates"."user_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "email_templates_system_name_unique" ON "email_templates" USING btree ("name") WHERE "email_templates"."user_id" is null;--> statement-breakpoint

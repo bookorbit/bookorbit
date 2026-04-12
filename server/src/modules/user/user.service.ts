@@ -130,9 +130,6 @@ export class UserService {
   }
 
   async updateMe(userId: number, dto: UpdateMeDto) {
-    if (dto.email !== undefined && dto.email !== null) {
-      await this.assertEmailAvailable(dto.email, userId);
-    }
     const user = await this.userRepo.update(userId, dto);
     if (!user) throw new NotFoundException('User not found');
     return user;

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { expect, vi } from 'vitest';
 import fastifyCookie from '@fastify/cookie';
 import { count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { hash } from 'bcryptjs';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -47,6 +48,7 @@ export function makeMetadataNoopMock(): MetadataNoopMock {
 }
 
 async function getAdminToken(app: NestFastifyApplication): Promise<string> {
+  const db = app.get<Db>(DB);
   const setupResponse = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/setup',
@@ -60,7 +62,39 @@ async function getAdminToken(app: NestFastifyApplication): Promise<string> {
   }
 
   if (setupResponse.statusCode === 409) {
-    throw new Error('Initial setup already completed. Use the dedicated e2e database reset command before running e2e tests.');
+    const loginResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { username: ADMIN_SETUP_DTO.username, password: ADMIN_SETUP_DTO.password },
+    });
+    if (loginResponse.statusCode === 200) {
+      const body = loginResponse.json() as { accessToken?: string };
+      if (body.accessToken) return body.accessToken;
+    }
+
+    const suffix = randomUUID().replaceAll('-', '');
+    const fallbackUsername = `scanner-e2e-admin-${suffix}`;
+    const passwordHash = await hash(ADMIN_SETUP_DTO.password, 4);
+    await db.insert(schema.users).values({
+      username: fallbackUsername,
+      name: 'Scanner E2E Admin (fallback)',
+      email: `${fallbackUsername}@example.com`,
+      passwordHash,
+      isSuperuser: true,
+      isDefaultPassword: false,
+      provisioningMethod: 'local',
+    });
+    const fallbackResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { username: fallbackUsername, password: ADMIN_SETUP_DTO.password },
+    });
+    if (fallbackResponse.statusCode !== 200) {
+      throw new Error(`app-harness: fallback admin login failed (${fallbackResponse.statusCode})`);
+    }
+    const body = fallbackResponse.json() as { accessToken?: string };
+    if (!body.accessToken) throw new Error('Fallback login succeeded but accessToken was missing');
+    return body.accessToken;
   }
 
   throw new Error(`Unexpected setup response: ${setupResponse.statusCode} ${setupResponse.body}`);

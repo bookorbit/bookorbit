@@ -1,5 +1,5 @@
 {
-  "id": "5e7847b4-0c76-43ea-8030-9d4b4e1cb352",
+  "id": "450f16cf-cf5a-4969-8f2c-7df4b18fd52e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -599,6 +599,19 @@
           "notNull": true,
           "default": 1
         },
+        "failed_login_attempts": {
+          "name": "failed_login_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "settings": {
           "name": "settings",
           "type": "jsonb",
@@ -739,6 +752,10 @@
         "users_token_version_nonnegative_chk": {
           "name": "users_token_version_nonnegative_chk",
           "value": "\"users\".\"token_version\" >= 0"
+        },
+        "users_failed_login_attempts_nonnegative_chk": {
+          "name": "users_failed_login_attempts_nonnegative_chk",
+          "value": "\"users\".\"failed_login_attempts\" >= 0"
         },
         "users_avatar_version_nonnegative_chk": {
           "name": "users_avatar_version_nonnegative_chk",
@@ -6105,6 +6122,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6135,6 +6158,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "book_bucket_files_uploaded_by_idx": {
+          "name": "book_bucket_files_uploaded_by_idx",
+          "columns": [
+            {
+              "expression": "uploaded_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -6152,6 +6190,15 @@
           "tableFrom": "book_bucket_files",
           "tableTo": "library_folders",
           "columnsFrom": ["target_folder_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "book_bucket_files_uploaded_by_users_id_fk": {
+          "name": "book_bucket_files_uploaded_by_users_id_fk",
+          "tableFrom": "book_bucket_files",
+          "tableTo": "users",
+          "columnsFrom": ["uploaded_by"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"

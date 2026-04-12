@@ -503,13 +503,15 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       });
       expectError(adminDuplicateEmail, 409, 'Email already in use');
 
+      // Self-service email change is disabled (SEC-030). The field is not in UpdateMeDto
+      // so the global forbidNonWhitelisted pipe rejects it with 400.
       const selfDuplicateEmail = await ctx.app.inject({
         method: 'PATCH',
         url: '/api/v1/users/me',
         headers: authHeader(regularB.accessToken),
         payload: { email: regularA.username + '@example.com' },
       });
-      expectError(selfDuplicateEmail, 409, 'Email already in use');
+      expectError(selfDuplicateEmail, 400, 'should not exist');
     });
 
     it('updates profile settings and enforces avatar upload/read/delete contracts', async () => {

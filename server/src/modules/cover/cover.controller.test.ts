@@ -41,7 +41,7 @@ describe('CoverController', () => {
     };
     coverService.proxyImage.mockResolvedValue({ buffer, contentType: 'image/jpeg' });
 
-    await controller.proxyImage('https://covers.example.com/dune.jpg', reply as never);
+    await controller.proxyImage({ url: 'https://covers.example.com/dune.jpg' }, reply as never);
 
     expect(coverService.proxyImage).toHaveBeenCalledWith('https://covers.example.com/dune.jpg');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');

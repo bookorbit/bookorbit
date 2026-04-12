@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 import { MetadataProviderKey } from '@projectx/types';
 
@@ -8,5 +8,6 @@ export class LookupMetadataDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
   id: string;
 }

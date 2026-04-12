@@ -69,10 +69,12 @@ export class AuthorsRepository {
         : params.sort === 'lastAddedAt'
           ? this.orderByDirection(lastAddedExpr, params.order)
           : params.sort === 'lastEnrichedAt'
-            ? sql`${authors.lastEnrichedAt} ${sql.raw(params.order.toUpperCase())} NULLS LAST`
+            ? params.order === 'asc'
+              ? sql`${authors.lastEnrichedAt} ASC NULLS LAST`
+              : sql`${authors.lastEnrichedAt} DESC NULLS LAST`
             : params.sort === 'sortName'
-              ? sql`${sortNameExpr} ${sql.raw(params.order.toUpperCase())}`
-              : sql`${authors.name} ${sql.raw(params.order.toUpperCase())}`;
+              ? this.orderByDirection(sortNameExpr, params.order)
+              : this.orderByDirection(authors.name, params.order);
 
     const having = params.minBookCount !== undefined ? sql`count(distinct ${books.id}) >= ${params.minBookCount}` : undefined;
 
@@ -404,7 +406,7 @@ export class AuthorsRepository {
     const clauses: SQL[] = [inArray(books.libraryId, params.libraryIds)];
     const query = params.q?.trim();
     if (query) {
-      clauses.push(ilike(authors.name, `%${query}%`));
+      clauses.push(ilike(authors.name, `%${escapeLikePattern(query)}%`));
     }
     if (params.hasPhoto !== undefined) {
       clauses.push(eq(authors.hasPhoto, params.hasPhoto));
@@ -413,9 +415,19 @@ export class AuthorsRepository {
   }
 
   private orderByDirection(
-    expression: SQL | typeof authors.sortName | typeof bookMetadata.title | typeof bookMetadata.publishedYear | typeof books.addedAt,
+    expression:
+      | SQL
+      | typeof authors.name
+      | typeof authors.sortName
+      | typeof bookMetadata.title
+      | typeof bookMetadata.publishedYear
+      | typeof books.addedAt,
     order: SortDirection,
   ) {
     return order === 'asc' ? asc(expression) : desc(expression);
   }
+}
+
+function escapeLikePattern(s: string): string {
+  return s.replace(/[\\%_]/g, '\\$&');
 }

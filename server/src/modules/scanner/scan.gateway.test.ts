@@ -6,7 +6,8 @@ function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateUser: vi.fn() };
   const scanJobStore = { get: vi.fn(), isRunning: vi.fn() };
-  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any);
+  const configService = { get: vi.fn().mockReturnValue('http://localhost:5173') };
+  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any, configService as any);
   return { gateway, jwtService, authService, scanJobStore };
 }
 
@@ -102,7 +103,7 @@ describe('handleConnection', () => {
 
     await gateway.handleConnection(client);
 
-    expect(jwtService.verify).toHaveBeenCalledWith('valid');
+    expect(jwtService.verify).toHaveBeenCalledWith('valid', { algorithms: ['HS256'] });
     expect(authService.validateUser).toHaveBeenCalledWith(42, 3);
     expect(client.data.user).toEqual({ id: 42, username: 'reader' });
     expect(disconnect).not.toHaveBeenCalled();
@@ -128,6 +129,24 @@ describe('handleConnection', () => {
 });
 
 describe('subscription lifecycle', () => {
+  it('afterInit injects runtime cors origin and credentials on socket engine', () => {
+    const { gateway } = makeGateway();
+    const server = { engine: { opts: { cors: { methods: ['GET'] } } } } as any;
+
+    gateway.afterInit(server);
+
+    expect(server.engine.opts.cors).toEqual({
+      methods: ['GET'],
+      origin: 'http://localhost:5173',
+      credentials: true,
+    });
+  });
+
+  it('afterInit safely no-ops when engine options are unavailable', () => {
+    const { gateway } = makeGateway();
+    expect(() => gateway.afterInit({} as any)).not.toThrow();
+  });
+
   it('logs disconnects and emits an in-flight progress snapshot on subscribe', () => {
     const { gateway, scanJobStore } = makeGateway();
     scanJobStore.get.mockReturnValue({

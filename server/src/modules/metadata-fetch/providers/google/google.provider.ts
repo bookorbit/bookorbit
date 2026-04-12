@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
@@ -75,29 +76,30 @@ export class GoogleProvider implements IdentifiableProvider {
   private async fetchVolumes(query: string, apiKey: string, signal?: AbortSignal): Promise<MetadataCandidate[]> {
     const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' }, apiKey);
     const startedAt = Date.now();
-    this.logger.log(`[google] [start] op=search query="${query}"`);
+    const safeQuery = sanitizeLogValue(query);
+    this.logger.log(`[google] [start] op=search query="${safeQuery}"`);
 
     try {
       const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
-          `[google] [fail] op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[google] [fail] op=search query="${safeQuery}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return [];
       }
       const body = (await res.json()) as GoogleBooksResponse;
       const items = (body.items ?? []).map(mapGoogleVolume);
       this.logger.log(
-        `[google] [end] op=search query="${query}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
+        `[google] [end] op=search query="${safeQuery}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
       );
       return items;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[google] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[google] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.warn(
-        `[google] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[google] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       throw err;
     }

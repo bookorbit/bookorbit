@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
@@ -36,29 +37,30 @@ export class AudibleProvider implements IdentifiableProvider {
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
     const requestUrl = url.toString();
     const startedAt = Date.now();
-    this.logger.log(`[audible] [start] op=search query="${query}"`);
+    const safeQuery = sanitizeLogValue(query);
+    this.logger.log(`[audible] [start] op=search query="${safeQuery}"`);
 
     try {
       const res = await fetchWithThrottle(requestUrl, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, params.signal) });
       if (!res.ok) {
         this.logger.warn(
-          `[audible] [fail] op=search query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[audible] [fail] op=search query="${safeQuery}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return [];
       }
       const body = (await res.json()) as AudibleSearchResponse;
       const results = (body.products ?? []).map(mapAudibleProduct);
       this.logger.log(
-        `[audible] [end] op=search query="${query}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
+        `[audible] [end] op=search query="${safeQuery}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
       );
       return results;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[audible] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(`[audible] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.error(
-        `[audible] [fail] op=search query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[audible] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return [];
     }

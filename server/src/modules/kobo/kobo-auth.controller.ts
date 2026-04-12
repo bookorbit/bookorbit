@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
+import { KoboAuthDeviceBodyDto } from './dto/kobo-auth-device-body.dto';
+import { KoboAuthRefreshBodyDto } from './dto/kobo-auth-refresh-body.dto';
 
 @Controller('kobo/:deviceToken')
 @Public()
@@ -10,7 +12,7 @@ import { KoboTokenGuard } from './guards/kobo-token.guard';
 export class KoboAuthController {
   @Post('v1/auth/device')
   @HttpCode(HttpStatus.OK)
-  authDevice(@Body() body: Record<string, unknown>) {
+  authDevice(@Body() body: KoboAuthDeviceBodyDto) {
     return {
       AccessToken: randomUUID(),
       RefreshToken: randomUUID(),
@@ -22,7 +24,7 @@ export class KoboAuthController {
 
   @Post('v1/auth/refresh')
   @HttpCode(HttpStatus.OK)
-  authRefresh(@Body() body: Record<string, unknown>) {
+  authRefresh(@Body() body: KoboAuthRefreshBodyDto) {
     return {
       AccessToken: randomUUID(),
       RefreshToken: body.RefreshToken ?? randomUUID(),

@@ -207,10 +207,11 @@ describe('UserService', () => {
     await expect(service.updateUser(2, { name: 'x' }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('updateMe rejects duplicate email conflicts explicitly', async () => {
-    userRepo.findByEmail.mockResolvedValue({ id: 9 });
+  it('SEC-030: updateMe ignores email field (email changes not permitted via self-service)', async () => {
+    userRepo.update.mockResolvedValue({ id: 2, name: 'Alice', email: 'alice@example.com' });
 
-    await expect(service.updateMe(2, { email: 'dup@example.com' })).rejects.toBeInstanceOf(ConflictException);
+    await service.updateMe(2, {} as never);
+    expect(userRepo.findByEmail).not.toHaveBeenCalled();
   });
 
   it('updateMe throws when repository update returns null', async () => {

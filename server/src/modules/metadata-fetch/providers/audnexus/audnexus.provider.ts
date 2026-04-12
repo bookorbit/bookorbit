@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { normalizeAudibleDomain } from '../audible/normalize-audible-domain';
@@ -63,29 +64,32 @@ export class AudnexusProvider implements MetadataProvider {
     url.searchParams.set('response_groups', AUDIBLE_RESPONSE_GROUPS);
     const requestUrl = url.toString();
     const startedAt = Date.now();
-    this.logger.log(`[audnexus] [start] op=resolve-asin method=GET query="${query}"`);
+    const safeQuery = sanitizeLogValue(query);
+    this.logger.log(`[audnexus] [start] op=resolve-asin method=GET query="${safeQuery}"`);
 
     try {
       const res = await fetchWithThrottle(requestUrl, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
-          `[audnexus] [fail] op=resolve-asin method=GET query="${query}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[audnexus] [fail] op=resolve-asin method=GET query="${safeQuery}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
         return null;
       }
       const body = (await res.json()) as AudibleSearchResponse;
       const asin = body.products?.[0]?.asin?.trim() || null;
       this.logger.log(
-        `[audnexus] [end] op=resolve-asin method=GET query="${query}" status=${res.status} found=${asin != null} durationMs=${Date.now() - startedAt}`,
+        `[audnexus] [end] op=resolve-asin method=GET query="${safeQuery}" status=${res.status} found=${asin != null} durationMs=${Date.now() - startedAt}`,
       );
       return asin;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[audnexus] [fail] op=resolve-asin method=GET query="${query}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(
+          `[audnexus] [fail] op=resolve-asin method=GET query="${safeQuery}" durationMs=${Date.now() - startedAt} message="throttled"`,
+        );
         throw err;
       }
       this.logger.error(
-        `[audnexus] [fail] op=resolve-asin method=GET query="${query}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[audnexus] [fail] op=resolve-asin method=GET query="${safeQuery}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
       return null;
     }
