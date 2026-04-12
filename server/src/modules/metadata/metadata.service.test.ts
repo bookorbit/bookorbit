@@ -530,6 +530,28 @@ describe('MetadataService', () => {
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ publishedYear: null }));
   });
 
+  it('extractAndSave(mobi) normalizes out-of-range 4-digit years to null before db writes', async () => {
+    const { db, updateSet } = makeDb();
+    const service = makeService(db);
+    vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+    vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+
+    mockParseMobiFile.mockResolvedValue({
+      title: 'Ancient Book',
+      description: null,
+      isbn: 'isbn',
+      publisher: null,
+      publishedDate: '0101-01-01',
+      language: 'en',
+      authors: ['Author'],
+      tags: ['Tag'],
+    });
+
+    await service.extractAndSave(34, '/tmp/ancient-book.mobi', 'mobi');
+
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ publishedYear: null }));
+  });
+
   it('replaceAuthors normalizes names and deduplicates case-insensitively before db writes', async () => {
     const { db, deleteWhere, transaction } = makeDb();
     const service = makeService(db);

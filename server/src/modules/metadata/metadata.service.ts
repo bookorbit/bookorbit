@@ -44,6 +44,16 @@ interface RelationMutationOptions {
 const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] as const;
 const MAX_RELATION_NAME_LENGTH = 200;
 const EXTRACTED_COVER_SOURCE = 'extracted';
+const MIN_PUBLISHED_YEAR = 1000;
+const MAX_PUBLISHED_YEAR = 2200;
+
+function normalizePublishedYear(year: number | null | undefined): number | null | undefined {
+  if (year === undefined) return undefined;
+  if (year === null) return null;
+  if (!Number.isInteger(year)) return null;
+  if (year < MIN_PUBLISHED_YEAR || year > MAX_PUBLISHED_YEAR) return null;
+  return year;
+}
 
 @Injectable()
 export class MetadataService {
@@ -490,7 +500,7 @@ export class MetadataService {
     if (filtered.title !== undefined) scalarFields.title = filtered.title;
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
     if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
-    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = filtered.publishedYear;
+    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
     if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
     if (filtered.audioMetadata?.chapters !== undefined) scalarFields.chapters = filtered.audioMetadata.chapters;
@@ -545,7 +555,7 @@ export class MetadataService {
     if (filtered.isbn10 !== undefined) scalarFields.isbn10 = filtered.isbn10;
     if (filtered.isbn13 !== undefined) scalarFields.isbn13 = filtered.isbn13;
     if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
-    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = filtered.publishedYear;
+    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
     if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;

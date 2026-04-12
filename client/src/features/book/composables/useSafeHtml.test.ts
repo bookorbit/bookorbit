@@ -4,7 +4,7 @@ import { useSafeHtml } from './useSafeHtml'
 
 vi.mock('dompurify', () => ({
   default: {
-    sanitize: vi.fn((input: string, config: { ALLOWED_TAGS: string[] }) => {
+    sanitize: vi.fn<(input: string, config: { ALLOWED_TAGS: string[] }) => string>((input: string, config: { ALLOWED_TAGS: string[] }) => {
       if (!config?.ALLOWED_TAGS) return ''
       // Simulate DOMPurify by stripping disallowed tags and dangerous attributes
       return input
