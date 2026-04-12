@@ -1,9 +1,13 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import type { GroupRule, SortField, SortSpec } from '@projectx/types';
 import { SORT_FIELDS } from '@projectx/types';
-import { IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 
 const SORT_DIRECTIONS: ReadonlyArray<SortSpec['dir']> = ['asc', 'desc'];
+
+function trimString(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
 
 export class SortSpecDto {
   @IsIn(SORT_FIELDS)
@@ -18,9 +22,11 @@ export class CreateLensDto {
   @MaxLength(255)
   name: string;
 
-  @IsOptional()
+  @Transform(({ value }) => trimString(value))
   @IsString()
-  icon?: string;
+  @IsNotEmpty()
+  @MaxLength(64)
+  icon: string;
 
   @IsOptional()
   @IsObject()

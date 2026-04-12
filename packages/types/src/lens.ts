@@ -16,7 +16,7 @@ export interface Lens {
 
 export interface CreateLensPayload {
   name: string;
-  icon?: string;
+  icon: string;
   filter?: GroupRule;
   defaultSort: SortSpec[];
   isPublic?: boolean;

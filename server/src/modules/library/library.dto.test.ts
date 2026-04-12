@@ -16,17 +16,29 @@ async function hasErrors(dto: object): Promise<boolean> {
 
 describe('Library DTO validation', () => {
   it('CreateLibraryDto requires non-empty name and at least one folder', async () => {
-    const bad = plainToInstance(CreateLibraryDto, { name: '', folders: [] });
+    const bad = plainToInstance(CreateLibraryDto, { name: '', icon: 'BookOpen', folders: [] });
     expect(await hasErrors(bad)).toBe(true);
 
-    const good = plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', folders: ['/books/scifi'] });
+    const good = plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', icon: 'BookOpen', folders: ['/books/scifi'] });
     expect(await hasErrors(good)).toBe(false);
   });
 
   it('CreateLibraryDto validates organization mode', async () => {
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'bad' }))).toBe(true);
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'book_per_folder' }))).toBe(false);
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', folders: ['/a'], organizationMode: 'book_per_file' }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], organizationMode: 'bad' }))).toBe(true);
+    expect(
+      await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], organizationMode: 'book_per_folder' })),
+    ).toBe(false);
+    expect(
+      await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], organizationMode: 'book_per_file' })),
+    ).toBe(false);
+  });
+
+  it('CreateLibraryDto requires a non-empty icon and UpdateLibraryDto rejects empty icons when provided', async () => {
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', folders: ['/books/scifi'] }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', icon: '   ', folders: ['/books/scifi'] }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { icon: '   ' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { icon: null }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { icon: 'BookOpen' }))).toBe(false);
   });
 
   it('UpdateLibraryDto allows explicit null fileNamingPattern while validating string values', async () => {
@@ -53,7 +65,7 @@ describe('Library DTO validation', () => {
   });
 
   it('CreateLibraryDto validates readingThreshold bounds', async () => {
-    const base = { name: 'x', folders: ['/a'] };
+    const base = { name: 'x', icon: 'BookOpen', folders: ['/a'] };
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 0.04 }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 5.01 }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, readingThreshold: 0.05 }))).toBe(false);
@@ -61,7 +73,7 @@ describe('Library DTO validation', () => {
   });
 
   it('CreateLibraryDto validates markAsFinishedPercentComplete bounds', async () => {
-    const base = { name: 'x', folders: ['/a'] };
+    const base = { name: 'x', icon: 'BookOpen', folders: ['/a'] };
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 89 }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 101 }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 90.5 }))).toBe(true);
@@ -77,7 +89,7 @@ describe('Library DTO validation', () => {
   });
 
   describe('file write settings validation', () => {
-    const base = { name: 'x', folders: ['/a'] };
+    const base = { name: 'x', icon: 'BookOpen', folders: ['/a'] };
 
     it('CreateLibraryDto accepts valid boolean file write flags', async () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEnabled: true }))).toBe(false);

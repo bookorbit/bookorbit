@@ -34,6 +34,8 @@ describe('Collection DTO validation', () => {
       expect((await errorsFor(UpdateCollectionDto, {})).length).toBe(0);
       expect((await errorsFor(UpdateCollectionDto, { icon: '🧪' })).length).toBe(0);
       expect((await errorsFor(UpdateCollectionDto, { name: '' })).length).toBeGreaterThan(0);
+      expect((await errorsFor(UpdateCollectionDto, { icon: '   ' })).length).toBeGreaterThan(0);
+      expect((await errorsFor(UpdateCollectionDto, { icon: null })).length).toBeGreaterThan(0);
     });
   });
 

@@ -97,14 +97,15 @@ describe('LibraryService', () => {
 
   it('create applies defaults, inserts folders, and starts an async scan', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi' }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi', icon: 'BookOpen' }]);
     libraryRepo.insertFolder.mockResolvedValueOnce([{ id: 11, path: '/a' }]).mockResolvedValueOnce([{ id: 12, path: '/b' }]);
 
-    const result = await service.create({ name: 'Sci-Fi', folders: ['/a', '/b'] } as any);
+    const result = await service.create({ name: 'Sci-Fi', icon: 'BookOpen', folders: ['/a', '/b'] } as any);
 
     expect(libraryRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Sci-Fi',
+        icon: 'BookOpen',
         displayOrder: 0,
         watch: false,
         metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
@@ -123,10 +124,10 @@ describe('LibraryService', () => {
 
   it('create passes file write defaults to insert', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi' }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi', icon: 'BookOpen' }]);
     libraryRepo.insertFolder.mockResolvedValueOnce([{ id: 11, path: '/a' }]);
 
-    await service.create({ name: 'Sci-Fi', folders: ['/a'] } as any);
+    await service.create({ name: 'Sci-Fi', icon: 'BookOpen', folders: ['/a'] } as any);
 
     expect(libraryRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -144,10 +145,10 @@ describe('LibraryService', () => {
 
   it('create starts watcher immediately when watch is enabled', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 6, name: 'Watched', watch: true }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 6, name: 'Watched', icon: 'BookOpen', watch: true }]);
     libraryRepo.insertFolder.mockResolvedValueOnce([{ id: 21, path: '/watch-a' }]).mockResolvedValueOnce([{ id: 22, path: '/watch-b' }]);
 
-    await service.create({ name: 'Watched', folders: ['/watch-a', '/watch-b'], watch: true } as any);
+    await service.create({ name: 'Watched', icon: 'BookOpen', folders: ['/watch-a', '/watch-b'], watch: true } as any);
 
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(6, ['/watch-a', '/watch-b']);
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(6);
@@ -156,11 +157,18 @@ describe('LibraryService', () => {
   it('create rejects duplicate library names', async () => {
     libraryRepo.findByName.mockResolvedValue([{ id: 9 }]);
 
-    await expect(service.create({ name: 'Dup', folders: ['/x'] } as any)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.create({ name: 'Dup', icon: 'BookOpen', folders: ['/x'] } as any)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('create rejects missing icons', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+
+    await expect(service.create({ name: 'Sci-Fi', folders: ['/a'] } as any)).rejects.toBeInstanceOf(BadRequestException);
+    expect(libraryRepo.insert).not.toHaveBeenCalled();
   });
 
   it('update synchronizes folder additions and removals', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 3, name: 'Current', watch: false }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 3, name: 'Current', icon: 'BookOpen', watch: false }]);
     libraryRepo.update.mockResolvedValue([{ id: 3, name: 'Updated' }]);
     libraryRepo.findFoldersByLibrary
       .mockResolvedValueOnce([
@@ -181,7 +189,7 @@ describe('LibraryService', () => {
   });
 
   it('update starts watcher when watch toggles on', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 7, name: 'Current', watch: false }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 7, name: 'Current', icon: 'BookOpen', watch: false }]);
     libraryRepo.update.mockResolvedValue([{ id: 7, name: 'Current', watch: true }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 31, path: '/watched' }]);
 
@@ -192,7 +200,7 @@ describe('LibraryService', () => {
   });
 
   it('update stops watcher when watch toggles off', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Current', watch: true }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Current', icon: 'BookOpen', watch: true }]);
     libraryRepo.update.mockResolvedValue([{ id: 8, name: 'Current', watch: false }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 41, path: '/watched' }]);
 
@@ -203,7 +211,7 @@ describe('LibraryService', () => {
   });
 
   it('update rebinds watcher when folders change and watch remains on', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Current', watch: true }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Current', icon: 'BookOpen', watch: true }]);
     libraryRepo.update.mockResolvedValue([{ id: 9, name: 'Current', watch: true }]);
     libraryRepo.findFoldersByLibrary
       .mockResolvedValueOnce([
@@ -221,13 +229,20 @@ describe('LibraryService', () => {
   });
 
   it('update triggers a background scan when format selection settings change', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', watch: false }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false }]);
     libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', watch: false }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
 
     await service.update(10, { formatPriority: ['epub', 'pdf'], allowedFormats: ['epub'] } as any);
 
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(10);
+  });
+
+  it('update rejects changes that would leave a library without an icon', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: null, watch: false }]);
+
+    await expect(service.update(10, { watch: true } as any)).rejects.toBeInstanceOf(BadRequestException);
+    expect(libraryRepo.update).not.toHaveBeenCalled();
   });
 
   it('remove deletes library and cleans related cover directories', async () => {

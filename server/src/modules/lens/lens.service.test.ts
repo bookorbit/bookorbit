@@ -27,7 +27,7 @@ function makeLens(overrides: Partial<Lens> = {}): Lens {
     id: 5,
     userId: 12,
     name: 'Favorites',
-    icon: null,
+    icon: 'Aperture',
     filter: null,
     defaultSort: [],
     isPublic: false,
@@ -119,17 +119,24 @@ describe('LensService', () => {
     const created = makeLens({ id: 7, isPublic: false, defaultSort: [{ field: 'title', dir: 'asc' }] });
     lensRepo.insert.mockResolvedValue([created]);
 
-    const result = await service.create({ name: 'New Lens', defaultSort: [{ field: 'title', dir: 'asc' }] }, makeUser({ id: 44 }));
+    const result = await service.create({ name: 'New Lens', icon: 'Aperture', defaultSort: [{ field: 'title', dir: 'asc' }] }, makeUser({ id: 44 }));
 
     expect(lensRepo.insert).toHaveBeenCalledWith({
       userId: 44,
       name: 'New Lens',
-      icon: null,
+      icon: 'Aperture',
       filter: null,
       defaultSort: [{ field: 'title', dir: 'asc' }],
       isPublic: false,
     });
     expect(result).toEqual(created);
+  });
+
+  it('create rejects missing icons', async () => {
+    const { service, lensRepo } = makeService();
+
+    await expect(service.create({ name: 'New Lens', defaultSort: [] } as never, makeUser())).rejects.toThrow(BadRequestException);
+    expect(lensRepo.insert).not.toHaveBeenCalled();
   });
 
   it('update blocks non-owner changes for non-superusers', async () => {
@@ -156,6 +163,14 @@ describe('LensService', () => {
       isPublic: undefined,
     });
     expect(result).toEqual(updated);
+  });
+
+  it('update rejects changes that would leave a lens without an icon', async () => {
+    const { service, lensRepo } = makeService();
+    lensRepo.findById.mockResolvedValue([makeLens({ icon: null })]);
+
+    await expect(service.update(5, { name: 'Rename' }, makeUser())).rejects.toThrow(BadRequestException);
+    expect(lensRepo.update).not.toHaveBeenCalled();
   });
 
   it('update can clear filter when filter is explicitly null', async () => {

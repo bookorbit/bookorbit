@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BooksPage } from '@projectx/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
@@ -24,6 +24,12 @@ function isUniqueViolation(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const causeCode = (error.cause as { code?: unknown } | undefined)?.code;
   return causeCode === '23505';
+}
+
+function normalizeIcon(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const icon = value.trim();
+  return icon.length > 0 ? icon : null;
 }
 
 @Injectable()
@@ -82,11 +88,15 @@ export class CollectionService {
   }
 
   async create(dto: CreateCollectionDto, user: RequestUser) {
+    const icon = normalizeIcon(dto.icon);
+    if (!icon) {
+      throw new BadRequestException('Icon is required');
+    }
     try {
       const [inserted] = await this.collectionRepo.insert({
         userId: user.id,
         name: dto.name,
-        icon: dto.icon.trim(),
+        icon,
         description: dto.description ?? null,
         syncToKobo: dto.syncToKobo ?? false,
       });
@@ -102,11 +112,15 @@ export class CollectionService {
 
   async update(id: number, dto: UpdateCollectionDto, user: RequestUser) {
     const existing = await this.findCollectionForUserOrThrow(id, user);
+    const icon = dto.icon !== undefined ? normalizeIcon(dto.icon) : normalizeIcon(existing.icon);
+    if (!icon) {
+      throw new BadRequestException('Icon is required');
+    }
 
     try {
       await this.collectionRepo.update(id, existing.userId, {
         ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.icon !== undefined && { icon: dto.icon.trim() || null }),
+        ...(dto.icon !== undefined && { icon }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
       });

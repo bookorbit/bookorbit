@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
@@ -16,6 +16,8 @@ const syncToKobo = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const error = ref<string | null>(null)
+const trimmedName = computed(() => name.value.trim())
+const trimmedIcon = computed(() => icon.value.trim())
 
 watch(
   () => props.open,
@@ -30,11 +32,18 @@ watch(
 )
 
 async function submit() {
-  if (!name.value.trim()) return
+  if (!trimmedName.value) {
+    error.value = 'Name is required'
+    return
+  }
+  if (!trimmedIcon.value) {
+    error.value = 'Choose an icon'
+    return
+  }
   saving.value = true
   error.value = null
   try {
-    await updateCollection(props.collection.id, name.value.trim(), icon.value, syncToKobo.value)
+    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value)
     emit('close')
   } catch {
     error.value = 'Failed to update collection'
@@ -126,7 +135,7 @@ async function handleDelete() {
             </button>
             <button
               type="submit"
-              :disabled="!name.trim() || saving || deleting"
+              :disabled="!trimmedName || !trimmedIcon || saving || deleting"
               class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ saving ? 'Saving...' : 'Save' }}

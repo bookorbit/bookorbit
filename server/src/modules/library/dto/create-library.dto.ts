@@ -1,5 +1,6 @@
 import {
   ArrayMinSize,
+  IsDefined,
   IsArray,
   IsBoolean,
   IsIn,
@@ -14,6 +15,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import type { CoverAspectRatio, OrganizationMode } from '@projectx/types';
 
 import {
@@ -29,16 +31,22 @@ import {
   LIBRARY_READING_THRESHOLD_MIN,
 } from '../library.constants';
 
+function trimString(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
 export class CreateLibraryDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
   name: string;
 
-  @IsOptional()
+  @IsDefined()
+  @Transform(({ value }) => trimString(value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
-  icon?: string;
+  icon: string;
 
   @IsOptional()
   @IsInt()

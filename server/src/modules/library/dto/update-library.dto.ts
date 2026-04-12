@@ -14,6 +14,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import type { CoverAspectRatio, OrganizationMode } from '@projectx/types';
 
 import {
@@ -29,6 +30,10 @@ import {
   LIBRARY_READING_THRESHOLD_MIN,
 } from '../library.constants';
 
+function trimString(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
 export class UpdateLibraryDto {
   @IsOptional()
   @IsString()
@@ -36,10 +41,12 @@ export class UpdateLibraryDto {
   @MaxLength(255)
   name?: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @Transform(({ value }) => trimString(value))
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
-  icon?: string | null;
+  icon?: string;
 
   @IsOptional()
   @IsInt()

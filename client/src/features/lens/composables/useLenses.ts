@@ -29,7 +29,7 @@ export function useLenses() {
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const lens: Lens = await res.json()
-    lenses.value.push(lens)
+    lenses.value = [...lenses.value, lens]
     return lens
   }
 
@@ -41,8 +41,7 @@ export function useLenses() {
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const updated: Lens = await res.json()
-    const idx = lenses.value.findIndex((l) => l.id === id)
-    if (idx !== -1) lenses.value[idx] = updated
+    lenses.value = lenses.value.map((l) => (l.id === id ? updated : l))
     return updated
   }
 

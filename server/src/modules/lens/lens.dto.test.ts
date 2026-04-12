@@ -16,26 +16,37 @@ describe('Lens DTO validation', () => {
   it('CreateLensDto validates sort field and direction', async () => {
     const valid = plainToInstance(CreateLensDto, {
       name: 'My Lens',
+      icon: 'Aperture',
       defaultSort: [{ field: SORT_FIELDS[0], dir: 'asc' }],
     });
     expect(await hasErrors(valid)).toBe(false);
 
     const invalidField = plainToInstance(CreateLensDto, {
       name: 'My Lens',
+      icon: 'Aperture',
       defaultSort: [{ field: 'invalid', dir: 'asc' }],
     });
     expect(await hasErrors(invalidField)).toBe(true);
 
     const invalidDirection = plainToInstance(CreateLensDto, {
       name: 'My Lens',
+      icon: 'Aperture',
       defaultSort: [{ field: SORT_FIELDS[0], dir: 'up' }],
     });
     expect(await hasErrors(invalidDirection)).toBe(true);
   });
 
   it('CreateLensDto requires filter to be an object when provided', async () => {
-    expect(await hasErrors(plainToInstance(CreateLensDto, { name: 'Lens', defaultSort: [], filter: 'bad' }))).toBe(true);
-    expect(await hasErrors(plainToInstance(CreateLensDto, { name: 'Lens', defaultSort: [], filter: {} }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLensDto, { name: 'Lens', icon: 'Aperture', defaultSort: [], filter: 'bad' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLensDto, { name: 'Lens', icon: 'Aperture', defaultSort: [], filter: {} }))).toBe(false);
+  });
+
+  it('CreateLensDto requires a non-empty icon and UpdateLensDto rejects empty icons when provided', async () => {
+    expect(await hasErrors(plainToInstance(CreateLensDto, { name: 'Lens', defaultSort: [] }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLensDto, { name: 'Lens', icon: '   ', defaultSort: [] }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLensDto, { icon: '   ' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLensDto, { icon: null }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLensDto, { icon: 'Aperture' }))).toBe(false);
   });
 
   it('UpdateLensDto accepts null filter to clear filters and rejects non-object filters', async () => {

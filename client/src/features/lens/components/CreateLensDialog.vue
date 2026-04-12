@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { X } from 'lucide-vue-next'
 import { useLenses } from '@/features/lens/composables/useLenses'
@@ -16,15 +16,24 @@ const icon = ref('')
 const isPublic = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
+const trimmedName = computed(() => name.value.trim())
+const trimmedIcon = computed(() => icon.value.trim())
 
 async function submit() {
-  if (!name.value.trim()) return
+  if (!trimmedName.value) {
+    error.value = 'Name is required'
+    return
+  }
+  if (!trimmedIcon.value) {
+    error.value = 'Choose an icon'
+    return
+  }
   saving.value = true
   error.value = null
   try {
     const lens = await createLens({
-      name: name.value.trim(),
-      icon: icon.value.trim() || undefined,
+      name: trimmedName.value,
+      icon: trimmedIcon.value,
       defaultSort: [],
       isPublic: isPublic.value,
     })
@@ -87,7 +96,7 @@ async function submit() {
             </button>
             <button
               type="submit"
-              :disabled="!name.trim() || saving"
+              :disabled="!trimmedName || !trimmedIcon || saving"
               class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ saving ? 'Creating...' : 'Create' }}

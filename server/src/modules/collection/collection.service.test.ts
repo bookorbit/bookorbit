@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { CollectionService } from './collection.service';
@@ -26,7 +26,7 @@ function makeCollection(overrides?: Record<string, unknown>) {
     id: 10,
     userId: 1,
     name: 'Favorites',
-    icon: null,
+    icon: 'FolderOpen',
     description: null,
     syncToKobo: false,
     displayOrder: 0,
@@ -158,6 +158,14 @@ describe('CollectionService', () => {
       collectionRepo.update.mockRejectedValue({ code: '23505' });
 
       await expect(service.update(10, { name: 'Favorites' }, makeUser())).rejects.toThrow('A collection with this name already exists');
+    });
+
+    it('rejects changes that would leave a collection without an icon', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection({ icon: null })]);
+
+      await expect(service.update(10, { name: 'Favorites' }, makeUser())).rejects.toThrow(BadRequestException);
+      expect(collectionRepo.update).not.toHaveBeenCalled();
     });
   });
 

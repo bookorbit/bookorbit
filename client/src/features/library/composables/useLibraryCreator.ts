@@ -109,6 +109,10 @@ export function useLibraryCreator() {
       error.value = 'Library name is required'
       return null
     }
+    if (!form.icon?.trim()) {
+      error.value = 'Choose an icon'
+      return null
+    }
     if (form.folders.length === 0) {
       error.value = 'At least one folder is required'
       return null

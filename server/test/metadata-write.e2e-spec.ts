@@ -1415,6 +1415,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         headers: authHeader(context.adminToken),
         payload: {
           name: `api-create-file-write-${randomUUID()}`,
+          icon: 'BookOpen',
           folders: [folderPath],
           fileWriteEnabled: true,
           fileWriteWriteCover: false,

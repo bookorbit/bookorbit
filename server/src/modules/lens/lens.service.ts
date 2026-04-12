@@ -13,6 +13,12 @@ import { ReorderLensesDto } from './dto/reorder-lenses.dto';
 import { UpdateLensDto } from './dto/update-lens.dto';
 import { LensRepository } from './lens.repository';
 
+function normalizeIcon(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const icon = value.trim();
+  return icon.length > 0 ? icon : null;
+}
+
 @Injectable()
 export class LensService {
   constructor(
@@ -63,10 +69,14 @@ export class LensService {
 
   async create(dto: CreateLensDto, user: RequestUser) {
     const filter = validateGroupRule(dto.filter);
+    const icon = normalizeIcon(dto.icon);
+    if (!icon) {
+      throw new BadRequestException('Icon is required');
+    }
     const [lens] = await this.lensRepo.insert({
       userId: user.id,
       name: dto.name,
-      icon: dto.icon ?? null,
+      icon,
       filter,
       defaultSort: dto.defaultSort ?? [],
       isPublic: dto.isPublic ?? false,
@@ -80,9 +90,13 @@ export class LensService {
 
     const hasFilterField = Object.prototype.hasOwnProperty.call(dto, 'filter');
     const filter = hasFilterField ? validateGroupRule(dto.filter) : undefined;
+    const icon = dto.icon !== undefined ? normalizeIcon(dto.icon) : normalizeIcon(lens.icon);
+    if (!icon) {
+      throw new BadRequestException('Icon is required');
+    }
     const [updated] = await this.lensRepo.update(id, lens.userId, {
       name: dto.name,
-      icon: dto.icon,
+      icon: dto.icon !== undefined ? icon : undefined,
       filter,
       defaultSort: dto.defaultSort,
       isPublic: dto.isPublic,

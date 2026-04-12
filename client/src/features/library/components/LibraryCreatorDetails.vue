@@ -110,7 +110,6 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
         <div class="flex items-center gap-3">
           <span v-if="icon" class="text-xs text-muted-foreground">
             <span class="font-medium text-foreground">{{ icon }}</span>
-            <button class="ml-1.5 text-muted-foreground hover:text-foreground underline" @click="emit('update:icon', null)">clear</button>
           </span>
           <span class="text-xs text-muted-foreground">{{ filteredIcons.length.toLocaleString() }} icons</span>
         </div>
@@ -141,7 +140,7 @@ const selectedIconComponent = computed(() => (props.icon ? (LucideIcons as Recor
                     class="flex items-center justify-center rounded-md transition-colors"
                     style="width: calc(100% / 10); aspect-ratio: 1"
                     :class="icon === iconName ? 'bg-primary text-primary-foreground' : 'text-foreground/70 hover:bg-muted hover:text-foreground'"
-                    @click="emit('update:icon', icon === iconName ? null : iconName)"
+                    @click="emit('update:icon', iconName)"
                   >
                     <component :is="getIconComponent(iconName)" :size="17" />
                   </button>

@@ -118,7 +118,7 @@ const title = computed(() => (props.library ? `Edit: ${props.library.name}` : 'C
 
 const stepValid = computed(() => {
   const id = activeId.value
-  if (id === 'details') return form.name.trim().length > 0 && form.icon !== null
+  if (id === 'details') return form.name.trim().length > 0 && Boolean(form.icon?.trim())
   if (id === 'folders') return form.folders.length > 0
   return true
 })

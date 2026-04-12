@@ -837,6 +837,7 @@ describe('Authorization matrix (e2e)', () => {
         headers: authHeader(personas.ownerUser.accessToken),
         payload: {
           name: `authz-private-lens-${randomUUID()}`,
+          icon: 'Aperture',
           defaultSort: [],
           isPublic: false,
         },
@@ -872,6 +873,7 @@ describe('Authorization matrix (e2e)', () => {
         headers: authHeader(personas.ownerUser.accessToken),
         payload: {
           name: `authz-public-lens-${randomUUID()}`,
+          icon: 'Aperture',
           defaultSort: [],
           isPublic: true,
         },

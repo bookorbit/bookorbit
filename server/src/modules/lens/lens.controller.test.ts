@@ -35,7 +35,7 @@ describe('LensController', () => {
 
     await controller.findAll(user);
     await controller.findOne(1, user);
-    await controller.create({ name: 'New lens' } as never, user);
+    await controller.create({ name: 'New lens', icon: 'Aperture' } as never, user);
     await controller.reorder({ order: [{ id: 1, displayOrder: 0 }] } as never, user);
     await controller.update(1, { name: 'Updated' } as never, user);
     await controller.remove(1, user);
@@ -43,7 +43,7 @@ describe('LensController', () => {
 
     expect(lensService.findAll).toHaveBeenCalledWith(user);
     expect(lensService.findOne).toHaveBeenCalledWith(1, user);
-    expect(lensService.create).toHaveBeenCalledWith({ name: 'New lens' }, user);
+    expect(lensService.create).toHaveBeenCalledWith({ name: 'New lens', icon: 'Aperture' }, user);
     expect(lensService.reorder).toHaveBeenCalledWith({ order: [{ id: 1, displayOrder: 0 }] }, user);
     expect(lensService.update).toHaveBeenCalledWith(1, { name: 'Updated' }, user);
     expect(lensService.remove).toHaveBeenCalledWith(1, user);

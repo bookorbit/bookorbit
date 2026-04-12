@@ -31,6 +31,12 @@ interface LibraryMetadataWriteStreamOptions {
   isCancelled?: () => boolean;
 }
 
+function normalizeIcon(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const icon = value.trim();
+  return icon.length > 0 ? icon : null;
+}
+
 interface LibraryMetadataWriteSummary {
   processed: number;
   succeeded: number;
@@ -96,10 +102,14 @@ export class LibraryService {
 
   async create(dto: CreateLibraryDto) {
     await this.assertNameAvailable(dto.name);
+    const icon = normalizeIcon(dto.icon);
+    if (!icon) {
+      throw new BadRequestException('Icon is required');
+    }
 
     const [library] = await this.libraryRepo.insert({
       name: dto.name,
-      icon: dto.icon ?? null,
+      icon,
       displayOrder: dto.displayOrder ?? 0,
       watch: dto.watch ?? false,
       autoScanCronExpression: dto.autoScanCronExpression ?? null,
@@ -145,6 +155,13 @@ export class LibraryService {
     }
 
     const { folders: folderPaths, ...fields } = dto;
+    const icon = fields.icon !== undefined ? normalizeIcon(fields.icon) : normalizeIcon(existing.icon);
+    if (!icon) {
+      throw new BadRequestException('Icon is required');
+    }
+    if (fields.icon !== undefined) {
+      fields.icon = icon;
+    }
 
     const [updated] = await this.libraryRepo.update(id, fields);
 

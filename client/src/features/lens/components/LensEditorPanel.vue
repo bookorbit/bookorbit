@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { X, Zap } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { GroupRule, Lens, Rule, SortSpec } from '@projectx/types'
@@ -49,6 +49,8 @@ const draftFilter = ref<GroupRule | undefined>(undefined)
 const draftSort = ref<SortSpec[]>([])
 const saving = ref(false)
 const saveError = ref<string | null>(null)
+const trimmedDraftName = computed(() => draftName.value.trim())
+const trimmedDraftIcon = computed(() => draftIcon.value.trim())
 
 const previewCount = ref<number | null>(null)
 const previewLoading = ref(false)
@@ -105,12 +107,20 @@ function initFilter() {
 
 async function save() {
   if (!props.lens) return
+  if (!trimmedDraftName.value) {
+    saveError.value = 'Name is required'
+    return
+  }
+  if (!trimmedDraftIcon.value) {
+    saveError.value = 'Choose an icon'
+    return
+  }
   saving.value = true
   saveError.value = null
   try {
     await updateLens(props.lens.id, {
-      name: draftName.value.trim(),
-      icon: draftIcon.value.trim(),
+      name: trimmedDraftName.value,
+      icon: trimmedDraftIcon.value,
       filter: draftFilter.value,
       defaultSort: draftSort.value,
     })
@@ -243,7 +253,7 @@ async function save() {
             </button>
             <button
               @click="save"
-              :disabled="!draftName.trim() || saving"
+              :disabled="!trimmedDraftName || !trimmedDraftIcon || saving"
               class="h-10 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ saving ? 'Saving...' : 'Save changes' }}
