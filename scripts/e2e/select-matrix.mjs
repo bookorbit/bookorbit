@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { matchesGlob } from "node:path";
 import process from "node:process";
 
-import { E2E_GLOBAL_CHANGE_PATHS, listE2ESuites } from "./e2e-suites.mjs";
+import { E2E_GLOBAL_CHANGE_PATHS, listE2ESuites } from "./suite-registry.mjs";
 
 const ZERO_SHA_PATTERN = /^0+$/;
 

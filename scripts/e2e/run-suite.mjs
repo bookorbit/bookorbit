@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { getE2ESuite, listE2ESuites } from "./e2e-suites.mjs";
+import { getE2ESuite, listE2ESuites } from "./suite-registry.mjs";
 
 const DEFAULT_E2E_DATABASE_URL = "postgres://projectx:projectx@localhost:5432/projectx_e2e";
 

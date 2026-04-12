@@ -6,7 +6,7 @@
 # Safe to run multiple times - sessions are deduplicated by session_id and
 # daily stats are upserted. Running again adds more data on top.
 #
-# Usage: ./scripts/seed/reading-sessions.sh [USER_ID]
+# Usage: ./scripts/fixtures/seed-reading-sessions.sh [USER_ID]
 #   USER_ID defaults to 1.
 
 set -euo pipefail

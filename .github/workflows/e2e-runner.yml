@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       suite-id:
-        description: "E2E suite id from scripts/test/e2e-suites.mjs (e.g. scanner-scenarios)"
+        description: "E2E suite id from scripts/e2e/suite-registry.mjs (e.g. scanner-scenarios)"
         required: true
         type: string
       check-name:

@@ -4,4 +4,4 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-node ./scripts/test/run-e2e-suite.mjs "$@"
+node ./scripts/e2e/run-suite.mjs "$@"

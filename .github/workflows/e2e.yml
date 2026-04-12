@@ -40,7 +40,7 @@ jobs:
       - name: Build matrix
         id: build
         shell: bash
-        run: echo "matrix=$(node scripts/test/list-suites-json.mjs)" >> "$GITHUB_OUTPUT"
+        run: echo "matrix=$(node scripts/e2e/list-matrix.mjs)" >> "$GITHUB_OUTPUT"
 
   e2e:
     needs: setup

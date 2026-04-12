@@ -146,7 +146,7 @@ pnpm run e2e:run -- scanner-scenarios --testNamePattern=book-per-folder-disc-fol
 
 ### E2E runner architecture
 
-- All suite metadata lives in `scripts/test/e2e-suites.mjs` (suite id, spec file, JUnit output, DB prep mode).
+- All suite metadata lives in `scripts/e2e/suite-registry.mjs` (suite id, spec file, JUnit output, DB prep mode).
 - Local and CI use the same command: `pnpm run e2e:run -- <suite-id>`.
 - Use `all` as a composite suite id to run every configured suite in order, or use `pnpm run e2e:all`.
 - Dedicated-db suites auto-start local PostgreSQL when `CI != true`, then reset and migrate the e2e database through `pnpm run e2e:db:prepare`.

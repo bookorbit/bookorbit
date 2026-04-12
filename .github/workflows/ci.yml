@@ -363,7 +363,7 @@ jobs:
           GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           GITHUB_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
-          MATRIX=$(node scripts/test/select-e2e-suites-json.mjs)
+          MATRIX=$(node scripts/e2e/select-matrix.mjs)
           echo "matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
           echo "selected_suites=$(echo "$MATRIX" | jq -c .)"
 
