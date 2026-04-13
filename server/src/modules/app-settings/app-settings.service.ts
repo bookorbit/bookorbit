@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import {
   AuthorAutoEnrichmentWriteMode,
@@ -35,7 +36,10 @@ function parseBooleanSetting(value: string | undefined, defaultValue: boolean): 
 export class AppSettingsService {
   private readonly logger = new Logger(AppSettingsService.name);
 
-  constructor(private readonly repo: AppSettingsRepository) {}
+  constructor(
+    private readonly repo: AppSettingsRepository,
+    private readonly config: ConfigService,
+  ) {}
 
   listSettings() {
     return this.repo.listPublic();
@@ -106,7 +110,7 @@ export class AppSettingsService {
       throw new BadRequestException('Issuer URI is not configured');
     }
 
-    const parsedIssuer = await ensureSafeUrl(uri);
+    const parsedIssuer = await ensureSafeUrl(uri, { allowLocal: this.config.get<string>('app.nodeEnv') !== 'production' });
     const normalizedIssuer = parsedIssuer.href.replace(/\/$/, '');
     const discoveryUrl = `${normalizedIssuer}/.well-known/openid-configuration`;
 

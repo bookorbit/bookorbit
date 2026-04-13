@@ -4,7 +4,7 @@ import { isIP } from 'net';
 
 const SAFE_PROTOCOLS = new Set(['http:', 'https:']);
 
-export async function ensureSafeUrl(rawUrl: string): Promise<URL> {
+export async function ensureSafeUrl(rawUrl: string, options?: { allowLocal?: boolean }): Promise<URL> {
   const candidate = rawUrl.trim();
   if (!candidate) throw new BadRequestException('Invalid URL');
 
@@ -19,16 +19,19 @@ export async function ensureSafeUrl(rawUrl: string): Promise<URL> {
     throw new BadRequestException('URL must use http or https');
   }
 
-  await ensureSafeRemoteHost(parsed.hostname);
+  await ensureSafeRemoteHost(parsed.hostname, options);
   return parsed;
 }
 
-export async function ensureSafeRemoteHost(hostname: string): Promise<void> {
+export async function ensureSafeRemoteHost(hostname: string, options?: { allowLocal?: boolean }): Promise<void> {
   const normalizedHost = hostname.trim().toLowerCase();
   if (!normalizedHost) throw new BadRequestException('URL host is required');
 
   if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost') || normalizedHost.endsWith('.local')) {
-    throw new BadRequestException('URL host is not allowed');
+    if (!options?.allowLocal) {
+      throw new BadRequestException('URL host is not allowed');
+    }
+    return; // explicitly local host, allowed in non-production — skip DNS/IP checks
   }
 
   // URL.hostname wraps IPv6 in brackets (e.g. [::1]); strip them for isIP/range checks

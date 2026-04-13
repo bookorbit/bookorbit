@@ -32,8 +32,13 @@ export class OidcTokenClientService {
       code_verifier: params.codeVerifier,
       redirect_uri: params.redirectUri,
       client_id: params.clientId,
-      client_secret: params.clientSecret,
     });
+
+    // Public clients (token_endpoint_auth_method: none) must not send client_secret.
+    // Sending an empty secret is still interpreted as client_secret_post by some providers.
+    if (params.clientSecret) {
+      body.set('client_secret', params.clientSecret);
+    }
 
     const res = await fetch(params.tokenEndpoint, {
       method: 'POST',

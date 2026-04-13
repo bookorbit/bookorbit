@@ -1,4 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
 
@@ -7,6 +8,7 @@ vi.mock('../../common/utils/ssrf.utils', () => ({
   ensureSafeRemoteHost: vi.fn().mockResolvedValue(undefined),
 }));
 
+import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { AppSettingsRepository } from './app-settings.repository';
 import { AppSettingsService } from './app-settings.service';
 
@@ -20,13 +22,19 @@ function makeRepo(): jest.Mocked<AppSettingsRepository> {
   } as unknown as jest.Mocked<AppSettingsRepository>;
 }
 
+function makeConfig(nodeEnv = 'development'): ConfigService {
+  return { get: vi.fn().mockReturnValue(nodeEnv) } as unknown as ConfigService;
+}
+
 describe('AppSettingsService', () => {
   let service: AppSettingsService;
   let repo: ReturnType<typeof makeRepo>;
+  let config: ConfigService;
 
   beforeEach(() => {
     repo = makeRepo();
-    service = new AppSettingsService(repo);
+    config = makeConfig();
+    service = new AppSettingsService(repo, config);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   });
@@ -272,6 +280,20 @@ describe('AppSettingsService', () => {
       vi.stubGlobal('fetch', fetchMock);
       await service.testOidcConnection();
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('https://saved.host'), expect.any(Object));
+      vi.unstubAllGlobals();
+    });
+    it('passes allowLocal: true when nodeEnv is development', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
+      await service.testOidcConnection('https://auth.projectx.local:9093');
+      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://auth.projectx.local:9093', { allowLocal: true });
+      vi.unstubAllGlobals();
+    });
+
+    it('passes allowLocal: false when nodeEnv is production', async () => {
+      const prodService = new AppSettingsService(repo, makeConfig('production'));
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
+      await prodService.testOidcConnection('https://kc.example.com/realms/main');
+      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://kc.example.com/realms/main', { allowLocal: false });
       vi.unstubAllGlobals();
     });
   });

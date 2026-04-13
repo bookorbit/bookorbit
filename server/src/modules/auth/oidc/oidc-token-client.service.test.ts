@@ -60,6 +60,20 @@ describe('OidcTokenClientService', () => {
       expect(body).toContain('grant_type=authorization_code');
       expect(body).toContain(`code=${CODE_PARAMS.code}`);
       expect(body).toContain(`client_id=${CODE_PARAMS.clientId}`);
+      expect(body).toContain(`client_secret=${CODE_PARAMS.clientSecret}`);
+    });
+
+    it('omits client_secret for public clients (empty secret)', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ access_token: 'a', id_token: 'i' }),
+      });
+
+      await service.exchangeCode({ ...CODE_PARAMS, clientSecret: '' });
+
+      const body = fetchMock.mock.calls[0][1].body as string;
+      expect(body).not.toContain('client_secret');
+      expect(body).toContain(`client_id=${CODE_PARAMS.clientId}`);
     });
 
     it('throws InternalServerErrorException on non-OK response', async () => {
