@@ -33,6 +33,14 @@ export const migrationConfig = registerAs('migration', () => ({
   encryptionKey: process.env.MIGRATION_ENCRYPTION_KEY ?? '',
 }));
 
+export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({
+  stateTtlMs: parsePositiveInteger(process.env.OIDC_STATE_TTL_SECS, 300) * 1000,
+  discoveryCacheTtlMs: parsePositiveInteger(process.env.OIDC_DISCOVERY_CACHE_TTL_SECS, 3600) * 1000,
+  jwksCacheTtlMs: parsePositiveInteger(process.env.OIDC_JWKS_CACHE_TTL_SECS, 21600) * 1000,
+  clockToleranceSecs: parsePositiveInteger(process.env.OIDC_CLOCK_TOLERANCE_SECS, 30),
+  tokenExchangeTimeoutMs: parsePositiveInteger(process.env.OIDC_TOKEN_EXCHANGE_TIMEOUT_MS, 10_000),
+}));
+
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1) {

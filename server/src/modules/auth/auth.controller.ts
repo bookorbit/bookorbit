@@ -13,6 +13,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { OidcCallbackDto } from './dto/oidc-callback.dto';
+import { OidcUnlinkDto } from './dto/oidc-unlink.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetupDto } from './dto/setup.dto';
@@ -123,13 +124,15 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: ONE_MINUTE_MS } })
   @Post('oidc/state')
   @HttpCode(HttpStatus.OK)
   oidcGenerateState() {
-    return { state: this.oidcService.generateState() };
+    return this.oidcService.generateState();
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
   @Post('oidc/callback')
   @HttpCode(HttpStatus.OK)
   oidcCallback(@Body() dto: OidcCallbackDto, @Res({ passthrough: true }) reply: FastifyReply) {
@@ -143,5 +146,30 @@ export class AuthController {
     const body = req.body as Record<string, string> | undefined;
     const logoutToken = body?.['logout_token'] ?? '';
     return this.oidcService.handleBackchannelLogout(logoutToken);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
+  @Post('oidc/link-state')
+  @HttpCode(HttpStatus.OK)
+  oidcGenerateLinkState(@CurrentUser() user: RequestUser) {
+    return this.oidcService.generateLinkState(user.id);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
+  @Post('oidc/preview-state')
+  @HttpCode(HttpStatus.OK)
+  oidcGeneratePreviewState() {
+    return this.oidcService.generatePreviewState();
+  }
+
+  @Get('oidc/identity')
+  oidcGetIdentity(@CurrentUser() user: RequestUser) {
+    return this.oidcService.getLinkedIdentity(user.id);
+  }
+
+  @Delete('oidc/identity')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  oidcUnlinkIdentity(@CurrentUser() user: RequestUser, @Body() dto: OidcUnlinkDto) {
+    return this.oidcService.unlinkIdentity(user.id, dto.password);
   }
 }

@@ -1,4 +1,4 @@
-import type { AuthorAutoEnrichmentConfig } from '@projectx/types';
+import type { AuthorAutoEnrichmentConfig, OidcBaseConfig } from '@projectx/types';
 
 export const APP_SETTING_KEYS = {
   ALLOW_REGISTRATION: 'allow_registration',
@@ -24,24 +24,8 @@ export const APP_SETTING_KEYS = {
 
 export const DEFAULT_AUDIT_RETENTION_DAYS = 90;
 
-export interface OidcFullConfig {
-  enabled: boolean;
-  providerName: string;
-  issuerUri: string;
-  clientId: string;
+export interface OidcFullConfig extends OidcBaseConfig {
   clientSecret: string;
-  scopes: string;
-  claimMapping: {
-    username: string;
-    name: string;
-    email: string;
-    groups: string;
-  };
-  autoProvision: {
-    enabled: boolean;
-    allowLocalLinking: boolean;
-    defaultPermissionNames: string[];
-  };
 }
 
 export const DEFAULT_OIDC_CONFIG: OidcFullConfig = {

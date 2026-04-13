@@ -9,6 +9,11 @@ export enum AuditAction {
   AuthPasswordAdminReset = "auth.password.admin_reset",
   AuthSessionRevoke = "auth.session.revoke",
 
+  OidcLogin = "auth.oidc.login",
+  OidcUserProvisioned = "auth.oidc.user_provisioned",
+  OidcIdentityLinked = "auth.oidc.identity_linked",
+  OidcIdentityUnlinked = "auth.oidc.identity_unlinked",
+
   UserCreate = "user.create",
   UserUpdate = "user.update",
   UserSelfUpdate = "user.self_update",
@@ -98,6 +103,7 @@ export enum AuditResource {
   EmailTemplate = "email_template",
   EmailRecipient = "email_recipient",
   EmailRecipientGroup = "email_recipient_group",
+  OidcIdentity = "oidc_identity",
 }
 
 export interface AuditLogEntry {

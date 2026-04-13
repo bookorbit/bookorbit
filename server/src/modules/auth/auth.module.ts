@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { BackchannelLogoutService } from './oidc/backchannel-logout.service';
 import { OidcClaimExtractorService } from './oidc/oidc-claim-extractor.service';
+import { OidcCleanupService } from './oidc/oidc-cleanup.service';
 import { OidcDiscoveryService } from './oidc/oidc-discovery.service';
 import { OidcGroupMappingService } from './oidc/oidc-group-mapping.service';
 import { OidcService } from './oidc/oidc.service';
@@ -51,6 +52,7 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
     OidcSessionRepository,
     OidcGroupMappingService,
     BackchannelLogoutService,
+    OidcCleanupService,
   ],
   exports: [AuthService],
 })

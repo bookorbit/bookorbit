@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 export interface TokenResponse {
   accessToken: string;
@@ -17,6 +18,11 @@ interface TokenEndpointResponse {
 @Injectable()
 export class OidcTokenClientService {
   private readonly logger = new Logger(OidcTokenClientService.name);
+  private readonly tokenExchangeTimeoutMs: number;
+
+  constructor(private readonly configService: ConfigService) {
+    this.tokenExchangeTimeoutMs = this.configService.get<number>('oidcRuntime.tokenExchangeTimeoutMs') ?? 10_000;
+  }
 
   async exchangeCode(params: {
     code: string;
@@ -44,7 +50,7 @@ export class OidcTokenClientService {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(this.tokenExchangeTimeoutMs),
     });
 
     if (!res.ok) {

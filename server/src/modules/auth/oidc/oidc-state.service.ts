@@ -1,27 +1,46 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
+import { and, gt, lt, eq } from 'drizzle-orm';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import { DB } from '../../../db/db.module';
+import * as schema from '../../../db/schema';
+
+type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class OidcStateService {
-  private readonly states = new Map<string, number>();
-  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly ttlMs: number;
 
-  generate(): string {
-    // Prune expired states
-    const now = Date.now();
-    for (const [state, ts] of this.states) {
-      if (now - ts > this.TTL) this.states.delete(state);
-    }
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly configService: ConfigService,
+  ) {
+    this.ttlMs = this.configService.get<number>('oidcRuntime.stateTtlMs') ?? 5 * 60 * 1000;
+  }
 
+  async generate(meta?: Record<string, unknown>): Promise<string> {
     const state = randomBytes(32).toString('base64url');
-    this.states.set(state, Date.now());
+    const expiresAt = new Date(Date.now() + this.ttlMs);
+
+    await Promise.all([
+      this.db.delete(schema.oidcStates).where(lt(schema.oidcStates.expiresAt, new Date())),
+      this.db.insert(schema.oidcStates).values({ state, expiresAt, meta: meta ? JSON.stringify(meta) : null }),
+    ]);
+
     return state;
   }
 
-  validateAndConsume(state: string): boolean {
-    const ts = this.states.get(state);
-    if (!ts) return false;
-    this.states.delete(state); // one-time use
-    return Date.now() - ts <= this.TTL;
+  async validateAndConsume(state: string): Promise<{ valid: boolean; meta?: Record<string, unknown> }> {
+    const deleted = await this.db
+      .delete(schema.oidcStates)
+      .where(and(eq(schema.oidcStates.state, state), gt(schema.oidcStates.expiresAt, new Date())))
+      .returning();
+
+    if (deleted.length === 0) return { valid: false };
+    const row = deleted[0];
+    const meta = row.meta ? (JSON.parse(row.meta) as Record<string, unknown>) : undefined;
+    return { valid: true, meta };
   }
 }

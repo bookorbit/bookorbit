@@ -104,7 +104,19 @@ export class AppSettingsService {
     return merged;
   }
 
-  async testOidcConnection(issuerUri?: string): Promise<{ success: boolean; issuer?: string; authorizationEndpoint?: string; error?: string }> {
+  async testOidcConnection(issuerUri?: string): Promise<{
+    success: boolean;
+    issuer?: string;
+    authorizationEndpoint?: string;
+    tokenEndpoint?: string;
+    userinfoEndpoint?: string;
+    jwksUri?: string;
+    supportedScopes?: string[];
+    supportedGrantTypes?: string[];
+    codeChallengeMethodsSupported?: string[];
+    backchannelLogoutSupported?: boolean;
+    error?: string;
+  }> {
     const uri = issuerUri || (await this.getOidcConfig()).issuerUri;
     if (!uri) {
       throw new BadRequestException('Issuer URI is not configured');
@@ -128,7 +140,18 @@ export class AppSettingsService {
         throw new BadRequestException('Provider returned an invalid discovery document');
       }
       this.logger.log(`[app-settings.oidc_test] [end] issuerUri=${uri} durationMs=${Date.now() - start} - OIDC connection test succeeded`);
-      return { success: true, issuer: json.issuer, authorizationEndpoint: json.authorization_endpoint };
+      return {
+        success: true,
+        issuer: json.issuer,
+        authorizationEndpoint: json.authorization_endpoint,
+        tokenEndpoint: (json as Record<string, unknown>).token_endpoint as string | undefined,
+        userinfoEndpoint: (json as Record<string, unknown>).userinfo_endpoint as string | undefined,
+        jwksUri: (json as Record<string, unknown>).jwks_uri as string | undefined,
+        supportedScopes: (json as Record<string, unknown>).scopes_supported as string[] | undefined,
+        supportedGrantTypes: (json as Record<string, unknown>).grant_types_supported as string[] | undefined,
+        codeChallengeMethodsSupported: (json as Record<string, unknown>).code_challenge_methods_supported as string[] | undefined,
+        backchannelLogoutSupported: (json as Record<string, unknown>).backchannel_logout_supported as boolean | undefined,
+      };
     } catch (err) {
       const durationMs = Date.now() - start;
       const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';

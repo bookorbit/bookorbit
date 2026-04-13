@@ -1,71 +1,168 @@
 import { OidcStateService } from './oidc-state.service';
 
+const mockConfig = { get: vi.fn().mockReturnValue(undefined) };
+
+function makeDb(overrides: Partial<ReturnType<typeof makeDb>> = {}) {
+  const deleteMock = vi.fn().mockReturnThis();
+  const db = {
+    delete: vi.fn().mockReturnValue({ where: deleteMock }),
+    insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
+    ...overrides,
+  };
+  return { db, deleteMock };
+}
+
 describe('OidcStateService', () => {
-  let service: OidcStateService;
-
-  beforeEach(() => {
-    service = new OidcStateService();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   describe('generate', () => {
-    it('returns a non-empty base64url string', () => {
-      const state = service.generate();
+    it('returns a non-empty base64url string', async () => {
+      const { db } = makeDb();
+      db.delete.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      const state = await service.generate();
       expect(typeof state).toBe('string');
       expect(state.length).toBeGreaterThan(0);
       expect(state).toMatch(/^[A-Za-z0-9_-]+$/);
     });
 
-    it('returns unique values on each call', () => {
-      const a = service.generate();
-      const b = service.generate();
+    it('returns unique values on each call', async () => {
+      const { db } = makeDb();
+      db.delete.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      const a = await service.generate();
+      const b = await service.generate();
       expect(a).not.toBe(b);
     });
 
-    it('prunes expired states on generate', () => {
-      const state = service.generate();
-      // Advance past TTL (5 minutes)
-      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+    it('inserts state with meta=null when no meta passed', async () => {
+      const valuesMock = vi.fn().mockResolvedValue(undefined);
+      const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
+      const db = {
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+        insert: insertMock,
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
 
-      // generate() triggers pruning
-      service.generate();
+      const state = await service.generate();
 
-      // The original state should now be expired and validateAndConsume returns false
-      expect(service.validateAndConsume(state)).toBe(false);
+      expect(insertMock).toHaveBeenCalledOnce();
+      const [[{ state: insertedState, meta }]] = valuesMock.mock.calls;
+      expect(insertedState).toBe(state);
+      expect(meta).toBeNull();
+    });
+
+    it('inserts state with serialized meta when meta passed', async () => {
+      const valuesMock = vi.fn().mockResolvedValue(undefined);
+      const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
+      const db = {
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+        insert: insertMock,
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
+      const metaPayload = { mode: 'link', userId: 42 };
+
+      await service.generate(metaPayload);
+
+      const [[{ meta }]] = valuesMock.mock.calls;
+      expect(JSON.parse(meta as string)).toEqual(metaPayload);
+    });
+
+    it('inserts state into the database with an expiry', async () => {
+      const valuesMock = vi.fn().mockResolvedValue(undefined);
+      const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
+      const db = {
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+        insert: insertMock,
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      const before = Date.now();
+      const state = await service.generate();
+      const after = Date.now();
+
+      const [[{ state: insertedState, expiresAt }]] = valuesMock.mock.calls;
+      expect(insertedState).toBe(state);
+      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 5 * 60 * 1000);
+      expect(expiresAt.getTime()).toBeLessThanOrEqual(after + 20 * 60 * 1000);
+    });
+
+    it('prunes expired states on each generate call', async () => {
+      const whereMock = vi.fn().mockResolvedValue(undefined);
+      const db = {
+        delete: vi.fn().mockReturnValue({ where: whereMock }),
+        insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      await service.generate();
+
+      expect(db.delete).toHaveBeenCalled();
+      expect(whereMock).toHaveBeenCalled();
     });
   });
 
   describe('validateAndConsume', () => {
-    it('returns true for a valid, fresh state', () => {
-      const state = service.generate();
-      expect(service.validateAndConsume(state)).toBe(true);
+    it('returns { valid: true } when delete removes a row (valid state, no meta)', async () => {
+      const db = {
+        delete: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ state: 'valid-state', meta: null }]),
+          }),
+        }),
+        insert: vi.fn(),
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      const result = await service.validateAndConsume('valid-state');
+      expect(result.valid).toBe(true);
+      expect(result.meta).toBeUndefined();
     });
 
-    it('returns false on second use (one-time use)', () => {
-      const state = service.generate();
-      service.validateAndConsume(state);
-      expect(service.validateAndConsume(state)).toBe(false);
+    it('returns { valid: true, meta } when row has serialized meta', async () => {
+      const metaPayload = { mode: 'link', userId: 99 };
+      const db = {
+        delete: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ state: 'valid-state', meta: JSON.stringify(metaPayload) }]),
+          }),
+        }),
+        insert: vi.fn(),
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      const result = await service.validateAndConsume('valid-state');
+      expect(result.valid).toBe(true);
+      expect(result.meta).toEqual(metaPayload);
     });
 
-    it('returns false for unknown state', () => {
-      expect(service.validateAndConsume('totally-fake-state')).toBe(false);
+    it('returns { valid: false } when delete removes nothing (expired or unknown state)', async () => {
+      const db = {
+        delete: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+        insert: vi.fn(),
+      };
+      const service = new OidcStateService(db as never, mockConfig as never);
+
+      const result = await service.validateAndConsume('unknown-state');
+      expect(result.valid).toBe(false);
     });
 
-    it('returns false for expired state', () => {
-      const state = service.generate();
-      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
-      expect(service.validateAndConsume(state)).toBe(false);
-    });
+    it('uses DELETE...RETURNING for atomic one-time consumption', async () => {
+      const returningMock = vi.fn().mockResolvedValue([]);
+      const whereMock = vi.fn().mockReturnValue({ returning: returningMock });
+      const deleteMock = vi.fn().mockReturnValue({ where: whereMock });
+      const db = { delete: deleteMock, insert: vi.fn() };
+      const service = new OidcStateService(db as never, mockConfig as never);
 
-    it('returns true at exactly TTL boundary', () => {
-      const state = service.generate();
-      vi.advanceTimersByTime(5 * 60 * 1000);
-      // At exactly TTL, Date.now() - ts === TTL, which is NOT > TTL, so still valid
-      expect(service.validateAndConsume(state)).toBe(true);
+      await service.validateAndConsume('some-state');
+
+      expect(deleteMock).toHaveBeenCalledOnce();
+      expect(whereMock).toHaveBeenCalledOnce();
+      expect(returningMock).toHaveBeenCalledOnce();
     });
   });
 });

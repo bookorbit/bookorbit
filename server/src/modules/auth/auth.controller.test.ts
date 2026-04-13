@@ -19,8 +19,12 @@ function makeController() {
   };
   const oidcService = {
     generateState: vi.fn(),
+    generateLinkState: vi.fn(),
+    generatePreviewState: vi.fn(),
     handleCallback: vi.fn(),
     handleBackchannelLogout: vi.fn(),
+    getLinkedIdentity: vi.fn(),
+    unlinkIdentity: vi.fn(),
   };
 
   const controller = new AuthController(authService as never, oidcService as never);
@@ -63,16 +67,28 @@ describe('AuthController', () => {
   it('delegates oidc endpoints to OidcService', async () => {
     const { controller, oidcService } = makeController();
     const reply = {} as never;
-    oidcService.generateState.mockReturnValue('state-123');
+    const stateResult = { state: 'state-123', authorizationEndpoint: 'https://idp.example.com/auth' };
+    oidcService.generateState.mockResolvedValue(stateResult);
+    oidcService.generateLinkState.mockResolvedValue(stateResult);
+    oidcService.generatePreviewState.mockResolvedValue(stateResult);
+    oidcService.getLinkedIdentity.mockResolvedValue({ oidcSubject: 'sub-1', oidcIssuer: 'https://idp.example.com' });
 
-    expect(controller.oidcGenerateState()).toEqual({ state: 'state-123' });
+    await expect(controller.oidcGenerateState()).resolves.toEqual(stateResult);
     await controller.oidcCallback({ code: 'abc' } as never, reply);
     await controller.oidcBackchannelLogout({ body: { logout_token: 'logout-1' } } as never);
     await controller.oidcBackchannelLogout({ body: undefined } as never);
+    await controller.oidcGenerateLinkState({ id: 7 } as never);
+    await controller.oidcGeneratePreviewState();
+    await controller.oidcGetIdentity({ id: 7 } as never);
+    await controller.oidcUnlinkIdentity({ id: 7 } as never, { password: 'Secret1!' });
 
     expect(oidcService.handleCallback).toHaveBeenCalledWith({ code: 'abc' }, reply);
     expect(oidcService.handleBackchannelLogout).toHaveBeenNthCalledWith(1, 'logout-1');
     expect(oidcService.handleBackchannelLogout).toHaveBeenNthCalledWith(2, '');
+    expect(oidcService.generateLinkState).toHaveBeenCalledWith(7);
+    expect(oidcService.generatePreviewState).toHaveBeenCalled();
+    expect(oidcService.getLinkedIdentity).toHaveBeenCalledWith(7);
+    expect(oidcService.unlinkIdentity).toHaveBeenCalledWith(7, 'Secret1!');
   });
 
   it('defines throttling metadata for sensitive public endpoints', () => {
@@ -100,5 +116,15 @@ describe('AuthController', () => {
     expect(forgotTtl).toBe(3_600_000);
     expect(resetLimit).toBe(5);
     expect(resetTtl).toBe(60_000);
+
+    const oidcStateLimit = Reflect.getMetadata(limitKey, AuthController.prototype.oidcGenerateState) as number;
+    const oidcStateTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.oidcGenerateState) as number;
+    const oidcCallbackLimit = Reflect.getMetadata(limitKey, AuthController.prototype.oidcCallback) as number;
+    const oidcCallbackTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.oidcCallback) as number;
+
+    expect(oidcStateLimit).toBe(10);
+    expect(oidcStateTtl).toBe(60_000);
+    expect(oidcCallbackLimit).toBe(5);
+    expect(oidcCallbackTtl).toBe(60_000);
   });
 });

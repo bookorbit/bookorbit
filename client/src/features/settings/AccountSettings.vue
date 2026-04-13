@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ChevronDown, ChevronUp, KeyRound, Save, Trash2, Upload } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { ChevronDown, ChevronUp, KeyRound, Link, LinkIcon, Save, Trash2, Upload } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
@@ -129,6 +129,86 @@ watch(
   },
   { immediate: true },
 )
+
+interface OidcIdentity {
+  oidcSubject: string | null
+  oidcIssuer: string | null
+}
+
+const oidcIdentity = ref<OidcIdentity | null>(null)
+const oidcIdentityLoading = ref(false)
+const unlinkPassword = ref('')
+const unlinkDialogOpen = ref(false)
+const unlinking = ref(false)
+const linkingOidc = ref(false)
+
+onMounted(async () => {
+  oidcIdentityLoading.value = true
+  try {
+    const res = await api('/api/auth/oidc/identity')
+    if (res.ok) {
+      oidcIdentity.value = await res.json()
+    }
+  } finally {
+    oidcIdentityLoading.value = false
+  }
+})
+
+async function initiateOidcLink() {
+  linkingOidc.value = true
+  try {
+    const stateRes = await api('/api/auth/oidc/link-state', { method: 'POST' })
+    if (!stateRes.ok) throw new Error('Failed to generate link state')
+    const { state, authorizationEndpoint } = await stateRes.json()
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: '',
+      redirect_uri: `${window.location.origin}/oauth2-callback`,
+      scope: 'openid profile email',
+      state,
+      nonce: crypto.randomUUID(),
+    })
+    sessionStorage.setItem('oidc_link_pending', '1')
+    window.location.href = `${authorizationEndpoint}?${params.toString()}`
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Failed to start OIDC link')
+    linkingOidc.value = false
+  }
+}
+
+async function confirmUnlink() {
+  if (!unlinkPassword.value) return
+  unlinking.value = true
+  try {
+    const res = await api('/api/auth/oidc/identity', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: unlinkPassword.value }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to unlink')
+    }
+    oidcIdentity.value = { oidcSubject: null, oidcIssuer: null }
+    unlinkDialogOpen.value = false
+    unlinkPassword.value = ''
+    toast.success('OIDC identity unlinked')
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Failed to unlink identity')
+  } finally {
+    unlinking.value = false
+  }
+}
+
+function openUnlinkDialog() {
+  unlinkPassword.value = ''
+  unlinkDialogOpen.value = true
+}
+
+function closeUnlinkDialog() {
+  unlinkDialogOpen.value = false
+  unlinkPassword.value = ''
+}
 </script>
 
 <template>
@@ -261,6 +341,42 @@ watch(
     </div>
   </div>
 
+  <!-- OIDC Identity section -->
+  <div v-if="!oidcIdentityLoading" class="mt-4">
+    <section class="rounded-xl border border-border bg-card p-4 md:p-5 space-y-3">
+      <div class="flex items-center gap-2">
+        <LinkIcon class="h-4 w-4 text-muted-foreground shrink-0" />
+        <h2 class="text-sm font-semibold text-foreground">Connected Account</h2>
+      </div>
+      <div v-if="oidcIdentity?.oidcSubject">
+        <p class="text-sm text-muted-foreground">Your account is linked to an external OIDC provider.</p>
+        <div class="mt-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs font-mono text-muted-foreground space-y-0.5">
+          <div><span class="text-foreground font-medium">Issuer:</span> {{ oidcIdentity.oidcIssuer }}</div>
+          <div><span class="text-foreground font-medium">Subject:</span> {{ oidcIdentity.oidcSubject }}</div>
+        </div>
+        <button
+          type="button"
+          class="mt-3 rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors"
+          @click="openUnlinkDialog"
+        >
+          Unlink identity
+        </button>
+      </div>
+      <div v-else>
+        <p class="text-sm text-muted-foreground">No external OIDC account linked. You can link your account to an SSO provider.</p>
+        <button
+          type="button"
+          :disabled="linkingOidc"
+          class="mt-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
+          @click="initiateOidcLink"
+        >
+          <Link class="h-3 w-3" />
+          {{ linkingOidc ? 'Redirecting...' : 'Link OIDC account' }}
+        </button>
+      </div>
+    </section>
+  </div>
+
   <div
     v-if="removeAvatarConfirmOpen"
     class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
@@ -282,6 +398,36 @@ watch(
           @click="onRemoveAvatar"
         >
           Remove
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unlink OIDC identity confirmation dialog -->
+  <div v-if="unlinkDialogOpen" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeUnlinkDialog">
+    <button class="absolute inset-0 bg-black/45" @click="closeUnlinkDialog" />
+    <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+      <p class="text-base font-semibold text-foreground">Unlink OIDC identity?</p>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Enter your password to confirm. After unlinking you can only log in with username and password.
+      </p>
+      <input
+        v-model="unlinkPassword"
+        type="password"
+        placeholder="Current password"
+        autocomplete="current-password"
+        class="input-field mt-3 w-full"
+      />
+      <div class="mt-4 flex items-center justify-end gap-2">
+        <button class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors" @click="closeUnlinkDialog">
+          Cancel
+        </button>
+        <button
+          :disabled="unlinking || !unlinkPassword"
+          class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+          @click="confirmUnlink"
+        >
+          {{ unlinking ? 'Unlinking...' : 'Unlink' }}
         </button>
       </div>
     </div>

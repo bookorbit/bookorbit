@@ -26,7 +26,7 @@ describe('OidcTokenValidatorService', () => {
   let service: OidcTokenValidatorService;
 
   beforeEach(() => {
-    service = new OidcTokenValidatorService();
+    service = new OidcTokenValidatorService({ get: vi.fn().mockReturnValue(undefined) } as never);
     vi.clearAllMocks();
     (createRemoteJWKSet as vi.Mock).mockReturnValue('mocked-jwks');
   });

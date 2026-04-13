@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, IsUrl, MaxLength, ValidateNested } from 'class-validator';
 
 class ClaimMappingDto {
   @IsString()
@@ -43,7 +43,7 @@ export class UpdateOidcConfigDto {
   providerName?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUrl({ require_tld: false, protocols: ['http', 'https'] })
   @MaxLength(2048)
   issuerUri?: string;
 
@@ -61,6 +61,11 @@ export class UpdateOidcConfigDto {
   @IsString()
   @MaxLength(500)
   scopes?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false, protocols: ['http', 'https'] })
+  @MaxLength(2048)
+  iconUrl?: string;
 
   @IsOptional()
   @ValidateNested()

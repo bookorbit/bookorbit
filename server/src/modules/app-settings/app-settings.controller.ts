@@ -1,18 +1,24 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
 
 import { Permission, AuditAction, AuditResource } from '@projectx/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { AppSettingsService } from './app-settings.service';
+import { OidcGroupMappingAdminService } from './oidc-group-mapping-admin.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
 import { UpdateOidcConfigDto } from './dto/update-oidc-config.dto';
+import { CreateGroupMappingDto } from './dto/create-group-mapping.dto';
+import { UpdateGroupMappingDto } from './dto/update-group-mapping.dto';
 
 @Controller('app-settings')
 @RequirePermission(Permission.ManageAppSettings)
 export class AppSettingsController {
-  constructor(private readonly appSettingsService: AppSettingsService) {}
+  constructor(
+    private readonly appSettingsService: AppSettingsService,
+    private readonly groupMappingAdmin: OidcGroupMappingAdminService,
+  ) {}
 
   @Get()
   listSettings() {
@@ -66,6 +72,7 @@ export class AppSettingsController {
       issuerUri: config.issuerUri,
       clientId: config.clientId,
       scopes: config.scopes,
+      iconUrl: config.iconUrl,
     };
   }
 
@@ -85,5 +92,28 @@ export class AppSettingsController {
   @HttpCode(HttpStatus.OK)
   testOidcConnection(@Query('issuerUri') issuerUri?: string) {
     return this.appSettingsService.testOidcConnection(issuerUri);
+  }
+
+  @Get('oidc/group-mappings')
+  listGroupMappings() {
+    return this.groupMappingAdmin.listMappings();
+  }
+
+  @Post('oidc/group-mappings')
+  @HttpCode(HttpStatus.CREATED)
+  createGroupMapping(@Body() dto: CreateGroupMappingDto) {
+    return this.groupMappingAdmin.createMapping(dto.oidcGroupClaim, dto.permissionName);
+  }
+
+  @Put('oidc/group-mappings/:id')
+  @HttpCode(HttpStatus.OK)
+  updateGroupMapping(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateGroupMappingDto) {
+    return this.groupMappingAdmin.updateMapping(id, dto.permissionName);
+  }
+
+  @Delete('oidc/group-mappings/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteGroupMapping(@Param('id', ParseIntPipe) id: number) {
+    return this.groupMappingAdmin.deleteMapping(id);
   }
 }

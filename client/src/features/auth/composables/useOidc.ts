@@ -1,4 +1,4 @@
-import type { OidcPublicConfig } from '@projectx/types'
+import type { OidcCallbackResponse, OidcPublicConfig } from '@projectx/types'
 
 async function generatePkce(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const array = new Uint8Array(32)
@@ -28,6 +28,15 @@ function generateNonce(): string {
     .replace(/=/g, '')
 }
 
+export class OidcLoginError extends Error {
+  constructor(
+    public readonly errorCode: string | undefined,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
 export function useOidc() {
   async function getPublicConfig(): Promise<OidcPublicConfig | null> {
     try {
@@ -41,27 +50,28 @@ export function useOidc() {
 
   async function initiateLogin(): Promise<void> {
     const config = await getPublicConfig()
-    if (!config?.enabled || !config.issuerUri) {
-      throw new Error('OIDC is not configured')
+    if (!config?.enabled) {
+      throw new OidcLoginError(undefined, 'OIDC is not configured')
     }
-
-    // Fetch discovery document on the client side
-    let discRes: Response
-    try {
-      discRes = await fetch(`${config.issuerUri.replace(/\/$/, '')}/.well-known/openid-configuration`)
-    } catch {
-      throw new Error('Cannot reach OIDC provider - check the Issuer URI in settings')
-    }
-    if (!discRes.ok) throw new Error(`OIDC provider returned HTTP ${discRes.status} - check the Issuer URI in settings`)
-    const disc = await discRes.json()
 
     const { codeVerifier, codeChallenge } = await generatePkce()
     const nonce = generateNonce()
 
-    // Get server-side state (CSRF protection)
+    // Save any redirect target before leaving the page (P1-1: capture redirect for post-login navigation)
+    sessionStorage.removeItem('oidc_redirect')
+    const redirectTarget = new URLSearchParams(window.location.search).get('redirect')
+    if (redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//')) {
+      sessionStorage.setItem('oidc_redirect', redirectTarget)
+    }
+
+    // Get server-side state + authorizationEndpoint (server resolves discovery - avoids CORS issues)
     const stateRes = await fetch('/api/v1/auth/oidc/state', { method: 'POST', credentials: 'include' })
-    if (!stateRes.ok) throw new Error('Failed to generate state')
-    const { state } = await stateRes.json()
+    if (!stateRes.ok) throw new OidcLoginError(undefined, 'Failed to generate state')
+    const { state, authorizationEndpoint } = (await stateRes.json()) as { state: string; authorizationEndpoint: string }
+
+    if (!authorizationEndpoint) {
+      throw new OidcLoginError(undefined, 'OIDC provider is not reachable - check the Issuer URI in settings')
+    }
 
     // Store PKCE data for the callback
     sessionStorage.setItem(`oidc_pkce_${state}`, JSON.stringify({ codeVerifier, nonce, state }))
@@ -79,12 +89,12 @@ export function useOidc() {
       nonce,
     })
 
-    window.location.href = `${disc.authorization_endpoint}?${params.toString()}`
+    window.location.href = `${authorizationEndpoint}?${params.toString()}`
   }
 
   async function exchangeCode(code: string, state: string) {
     const pkceJson = sessionStorage.getItem(`oidc_pkce_${state}`)
-    if (!pkceJson) throw new Error('No PKCE data found for this state')
+    if (!pkceJson) throw new OidcLoginError(undefined, 'No PKCE data found for this state')
 
     const { codeVerifier, nonce } = JSON.parse(pkceJson) as { codeVerifier: string; nonce: string; state: string }
     sessionStorage.removeItem(`oidc_pkce_${state}`)
@@ -99,11 +109,11 @@ export function useOidc() {
     })
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(((err as Record<string, unknown>).message as string) ?? 'OIDC login failed')
+      const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      throw new OidcLoginError(err['errorCode'] as string | undefined, (err['message'] as string) ?? 'OIDC login failed')
     }
 
-    return res.json()
+    return res.json() as Promise<OidcCallbackResponse>
   }
 
   return { getPublicConfig, initiateLogin, exchangeCode }

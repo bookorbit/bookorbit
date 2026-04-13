@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, lt } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
@@ -15,8 +15,6 @@ type Db = NodePgDatabase<typeof schema>;
 @Injectable()
 export class BackchannelLogoutService {
   private readonly logger = new Logger(BackchannelLogoutService.name);
-  // JTI replay prevention: jti -> expiry timestamp
-  private readonly usedJtis = new Map<string, number>();
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -39,24 +37,23 @@ export class BackchannelLogoutService {
       jwksUri: discovery.jwksUri,
     });
 
-    // Replay prevention
+    // Replay prevention via DB — atomic insert, conflict = already used
     if (claims.jti) {
       const jti = typeof claims.jti === 'string' ? claims.jti : undefined;
-      if (jti && this.usedJtis.has(jti)) {
-        this.logger.warn(
-          '[auth.oidc_backchannel_logout] [fail] errorClass=UnauthorizedException error="logout token jti replay" - backchannel logout rejected',
-        );
-        return;
-      }
-      const exp = claims.exp ? claims.exp * 1000 : Date.now() + 3_600_000;
       if (jti) {
-        this.usedJtis.set(jti, exp);
-      }
+        const expiresAt = claims.exp ? new Date(claims.exp * 1000) : new Date(Date.now() + 3_600_000);
 
-      // Prune expired JTIs
-      const now = Date.now();
-      for (const [jti, expiry] of this.usedJtis) {
-        if (expiry < now) this.usedJtis.delete(jti);
+        const inserted = await this.db.insert(schema.oidcUsedJtis).values({ jti, expiresAt }).onConflictDoNothing().returning();
+
+        if (inserted.length === 0) {
+          this.logger.warn(
+            '[auth.oidc_backchannel_logout] [fail] errorClass=UnauthorizedException error="logout token jti replay" - backchannel logout rejected',
+          );
+          return;
+        }
+
+        // Prune expired JTIs
+        await this.db.delete(schema.oidcUsedJtis).where(lt(schema.oidcUsedJtis.expiresAt, new Date()));
       }
     }
 

@@ -236,6 +236,26 @@ export class UserRepository {
       .where(eq(schema.users.id, userId));
   }
 
+  async unlinkOidcIdentity(userId: number) {
+    await this.db.update(schema.users).set({ oidcSubject: null, oidcIssuer: null, provisioningMethod: 'local' }).where(eq(schema.users.id, userId));
+  }
+
+  async getUserOidcIdentity(userId: number): Promise<{ oidcSubject: string | null; oidcIssuer: string | null } | null> {
+    const row = await this.db.query.users.findFirst({
+      where: eq(schema.users.id, userId),
+      columns: { oidcSubject: true, oidcIssuer: true },
+    });
+    return row ?? null;
+  }
+
+  async findPasswordHashById(userId: number): Promise<string | null> {
+    const row = await this.db.query.users.findFirst({
+      where: eq(schema.users.id, userId),
+      columns: { passwordHash: true },
+    });
+    return row?.passwordHash ?? null;
+  }
+
   async createOidcUser(data: { username: string; name: string; email?: string; oidcSubject: string; oidcIssuer: string; avatarUrl?: string }) {
     const passwordHash = await hash(`OIDC_USER_${randomUUID()}`, 12);
     const [user] = await this.db

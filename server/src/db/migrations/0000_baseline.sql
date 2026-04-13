@@ -573,8 +573,20 @@ CREATE TABLE "oidc_sessions" (
 	"oidc_issuer" text NOT NULL,
 	"oidc_session_id" text,
 	"id_token_hint" text,
+	"idp_refresh_token" text,
 	"revoked" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "oidc_states" (
+	"state" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"meta" text
+);
+--> statement-breakpoint
+CREATE TABLE "oidc_used_jtis" (
+	"jti" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
@@ -983,6 +995,8 @@ CREATE INDEX "oidc_sessions_user_active_idx" ON "oidc_sessions" USING btree ("us
 CREATE INDEX "oidc_sessions_subject_issuer_idx" ON "oidc_sessions" USING btree ("oidc_subject","oidc_issuer");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_session_id");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_expires_at_idx" ON "oidc_sessions" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "oidc_states_expires_at_idx" ON "oidc_states" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "oidc_used_jtis_expires_at_idx" ON "oidc_used_jtis" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "opds_users_username_lower_uidx" ON "opds_users" USING btree (lower("username"));--> statement-breakpoint
 CREATE INDEX "kobo_devices_user_id_idx" ON "kobo_devices" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "kobo_snapshot_books_snapshot_synced_book_idx" ON "kobo_snapshot_books" USING btree ("snapshot_id","synced","book_id");--> statement-breakpoint

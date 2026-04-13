@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 
 import { AppSettingsController } from './app-settings.controller';
 import { AppSettingsService } from './app-settings.service';
+import { OidcGroupMappingAdminService } from './oidc-group-mapping-admin.service';
 
 function makeService(): jest.Mocked<AppSettingsService> {
   return {
@@ -25,6 +26,15 @@ function makeService(): jest.Mocked<AppSettingsService> {
   } as unknown as jest.Mocked<AppSettingsService>;
 }
 
+function makeGroupMappingService(): jest.Mocked<OidcGroupMappingAdminService> {
+  return {
+    listMappings: vi.fn().mockResolvedValue([]),
+    createMapping: vi.fn(),
+    updateMapping: vi.fn(),
+    deleteMapping: vi.fn(),
+  } as unknown as jest.Mocked<OidcGroupMappingAdminService>;
+}
+
 describe('AppSettingsController', () => {
   let controller: AppSettingsController;
   let service: ReturnType<typeof makeService>;
@@ -33,7 +43,10 @@ describe('AppSettingsController', () => {
     service = makeService();
     const module = await Test.createTestingModule({
       controllers: [AppSettingsController],
-      providers: [{ provide: AppSettingsService, useValue: service }],
+      providers: [
+        { provide: AppSettingsService, useValue: service },
+        { provide: OidcGroupMappingAdminService, useValue: makeGroupMappingService() },
+      ],
     }).compile();
     controller = module.get(AppSettingsController);
   });
@@ -93,6 +106,7 @@ describe('AppSettingsController', () => {
         clientId: 'projectx',
         clientSecret: 'supersecret',
         scopes: 'openid',
+        iconUrl: 'https://kc.example.com/icon.png',
         claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
         autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
       });
@@ -101,6 +115,7 @@ describe('AppSettingsController', () => {
       expect(result).not.toHaveProperty('claimMapping');
       expect(result).not.toHaveProperty('autoProvision');
       expect(result.clientId).toBe('projectx');
+      expect(result.iconUrl).toBe('https://kc.example.com/icon.png');
     });
   });
 

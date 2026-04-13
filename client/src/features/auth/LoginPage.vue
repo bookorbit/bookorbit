@@ -278,9 +278,10 @@ async function handleOidcLogin() {
         <button
           type="button"
           :disabled="oidcLoading"
-          class="w-full rounded-md border border-input bg-background/60 px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors backdrop-blur-sm"
+          class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background/60 px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors backdrop-blur-sm"
           @click="handleOidcLogin"
         >
+          <img v-if="oidcConfig.iconUrl" :src="oidcConfig.iconUrl" alt="" class="h-4 w-4 shrink-0 object-contain" />
           {{ oidcLoading ? 'Redirecting...' : `Sign in with ${oidcConfig.providerName || 'SSO'}` }}
         </button>
       </template>

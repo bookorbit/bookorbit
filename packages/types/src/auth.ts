@@ -1,3 +1,19 @@
+export enum OidcErrorCode {
+  STATE_EXPIRED = 'oidc_state_expired',
+  TOKEN_EXCHANGE_FAILED = 'oidc_token_exchange_failed',
+  USER_NOT_PROVISIONED = 'oidc_user_not_provisioned',
+  USER_INACTIVE = 'oidc_user_inactive',
+  PROVIDER_ERROR = 'oidc_provider_error',
+}
+
+export const ProvisioningMethod = {
+  Local: 'local',
+  Manual: 'manual',
+  Oidc: 'oidc',
+} as const;
+
+export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof ProvisioningMethod];
+
 export interface UserSettings {
   syncReaderPreferences?: boolean;
   statisticsConfig?: import("./statistics").StatisticsSettings;
@@ -13,7 +29,7 @@ export interface AuthUser {
   isDefaultPassword: boolean;
   settings: UserSettings;
   avatarUrl?: string | null;
-  provisioningMethod: "local" | "oidc";
+  provisioningMethod: ProvisioningMethod;
   permissions: string[];
 }
 
@@ -23,7 +39,53 @@ export interface OidcPublicConfig {
   issuerUri: string;
   clientId: string;
   scopes: string;
+  iconUrl?: string;
 }
+
+export interface OidcClaimMapping {
+  username: string;
+  name: string;
+  email: string;
+  groups: string;
+}
+
+export interface OidcAutoProvision {
+  enabled: boolean;
+  allowLocalLinking: boolean;
+  defaultPermissionNames: string[];
+}
+
+export interface OidcBaseConfig {
+  enabled: boolean;
+  providerName: string;
+  issuerUri: string;
+  clientId: string;
+  scopes: string;
+  iconUrl?: string;
+  claimMapping: OidcClaimMapping;
+  autoProvision: OidcAutoProvision;
+}
+
+export interface OidcCallbackResult {
+  mode: 'login';
+  accessToken: string;
+  user: AuthUser;
+}
+
+export interface OidcLinkResult {
+  mode: 'link';
+  linked: true;
+}
+
+export interface OidcPreviewResult {
+  mode: 'preview';
+  claims: {
+    raw: Record<string, unknown>;
+    mapped: { username: string; name: string; email?: string; groups: string[] };
+  };
+}
+
+export type OidcCallbackResponse = OidcCallbackResult | OidcLinkResult | OidcPreviewResult;
 
 export interface AuthResponse {
   accessToken: string;

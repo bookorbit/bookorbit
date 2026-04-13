@@ -1,4 +1,5 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 type JWKSGetter = ReturnType<typeof createRemoteJWKSet>;
@@ -12,7 +13,13 @@ interface JWKSCacheEntry {
 export class OidcTokenValidatorService {
   private readonly logger = new Logger(OidcTokenValidatorService.name);
   private readonly jwksCache = new Map<string, JWKSCacheEntry>();
-  private readonly JWKS_TTL = 6 * 3600 * 1000; // 6 hours
+  private readonly JWKS_TTL: number;
+  private readonly clockTolerance: number;
+
+  constructor(private readonly configService: ConfigService) {
+    this.JWKS_TTL = this.configService.get<number>('oidcRuntime.jwksCacheTtlMs') ?? 6 * 3600 * 1000;
+    this.clockTolerance = this.configService.get<number>('oidcRuntime.clockToleranceSecs') ?? 30;
+  }
 
   private getJwks(jwksUri: string): JWKSGetter {
     const cached = this.jwksCache.get(jwksUri);
@@ -30,7 +37,7 @@ export class OidcTokenValidatorService {
       const { payload } = await jwtVerify(idToken, jwks, {
         issuer: opts.issuer,
         audience: opts.clientId,
-        clockTolerance: 30,
+        clockTolerance: this.clockTolerance,
       });
 
       if (payload.nonce !== opts.nonce) {
@@ -53,7 +60,7 @@ export class OidcTokenValidatorService {
       const { payload } = await jwtVerify(logoutToken, jwks, {
         issuer: opts.issuer,
         audience: opts.clientId,
-        clockTolerance: 30,
+        clockTolerance: this.clockTolerance,
       });
 
       // Logout tokens must have the backchannel-logout event

@@ -34,6 +34,18 @@ export class UserService {
     return this.userRepo.linkOidcIdentity(userId, oidcSubject, oidcIssuer, avatarUrl);
   }
 
+  unlinkOidcIdentity(userId: number) {
+    return this.userRepo.unlinkOidcIdentity(userId);
+  }
+
+  getUserOidcIdentity(userId: number) {
+    return this.userRepo.getUserOidcIdentity(userId);
+  }
+
+  findPasswordHashById(userId: number) {
+    return this.userRepo.findPasswordHashById(userId);
+  }
+
   createOidcUser(data: Parameters<UserRepository['createOidcUser']>[0]) {
     return this.userRepo.createOidcUser(data);
   }

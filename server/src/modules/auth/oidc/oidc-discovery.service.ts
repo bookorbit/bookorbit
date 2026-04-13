@@ -1,4 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+import { ensureSafeUrl } from '../../../common/utils/ssrf.utils';
 
 export interface OidcDiscoveryDoc {
   issuer: string;
@@ -29,7 +32,13 @@ interface RawDiscoveryDoc {
 export class OidcDiscoveryService {
   private readonly logger = new Logger(OidcDiscoveryService.name);
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly TTL = 60 * 60 * 1000; // 1 hour
+  private readonly TTL: number;
+  private readonly allowLocal: boolean;
+
+  constructor(private readonly configService: ConfigService) {
+    this.allowLocal = this.configService.get<string>('app.nodeEnv') !== 'production';
+    this.TTL = this.configService.get<number>('oidcRuntime.discoveryCacheTtlMs') ?? 60 * 60 * 1000;
+  }
 
   async getDiscoveryDoc(issuerUri: string): Promise<OidcDiscoveryDoc> {
     const normalized = issuerUri.replace(/\/$/, '');
@@ -42,9 +51,24 @@ export class OidcDiscoveryService {
     const url = `${normalized}/.well-known/openid-configuration`;
 
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000), redirect: 'error' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = (await res.json()) as RawDiscoveryDoc;
+
+      // P0-3: Validate issuer matches the URI we requested
+      const rawIssuer = (raw.issuer ?? '').replace(/\/$/, '');
+      if (rawIssuer !== normalized) {
+        throw new Error(`Issuer mismatch: expected "${normalized}", got "${raw.issuer}"`);
+      }
+
+      // P0-4: Validate all endpoint URLs are SSRF-safe
+      const ssrfOpts = { allowLocal: this.allowLocal };
+      await Promise.all([
+        ensureSafeUrl(raw.token_endpoint, ssrfOpts),
+        ensureSafeUrl(raw.jwks_uri, ssrfOpts),
+        raw.userinfo_endpoint ? ensureSafeUrl(raw.userinfo_endpoint, ssrfOpts) : Promise.resolve(),
+        raw.end_session_endpoint ? ensureSafeUrl(raw.end_session_endpoint, ssrfOpts) : Promise.resolve(),
+      ]);
 
       const doc: OidcDiscoveryDoc = {
         issuer: raw.issuer,

@@ -13,12 +13,26 @@ const DISCOVERY_DOC = {
   backchannelLogoutSupported: true,
 };
 
-function makeService() {
-  const db = {
+function makeDb() {
+  return {
     update: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
     where: vi.fn().mockResolvedValue(undefined),
+    insert: vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoNothing: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ jti: 'jti-1' }]),
+        }),
+      }),
+    }),
+    delete: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
   };
+}
+
+function makeService(dbOverrides?: Partial<ReturnType<typeof makeDb>>) {
+  const db = { ...makeDb(), ...dbOverrides };
   const appSettings = {
     getOidcConfig: vi.fn().mockResolvedValue({ enabled: true, issuerUri: 'https://idp.example.com', clientId: 'client-id' }),
   };
@@ -103,18 +117,6 @@ describe('BackchannelLogoutService', () => {
     expect(userService.incrementTokenVersion).not.toHaveBeenCalled();
   });
 
-  it('prevents JTI replay — ignores second call with same jti', async () => {
-    const { service, tokenValidator, sessionRepo, userService } = makeService();
-    tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', jti: 'replay-jti', exp: Math.floor(Date.now() / 1000) + 3600 });
-    sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 10 }]);
-
-    await service.handleLogout('token-1');
-    await service.handleLogout('token-2');
-
-    // incrementTokenVersion should only be called once (second call is a replay)
-    expect(userService.incrementTokenVersion).toHaveBeenCalledTimes(1);
-  });
-
   it('proceeds normally when jti is absent', async () => {
     const { service, tokenValidator, sessionRepo, userService } = makeService();
     tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1' });
@@ -122,5 +124,77 @@ describe('BackchannelLogoutService', () => {
 
     await service.handleLogout('token-no-jti');
     expect(userService.incrementTokenVersion).toHaveBeenCalledWith(7);
+  });
+
+  describe('JTI replay prevention (DB-backed)', () => {
+    it('rejects second call when DB insert returns empty (conflict = already used)', async () => {
+      const jtiInsertResult: { jti: string }[] = [];
+      const db = makeDb();
+      db.insert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue(jtiInsertResult),
+          }),
+        }),
+      });
+
+      const { service, tokenValidator, sessionRepo, userService } = makeService(db);
+      tokenValidator.validateLogoutToken.mockResolvedValue({
+        sub: 'u1',
+        jti: 'replay-jti',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+      sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 10 }]);
+
+      await service.handleLogout('token-1');
+
+      // incrementTokenVersion should NOT be called because insert returned empty (replay)
+      expect(userService.incrementTokenVersion).not.toHaveBeenCalled();
+    });
+
+    it('processes successfully when DB insert returns the new row (first use)', async () => {
+      const { service, tokenValidator, sessionRepo, userService } = makeService();
+      tokenValidator.validateLogoutToken.mockResolvedValue({
+        sub: 'u1',
+        jti: 'fresh-jti',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+      sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 10 }]);
+
+      await service.handleLogout('fresh-token');
+
+      expect(userService.incrementTokenVersion).toHaveBeenCalledWith(10);
+    });
+
+    it('stores JTI with expiry derived from exp claim', async () => {
+      const valuesMock = vi.fn().mockReturnValue({
+        onConflictDoNothing: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ jti: 'jti-exp' }]),
+        }),
+      });
+      const db = makeDb();
+      db.insert.mockReturnValue({ values: valuesMock });
+
+      const { service, tokenValidator, sessionRepo } = makeService(db);
+      const exp = Math.floor(Date.now() / 1000) + 7200;
+      tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', jti: 'jti-exp', exp });
+      sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 5 }]);
+
+      await service.handleLogout('token');
+
+      const [[{ jti, expiresAt }]] = valuesMock.mock.calls;
+      expect(jti).toBe('jti-exp');
+      expect(expiresAt.getTime()).toBeCloseTo(exp * 1000, -3);
+    });
+
+    it('prunes expired JTIs from DB after each logout', async () => {
+      const { service, tokenValidator, sessionRepo, db } = makeService();
+      tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', jti: 'prune-jti' });
+      sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 3 }]);
+
+      await service.handleLogout('token');
+
+      expect(db.delete).toHaveBeenCalled();
+    });
   });
 });

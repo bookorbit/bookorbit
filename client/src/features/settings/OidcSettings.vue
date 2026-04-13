@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
+import { Permission, PERMISSION_LABELS } from '@projectx/types'
+import { Trash2 } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
@@ -12,15 +14,45 @@ interface OidcConfig {
   clientId: string
   clientSecret: string
   scopes: string
+  iconUrl?: string
   claimMapping: { username: string; name: string; email: string; groups: string }
   autoProvision: { enabled: boolean; allowLocalLinking: boolean; defaultPermissionNames: string[] }
 }
+
+interface OidcTestResult {
+  success: boolean
+  issuer?: string
+  authorizationEndpoint?: string
+  tokenEndpoint?: string
+  userinfoEndpoint?: string
+  jwksUri?: string
+  supportedScopes?: string[]
+  codeChallengeMethodsSupported?: string[]
+  backchannelLogoutSupported?: boolean
+  error?: string
+}
+
+interface GroupMapping {
+  id: number
+  oidcGroupClaim: string
+  permissionName: string | null
+  createdAt: string
+}
+
+const ALL_PERMISSIONS = Object.values(Permission)
 
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const saveError = ref<string | null>(null)
-const testResult = ref<{ success: boolean; message: string } | null>(null)
+const testResult = ref<OidcTestResult | null>(null)
+const showTestDetails = ref(false)
+const previewing = ref(false)
+const previewClaims = ref<{ raw: Record<string, unknown>; mapped: Record<string, unknown> } | null>(null)
+
+const groupMappings = ref<GroupMapping[]>([])
+const newMapping = reactive({ oidcGroupClaim: '', permissionName: ALL_PERMISSIONS[0] })
+const addingMapping = ref(false)
 
 const form = reactive<OidcConfig>({
   enabled: false,
@@ -29,17 +61,33 @@ const form = reactive<OidcConfig>({
   clientId: '',
   clientSecret: '',
   scopes: 'openid profile email',
+  iconUrl: '',
   claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
   autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
 })
 
+const defaultPermissionSet = computed(() => new Set(form.autoProvision.defaultPermissionNames))
+
 onMounted(async () => {
+  const stored = sessionStorage.getItem('oidc_preview_claims')
+  if (stored) {
+    try {
+      previewClaims.value = JSON.parse(stored)
+    } catch {
+      // ignore
+    }
+    sessionStorage.removeItem('oidc_preview_claims')
+  }
+
   try {
-    const res = await api('/api/v1/app-settings/oidc')
-    if (res.ok) {
-      const data = await res.json()
+    const [configRes, mappingsRes] = await Promise.all([api('/api/v1/app-settings/oidc'), api('/api/v1/app-settings/oidc/group-mappings')])
+    if (configRes.ok) {
+      const data = await configRes.json()
       Object.assign(form, data)
       form.clientSecret = ''
+    }
+    if (mappingsRes.ok) {
+      groupMappings.value = await mappingsRes.json()
     }
   } finally {
     loading.value = false
@@ -73,19 +121,88 @@ async function save() {
 
 async function testConnection() {
   testResult.value = null
+  showTestDetails.value = false
   testing.value = true
   try {
     const res = await api(`/api/v1/app-settings/oidc/test?issuerUri=${encodeURIComponent(form.issuerUri)}`, { method: 'POST' })
-    const data = await res.json()
-    if (data.success) {
-      testResult.value = { success: true, message: `Connected - issuer: ${data.issuer}` }
-    } else {
-      testResult.value = { success: false, message: data.error ?? 'Connection failed' }
-    }
+    const data: OidcTestResult = await res.json()
+    testResult.value = data
   } catch {
-    testResult.value = { success: false, message: 'Request failed' }
+    testResult.value = { success: false, error: 'Request failed' }
   } finally {
     testing.value = false
+  }
+}
+
+async function previewOidcClaims() {
+  previewing.value = true
+  previewClaims.value = null
+  try {
+    const stateRes = await api('/api/auth/oidc/preview-state', { method: 'POST' })
+    if (!stateRes.ok) throw new Error('Failed to generate preview state')
+    const { state, authorizationEndpoint } = await stateRes.json()
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: form.clientId,
+      redirect_uri: `${window.location.origin}/oauth2-callback`,
+      scope: form.scopes,
+      state,
+      nonce: crypto.randomUUID(),
+    })
+    sessionStorage.setItem('oidc_preview_pending', '1')
+    window.location.href = `${authorizationEndpoint}?${params.toString()}`
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Failed to start preview')
+    previewing.value = false
+  }
+}
+
+function toggleTestDetails() {
+  showTestDetails.value = !showTestDetails.value
+}
+
+function toggleDefaultPermission(permission: Permission) {
+  const idx = form.autoProvision.defaultPermissionNames.indexOf(permission)
+  if (idx === -1) {
+    form.autoProvision.defaultPermissionNames.push(permission)
+  } else {
+    form.autoProvision.defaultPermissionNames.splice(idx, 1)
+  }
+}
+
+async function addGroupMapping() {
+  if (!newMapping.oidcGroupClaim.trim()) return
+  addingMapping.value = true
+  try {
+    const res = await api('/api/v1/app-settings/oidc/group-mappings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oidcGroupClaim: newMapping.oidcGroupClaim.trim(), permissionName: newMapping.permissionName }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to add mapping')
+    }
+    const created: GroupMapping = await res.json()
+    groupMappings.value.push(created)
+    newMapping.oidcGroupClaim = ''
+    toast.success('Group mapping added')
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Failed to add mapping')
+  } finally {
+    addingMapping.value = false
+  }
+}
+
+async function deleteGroupMapping(id: number) {
+  try {
+    const res = await api(`/api/v1/app-settings/oidc/group-mappings/${id}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to delete')
+    groupMappings.value = groupMappings.value.filter((m) => m.id !== id)
+    toast.success('Group mapping removed')
+  } catch {
+    toast.error('Failed to remove group mapping')
   }
 }
 </script>
@@ -129,6 +246,16 @@ async function testConnection() {
           </div>
           <input v-model="form.providerName" type="text" placeholder="Authentik" class="input-field w-full md:w-72" />
         </div>
+        <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
+          <div class="min-w-0 md:shrink-0">
+            <p class="settings-label">Icon URL</p>
+            <p class="settings-hint">Optional logo shown next to the login button.</p>
+          </div>
+          <div class="flex w-full items-center gap-2 md:w-72">
+            <img v-if="form.iconUrl" :src="form.iconUrl" alt="icon preview" class="h-5 w-5 shrink-0 rounded object-contain" />
+            <input v-model="form.iconUrl" type="url" placeholder="https://example.com/logo.svg" class="input-field min-w-0 flex-1" />
+          </div>
+        </div>
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-start md:justify-between md:gap-8 md:px-5 md:py-4">
           <div class="min-w-0 md:shrink-0 md:pt-0.5">
             <p class="settings-label">Issuer URI</p>
@@ -148,12 +275,30 @@ async function testConnection() {
             </div>
             <div
               v-if="testResult"
-              class="w-full text-xs px-3 py-1.5 rounded-md border md:w-auto"
+              class="w-full rounded-md border px-3 py-2 text-xs md:w-auto"
               :class="
                 testResult.success ? 'border-green-500/30 text-green-600 bg-green-500/5' : 'border-destructive/30 text-destructive bg-destructive/5'
               "
             >
-              {{ testResult.message }}
+              <div class="flex items-center justify-between gap-2">
+                <span>{{ testResult.success ? `Connected - ${testResult.issuer ?? ''}` : (testResult.error ?? 'Connection failed') }}</span>
+                <button
+                  v-if="testResult.success"
+                  type="button"
+                  class="shrink-0 underline underline-offset-2 opacity-70 hover:opacity-100"
+                  @click="toggleTestDetails"
+                >
+                  {{ showTestDetails ? 'Hide' : 'Details' }}
+                </button>
+              </div>
+              <div v-if="testResult.success && showTestDetails" class="mt-2 space-y-0.5 border-t border-green-500/20 pt-2 font-mono text-[10px]">
+                <div v-if="testResult.tokenEndpoint">token: {{ testResult.tokenEndpoint }}</div>
+                <div v-if="testResult.userinfoEndpoint">userinfo: {{ testResult.userinfoEndpoint }}</div>
+                <div v-if="testResult.jwksUri">jwks: {{ testResult.jwksUri }}</div>
+                <div v-if="testResult.codeChallengeMethodsSupported?.length">pkce: {{ testResult.codeChallengeMethodsSupported.join(', ') }}</div>
+                <div v-if="testResult.supportedScopes?.length">scopes: {{ testResult.supportedScopes.join(', ') }}</div>
+                <div>backchannel logout: {{ testResult.backchannelLogoutSupported ? 'supported' : 'not supported' }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -180,7 +325,26 @@ async function testConnection() {
 
     <!-- Claim mapping -->
     <div>
-      <p class="settings-group-label">Claim Mapping</p>
+      <div class="flex items-center justify-between">
+        <p class="settings-group-label">Claim Mapping</p>
+        <button
+          v-if="form.enabled && form.clientId && form.issuerUri"
+          type="button"
+          :disabled="previewing"
+          class="text-xs font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50"
+          @click="previewOidcClaims"
+        >
+          {{ previewing ? 'Redirecting...' : 'Preview claims' }}
+        </button>
+      </div>
+      <div v-if="previewClaims" class="mb-3 rounded-md border border-border bg-card p-3 text-xs">
+        <p class="font-medium text-foreground mb-1.5">Mapped claims</p>
+        <pre class="text-muted-foreground overflow-auto rounded bg-muted/40 p-2 text-[10px]">{{ JSON.stringify(previewClaims.mapped, null, 2) }}</pre>
+        <p class="mt-2 font-medium text-foreground mb-1.5">Raw claims</p>
+        <pre class="text-muted-foreground overflow-auto rounded bg-muted/40 p-2 text-[10px] max-h-40">{{
+          JSON.stringify(previewClaims.raw, null, 2)
+        }}</pre>
+      </div>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
           <p class="settings-label md:shrink-0">Username claim</p>
@@ -218,6 +382,72 @@ async function testConnection() {
             <p class="settings-hint">Link OIDC identity to an existing local account by username match.</p>
           </div>
           <ToggleSwitch v-model="form.autoProvision.allowLocalLinking" class="self-start md:self-auto" />
+        </div>
+        <!-- P1-4: Default permissions for auto-provisioned users -->
+        <div class="px-4 py-3.5 bg-card md:px-5 md:py-4">
+          <div class="mb-3">
+            <p class="settings-label">Default permissions</p>
+            <p class="settings-hint">Permissions granted to new users on first OIDC login.</p>
+          </div>
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label v-for="perm in ALL_PERMISSIONS" :key="perm" class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                :checked="defaultPermissionSet.has(perm)"
+                class="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                @change="toggleDefaultPermission(perm)"
+              />
+              <span class="text-sm text-foreground">{{ PERMISSION_LABELS[perm] }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group Mappings (P1-3) -->
+    <div>
+      <p class="settings-group-label">Group Mappings</p>
+      <p class="mb-3 text-xs text-muted-foreground">Map OIDC group claims to ProjectX permissions. Synced on every login.</p>
+      <div class="border border-border rounded-lg overflow-hidden bg-card">
+        <!-- Existing mappings -->
+        <div v-if="groupMappings.length > 0" class="divide-y divide-border">
+          <div v-for="mapping in groupMappings" :key="mapping.id" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-foreground truncate">{{ mapping.oidcGroupClaim }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ mapping.permissionName ? (PERMISSION_LABELS[mapping.permissionName as Permission] ?? mapping.permissionName) : 'No permission' }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              @click="deleteGroupMapping(mapping.id)"
+            >
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div v-else class="px-4 py-4 text-sm text-muted-foreground md:px-5">No group mappings configured.</div>
+
+        <!-- Add new mapping -->
+        <div class="border-t border-border px-4 py-3.5 md:px-5 md:py-4">
+          <p class="settings-label mb-2">Add mapping</p>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <input v-model="newMapping.oidcGroupClaim" type="text" placeholder="OIDC group claim (e.g. admins)" class="input-field flex-1 min-w-0" />
+            <select v-model="newMapping.permissionName" class="input-field sm:w-52 shrink-0">
+              <option v-for="perm in ALL_PERMISSIONS" :key="perm" :value="perm">
+                {{ PERMISSION_LABELS[perm] }}
+              </option>
+            </select>
+            <button
+              type="button"
+              :disabled="addingMapping || !newMapping.oidcGroupClaim.trim()"
+              class="settings-btn-primary shrink-0 disabled:opacity-50"
+              @click="addGroupMapping"
+            >
+              {{ addingMapping ? 'Adding...' : 'Add' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

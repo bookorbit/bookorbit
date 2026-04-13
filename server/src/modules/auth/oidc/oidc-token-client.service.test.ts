@@ -16,7 +16,7 @@ describe('OidcTokenClientService', () => {
   let fetchMock: vi.Mock;
 
   beforeEach(() => {
-    service = new OidcTokenClientService();
+    service = new OidcTokenClientService({ get: vi.fn().mockReturnValue(undefined) } as never);
     fetchMock = vi.fn();
     global.fetch = fetchMock;
   });
