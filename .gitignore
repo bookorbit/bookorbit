@@ -16,6 +16,9 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# Package managers
+package-lock.json
+
 # Docker
 docker/postgres/data/
 

@@ -1,6 +1,7 @@
 {
   "name": "projectx",
   "private": true,
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "setup": "bash ./scripts/bootstrap/local.sh",
     "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @projectx/types dev\" \"npm run dev:server\" \"npm run dev:client\"",
@@ -63,6 +64,7 @@
   },
   "pnpm": {
     "overrides": {
+      "@esbuild-kit/core-utils>esbuild": "^0.25.12",
       "fastify": "^5.8.5"
     },
     "onlyBuiltDependencies": [
