@@ -1,15 +1,15 @@
 export enum OidcErrorCode {
-  STATE_EXPIRED = 'oidc_state_expired',
-  TOKEN_EXCHANGE_FAILED = 'oidc_token_exchange_failed',
-  USER_NOT_PROVISIONED = 'oidc_user_not_provisioned',
-  USER_INACTIVE = 'oidc_user_inactive',
-  PROVIDER_ERROR = 'oidc_provider_error',
+  STATE_EXPIRED = "oidc_state_expired",
+  TOKEN_EXCHANGE_FAILED = "oidc_token_exchange_failed",
+  USER_NOT_PROVISIONED = "oidc_user_not_provisioned",
+  USER_INACTIVE = "oidc_user_inactive",
+  PROVIDER_ERROR = "oidc_provider_error",
 }
 
 export const ProvisioningMethod = {
-  Local: 'local',
-  Manual: 'manual',
-  Oidc: 'oidc',
+  Local: "local",
+  Manual: "manual",
+  Oidc: "oidc",
 } as const;
 
 export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof ProvisioningMethod];
@@ -17,6 +17,9 @@ export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof Provis
 export interface UserSettings {
   syncReaderPreferences?: boolean;
   statisticsConfig?: import("./statistics").StatisticsSettings;
+  onboarding?: {
+    tourCompleted?: boolean;
+  };
 }
 
 export interface AuthUser {
@@ -102,18 +105,18 @@ export interface OidcBaseConfig {
 }
 
 export interface OidcCallbackResult {
-  mode: 'login';
+  mode: "login";
   accessToken: string;
   user: AuthUser;
 }
 
 export interface OidcLinkResult {
-  mode: 'link';
+  mode: "link";
   linked: true;
 }
 
 export interface OidcPreviewResult {
-  mode: 'preview';
+  mode: "preview";
   claims: {
     raw: Record<string, unknown>;
     mapped: { username: string; name: string; email?: string; groups: string[] };

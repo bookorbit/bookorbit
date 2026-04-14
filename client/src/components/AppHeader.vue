@@ -312,6 +312,7 @@ function formatBadgeClass(fmt: string): string {
 
       <!-- Center: desktop global search -->
       <div
+        data-tour="global-search"
         class="hidden md:flex flex-1 mx-4 relative items-center transition-all duration-300"
         :class="searchFocused || globalSearchQuery ? 'max-w-xl' : 'max-w-sm'"
       >
@@ -504,6 +505,7 @@ function formatBadgeClass(fmt: string): string {
           <Tooltip v-if="hasPermission('book_bucket_access')">
             <TooltipTrigger as-child>
               <Button
+                data-tour="book-bucket-btn"
                 variant="ghost"
                 size="icon"
                 class="relative h-8 w-8 border transition-colors"
@@ -531,6 +533,7 @@ function formatBadgeClass(fmt: string): string {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                data-tour="statistics-btn"
                 variant="ghost"
                 size="icon"
                 class="h-8 w-8 border transition-colors"
@@ -552,6 +555,7 @@ function formatBadgeClass(fmt: string): string {
           <Tooltip v-if="hasPermission('library_upload')">
             <TooltipTrigger as-child>
               <Button
+                data-tour="upload-button"
                 variant="ghost"
                 size="icon"
                 :class="[
@@ -575,6 +579,7 @@ function formatBadgeClass(fmt: string): string {
               <TooltipTrigger as-child>
                 <PopoverTrigger as-child>
                   <Button
+                    data-tour="appearance-picker"
                     variant="ghost"
                     size="icon"
                     :class="['h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors', iconRadiusClass]"
@@ -611,6 +616,7 @@ function formatBadgeClass(fmt: string): string {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                data-tour="settings-nav"
                 variant="ghost"
                 size="icon"
                 :class="[

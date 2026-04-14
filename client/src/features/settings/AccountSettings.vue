@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import type { OidcProviderPublic } from '@projectx/types'
-import { ChevronDown, ChevronUp, KeyRound, Link, LinkIcon, Save, Trash2, Upload } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Upload } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
@@ -11,10 +11,12 @@ import { MAX_PROFILE_AVATAR_BYTES, useProfileAvatar } from '@/features/auth/comp
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { useMediaQuery } from '@vueuse/core'
+import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 
 const { user, me } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { uploading, removing, uploadAvatar, removeAvatar } = useProfileAvatar()
+const { resetTour } = useOnboardingTour()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const savingProfile = ref(false)
@@ -448,6 +450,22 @@ function closeUnlinkDialog() {
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Guided Tour (desktop only) -->
+  <div class="hidden md:block mt-4">
+    <section class="rounded-xl border border-border bg-card p-4 md:p-5">
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <MapPin class="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p class="text-sm font-semibold text-foreground">Guided Tour</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Replay the walkthrough that highlights key features of the app.</p>
+          </div>
+        </div>
+        <button class="settings-btn-outline shrink-0" @click="resetTour">Take the tour again</button>
+      </div>
+    </section>
   </div>
 
   <!-- Unlink OIDC identity confirmation dialog -->

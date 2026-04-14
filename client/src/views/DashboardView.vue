@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { Settings2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -9,10 +9,12 @@ import DashboardScroller from '@/features/dashboard/components/DashboardScroller
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
+import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 
 const { hasPermission } = usePermissions()
 const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
 const { scrollers } = useDashboardConfig()
+const { maybeStartTour } = useOnboardingTour()
 
 const settingsOpen = ref(false)
 
@@ -22,6 +24,9 @@ const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value
 
 onMounted(() => {
   fetchLibraries()
+  nextTick(() => {
+    setTimeout(maybeStartTour, 500)
+  })
 })
 </script>
 

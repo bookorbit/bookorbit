@@ -219,6 +219,7 @@ onUnmounted(() => stopLibraryUploadListener())
       <!-- Libraries -->
       <SidebarGroup>
         <SidebarSectionHeader
+          data-tour="sidebar-libraries"
           label="Libraries"
           :is-open="librariesOpen"
           :collapsed-count="libraries.length"
@@ -300,6 +301,7 @@ onUnmounted(() => stopLibraryUploadListener())
       <!-- Lenses -->
       <SidebarGroup>
         <SidebarSectionHeader
+          data-tour="sidebar-lenses"
           label="Lenses"
           :is-open="lensesOpen"
           :collapsed-count="lenses.length"
@@ -359,6 +361,7 @@ onUnmounted(() => stopLibraryUploadListener())
       <!-- Collections -->
       <SidebarGroup>
         <SidebarSectionHeader
+          data-tour="sidebar-collections"
           label="Collections"
           :is-open="collectionsOpen"
           :collapsed-count="collections.length"

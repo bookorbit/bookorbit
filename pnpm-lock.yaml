@@ -53,6 +53,9 @@ importers:
       dompurify:
         specifier: ^3.4.1
         version: 3.4.1
+      driver.js:
+        specifier: ^1.4.0
+        version: 1.4.0
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
@@ -5574,6 +5577,12 @@ packages:
         integrity: sha512-k8DaKGP6r1G30Lx8V4+pCsLzKr8vLmV2paqEj1Y55GdAgJuIqpRp5FfajGF8KtwMxCz9qJc6wUIJnm053d/WCw==,
       }
     engines: { node: ">=12" }
+
+  driver.js@1.4.0:
+    resolution:
+      {
+        integrity: sha512-Gm64jm6PmcU+si21sQhBrTAM1JvUrR0QhNmjkprNLxohOBzul9+pNHXgQaT9lW84gwg9GMLB3NZGuGolsz5uew==,
+      }
 
   drizzle-kit@0.31.10:
     resolution:
@@ -13165,6 +13174,8 @@ snapshots:
   dotenv@16.6.1: {}
 
   dotenv@17.4.1: {}
+
+  driver.js@1.4.0: {}
 
   drizzle-kit@0.31.10:
     dependencies:

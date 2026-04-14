@@ -382,3 +382,125 @@
     display: none;
   }
 }
+
+/* ── Driver.js tour ─────────────────────────────────────────── */
+.driver-popover {
+  background-color: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--elevation-xl) !important;
+  padding: 1rem 1.125rem !important;
+  min-width: 260px !important;
+  max-width: 310px !important;
+  font-family: inherit !important;
+}
+
+.driver-popover-title {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  color: var(--card-foreground) !important;
+  margin-bottom: 0.25rem !important;
+  line-height: 1.4 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.driver-popover-description {
+  font-size: 0.8125rem !important;
+  line-height: 1.55 !important;
+  color: var(--muted-foreground) !important;
+}
+
+.driver-popover-footer {
+  margin-top: 0.875rem !important;
+  gap: 0.5rem !important;
+  padding-top: 0.625rem !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+.driver-popover-progress-text {
+  font-size: 0.6875rem !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0.65 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.driver-popover-prev-btn,
+.driver-popover-prev-btn:focus {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0.3125rem 0.625rem !important;
+  border-radius: calc(var(--radius) - 0.125rem) !important;
+  border: 1px solid var(--border) !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease !important;
+  text-shadow: none !important;
+}
+
+.driver-popover-prev-btn:hover {
+  background: var(--muted) !important;
+}
+
+.driver-popover-next-btn,
+.driver-popover-next-btn:focus {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0.3125rem 0.75rem !important;
+  border-radius: calc(var(--radius) - 0.125rem) !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: none !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  transition: opacity 0.15s ease !important;
+  text-shadow: none !important;
+}
+
+.driver-popover-next-btn:hover {
+  opacity: 0.88 !important;
+}
+
+.driver-popover-close-btn,
+.driver-popover-close-btn:focus {
+  all: unset !important;
+  position: absolute !important;
+  top: 0.625rem !important;
+  right: 0.75rem !important;
+  color: var(--muted-foreground) !important;
+  font-size: 1rem !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+  opacity: 0.7 !important;
+}
+
+.driver-popover-close-btn:hover {
+  color: var(--foreground) !important;
+  opacity: 1 !important;
+}
+
+/* Arrow: match popover card background on all sides */
+.driver-popover-arrow-side-left.driver-popover-arrow {
+  border-right-color: var(--card) !important;
+}
+
+.driver-popover-arrow-side-right.driver-popover-arrow {
+  border-left-color: var(--card) !important;
+}
+
+.driver-popover-arrow-side-top.driver-popover-arrow {
+  border-bottom-color: var(--card) !important;
+}
+
+.driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-top-color: var(--card) !important;
+}
