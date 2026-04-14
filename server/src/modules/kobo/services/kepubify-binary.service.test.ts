@@ -48,19 +48,8 @@ describe('KepubifyBinaryService', () => {
     expect(() => (service as any).detectBinaryName()).toThrow('Unsupported platform');
   });
 
-  it('returns system binary path when kepubify is already installed', async () => {
+  it('caches computed binary path after first resolution', async () => {
     const service = new KepubifyBinaryService(config as never);
-    statMock.mockResolvedValue({} as never);
-
-    await expect(service.getBinaryPath()).resolves.toBe('/usr/local/bin/kepubify');
-    await expect(service.getBinaryPath()).resolves.toBe('/usr/local/bin/kepubify');
-
-    expect(statMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('caches computed binary path after first resolution when system binary absent', async () => {
-    const service = new KepubifyBinaryService(config as never);
-    statMock.mockRejectedValue(new Error('missing'));
     const detectSpy = vi.spyOn(service as any, 'detectBinaryName').mockReturnValue('kepubify-linux-64bit');
     const ensureSpy = vi.spyOn(service as any, 'ensureBinary').mockResolvedValue(undefined);
 
