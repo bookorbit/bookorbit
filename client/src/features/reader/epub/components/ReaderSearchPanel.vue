@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Loader2, Search, X } from 'lucide-vue-next'
+import { ChevronLeft, Loader2, Search, X } from 'lucide-vue-next'
 import type { SearchResult } from '../composables/useSearch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -40,8 +40,19 @@ function onClear() {
 <template>
   <div class="fixed inset-0 z-50 flex">
     <div class="search-panel w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
-      <div class="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
-        <Search :size="16" class="text-muted-foreground shrink-0" />
+      <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              @click="emit('close')"
+            >
+              <ChevronLeft :size="18" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Close</TooltipContent>
+        </Tooltip>
+        <Search :size="15" class="text-muted-foreground shrink-0" />
         <input
           v-model="inputValue"
           type="text"
@@ -56,17 +67,6 @@ function onClear() {
         >
           <X :size="14" />
         </button>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              class="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-              @click="emit('close')"
-            >
-              <X :size="16" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Close</TooltipContent>
-        </Tooltip>
       </div>
 
       <div class="flex-1 overflow-y-auto">

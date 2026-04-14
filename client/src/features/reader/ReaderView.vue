@@ -315,6 +315,12 @@ function closeSearch() {
       </template>
     </ReaderHeader>
 
+    <Transition name="bookmark-fade">
+      <div v-if="bookmarks.isCurrentCfiBookmarked.value" class="absolute left-8 z-30 pointer-events-none" aria-hidden="true">
+        <div class="w-7 h-14 bg-primary" style="clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%)" />
+      </div>
+    </Transition>
+
     <div class="absolute inset-0">
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-10 bg-background">
         <div class="flex flex-col items-center gap-3">
@@ -401,3 +407,14 @@ function closeSearch() {
     />
   </div>
 </template>
+
+<style scoped>
+.bookmark-fade-enter-active,
+.bookmark-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.bookmark-fade-enter-from,
+.bookmark-fade-leave-to {
+  opacity: 0;
+}
+</style>

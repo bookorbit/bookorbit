@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Bookmark, BookOpen, Highlighter, Trash2, X } from 'lucide-vue-next'
+import { Bookmark, BookOpen, Highlighter, Trash2 } from 'lucide-vue-next'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
@@ -31,28 +31,21 @@ const activeTab = ref<Tab>('chapters')
 <template>
   <div class="fixed inset-0 z-50 flex">
     <div class="sidebar-panel w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
-      <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div class="flex gap-1">
-          <button
-            v-for="tab in [
-              { id: 'chapters', icon: BookOpen, label: 'Chapters' },
-              { id: 'bookmarks', icon: Bookmark, label: 'Bookmarks' },
-              { id: 'highlights', icon: Highlighter, label: 'Highlights' },
-            ] as const"
-            :key="tab.id"
-            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="activeTab === tab.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
-            @click="activeTab = tab.id"
-          >
-            <component :is="tab.icon" :size="13" />
-            {{ tab.label }}
-          </button>
-        </div>
+      <div class="flex items-stretch border-b border-border shrink-0">
         <button
-          class="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          @click="emit('close')"
+          v-for="tab in [
+            { id: 'chapters', icon: BookOpen, label: 'Chapters' },
+            { id: 'bookmarks', icon: Bookmark, label: 'Bookmarks' },
+            { id: 'highlights', icon: Highlighter, label: 'Highlights' },
+          ] as const"
+          :key="tab.id"
+          class="flex-1 flex items-center justify-center gap-1.5 py-3 text-[13.5px] relative transition-colors"
+          :class="activeTab === tab.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+          @click="activeTab = tab.id"
         >
-          <X :size="16" />
+          <component :is="tab.icon" :size="16" />
+          {{ tab.label }}
+          <span v-if="activeTab === tab.id" class="absolute bottom-0 inset-x-0 h-0.5 bg-primary rounded-t-full" />
         </button>
       </div>
 
@@ -180,7 +173,7 @@ const TocList = defineComponent({
                           emit('toggleExpand', item.href)
                         },
                       },
-                      [expanded ? h(ChevronDown as Component, { size: 14 }) : h(ChevronRight as Component, { size: 14 })],
+                      [expanded ? h(ChevronDown as Component, { size: 14 }) : h(ChevronRight as Component, { size: 12 })],
                     )
                   : h('span', { class: 'w-3.5 shrink-0' }),
                 h('span', { class: 'truncate' }, item.label),
