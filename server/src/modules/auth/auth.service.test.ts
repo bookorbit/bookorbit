@@ -16,6 +16,7 @@ function makeDb(overrides?: Record<string, unknown>) {
       refreshTokens: { findFirst: vi.fn(), findMany: vi.fn() },
       users: { findFirst: vi.fn() },
       passwordResetTokens: { findFirst: vi.fn() },
+      oidcProviders: { findFirst: vi.fn() },
     },
     $count: vi.fn().mockResolvedValue(0),
     insert: vi.fn().mockReturnThis(),
@@ -104,7 +105,6 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     jwtService as never,
     config as never,
     systemMailService as never,
-    appSettings as never,
     oidcSessionRepo as never,
     oidcDiscovery as never,
     { emit: vi.fn() } as never,
@@ -832,11 +832,16 @@ describe('AuthService', () => {
     });
 
     it('returns logout URL when OIDC end-session endpoint is available', async () => {
-      const { service, db, userService, appSettings, oidcSessionRepo, oidcDiscovery } = makeService();
+      const { service, db, userService, oidcSessionRepo, oidcDiscovery } = makeService();
       (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({ id: 1, userId: 7 });
       userService.incrementTokenVersion.mockResolvedValue(undefined);
-      appSettings.getOidcConfig.mockResolvedValue({ enabled: true, issuerUri: 'https://issuer.example' });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).oidcProviders.findFirst.mockResolvedValue({
+        id: 1,
+        enabled: true,
+        issuerUri: 'https://issuer.example',
+      });
       oidcSessionRepo.findActiveByUserId.mockResolvedValue({
+        providerId: 1,
         idTokenHint: 'id-token-hint',
       });
       oidcDiscovery.getDiscoveryDoc.mockResolvedValue({
@@ -859,11 +864,16 @@ describe('AuthService', () => {
     });
 
     it('revokes OIDC session and returns empty object when end-session endpoint is missing', async () => {
-      const { service, db, userService, appSettings, oidcSessionRepo, oidcDiscovery } = makeService();
+      const { service, db, userService, oidcSessionRepo, oidcDiscovery } = makeService();
       (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({ id: 1, userId: 8 });
       userService.incrementTokenVersion.mockResolvedValue(undefined);
-      appSettings.getOidcConfig.mockResolvedValue({ enabled: true, issuerUri: 'https://issuer.example' });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).oidcProviders.findFirst.mockResolvedValue({
+        id: 1,
+        enabled: true,
+        issuerUri: 'https://issuer.example',
+      });
       oidcSessionRepo.findActiveByUserId.mockResolvedValue({
+        providerId: 1,
         idTokenHint: 'id-token-hint',
       });
       oidcDiscovery.getDiscoveryDoc.mockResolvedValue({

@@ -20,19 +20,19 @@ export class OidcStateService {
     this.ttlMs = this.configService.get<number>('oidcRuntime.stateTtlMs') ?? 5 * 60 * 1000;
   }
 
-  async generate(meta?: Record<string, unknown>): Promise<string> {
+  async generate(providerId: number, meta?: Record<string, unknown>): Promise<string> {
     const state = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + this.ttlMs);
 
     await Promise.all([
       this.db.delete(schema.oidcStates).where(lt(schema.oidcStates.expiresAt, new Date())),
-      this.db.insert(schema.oidcStates).values({ state, expiresAt, meta: meta ? JSON.stringify(meta) : null }),
+      this.db.insert(schema.oidcStates).values({ state, providerId, expiresAt, meta: meta ? JSON.stringify(meta) : null }),
     ]);
 
     return state;
   }
 
-  async validateAndConsume(state: string): Promise<{ valid: boolean; meta?: Record<string, unknown> }> {
+  async validateAndConsume(state: string): Promise<{ valid: boolean; providerId?: number; meta?: Record<string, unknown> }> {
     const deleted = await this.db
       .delete(schema.oidcStates)
       .where(and(eq(schema.oidcStates.state, state), gt(schema.oidcStates.expiresAt, new Date())))
@@ -41,6 +41,6 @@ export class OidcStateService {
     if (deleted.length === 0) return { valid: false };
     const row = deleted[0];
     const meta = row.meta ? (JSON.parse(row.meta) as Record<string, unknown>) : undefined;
-    return { valid: true, meta };
+    return { valid: true, providerId: row.providerId, meta };
   }
 }

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import type { OidcProviderPublic } from '@projectx/types'
 import { ChevronDown, ChevronUp, KeyRound, Link, LinkIcon, Save, Trash2, Upload } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
+import { generatePkce } from '@/features/auth/composables/useOidc'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { MAX_PROFILE_AVATAR_BYTES, useProfileAvatar } from '@/features/auth/composables/useProfileAvatar'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
@@ -130,57 +132,80 @@ watch(
   { immediate: true },
 )
 
-interface OidcIdentity {
-  oidcSubject: string | null
-  oidcIssuer: string | null
+interface LinkedIdentity {
+  id: number
+  providerId: number
+  providerSlug: string
+  providerName: string
+  providerIconUrl: string | null
+  oidcSubject: string
+  oidcIssuer: string
+  linkedAt: string
 }
 
-const oidcIdentity = ref<OidcIdentity | null>(null)
+const linkedIdentities = ref<LinkedIdentity[]>([])
+const oidcProviders = ref<OidcProviderPublic[]>([])
 const oidcIdentityLoading = ref(false)
 const unlinkPassword = ref('')
 const unlinkDialogOpen = ref(false)
+const unlinkTarget = ref<LinkedIdentity | null>(null)
 const unlinking = ref(false)
-const linkingOidc = ref(false)
+const linkingSlug = ref<string | null>(null)
 
 onMounted(async () => {
   oidcIdentityLoading.value = true
   try {
-    const res = await api('/api/auth/oidc/identity')
-    if (res.ok) {
-      oidcIdentity.value = await res.json()
-    }
+    const [identitiesRes, providersRes] = await Promise.all([
+      api('/api/v1/auth/oidc/identities'),
+      fetch('/api/v1/app-settings/oidc/providers/public'),
+    ])
+    if (identitiesRes.ok) linkedIdentities.value = await identitiesRes.json()
+    if (providersRes.ok) oidcProviders.value = await providersRes.json()
   } finally {
     oidcIdentityLoading.value = false
   }
 })
 
-async function initiateOidcLink() {
-  linkingOidc.value = true
+function availableForLinking(): OidcProviderPublic[] {
+  const linkedSlugs = new Set(linkedIdentities.value.map((i) => i.providerSlug))
+  return oidcProviders.value.filter((p) => p.enabled && !linkedSlugs.has(p.slug))
+}
+
+async function initiateOidcLink(provider: OidcProviderPublic) {
+  linkingSlug.value = provider.slug
   try {
-    const stateRes = await api('/api/auth/oidc/link-state', { method: 'POST' })
-    if (!stateRes.ok) throw new Error('Failed to generate link state')
-    const { state, authorizationEndpoint } = await stateRes.json()
+    const stateRes = await api(`/api/v1/auth/oidc/${provider.slug}/link-state`, { method: 'POST' })
+    if (!stateRes.ok) {
+      const err = await stateRes.json().catch(() => ({}))
+      throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to generate link state')
+    }
+    const { state, authorizationEndpoint, clientId, scopes } = await stateRes.json()
+    const nonce = crypto.randomUUID()
+    const { codeVerifier, codeChallenge } = await generatePkce()
     const params = new URLSearchParams({
       response_type: 'code',
-      client_id: '',
+      client_id: clientId,
       redirect_uri: `${window.location.origin}/oauth2-callback`,
-      scope: 'openid profile email',
+      scope: scopes,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
       state,
-      nonce: crypto.randomUUID(),
+      nonce,
     })
+    sessionStorage.setItem(`oidc_pkce_${state}`, JSON.stringify({ codeVerifier, nonce, state }))
     sessionStorage.setItem('oidc_link_pending', '1')
     window.location.href = `${authorizationEndpoint}?${params.toString()}`
   } catch (err) {
     toast.error(err instanceof Error ? err.message : 'Failed to start OIDC link')
-    linkingOidc.value = false
+    linkingSlug.value = null
   }
 }
 
 async function confirmUnlink() {
-  if (!unlinkPassword.value) return
+  if (!unlinkPassword.value || !unlinkTarget.value) return
   unlinking.value = true
   try {
-    const res = await api('/api/auth/oidc/identity', {
+    const res = await api(`/api/v1/auth/oidc/identities/${unlinkTarget.value.providerId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: unlinkPassword.value }),
@@ -189,10 +214,11 @@ async function confirmUnlink() {
       const err = await res.json().catch(() => ({}))
       throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to unlink')
     }
-    oidcIdentity.value = { oidcSubject: null, oidcIssuer: null }
+    linkedIdentities.value = linkedIdentities.value.filter((i) => i.providerId !== unlinkTarget.value!.providerId)
     unlinkDialogOpen.value = false
     unlinkPassword.value = ''
-    toast.success('OIDC identity unlinked')
+    unlinkTarget.value = null
+    toast.success('Identity unlinked')
   } catch (err) {
     toast.error(err instanceof Error ? err.message : 'Failed to unlink identity')
   } finally {
@@ -200,7 +226,8 @@ async function confirmUnlink() {
   }
 }
 
-function openUnlinkDialog() {
+function openUnlinkDialog(identity: LinkedIdentity) {
+  unlinkTarget.value = identity
   unlinkPassword.value = ''
   unlinkDialogOpen.value = true
 }
@@ -208,6 +235,7 @@ function openUnlinkDialog() {
 function closeUnlinkDialog() {
   unlinkDialogOpen.value = false
   unlinkPassword.value = ''
+  unlinkTarget.value = null
 }
 </script>
 
@@ -346,34 +374,53 @@ function closeUnlinkDialog() {
     <section class="rounded-xl border border-border bg-card p-4 md:p-5 space-y-3">
       <div class="flex items-center gap-2">
         <LinkIcon class="h-4 w-4 text-muted-foreground shrink-0" />
-        <h2 class="text-sm font-semibold text-foreground">Connected Account</h2>
+        <h2 class="text-sm font-semibold text-foreground">Connected Accounts</h2>
       </div>
-      <div v-if="oidcIdentity?.oidcSubject">
-        <p class="text-sm text-muted-foreground">Your account is linked to an external OIDC provider.</p>
-        <div class="mt-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs font-mono text-muted-foreground space-y-0.5">
-          <div><span class="text-foreground font-medium">Issuer:</span> {{ oidcIdentity.oidcIssuer }}</div>
-          <div><span class="text-foreground font-medium">Subject:</span> {{ oidcIdentity.oidcSubject }}</div>
+
+      <!-- Linked identities -->
+      <div v-if="linkedIdentities.length > 0" class="space-y-2">
+        <div
+          v-for="identity in linkedIdentities"
+          :key="identity.id"
+          class="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2"
+        >
+          <img v-if="identity.providerIconUrl" :src="identity.providerIconUrl" alt="" class="h-5 w-5 shrink-0 rounded object-contain" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-foreground truncate">{{ identity.providerName }}</p>
+            <p class="text-xs text-muted-foreground truncate">{{ identity.oidcSubject }}</p>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors"
+            @click="openUnlinkDialog(identity)"
+          >
+            Unlink
+          </button>
         </div>
-        <button
-          type="button"
-          class="mt-3 rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors"
-          @click="openUnlinkDialog"
-        >
-          Unlink identity
-        </button>
       </div>
-      <div v-else>
-        <p class="text-sm text-muted-foreground">No external OIDC account linked. You can link your account to an SSO provider.</p>
-        <button
-          type="button"
-          :disabled="linkingOidc"
-          class="mt-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
-          @click="initiateOidcLink"
-        >
-          <Link class="h-3 w-3" />
-          {{ linkingOidc ? 'Redirecting...' : 'Link OIDC account' }}
-        </button>
+
+      <!-- Link new provider -->
+      <div v-if="availableForLinking().length > 0" class="space-y-2">
+        <p class="text-xs text-muted-foreground">Link additional providers:</p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="provider in availableForLinking()"
+            :key="provider.slug"
+            type="button"
+            :disabled="linkingSlug !== null"
+            class="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
+            @click="initiateOidcLink(provider)"
+          >
+            <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="h-3 w-3 shrink-0 object-contain" />
+            <Link class="h-3 w-3" />
+            {{ linkingSlug === provider.slug ? 'Redirecting...' : `Link ${provider.displayName}` }}
+          </button>
+        </div>
       </div>
+
+      <p v-if="linkedIdentities.length === 0 && availableForLinking().length === 0" class="text-sm text-muted-foreground">
+        No OIDC providers are configured. Ask an administrator to set up SSO.
+      </p>
     </section>
   </div>
 
@@ -407,10 +454,8 @@ function closeUnlinkDialog() {
   <div v-if="unlinkDialogOpen" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeUnlinkDialog">
     <button class="absolute inset-0 bg-black/45" @click="closeUnlinkDialog" />
     <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
-      <p class="text-base font-semibold text-foreground">Unlink OIDC identity?</p>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Enter your password to confirm. After unlinking you can only log in with username and password.
-      </p>
+      <p class="text-base font-semibold text-foreground">Unlink {{ unlinkTarget?.providerName ?? 'OIDC' }} identity?</p>
+      <p class="mt-1 text-sm text-muted-foreground">Enter your password to confirm. You will no longer be able to sign in with this provider.</p>
       <input
         v-model="unlinkPassword"
         type="password"

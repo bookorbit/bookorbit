@@ -19,7 +19,7 @@ describe('OidcStateService', () => {
       db.delete.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
       const service = new OidcStateService(db as never, mockConfig as never);
 
-      const state = await service.generate();
+      const state = await service.generate(1);
       expect(typeof state).toBe('string');
       expect(state.length).toBeGreaterThan(0);
       expect(state).toMatch(/^[A-Za-z0-9_-]+$/);
@@ -30,8 +30,8 @@ describe('OidcStateService', () => {
       db.delete.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
       const service = new OidcStateService(db as never, mockConfig as never);
 
-      const a = await service.generate();
-      const b = await service.generate();
+      const a = await service.generate(1);
+      const b = await service.generate(1);
       expect(a).not.toBe(b);
     });
 
@@ -44,11 +44,12 @@ describe('OidcStateService', () => {
       };
       const service = new OidcStateService(db as never, mockConfig as never);
 
-      const state = await service.generate();
+      const state = await service.generate(1);
 
       expect(insertMock).toHaveBeenCalledOnce();
-      const [[{ state: insertedState, meta }]] = valuesMock.mock.calls;
+      const [[{ state: insertedState, providerId, meta }]] = valuesMock.mock.calls;
       expect(insertedState).toBe(state);
+      expect(providerId).toBe(1);
       expect(meta).toBeNull();
     });
 
@@ -62,7 +63,7 @@ describe('OidcStateService', () => {
       const service = new OidcStateService(db as never, mockConfig as never);
       const metaPayload = { mode: 'link', userId: 42 };
 
-      await service.generate(metaPayload);
+      await service.generate(1, metaPayload);
 
       const [[{ meta }]] = valuesMock.mock.calls;
       expect(JSON.parse(meta as string)).toEqual(metaPayload);
@@ -78,7 +79,7 @@ describe('OidcStateService', () => {
       const service = new OidcStateService(db as never, mockConfig as never);
 
       const before = Date.now();
-      const state = await service.generate();
+      const state = await service.generate(1);
       const after = Date.now();
 
       const [[{ state: insertedState, expiresAt }]] = valuesMock.mock.calls;
@@ -95,7 +96,7 @@ describe('OidcStateService', () => {
       };
       const service = new OidcStateService(db as never, mockConfig as never);
 
-      await service.generate();
+      await service.generate(1);
 
       expect(db.delete).toHaveBeenCalled();
       expect(whereMock).toHaveBeenCalled();
@@ -107,7 +108,7 @@ describe('OidcStateService', () => {
       const db = {
         delete: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([{ state: 'valid-state', meta: null }]),
+            returning: vi.fn().mockResolvedValue([{ state: 'valid-state', providerId: 1, meta: null }]),
           }),
         }),
         insert: vi.fn(),
@@ -116,6 +117,7 @@ describe('OidcStateService', () => {
 
       const result = await service.validateAndConsume('valid-state');
       expect(result.valid).toBe(true);
+      expect(result.providerId).toBe(1);
       expect(result.meta).toBeUndefined();
     });
 
@@ -124,7 +126,7 @@ describe('OidcStateService', () => {
       const db = {
         delete: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([{ state: 'valid-state', meta: JSON.stringify(metaPayload) }]),
+            returning: vi.fn().mockResolvedValue([{ state: 'valid-state', providerId: 1, meta: JSON.stringify(metaPayload) }]),
           }),
         }),
         insert: vi.fn(),

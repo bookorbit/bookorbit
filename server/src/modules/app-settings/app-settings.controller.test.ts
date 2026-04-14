@@ -1,9 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { AppSettingsController } from './app-settings.controller';
 import { AppSettingsService } from './app-settings.service';
-import { OidcGroupMappingAdminService } from './oidc-group-mapping-admin.service';
+import { OidcProviderService } from './oidc-provider.service';
 
 function makeService(): jest.Mocked<AppSettingsService> {
   return {
@@ -13,9 +12,6 @@ function makeService(): jest.Mocked<AppSettingsService> {
     isBookBucketAutoFetchEnabled: vi.fn(),
     getAuthorsAutoEnrichmentWriteMode: vi.fn(),
     isAuthorsProviderAudnexusEnabled: vi.fn(),
-    getOidcConfig: vi.fn(),
-    updateOidcConfig: vi.fn(),
-    testOidcConnection: vi.fn(),
     getUploadPattern: vi.fn(),
     setUploadPattern: vi.fn(),
     getDownloadPattern: vi.fn(),
@@ -26,26 +22,38 @@ function makeService(): jest.Mocked<AppSettingsService> {
   } as unknown as jest.Mocked<AppSettingsService>;
 }
 
-function makeGroupMappingService(): jest.Mocked<OidcGroupMappingAdminService> {
+function makeOidcProviderService(): jest.Mocked<OidcProviderService> {
   return {
-    listMappings: vi.fn().mockResolvedValue([]),
-    createMapping: vi.fn(),
-    updateMapping: vi.fn(),
-    deleteMapping: vi.fn(),
-  } as unknown as jest.Mocked<OidcGroupMappingAdminService>;
+    findAll: vi.fn().mockResolvedValue([]),
+    findEnabled: vi.fn().mockResolvedValue([]),
+    findBySlugOrFail: vi.fn(),
+    findByIdOrFail: vi.fn(),
+    findByIssuerUri: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    reorder: vi.fn(),
+    testConnection: vi.fn(),
+    listGroupMappings: vi.fn().mockResolvedValue([]),
+    createGroupMapping: vi.fn(),
+    updateGroupMapping: vi.fn(),
+    deleteGroupMapping: vi.fn(),
+  } as unknown as jest.Mocked<OidcProviderService>;
 }
 
 describe('AppSettingsController', () => {
   let controller: AppSettingsController;
   let service: ReturnType<typeof makeService>;
+  let oidcProviderService: ReturnType<typeof makeOidcProviderService>;
 
   beforeEach(async () => {
     service = makeService();
+    oidcProviderService = makeOidcProviderService();
     const module = await Test.createTestingModule({
       controllers: [AppSettingsController],
       providers: [
         { provide: AppSettingsService, useValue: service },
-        { provide: OidcGroupMappingAdminService, useValue: makeGroupMappingService() },
+        { provide: OidcProviderService, useValue: oidcProviderService },
       ],
     }).compile();
     controller = module.get(AppSettingsController);
@@ -97,75 +105,51 @@ describe('AppSettingsController', () => {
     });
   });
 
-  describe('getOidcPublicConfig', () => {
-    it('returns only public fields, not clientSecret', async () => {
-      service.getOidcConfig.mockResolvedValue({
-        enabled: true,
-        providerName: 'Keycloak',
-        issuerUri: 'https://kc.example.com',
-        clientId: 'projectx',
-        clientSecret: 'supersecret',
-        scopes: 'openid',
-        iconUrl: 'https://kc.example.com/icon.png',
-        claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
-        autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
-      });
-      const result = await controller.getOidcPublicConfig();
-      expect(result).not.toHaveProperty('clientSecret');
-      expect(result).not.toHaveProperty('claimMapping');
-      expect(result).not.toHaveProperty('autoProvision');
-      expect(result.clientId).toBe('projectx');
-      expect(result.iconUrl).toBe('https://kc.example.com/icon.png');
+  describe('OIDC provider CRUD', () => {
+    it('getOidcProvidersPublic returns enabled providers without secrets', async () => {
+      oidcProviderService.findEnabled.mockResolvedValue([
+        {
+          id: 1,
+          slug: 'keycloak',
+          displayName: 'Keycloak',
+          enabled: true,
+          issuerUri: 'https://kc.example.com',
+          clientId: 'projectx',
+          clientSecret: 'secret',
+          scopes: 'openid',
+          iconUrl: null,
+        },
+      ] as never);
+      const result = await controller.getOidcProvidersPublic();
+      expect(result).toHaveLength(1);
+      expect(result[0]).not.toHaveProperty('clientSecret');
+      expect(result[0].clientId).toBe('projectx');
     });
-  });
 
-  describe('getOidcConfig', () => {
-    it('masks clientSecret when present', async () => {
-      service.getOidcConfig.mockResolvedValue({
-        enabled: true,
-        providerName: '',
-        issuerUri: '',
-        clientId: '',
-        clientSecret: 'secret123',
-        scopes: 'openid',
-        claimMapping: { username: '', name: '', email: '', groups: '' },
-        autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
-      });
-      const result = await controller.getOidcConfig();
+    it('getOidcProvider masks clientSecret', async () => {
+      oidcProviderService.findBySlugOrFail.mockResolvedValue({ id: 1, slug: 'keycloak', clientSecret: 'secret123' } as never);
+      const result = await controller.getOidcProvider('keycloak');
       expect(result.clientSecret).toBe('***');
     });
 
-    it('returns empty string for clientSecret when not set', async () => {
-      service.getOidcConfig.mockResolvedValue({
-        enabled: false,
-        providerName: '',
-        issuerUri: '',
-        clientId: '',
-        clientSecret: '',
-        scopes: 'openid',
-        claimMapping: { username: '', name: '', email: '', groups: '' },
-        autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
-      });
-      const result = await controller.getOidcConfig();
+    it('getOidcProvider returns empty clientSecret when not set', async () => {
+      oidcProviderService.findBySlugOrFail.mockResolvedValue({ id: 1, slug: 'keycloak', clientSecret: '' } as never);
+      const result = await controller.getOidcProvider('keycloak');
       expect(result.clientSecret).toBe('');
     });
-  });
 
-  describe('testOidcConnection', () => {
-    it('delegates to service.testOidcConnection with provided issuerUri', async () => {
-      service.testOidcConnection.mockResolvedValue({
-        success: true,
-        issuer: 'https://kc.example.com',
-        authorizationEndpoint: 'https://kc.example.com/auth',
-      });
-      const result = await controller.testOidcConnection('https://kc.example.com');
-      expect(service.testOidcConnection).toHaveBeenCalledWith('https://kc.example.com');
+    it('testOidcProviderConnection delegates to service', async () => {
+      oidcProviderService.testConnection.mockResolvedValue({ success: true, issuer: 'https://kc.example.com' } as never);
+      const result = await controller.testOidcProviderConnection('keycloak', 'https://kc.example.com');
+      expect(oidcProviderService.testConnection).toHaveBeenCalledWith('https://kc.example.com');
       expect(result.success).toBe(true);
     });
 
-    it('propagates BadRequestException from service', async () => {
-      service.testOidcConnection.mockRejectedValue(new BadRequestException('Issuer URI is not configured'));
-      await expect(controller.testOidcConnection()).rejects.toThrow(BadRequestException);
+    it('testOidcProviderConnection falls back to saved issuerUri', async () => {
+      oidcProviderService.findBySlugOrFail.mockResolvedValue({ issuerUri: 'https://saved.example.com' } as never);
+      oidcProviderService.testConnection.mockResolvedValue({ success: true } as never);
+      await controller.testOidcProviderConnection('keycloak');
+      expect(oidcProviderService.testConnection).toHaveBeenCalledWith('https://saved.example.com');
     });
   });
 });

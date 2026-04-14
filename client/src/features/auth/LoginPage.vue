@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { OidcPublicConfig } from '@projectx/types'
+import type { OidcProviderPublic } from '@projectx/types'
 import { Moon, Sun, Wallpaper } from 'lucide-vue-next'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useAuth } from './composables/useAuth'
@@ -49,18 +49,18 @@ function closeAll() {
 }
 
 const { login } = useAuth()
-const { getPublicConfig, initiateLogin } = useOidc()
+const { getPublicProviders, initiateLogin } = useOidc()
 const { setupStatusError } = useSetupStatus()
 
 const username = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
 const loading = ref(false)
-const oidcConfig = ref<OidcPublicConfig | null>(null)
-const oidcLoading = ref(false)
+const oidcProviders = ref<OidcProviderPublic[]>([])
+const oidcLoadingSlug = ref<string | null>(null)
 
 onMounted(async () => {
-  oidcConfig.value = await getPublicConfig()
+  oidcProviders.value = await getPublicProviders()
 })
 
 async function handleSubmit() {
@@ -75,14 +75,14 @@ async function handleSubmit() {
   }
 }
 
-async function handleOidcLogin() {
+async function handleOidcLogin(provider: OidcProviderPublic) {
   error.value = null
-  oidcLoading.value = true
+  oidcLoadingSlug.value = provider.slug
   try {
-    await initiateLogin()
+    await initiateLogin(provider)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'OIDC login failed'
-    oidcLoading.value = false
+    oidcLoadingSlug.value = null
   }
 }
 </script>
@@ -268,25 +268,29 @@ async function handleOidcLogin() {
         </button>
       </form>
 
-      <template v-if="oidcConfig?.enabled">
+      <template v-if="oidcProviders.length > 0">
         <div class="flex items-center gap-3 my-6">
           <div class="flex-1 h-px bg-border" />
-          <span class="text-xs text-muted-foreground">or</span>
+          <span class="text-sm text-muted-foreground">or</span>
           <div class="flex-1 h-px bg-border" />
         </div>
 
-        <button
-          type="button"
-          :disabled="oidcLoading"
-          class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background/60 px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors backdrop-blur-sm"
-          @click="handleOidcLogin"
-        >
-          <img v-if="oidcConfig.iconUrl" :src="oidcConfig.iconUrl" alt="" class="h-4 w-4 shrink-0 object-contain" />
-          {{ oidcLoading ? 'Redirecting...' : `Sign in with ${oidcConfig.providerName || 'SSO'}` }}
-        </button>
+        <div class="space-y-3">
+          <button
+            v-for="provider in oidcProviders"
+            :key="provider.slug"
+            type="button"
+            :disabled="oidcLoadingSlug !== null"
+            class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background/60 px-4 py-2 text-[14px] font-medium text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors backdrop-blur-sm"
+            @click="handleOidcLogin(provider)"
+          >
+            <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="h-4 w-4 shrink-0 object-contain" />
+            {{ oidcLoadingSlug === provider.slug ? 'Redirecting...' : `Sign in with ${provider.displayName}` }}
+          </button>
+        </div>
       </template>
 
-      <p class="mt-4 text-center text-sm text-muted-foreground">
+      <p class="mt-6 text-center text-sm text-muted-foreground">
         <RouterLink to="/forgot-password" class="text-primary hover:underline">Forgot password?</RouterLink>
       </p>
     </div>

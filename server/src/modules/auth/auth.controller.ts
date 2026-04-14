@@ -125,10 +125,10 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { limit: 10, ttl: ONE_MINUTE_MS } })
-  @Post('oidc/state')
+  @Post('oidc/:slug/state')
   @HttpCode(HttpStatus.OK)
-  oidcGenerateState() {
-    return this.oidcService.generateState();
+  oidcGenerateState(@Param('slug') slug: string) {
+    return this.oidcService.generateState(slug);
   }
 
   @Public()
@@ -149,27 +149,27 @@ export class AuthController {
   }
 
   @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
-  @Post('oidc/link-state')
+  @Post('oidc/:slug/link-state')
   @HttpCode(HttpStatus.OK)
-  oidcGenerateLinkState(@CurrentUser() user: RequestUser) {
-    return this.oidcService.generateLinkState(user.id);
+  oidcGenerateLinkState(@CurrentUser() user: RequestUser, @Param('slug') slug: string) {
+    return this.oidcService.generateLinkState(user.id, slug);
   }
 
   @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
-  @Post('oidc/preview-state')
+  @Post('oidc/:slug/preview-state')
   @HttpCode(HttpStatus.OK)
-  oidcGeneratePreviewState() {
-    return this.oidcService.generatePreviewState();
+  oidcGeneratePreviewState(@Param('slug') slug: string) {
+    return this.oidcService.generatePreviewState(slug);
   }
 
-  @Get('oidc/identity')
-  oidcGetIdentity(@CurrentUser() user: RequestUser) {
-    return this.oidcService.getLinkedIdentity(user.id);
+  @Get('oidc/identities')
+  oidcGetIdentities(@CurrentUser() user: RequestUser) {
+    return this.oidcService.getLinkedIdentities(user.id);
   }
 
-  @Delete('oidc/identity')
+  @Delete('oidc/identities/:providerId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  oidcUnlinkIdentity(@CurrentUser() user: RequestUser, @Body() dto: OidcUnlinkDto) {
-    return this.oidcService.unlinkIdentity(user.id, dto.password);
+  oidcUnlinkIdentity(@CurrentUser() user: RequestUser, @Param('providerId', ParseIntPipe) providerId: number, @Body() dto: OidcUnlinkDto) {
+    return this.oidcService.unlinkIdentity(user.id, providerId, dto.password);
   }
 }

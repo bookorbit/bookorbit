@@ -1,11 +1,13 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { compare } from 'bcryptjs';
 import type { FastifyReply } from 'fastify';
 import { AuditAction, AuditResource, OidcCallbackResponse, OidcErrorCode, Permission } from '@projectx/types';
+import type { OidcAutoProvision, OidcClaimMapping } from '@projectx/types';
 
 import { AUDIT_EVENT, AuditEventsService } from '../../audit/audit-events.service';
-import { AppSettingsService } from '../../app-settings/app-settings.service';
+import { OidcProviderService } from '../../app-settings/oidc-provider.service';
+import { OidcIdentityRepository } from '../../user/oidc-identity.repository';
 import { UserService } from '../../user/user.service';
 import { AuthService } from '../auth.service';
 import { BackchannelLogoutService } from './backchannel-logout.service';
@@ -45,7 +47,7 @@ export class OidcService {
   private readonly appUrl: string;
 
   constructor(
-    private readonly appSettings: AppSettingsService,
+    private readonly providerService: OidcProviderService,
     private readonly discovery: OidcDiscoveryService,
     private readonly tokenClient: OidcTokenClientService,
     private readonly tokenValidator: OidcTokenValidatorService,
@@ -54,6 +56,7 @@ export class OidcService {
     private readonly sessionRepo: OidcSessionRepository,
     private readonly groupMapping: OidcGroupMappingService,
     private readonly backchannelLogout: BackchannelLogoutService,
+    private readonly identityRepo: OidcIdentityRepository,
     private readonly userService: UserService,
     private readonly authService: AuthService,
     private readonly auditEvents: AuditEventsService,
@@ -62,24 +65,37 @@ export class OidcService {
     this.appUrl = (this.configService.get<string>('app.appUrl') ?? 'http://localhost:5173').replace(/\/$/, '');
   }
 
-  async generateState(): Promise<{ state: string; authorizationEndpoint: string }> {
-    const config = await this.appSettings.getOidcConfig();
-    if (!config.enabled) throw new UnauthorizedException('OIDC is not enabled');
-    const [state, disc] = await Promise.all([this.stateService.generate(), this.discovery.getDiscoveryDoc(config.issuerUri)]);
+  async generateState(providerSlug: string): Promise<{ state: string; authorizationEndpoint: string }> {
+    const provider = await this.providerService.findBySlugOrFail(providerSlug);
+    if (!provider.enabled) throw new UnauthorizedException('OIDC provider is not enabled');
+    const [state, disc] = await Promise.all([this.stateService.generate(provider.id), this.discovery.getDiscoveryDoc(provider.issuerUri)]);
     return { state, authorizationEndpoint: disc.authorizationEndpoint };
   }
 
-  async generateLinkState(userId: number): Promise<{ state: string; authorizationEndpoint: string }> {
-    const config = await this.appSettings.getOidcConfig();
-    if (!config.enabled) throw new UnauthorizedException('OIDC is not enabled');
-    const [state, disc] = await Promise.all([this.stateService.generate({ mode: 'link', userId }), this.discovery.getDiscoveryDoc(config.issuerUri)]);
-    return { state, authorizationEndpoint: disc.authorizationEndpoint };
+  async generateLinkState(
+    userId: number,
+    providerSlug: string,
+  ): Promise<{ state: string; authorizationEndpoint: string; clientId: string; scopes: string }> {
+    const provider = await this.providerService.findBySlugOrFail(providerSlug);
+    if (!provider.enabled) throw new UnauthorizedException('OIDC provider is not enabled');
+
+    const existing = await this.identityRepo.findByUserAndProvider(userId, provider.id);
+    if (existing) throw new BadRequestException('You already have an identity linked to this provider');
+
+    const [state, disc] = await Promise.all([
+      this.stateService.generate(provider.id, { mode: 'link', userId }),
+      this.discovery.getDiscoveryDoc(provider.issuerUri),
+    ]);
+    return { state, authorizationEndpoint: disc.authorizationEndpoint, clientId: provider.clientId, scopes: provider.scopes };
   }
 
-  async generatePreviewState(): Promise<{ state: string; authorizationEndpoint: string }> {
-    const config = await this.appSettings.getOidcConfig();
-    if (!config.enabled) throw new UnauthorizedException('OIDC is not enabled');
-    const [state, disc] = await Promise.all([this.stateService.generate({ mode: 'preview' }), this.discovery.getDiscoveryDoc(config.issuerUri)]);
+  async generatePreviewState(providerSlug: string): Promise<{ state: string; authorizationEndpoint: string }> {
+    const provider = await this.providerService.findBySlugOrFail(providerSlug);
+    if (!provider.enabled) throw new UnauthorizedException('OIDC provider is not enabled');
+    const [state, disc] = await Promise.all([
+      this.stateService.generate(provider.id, { mode: 'preview' }),
+      this.discovery.getDiscoveryDoc(provider.issuerUri),
+    ]);
     return { state, authorizationEndpoint: disc.authorizationEndpoint };
   }
 
@@ -87,19 +103,34 @@ export class OidcService {
     return this.backchannelLogout.handleLogout(logoutToken);
   }
 
-  async getLinkedIdentity(userId: number) {
-    return this.userService.getUserOidcIdentity(userId);
+  async getLinkedIdentities(userId: number) {
+    return this.identityRepo.findByUser(userId);
   }
 
-  async unlinkIdentity(userId: number, password: string): Promise<void> {
+  async unlinkIdentity(userId: number, providerId: number, password: string): Promise<void> {
     const hash = await this.userService.findPasswordHashById(userId);
     if (!hash) throw new BadRequestException('User not found');
 
     const valid = await compare(password, hash);
     if (!valid) throw new BadRequestException('Incorrect password');
 
-    const identity = await this.userService.getUserOidcIdentity(userId);
-    await this.userService.unlinkOidcIdentity(userId);
+    const identity = await this.identityRepo.findByUserAndProvider(userId, providerId);
+    if (!identity) throw new NotFoundException('No identity linked to this provider');
+
+    // D4: Check if user has local password OR another linked identity
+    const user = await this.userService.findById(userId);
+    if (!user) throw new BadRequestException('User not found');
+
+    const identityCount = await this.identityRepo.countByUser(userId);
+    const hasLocalAuth = user.provisioningMethod !== 'oidc';
+    if (!hasLocalAuth && identityCount <= 1) {
+      throw new BadRequestException('Cannot unlink: this is your only authentication method. Set a password first.');
+    }
+
+    await this.identityRepo.remove(userId, providerId);
+
+    // Clean up provider-scoped permission grants
+    await this.groupMapping.removeProviderGrants(userId, providerId);
 
     this.auditEvents.emit(AUDIT_EVENT, {
       userId,
@@ -107,7 +138,7 @@ export class OidcService {
       action: AuditAction.OidcIdentityUnlinked,
       resource: AuditResource.OidcIdentity,
       resourceId: userId,
-      description: `User unlinked OIDC identity (issuer: ${identity?.oidcIssuer ?? 'unknown'})`,
+      description: `User unlinked OIDC identity (issuer: ${identity.oidcIssuer ?? 'unknown'})`,
     });
   }
 
@@ -116,23 +147,25 @@ export class OidcService {
     reply: FastifyReply,
   ): Promise<OidcCallbackResponse> {
     const stateResult = await this.stateService.validateAndConsume(params.state);
-    if (!stateResult.valid) {
+    if (!stateResult.valid || !stateResult.providerId) {
       throw new UnauthorizedException({
         message: 'Your login session expired. Please try signing in again.',
         errorCode: OidcErrorCode.STATE_EXPIRED,
       });
     }
 
-    const config = await this.appSettings.getOidcConfig();
-    if (!config.enabled) throw new UnauthorizedException('OIDC is not enabled');
+    const provider = await this.providerService.findByIdOrFail(stateResult.providerId);
+    if (!provider.enabled) throw new UnauthorizedException('OIDC provider is not enabled');
 
-    // P2-9: Validate redirect URI against allowed app URL
+    const claimMapping = provider.claimMapping as OidcClaimMapping;
+    const autoProvision = provider.autoProvision as OidcAutoProvision;
+
     const allowedRedirectUri = `${this.appUrl}/oauth2-callback`;
     if (normalizeRedirectUri(params.redirectUri) !== normalizeRedirectUri(allowedRedirectUri)) {
       throw new BadRequestException(`Redirect URI is not allowed: ${params.redirectUri}`);
     }
 
-    const disc = await this.discovery.getDiscoveryDoc(config.issuerUri);
+    const disc = await this.discovery.getDiscoveryDoc(provider.issuerUri);
 
     let tokens: Awaited<ReturnType<typeof this.tokenClient.exchangeCode>>;
     try {
@@ -141,8 +174,8 @@ export class OidcService {
         codeVerifier: params.codeVerifier,
         redirectUri: params.redirectUri,
         tokenEndpoint: disc.tokenEndpoint,
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
+        clientId: provider.clientId,
+        clientSecret: provider.clientSecret ?? '',
       });
     } catch {
       throw new UnauthorizedException({
@@ -153,7 +186,7 @@ export class OidcService {
 
     const idTokenClaims = await this.tokenValidator.validateIdToken(tokens.idToken, {
       issuer: disc.issuer,
-      clientId: config.clientId,
+      clientId: provider.clientId,
       nonce: params.nonce,
       jwksUri: disc.jwksUri,
     });
@@ -163,7 +196,7 @@ export class OidcService {
       userInfoClaims = await this.tokenClient.fetchUserInfo(disc.userinfoEndpoint, tokens.accessToken);
     }
 
-    const claims = this.claimExtractor.extract(idTokenClaims as Record<string, unknown>, userInfoClaims, config.claimMapping);
+    const claims = this.claimExtractor.extract(idTokenClaims as Record<string, unknown>, userInfoClaims, claimMapping);
     if (!claims.subject) {
       this.logger.warn('[auth.oidc_callback] [fail] errorClass=UnauthorizedException error="missing sub claim" - OIDC callback failed');
       throw new UnauthorizedException({
@@ -186,7 +219,17 @@ export class OidcService {
 
     if (mode === 'link') {
       const targetUserId = stateResult.meta?.userId as number;
-      await this.userService.linkOidcIdentity(targetUserId, claims.subject, disc.issuer, claims.avatarUrl);
+      await this.identityRepo.create({
+        userId: targetUserId,
+        providerId: provider.id,
+        oidcSubject: claims.subject,
+        oidcIssuer: disc.issuer,
+      });
+
+      // Also update avatar if available
+      if (claims.avatarUrl) {
+        await this.userService.linkOidcIdentity(targetUserId, claims.subject, disc.issuer, claims.avatarUrl);
+      }
 
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: targetUserId,
@@ -201,11 +244,12 @@ export class OidcService {
     }
 
     // Default: login flow
-    const user = await this.findOrProvisionUser(claims, config, disc.issuer);
+    const user = await this.findOrProvisionUser(claims, provider, disc.issuer, autoProvision);
 
     const sid = (idTokenClaims as Record<string, unknown>).sid ? String((idTokenClaims as Record<string, unknown>).sid) : undefined;
     await this.sessionRepo.create({
       userId: user.id,
+      providerId: provider.id,
       oidcSubject: claims.subject,
       oidcIssuer: disc.issuer,
       oidcSessionId: sid,
@@ -229,17 +273,29 @@ export class OidcService {
 
   private async findOrProvisionUser(
     claims: { subject: string; username: string; name: string; email?: string; avatarUrl?: string; groups: string[] },
-    config: Awaited<ReturnType<AppSettingsService['getOidcConfig']>>,
+    provider: Awaited<ReturnType<OidcProviderService['findByIdOrFail']>>,
     issuer: string,
+    autoProvision: OidcAutoProvision,
   ) {
-    let user = await this.userService.findByOidcSubject(claims.subject, issuer);
+    // Look up by identity table first
+    const identity = await this.identityRepo.findByProviderAndSubject(provider.id, claims.subject);
+    let user = identity ? await this.userService.findById(identity.userId) : null;
 
-    if (!user && config.autoProvision.allowLocalLinking) {
+    if (!user && autoProvision.allowLocalLinking) {
+      // Case-insensitive username matching for auto-link
       const byUsername = await this.userService.findByUsername(claims.username);
       if (byUsername) {
         let linkConflict: unknown;
         try {
+          await this.identityRepo.create({
+            userId: byUsername.id,
+            providerId: provider.id,
+            oidcSubject: claims.subject,
+            oidcIssuer: issuer,
+          });
+          // Also maintain legacy columns for backward compatibility
           await this.userService.linkOidcIdentity(byUsername.id, claims.subject, issuer, claims.avatarUrl);
+
           this.auditEvents.emit(AUDIT_EVENT, {
             userId: byUsername.id,
             actorUsername: byUsername.username,
@@ -252,7 +308,8 @@ export class OidcService {
           if (!isUniqueViolation(error)) throw error;
           linkConflict = error;
         }
-        user = await this.userService.findByOidcSubject(claims.subject, issuer);
+        const recheckIdentity = await this.identityRepo.findByProviderAndSubject(provider.id, claims.subject);
+        user = recheckIdentity ? await this.userService.findById(recheckIdentity.userId) : null;
         if (!user && linkConflict) {
           throw toThrowable(linkConflict, 'OIDC identity conflict');
         }
@@ -260,9 +317,9 @@ export class OidcService {
     }
 
     let createdUser = false;
-    if (!user && config.autoProvision.enabled) {
+    if (!user && autoProvision.enabled) {
       try {
-        user = await this.userService.createOidcUser({
+        const rawUser = await this.userService.createOidcUser({
           username: claims.username,
           name: claims.name,
           email: claims.email,
@@ -271,14 +328,30 @@ export class OidcService {
           avatarUrl: claims.avatarUrl,
         });
         createdUser = true;
+
+        // Create identity link in new table
+        await this.identityRepo.create({
+          userId: rawUser.id,
+          providerId: provider.id,
+          oidcSubject: claims.subject,
+          oidcIssuer: issuer,
+        });
+
+        user = await this.userService.findById(rawUser.id);
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
-        user = await this.userService.findByOidcSubject(claims.subject, issuer);
-        if (!user) throw toThrowable(error, 'OIDC user provisioning conflict');
+        const recheckIdentity = await this.identityRepo.findByProviderAndSubject(provider.id, claims.subject);
+        user = recheckIdentity ? await this.userService.findById(recheckIdentity.userId) : null;
+        if (!user) {
+          throw new UnauthorizedException({
+            message: 'Your account has not been set up. Contact your administrator for access.',
+            errorCode: OidcErrorCode.USER_NOT_PROVISIONED,
+          });
+        }
       }
 
-      if (createdUser && config.autoProvision.defaultPermissionNames?.length) {
-        await this.userService.setPermissionsDirectly(user!.id, config.autoProvision.defaultPermissionNames as Permission[]);
+      if (createdUser && autoProvision.defaultPermissionNames?.length) {
+        await this.userService.setPermissionsDirectly(user!.id, autoProvision.defaultPermissionNames as Permission[]);
       }
 
       if (createdUser && user) {
@@ -307,7 +380,7 @@ export class OidcService {
       });
     }
 
-    await this.groupMapping.syncUserGroups(user.id, claims.groups);
+    await this.groupMapping.syncUserGroups(user.id, provider.id, claims.groups);
 
     return user;
   }

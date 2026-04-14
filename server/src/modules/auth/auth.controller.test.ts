@@ -23,7 +23,7 @@ function makeController() {
     generatePreviewState: vi.fn(),
     handleCallback: vi.fn(),
     handleBackchannelLogout: vi.fn(),
-    getLinkedIdentity: vi.fn(),
+    getLinkedIdentities: vi.fn(),
     unlinkIdentity: vi.fn(),
   };
 
@@ -71,24 +71,25 @@ describe('AuthController', () => {
     oidcService.generateState.mockResolvedValue(stateResult);
     oidcService.generateLinkState.mockResolvedValue(stateResult);
     oidcService.generatePreviewState.mockResolvedValue(stateResult);
-    oidcService.getLinkedIdentity.mockResolvedValue({ oidcSubject: 'sub-1', oidcIssuer: 'https://idp.example.com' });
+    oidcService.getLinkedIdentities.mockResolvedValue([]);
 
-    await expect(controller.oidcGenerateState()).resolves.toEqual(stateResult);
+    await expect(controller.oidcGenerateState('keycloak')).resolves.toEqual(stateResult);
     await controller.oidcCallback({ code: 'abc' } as never, reply);
     await controller.oidcBackchannelLogout({ body: { logout_token: 'logout-1' } } as never);
     await controller.oidcBackchannelLogout({ body: undefined } as never);
-    await controller.oidcGenerateLinkState({ id: 7 } as never);
-    await controller.oidcGeneratePreviewState();
-    await controller.oidcGetIdentity({ id: 7 } as never);
-    await controller.oidcUnlinkIdentity({ id: 7 } as never, { password: 'Secret1!' });
+    await controller.oidcGenerateLinkState({ id: 7 } as never, 'keycloak');
+    await controller.oidcGeneratePreviewState('keycloak');
+    await controller.oidcGetIdentities({ id: 7 } as never);
+    await controller.oidcUnlinkIdentity({ id: 7 } as never, 3, { password: 'Secret1!' });
 
+    expect(oidcService.generateState).toHaveBeenCalledWith('keycloak');
     expect(oidcService.handleCallback).toHaveBeenCalledWith({ code: 'abc' }, reply);
     expect(oidcService.handleBackchannelLogout).toHaveBeenNthCalledWith(1, 'logout-1');
     expect(oidcService.handleBackchannelLogout).toHaveBeenNthCalledWith(2, '');
-    expect(oidcService.generateLinkState).toHaveBeenCalledWith(7);
-    expect(oidcService.generatePreviewState).toHaveBeenCalled();
-    expect(oidcService.getLinkedIdentity).toHaveBeenCalledWith(7);
-    expect(oidcService.unlinkIdentity).toHaveBeenCalledWith(7, 'Secret1!');
+    expect(oidcService.generateLinkState).toHaveBeenCalledWith(7, 'keycloak');
+    expect(oidcService.generatePreviewState).toHaveBeenCalledWith('keycloak');
+    expect(oidcService.getLinkedIdentities).toHaveBeenCalledWith(7);
+    expect(oidcService.unlinkIdentity).toHaveBeenCalledWith(7, 3, 'Secret1!');
   });
 
   it('defines throttling metadata for sensitive public endpoints', () => {

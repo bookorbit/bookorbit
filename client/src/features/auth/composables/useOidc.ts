@@ -1,6 +1,6 @@
-import type { OidcCallbackResponse, OidcPublicConfig } from '@projectx/types'
+import type { OidcCallbackResponse, OidcProviderPublic } from '@projectx/types'
 
-async function generatePkce(): Promise<{ codeVerifier: string; codeChallenge: string }> {
+export async function generatePkce(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const array = new Uint8Array(32)
   crypto.getRandomValues(array)
   const codeVerifier = btoa(String.fromCharCode(...array))
@@ -38,34 +38,31 @@ export class OidcLoginError extends Error {
 }
 
 export function useOidc() {
-  async function getPublicConfig(): Promise<OidcPublicConfig | null> {
+  async function getPublicProviders(): Promise<OidcProviderPublic[]> {
     try {
-      const res = await fetch('/api/v1/app-settings/oidc/public')
-      if (!res.ok) return null
+      const res = await fetch('/api/v1/app-settings/oidc/providers/public')
+      if (!res.ok) return []
       return res.json()
     } catch {
-      return null
+      return []
     }
   }
 
-  async function initiateLogin(): Promise<void> {
-    const config = await getPublicConfig()
-    if (!config?.enabled) {
-      throw new OidcLoginError(undefined, 'OIDC is not configured')
+  async function initiateLogin(provider: OidcProviderPublic): Promise<void> {
+    if (!provider.enabled) {
+      throw new OidcLoginError(undefined, 'OIDC provider is not enabled')
     }
 
     const { codeVerifier, codeChallenge } = await generatePkce()
     const nonce = generateNonce()
 
-    // Save any redirect target before leaving the page (P1-1: capture redirect for post-login navigation)
     sessionStorage.removeItem('oidc_redirect')
     const redirectTarget = new URLSearchParams(window.location.search).get('redirect')
     if (redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//')) {
       sessionStorage.setItem('oidc_redirect', redirectTarget)
     }
 
-    // Get server-side state + authorizationEndpoint (server resolves discovery - avoids CORS issues)
-    const stateRes = await fetch('/api/v1/auth/oidc/state', { method: 'POST', credentials: 'include' })
+    const stateRes = await fetch(`/api/v1/auth/oidc/${provider.slug}/state`, { method: 'POST', credentials: 'include' })
     if (!stateRes.ok) throw new OidcLoginError(undefined, 'Failed to generate state')
     const { state, authorizationEndpoint } = (await stateRes.json()) as { state: string; authorizationEndpoint: string }
 
@@ -73,16 +70,15 @@ export function useOidc() {
       throw new OidcLoginError(undefined, 'OIDC provider is not reachable - check the Issuer URI in settings')
     }
 
-    // Store PKCE data for the callback
     sessionStorage.setItem(`oidc_pkce_${state}`, JSON.stringify({ codeVerifier, nonce, state }))
 
     const redirectUri = `${window.location.origin}/oauth2-callback`
 
     const params = new URLSearchParams({
       response_type: 'code',
-      client_id: config.clientId,
+      client_id: provider.clientId,
       redirect_uri: redirectUri,
-      scope: config.scopes,
+      scope: provider.scopes,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state,
@@ -116,5 +112,5 @@ export function useOidc() {
     return res.json() as Promise<OidcCallbackResponse>
   }
 
-  return { getPublicConfig, initiateLogin, exchangeCode }
+  return { getPublicProviders, initiateLogin, exchangeCode }
 }

@@ -13,6 +13,22 @@ const DISCOVERY_DOC = {
   backchannelLogoutSupported: true,
 };
 
+const PROVIDER = {
+  id: 1,
+  slug: 'keycloak',
+  enabled: true,
+  issuerUri: 'https://idp.example.com',
+  clientId: 'client-id',
+  clientSecret: 'secret',
+};
+
+function makeLogoutToken(payload: Record<string, unknown> = {}): string {
+  const defaultPayload = { iss: 'https://idp.example.com', sub: 'u1', ...payload };
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(defaultPayload)).toString('base64url');
+  return `${header}.${body}.fake-sig`;
+}
+
 function makeDb() {
   return {
     update: vi.fn().mockReturnThis(),
@@ -33,8 +49,8 @@ function makeDb() {
 
 function makeService(dbOverrides?: Partial<ReturnType<typeof makeDb>>) {
   const db = { ...makeDb(), ...dbOverrides };
-  const appSettings = {
-    getOidcConfig: vi.fn().mockResolvedValue({ enabled: true, issuerUri: 'https://idp.example.com', clientId: 'client-id' }),
+  const providerService = {
+    findByIssuerUri: vi.fn().mockResolvedValue(PROVIDER),
   };
   const discovery = {
     getDiscoveryDoc: vi.fn().mockResolvedValue(DISCOVERY_DOC),
@@ -54,22 +70,30 @@ function makeService(dbOverrides?: Partial<ReturnType<typeof makeDb>>) {
 
   const service = new BackchannelLogoutService(
     db as never,
-    appSettings as never,
+    providerService as never,
     discovery as never,
     tokenValidator as never,
     sessionRepo as never,
     userService as never,
   );
 
-  return { service, db, appSettings, discovery, tokenValidator, sessionRepo, userService };
+  return { service, db, providerService, discovery, tokenValidator, sessionRepo, userService };
 }
 
 describe('BackchannelLogoutService', () => {
-  it('does nothing when OIDC is disabled', async () => {
-    const { service, appSettings, tokenValidator } = makeService();
-    appSettings.getOidcConfig.mockResolvedValue({ enabled: false });
+  it('does nothing when no matching provider found', async () => {
+    const { service, providerService, tokenValidator } = makeService();
+    providerService.findByIssuerUri.mockResolvedValue(null);
 
-    await service.handleLogout('logout-token');
+    await service.handleLogout(makeLogoutToken());
+    expect(tokenValidator.validateLogoutToken).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when provider is disabled', async () => {
+    const { service, providerService, tokenValidator } = makeService();
+    providerService.findByIssuerUri.mockResolvedValue({ ...PROVIDER, enabled: false });
+
+    await service.handleLogout(makeLogoutToken());
     expect(tokenValidator.validateLogoutToken).not.toHaveBeenCalled();
   });
 
@@ -78,7 +102,7 @@ describe('BackchannelLogoutService', () => {
     tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', sid: 'sess-1', jti: 'jti-1' });
     sessionRepo.findActiveBySid.mockResolvedValue({ userId: 42 });
 
-    await service.handleLogout('logout-token');
+    await service.handleLogout(makeLogoutToken({ sub: 'u1' }));
 
     expect(sessionRepo.revokeBySid).toHaveBeenCalledWith('sess-1');
     expect(userService.incrementTokenVersion).toHaveBeenCalledWith(42);
@@ -90,7 +114,7 @@ describe('BackchannelLogoutService', () => {
     sessionRepo.findActiveBySid.mockResolvedValue(null);
     sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 99 }]);
 
-    await service.handleLogout('logout-token');
+    await service.handleLogout(makeLogoutToken({ sub: 'u1' }));
 
     expect(sessionRepo.revokeBySubjectAndIssuer).toHaveBeenCalledWith('u1', 'https://idp.example.com');
     expect(userService.incrementTokenVersion).toHaveBeenCalledWith(99);
@@ -101,7 +125,7 @@ describe('BackchannelLogoutService', () => {
     tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', jti: 'jti-3' });
     sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 55 }]);
 
-    await service.handleLogout('logout-token');
+    await service.handleLogout(makeLogoutToken({ sub: 'u1' }));
 
     expect(sessionRepo.findActiveBySid).not.toHaveBeenCalled();
     expect(userService.incrementTokenVersion).toHaveBeenCalledWith(55);
@@ -112,7 +136,7 @@ describe('BackchannelLogoutService', () => {
     tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'ghost-user', jti: 'jti-4' });
     sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([]);
 
-    await service.handleLogout('logout-token');
+    await service.handleLogout(makeLogoutToken({ sub: 'ghost-user' }));
 
     expect(userService.incrementTokenVersion).not.toHaveBeenCalled();
   });
@@ -122,7 +146,7 @@ describe('BackchannelLogoutService', () => {
     tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1' });
     sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 7 }]);
 
-    await service.handleLogout('token-no-jti');
+    await service.handleLogout(makeLogoutToken({ sub: 'u1' }));
     expect(userService.incrementTokenVersion).toHaveBeenCalledWith(7);
   });
 
@@ -146,9 +170,8 @@ describe('BackchannelLogoutService', () => {
       });
       sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 10 }]);
 
-      await service.handleLogout('token-1');
+      await service.handleLogout(makeLogoutToken({ sub: 'u1', jti: 'replay-jti' }));
 
-      // incrementTokenVersion should NOT be called because insert returned empty (replay)
       expect(userService.incrementTokenVersion).not.toHaveBeenCalled();
     });
 
@@ -161,7 +184,7 @@ describe('BackchannelLogoutService', () => {
       });
       sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 10 }]);
 
-      await service.handleLogout('fresh-token');
+      await service.handleLogout(makeLogoutToken({ sub: 'u1', jti: 'fresh-jti' }));
 
       expect(userService.incrementTokenVersion).toHaveBeenCalledWith(10);
     });
@@ -180,7 +203,7 @@ describe('BackchannelLogoutService', () => {
       tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', jti: 'jti-exp', exp });
       sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 5 }]);
 
-      await service.handleLogout('token');
+      await service.handleLogout(makeLogoutToken({ sub: 'u1', jti: 'jti-exp', exp }));
 
       const [[{ jti, expiresAt }]] = valuesMock.mock.calls;
       expect(jti).toBe('jti-exp');
@@ -192,7 +215,7 @@ describe('BackchannelLogoutService', () => {
       tokenValidator.validateLogoutToken.mockResolvedValue({ sub: 'u1', jti: 'prune-jti' });
       sessionRepo.findActiveBySubjectAndIssuer.mockResolvedValue([{ userId: 3 }]);
 
-      await service.handleLogout('token');
+      await service.handleLogout(makeLogoutToken({ sub: 'u1', jti: 'prune-jti' }));
 
       expect(db.delete).toHaveBeenCalled();
     });

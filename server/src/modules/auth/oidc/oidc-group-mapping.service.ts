@@ -14,57 +14,134 @@ export class OidcGroupMappingService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Full-sync OIDC group permissions for a user.
+   * Provider-scoped full-sync of OIDC group permissions.
    *
-   * Adds permissions gained from the current group claims and removes permissions
-   * that were previously granted via OIDC groups but are no longer in scope.
-   *
-   * Note: Any permission that exists in `oidc_group_mappings` is treated as
-   * OIDC-managed. If an admin also manually granted the same permission, OIDC
-   * management takes precedence — the permission will be removed if the user's
-   * groups no longer entitle it.
+   * For the given provider, calculates which permissions the user should have
+   * based on their group claims and the provider's group mappings. Updates
+   * `oidc_permission_grants` for provenance tracking, then materializes the
+   * effective union of all provider grants into `user_permissions`.
    */
-  async syncUserGroups(userId: number, groups: string[]): Promise<void> {
+  async syncUserGroups(userId: number, providerId: number, groups: string[]): Promise<void> {
     const start = Date.now();
-    this.logger.log(`[auth.oidc_group_sync] [start] userId=${userId} groupCount=${groups.length} - group sync started`);
+    this.logger.log(`[auth.oidc_group_sync] [start] userId=${userId} providerId=${providerId} groupCount=${groups.length} - group sync started`);
 
     await this.db.transaction(async (tx) => {
-      // All group mappings in the system — defines the OIDC-managed permission set.
-      const allMappings = await tx.query.oidcGroupMappings.findMany();
-      if (allMappings.length === 0) return;
+      // Get mappings for this specific provider
+      const providerMappings = await tx.query.oidcGroupMappings.findMany({
+        where: eq(schema.oidcGroupMappings.providerId, providerId),
+      });
+      if (providerMappings.length === 0) {
+        // No mappings for this provider - clean up any stale grants
+        await tx
+          .delete(schema.oidcPermissionGrants)
+          .where(and(eq(schema.oidcPermissionGrants.userId, userId), eq(schema.oidcPermissionGrants.providerId, providerId)));
+        return;
+      }
 
-      const allOidcPermissions = new Set(allMappings.map((m) => m.permissionName).filter(Boolean) as string[]);
-
-      // Desired permissions based on the user's current groups.
+      // Desired permissions based on user's groups and this provider's mappings
       const desired = new Set(
-        allMappings.filter((m) => m.permissionName && groups.includes(m.oidcGroupClaim)).map((m) => m.permissionName as string),
+        providerMappings.filter((m) => m.permissionName && groups.includes(m.oidcGroupClaim)).map((m) => m.permissionName as string),
       );
 
-      // Current user permissions that are OIDC-managed.
+      // Current grants for this provider
+      const currentGrants = await tx.query.oidcPermissionGrants.findMany({
+        where: and(eq(schema.oidcPermissionGrants.userId, userId), eq(schema.oidcPermissionGrants.providerId, providerId)),
+      });
+      const currentGrantPerms = new Set(currentGrants.map((g) => g.permissionName));
+
+      const toAdd = [...desired].filter((p) => !currentGrantPerms.has(p));
+      const toRemove = [...currentGrantPerms].filter((p) => !desired.has(p));
+
+      // Update provenance table
+      if (toAdd.length > 0) {
+        await tx
+          .insert(schema.oidcPermissionGrants)
+          .values(toAdd.map((permissionName) => ({ userId, providerId, permissionName })))
+          .onConflictDoNothing();
+      }
+      if (toRemove.length > 0) {
+        await tx
+          .delete(schema.oidcPermissionGrants)
+          .where(
+            and(
+              eq(schema.oidcPermissionGrants.userId, userId),
+              eq(schema.oidcPermissionGrants.providerId, providerId),
+              inArray(schema.oidcPermissionGrants.permissionName, toRemove),
+            ),
+          );
+      }
+
+      // Now materialize: effective OIDC permissions = union across all providers
+      const allGrants = await tx.query.oidcPermissionGrants.findMany({
+        where: eq(schema.oidcPermissionGrants.userId, userId),
+      });
+      const effectiveOidcPerms = new Set(allGrants.map((g) => g.permissionName));
+
+      // All OIDC-managed permission names (from all providers)
+      const allMappings = await tx.query.oidcGroupMappings.findMany();
+      const allOidcPermissions = new Set(allMappings.map((m) => m.permissionName).filter(Boolean) as string[]);
+
+      // Current user permissions
       const currentUserPerms = await tx.query.userPermissions.findMany({
         where: eq(schema.userPermissions.userId, userId),
       });
-      const currentOidcPerms = currentUserPerms.filter((p) => allOidcPermissions.has(p.permissionName)).map((p) => p.permissionName);
+      const currentUserPermSet = new Set(currentUserPerms.map((p) => p.permissionName));
 
-      const toAdd = [...desired].filter((p) => !currentUserPerms.some((up) => up.permissionName === p));
-      const toRemove = currentOidcPerms.filter((p) => !desired.has(p));
+      // Add OIDC-granted permissions not yet in user_permissions
+      const permsToAdd = [...effectiveOidcPerms].filter((p) => !currentUserPermSet.has(p));
+      // Remove OIDC-managed permissions that are no longer granted by any provider
+      const permsToRemove = currentUserPerms
+        .filter((p) => allOidcPermissions.has(p.permissionName) && !effectiveOidcPerms.has(p.permissionName))
+        .map((p) => p.permissionName);
 
-      if (toAdd.length > 0) {
+      if (permsToAdd.length > 0) {
         await tx
           .insert(schema.userPermissions)
-          .values(toAdd.map((permissionName) => ({ userId, permissionName })))
+          .values(permsToAdd.map((permissionName) => ({ userId, permissionName })))
           .onConflictDoNothing();
       }
-
-      if (toRemove.length > 0) {
+      if (permsToRemove.length > 0) {
         await tx
           .delete(schema.userPermissions)
-          .where(and(eq(schema.userPermissions.userId, userId), inArray(schema.userPermissions.permissionName, toRemove)));
+          .where(and(eq(schema.userPermissions.userId, userId), inArray(schema.userPermissions.permissionName, permsToRemove)));
       }
 
       this.logger.log(
-        `[auth.oidc_group_sync] [end] userId=${userId} durationMs=${Date.now() - start} added=${toAdd.length} removed=${toRemove.length} - group sync completed`,
+        `[auth.oidc_group_sync] [end] userId=${userId} providerId=${providerId} durationMs=${Date.now() - start} added=${permsToAdd.length} removed=${permsToRemove.length} - group sync completed`,
       );
+    });
+  }
+
+  async removeProviderGrants(userId: number, providerId: number): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      // Remove grants from this provider
+      await tx
+        .delete(schema.oidcPermissionGrants)
+        .where(and(eq(schema.oidcPermissionGrants.userId, userId), eq(schema.oidcPermissionGrants.providerId, providerId)));
+
+      // Recalculate effective permissions from remaining providers
+      const remainingGrants = await tx.query.oidcPermissionGrants.findMany({
+        where: eq(schema.oidcPermissionGrants.userId, userId),
+      });
+      const effectiveOidcPerms = new Set(remainingGrants.map((g) => g.permissionName));
+
+      // Get all OIDC-managed permission names
+      const allMappings = await tx.query.oidcGroupMappings.findMany();
+      const allOidcPermissions = new Set(allMappings.map((m) => m.permissionName).filter(Boolean) as string[]);
+
+      // Remove user permissions that were OIDC-managed but no longer granted
+      const currentUserPerms = await tx.query.userPermissions.findMany({
+        where: eq(schema.userPermissions.userId, userId),
+      });
+      const permsToRemove = currentUserPerms
+        .filter((p) => allOidcPermissions.has(p.permissionName) && !effectiveOidcPerms.has(p.permissionName))
+        .map((p) => p.permissionName);
+
+      if (permsToRemove.length > 0) {
+        await tx
+          .delete(schema.userPermissions)
+          .where(and(eq(schema.userPermissions.userId, userId), inArray(schema.userPermissions.permissionName, permsToRemove)));
+      }
     });
   }
 }

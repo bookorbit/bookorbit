@@ -28,7 +28,6 @@ import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { resolveUserAvatarUrl } from '../../common/utils/user-avatar-url';
 import { SystemMailService } from '../email/system-mail.service';
-import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserService } from '../user/user.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -72,7 +71,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly systemMailService: SystemMailService,
-    private readonly appSettings: AppSettingsService,
     private readonly oidcSessionRepo: OidcSessionRepository,
     private readonly oidcDiscovery: OidcDiscoveryService,
     private readonly auditEvents: AuditEventsService,
@@ -374,10 +372,11 @@ export class AuthService {
 
     const oidcLogoutStart = Date.now();
     try {
-      const config = await this.appSettings.getOidcConfig();
-      if (!config.enabled) return {};
+      if (!oidcSession.providerId) return {};
+      const provider = await this.db.query.oidcProviders.findFirst({ where: eq(schema.oidcProviders.id, oidcSession.providerId) });
+      if (!provider?.enabled) return {};
 
-      const disc = await this.oidcDiscovery.getDiscoveryDoc(config.issuerUri);
+      const disc = await this.oidcDiscovery.getDiscoveryDoc(provider.issuerUri);
       if (!disc.endSessionEndpoint) return {};
 
       const origin = req.headers['origin'] ?? req.headers['referer'];

@@ -42,6 +42,41 @@ export interface OidcPublicConfig {
   iconUrl?: string;
 }
 
+export interface OidcProviderPublic {
+  slug: string;
+  displayName: string;
+  enabled: boolean;
+  iconUrl?: string | null;
+  clientId: string;
+  scopes: string;
+}
+
+export interface OidcProviderConfig {
+  id: number;
+  slug: string;
+  displayName: string;
+  enabled: boolean;
+  issuerUri: string;
+  clientId: string;
+  clientSecret?: string;
+  scopes: string;
+  iconUrl?: string | null;
+  claimMapping: OidcClaimMapping;
+  autoProvision: OidcAutoProvision;
+  displayOrder: number;
+}
+
+export interface OidcLinkedIdentity {
+  id: number;
+  providerId: number;
+  providerSlug: string;
+  providerName: string;
+  providerIconUrl?: string | null;
+  oidcSubject: string;
+  oidcIssuer: string;
+  linkedAt: string;
+}
+
 export interface OidcClaimMapping {
   username: string;
   name: string;

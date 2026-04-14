@@ -5,10 +5,11 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { AppSettingsService } from './app-settings.service';
-import { OidcGroupMappingAdminService } from './oidc-group-mapping-admin.service';
+import { OidcProviderService } from './oidc-provider.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
-import { UpdateOidcConfigDto } from './dto/update-oidc-config.dto';
+import { CreateOidcProviderDto } from './dto/create-oidc-provider.dto';
+import { UpdateOidcProviderDto } from './dto/update-oidc-provider.dto';
 import { CreateGroupMappingDto } from './dto/create-group-mapping.dto';
 import { UpdateGroupMappingDto } from './dto/update-group-mapping.dto';
 
@@ -17,7 +18,7 @@ import { UpdateGroupMappingDto } from './dto/update-group-mapping.dto';
 export class AppSettingsController {
   constructor(
     private readonly appSettingsService: AppSettingsService,
-    private readonly groupMappingAdmin: OidcGroupMappingAdminService,
+    private readonly oidcProviderService: OidcProviderService,
   ) {}
 
   @Get()
@@ -62,58 +63,104 @@ export class AppSettingsController {
     return { pattern: dto.pattern };
   }
 
+  // --- OIDC Provider CRUD ---
+
   @Public()
-  @Get('oidc/public')
-  async getOidcPublicConfig() {
-    const config = await this.appSettingsService.getOidcConfig();
-    return {
-      enabled: config.enabled,
-      providerName: config.providerName,
-      issuerUri: config.issuerUri,
-      clientId: config.clientId,
-      scopes: config.scopes,
-      iconUrl: config.iconUrl,
-    };
+  @Get('oidc/providers/public')
+  async getOidcProvidersPublic() {
+    const providers = await this.oidcProviderService.findEnabled();
+    return providers.map((p) => ({
+      slug: p.slug,
+      displayName: p.displayName,
+      enabled: p.enabled,
+      iconUrl: p.iconUrl,
+      clientId: p.clientId,
+      scopes: p.scopes,
+    }));
   }
 
-  @Get('oidc')
-  async getOidcConfig() {
-    const config = await this.appSettingsService.getOidcConfig();
-    return { ...config, clientSecret: config.clientSecret ? '***' : '' };
+  @Get('oidc/providers')
+  listOidcProviders() {
+    return this.oidcProviderService.findAll();
   }
 
-  @Put('oidc')
-  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated OIDC configuration' })
-  updateOidcConfig(@Body() dto: UpdateOidcConfigDto) {
-    return this.appSettingsService.updateOidcConfig(dto);
+  @Get('oidc/providers/:slug')
+  async getOidcProvider(@Param('slug') slug: string) {
+    const provider = await this.oidcProviderService.findBySlugOrFail(slug);
+    return { ...provider, clientSecret: provider.clientSecret ? '***' : '' };
   }
 
-  @Post('oidc/test')
-  @HttpCode(HttpStatus.OK)
-  testOidcConnection(@Query('issuerUri') issuerUri?: string) {
-    return this.appSettingsService.testOidcConnection(issuerUri);
-  }
-
-  @Get('oidc/group-mappings')
-  listGroupMappings() {
-    return this.groupMappingAdmin.listMappings();
-  }
-
-  @Post('oidc/group-mappings')
+  @Post('oidc/providers')
   @HttpCode(HttpStatus.CREATED)
-  createGroupMapping(@Body() dto: CreateGroupMappingDto) {
-    return this.groupMappingAdmin.createMapping(dto.oidcGroupClaim, dto.permissionName);
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: (req) => {
+      const slug = (req.body as Record<string, unknown> | undefined)?.slug;
+      return `Created OIDC provider '${typeof slug === 'string' ? slug : 'unknown'}'`;
+    },
+  })
+  createOidcProvider(@Body() dto: CreateOidcProviderDto) {
+    return this.oidcProviderService.create(dto);
   }
 
-  @Put('oidc/group-mappings/:id')
-  @HttpCode(HttpStatus.OK)
-  updateGroupMapping(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateGroupMappingDto) {
-    return this.groupMappingAdmin.updateMapping(id, dto.permissionName);
+  @Put('oidc/providers/:slug')
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: (req) => `Updated OIDC provider '${req.params['slug']}'`,
+  })
+  updateOidcProvider(@Param('slug') slug: string, @Body() dto: UpdateOidcProviderDto) {
+    return this.oidcProviderService.update(slug, dto);
   }
 
-  @Delete('oidc/group-mappings/:id')
+  @Delete('oidc/providers/:slug')
   @HttpCode(HttpStatus.NO_CONTENT)
-  deleteGroupMapping(@Param('id', ParseIntPipe) id: number) {
-    return this.groupMappingAdmin.deleteMapping(id);
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: (req) => `Deleted OIDC provider '${req.params['slug']}'`,
+  })
+  deleteOidcProvider(@Param('slug') slug: string) {
+    return this.oidcProviderService.remove(slug);
+  }
+
+  @Post('oidc/providers/:slug/test')
+  @HttpCode(HttpStatus.OK)
+  async testOidcProviderConnection(@Param('slug') slug: string, @Query('issuerUri') issuerUri?: string) {
+    const uri = issuerUri || (await this.oidcProviderService.findBySlugOrFail(slug)).issuerUri;
+    return this.oidcProviderService.testConnection(uri);
+  }
+
+  @Put('oidc/providers/reorder')
+  @HttpCode(HttpStatus.OK)
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Reordered OIDC providers' })
+  reorderOidcProviders(@Body() body: { slugs: string[] }) {
+    return this.oidcProviderService.reorder(body.slugs);
+  }
+
+  // --- Provider-scoped group mappings ---
+
+  @Get('oidc/providers/:slug/group-mappings')
+  listProviderGroupMappings(@Param('slug') slug: string) {
+    return this.oidcProviderService.listGroupMappings(slug);
+  }
+
+  @Post('oidc/providers/:slug/group-mappings')
+  @HttpCode(HttpStatus.CREATED)
+  createProviderGroupMapping(@Param('slug') slug: string, @Body() dto: CreateGroupMappingDto) {
+    return this.oidcProviderService.createGroupMapping(slug, dto.oidcGroupClaim, dto.permissionName);
+  }
+
+  @Put('oidc/providers/:slug/group-mappings/:id')
+  @HttpCode(HttpStatus.OK)
+  updateProviderGroupMapping(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateGroupMappingDto) {
+    return this.oidcProviderService.updateGroupMapping(slug, id, dto.permissionName);
+  }
+
+  @Delete('oidc/providers/:slug/group-mappings/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteProviderGroupMapping(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+    return this.oidcProviderService.deleteGroupMapping(slug, id);
   }
 }

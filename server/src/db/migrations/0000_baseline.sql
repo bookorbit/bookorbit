@@ -560,15 +560,51 @@ CREATE TABLE "user_reading_daily_stats" (
 --> statement-breakpoint
 CREATE TABLE "oidc_group_mappings" (
 	"id" serial PRIMARY KEY NOT NULL,
+	"provider_id" integer NOT NULL,
 	"oidc_group_claim" text NOT NULL,
 	"permission_name" varchar(100),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "oidc_identities" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"provider_id" integer NOT NULL,
+	"oidc_subject" text NOT NULL,
+	"oidc_issuer" text NOT NULL,
+	"linked_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "oidc_permission_grants" (
+	"user_id" integer NOT NULL,
+	"provider_id" integer NOT NULL,
+	"permission_name" varchar(100) NOT NULL,
+	CONSTRAINT "oidc_permission_grants_user_id_provider_id_permission_name_pk" PRIMARY KEY("user_id","provider_id","permission_name")
+);
+--> statement-breakpoint
+CREATE TABLE "oidc_providers" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"slug" varchar(100) NOT NULL,
+	"display_name" varchar(255) NOT NULL,
+	"enabled" boolean DEFAULT false NOT NULL,
+	"issuer_uri" text NOT NULL,
+	"client_id" text NOT NULL,
+	"client_secret" text,
+	"scopes" text DEFAULT 'openid profile email' NOT NULL,
+	"icon_url" text,
+	"claim_mapping" jsonb DEFAULT '{"username":"preferred_username","name":"name","email":"email","groups":"groups"}'::jsonb NOT NULL,
+	"auto_provision" jsonb DEFAULT '{"enabled":false,"allowLocalLinking":false,"defaultPermissionNames":[]}'::jsonb NOT NULL,
+	"display_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "oidc_group_mappings_oidc_group_claim_unique" UNIQUE("oidc_group_claim")
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "oidc_providers_slug_unique" UNIQUE("slug"),
+	CONSTRAINT "oidc_providers_issuer_uri_unique" UNIQUE("issuer_uri")
 );
 --> statement-breakpoint
 CREATE TABLE "oidc_sessions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
+	"provider_id" integer,
 	"oidc_subject" text NOT NULL,
 	"oidc_issuer" text NOT NULL,
 	"oidc_session_id" text,
@@ -581,6 +617,7 @@ CREATE TABLE "oidc_sessions" (
 --> statement-breakpoint
 CREATE TABLE "oidc_states" (
 	"state" text PRIMARY KEY NOT NULL,
+	"provider_id" integer NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"meta" text
 );
@@ -873,7 +910,14 @@ ALTER TABLE "user_book_status" ADD CONSTRAINT "user_book_status_user_id_users_id
 ALTER TABLE "user_book_status" ADD CONSTRAINT "user_book_status_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_reading_daily_stats" ADD CONSTRAINT "user_reading_daily_stats_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_reading_daily_stats" ADD CONSTRAINT "user_reading_daily_stats_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_group_mappings" ADD CONSTRAINT "oidc_group_mappings_provider_id_oidc_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."oidc_providers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_identities" ADD CONSTRAINT "oidc_identities_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_identities" ADD CONSTRAINT "oidc_identities_provider_id_oidc_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."oidc_providers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_permission_grants" ADD CONSTRAINT "oidc_permission_grants_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_permission_grants" ADD CONSTRAINT "oidc_permission_grants_provider_id_oidc_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."oidc_providers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oidc_sessions" ADD CONSTRAINT "oidc_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_sessions" ADD CONSTRAINT "oidc_sessions_provider_id_oidc_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."oidc_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "oidc_states" ADD CONSTRAINT "oidc_states_provider_id_oidc_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."oidc_providers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "opds_users" ADD CONSTRAINT "opds_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_devices" ADD CONSTRAINT "kobo_devices_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kobo_library_snapshots" ADD CONSTRAINT "kobo_library_snapshots_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -991,10 +1035,17 @@ CREATE INDEX "rs_user_book_file_idx" ON "reading_sessions" USING btree ("user_id
 CREATE INDEX "ubs_user_id_idx" ON "user_book_status" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "ubs_user_status_idx" ON "user_book_status" USING btree ("user_id","status");--> statement-breakpoint
 CREATE INDEX "urds_user_day_idx" ON "user_reading_daily_stats" USING btree ("user_id","day");--> statement-breakpoint
+CREATE UNIQUE INDEX "oidc_group_mappings_provider_claim_uidx" ON "oidc_group_mappings" USING btree ("provider_id","oidc_group_claim");--> statement-breakpoint
+CREATE UNIQUE INDEX "oidc_identities_provider_subject_uidx" ON "oidc_identities" USING btree ("provider_id","oidc_subject");--> statement-breakpoint
+CREATE UNIQUE INDEX "oidc_identities_user_provider_uidx" ON "oidc_identities" USING btree ("user_id","provider_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "oidc_identities_issuer_subject_uidx" ON "oidc_identities" USING btree ("oidc_issuer","oidc_subject");--> statement-breakpoint
+CREATE INDEX "oidc_identities_user_id_idx" ON "oidc_identities" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "oidc_providers_enabled_order_idx" ON "oidc_providers" USING btree ("enabled","display_order");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_user_active_idx" ON "oidc_sessions" USING btree ("user_id") WHERE "oidc_sessions"."revoked" = false;--> statement-breakpoint
 CREATE INDEX "oidc_sessions_subject_issuer_idx" ON "oidc_sessions" USING btree ("oidc_subject","oidc_issuer");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_sid_idx" ON "oidc_sessions" USING btree ("oidc_session_id");--> statement-breakpoint
 CREATE INDEX "oidc_sessions_expires_at_idx" ON "oidc_sessions" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "oidc_sessions_provider_id_idx" ON "oidc_sessions" USING btree ("provider_id");--> statement-breakpoint
 CREATE INDEX "oidc_states_expires_at_idx" ON "oidc_states" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "oidc_used_jtis_expires_at_idx" ON "oidc_used_jtis" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "opds_users_username_lower_uidx" ON "opds_users" USING btree (lower("username"));--> statement-breakpoint

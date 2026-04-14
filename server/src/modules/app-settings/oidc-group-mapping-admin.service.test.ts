@@ -36,17 +36,6 @@ describe('OidcGroupMappingAdminService', () => {
     });
   });
 
-  describe('createMapping', () => {
-    it('inserts and returns the new row', async () => {
-      const row = { id: 1, oidcGroupClaim: 'editors', permissionName: 'library_edit_metadata' };
-      db.returning.mockResolvedValue([row]);
-      const result = await service.createMapping('editors', 'library_edit_metadata');
-      expect(db.insert).toHaveBeenCalled();
-      expect(db.values).toHaveBeenCalledWith({ oidcGroupClaim: 'editors', permissionName: 'library_edit_metadata' });
-      expect(result).toEqual(row);
-    });
-  });
-
   describe('updateMapping', () => {
     it('updates permissionName and returns the updated row', async () => {
       const row = { id: 5, oidcGroupClaim: 'editors', permissionName: 'manage_users' };

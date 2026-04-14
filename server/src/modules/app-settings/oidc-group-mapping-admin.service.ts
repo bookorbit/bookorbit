@@ -7,17 +7,16 @@ import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
+/**
+ * @deprecated Use OidcProviderService for provider-scoped group mapping operations.
+ * Kept temporarily for backward compatibility during migration.
+ */
 @Injectable()
 export class OidcGroupMappingAdminService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   listMappings() {
     return this.db.query.oidcGroupMappings.findMany({ orderBy: (t, { asc }) => [asc(t.oidcGroupClaim)] });
-  }
-
-  async createMapping(oidcGroupClaim: string, permissionName: string) {
-    const [row] = await this.db.insert(schema.oidcGroupMappings).values({ oidcGroupClaim, permissionName }).returning();
-    return row;
   }
 
   async updateMapping(id: number, permissionName: string) {

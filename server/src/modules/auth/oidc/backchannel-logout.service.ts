@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
-import { AppSettingsService } from '../../app-settings/app-settings.service';
+import { OidcProviderService } from '../../app-settings/oidc-provider.service';
 import { UserService } from '../../user/user.service';
 import { OidcDiscoveryService } from './oidc-discovery.service';
 import { OidcSessionRepository } from './oidc-session.repository';
@@ -12,13 +12,24 @@ import { OidcTokenValidatorService } from './oidc-token-validator.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64url').toString('utf8');
+    return JSON.parse(payload) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 @Injectable()
 export class BackchannelLogoutService {
   private readonly logger = new Logger(BackchannelLogoutService.name);
 
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly appSettings: AppSettingsService,
+    private readonly providerService: OidcProviderService,
     private readonly discovery: OidcDiscoveryService,
     private readonly tokenValidator: OidcTokenValidatorService,
     private readonly sessionRepo: OidcSessionRepository,
@@ -26,18 +37,35 @@ export class BackchannelLogoutService {
   ) {}
 
   async handleLogout(logoutToken: string): Promise<void> {
-    const config = await this.appSettings.getOidcConfig();
-    if (!config.enabled) return;
+    // D2: Decode JWT without verification to find the issuer
+    const unverified = decodeJwtPayload(logoutToken);
+    if (!unverified?.iss) {
+      this.logger.warn('[auth.oidc_backchannel_logout] [fail] error="cannot decode logout token issuer" - backchannel logout rejected');
+      return;
+    }
 
-    const discovery = await this.discovery.getDiscoveryDoc(config.issuerUri);
+    const issuerRaw = unverified.iss;
+    if (typeof issuerRaw !== 'string') {
+      this.logger.warn('[auth.oidc_backchannel_logout] [fail] error="cannot decode logout token issuer" - backchannel logout rejected');
+      return;
+    }
+
+    const issuer = issuerRaw;
+    const provider = await this.providerService.findByIssuerUri(issuer);
+    if (!provider || !provider.enabled) {
+      this.logger.warn(`[auth.oidc_backchannel_logout] [fail] issuer=${issuer} error="no matching enabled provider" - backchannel logout rejected`);
+      return;
+    }
+
+    const discovery = await this.discovery.getDiscoveryDoc(provider.issuerUri);
 
     const claims = await this.tokenValidator.validateLogoutToken(logoutToken, {
       issuer: discovery.issuer,
-      clientId: config.clientId,
+      clientId: provider.clientId,
       jwksUri: discovery.jwksUri,
     });
 
-    // Replay prevention via DB — atomic insert, conflict = already used
+    // Replay prevention via DB
     if (claims.jti) {
       const jti = typeof claims.jti === 'string' ? claims.jti : undefined;
       if (jti) {
@@ -52,7 +80,6 @@ export class BackchannelLogoutService {
           return;
         }
 
-        // Prune expired JTIs
         await this.db.delete(schema.oidcUsedJtis).where(lt(schema.oidcUsedJtis.expiresAt, new Date()));
       }
     }
@@ -86,13 +113,11 @@ export class BackchannelLogoutService {
       return;
     }
 
-    // Revoke all refresh tokens
     await this.db
       .update(schema.refreshTokens)
       .set({ revokedAt: new Date() })
       .where(and(eq(schema.refreshTokens.userId, userId), isNull(schema.refreshTokens.revokedAt)));
 
-    // Invalidate all JWTs via token version bump
     await this.userService.incrementTokenVersion(userId);
 
     this.logger.log(`[auth.oidc_backchannel_logout] [end] userId=${userId} - backchannel logout completed`);

@@ -62,9 +62,8 @@ onMounted(async () => {
     }
 
     if (data.mode === 'preview') {
-      sessionStorage.removeItem('oidc_preview_pending')
       sessionStorage.setItem('oidc_preview_claims', JSON.stringify(data.claims))
-      router.replace('/settings/oidc')
+      router.replace('/settings/admin/oidc')
       return
     }
   } catch (err) {

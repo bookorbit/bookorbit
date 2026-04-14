@@ -1,4 +1,4 @@
-import type { AuthorAutoEnrichmentConfig, OidcBaseConfig } from '@projectx/types';
+import type { AuthorAutoEnrichmentConfig, OidcAutoProvision, OidcBaseConfig, OidcClaimMapping } from '@projectx/types';
 
 export const APP_SETTING_KEYS = {
   ALLOW_REGISTRATION: 'allow_registration',
@@ -37,6 +37,19 @@ export const DEFAULT_OIDC_CONFIG: OidcFullConfig = {
   scopes: 'openid profile email',
   claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
   autoProvision: { enabled: false, allowLocalLinking: true, defaultPermissionNames: [] },
+};
+
+export const DEFAULT_CLAIM_MAPPING: OidcClaimMapping = {
+  username: 'preferred_username',
+  name: 'name',
+  email: 'email',
+  groups: 'groups',
+};
+
+export const DEFAULT_AUTO_PROVISION: OidcAutoProvision = {
+  enabled: false,
+  allowLocalLinking: false,
+  defaultPermissionNames: [],
 };
 
 export const DEFAULT_AUTHOR_ENRICHMENT_CONFIG: AuthorAutoEnrichmentConfig = {
