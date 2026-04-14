@@ -40,8 +40,19 @@ RUN mkdir -p /deploy/migrations && cp -r /app/server/src/db/migrations/. /deploy
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 
+ARG TARGETARCH
 RUN apk upgrade --no-cache && \
-    apk add --no-cache poppler-utils su-exec && \
+    apk add --no-cache poppler-utils su-exec curl && \
+    case "$TARGETARCH" in \
+      amd64) KEPUBIFY_BIN="kepubify-linux-64bit" ;; \
+      arm64) KEPUBIFY_BIN="kepubify-linux-arm64" ;; \
+      arm)   KEPUBIFY_BIN="kepubify-linux-arm" ;; \
+      386)   KEPUBIFY_BIN="kepubify-linux-32bit" ;; \
+    esac && \
+    curl -fsSL "https://github.com/neonsolstice/projectx-tools/raw/main/kepubify/${KEPUBIFY_BIN}" \
+      -o /usr/local/bin/kepubify && \
+    chmod +x /usr/local/bin/kepubify && \
+    apk del curl && \
     rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production

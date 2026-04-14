@@ -4,7 +4,8 @@ import { join } from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-const KEPUBIFY_BASE_URL = 'https://github.com/booklore-app/booklore-tools/raw/main/kepubify/';
+const KEPUBIFY_BASE_URL = 'https://github.com/neonsolstice/projectx-tools/raw/main/kepubify/';
+const SYSTEM_BINARY_PATH = '/usr/local/bin/kepubify';
 
 @Injectable()
 export class KepubifyBinaryService {
@@ -18,12 +19,27 @@ export class KepubifyBinaryService {
 
   async getBinaryPath(): Promise<string> {
     if (this.cachedBinaryPath) return this.cachedBinaryPath;
+
+    if (await this.exists(SYSTEM_BINARY_PATH)) {
+      this.cachedBinaryPath = SYSTEM_BINARY_PATH;
+      return SYSTEM_BINARY_PATH;
+    }
+
     const binaryName = this.detectBinaryName();
     const toolsDir = join(this.appDataPath, '.tools', 'kepubify');
     const binaryPath = join(toolsDir, binaryName);
     await this.ensureBinary(binaryPath, binaryName, toolsDir);
     this.cachedBinaryPath = binaryPath;
     return binaryPath;
+  }
+
+  private async exists(path: string): Promise<boolean> {
+    try {
+      await stat(path);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private detectBinaryName(): string {
