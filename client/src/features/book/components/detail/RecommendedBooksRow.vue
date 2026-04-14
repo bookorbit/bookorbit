@@ -48,15 +48,16 @@ function scroll(direction: 'left' | 'right') {
 
     <div v-if="loading" class="flex gap-3 overflow-x-auto pb-2">
       <div v-for="i in 10" :key="i" class="w-24 shrink-0">
-        <div class="w-full rounded-sm bg-muted animate-pulse" style="aspect-ratio: 2/3" />
+        <div class="w-full rounded-sm bg-muted animate-shimmer" style="aspect-ratio: 2/3" />
       </div>
     </div>
 
     <div v-else ref="scrollEl" class="flex gap-6 overflow-x-auto pb-2">
       <button
-        v-for="rec in recommendations"
+        v-for="(rec, index) in recommendations"
         :key="rec.id"
-        class="w-30 shrink-0 text-left group"
+        class="w-30 shrink-0 text-left group animate-fade-up"
+        :style="{ animationDelay: `${index * 40}ms` }"
         @click="router.push({ name: 'book-detail', params: { bookId: rec.id } })"
       >
         <div
@@ -67,7 +68,7 @@ function scroll(direction: 'left' | 'right') {
           <img
             :src="coverUrl(rec.id, 'thumbnail')"
             :alt="rec.title ?? ''"
-            class="w-full h-full object-cover"
+            class="w-full h-full object-cover transition-opacity duration-300 ease-out"
             loading="lazy"
             @error="(e) => ((e.target as HTMLImageElement).style.display = 'none')"
           />

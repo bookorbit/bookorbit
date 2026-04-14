@@ -67,7 +67,13 @@ function tileClass(size: StatisticsChartSize): string {
     :animation="200"
     @update:model-value="handleReorder"
   >
-    <div v-for="chart in charts" :key="chart.id" :class="tileClass(STATISTICS_CHART_META[chart.id].size)">
+    <div
+      v-for="(chart, index) in charts"
+      :key="chart.id"
+      :class="tileClass(STATISTICS_CHART_META[chart.id].size)"
+      class="animate-fade-up"
+      :style="{ animationDelay: `${index * 60}ms` }"
+    >
       <component :is="CHART_COMPONENTS[chart.id]" />
     </div>
   </VueDraggable>

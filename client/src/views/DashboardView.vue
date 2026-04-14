@@ -18,7 +18,9 @@ const { maybeStartTour } = useOnboardingTour()
 
 const settingsOpen = ref(false)
 
-const enabledScrollers = computed(() => scrollers.value.filter((s) => s.enabled).sort((a, b) => a.order - b.order))
+const enabledScrollers = computed(() =>
+  (Array.isArray(scrollers.value) ? scrollers.value : []).filter((s) => s.enabled).sort((a, b) => a.order - b.order),
+)
 
 const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
 
@@ -34,7 +36,10 @@ onMounted(() => {
   <main class="relative flex-none">
     <!-- Floating Settings Button -->
     <div class="pointer-events-none fixed bottom-6 right-6 z-50">
-      <div class="pointer-events-auto transition-all duration-300">
+      <div
+        class="pointer-events-auto animate-fade-up"
+        style="animation-delay: 400ms; animation-duration: 0.3s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1)"
+      >
         <Tooltip>
           <TooltipTrigger as-child>
             <button
@@ -54,12 +59,14 @@ onMounted(() => {
       <DashboardWelcome v-if="hasNoLibraries" :can-create="hasPermission('manage_libraries')" />
       <template v-else>
         <DashboardScroller
-          v-for="scroller in enabledScrollers"
+          v-for="(scroller, index) in enabledScrollers"
           :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"
           :type="scroller.type"
           :title="scroller.label"
           :limit="scroller.limit"
           :lens-id="scroller.lensId"
+          class="animate-fade-up"
+          :style="{ animationDelay: `${index * 100}ms` }"
         />
         <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
           <p class="text-sm text-muted-foreground">All shelves are hidden.</p>

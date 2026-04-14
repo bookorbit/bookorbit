@@ -22,8 +22,12 @@ provide(
 
 <template>
   <TooltipProvider :delay-duration="0">
-    <router-view />
+    <router-view v-slot="{ Component, route }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" :key="route.matched[0]?.path ?? route.path" />
+      </Transition>
+    </router-view>
     <ChangePasswordDialog v-if="isOpen" />
-    <Toaster rich-colors />
+    <Toaster rich-colors position="bottom-right" :visible-toasts="5" :gap="8" />
   </TooltipProvider>
 </template>

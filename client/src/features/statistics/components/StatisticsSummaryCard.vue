@@ -66,9 +66,13 @@ const kpis = computed(() => [
     <div class="relative p-4">
       <div class="flex gap-3 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div
-          v-for="kpi in kpis"
+          v-for="(kpi, index) in kpis"
           :key="kpi.label"
-          :class="['border-border/60 bg-background/50 flex shrink-0 items-center gap-3 rounded-lg border px-4 py-2.5', loading ? 'opacity-60' : '']"
+          :class="[
+            'border-border/60 bg-background/50 flex shrink-0 items-center gap-3 rounded-lg border px-4 py-2.5 animate-fade-up',
+            loading ? 'opacity-60' : '',
+          ]"
+          :style="{ animationDelay: `${index * 50}ms` }"
         >
           <div class="shrink-0 rounded-md p-1.5" :style="iconStyle(kpi.colorIndex)">
             <component :is="kpi.icon" class="size-4" />

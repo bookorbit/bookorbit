@@ -442,19 +442,21 @@ onUnmounted(() => {
       </div>
 
       <!-- Drag-and-drop overlay -->
-      <div v-if="dragOver" class="fixed inset-0 z-40 flex items-center justify-center bg-primary/5 backdrop-blur-sm pointer-events-none">
-        <div
-          class="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-primary/50 bg-card/90 px-12 py-10 shadow-xl max-w-sm w-full"
-        >
-          <div class="flex items-center justify-center size-16 rounded-2xl bg-primary/10 animate-pulse">
-            <PackageOpen class="size-8 text-primary" />
-          </div>
-          <div class="text-center">
-            <p class="text-sm font-medium text-foreground">Drop files into Book Bucket</p>
-            <p class="text-xs text-muted-foreground mt-1">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
+      <Transition name="content">
+        <div v-if="dragOver" class="fixed inset-0 z-40 flex items-center justify-center bg-primary/5 backdrop-blur-sm pointer-events-none">
+          <div
+            class="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-primary/50 bg-card/90 px-12 py-10 shadow-xl max-w-sm w-full animate-scale-in"
+          >
+            <div class="flex items-center justify-center size-16 rounded-2xl bg-primary/10 animate-pulse">
+              <PackageOpen class="size-8 text-primary" />
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-medium text-foreground">Drop files into Book Bucket</p>
+              <p class="text-xs text-muted-foreground mt-1">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
 
       <BookBucketFileList
         :items="items"

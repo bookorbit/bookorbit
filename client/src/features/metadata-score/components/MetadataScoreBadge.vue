@@ -32,7 +32,7 @@ const colorClass = computed(() => {
   <button
     v-if="label !== null"
     type="button"
-    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-opacity hover:opacity-80"
+    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all duration-200 hover:opacity-80"
     :class="colorClass"
     @click="handleClick"
   >

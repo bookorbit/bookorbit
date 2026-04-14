@@ -19,7 +19,7 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
-      draft.value = scrollers.value.map((s) => ({ ...s }))
+      draft.value = (Array.isArray(scrollers.value) ? scrollers.value : DEFAULT_SCROLLERS).map((s) => ({ ...s }))
       fetchLenses()
     }
   },

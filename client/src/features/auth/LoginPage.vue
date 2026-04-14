@@ -226,13 +226,13 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
     <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll()" />
 
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
-      <div class="text-center mb-8">
+      <div class="text-center mb-8 animate-fade-up">
         <h1 class="text-2xl font-serif font-semibold text-foreground">project<span class="text-primary">x</span></h1>
         <p class="text-sm text-muted-foreground mt-1">Sign in to your account</p>
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
-        <div class="space-y-1.5">
+        <div class="space-y-1.5 animate-fade-up" style="animation-delay: 80ms">
           <label for="username" class="text-sm font-medium text-foreground">Username</label>
           <input
             id="username"
@@ -244,7 +244,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
           />
         </div>
 
-        <div class="space-y-1.5">
+        <div class="space-y-1.5 animate-fade-up" style="animation-delay: 160ms">
           <label for="password" class="text-sm font-medium text-foreground">Password</label>
           <input
             id="password"
@@ -256,13 +256,14 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
           />
         </div>
 
-        <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
-        <div v-if="setupStatusError" class="text-sm text-destructive">{{ setupStatusError }}</div>
+        <div v-if="error" class="text-sm text-destructive animate-shake">{{ error }}</div>
+        <div v-if="setupStatusError" class="text-sm text-destructive animate-shake">{{ setupStatusError }}</div>
 
         <button
           type="submit"
           :disabled="loading"
-          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors animate-fade-up"
+          style="animation-delay: 240ms"
         >
           {{ loading ? 'Signing in...' : 'Sign in' }}
         </button>

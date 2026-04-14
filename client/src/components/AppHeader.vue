@@ -238,69 +238,71 @@ function formatBadgeClass(fmt: string): string {
         </button>
 
         <!-- Mobile search dropdown -->
-        <div
-          v-if="showDropdown"
-          @mousedown.prevent
-          class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
-        >
-          <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
+        <Transition name="search-drop">
           <div
-            v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
-            class="p-3 text-xs text-muted-foreground text-center"
+            v-if="showDropdown"
+            @mousedown.prevent
+            class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
           >
-            No results
-          </div>
-          <button
-            v-for="(result, index) in globalResults"
-            :key="result.id"
-            @click="navigateToResult(result)"
-            :class="[
-              'w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left border-b border-border/40 last:border-b-0',
-              selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
-            ]"
-          >
-            <BookCoverImage
-              :book-id="result.id"
-              type="thumbnail"
-              class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
-              :alt="result.title ?? ''"
-            />
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-foreground truncate">
-                <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
-                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
-                  <span v-else>{{ seg.text }}</span>
-                </template>
-              </p>
-              <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
-                <template v-for="seg in highlightSegments(result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
-                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
-                  <span v-else>{{ seg.text }}</span>
-                </template>
-              </p>
-              <p v-if="result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
-                <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
-                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
-                  <span v-else>{{ seg.text }}</span>
-                </template>
-              </p>
+            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
+            <div
+              v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
+              class="p-3 text-xs text-muted-foreground text-center"
+            >
+              No results
             </div>
-            <div class="flex flex-col items-end gap-1 shrink-0">
-              <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded border border-primary/15 max-w-20 truncate">
-                {{ result.libraryName }}
-              </span>
-              <div v-if="result.formats.length" class="flex gap-1">
-                <span
-                  v-for="fmt in sortFormats(result.formats)"
-                  :key="fmt"
-                  :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
-                >
-                  {{ fmt }}
-                </span>
+            <button
+              v-for="(result, index) in globalResults"
+              :key="result.id"
+              @click="navigateToResult(result)"
+              :class="[
+                'w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left border-b border-border/40 last:border-b-0',
+                selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
+              ]"
+            >
+              <BookCoverImage
+                :book-id="result.id"
+                type="thumbnail"
+                class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
+                :alt="result.title ?? ''"
+              />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-foreground truncate">
+                  <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
+                    <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                    <span v-else>{{ seg.text }}</span>
+                  </template>
+                </p>
+                <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                  <template v-for="seg in highlightSegments(result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
+                    <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                    <span v-else>{{ seg.text }}</span>
+                  </template>
+                </p>
+                <p v-if="result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
+                  <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
+                    <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
+                    <span v-else>{{ seg.text }}</span>
+                  </template>
+                </p>
               </div>
-            </div>
-          </button>
-        </div>
+              <div class="flex flex-col items-end gap-1 shrink-0">
+                <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded border border-primary/15 max-w-20 truncate">
+                  {{ result.libraryName }}
+                </span>
+                <div v-if="result.formats.length" class="flex gap-1">
+                  <span
+                    v-for="fmt in sortFormats(result.formats)"
+                    :key="fmt"
+                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
+                  >
+                    {{ fmt }}
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
+        </Transition>
       </div>
     </template>
 
@@ -344,69 +346,71 @@ function formatBadgeClass(fmt: string): string {
         </div>
 
         <!-- Desktop search dropdown -->
-        <div
-          v-if="showDropdown"
-          @mousedown.prevent
-          class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto"
-        >
-          <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
+        <Transition name="search-drop">
           <div
-            v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
-            class="p-3 text-xs text-muted-foreground text-center"
+            v-if="showDropdown"
+            @mousedown.prevent
+            class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto"
           >
-            No results
-          </div>
-          <button
-            v-for="(result, index) in globalResults"
-            :key="result.id"
-            @click="navigateToResult(result)"
-            :class="[
-              'w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left border-b border-border/40 last:border-b-0',
-              selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
-            ]"
-          >
-            <BookCoverImage
-              :book-id="result.id"
-              type="thumbnail"
-              class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
-              :alt="result.title ?? ''"
-            />
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-foreground truncate">
-                <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
-                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
-                  <span v-else>{{ seg.text }}</span>
-                </template>
-              </p>
-              <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
-                <template v-for="seg in highlightSegments(result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
-                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
-                  <span v-else>{{ seg.text }}</span>
-                </template>
-              </p>
-              <p v-if="result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
-                <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
-                  <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
-                  <span v-else>{{ seg.text }}</span>
-                </template>
-              </p>
+            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
+            <div
+              v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
+              class="p-3 text-xs text-muted-foreground text-center"
+            >
+              No results
             </div>
-            <div class="flex flex-col items-end gap-1 shrink-0">
-              <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded border border-primary/15 max-w-20 truncate">
-                {{ result.libraryName }}
-              </span>
-              <div v-if="result.formats.length" class="flex gap-1">
-                <span
-                  v-for="fmt in sortFormats(result.formats)"
-                  :key="fmt"
-                  :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
-                >
-                  {{ fmt }}
-                </span>
+            <button
+              v-for="(result, index) in globalResults"
+              :key="result.id"
+              @click="navigateToResult(result)"
+              :class="[
+                'w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left border-b border-border/40 last:border-b-0',
+                selectedIndex === index ? 'bg-accent' : 'hover:bg-accent/60',
+              ]"
+            >
+              <BookCoverImage
+                :book-id="result.id"
+                type="thumbnail"
+                class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
+                :alt="result.title ?? ''"
+              />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-foreground truncate">
+                  <template v-for="seg in highlightSegments(result.title, globalSearchQuery)" :key="seg.text + seg.match">
+                    <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                    <span v-else>{{ seg.text }}</span>
+                  </template>
+                </p>
+                <p v-if="result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                  <template v-for="seg in highlightSegments(result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
+                    <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                    <span v-else>{{ seg.text }}</span>
+                  </template>
+                </p>
+                <p v-if="result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
+                  <template v-for="seg in highlightSegments(result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
+                    <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
+                    <span v-else>{{ seg.text }}</span>
+                  </template>
+                </p>
               </div>
-            </div>
-          </button>
-        </div>
+              <div class="flex flex-col items-end gap-1 shrink-0">
+                <span class="text-[10px] font-medium text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded border border-primary/15 max-w-20 truncate">
+                  {{ result.libraryName }}
+                </span>
+                <div v-if="result.formats.length" class="flex gap-1">
+                  <span
+                    v-for="fmt in sortFormats(result.formats)"
+                    :key="fmt"
+                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
+                  >
+                    {{ fmt }}
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
+        </Transition>
       </div>
 
       <!-- Right -->

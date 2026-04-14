@@ -53,7 +53,11 @@ const iconStyle = computed(() => {
           <p class="text-sm">Failed to load data</p>
         </div>
 
-        <div v-else-if="empty" class="text-muted-foreground flex h-full flex-col items-center justify-center gap-3">
+        <div
+          v-else-if="empty"
+          class="text-muted-foreground flex h-full flex-col items-center justify-center gap-3 animate-fade-up"
+          style="animation-delay: 100ms"
+        >
           <component :is="icon" class="size-9 opacity-20" />
           <div class="flex flex-col items-center gap-1">
             <p class="text-sm font-medium">No data yet</p>

@@ -12,7 +12,11 @@ const maxWidth = computed(() => (route.meta.maxWidth as string | undefined) ?? '
     <SettingsHeader />
     <main class="flex-1 overflow-y-auto overflow-x-hidden">
       <div class="md:px-6 px-4 py-6" :class="maxWidth">
-        <router-view />
+        <router-view v-slot="{ Component, route: childRoute }">
+          <div :key="childRoute.path">
+            <component :is="Component" />
+          </div>
+        </router-view>
       </div>
     </main>
   </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useAttrs } from 'vue'
 import { Aperture, BookMarked, ChevronLeft, ChevronRight, RefreshCw, Shuffle, Sparkles } from 'lucide-vue-next'
 
 import type { BookCard, ScrollerType } from '@projectx/types'
@@ -10,12 +10,18 @@ import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useDashboardScroller } from '../composables/useDashboardScroller'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 
+defineOptions({
+  inheritAttrs: false,
+})
+
 const props = defineProps<{
   type: ScrollerType
   title: string
   limit?: number
   lensId?: number
 }>()
+
+const attrs = useAttrs()
 
 const { books, loading, error, refresh } = useDashboardScroller(props.type, props.limit, props.lensId)
 
@@ -70,7 +76,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 </script>
 
 <template>
-  <section class="group/scroller overflow-hidden rounded-2xl border border-primary/40 bg-card/30 shadow-sm backdrop-blur-[1px]">
+  <section v-bind="attrs" class="group/scroller overflow-hidden rounded-2xl border border-primary/40 bg-card/30 shadow-sm backdrop-blur-[1px]">
     <!-- Header -->
     <div class="mb-2 flex items-center justify-between px-5 pt-4">
       <div class="flex items-center gap-2.5">
@@ -118,8 +124,8 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     </div>
 
     <!-- Empty -->
-    <div v-else-if="books.length === 0" class="flex flex-col items-center justify-center py-10 gap-3 text-center">
-      <div class="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+    <div v-else-if="books.length === 0" class="flex flex-col items-center justify-center py-10 gap-3 text-center animate-fade-up">
+      <div class="h-12 w-12 rounded-full bg-muted flex items-center justify-center animate-scale-in">
         <component :is="typeIcon" :size="20" class="text-muted-foreground/60" />
       </div>
       <p class="text-sm text-muted-foreground">

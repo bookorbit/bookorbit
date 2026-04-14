@@ -80,51 +80,53 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 
 <template>
   <BookDetailLayout :book-id="bookId">
-    <template v-if="detail">
-      <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" />
-      <EditMetadataTab
-        v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
-        :book="detail"
-        @saved="onMetadataSaved"
-        @locks-changed="onLocksChanged"
-        @cover-changed="onCoverChanged"
-      />
-      <FilesTab v-else-if="tab === 'files'" :book="detail" />
-    </template>
+    <Transition name="content" mode="out-in">
+      <div v-if="detail" key="detail">
+        <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" />
+        <EditMetadataTab
+          v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
+          :book="detail"
+          @saved="onMetadataSaved"
+          @locks-changed="onLocksChanged"
+          @cover-changed="onCoverChanged"
+        />
+        <FilesTab v-else-if="tab === 'files'" :book="detail" />
+      </div>
 
-    <template v-else-if="loading">
-      <div v-if="tab === 'details'" class="flex flex-col md:flex-row gap-8">
-        <div class="md:w-56 shrink-0">
-          <div class="w-full rounded-sm bg-muted animate-pulse" style="aspect-ratio: 2/3" />
-          <div class="mt-4 space-y-2">
-            <div class="h-9 rounded-md bg-muted animate-pulse" />
-            <div class="h-9 rounded-md bg-muted animate-pulse" />
+      <div v-else-if="loading" key="loading">
+        <div v-if="tab === 'details'" class="flex flex-col md:flex-row gap-8">
+          <div class="md:w-56 shrink-0">
+            <div class="w-full rounded-sm bg-muted animate-shimmer" style="aspect-ratio: 2/3" />
+            <div class="mt-4 space-y-2">
+              <div class="h-9 rounded-md bg-muted animate-shimmer" />
+              <div class="h-9 rounded-md bg-muted animate-shimmer" />
+            </div>
+          </div>
+          <div class="flex-1 space-y-3">
+            <div class="h-7 w-3/4 rounded bg-muted animate-shimmer" />
+            <div class="h-4 w-1/2 rounded bg-muted animate-shimmer" />
+            <div class="h-4 w-1/3 rounded bg-muted animate-shimmer" />
+            <div class="flex gap-1.5 mt-4">
+              <div class="h-5 w-12 rounded bg-muted animate-shimmer" />
+              <div class="h-5 w-16 rounded bg-muted animate-shimmer" />
+              <div class="h-5 w-10 rounded bg-muted animate-shimmer" />
+            </div>
+            <div class="h-32 w-full rounded bg-muted animate-shimmer mt-4" />
           </div>
         </div>
-        <div class="flex-1 space-y-3">
-          <div class="h-7 w-3/4 rounded bg-muted animate-pulse" />
-          <div class="h-4 w-1/2 rounded bg-muted animate-pulse" />
-          <div class="h-4 w-1/3 rounded bg-muted animate-pulse" />
-          <div class="flex gap-1.5 mt-4">
-            <div class="h-5 w-12 rounded bg-muted animate-pulse" />
-            <div class="h-5 w-16 rounded bg-muted animate-pulse" />
-            <div class="h-5 w-10 rounded bg-muted animate-pulse" />
-          </div>
-          <div class="h-32 w-full rounded bg-muted animate-pulse mt-4" />
+        <div v-else-if="tab === 'edit'" class="max-w-2xl space-y-4">
+          <div class="h-9 rounded-md bg-muted animate-shimmer" />
+          <div class="h-9 rounded-md bg-muted animate-shimmer" />
+          <div class="h-9 rounded-md bg-muted animate-shimmer" />
+        </div>
+        <div v-else-if="tab === 'files'" class="space-y-3">
+          <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-shimmer" />
         </div>
       </div>
-      <div v-else-if="tab === 'edit'" class="max-w-2xl space-y-4">
-        <div class="h-9 rounded-md bg-muted animate-pulse" />
-        <div class="h-9 rounded-md bg-muted animate-pulse" />
-        <div class="h-9 rounded-md bg-muted animate-pulse" />
-      </div>
-      <div v-else-if="tab === 'files'" class="space-y-3">
-        <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-pulse" />
-      </div>
-    </template>
 
-    <template v-else-if="notFound">
-      <EntityNotFound entity="Book" />
-    </template>
+      <div v-else-if="notFound" key="not-found">
+        <EntityNotFound entity="Book" />
+      </div>
+    </Transition>
   </BookDetailLayout>
 </template>

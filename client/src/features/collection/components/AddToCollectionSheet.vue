@@ -124,10 +124,10 @@ function handlePointerDownOutside(e: Event) {
       </SheetHeader>
 
       <div class="px-4 pb-4 space-y-4">
-        <p class="text-xs text-muted-foreground">{{ bookIds.length }} book{{ bookIds.length === 1 ? '' : 's' }} selected</p>
+        <p class="text-xs text-muted-foreground animate-fade-up">{{ bookIds.length }} book{{ bookIds.length === 1 ? '' : 's' }} selected</p>
 
         <!-- Create new collection -->
-        <div class="space-y-2">
+        <div class="space-y-2 animate-fade-up" style="animation-delay: 50ms">
           <p class="text-xs font-medium text-foreground uppercase tracking-wider">New Collection</p>
           <div class="space-y-2">
             <Input v-model="newName" placeholder="Collection name" class="flex-1" @keydown.enter="handleCreate" />
@@ -141,7 +141,7 @@ function handlePointerDownOutside(e: Event) {
         </div>
 
         <!-- Existing collections -->
-        <div v-if="localCollections.length > 0" class="space-y-2">
+        <div v-if="localCollections.length > 0" class="space-y-2 animate-fade-up" style="animation-delay: 100ms">
           <p class="text-xs font-medium text-foreground uppercase tracking-wider">Collections</p>
           <div class="space-y-1">
             <button

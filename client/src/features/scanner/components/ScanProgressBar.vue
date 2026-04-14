@@ -24,7 +24,10 @@ const label = computed(() => {
 <template>
   <div v-if="isActive" class="flex items-center gap-3 px-4 py-2 rounded-lg bg-primary/5 border border-primary/15">
     <div class="relative h-1.5 flex-1 rounded-full bg-primary/10 overflow-hidden">
-      <div class="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-300 ease-out" :style="{ width: `${pct}%` }" />
+      <div
+        class="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-300 ease-out animate-progress-stripes"
+        :style="{ width: `${pct}%` }"
+      />
     </div>
     <span class="text-xs text-muted-foreground whitespace-nowrap">{{ label }}</span>
   </div>

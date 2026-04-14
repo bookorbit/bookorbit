@@ -30,7 +30,13 @@ const viewKey = computed(() => {
 
       <!-- 2. Independent View Area: Everything below the header scrolls here -->
       <div class="px-4 pt-2 flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent">
-        <router-view :key="viewKey" />
+        <router-view v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <div :key="viewKey">
+              <component :is="Component" />
+            </div>
+          </Transition>
+        </router-view>
       </div>
     </SidebarInset>
     <BookMetadataFetchWidget />

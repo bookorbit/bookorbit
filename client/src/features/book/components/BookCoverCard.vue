@@ -255,7 +255,7 @@ async function handleSetStatus(status: ReadStatus) {
       <img
         v-if="book.hasCover && coverLoaded && !coverFailed"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90"
+        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90 transition-opacity duration-300 ease-out"
         aria-hidden="true"
         loading="lazy"
       />
@@ -264,8 +264,8 @@ async function handleSetStatus(status: ReadStatus) {
         v-if="book.hasCover && !coverFailed"
         :ref="onMainImgRef"
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-contain"
-        :class="isMissing ? 'brightness-50' : ''"
+        class="absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-out"
+        :class="[isMissing ? 'brightness-50' : '', coverLoaded ? 'opacity-100' : 'opacity-0']"
         loading="lazy"
         decoding="async"
         :alt="book.title ?? ''"
@@ -351,7 +351,8 @@ async function handleSetStatus(status: ReadStatus) {
       <!-- Reading progress bar - bottom edge -->
       <div
         v-if="showProgressBar && !selectionMode"
-        class="absolute bottom-0 left-0 z-10 h-0.75 transition-all duration-300"
+        class="absolute bottom-0 left-0 z-10 h-0.75 transition-[width] duration-500"
+        style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
         :class="book.readingProgress === 100 ? 'bg-green-500/80' : 'bg-primary/70'"
         :style="{ width: `${book.readingProgress}%` }"
       />

@@ -24,12 +24,13 @@ function handleStepClick(index: number) {
   <nav class="flex flex-col">
     <template v-for="(step, i) in steps" :key="i">
       <button
-        class="flex items-start gap-3 rounded-lg px-2.5 py-2.5 text-left w-full transition-colors"
+        class="flex items-start gap-3 rounded-lg px-2.5 py-2.5 text-left w-full transition-colors animate-fade-up"
         :class="i === activeIndex ? 'bg-primary/10' : 'hover:bg-muted'"
+        :style="{ animationDelay: `${i * 50}ms` }"
         @click="handleStepClick(i)"
       >
         <span
-          class="mt-0.5 size-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors"
+          class="mt-0.5 size-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-200"
           :class="
             step.status === 'done'
               ? 'bg-emerald-500 text-white'

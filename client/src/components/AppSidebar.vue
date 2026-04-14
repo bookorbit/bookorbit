@@ -231,69 +231,71 @@ onUnmounted(() => stopLibraryUploadListener())
           @add="createLibraryOpen = true"
           @toggle-reorder="isReorderingLibraries = !isReorderingLibraries"
         />
-        <div v-show="librariesOpen">
-          <SidebarGroupContent>
-            <VueDraggable
-              v-model="localLibraries"
-              tag="ul"
-              :animation="150"
-              handle=".drag-handle"
-              :disabled="!isReorderingLibraries"
-              class="contents"
-              @start="onLibraryDragStart"
-              @end="onLibraryDragEnd"
-            >
-              <SidebarNavItem
-                v-for="lib in localLibraries"
-                :key="lib.id"
-                :is-active="activeLibraryId === lib.id"
-                :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
-                :icon="resolveIcon(lib.icon, Icons.BookCopy)"
-                :icon-class="''"
-                :label="lib.name"
-                @click="navigateFromSidebar({ name: 'library', params: { id: lib.id } })"
+        <Transition name="section">
+          <div v-if="librariesOpen">
+            <SidebarGroupContent>
+              <VueDraggable
+                v-model="localLibraries"
+                tag="ul"
+                :animation="150"
+                handle=".drag-handle"
+                :disabled="!isReorderingLibraries"
+                class="contents"
+                @start="onLibraryDragStart"
+                @end="onLibraryDragEnd"
               >
-                <template #badge>
-                  <span
-                    v-if="getProgress(lib.id)?.status === 'running'"
-                    class="ml-auto shrink-0 rounded-md bg-primary/20 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-primary group-data-[collapsible=icon]:hidden"
-                  >
-                    {{ scanPct(lib.id) }}%
-                  </span>
-                  <span
-                    v-else-if="lib.bookCount !== undefined"
-                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
-                  >
-                    {{ lib.bookCount.toLocaleString() }}
-                  </span>
-                  <Icons.GripVertical
-                    v-if="isReorderingLibraries"
-                    class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
-                    @click.stop
-                  />
-                </template>
-                <template #extra>
-                  <Transition name="scan-progress">
-                    <div v-if="getProgress(lib.id)?.status === 'running'" class="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
-                      <div class="h-0.5 w-full rounded-full bg-sidebar-foreground/10 overflow-hidden">
-                        <div
-                          class="h-full rounded-full bg-primary"
-                          :style="{
-                            width: getProgress(lib.id)!.total > 0 ? `${scanPct(lib.id)}%` : '30%',
-                            animation: 'none',
-                          }"
-                        />
+                <SidebarNavItem
+                  v-for="lib in localLibraries"
+                  :key="lib.id"
+                  :is-active="activeLibraryId === lib.id"
+                  :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
+                  :icon="resolveIcon(lib.icon, Icons.BookCopy)"
+                  :icon-class="''"
+                  :label="lib.name"
+                  @click="navigateFromSidebar({ name: 'library', params: { id: lib.id } })"
+                >
+                  <template #badge>
+                    <span
+                      v-if="getProgress(lib.id)?.status === 'running'"
+                      class="ml-auto shrink-0 rounded-md bg-primary/20 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-primary group-data-[collapsible=icon]:hidden"
+                    >
+                      {{ scanPct(lib.id) }}%
+                    </span>
+                    <span
+                      v-else-if="lib.bookCount !== undefined"
+                      class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                    >
+                      {{ lib.bookCount.toLocaleString() }}
+                    </span>
+                    <Icons.GripVertical
+                      v-if="isReorderingLibraries"
+                      class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
+                      @click.stop
+                    />
+                  </template>
+                  <template #extra>
+                    <Transition name="scan-progress">
+                      <div v-if="getProgress(lib.id)?.status === 'running'" class="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
+                        <div class="h-0.5 w-full rounded-full bg-sidebar-foreground/10 overflow-hidden">
+                          <div
+                            class="h-full rounded-full bg-primary"
+                            :style="{
+                              width: getProgress(lib.id)!.total > 0 ? `${scanPct(lib.id)}%` : '30%',
+                              animation: 'none',
+                            }"
+                          />
+                        </div>
+                        <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
+                          {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
+                        </p>
                       </div>
-                      <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
-                        {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
-                      </p>
-                    </div>
-                  </Transition>
-                </template>
-              </SidebarNavItem>
-            </VueDraggable>
-          </SidebarGroupContent>
-        </div>
+                    </Transition>
+                  </template>
+                </SidebarNavItem>
+              </VueDraggable>
+            </SidebarGroupContent>
+          </div>
+        </Transition>
       </SidebarGroup>
 
       <SidebarSeparator />
@@ -313,47 +315,49 @@ onUnmounted(() => stopLibraryUploadListener())
           @add="createLensOpen = true"
           @toggle-reorder="isReorderingLenses = !isReorderingLenses"
         />
-        <div v-show="lensesOpen">
-          <SidebarGroupContent>
-            <VueDraggable
-              v-model="localLenses"
-              tag="ul"
-              :animation="150"
-              handle=".drag-handle"
-              :disabled="!isReorderingLenses"
-              class="contents"
-              @start="onLensDragStart"
-              @end="onLensDragEnd"
-            >
-              <SidebarNavItem
-                v-for="lens in localLenses"
-                :key="lens.id"
-                :is-active="activeLensId === lens.id"
-                :tooltip="lens.name"
-                :icon="resolveIcon(lens.icon, Icons.Aperture)"
-                :label="lens.name"
-                @click="navigateFromSidebar({ name: 'lens', params: { id: lens.id } })"
+        <Transition name="section">
+          <div v-if="lensesOpen">
+            <SidebarGroupContent>
+              <VueDraggable
+                v-model="localLenses"
+                tag="ul"
+                :animation="150"
+                handle=".drag-handle"
+                :disabled="!isReorderingLenses"
+                class="contents"
+                @start="onLensDragStart"
+                @end="onLensDragEnd"
               >
-                <template #badge>
-                  <span
-                    v-if="lens.bookCount != null && lens.bookCount > 0"
-                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
-                  >
-                    {{ lens.bookCount.toLocaleString() }}
-                  </span>
-                  <Icons.GripVertical
-                    v-if="isReorderingLenses"
-                    class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
-                    @click.stop
-                  />
-                </template>
-              </SidebarNavItem>
-            </VueDraggable>
-            <div v-if="localLenses.length === 0">
-              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No lenses yet</span>
-            </div>
-          </SidebarGroupContent>
-        </div>
+                <SidebarNavItem
+                  v-for="lens in localLenses"
+                  :key="lens.id"
+                  :is-active="activeLensId === lens.id"
+                  :tooltip="lens.name"
+                  :icon="resolveIcon(lens.icon, Icons.Aperture)"
+                  :label="lens.name"
+                  @click="navigateFromSidebar({ name: 'lens', params: { id: lens.id } })"
+                >
+                  <template #badge>
+                    <span
+                      v-if="lens.bookCount != null && lens.bookCount > 0"
+                      class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                    >
+                      {{ lens.bookCount.toLocaleString() }}
+                    </span>
+                    <Icons.GripVertical
+                      v-if="isReorderingLenses"
+                      class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
+                      @click.stop
+                    />
+                  </template>
+                </SidebarNavItem>
+              </VueDraggable>
+              <div v-if="localLenses.length === 0">
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No lenses yet</span>
+              </div>
+            </SidebarGroupContent>
+          </div>
+        </Transition>
       </SidebarGroup>
 
       <SidebarSeparator />
@@ -373,47 +377,49 @@ onUnmounted(() => stopLibraryUploadListener())
           @add="createCollectionOpen = true"
           @toggle-reorder="isReorderingCollections = !isReorderingCollections"
         />
-        <div v-show="collectionsOpen">
-          <SidebarGroupContent>
-            <VueDraggable
-              v-model="localCollections"
-              tag="ul"
-              :animation="150"
-              handle=".drag-handle"
-              :disabled="!isReorderingCollections"
-              class="contents"
-              @start="onCollectionDragStart"
-              @end="onCollectionDragEnd"
-            >
-              <SidebarNavItem
-                v-for="collection in localCollections"
-                :key="collection.id"
-                :is-active="activeCollectionId === collection.id"
-                :tooltip="collection.name"
-                :icon="resolveIcon(collection.icon, Icons.FolderOpen)"
-                :label="collection.name"
-                @click="navigateFromSidebar({ name: 'collection', params: { id: collection.id } })"
+        <Transition name="section">
+          <div v-if="collectionsOpen">
+            <SidebarGroupContent>
+              <VueDraggable
+                v-model="localCollections"
+                tag="ul"
+                :animation="150"
+                handle=".drag-handle"
+                :disabled="!isReorderingCollections"
+                class="contents"
+                @start="onCollectionDragStart"
+                @end="onCollectionDragEnd"
               >
-                <template #badge>
-                  <span
-                    v-if="collection.bookCount > 0"
-                    class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
-                  >
-                    {{ collection.bookCount.toLocaleString() }}
-                  </span>
-                  <Icons.GripVertical
-                    v-if="isReorderingCollections"
-                    class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
-                    @click.stop
-                  />
-                </template>
-              </SidebarNavItem>
-            </VueDraggable>
-            <div v-if="localCollections.length === 0">
-              <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No collections yet</span>
-            </div>
-          </SidebarGroupContent>
-        </div>
+                <SidebarNavItem
+                  v-for="collection in localCollections"
+                  :key="collection.id"
+                  :is-active="activeCollectionId === collection.id"
+                  :tooltip="collection.name"
+                  :icon="resolveIcon(collection.icon, Icons.FolderOpen)"
+                  :label="collection.name"
+                  @click="navigateFromSidebar({ name: 'collection', params: { id: collection.id } })"
+                >
+                  <template #badge>
+                    <span
+                      v-if="collection.bookCount > 0"
+                      class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+                    >
+                      {{ collection.bookCount.toLocaleString() }}
+                    </span>
+                    <Icons.GripVertical
+                      v-if="isReorderingCollections"
+                      class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
+                      @click.stop
+                    />
+                  </template>
+                </SidebarNavItem>
+              </VueDraggable>
+              <div v-if="localCollections.length === 0">
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No collections yet</span>
+              </div>
+            </SidebarGroupContent>
+          </div>
+        </Transition>
       </SidebarGroup>
     </SidebarContent>
 

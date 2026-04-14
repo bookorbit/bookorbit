@@ -16,6 +16,7 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>()
     <span
       class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
       :class="modelValue ? 'translate-x-4' : 'translate-x-0'"
+      style="transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1)"
     />
   </button>
 </template>

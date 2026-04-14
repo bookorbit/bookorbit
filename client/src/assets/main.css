@@ -383,6 +383,225 @@
   }
 }
 
+/* ── Micro-animation keyframes ───────────────────────────────
+   Shared motion vocabulary used across all components.
+   Wrapped in prefers-reduced-motion so users who opt out
+   get instant transitions instead.
+──────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: -400px 0;
+    }
+    to {
+      background-position: 400px 0;
+    }
+  }
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-3px);
+    }
+    75% {
+      transform: translateX(3px);
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes count-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes progress-stripes {
+    from {
+      background-position: 1rem 0;
+    }
+    to {
+      background-position: 0 0;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.25s ease-out both;
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.3s ease-out both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.25s ease-out both;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent 0%, color-mix(in oklch, var(--foreground) 6%, transparent) 50%, transparent 100%);
+    background-size: 400px 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  .animate-shake {
+    animation: shake 0.3s ease-in-out;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-count-pulse {
+    animation: count-pulse 0.2s ease-out;
+  }
+
+  .animate-progress-stripes {
+    background-image: linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.1) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.1) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 1rem 1rem;
+    animation: progress-stripes 0.5s linear infinite;
+  }
+}
+
+/* Page route transitions */
+.page-enter-active {
+  transition: opacity 0.2s ease-out;
+}
+.page-leave-active {
+  transition: opacity 0.15s ease-in;
+}
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+}
+
+/* Tab content transitions */
+.tab-enter-active {
+  transition:
+    opacity 0.15s ease-out,
+    transform 0.15s ease-out;
+}
+.tab-leave-active {
+  transition:
+    opacity 0.1s ease-in,
+    transform 0.1s ease-in;
+}
+.tab-enter-from {
+  opacity: 0;
+  transform: translateX(4px);
+}
+.tab-leave-to {
+  opacity: 0;
+  transform: translateX(-4px);
+}
+
+/* Content crossfade (skeleton → content) */
+.content-enter-active {
+  transition: opacity 0.25s ease-out;
+}
+.content-leave-active {
+  transition: opacity 0.15s ease-in;
+}
+.content-enter-from,
+.content-leave-to {
+  opacity: 0;
+}
+
+/* Sidebar section collapse/expand */
+.section-enter-active {
+  transition:
+    max-height 0.25s ease-out,
+    opacity 0.25s ease-out;
+  overflow: hidden;
+}
+.section-leave-active {
+  transition:
+    max-height 0.2s ease-in,
+    opacity 0.2s ease-in;
+  overflow: hidden;
+}
+.section-enter-from,
+.section-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+.section-enter-to,
+.section-leave-from {
+  max-height: 100dvh;
+  opacity: 1;
+}
+
+/* Search dropdown entrance */
+.search-drop-enter-active {
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.2s ease-out;
+}
+.search-drop-leave-active {
+  transition: opacity 0.15s ease-in;
+}
+.search-drop-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.search-drop-leave-to {
+  opacity: 0;
+}
+
 /* ── Driver.js tour ─────────────────────────────────────────── */
 .driver-popover {
   background-color: var(--card) !important;
