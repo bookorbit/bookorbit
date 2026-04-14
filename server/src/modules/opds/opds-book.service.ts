@@ -45,6 +45,7 @@ export interface OpdsBookEntry {
   language: string | null;
   publisher: string | null;
   isbn13: string | null;
+  hasCover: boolean;
   authors: string[];
   files: { id: number; format: string }[];
 }
@@ -378,6 +379,7 @@ export class OpdsBookService {
           language: bookMetadata.language,
           publisher: bookMetadata.publisher,
           isbn13: bookMetadata.isbn13,
+          coverSource: bookMetadata.coverSource,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -424,6 +426,7 @@ export class OpdsBookService {
         language: row.language,
         publisher: row.publisher,
         isbn13: row.isbn13,
+        hasCover: row.coverSource !== null,
         authors: authorsByBook.get(row.id) ?? [],
         files: filesByBook.get(row.id) ?? [],
       }))

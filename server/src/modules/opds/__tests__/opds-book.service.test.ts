@@ -208,6 +208,7 @@ describe('OpdsBookService', () => {
           language: null,
           publisher: null,
           isbn13: null,
+          coverSource: null,
         },
         {
           id: 1,
@@ -221,6 +222,7 @@ describe('OpdsBookService', () => {
           language: 'en',
           publisher: 'Pub',
           isbn13: '123',
+          coverSource: 'extracted',
         },
       ],
       [
@@ -237,12 +239,14 @@ describe('OpdsBookService', () => {
       expect.objectContaining({
         id: 1,
         title: 'First',
+        hasCover: true,
         authors: ['Author One'],
         files: [{ id: 10, format: 'epub' }],
       }),
       expect.objectContaining({
         id: 2,
         title: 'second',
+        hasCover: false,
         authors: ['Author Two'],
         files: [{ id: 20, format: 'unknown' }],
       }),

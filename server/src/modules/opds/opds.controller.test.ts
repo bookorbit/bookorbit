@@ -199,6 +199,7 @@ describe('OpdsController', () => {
     await controller.cover(42, { userId: 7, isSuperuser: false } as never, reply);
 
     expect(opdsBookService.validateBookAccess).toHaveBeenCalledWith(42, 7, false);
+    expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/books/covers/42/cover_custom.png');
     expect(reply.header).toHaveBeenCalledWith('ETag', '"1234"');
     expect(reply.type).toHaveBeenCalledWith('image/png');
@@ -214,6 +215,7 @@ describe('OpdsController', () => {
 
     await controller.cover(42, { userId: 7, isSuperuser: false } as never, reply, '"5000"');
 
+    expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
     expect(reply.status).toHaveBeenCalledWith(304);
     expect(reply.send).toHaveBeenCalledWith();
     expect(mockCreateReadStream).not.toHaveBeenCalled();
@@ -236,6 +238,7 @@ describe('OpdsController', () => {
 
     await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply);
 
+    expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
     expect(reply.header).toHaveBeenCalledWith('ETag', '"2222"');
     expect(reply.send).toHaveBeenCalledWith(stream);
@@ -249,6 +252,7 @@ describe('OpdsController', () => {
 
     await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply, '"3333"');
 
+    expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
     expect(reply.status).toHaveBeenCalledWith(304);
     expect(reply.send).toHaveBeenCalledWith();
     expect(mockCreateReadStream).not.toHaveBeenCalled();

@@ -20,6 +20,7 @@ function sampleBook(overrides?: Partial<OpdsBookEntry>): OpdsBookEntry {
     language: 'en',
     publisher: 'Tor Books',
     isbn13: '9780765311788',
+    hasCover: true,
     authors: ['Brandon Sanderson'],
     files: [{ id: 10, format: 'epub' }],
     ...overrides,
@@ -158,6 +159,25 @@ describe('OpdsService', () => {
       expect(xml).toContain('http://opds-spec.org/image"');
       expect(xml).toContain('http://opds-spec.org/image/thumbnail"');
       expect(xml).not.toMatch(/href="http:\/\/localhost/);
+    });
+
+    it('omits cover and thumbnail links when hasCover is false', () => {
+      const service = makeService();
+      const book = sampleBook({ hasCover: false });
+      const xml = service.generateAcquisitionFeed(
+        'Catalog',
+        'urn:projectx:catalog',
+        [book],
+        1,
+        1,
+        50,
+        `${BASE}/catalog?page=1&size=50`,
+        'test-token',
+      );
+
+      expect(xml).not.toContain('http://opds-spec.org/image');
+      expect(xml).not.toContain(`${BASE}/1/cover`);
+      expect(xml).not.toContain(`${BASE}/1/thumbnail`);
     });
 
     it('includes series link when seriesName is set', () => {

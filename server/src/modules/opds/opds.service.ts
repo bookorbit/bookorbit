@@ -163,10 +163,12 @@ export class OpdsService {
       lines.push(`  ${xmlEl('dc:identifier', `urn:isbn:${esc(book.isbn13)}`)}`);
     }
 
-    lines.push(`  ${xmlLink('http://opds-spec.org/image', `${BASE}/${book.id}/cover?t=${encodeURIComponent(coverToken)}`, 'image/jpeg')}`);
-    lines.push(
-      `  ${xmlLink('http://opds-spec.org/image/thumbnail', `${BASE}/${book.id}/thumbnail?t=${encodeURIComponent(coverToken)}`, 'image/jpeg')}`,
-    );
+    if (book.hasCover) {
+      lines.push(`  ${xmlLink('http://opds-spec.org/image', `${BASE}/${book.id}/cover?t=${encodeURIComponent(coverToken)}`, 'image/jpeg')}`);
+      lines.push(
+        `  ${xmlLink('http://opds-spec.org/image/thumbnail', `${BASE}/${book.id}/thumbnail?t=${encodeURIComponent(coverToken)}`, 'image/jpeg')}`,
+      );
+    }
 
     for (const file of book.files) {
       const mime = fileMimeType(file.format);

@@ -204,6 +204,7 @@ export class OpdsController {
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
+    reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
       const files = await readdir(dir);
@@ -233,6 +234,7 @@ export class OpdsController {
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
+    reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
     try {
       const { mtimeMs } = await stat(thumbnailPath);
