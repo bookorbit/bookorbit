@@ -4,8 +4,23 @@ export function bookCoverStyle(seed: string): { background: string; color: strin
     hash = seed.charCodeAt(i) + ((hash << 5) - hash)
   }
   const hue = Math.abs(hash) % 360
-  return {
-    background: `oklch(0.22 0.07 ${hue})`,
-    color: `oklch(0.92 0.03 ${hue})`,
+  const useLightVariant = Math.abs(hash) % 5 < 2
+  if (useLightVariant) {
+    return {
+      background: `oklch(0.90 0.10 ${hue})`,
+      color: `oklch(0.28 0.12 ${hue})`,
+    }
   }
+  return {
+    background: `oklch(0.26 0.14 ${hue})`,
+    color: `oklch(0.96 0.06 ${hue})`,
+  }
+}
+
+export function titleFontSizeClass(title: string): string {
+  const len = title.length
+  if (len <= 8) return 'text-[14cqi]'
+  if (len <= 16) return 'text-[11cqi]'
+  if (len <= 30) return 'text-[8cqi]'
+  return 'text-[6cqi]'
 }

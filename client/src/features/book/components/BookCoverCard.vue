@@ -44,6 +44,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
+import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 
 const router = useRouter()
 
@@ -245,14 +246,14 @@ async function handleSetStatus(status: ReadStatus) {
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
       :class="[isMissing ? '' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]']"
-      :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
+      :style="[{ aspectRatio: coverAspectRatio }, !book.hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
     >
       <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
       <div v-if="isMissing" class="absolute inset-0 z-30 pointer-events-none rounded-sm ring-2 ring-inset ring-amber-500" />
 
       <!-- Blurred background fill for mismatched aspect ratios -->
       <img
-        v-if="coverLoaded && !coverFailed"
+        v-if="book.hasCover && coverLoaded && !coverFailed"
         :src="coverSrc"
         class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90"
         aria-hidden="true"
@@ -260,7 +261,7 @@ async function handleSetStatus(status: ReadStatus) {
       />
 
       <img
-        v-if="!coverFailed"
+        v-if="book.hasCover && !coverFailed"
         :ref="onMainImgRef"
         :src="coverSrc"
         class="absolute inset-0 w-full h-full object-contain"
@@ -271,6 +272,9 @@ async function handleSetStatus(status: ReadStatus) {
         @load="coverLoaded = true"
         @error="coverFailed = true"
       />
+
+      <!-- Skeleton shimmer while a known-cover loads -->
+      <div v-if="book.hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
 
       <!-- Series badge -->
       <div v-if="showSeriesOverlay" class="absolute top-1.5 left-1.5 right-1.5 z-10 pointer-events-none">
@@ -374,20 +378,14 @@ async function handleSetStatus(status: ReadStatus) {
         </span>
       </div>
 
-      <!-- Title + author (no-cover fallback, always visible when cover absent) -->
-      <div v-if="!coverLoaded" class="absolute bottom-0 left-0 right-0 p-2 bg-linear-to-t from-black/60 to-transparent">
-        <p class="text-xs font-bold leading-tight" :class="hoverTitleClampClass" :style="{ color: coverStyle.color }">
-          {{ book.title ?? '-' }}
-        </p>
-        <button
-          v-if="authorLine"
-          class="text-[10px] mt-0.5 opacity-80 truncate hover:underline block w-full text-left"
-          :style="{ color: coverStyle.color }"
-          @click.stop="openAuthorBrowse"
-        >
-          {{ authorLine }}
-        </button>
-      </div>
+      <!-- Placeholder shown when book has no cover or cover failed to load -->
+      <BookCoverPlaceholder
+        v-if="!book.hasCover || coverFailed"
+        :title="book.title"
+        :author-line="authorLine"
+        :is-audio="isAudiobook"
+        :seed="book.title ?? String(book.id)"
+      />
 
       <!-- Refresh spinner overlay -->
       <Transition name="fade">

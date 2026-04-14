@@ -347,6 +347,7 @@ export class ScannerRepository {
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
           rating: bookMetadata.rating,
+          coverSource: bookMetadata.coverSource,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))

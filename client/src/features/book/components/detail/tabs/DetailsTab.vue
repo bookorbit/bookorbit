@@ -13,6 +13,7 @@ import type { BookDetail, BookKoboState, ReadStatus } from '@projectx/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
+import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -237,6 +238,7 @@ const canViewKobo = computed(() => hasPermission('kobo_sync'))
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
 
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
+const hasCover = computed(() => props.book.coverSource !== null)
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
 
@@ -550,6 +552,12 @@ function handleCoverLoad() {
   coverLoaded.value = true
 }
 
+function handleCoverClick() {
+  if (hasCover.value && coverLoaded.value && !coverFailed.value) {
+    coverLightboxOpen.value = true
+  }
+}
+
 function openEditCover() {
   router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
 }
@@ -688,25 +696,34 @@ watch(
       <!-- Cover thumbnail -->
       <div class="w-28 shrink-0">
         <div
-          class="relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
-          :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
-          @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
+          class="relative w-full rounded-sm overflow-hidden shadow-md"
+          :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
+          :style="[{ aspectRatio: coverAspectRatio }, !hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
+          @click="handleCoverClick"
         >
           <img
-            v-if="!coverFailed"
+            v-if="hasCover && !coverFailed"
             :src="coverSrc"
             class="absolute inset-0 w-full h-full object-cover scale-110 blur-lg brightness-50 transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             aria-hidden="true"
           />
           <img
-            v-if="!coverFailed"
+            v-if="hasCover && !coverFailed"
             :src="coverSrc"
             class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             :alt="book.title ?? ''"
             @load="handleCoverLoad"
             @error="coverFailed = true"
+          />
+          <div v-if="hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
+          <BookCoverPlaceholder
+            v-if="!hasCover || coverFailed"
+            :title="book.title"
+            :author-line="book.authors.map((a) => a.name).join(', ') || null"
+            :is-audio="isPrimaryAudio"
+            :seed="book.title ?? String(book.id)"
           />
         </div>
       </div>
@@ -887,9 +904,10 @@ watch(
     <div class="hidden md:block md:w-56 shrink-0 md:sticky md:top-0 md:self-start">
       <div class="max-w-48 mx-auto md:max-w-none">
         <div
-          class="group relative w-full rounded-sm overflow-hidden shadow-md cursor-zoom-in"
-          :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
-          @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
+          class="group relative w-full rounded-sm overflow-hidden shadow-md"
+          :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
+          :style="[{ aspectRatio: coverAspectRatio }, !hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
+          @click="handleCoverClick"
         >
           <Tooltip>
             <TooltipTrigger as-child>
@@ -904,20 +922,28 @@ watch(
           </Tooltip>
           <!-- Blurred background fill for mismatched aspect ratios -->
           <img
-            v-if="!coverFailed"
+            v-if="hasCover && !coverFailed"
             :src="coverSrc"
             class="absolute inset-0 w-full h-full object-cover scale-110 blur-lg brightness-50 transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             aria-hidden="true"
           />
           <img
-            v-if="!coverFailed"
+            v-if="hasCover && !coverFailed"
             :src="coverSrc"
             class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
             :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
             :alt="book.title ?? ''"
             @load="handleCoverLoad"
             @error="coverFailed = true"
+          />
+          <div v-if="hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
+          <BookCoverPlaceholder
+            v-if="!hasCover || coverFailed"
+            :title="book.title"
+            :author-line="book.authors.map((a) => a.name).join(', ') || null"
+            :is-audio="isPrimaryAudio"
+            :seed="book.title ?? String(book.id)"
           />
         </div>
 

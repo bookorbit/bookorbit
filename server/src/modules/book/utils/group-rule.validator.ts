@@ -26,6 +26,7 @@ const RULE_FIELDS = [
   'description',
   'isbn',
   'metadataScore',
+  'cover',
 ] as const;
 const RULE_OPERATORS = [
   'contains',
@@ -75,6 +76,7 @@ const VALID_OPERATORS_BY_FIELD: Record<string, string[]> = {
   description: ['isEmpty', 'isNotEmpty'],
   isbn: ['isEmpty', 'isNotEmpty', 'eq'],
   metadataScore: ['gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
+  cover: ['isMissing', 'isPresent'],
 };
 
 const ruleSchema: z.ZodType<Rule> = z

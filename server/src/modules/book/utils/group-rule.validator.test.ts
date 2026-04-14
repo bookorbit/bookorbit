@@ -211,6 +211,33 @@ describe('validateGroupRule', () => {
     };
     expect(() => validateGroupRule(rule)).toThrow(BadRequestException);
   });
+
+  it('accepts cover with isMissing operator', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'cover', operator: 'isMissing' }],
+    };
+    expect(validateGroupRule(rule)).toBeDefined();
+  });
+
+  it('accepts cover with isPresent operator', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'cover', operator: 'isPresent' }],
+    };
+    expect(validateGroupRule(rule)).toBeDefined();
+  });
+
+  it('throws BadRequestException for cover with invalid operator', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'cover', operator: 'contains', value: 'x' }],
+    };
+    expect(() => validateGroupRule(rule)).toThrow(BadRequestException);
+  });
 });
 
 describe('groupRuleSchema depth enforcement', () => {

@@ -39,6 +39,7 @@ vi.mock('@/features/book/composables/useCoverVersions', () => ({
 }))
 vi.mock('@/features/book/lib/book-cover', () => ({
   bookCoverStyle: () => ({ background: 'oklch(0.22 0.07 200)', color: 'oklch(0.92 0.03 200)' }),
+  titleFontSizeClass: () => 'text-[11cqi]',
 }))
 
 const globalStubs = {

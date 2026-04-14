@@ -807,3 +807,17 @@ describe('ILIKE pattern escaping (SEC-013)', () => {
     expect(clause.pattern).toBe('%Dune%');
   });
 });
+
+describe('coverRuleToSql', () => {
+  it('isMissing produces isNull(bookMetadata.coverSource)', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'cover', operator: 'isMissing' }) as never, BASE_CTX) as any;
+    expect(getRuleSql(where)).toMatchObject({ type: 'isNull' });
+  });
+
+  it('isPresent produces isNotNull(bookMetadata.coverSource)', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'cover', operator: 'isPresent' }) as never, BASE_CTX) as any;
+    expect(getRuleSql(where)).toMatchObject({ type: 'isNotNull' });
+  });
+});

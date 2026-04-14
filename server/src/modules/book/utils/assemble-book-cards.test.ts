@@ -12,6 +12,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
     publishedYear: null,
     language: null,
     rating: null,
+    coverSource: null,
     ...overrides,
   };
 }
@@ -125,6 +126,18 @@ describe('assembleBookCards', () => {
   it('returns an empty array when given no book rows', () => {
     const cards = assembleBookCards([], [], [], [], []);
     expect(cards).toEqual([]);
+  });
+
+  it('sets hasCover to false when coverSource is null', () => {
+    const rows = [makeBookRow(1, { coverSource: null })];
+    const [card] = assembleBookCards(rows, [], [], [], []);
+    expect(card.hasCover).toBe(false);
+  });
+
+  it('sets hasCover to true when coverSource is non-null', () => {
+    const rows = [makeBookRow(1, { coverSource: 'extracted' })];
+    const [card] = assembleBookCards(rows, [], [], [], []);
+    expect(card.hasCover).toBe(true);
   });
 
   it('includes all optional metadata fields', () => {

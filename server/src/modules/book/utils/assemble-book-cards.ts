@@ -14,6 +14,7 @@ type BookRow = {
   publishedYear: number | null;
   language: string | null;
   rating: number | null;
+  coverSource: string | null;
 };
 
 type NameRow = { bookId: number; name: string };
@@ -99,6 +100,7 @@ export function assembleBookCards(
       readingProgress,
       readStatus: statusByBookId.get(row.id) ?? null,
       addedAt: row.addedAt.toISOString(),
+      hasCover: row.coverSource != null,
     };
   });
 }

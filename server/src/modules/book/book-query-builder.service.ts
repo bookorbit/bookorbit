@@ -167,6 +167,8 @@ export class BookQueryBuilder {
         return this.isbnRuleToSql(operator, value as string | undefined);
       case 'metadataScore':
         return this.numericRuleToSql(bookMetadata.metadataScore, operator, value as number, valueTo as number | undefined);
+      case 'cover':
+        return this.coverRuleToSql(operator);
       default:
         throw new BadRequestException(`Unknown filter field: ${String(field)}`);
     }
@@ -374,6 +376,17 @@ export class BookQueryBuilder {
         return eq(books.status, 'present');
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for status field`);
+    }
+  }
+
+  private coverRuleToSql(operator: string): SQL {
+    switch (operator) {
+      case 'isMissing':
+        return isNull(bookMetadata.coverSource);
+      case 'isPresent':
+        return isNotNull(bookMetadata.coverSource);
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for cover field`);
     }
   }
 

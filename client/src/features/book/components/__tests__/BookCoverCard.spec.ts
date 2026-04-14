@@ -14,6 +14,7 @@ vi.mock('@/features/book/composables/useCoverVersions', () => ({
 }))
 vi.mock('@/features/book/lib/book-cover', () => ({
   bookCoverStyle: () => ({ background: 'oklch(0.22 0.07 200)', color: 'oklch(0.92 0.03 200)' }),
+  titleFontSizeClass: () => 'text-[11cqi]',
 }))
 
 // Stub complex UI sub-components
@@ -57,6 +58,7 @@ const missingBook: BookCard = {
   readingProgress: null,
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
+  hasCover: false,
 }
 
 const presentBook: BookCard = {
@@ -74,6 +76,13 @@ const presentBook: BookCard = {
   readingProgress: null,
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
+  hasCover: false,
+}
+
+const presentBookWithCover: BookCard = {
+  ...presentBook,
+  id: 3,
+  hasCover: true,
 }
 
 describe('BookCoverCard — missing state', () => {
@@ -129,20 +138,44 @@ describe('BookCoverCard — present state', () => {
     const wrapper = mountCard(presentBook, '2/3')
     const fallbackTitle = wrapper.find('[class*="bg-linear-to-t"] p')
     const fallbackAuthor = wrapper.find('[class*="bg-linear-to-t"] button')
-    expect(fallbackTitle.classes()).toContain('line-clamp-2')
-    expect(fallbackAuthor.classes()).toContain('truncate')
+    expect(fallbackTitle.exists()).toBe(false)
+    expect(fallbackAuthor.exists()).toBe(false)
   })
 
   it('clamps fallback title to 1 line for 1/1 covers and keeps author to one line', () => {
     const wrapper = mountCard(presentBook, '1/1')
     const fallbackTitle = wrapper.find('[class*="bg-linear-to-t"] p')
     const fallbackAuthor = wrapper.find('[class*="bg-linear-to-t"] button')
-    expect(fallbackTitle.classes()).toContain('line-clamp-1')
-    expect(fallbackAuthor.classes()).toContain('truncate')
+    expect(fallbackTitle.exists()).toBe(false)
+    expect(fallbackAuthor.exists()).toBe(false)
   })
 
   it('anchors the kebab menu button to the lower-right corner', () => {
     const wrapper = mountCard(presentBook)
     expect(wrapper.find('div.absolute.bottom-2.right-2.z-20').exists()).toBe(true)
+  })
+})
+
+describe('BookCoverCard — placeholder state', () => {
+  it('shows BookCoverPlaceholder when hasCover is false', () => {
+    const wrapper = mountCard(presentBook)
+    expect(wrapper.findComponent({ name: 'BookCoverPlaceholder' }).exists()).toBe(true)
+  })
+
+  it('does not render cover img when hasCover is false', () => {
+    const wrapper = mountCard(presentBook)
+    const imgs = wrapper.findAll('img')
+    expect(imgs).toHaveLength(0)
+  })
+
+  it('does not show BookCoverPlaceholder when hasCover is true', () => {
+    const wrapper = mountCard(presentBookWithCover)
+    expect(wrapper.findComponent({ name: 'BookCoverPlaceholder' }).exists()).toBe(false)
+  })
+
+  it('renders cover img when hasCover is true', () => {
+    const wrapper = mountCard(presentBookWithCover)
+    const imgs = wrapper.findAll('img')
+    expect(imgs.length).toBeGreaterThan(0)
   })
 })

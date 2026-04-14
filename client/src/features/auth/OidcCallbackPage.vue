@@ -68,7 +68,7 @@ onMounted(async () => {
     }
   } catch (err) {
     if (err instanceof OidcLoginError && err.errorCode && OIDC_ERROR_MESSAGES[err.errorCode]) {
-      error.value = OIDC_ERROR_MESSAGES[err.errorCode]
+      error.value = OIDC_ERROR_MESSAGES[err.errorCode] ?? null
     } else {
       error.value = err instanceof Error ? err.message : 'OIDC login failed'
     }

@@ -42,6 +42,7 @@ const missingBook: BookCard = {
   readingProgress: null,
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
+  hasCover: false,
 }
 
 const presentBook: BookCard = {
@@ -59,6 +60,7 @@ const presentBook: BookCard = {
   readingProgress: null,
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
+  hasCover: false,
 }
 
 describe('BookListRow — missing state', () => {

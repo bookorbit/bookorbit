@@ -18,7 +18,8 @@ export type RuleField =
   | "readProgress"
   | "description"
   | "isbn"
-  | "metadataScore";
+  | "metadataScore"
+  | "cover";
 
 export type RuleOperator =
   | "contains"
@@ -67,6 +68,7 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   description: ["isEmpty", "isNotEmpty"],
   isbn: ["isEmpty", "isNotEmpty", "eq"],
   metadataScore: ["gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
+  cover: ["isMissing", "isPresent"],
 };
 
 export const RULE_FIELDS = Object.keys(FIELD_OPERATORS) as RuleField[];

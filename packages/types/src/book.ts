@@ -43,6 +43,7 @@ export type BookCard = {
   readingProgress: number | null;
   readStatus: UserBookStatus | null;
   addedAt: string;
+  hasCover: boolean;
 };
 
 export type BookDetailFile = {
