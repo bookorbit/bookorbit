@@ -24,7 +24,7 @@ const viewKey = computed(() => {
 <template>
   <SidebarProvider class="glow-wrapper min-h-screen" :class="backgroundClass">
     <AppSidebar />
-    <SidebarInset class="flex flex-col h-screen overflow-hidden relative bg-transparent md:pb-3">
+    <SidebarInset class="flex flex-col h-screen overflow-hidden relative bg-transparent pb-3">
       <!-- 1. Global App Header: Fixed at the top, independent of views -->
       <AppHeader />
 
@@ -32,7 +32,7 @@ const viewKey = computed(() => {
       <div class="px-4 pt-2 flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent">
         <router-view v-slot="{ Component }">
           <Transition name="page" mode="out-in">
-            <div :key="viewKey">
+            <div :key="viewKey" :class="{ 'h-full': viewKey === 'settings' || BOOK_ROUTE_NAMES.has(viewKey) }">
               <component :is="Component" />
             </div>
           </Transition>
