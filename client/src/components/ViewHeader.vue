@@ -15,16 +15,32 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-defineProps<{
-  title: string
-  icon?: string
-  total: number
-  coverSize: number
-  gridGap: number
-  viewMode: 'grid' | 'list'
-  selectionMode?: boolean
-  coverShape?: 'square' | 'circle'
-}>()
+withDefaults(
+  defineProps<{
+    title: string
+    icon?: string
+    total: number
+    coverSize: number
+    gridGap: number
+    viewMode: 'grid' | 'list'
+    selectionMode?: boolean
+    coverShape?: 'square' | 'circle'
+    coverSizeMin?: number
+    coverSizeMax?: number
+    coverSizeStep?: number
+    gridGapMin?: number
+    gridGapMax?: number
+    gridGapStep?: number
+  }>(),
+  {
+    coverSizeMin: 100,
+    coverSizeMax: 280,
+    coverSizeStep: 10,
+    gridGapMin: 4,
+    gridGapMax: 40,
+    gridGapStep: 4,
+  },
+)
 
 const emit = defineEmits<{
   'update:coverSize': [value: number]
@@ -119,9 +135,9 @@ function getIconComponent(name: string) {
                 :value="coverSize"
                 @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
                 type="range"
-                min="100"
-                max="280"
-                step="10"
+                :min="coverSizeMin"
+                :max="coverSizeMax"
+                :step="coverSizeStep"
                 class="w-full accent-primary cursor-pointer"
               />
             </div>
@@ -134,9 +150,9 @@ function getIconComponent(name: string) {
                 :value="gridGap"
                 @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
                 type="range"
-                min="4"
-                max="40"
-                step="4"
+                :min="gridGapMin"
+                :max="gridGapMax"
+                :step="gridGapStep"
                 class="w-full accent-primary cursor-pointer"
               />
             </div>
@@ -215,9 +231,9 @@ function getIconComponent(name: string) {
             :value="coverSize"
             @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
             type="range"
-            min="100"
-            max="280"
-            step="10"
+            :min="coverSizeMin"
+            :max="coverSizeMax"
+            :step="coverSizeStep"
             class="w-full accent-primary cursor-pointer"
           />
         </div>
@@ -230,9 +246,9 @@ function getIconComponent(name: string) {
             :value="gridGap"
             @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
             type="range"
-            min="4"
-            max="40"
-            step="4"
+            :min="gridGapMin"
+            :max="gridGapMax"
+            :step="gridGapStep"
             class="w-full accent-primary cursor-pointer"
           />
         </div>

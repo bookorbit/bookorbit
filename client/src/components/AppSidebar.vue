@@ -101,6 +101,7 @@ const {
 
 const isDashboardActive = computed(() => route.name === 'dashboard')
 const isAuthorsActive = computed(() => route.name === 'authors' || route.name === 'author-detail')
+const isSeriesActive = computed(() => route.name === 'series' || route.name === 'series-detail')
 
 const activeLibraryId = computed(() => {
   const id = route.params.id
@@ -209,6 +210,13 @@ onUnmounted(() => stopLibraryUploadListener())
               :icon="Icons.Users"
               label="Authors"
               @click="navigateFromSidebar({ name: 'authors' })"
+            />
+            <SidebarNavItem
+              :is-active="isSeriesActive"
+              tooltip="Series"
+              :icon="Icons.Library"
+              label="Series"
+              @click="navigateFromSidebar({ name: 'series' })"
             />
           </SidebarMenu>
         </SidebarGroupContent>

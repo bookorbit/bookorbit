@@ -210,6 +210,18 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: (to) => fallbackById('Author', numericParam(to, 'id')) },
       },
       {
+        path: '/series',
+        name: 'series',
+        component: () => import('@/features/series/views/SeriesView.vue'),
+        meta: { title: 'Series' },
+      },
+      {
+        path: '/series/:seriesName',
+        name: 'series-detail',
+        component: () => import('@/features/series/views/SeriesDetailView.vue'),
+        meta: { title: (to) => `Series · ${firstText(to.params.seriesName) ?? 'Series'}` },
+      },
+      {
         path: '/book/:bookId',
         name: 'book-detail',
         component: () => import('@/views/BookDetailView.vue'),

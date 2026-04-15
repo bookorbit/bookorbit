@@ -754,7 +754,12 @@ watch(
             <span class="text-muted-foreground">narrated by</span>
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
-          <span v-if="seriesLine" class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+          <RouterLink
+            v-if="seriesLine"
+            :to="{ name: 'series-detail', params: { seriesName: book.seriesName! } }"
+            class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+            >{{ seriesLine }}</RouterLink
+          >
         </div>
         <!-- Stars: own row -->
         <div class="mt-2 flex items-center gap-0.5" @mouseleave="hoverRating = null">
@@ -1111,7 +1116,11 @@ watch(
           </p>
           <template v-if="seriesLine">
             <span class="text-muted-foreground/60 text-xs">·</span>
-            <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+            <RouterLink
+              :to="{ name: 'series-detail', params: { seriesName: book.seriesName! } }"
+              class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+              >{{ seriesLine }}</RouterLink
+            >
           </template>
         </div>
 

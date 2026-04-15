@@ -53,6 +53,7 @@ import { UserBookStatusModule } from './modules/user-book-status/user-book-statu
 import { AuditModule } from './modules/audit/audit.module';
 import { MigrationModule } from './modules/migration/migration.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { SeriesModule } from './modules/series/series.module';
 
 @Module({
   imports: [
@@ -114,6 +115,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     AuditModule,
     MigrationModule,
     NotificationModule,
+    SeriesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

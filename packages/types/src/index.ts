@@ -27,3 +27,4 @@ export * from "./statistics";
 export * from "./user-statistics";
 export * from "./migration";
 export * from "./notification";
+export * from "./series";
