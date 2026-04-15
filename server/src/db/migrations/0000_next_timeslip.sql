@@ -847,6 +847,19 @@ CREATE TABLE "email_send_log" (
 	CONSTRAINT "email_send_log_sent_after_created_chk" CHECK ("email_send_log"."sent_at" is null or "email_send_log"."sent_at" >= "email_send_log"."created_at")
 );
 --> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"type" varchar(50) NOT NULL,
+	"title" varchar(255) NOT NULL,
+	"message" text,
+	"action_url" varchar(2048),
+	"meta" jsonb,
+	"read" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -953,6 +966,7 @@ ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_id_books_id_fk"
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_file_id_book_files_id_fk" FOREIGN KEY ("book_file_id") REFERENCES "public"."book_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_provider_id_email_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."email_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_audit_user_id" ON "audit_log" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_resource" ON "audit_log" USING btree ("resource","resource_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_action" ON "audit_log" USING btree ("action");--> statement-breakpoint
@@ -1062,4 +1076,7 @@ CREATE UNIQUE INDEX "email_recipients_user_email_lower_uidx" ON "email_recipient
 CREATE UNIQUE INDEX "email_recipients_one_default_per_user_uidx" ON "email_recipients" USING btree ("user_id") WHERE "email_recipients"."is_default" = true;--> statement-breakpoint
 CREATE INDEX "email_send_log_user_created_at_idx" ON "email_send_log" USING btree ("user_id","created_at");--> statement-breakpoint
 CREATE INDEX "email_send_log_created_at_idx" ON "email_send_log" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX "email_send_log_status_next_retry_idx" ON "email_send_log" USING btree ("status","next_retry_at");
+CREATE INDEX "email_send_log_status_next_retry_idx" ON "email_send_log" USING btree ("status","next_retry_at");--> statement-breakpoint
+CREATE INDEX "notifications_user_id_idx" ON "notifications" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "notifications_user_unread_idx" ON "notifications" USING btree ("user_id","read");--> statement-breakpoint
+CREATE INDEX "notifications_created_at_idx" ON "notifications" USING btree ("created_at");

@@ -1,7 +1,9 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import type { AuthorEnrichmentFailedPage } from '@projectx/types';
+import { NotificationType } from '@projectx/types';
 
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { NotificationService } from '../notification/notification.service';
 import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEventsService } from '../metadata/metadata-events.service';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
@@ -36,6 +38,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     private readonly enrichmentConfig: AuthorEnrichmentConfigService,
     private readonly metadataEvents: MetadataEventsService,
     private readonly session: AuthorEnrichmentSessionService,
+    private readonly notificationService: NotificationService,
     @Optional() private readonly gateway?: AuthorEnrichmentGateway,
   ) {}
 
@@ -180,6 +183,19 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   private async checkAndResetSession(): Promise<void> {
     const summary = await this.queueRepo.getStatusSummary();
     if (summary.queued === 0 && summary.processing === 0 && summary.rateLimited === 0) {
+      if (this.session.sessionTotal > 0) {
+        const hasFailed = summary.failed > 0;
+        this.notificationService
+          .notify({
+            type: hasFailed ? NotificationType.AuthorEnrichmentFailed : NotificationType.AuthorEnrichmentCompleted,
+            title: hasFailed ? 'Author enrichment completed with errors' : 'Author enrichment completed',
+            message:
+              `Processed ${this.session.sessionDone} of ${this.session.sessionTotal} authors` + (hasFailed ? `, ${summary.failed} failed` : ''),
+            scope: { kind: 'all' },
+            meta: { sessionTotal: this.session.sessionTotal, sessionDone: this.session.sessionDone, failed: summary.failed },
+          })
+          .catch(() => {});
+      }
       this.session.reset();
     }
   }

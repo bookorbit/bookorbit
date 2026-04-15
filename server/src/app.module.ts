@@ -52,6 +52,7 @@ import { ReadingSessionModule } from './modules/reading-session/reading-session.
 import { UserBookStatusModule } from './modules/user-book-status/user-book-status.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { MigrationModule } from './modules/migration/migration.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -112,6 +113,7 @@ import { MigrationModule } from './modules/migration/migration.module';
     UserBookStatusModule,
     AuditModule,
     MigrationModule,
+    NotificationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

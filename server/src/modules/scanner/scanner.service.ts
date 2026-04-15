@@ -1,8 +1,10 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 
 import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanBooksAddedEvent, ScanProgressEvent } from '@projectx/types';
+import { NotificationType } from '@projectx/types';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
+import { NotificationService } from '../notification/notification.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
 import { basename, dirname, relative, sep } from 'path';
@@ -40,6 +42,7 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly metadataService: MetadataService,
     private readonly scanJobStore: ScanJobStore,
     private readonly scanGateway: ScanGateway,
+    private readonly notificationService: NotificationService,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
   ) {}
 
@@ -464,6 +467,16 @@ export class ScannerService implements OnApplicationBootstrap {
       );
       this.scanJobStore.increment(libraryId, { added: totals.addedCount, updated: totals.updatedCount });
       this.emitFromStore(libraryId, jobId, 'completed');
+
+      this.notificationService
+        .notify({
+          type: NotificationType.ScanCompleted,
+          title: 'Library scan completed',
+          message: `Added ${totals.addedCount} books, updated ${totals.updatedCount}, ${totals.missingCount} missing`,
+          scope: { kind: 'library', libraryId },
+          meta: { libraryId, jobId, ...totals },
+        })
+        .catch(() => {});
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await this.scannerRepo.failScanJob(jobId, message).catch(() => {
@@ -473,6 +486,16 @@ export class ScannerService implements OnApplicationBootstrap {
         `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${message.replace(/"/g, '\\"')}" - scan job failed`,
       );
       this.emitFromStore(libraryId, jobId, 'failed', message);
+
+      this.notificationService
+        .notify({
+          type: NotificationType.ScanFailed,
+          title: 'Library scan failed',
+          message: message.slice(0, 200),
+          scope: { kind: 'library', libraryId },
+          meta: { libraryId, jobId },
+        })
+        .catch(() => {});
     } finally {
       this.flushBookEmitBuffer(libraryId);
       this.scanJobStore.delete(libraryId);

@@ -11,6 +11,7 @@ import { EmailPreferencesService } from './email-preferences.service';
 import { EmailSendLogService } from './email-send-log.service';
 import { EmailTransportService } from './email-transport.service';
 import { EmailBookAccessService } from './email-book-access.service';
+import { NotificationService } from '../notification/notification.service';
 import type { RequestUser } from '../../common/types/request-user';
 import type { SendBookDto } from './dto/send-book.dto';
 import * as fs from 'fs';
@@ -117,6 +118,10 @@ describe('EmailSendOrchestrator', () => {
             assertUserCanAccessBook: vi.fn().mockResolvedValue(undefined),
             assertUserCanAccessBooks: vi.fn().mockResolvedValue(undefined),
           },
+        },
+        {
+          provide: NotificationService,
+          useValue: { notify: vi.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

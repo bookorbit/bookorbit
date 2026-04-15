@@ -70,6 +70,9 @@ function makeService(withGateway = true) {
   const gateway = {
     emitStatus: vi.fn(),
   };
+  const notificationService = {
+    notify: vi.fn().mockResolvedValue(undefined),
+  };
 
   const service = new BookMetadataFetchOrchestratorService(
     queueRepo as never,
@@ -82,6 +85,7 @@ function makeService(withGateway = true) {
     bookMetadataLockService as never,
     session,
     throttleTracker as never,
+    notificationService as never,
     withGateway ? (gateway as never) : undefined,
   );
 

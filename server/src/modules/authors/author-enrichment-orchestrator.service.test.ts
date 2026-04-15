@@ -98,6 +98,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       enrichmentConfig as never,
       metadataEvents as never,
       session,
+      { notify: vi.fn() } as never,
       gateway as never,
     );
   });

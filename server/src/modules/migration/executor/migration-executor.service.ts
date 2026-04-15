@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import type { MigrationProgressEvent } from '@projectx/types';
+import { NotificationType } from '@projectx/types';
+import { NotificationService } from '../../notification/notification.service';
 import { asRecord } from '../core/coerce';
 import { parseConnectionConfig } from '../core/connection-config';
 import { MigrationEncryptionService } from '../core/migration-encryption.service';
@@ -30,6 +32,7 @@ export class MigrationExecutorService {
     private readonly config: ConfigService,
     private readonly encryption: MigrationEncryptionService,
     private readonly progressGateway: MigrationProgressGateway,
+    private readonly notificationService: NotificationService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -112,6 +115,18 @@ export class MigrationExecutorService {
       this.logger.log(
         `[migration.execute] [end] runId=${runId} durationMs=${durationMs} matchedBooks=${planned.plan.matchedBooks.length} unresolvedBooks=${planned.plan.unresolvedBooks.length} - migration execution completed`,
       );
+
+      if (run.triggeredByUserId) {
+        this.notificationService
+          .notify({
+            type: NotificationType.MigrationCompleted,
+            title: 'Migration completed',
+            message: `Matched ${planned.plan.matchedBooks.length} books, ${planned.plan.unresolvedBooks.length} unresolved`,
+            scope: { kind: 'user', userId: run.triggeredByUserId },
+            meta: { runId, matchedBooks: planned.plan.matchedBooks.length, unresolvedBooks: planned.plan.unresolvedBooks.length },
+          })
+          .catch(() => {});
+      }
     } catch (error) {
       const durationMs = Date.now() - startMs;
       if (error instanceof RunInterruptedError) {
@@ -128,6 +143,18 @@ export class MigrationExecutorService {
       );
       const failedStage = await this.failRun(runId, message);
       await this.emitRunProgress(runId, 'failed', failedStage);
+
+      if (run.triggeredByUserId) {
+        this.notificationService
+          .notify({
+            type: NotificationType.MigrationFailed,
+            title: 'Migration failed',
+            message: message.slice(0, 200),
+            scope: { kind: 'user', userId: run.triggeredByUserId },
+            meta: { runId },
+          })
+          .catch(() => {});
+      }
     }
   }
 

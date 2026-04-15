@@ -411,6 +411,11 @@ describe('Authorization matrix (e2e)', () => {
           path: '/audit-log',
           token: 'allPerms',
         },
+        [Permission.NotificationAccess]: {
+          method: 'GET',
+          path: '/notifications',
+          token: 'allPerms',
+        },
       };
 
       const failures: MatrixFailure[] = [];

@@ -500,14 +500,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         >
           <input
             v-model="form.title"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('title')"
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel label="Subtitle" field="subtitle" :locked="isLocked('subtitle')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
           <input
             v-model="form.subtitle"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('subtitle')"
           />
         </MetadataFieldLabel>
@@ -515,8 +515,15 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
 
       <!-- Authors | Narrators (audio only) -->
       <div class="grid gap-3" :class="isPrimaryAudio ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'">
-        <MetadataFieldLabel label="Authors" field="authors" :locked="isLocked('authors')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
-          <ChipInput v-model="form.authors" :search-fn="searchAuthors" :disabled="isLocked('authors')" control-class="pr-10" />
+        <MetadataFieldLabel
+          label="Authors"
+          field="authors"
+          :locked="isLocked('authors')"
+          :is-updating="isUpdatingLock"
+          multiline
+          @toggle="handleLockToggle"
+        >
+          <ChipInput v-model="form.authors" :search-fn="searchAuthors" :disabled="isLocked('authors')" control-class="pr-12" />
         </MetadataFieldLabel>
         <MetadataFieldLabel
           v-if="isPrimaryAudio"
@@ -524,15 +531,23 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           field="narrators"
           :locked="isLocked('narrators')"
           :is-updating="isUpdatingLock"
+          multiline
           @toggle="handleLockToggle"
         >
-          <ChipInput v-model="form.narrators" :search-fn="searchNarrators" :disabled="isLocked('narrators')" control-class="pr-10" />
+          <ChipInput v-model="form.narrators" :search-fn="searchNarrators" :disabled="isLocked('narrators')" control-class="pr-12" />
         </MetadataFieldLabel>
       </div>
 
       <!-- Genres -->
-      <MetadataFieldLabel label="Genres" field="genres" :locked="isLocked('genres')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
-        <ChipInput v-model="form.genres" :search-fn="searchGenres" :disabled="isLocked('genres')" control-class="pr-10" />
+      <MetadataFieldLabel
+        label="Genres"
+        field="genres"
+        :locked="isLocked('genres')"
+        :is-updating="isUpdatingLock"
+        multiline
+        @toggle="handleLockToggle"
+      >
+        <ChipInput v-model="form.genres" :search-fn="searchGenres" :disabled="isLocked('genres')" control-class="pr-12" />
       </MetadataFieldLabel>
 
       <!-- Tags | Rating -->
@@ -543,9 +558,10 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           field="tags"
           :locked="isLocked('tags')"
           :is-updating="isUpdatingLock"
+          multiline
           @toggle="handleLockToggle"
         >
-          <ChipInput v-model="form.tags" :search-fn="searchTags" :disabled="isLocked('tags')" control-class="pr-10" />
+          <ChipInput v-model="form.tags" :search-fn="searchTags" :disabled="isLocked('tags')" control-class="pr-12" />
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="w-full sm:w-auto sm:shrink-0"
@@ -556,7 +572,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           @toggle="handleLockToggle"
         >
           <div
-            class="flex h-8 items-center gap-0.5 rounded-lg border border-input bg-background px-2 py-2 pr-10"
+            class="flex h-8 items-center gap-0.5 rounded-lg border border-input bg-background px-2 py-2 pr-12"
             :class="isLocked('rating') ? 'opacity-50 cursor-not-allowed' : ''"
             @mouseleave="hoverRating = null"
           >
@@ -602,7 +618,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         >
           <input
             v-model="form.seriesName"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('seriesName')"
           />
         </MetadataFieldLabel>
@@ -619,7 +635,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             type="number"
             step="0.1"
             min="0"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('seriesIndex')"
             @input="setFloatField('seriesIndex', $event)"
           />
@@ -634,7 +650,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         >
           <input
             v-model="form.publisher"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('publisher')"
           />
         </MetadataFieldLabel>
@@ -652,7 +668,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         >
           <input
             v-model="form.language"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             maxlength="10"
             :disabled="isLocked('language')"
           />
@@ -670,7 +686,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             type="number"
             min="1"
             max="2100"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('publishedYear')"
             @input="setIntField('publishedYear', $event)"
           />
@@ -687,7 +703,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             :value="form.pageCount ?? ''"
             type="number"
             min="1"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('pageCount')"
             @input="setIntField('pageCount', $event)"
           />
@@ -702,7 +718,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         >
           <input
             v-model="form.isbn13"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             maxlength="13"
             :disabled="isLocked('isbn13')"
           />
@@ -717,7 +733,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         >
           <input
             v-model="form.isbn10"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             maxlength="10"
             :disabled="isLocked('isbn10')"
           />
@@ -735,7 +751,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             :value="form.durationSeconds ?? ''"
             type="number"
             min="1"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="isLocked('durationSeconds')"
             @input="setIntField('durationSeconds', $event)"
           />
@@ -750,7 +766,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           @toggle="handleLockToggle"
         >
           <div
-            class="flex h-8 items-center rounded-lg border border-input bg-background px-3 pr-10"
+            class="flex h-8 items-center rounded-lg border border-input bg-background px-3 pr-12"
             :class="isLocked('abridged') ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <input
@@ -781,7 +797,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               <MetadataFieldLabel :label="label" :field="field" :locked="isLocked(field)" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
                 <input
                   v-model="form[field]"
-                  class="w-full h-8 rounded-md border border-input bg-background px-2.5 pr-10 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-full h-8 rounded-md border border-input bg-background px-2.5 pr-12 text-xs font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                   :disabled="isLocked(field)"
                 />
               </MetadataFieldLabel>
@@ -812,7 +828,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             >
               <input
                 v-model="form.comicIssueNumber"
-                class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="isLocked('comicIssueNumber')"
               />
             </MetadataFieldLabel>
@@ -825,7 +841,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             >
               <input
                 v-model="form.comicVolumeName"
-                class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="isLocked('comicVolumeName')"
               />
             </MetadataFieldLabel>
@@ -836,9 +852,10 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             field="comicStoryArcs"
             :locked="isLocked('comicStoryArcs')"
             :is-updating="isUpdatingLock"
+            multiline
             @toggle="handleLockToggle"
           >
-            <ChipInput v-model="form.comicStoryArcs" :search-fn="searchComicMetadata" :disabled="isLocked('comicStoryArcs')" control-class="pr-10" />
+            <ChipInput v-model="form.comicStoryArcs" :search-fn="searchComicMetadata" :disabled="isLocked('comicStoryArcs')" control-class="pr-12" />
           </MetadataFieldLabel>
           <!-- Pencillers | Inkers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -847,13 +864,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               field="comicPencillers"
               :locked="isLocked('comicPencillers')"
               :is-updating="isUpdatingLock"
+              multiline
               @toggle="handleLockToggle"
             >
               <ChipInput
                 v-model="form.comicPencillers"
                 :search-fn="searchComicMetadata"
                 :disabled="isLocked('comicPencillers')"
-                control-class="pr-10"
+                control-class="pr-12"
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
@@ -861,9 +879,10 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               field="comicInkers"
               :locked="isLocked('comicInkers')"
               :is-updating="isUpdatingLock"
+              multiline
               @toggle="handleLockToggle"
             >
-              <ChipInput v-model="form.comicInkers" :search-fn="searchComicMetadata" :disabled="isLocked('comicInkers')" control-class="pr-10" />
+              <ChipInput v-model="form.comicInkers" :search-fn="searchComicMetadata" :disabled="isLocked('comicInkers')" control-class="pr-12" />
             </MetadataFieldLabel>
           </div>
           <!-- Colorists | Letterers -->
@@ -873,13 +892,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               field="comicColorists"
               :locked="isLocked('comicColorists')"
               :is-updating="isUpdatingLock"
+              multiline
               @toggle="handleLockToggle"
             >
               <ChipInput
                 v-model="form.comicColorists"
                 :search-fn="searchComicMetadata"
                 :disabled="isLocked('comicColorists')"
-                control-class="pr-10"
+                control-class="pr-12"
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
@@ -887,13 +907,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               field="comicLetterers"
               :locked="isLocked('comicLetterers')"
               :is-updating="isUpdatingLock"
+              multiline
               @toggle="handleLockToggle"
             >
               <ChipInput
                 v-model="form.comicLetterers"
                 :search-fn="searchComicMetadata"
                 :disabled="isLocked('comicLetterers')"
-                control-class="pr-10"
+                control-class="pr-12"
               />
             </MetadataFieldLabel>
           </div>
@@ -903,13 +924,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             field="comicCoverArtists"
             :locked="isLocked('comicCoverArtists')"
             :is-updating="isUpdatingLock"
+            multiline
             @toggle="handleLockToggle"
           >
             <ChipInput
               v-model="form.comicCoverArtists"
               :search-fn="searchComicMetadata"
               :disabled="isLocked('comicCoverArtists')"
-              control-class="pr-10"
+              control-class="pr-12"
             />
           </MetadataFieldLabel>
           <!-- Characters | Teams -->
@@ -919,13 +941,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               field="comicCharacters"
               :locked="isLocked('comicCharacters')"
               :is-updating="isUpdatingLock"
+              multiline
               @toggle="handleLockToggle"
             >
               <ChipInput
                 v-model="form.comicCharacters"
                 :search-fn="searchComicMetadata"
                 :disabled="isLocked('comicCharacters')"
-                control-class="pr-10"
+                control-class="pr-12"
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
@@ -933,9 +956,10 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               field="comicTeams"
               :locked="isLocked('comicTeams')"
               :is-updating="isUpdatingLock"
+              multiline
               @toggle="handleLockToggle"
             >
-              <ChipInput v-model="form.comicTeams" :search-fn="searchComicMetadata" :disabled="isLocked('comicTeams')" control-class="pr-10" />
+              <ChipInput v-model="form.comicTeams" :search-fn="searchComicMetadata" :disabled="isLocked('comicTeams')" control-class="pr-12" />
             </MetadataFieldLabel>
           </div>
           <!-- Locations -->
@@ -944,9 +968,10 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             field="comicLocations"
             :locked="isLocked('comicLocations')"
             :is-updating="isUpdatingLock"
+            multiline
             @toggle="handleLockToggle"
           >
-            <ChipInput v-model="form.comicLocations" :search-fn="searchComicMetadata" :disabled="isLocked('comicLocations')" control-class="pr-10" />
+            <ChipInput v-model="form.comicLocations" :search-fn="searchComicMetadata" :disabled="isLocked('comicLocations')" control-class="pr-12" />
           </MetadataFieldLabel>
         </div>
       </div>
@@ -963,13 +988,15 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         <textarea
           v-model="form.description"
           rows="6"
-          class="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 pr-10 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="isLocked('description')"
         />
       </MetadataFieldLabel>
 
       <!-- Mobile: sticky Save/Cancel bar -->
-      <div class="lg:hidden sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex gap-2">
+      <div
+        class="lg:hidden sticky bottom-0 z-20 bg-background/95 backdrop-blur-sm border-t border-border -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex gap-2"
+      >
         <button
           class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
           :disabled="!isDirty || saving"

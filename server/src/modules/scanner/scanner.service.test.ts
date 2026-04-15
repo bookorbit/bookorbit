@@ -131,7 +131,13 @@ const mockMetadata = {
 
 function makeService(repo: ReturnType<typeof makeRepo>) {
   const jobStore = new ScanJobStore();
-  const service = new ScannerService(repo as any, mockMetadata as any, jobStore, mockGateway as any);
+  const service = new ScannerService(
+    repo as any,
+    mockMetadata as any,
+    jobStore,
+    mockGateway as any,
+    { notify: vi.fn().mockResolvedValue(undefined) } as any,
+  );
   return { service, jobStore };
 }
 

@@ -55,6 +55,8 @@ const sections = computed<Section[]>(() => {
 
   result.push({ label: 'Account', routeName: 'settings-account' })
 
+  result.push({ label: 'Notifications', routeName: 'settings-notifications' })
+
   if (su) {
     result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
   }

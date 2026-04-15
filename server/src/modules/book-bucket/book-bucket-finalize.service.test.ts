@@ -69,6 +69,7 @@ function makeService() {
     processor as never,
     events as never,
     gateway as never,
+    { notify: vi.fn().mockResolvedValue(undefined) } as never,
   );
 
   return { service, db, repo, libraryService, appSettings, metadataService, validator, storage, processor, events, gateway };

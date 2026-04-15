@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import type { BookMetadataFetchReason, MetadataField } from '@projectx/types';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey, NotificationType } from '@projectx/types';
+import { NotificationService } from '../notification/notification.service';
 import { BookReadService } from '../book/book-read.service';
 import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -37,6 +38,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     private readonly bookMetadataLockService: BookMetadataLockService,
     private readonly session: BookMetadataFetchSessionService,
     private readonly throttleTracker: ProviderThrottleTracker,
+    private readonly notificationService: NotificationService,
     @Optional() private readonly gateway?: BookMetadataFetchGateway,
   ) {}
 
@@ -404,6 +406,19 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   private async checkAndResetSession(): Promise<void> {
     const summary = await this.queueRepo.getStatusSummary();
     if (summary.queued === 0 && summary.processing === 0) {
+      const snapshot = this.session.getSnapshot();
+      if (snapshot.sessionTotal > 0) {
+        const hasFailed = summary.failed > 0;
+        this.notificationService
+          .notify({
+            type: hasFailed ? NotificationType.MetadataFetchFailed : NotificationType.MetadataFetchCompleted,
+            title: hasFailed ? 'Metadata fetch completed with errors' : 'Metadata fetch completed',
+            message: `Processed ${snapshot.sessionDone} of ${snapshot.sessionTotal} books` + (hasFailed ? `, ${summary.failed} failed` : ''),
+            scope: { kind: 'all' },
+            meta: { sessionTotal: snapshot.sessionTotal, sessionDone: snapshot.sessionDone, failed: summary.failed },
+          })
+          .catch(() => {});
+      }
       this.session.reset();
     }
   }

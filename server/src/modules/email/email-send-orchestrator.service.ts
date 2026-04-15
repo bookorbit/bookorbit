@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createReadStream } from 'fs';
 
+import { NotificationType } from '@projectx/types';
 import type { BookFile } from '../../db/schema';
 import type { RequestUser } from '../../common/types/request-user';
+import { NotificationService } from '../notification/notification.service';
 import { EmailBookAccessService } from './email-book-access.service';
 import { EmailFileSelector } from './email-file-selector';
 import { EmailPreferencesService } from './email-preferences.service';
@@ -19,6 +21,7 @@ import type { SendBookDto } from './dto/send-book.dto';
 
 interface SendTask {
   bookId: number;
+  userId: number;
   recipientId: number;
   recipientEmail: string;
   recipientName: string;
@@ -47,6 +50,7 @@ export class EmailSendOrchestrator {
     private readonly preferencesService: EmailPreferencesService,
     private readonly sendLogService: EmailSendLogService,
     private readonly transportService: EmailTransportService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async send(dto: SendBookDto, user: RequestUser): Promise<{ queued: number }> {
@@ -68,7 +72,7 @@ export class EmailSendOrchestrator {
       let queued = 0;
       for (const task of tasks) {
         for (const bookId of dto.bookIds) {
-          await this.enqueueOne({ ...task, bookId }, resolved, dto.fileId ?? null, user);
+          await this.enqueueOne({ ...task, bookId, userId: user.id }, resolved, dto.fileId ?? null, user);
           queued++;
         }
       }
@@ -115,6 +119,7 @@ export class EmailSendOrchestrator {
 
       const task: SendTask = {
         bookId: logEntry.bookId,
+        userId: user.id,
         recipientId: 0,
         recipientEmail: logEntry.toEmail,
         recipientName: logEntry.toName ?? '',
@@ -154,6 +159,7 @@ export class EmailSendOrchestrator {
       await this.enqueueOne(
         {
           bookId,
+          userId: user.id,
           recipientId: recipient.id,
           recipientEmail: recipient.email,
           recipientName: recipient.name,
@@ -178,7 +184,7 @@ export class EmailSendOrchestrator {
     }
   }
 
-  private async buildTasks(dto: SendBookDto, user: RequestUser, defaultTemplateId: number | null): Promise<Omit<SendTask, 'bookId'>[]> {
+  private async buildTasks(dto: SendBookDto, user: RequestUser, defaultTemplateId: number | null): Promise<Omit<SendTask, 'bookId' | 'userId'>[]> {
     const recipientIds = new Set<number>(dto.recipientIds ?? []);
 
     if (dto.groupIds?.length) {
@@ -257,6 +263,16 @@ export class EmailSendOrchestrator {
       });
 
       await this.sendLogService.markSent(logId);
+
+      this.notificationService
+        .notify({
+          type: NotificationType.EmailSent,
+          title: 'Email sent successfully',
+          message: `Sent to ${task.recipientEmail}`,
+          scope: { kind: 'user', userId: task.userId },
+          meta: { logId, bookId: task.bookId, recipientEmail: task.recipientEmail },
+        })
+        .catch(() => {});
     } catch (error) {
       const errorClass = this.getErrorClass(error);
       const errorMessage = this.getErrorMessage(error);
@@ -277,6 +293,16 @@ export class EmailSendOrchestrator {
         this.logger.error(
           `[${EMAIL_DISPATCH_EVENT}] [fail] logId=${logId} toEmail=${task.recipientEmail} attempt=${attempt} willRetry=false errorClass=${errorClass} error="${errorMessage}" - dispatch failed`,
         );
+
+        this.notificationService
+          .notify({
+            type: NotificationType.EmailFailed,
+            title: 'Email delivery failed',
+            message: `Failed to send to ${task.recipientEmail}`,
+            scope: { kind: 'user', userId: task.userId },
+            meta: { logId, bookId: task.bookId, recipientEmail: task.recipientEmail },
+          })
+          .catch(() => {});
       }
     }
   }

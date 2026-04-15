@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 import { ScannerModule } from '../scanner/scanner.module';
 import { MigrationController } from './migration.controller';
 import { MigrationProgressGateway } from './migration-progress.gateway';
@@ -28,6 +29,7 @@ import { MigrationReportingService } from './reporting/migration-reporting.servi
 @Module({
   imports: [
     AuthModule,
+    forwardRef(() => NotificationModule),
     ScannerModule,
     JwtModule.registerAsync({
       inject: [ConfigService],

@@ -5,7 +5,8 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { BookBucketAutoFinalizeMetadataMode, BookBucketFinalizeFileResult, BookBucketFinalizeResult, BookBucketMetadata } from '@projectx/types';
-import { resolveUploadPath } from '@projectx/types';
+import { NotificationType, resolveUploadPath } from '@projectx/types';
+import { NotificationService } from '../notification/notification.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, books, libraries, libraryFolders } from '../../db/schema';
@@ -56,6 +57,7 @@ export class BookBucketFinalizeService implements OnModuleInit {
     private readonly processor: UploadProcessorService,
     private readonly events: BookBucketEventsService,
     private readonly gateway: BookBucketGateway,
+    private readonly notificationService: NotificationService,
   ) {}
 
   onModuleInit() {
@@ -136,6 +138,16 @@ export class BookBucketFinalizeService implements OnModuleInit {
     }
 
     await this.emitSummary();
+
+    this.notificationService
+      .notify({
+        type: NotificationType.BookBucketFinalized,
+        title: 'Book Bucket finalization completed',
+        message: `${succeeded} succeeded, ${failed} failed`,
+        scope: { kind: 'user', userId },
+        meta: { total: results.length, succeeded, failed },
+      })
+      .catch(() => {});
 
     return { total: results.length, succeeded, failed, results };
   }
@@ -244,6 +256,16 @@ export class BookBucketFinalizeService implements OnModuleInit {
     if (result.success) {
       this.logger.log(`Auto-finalized Book Bucket file ${fileId} -> book ${result.bookId} (confidence ${row.confidence}%)`);
       await this.emitSummary();
+
+      this.notificationService
+        .notify({
+          type: NotificationType.BookBucketFinalized,
+          title: 'Book auto-finalized',
+          message: `"${row.fileName}" was added to your library`,
+          scope: row.uploadedBy ? { kind: 'user', userId: row.uploadedBy } : { kind: 'all' },
+          meta: { fileId, bookId: result.bookId },
+        })
+        .catch(() => {});
     } else {
       this.logger.warn(`Auto-finalize skipped for Book Bucket file ${fileId}: ${result.message}`);
     }

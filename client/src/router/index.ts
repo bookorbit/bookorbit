@@ -61,6 +61,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: 'Account' },
           },
           {
+            path: 'notifications',
+            name: 'settings-notifications',
+            component: () => import('@/features/notifications/components/NotificationPreferences.vue'),
+            meta: { title: 'Notifications' },
+          },
+          {
             path: 'libraries',
             name: 'settings-libraries',
             component: () => import('@/features/settings/LibrariesSettings.vue'),

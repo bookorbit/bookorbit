@@ -25,6 +25,7 @@ function makeExecutorService() {
     config as never,
     encryption as never,
     progressGateway as never,
+    { notify: vi.fn().mockResolvedValue(undefined) } as never,
   );
 
   return { service, repo, sharedOverlays, covers, userState, progressGateway };

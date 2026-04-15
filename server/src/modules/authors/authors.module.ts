@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
@@ -8,6 +8,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { NotificationModule } from '../notification/notification.module';
 import { AuthorImageStorageService } from './author-image-storage.service';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
@@ -32,6 +33,7 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider];
     LibraryModule,
     AppSettingsModule,
     MetadataModule,
+    forwardRef(() => NotificationModule),
     AuthModule,
     JwtModule.registerAsync({
       inject: [ConfigService],

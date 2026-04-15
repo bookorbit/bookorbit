@@ -9,6 +9,7 @@
    - Dark mode overrides lightness + slightly raises --tint-c.
 ────────────────────────────────────────────────────────────── */
 :root {
+  color-scheme: light;
   /* Tint controls — warm amber base */
   --tint-h: 80;
   --tint-c: 0.006;
@@ -70,9 +71,13 @@
   --radius: 0.625rem;
 
   --dot-color: oklch(0.82 var(--tint-c-surface) var(--tint-h));
+
+  --scrollbar-thumb: oklch(0.8 var(--tint-c) var(--tint-h));
+  --scrollbar-thumb-hover: oklch(0.7 var(--tint-c) var(--tint-h));
 }
 
 .dark {
+  color-scheme: dark;
   --tint-c: 0.0175;
   --tint-c-surface: var(--tint-c);
   --bg-lift: 0;
@@ -129,4 +134,7 @@
   --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.7);
 
   --dot-color: oklch(calc(0.3 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
+
+  --scrollbar-thumb: oklch(0.35 var(--tint-c) var(--tint-h));
+  --scrollbar-thumb-hover: oklch(0.45 var(--tint-c) var(--tint-h));
 }

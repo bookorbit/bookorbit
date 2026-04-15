@@ -18,6 +18,16 @@ export class CleanupService implements OnApplicationBootstrap {
     await this.cleanup();
   }
 
+  private async hasNotificationsTable(): Promise<boolean> {
+    const result = await this.db.execute<{ table_name: string }>(sql`
+      select table_name
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = 'notifications'
+    `);
+    return result.rows.length === 1;
+  }
+
   private async hasAuthStateTables(): Promise<boolean> {
     const result = await this.db.execute<{ table_name: string }>(sql`
       select table_name
@@ -53,8 +63,15 @@ export class CleanupService implements OnApplicationBootstrap {
         .delete(schema.oidcSessions)
         .where(or(lt(schema.oidcSessions.expiresAt, now), eq(schema.oidcSessions.revoked, true)));
 
+      let notificationCount = 0;
+      if (await this.hasNotificationsTable()) {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const { rowCount } = await this.db.delete(schema.notifications).where(lt(schema.notifications.createdAt, thirtyDaysAgo));
+        notificationCount = rowCount ?? 0;
+      }
+
       this.logger.log(
-        `[${event}] [end] refreshDeleted=${refreshCount ?? 0} resetDeleted=${resetCount ?? 0} oidcDeleted=${oidcCount ?? 0} durationMs=${Date.now() - startedAt} - auth state cleanup completed`,
+        `[${event}] [end] refreshDeleted=${refreshCount ?? 0} resetDeleted=${resetCount ?? 0} oidcDeleted=${oidcCount ?? 0} notificationsDeleted=${notificationCount} durationMs=${Date.now() - startedAt} - auth state cleanup completed`,
       );
     } catch (error) {
       const { errorClass, errorMessage } = getSanitizedErrorInfo(error);

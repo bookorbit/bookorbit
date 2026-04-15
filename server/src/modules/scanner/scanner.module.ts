@@ -6,6 +6,7 @@ import type { StringValue } from 'ms';
 import { AuthModule } from '../auth/auth.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { NotificationModule } from '../notification/notification.module';
 import { FileEventProcessorService } from './file-event-processor.service';
 import { FileWatcherService } from './file-watcher.service';
 import { ScanGateway } from './scan.gateway';
@@ -18,6 +19,7 @@ import { ScannerService } from './scanner.service';
   imports: [
     MetadataModule,
     AuthModule,
+    forwardRef(() => NotificationModule),
     forwardRef(() => BookMetadataFetchModule),
     JwtModule.registerAsync({
       inject: [ConfigService],

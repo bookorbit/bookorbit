@@ -20,6 +20,7 @@ export interface UserSettings {
   onboarding?: {
     tourCompleted?: boolean;
   };
+  notificationPreferences?: import("./notification").NotificationPreferences;
 }
 
 export interface AuthUser {

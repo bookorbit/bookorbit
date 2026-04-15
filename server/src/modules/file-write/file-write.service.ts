@@ -4,7 +4,9 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
 import type { WriteResult } from '@projectx/types';
+import { NotificationType } from '@projectx/types';
 import { bookCoverDirPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
+import { NotificationService } from '../notification/notification.service';
 import { FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
@@ -34,6 +36,7 @@ export class FileWriteService implements OnModuleDestroy {
     private readonly registry: FormatWriterRegistry,
     private readonly lockService: FileLockService,
     private readonly config: ConfigService,
+    private readonly notificationService: NotificationService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_WRITE_DEBOUNCE_MS);
@@ -178,12 +181,37 @@ export class FileWriteService implements OnModuleDestroy {
         result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason };
         this.logWriteFail(bookId, format, triggeredBy, userId, dryRun, startedAt, error);
         await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+
+        if (userId && triggeredBy === 'sync') {
+          this.notificationService
+            .notify({
+              type: NotificationType.FileWriteBackFailed,
+              title: 'File write-back failed',
+              message: reason.slice(0, 200),
+              scope: { kind: 'user', userId },
+              meta: { bookId },
+            })
+            .catch(() => {});
+        }
+
         return result;
       }
 
       await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
       if (result.status === 'success') {
         await this.fileWriteRepo.setLastWrittenAt(bookId, new Date());
+
+        if (userId && triggeredBy === 'sync') {
+          this.notificationService
+            .notify({
+              type: NotificationType.FileWriteBackCompleted,
+              title: 'File metadata updated',
+              message: `Updated ${result.fieldsWritten.length} fields`,
+              scope: { kind: 'user', userId },
+              meta: { bookId, fieldsWritten: result.fieldsWritten },
+            })
+            .catch(() => {});
+        }
       }
       this.logWriteEnd(bookId, format, triggeredBy, userId, dryRun, startedAt, result);
       return result;

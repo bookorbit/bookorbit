@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
+import { NotificationModule } from '../notification/notification.module';
 import { FileLockService } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteService } from './file-write.service';
@@ -11,6 +12,7 @@ import { CbzFormatWriter } from './formats/cbx/cbz-format-writer';
 import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
 
 @Module({
+  imports: [forwardRef(() => NotificationModule)],
   providers: [
     FileWriteService,
     FileWriteRepository,

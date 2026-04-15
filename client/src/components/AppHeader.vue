@@ -31,6 +31,8 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useBookBucketSummary } from '@/features/book-bucket/composables/useBookBucketSummary'
+import NotificationSheet from '@/features/notifications/components/NotificationSheet.vue'
+import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types'
 import { useThemeStore } from '@/stores/theme'
@@ -42,6 +44,7 @@ const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 const { summary: bookBucketSummary, fetchSummary: fetchBookBucketSummary, subscribe: subscribeBookBucketSummary } = useBookBucketSummary()
+const { subscribe: subscribeNotifications } = useNotifications()
 const themeStore = useThemeStore()
 
 const isBookBucketActive = computed(() => route.name === 'book-bucket')
@@ -151,6 +154,9 @@ onMounted(() => {
   if (hasPermission('book_bucket_access')) {
     fetchBookBucketSummary()
     subscribeBookBucketSummary()
+  }
+  if (hasPermission('notification_access')) {
+    subscribeNotifications()
   }
 })
 
@@ -433,6 +439,11 @@ function formatBadgeClass(fmt: string): string {
           <TooltipContent>Search</TooltipContent>
         </Tooltip>
 
+        <!-- Mobile: Notifications bell -->
+        <div class="md:hidden">
+          <NotificationSheet v-if="hasPermission('notification_access')" :icon-radius-class="iconRadiusClass" />
+        </div>
+
         <!-- Mobile: Kebab Menu -->
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
@@ -532,6 +543,9 @@ function formatBadgeClass(fmt: string): string {
             </TooltipTrigger>
             <TooltipContent>Book Bucket</TooltipContent>
           </Tooltip>
+
+          <!-- Notifications button -->
+          <NotificationSheet v-if="hasPermission('notification_access')" :icon-radius-class="iconRadiusClass" />
 
           <!-- Statistics button -->
           <Tooltip>

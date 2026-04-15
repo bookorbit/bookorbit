@@ -9,6 +9,7 @@ import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
+import { NotificationModule } from '../notification/notification.module';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchController } from './book-metadata-fetch.controller';
 import { BookMetadataFetchEligibilityService } from './book-metadata-fetch-eligibility.service';
@@ -24,6 +25,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
     MetadataModule,
     MetadataFetchModule,
     MetadataScoreModule,
+    forwardRef(() => NotificationModule),
     AuthModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
