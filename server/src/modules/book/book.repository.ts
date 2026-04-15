@@ -31,6 +31,7 @@ import {
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 type MetadataUpdateExecutor = Pick<Db, 'update'>;
+type MetadataReadExecutor = Pick<Db, 'select'>;
 type PatternMetadataRow = {
   bookId: number;
   title: string | null;
@@ -70,6 +71,7 @@ export class BookRepository {
           language: bookMetadata.language,
           rating: bookMetadata.rating,
           coverSource: bookMetadata.coverSource,
+          lockedFields: bookMetadata.lockedFields,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -480,6 +482,27 @@ export class BookRepository {
 
   async deleteByIds(bookIds: number[]): Promise<void> {
     await this.db.delete(books).where(inArray(books.id, bookIds));
+  }
+
+  async bulkSetRating(bookIds: number[], rating: number | null): Promise<void> {
+    if (bookIds.length === 0) return;
+    await this.db.update(bookMetadata).set({ rating, updatedAt: new Date() }).where(inArray(bookMetadata.bookId, bookIds));
+  }
+
+  async findTagsByBookIds(bookIds: number[], executor: MetadataReadExecutor = this.db): Promise<Map<number, string[]>> {
+    if (bookIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ bookId: bookTags.bookId, name: tags.name })
+      .from(bookTags)
+      .innerJoin(tags, eq(bookTags.tagId, tags.id))
+      .where(inArray(bookTags.bookId, bookIds));
+    const result = new Map<number, string[]>();
+    for (const row of rows) {
+      const existing = result.get(row.bookId) ?? [];
+      existing.push(row.name);
+      result.set(row.bookId, existing);
+    }
+    return result;
   }
 
   async updateMetadataFields(

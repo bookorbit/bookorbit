@@ -11,8 +11,9 @@ import {
   Download,
   ExternalLink,
   FolderPlus,
-  Headphones,
   Image,
+  Lock,
+  LockOpen,
   Loader2,
   MoreVertical,
   PanelRight,
@@ -63,11 +64,6 @@ const emit = defineEmits<{
 const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
-const seriesLine = computed(() => {
-  if (!props.book.seriesName) return null
-  const idx = props.book.seriesIndex
-  return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
-})
 
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
@@ -111,17 +107,12 @@ const { cardOverlays } = useDisplaySettings()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const showSendDialog = ref(false)
 
-const showSeriesOverlay = computed(() => cardOverlays.value.includes('series') && seriesLine.value != null)
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
-const showProgressPill = computed(() => cardOverlays.value.includes('progress-pill') && hasProgress.value)
 const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && primaryFile.value?.format != null)
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
-const showNewOverlay = computed(() => {
-  if (!cardOverlays.value.includes('new')) return false
-  const addedAt = new Date(props.book.addedAt)
-  return Date.now() - addedAt.getTime() < 7 * 24 * 60 * 60 * 1000
-})
+const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
+const metadataLocked = computed(() => props.book.hasMetadataLocks)
 
 const ratingColor = computed(() => {
   const r = Math.round(props.book.rating ?? 0)
@@ -276,56 +267,32 @@ async function handleSetStatus(status: ReadStatus) {
       <!-- Skeleton shimmer while a known-cover loads -->
       <div v-if="book.hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
 
-      <!-- Series badge -->
-      <div v-if="showSeriesOverlay" class="absolute top-1.5 left-1.5 right-1.5 z-10 pointer-events-none">
-        <span
-          class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-black/60 line-clamp-1"
-          :style="{ color: coverStyle.color }"
-        >
-          {{ seriesLine }}
-        </span>
-      </div>
-
-      <!-- "New" dot - top-right accent indicator -->
-      <div v-if="showNewOverlay && !isMissing" class="absolute top-1.5 right-1.5 z-10 size-2 rounded-full bg-primary shadow-sm pointer-events-none" />
-
-      <!-- Read status icon - top-left -->
+      <!-- Top-left overlay: read status -->
       <div
         v-if="showReadBadge && !isMissing"
-        class="absolute top-1.5 left-1.5 z-10 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
+        class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
       >
-        <component
-          :is="STATUS_ICONS[localReadStatus!]"
-          :size="14"
-          :class="[STATUS_COLORS[localReadStatus!], 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]']"
-        />
+        <component :is="STATUS_ICONS[localReadStatus!]" :size="12" :class="STATUS_COLORS[localReadStatus!]" />
       </div>
 
-      <!-- Bottom-left overlays: rating dots + progress pill -->
+      <!-- Top-right overlay: lock status -->
       <div
-        v-if="(showRatingOverlay || showProgressPill) && !selectionMode"
-        class="absolute bottom-1.5 left-1.5 z-10 flex flex-col gap-0.5 items-start pointer-events-none"
+        v-if="showLockStatusPill"
+        class="absolute top-1.5 right-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
       >
-        <div v-if="showProgressPill">
-          <span
-            v-if="book.readingProgress === 100"
-            class="flex items-center gap-0.5 text-[8px] font-semibold px-1.5 py-0.5 rounded bg-green-600/90 text-white"
-          >
-            <Check :size="8" />
-          </span>
-          <span v-else class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60" :style="{ color: coverStyle.color }">
-            {{ Math.floor(book.readingProgress!) }}%
-          </span>
-        </div>
-        <div v-if="showRatingOverlay" class="relative flex items-center justify-center size-5 group-hover:opacity-0 transition-opacity duration-150">
-          <Star class="size-5" :style="{ fill: ratingColor, color: ratingColor }" />
-          <span class="absolute text-[7px] font-black text-white leading-none" style="margin-top: 1px">
-            {{ Math.round(book.rating!) }}
-          </span>
-        </div>
+        <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
       </div>
 
-      <!-- Format badge - bottom-right -->
+      <!-- Bottom-left overlay: rating -->
+      <div
+        v-if="showRatingOverlay && !selectionMode"
+        class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-0.5 bg-black/60 rounded-full px-1.5 py-0.5 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
+      >
+        <Star class="size-3" :style="{ fill: ratingColor, color: ratingColor }" />
+        <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
+      </div>
+
+      <!-- Bottom-right overlay: format badge -->
       <div
         v-if="showFormatOverlay && !selectionMode"
         class="absolute bottom-1.5 right-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
@@ -335,16 +302,6 @@ async function handleSetStatus(status: ReadStatus) {
           :style="{ backgroundColor: getFormatColor(primaryFile!.format!) + 'cc' }"
         >
           {{ primaryFile!.format!.toUpperCase() }}
-        </span>
-      </div>
-
-      <!-- Audiobook badge - bottom-left, distinct from series/read-status badges at top-left -->
-      <div
-        v-if="isAudiobook && !selectionMode"
-        class="absolute bottom-5 left-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
-      >
-        <span class="flex items-center gap-0.5 bg-black/60 text-white rounded px-1.5 py-0.5">
-          <Headphones class="size-2.5" />
         </span>
       </div>
 

@@ -21,13 +21,11 @@ const {
 } = useDisplaySettings()
 
 const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
-  { key: 'series', label: 'Series name', hint: 'Series title and index badge at top-left' },
   { key: 'progress-bar', label: 'Progress bar', hint: 'Thin colored line along the bottom edge' },
-  { key: 'progress-pill', label: 'Progress pill', hint: '% badge at bottom-left' },
   { key: 'format', label: 'File format', hint: 'Color-coded EPUB, PDF, CBZ badge at bottom-right' },
-  { key: 'rating', label: 'Rating dots', hint: '5-dot rating indicator at bottom-left' },
-  { key: 'new', label: 'New indicator', hint: 'Accent dot on books added in the last 7 days' },
-  { key: 'read-status', label: 'Read status', hint: 'Color icon showing the current reading status' },
+  { key: 'rating', label: 'Rating', hint: 'Star rating indicator at bottom-left' },
+  { key: 'read-status', label: 'Read status', hint: 'Color icon showing the current reading status at top-left' },
+  { key: 'lock-status', label: 'Lock status', hint: 'Metadata lock icon at top-right - orange when locked, green when unlocked' },
 ]
 
 const BACKGROUND_GROUPS: { label: string; ids: string[] }[] = [

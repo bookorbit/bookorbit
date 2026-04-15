@@ -1,9 +1,10 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import BookCoverCard from '../BookCoverCard.vue'
 import type { BookCard } from '@projectx/types'
 import { ref } from 'vue'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
@@ -43,6 +44,12 @@ function mountCard(book: BookCard, coverAspectRatio: '2/3' | '1/1' = '2/3') {
   })
 }
 
+const { cardOverlays } = useDisplaySettings()
+
+afterEach(() => {
+  cardOverlays.value = ['progress-bar', 'format', 'rating', 'read-status']
+})
+
 const missingBook: BookCard = {
   id: 1,
   status: 'missing',
@@ -59,6 +66,7 @@ const missingBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   hasCover: false,
+  hasMetadataLocks: false,
 }
 
 const presentBook: BookCard = {
@@ -77,6 +85,7 @@ const presentBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   hasCover: false,
+  hasMetadataLocks: false,
 }
 
 const presentBookWithCover: BookCard = {
@@ -153,6 +162,24 @@ describe('BookCoverCard — present state', () => {
   it('anchors the kebab menu button to the lower-right corner', () => {
     const wrapper = mountCard(presentBook)
     expect(wrapper.find('div.absolute.bottom-2.right-2.z-20').exists()).toBe(true)
+  })
+
+  it('renders an orange lock pill when lock-status overlay is enabled and metadata is locked', () => {
+    cardOverlays.value = ['lock-status']
+
+    const wrapper = mountCard({ ...presentBook, hasMetadataLocks: true })
+
+    expect(wrapper.find('.text-amber-400').exists()).toBe(true)
+    expect(wrapper.find('.text-emerald-400').exists()).toBe(false)
+  })
+
+  it('renders a green unlock pill when lock-status overlay is enabled and metadata is unlocked', () => {
+    cardOverlays.value = ['lock-status']
+
+    const wrapper = mountCard(presentBook)
+
+    expect(wrapper.find('.text-emerald-400').exists()).toBe(true)
+    expect(wrapper.find('.text-amber-400').exists()).toBe(false)
   })
 })
 

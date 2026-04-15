@@ -9,6 +9,7 @@ import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
@@ -81,6 +82,7 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+const bulkTagsOpen = ref(false)
 const sendBookOpen = ref(false)
 const editCollectionOpen = ref(false)
 const mobileControlsExpanded = ref(false)
@@ -94,11 +96,25 @@ const {
 } = useDeleteBook((id) => {
   books.value = books.value.filter((b) => b.id !== id)
 })
-const { handleBulkRefreshMetadata, handleBulkReExtractCover, handleExport, handleDeleteSelected } = useBookBulkActions(selectedIds, (ids) => {
-  const deleted = new Set(ids)
-  books.value = books.value.filter((b) => !deleted.has(b.id))
-  exitSelectionMode()
-})
+const {
+  inFlight,
+  handleBulkRefreshMetadata,
+  handleBulkReExtractCover,
+  handleExport,
+  handleBulkSetStatus,
+  handleBulkSetRating,
+  handleBulkUpdateTags,
+  handleBulkSetMetadataLock,
+  handleDeleteSelected,
+} = useBookBulkActions(
+  selectedIds,
+  (ids) => {
+    const deleted = new Set(ids)
+    books.value = books.value.filter((b) => !deleted.has(b.id))
+    exitSelectionMode()
+  },
+  books,
+)
 
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)
@@ -228,6 +244,7 @@ watch(
     :visible="selectionMode"
     :count="selectedCount"
     :in-collection="true"
+    :in-flight="inFlight"
     @send="sendBookOpen = true"
     @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
@@ -235,6 +252,10 @@ watch(
     @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
     @re-extract-cover="handleBulkReExtractCover"
+    @set-status="handleBulkSetStatus"
+    @set-rating="handleBulkSetRating"
+    @edit-tags="bulkTagsOpen = true"
+    @lock-metadata="handleBulkSetMetadataLock"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
@@ -245,6 +266,7 @@ watch(
     @update:open="addToCollectionOpen = $event"
     @done="exitSelectionMode"
   />
+  <BulkUpdateTagsDialog :open="bulkTagsOpen" :book-count="selectedCount" @update:open="bulkTagsOpen = $event" @confirm="handleBulkUpdateTags" />
 
   <EditCollectionDialog
     v-if="collection"

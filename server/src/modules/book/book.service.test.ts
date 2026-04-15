@@ -82,6 +82,7 @@ function makeService() {
     findLibraryIdsByBookIds: vi.fn(),
     findPrimaryFilesByBookIds: vi.fn(),
     findAllFilesByBookIds: vi.fn(),
+    findTagsByBookIds: vi.fn(),
     findPrimaryFile: vi.fn(),
     findById: vi.fn(),
     findCollectionsByBookId: vi.fn(),
@@ -95,6 +96,7 @@ function makeService() {
     upsertProgress: vi.fn(),
     findAudioProgress: vi.fn(),
     upsertAudioProgress: vi.fn(),
+    bulkSetRating: vi.fn(),
     updateMetadataFields: vi.fn(),
     withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
@@ -189,6 +191,7 @@ function makeService() {
     libraryService,
     queryBuilder,
     metadataService,
+    scoreService,
     pipeline,
     config,
     appSettings,
@@ -1487,6 +1490,51 @@ describe('BookService', () => {
       const result = await service.bulkReExtractCover([1], user, undefined, { isCancelled: () => true });
 
       expect(result).toEqual({ processed: 0, updated: 0 });
+    });
+  });
+
+  describe('bulk metadata actions', () => {
+    it('bulkSetRating updates ratings and queues file writes and score recalculation', async () => {
+      const { service, bookRepo, fileWriteService, scoreService } = makeService();
+      const user = makeUser({ id: 42 });
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      await service.bulkSetRating([3, 5], 4, user);
+
+      expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3, 5], 4);
+      expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(1, 3, 'auto', 42);
+      expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(2, 5, 'auto', 42);
+      expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(1, 3);
+      expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(2, 5);
+    });
+
+    it('bulkUpdateTags performs all tag changes in one transaction and queues follow-up work', async () => {
+      const { service, bookRepo, metadataService, fileWriteService, scoreService } = makeService();
+      const user = makeUser({ id: 11 });
+      const tx = { select: vi.fn(), delete: vi.fn(), insert: vi.fn() };
+      bookRepo.withTransaction.mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx));
+      bookRepo.findTagsByBookIds.mockResolvedValue(new Map([[7, ['existing']]]));
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      await service.bulkUpdateTags([7], 'add', ['new'], user);
+
+      expect(bookRepo.findTagsByBookIds).toHaveBeenCalledWith([7], tx);
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(7, ['existing', 'new'], { executor: tx });
+      expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(7, 'auto', 11);
+      expect(scoreService.calculateAndSave).toHaveBeenCalledWith(7);
+    });
+
+    it('bulkUpdateTags replaces tags inside the transaction executor', async () => {
+      const { service, bookRepo, metadataService } = makeService();
+      const user = makeUser();
+      const tx = { select: vi.fn(), delete: vi.fn(), insert: vi.fn() };
+      bookRepo.withTransaction.mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx));
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      await service.bulkUpdateTags([9], 'replace', ['fresh'], user);
+
+      expect(bookRepo.findTagsByBookIds).not.toHaveBeenCalled();
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(9, ['fresh'], { executor: tx });
     });
   });
 

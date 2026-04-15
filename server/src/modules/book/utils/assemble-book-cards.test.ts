@@ -13,6 +13,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
     language: null,
     rating: null,
     coverSource: null,
+    lockedFields: null,
     ...overrides,
   };
 }
@@ -138,6 +139,22 @@ describe('assembleBookCards', () => {
     const rows = [makeBookRow(1, { coverSource: 'extracted' })];
     const [card] = assembleBookCards(rows, [], [], [], []);
     expect(card.hasCover).toBe(true);
+  });
+
+  it('marks cards with metadata locks', () => {
+    const rows = [makeBookRow(1, { lockedFields: ['title'] })];
+
+    const [card] = assembleBookCards(rows, [], [], [], []);
+
+    expect(card.hasMetadataLocks).toBe(true);
+  });
+
+  it('marks cards without metadata locks as unlocked', () => {
+    const rows = [makeBookRow(1, { lockedFields: [] })];
+
+    const [card] = assembleBookCards(rows, [], [], [], []);
+
+    expect(card.hasMetadataLocks).toBe(false);
   });
 
   it('includes all optional metadata fields', () => {

@@ -9,6 +9,7 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import LensEditorPanel from '@/features/lens/components/LensEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useLens } from '@/features/lens/composables/useLens'
@@ -91,6 +92,7 @@ function toggleSelectionMode() {
 }
 
 const addToCollectionOpen = ref(false)
+const bulkTagsOpen = ref(false)
 const sendBookOpen = ref(false)
 const {
   pendingId: deleteBookId,
@@ -101,11 +103,25 @@ const {
 } = useDeleteBook((id) => {
   books.value = books.value.filter((b) => b.id !== id)
 })
-const { handleBulkRefreshMetadata, handleBulkReExtractCover, handleExport, handleDeleteSelected } = useBookBulkActions(selectedIds, (ids) => {
-  const deleted = new Set(ids)
-  books.value = books.value.filter((b) => !deleted.has(b.id))
-  exitSelectionMode()
-})
+const {
+  inFlight,
+  handleBulkRefreshMetadata,
+  handleBulkReExtractCover,
+  handleExport,
+  handleBulkSetStatus,
+  handleBulkSetRating,
+  handleBulkUpdateTags,
+  handleBulkSetMetadataLock,
+  handleDeleteSelected,
+} = useBookBulkActions(
+  selectedIds,
+  (ids) => {
+    const deleted = new Set(ids)
+    books.value = books.value.filter((b) => !deleted.has(b.id))
+    exitSelectionMode()
+  },
+  books,
+)
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
@@ -247,12 +263,17 @@ watch(
   <SelectionActionBar
     :visible="selectionMode"
     :count="selectedCount"
+    :in-flight="inFlight"
     @send="sendBookOpen = true"
     @export="handleExport"
     @add-to-collection="addToCollectionOpen = true"
     @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
     @re-extract-cover="handleBulkReExtractCover"
+    @set-status="handleBulkSetStatus"
+    @set-rating="handleBulkSetRating"
+    @edit-tags="bulkTagsOpen = true"
+    @lock-metadata="handleBulkSetMetadataLock"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
   />
@@ -263,6 +284,7 @@ watch(
     @update:open="addToCollectionOpen = $event"
     @added="exitSelectionMode"
   />
+  <BulkUpdateTagsDialog :open="bulkTagsOpen" :book-count="selectedCount" @update:open="bulkTagsOpen = $event" @confirm="handleBulkUpdateTags" />
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />

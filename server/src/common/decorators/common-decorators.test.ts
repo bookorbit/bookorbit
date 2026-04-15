@@ -39,4 +39,13 @@ describe('common decorators', () => {
     expect(Reflect.getMetadata(LIBRARY_ACCESS_KEY, DecoratedController.prototype.withLibraryAccess)).toBe('viewer');
     expect(Reflect.getMetadata(AUDITABLE_KEY, DecoratedController.prototype.audited)).toEqual(auditableOptions);
   });
+
+  it('throws when audit action is undefined at decorator creation time', () => {
+    expect(() =>
+      Auditable({
+        action: undefined as never,
+        description: 'Missing action',
+      }),
+    ).toThrow('Auditable decorator requires a defined audit action');
+  });
 });

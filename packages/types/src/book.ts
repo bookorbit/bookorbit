@@ -44,6 +44,7 @@ export type BookCard = {
   readStatus: UserBookStatus | null;
   addedAt: string;
   hasCover: boolean;
+  hasMetadataLocks: boolean;
 };
 
 export type BookDetailFile = {

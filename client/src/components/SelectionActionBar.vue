@@ -1,8 +1,31 @@
 <script setup lang="ts">
 import { computed, ref, useSlots, watch } from 'vue'
-import { Download, FolderMinus, FolderPlus, ImageDown, Mail, Pencil, RefreshCw, Trash2, X } from 'lucide-vue-next'
+import {
+  BookOpen,
+  Download,
+  FolderMinus,
+  FolderPlus,
+  ImageDown,
+  Lock,
+  Loader2,
+  Mail,
+  MoreHorizontal,
+  Pencil,
+  RefreshCw,
+  Star,
+  Tag,
+  Trash2,
+  Unlock,
+  X,
+} from 'lucide-vue-next'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { STATUS_ICONS, STATUS_OPTIONS } from '@/features/book/composables/useBookStatus'
+import type { ReadStatus } from '@projectx/types'
+import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
+
+export type ExportScope = 'primary' | 'all' | 'audio'
 
 const ICON_SIZE = 17
 
@@ -22,6 +45,7 @@ const props = defineProps<{
   count: number
   visible: boolean
   inCollection?: boolean
+  inFlight?: InFlightOp | null
 }>()
 
 const emit = defineEmits<{
@@ -29,27 +53,64 @@ const emit = defineEmits<{
   'remove-from-collection': []
   edit: []
   send: []
-  export: [allFormats: boolean]
+  export: [scope: ExportScope]
   'refresh-metadata': []
   're-extract-cover': []
+  'set-status': [status: ReadStatus]
+  'set-rating': [rating: number | null]
+  'edit-tags': []
+  'lock-metadata': [locked: boolean]
   delete: []
   exit: []
 }>()
 
 const { hasPermission } = usePermissions()
 const confirmingDelete = ref(false)
+const deleteInput = ref('')
 const exportMenuOpen = ref(false)
+const ratingMenuOpen = ref(false)
+const moreMenuOpen = ref(false)
 const slots = useSlots()
 const hasCustomContent = computed(() => Boolean(slots.content))
 
-function onExport(allFormats: boolean) {
-  emit('export', allFormats)
+const canConfirmDelete = computed(() => props.count <= 50 || deleteInput.value === 'DELETE')
+
+function onExport(scope: ExportScope) {
+  emit('export', scope)
   exportMenuOpen.value = false
 }
 
 function onConfirmDelete() {
+  if (!canConfirmDelete.value) return
   emit('delete')
   confirmingDelete.value = false
+  deleteInput.value = ''
+}
+
+function onSetStatus(status: ReadStatus) {
+  emit('set-status', status)
+}
+
+function onSetRating(rating: number | null) {
+  emit('set-rating', rating)
+  ratingMenuOpen.value = false
+}
+
+function clearRating() {
+  onSetRating(null)
+}
+
+function cancelDelete() {
+  confirmingDelete.value = false
+  deleteInput.value = ''
+}
+
+function lockAll() {
+  emit('lock-metadata', true)
+}
+
+function unlockAll() {
+  emit('lock-metadata', false)
 }
 
 watch(
@@ -58,6 +119,9 @@ watch(
     if (!v) {
       confirmingDelete.value = false
       exportMenuOpen.value = false
+      ratingMenuOpen.value = false
+      moreMenuOpen.value = false
+      deleteInput.value = ''
     }
   },
 )
@@ -74,129 +138,210 @@ watch(
   >
     <div
       v-if="visible"
-      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-2.5 py-2 rounded-full bg-card/90 backdrop-blur-xl border border-primary/40 shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100svw-24px)] rounded-full bg-card/90 backdrop-blur-xl border border-primary/40 shadow-[0_8px_32px_rgba(0,0,0,0.35)] overflow-hidden"
     >
-      <TooltipProvider :delay-duration="0">
-        <template v-if="hasCustomContent">
-          <slot name="content" :count="count" />
-        </template>
-        <template v-else-if="!confirmingDelete && !exportMenuOpen">
-          <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{ count }}</span>
+      <div class="flex items-center gap-1 px-2.5 py-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <TooltipProvider :delay-duration="0">
+          <!-- In-flight SSE progress -->
+          <template v-if="inFlight">
+            <Loader2 :size="15" class="animate-spin text-primary shrink-0" />
+            <span class="px-2 text-sm font-medium text-foreground whitespace-nowrap">
+              {{ inFlight.label }} {{ inFlight.processed }} / {{ inFlight.total }}
+            </span>
+          </template>
 
-          <div :class="DIVIDER" />
+          <template v-else-if="hasCustomContent">
+            <slot name="content" :count="count" />
+          </template>
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('send')">
-                <Mail :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Send via email</TooltipContent>
-          </Tooltip>
+          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !moreMenuOpen">
+            <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{
+              count
+            }}</span>
 
-          <Tooltip v-if="hasPermission('library_download')">
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="exportMenuOpen = true">
-                <Download :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Export as ZIP</TooltipContent>
-          </Tooltip>
+            <div :class="DIVIDER" />
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('add-to-collection')">
-                <FolderPlus :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Add to collection</TooltipContent>
-          </Tooltip>
+            <Tooltip v-if="hasPermission('email_send')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('send')">
+                  <Mail :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Send via email</TooltipContent>
+            </Tooltip>
 
-          <Tooltip v-if="inCollection">
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_DESTRUCTIVE : BTN_DISABLED]" @click="emit('remove-from-collection')">
-                <FolderMinus :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Remove from collection</TooltipContent>
-          </Tooltip>
+            <Tooltip v-if="hasPermission('library_download')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="exportMenuOpen = true">
+                  <Download :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Export as ZIP</TooltipContent>
+            </Tooltip>
 
-          <Tooltip v-if="hasPermission('library_edit_metadata')">
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('edit')">
-                <Pencil :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Edit metadata</TooltipContent>
-          </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('add-to-collection')">
+                  <FolderPlus :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Add to collection</TooltipContent>
+            </Tooltip>
 
-          <div v-if="hasPermission('library_edit_metadata')" :class="DIVIDER" />
+            <Tooltip v-if="inCollection">
+              <TooltipTrigger as-child>
+                <button
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_DESTRUCTIVE : BTN_DISABLED]"
+                  @click="emit('remove-from-collection')"
+                >
+                  <FolderMinus :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Remove from collection</TooltipContent>
+            </Tooltip>
 
-          <Tooltip v-if="hasPermission('library_edit_metadata')">
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('refresh-metadata')">
-                <RefreshCw :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Refresh metadata</TooltipContent>
-          </Tooltip>
+            <Tooltip v-if="hasPermission('library_edit_metadata')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('edit')">
+                  <Pencil :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Edit metadata</TooltipContent>
+            </Tooltip>
 
-          <Tooltip v-if="hasPermission('library_edit_metadata')">
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('re-extract-cover')">
-                <ImageDown :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Re-extract cover from file</TooltipContent>
-          </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                  aria-label="Set reading status"
+                  title="Set reading status"
+                >
+                  <BookOpen :size="ICON_SIZE" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="center" class="w-48">
+                <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="onSetStatus(opt.value)">
+                  <component :is="STATUS_ICONS[opt.value]" :size="14" />
+                  <span>{{ opt.label }}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <div :class="DIVIDER" />
+            <Tooltip v-if="hasPermission('library_edit_metadata')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="ratingMenuOpen = true">
+                  <Star :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Set rating</TooltipContent>
+            </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_DESTRUCTIVE : BTN_DISABLED]" @click="confirmingDelete = true">
-                <Trash2 :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Delete selected</TooltipContent>
-          </Tooltip>
+            <Tooltip v-if="hasPermission('library_edit_metadata')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('edit-tags')">
+                  <Tag :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Edit tags</TooltipContent>
+            </Tooltip>
 
-          <div :class="DIVIDER" />
+            <div v-if="hasPermission('library_edit_metadata')" :class="DIVIDER" />
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button :class="[BTN_ICON, 'text-muted-foreground hover:text-foreground hover:bg-muted']" @click="emit('exit')">
-                <X :size="ICON_SIZE" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Exit selection</TooltipContent>
-          </Tooltip>
-        </template>
+            <Tooltip v-if="hasPermission('library_edit_metadata')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="moreMenuOpen = true">
+                  <MoreHorizontal :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">More actions</TooltipContent>
+            </Tooltip>
 
-        <template v-else-if="exportMenuOpen">
-          <span class="px-3 text-sm font-semibold text-foreground whitespace-nowrap">Export as ZIP:</span>
+            <div :class="DIVIDER" />
 
-          <div :class="DIVIDER" />
+            <Tooltip v-if="hasPermission('library_delete_books')">
+              <TooltipTrigger as-child>
+                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_DESTRUCTIVE : BTN_DISABLED]" @click="confirmingDelete = true">
+                  <Trash2 :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Delete selected</TooltipContent>
+            </Tooltip>
 
-          <button :class="BTN_TEXT_PRIMARY" @click="onExport(false)">Primary only</button>
+            <div :class="DIVIDER" />
 
-          <button :class="BTN_TEXT_PRIMARY" @click="onExport(true)">All formats</button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button :class="[BTN_ICON, 'text-muted-foreground hover:text-foreground hover:bg-muted']" @click="emit('exit')">
+                  <X :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Exit selection</TooltipContent>
+            </Tooltip>
+          </template>
 
-          <div :class="DIVIDER" />
+          <!-- Export scope picker -->
+          <template v-else-if="exportMenuOpen">
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Export as ZIP:</span>
+            <div :class="DIVIDER" />
+            <button :class="BTN_TEXT_PRIMARY" @click="onExport('primary')">Primary only</button>
+            <button :class="BTN_TEXT_PRIMARY" @click="onExport('all')">All formats</button>
+            <button :class="BTN_TEXT_PRIMARY" @click="onExport('audio')">Audio only</button>
+            <div :class="DIVIDER" />
+            <button :class="BTN_TEXT_CANCEL" @click="exportMenuOpen = false">Cancel</button>
+          </template>
 
-          <button :class="BTN_TEXT_CANCEL" @click="exportMenuOpen = false">Cancel</button>
-        </template>
+          <!-- Star rating picker -->
+          <template v-else-if="ratingMenuOpen">
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Set rating:</span>
+            <div :class="DIVIDER" />
+            <button v-for="n in [1, 2, 3, 4, 5]" :key="n" :class="BTN_TEXT_PRIMARY" @click="onSetRating(n)">{{ n }}</button>
+            <button :class="BTN_TEXT_CANCEL" @click="clearRating">Clear</button>
+            <div :class="DIVIDER" />
+            <button :class="BTN_TEXT_CANCEL" @click="ratingMenuOpen = false">Cancel</button>
+          </template>
 
-        <template v-else>
-          <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap">Delete {{ count }} book{{ count === 1 ? '' : 's' }}?</span>
+          <!-- More actions -->
+          <template v-else-if="moreMenuOpen">
+            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('refresh-metadata')">
+              <RefreshCw :size="ICON_SIZE" />
+            </button>
+            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('re-extract-cover')">
+              <ImageDown :size="ICON_SIZE" />
+            </button>
+            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="lockAll">
+              <Lock :size="ICON_SIZE" />
+            </button>
+            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="unlockAll">
+              <Unlock :size="ICON_SIZE" />
+            </button>
+            <div :class="DIVIDER" />
+            <button :class="BTN_TEXT_CANCEL" @click="moreMenuOpen = false">Back</button>
+          </template>
 
-          <div :class="DIVIDER" />
-
-          <button :class="BTN_TEXT_DESTRUCTIVE" @click="onConfirmDelete">Delete</button>
-
-          <button :class="BTN_TEXT_CANCEL" @click="confirmingDelete = false">Cancel</button>
-        </template>
-      </TooltipProvider>
+          <!-- Delete confirmation -->
+          <template v-else>
+            <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap"> Delete {{ count }} book{{ count === 1 ? '' : 's' }}? </span>
+            <template v-if="count > 50">
+              <input
+                v-model="deleteInput"
+                class="h-7 w-20 rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive"
+                placeholder="Type DELETE"
+              />
+            </template>
+            <div :class="DIVIDER" />
+            <button
+              :disabled="!canConfirmDelete"
+              :class="[BTN_TEXT_DESTRUCTIVE, !canConfirmDelete && 'opacity-40 cursor-not-allowed']"
+              @click="onConfirmDelete"
+            >
+              Delete
+            </button>
+            <button :class="BTN_TEXT_CANCEL" @click="cancelDelete">Cancel</button>
+          </template>
+        </TooltipProvider>
+      </div>
     </div>
   </Transition>
 </template>

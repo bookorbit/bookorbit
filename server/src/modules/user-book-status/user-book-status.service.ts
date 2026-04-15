@@ -17,6 +17,14 @@ export class UserBookStatusService {
     await this.repo.upsert(userId, bookId, status, 'manual', new Date());
   }
 
+  async bulkSetManual(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
+    if (bookIds.length === 0) return;
+    const now = new Date();
+    const existing = await this.repo.findByBookIds(userId, bookIds);
+    const existingMap = new Map(existing.map((row) => [row.bookId, row]));
+    await Promise.all(bookIds.map((bookId) => this.repo.upsert(userId, bookId, status, 'manual', now, existingMap.get(bookId))));
+  }
+
   async autoUpdate(
     userId: number,
     bookId: number,

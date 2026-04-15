@@ -29,6 +29,10 @@ import { FileWriteService } from '../file-write/file-write.service';
 import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
 import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
+import { BulkSetStatusDto } from './dto/bulk-set-status.dto';
+import { BulkSetRatingDto } from './dto/bulk-set-rating.dto';
+import { BulkUpdateTagsDto } from './dto/bulk-update-tags.dto';
+import { BulkSetMetadataLockDto } from './dto/bulk-set-metadata-lock.dto';
 import { DeleteBooksDto } from './dto/delete-books.dto';
 import { ExportBooksDto } from './dto/export-books.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
@@ -490,6 +494,69 @@ export class BookController {
   @HttpCode(HttpStatus.NO_CONTENT)
   setReadStatus(@Param('id', ParseIntPipe) id: number, @Body() dto: SetStatusDto, @CurrentUser() user: RequestUser) {
     return this.bookService.setReadStatus(id, dto.status, user);
+  }
+
+  @Post('bulk-set-status')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.BookBulkSetStatus,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; status?: string };
+      const count = body?.bookIds?.length ?? 0;
+      return `Bulk set status to ${body?.status ?? 'unknown'} for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
+  bulkSetStatus(@Body() dto: BulkSetStatusDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkSetStatus(dto.bookIds, dto.status, user);
+  }
+
+  @Post('bulk-set-rating')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookBulkSetRating,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; rating?: number | null };
+      const count = body?.bookIds?.length ?? 0;
+      return `Bulk set rating to ${body?.rating ?? 'null'} for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
+  bulkSetRating(@Body() dto: BulkSetRatingDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkSetRating(dto.bookIds, dto.rating ?? null, user);
+  }
+
+  @Post('bulk-update-tags')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookBulkUpdateTags,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; mode?: string };
+      const count = body?.bookIds?.length ?? 0;
+      return `Bulk ${body?.mode ?? 'update'} tags for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
+  bulkUpdateTags(@Body() dto: BulkUpdateTagsDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkUpdateTags(dto.bookIds, dto.mode, dto.tags, user);
+  }
+
+  @Post('bulk-set-metadata-lock')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookBulkSetMetadataLock,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; locked?: boolean };
+      const count = body?.bookIds?.length ?? 0;
+      return `Bulk ${body?.locked ? 'locked' : 'unlocked'} metadata for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
+  bulkSetMetadataLock(@Body() dto: BulkSetMetadataLockDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.bulkSetMetadataLock(dto.bookIds, dto.locked, user);
   }
 
   @Get(':id')

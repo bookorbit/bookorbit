@@ -70,6 +70,10 @@ export class BookMetadataLockService {
     return normalized;
   }
 
+  async bulkReplaceLockedFields(bookIds: number[], lockedFields: BookMetadataLockField[]): Promise<void> {
+    await this.lockRepo.bulkReplaceLockedFields(bookIds, lockedFields);
+  }
+
   async getCoverLockedBookIds(bookIds: number[]): Promise<Set<number>> {
     const fieldsMap = await this.lockRepo.findLockedFieldsByBookIds(bookIds);
     const locked = new Set<number>();

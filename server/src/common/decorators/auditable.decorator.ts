@@ -17,4 +17,10 @@ export interface AuditableOptions {
   description: string | ((req: AuditRequest, responseBody: unknown) => string);
 }
 
-export const Auditable = (options: AuditableOptions) => SetMetadata(AUDITABLE_KEY, options);
+export const Auditable = (options: AuditableOptions) => {
+  if (!options.action) {
+    throw new Error('Auditable decorator requires a defined audit action');
+  }
+
+  return SetMetadata(AUDITABLE_KEY, options);
+};

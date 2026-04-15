@@ -20,8 +20,15 @@ import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { basename, extname, join } from 'path';
 
-import { DEFAULT_DOWNLOAD_PATTERN, MetadataProviderKey, Permission, isAudioFormat, resolveUploadPath } from '@projectx/types';
-import type { AudiobookChapter, BookKoboState, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
+import {
+  BOOK_METADATA_LOCK_FIELDS,
+  DEFAULT_DOWNLOAD_PATTERN,
+  MetadataProviderKey,
+  Permission,
+  isAudioFormat,
+  resolveUploadPath,
+} from '@projectx/types';
+import type { AudiobookChapter, BookKoboState, BookMetadataLockField, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
 import { assembleBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -716,6 +723,68 @@ export class BookService {
     await this.userBookStatusService.setManual(user.id, bookId, status);
   }
 
+  async bulkSetStatus(bookIds: number[], status: ReadStatus, user: RequestUser): Promise<void> {
+    const event = 'book.bulk.set_status';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} status=${status} - bulk set status started`);
+    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.userBookStatusService.bulkSetManual(user.id, bookIds, status);
+    this.logger.log(
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} status=${status} durationMs=${Date.now() - startedAt} - bulk set status completed`,
+    );
+  }
+
+  async bulkSetRating(bookIds: number[], rating: number | null, user: RequestUser): Promise<void> {
+    const event = 'book.bulk.set_rating';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} - bulk set rating started`);
+    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.bookRepo.bulkSetRating(bookIds, rating);
+    this.triggerPostMetadataUpdateEffects(bookIds, user.id);
+    this.logger.log(
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} durationMs=${Date.now() - startedAt} - bulk set rating completed`,
+    );
+  }
+
+  async bulkUpdateTags(bookIds: number[], mode: 'add' | 'remove' | 'replace', tags: string[], user: RequestUser): Promise<void> {
+    const event = 'book.bulk.update_tags';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} mode=${mode} tagCount=${tags.length} - bulk update tags started`);
+    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.bookRepo.withTransaction(async (tx) => {
+      if (mode === 'replace') {
+        for (const bookId of bookIds) {
+          await this.metadataService.replaceTags(bookId, tags, { executor: tx });
+        }
+        return;
+      }
+
+      const currentTagsMap = await this.bookRepo.findTagsByBookIds(bookIds, tx);
+      for (const bookId of bookIds) {
+        const current = currentTagsMap.get(bookId) ?? [];
+        const next = mode === 'add' ? [...new Set([...current, ...tags])] : current.filter((t) => !tags.includes(t));
+        await this.metadataService.replaceTags(bookId, next, { executor: tx });
+      }
+    });
+    this.triggerPostMetadataUpdateEffects(bookIds, user.id);
+
+    this.logger.log(
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} mode=${mode} tagCount=${tags.length} durationMs=${Date.now() - startedAt} - bulk update tags completed`,
+    );
+  }
+
+  async bulkSetMetadataLock(bookIds: number[], locked: boolean, user: RequestUser): Promise<void> {
+    const event = 'book.bulk.set_metadata_lock';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} locked=${locked} - bulk set metadata lock started`);
+    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    const fields: BookMetadataLockField[] = locked ? [...BOOK_METADATA_LOCK_FIELDS] : [];
+    await this.bookMetadataLockService.bulkReplaceLockedFields(bookIds, fields);
+    this.logger.log(
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} locked=${locked} durationMs=${Date.now() - startedAt} - bulk set metadata lock completed`,
+    );
+  }
+
   async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {
     await this.verifyBookAccess(id, user);
 
@@ -1339,6 +1408,15 @@ export class BookService {
     this.logger.warn(
       `[book.file_metadata_pdf] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf file metadata warning emitted`,
     );
+  }
+
+  private triggerPostMetadataUpdateEffects(bookIds: number[], userId: number): void {
+    for (const bookId of bookIds) {
+      this.fileWriteService?.scheduleWrite(bookId, 'auto', userId);
+      void this.scoreService
+        .calculateAndSave(bookId)
+        .catch((err: Error) => this.logger.warn(`Score calculation failed for book ${bookId}: ${err.message}`));
+    }
   }
 
   private resolveChapters(

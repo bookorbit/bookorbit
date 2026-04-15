@@ -43,6 +43,7 @@ const missingBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   hasCover: false,
+  hasMetadataLocks: false,
 }
 
 const presentBook: BookCard = {
@@ -61,6 +62,7 @@ const presentBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   hasCover: false,
+  hasMetadataLocks: false,
 }
 
 describe('BookListRow — missing state', () => {
@@ -101,5 +103,20 @@ describe('BookListRow — present state', () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
     const root = wrapper.find('.flex.items-center')
     expect(root.classes().join(' ')).toContain('hover:bg-muted')
+  })
+
+  it('syncs the displayed star rating when the book prop changes externally', async () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    expect(wrapper.findAll('.fill-amber-400')).toHaveLength(0)
+
+    await wrapper.setProps({
+      book: {
+        ...presentBook,
+        rating: 4,
+      },
+    })
+
+    expect(wrapper.findAll('.fill-amber-400')).toHaveLength(4)
   })
 })

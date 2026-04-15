@@ -74,6 +74,13 @@ const localRating = ref<number | null>(props.book.rating)
 const hoverRating = ref<number | null>(null)
 const displayRating = computed(() => hoverRating.value ?? localRating.value)
 
+watch(
+  () => props.book.rating,
+  (rating) => {
+    localRating.value = rating ?? null
+  },
+)
+
 async function setRating(star: number) {
   const newRating = localRating.value === star ? null : star
   localRating.value = newRating

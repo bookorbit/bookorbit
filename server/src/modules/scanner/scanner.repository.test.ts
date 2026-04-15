@@ -234,13 +234,13 @@ describe('ScannerRepository', () => {
     const { repo, queues } = makeRepo();
     await expect(repo.findBookCardData([])).resolves.toEqual({ rows: [], authorRows: [], fileRows: [], genreRows: [] });
 
-    queues.select.push([{ id: 1, title: 'Book One' }]);
+    queues.select.push([{ id: 1, title: 'Book One', lockedFields: [] }]);
     queues.select.push([{ bookId: 1, name: 'Author One' }]);
     queues.select.push([{ bookId: 1, id: 10, format: 'epub', role: 'content' }]);
     queues.select.push([{ bookId: 1, name: 'Fiction' }]);
 
     await expect(repo.findBookCardData([1])).resolves.toEqual({
-      rows: [{ id: 1, title: 'Book One' }],
+      rows: [{ id: 1, title: 'Book One', lockedFields: [] }],
       authorRows: [{ bookId: 1, name: 'Author One' }],
       fileRows: [{ bookId: 1, id: 10, format: 'epub', role: 'content' }],
       genreRows: [{ bookId: 1, name: 'Fiction' }],

@@ -38,4 +38,13 @@ export class BookMetadataLockRepository {
       .values({ bookId, lockedFields, updatedAt: now })
       .onConflictDoUpdate({ target: bookMetadata.bookId, set: { lockedFields, updatedAt: now } });
   }
+
+  async bulkReplaceLockedFields(bookIds: number[], lockedFields: BookMetadataLockField[]): Promise<void> {
+    if (bookIds.length === 0) return;
+    const now = new Date();
+    await this.db
+      .insert(bookMetadata)
+      .values(bookIds.map((bookId) => ({ bookId, lockedFields, updatedAt: now })))
+      .onConflictDoUpdate({ target: bookMetadata.bookId, set: { lockedFields, updatedAt: now } });
+  }
 }
