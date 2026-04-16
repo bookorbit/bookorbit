@@ -1,6 +1,6 @@
 import { basename } from 'path';
 
-import type { BookCard, UserBookStatus } from '@projectx/types';
+import type { BookCard, CollapsedSeriesInfo, UserBookStatus } from '@projectx/types';
 
 type BookRow = {
   id: number;
@@ -16,6 +16,13 @@ type BookRow = {
   rating: number | null;
   coverSource: string | null;
   lockedFields: string[] | null;
+};
+
+type CollapsedBookRow = BookRow & {
+  bookCount: number | null;
+  readCount: number | null;
+  coverBookIds: number[] | null;
+  seriesLatestAddedAt: Date | null;
 };
 
 type NameRow = { bookId: number; name: string };
@@ -105,4 +112,89 @@ export function assembleBookCards(
       hasMetadataLocks: (row.lockedFields?.length ?? 0) > 0,
     };
   });
+}
+
+export function assembleCollapsedBookCards(
+  rows: CollapsedBookRow[],
+  authorRows: NameRow[],
+  fileRows: FileRow[],
+  genreRows: NameRow[],
+  progressRows: ProgressRow[],
+  statusRows: StatusRow[] = [],
+): BookCard[] {
+  const base = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows);
+
+  for (let i = 0; i < base.length; i++) {
+    const row = rows[i];
+    if (row && row.bookCount !== null) {
+      const collapsed: CollapsedSeriesInfo = {
+        bookCount: row.bookCount,
+        readCount: row.readCount ?? 0,
+        coverBookIds: row.coverBookIds ?? [],
+        seriesLatestAddedAt: row.seriesLatestAddedAt?.toISOString() ?? null,
+      };
+      base[i] = { ...base[i]!, collapsedSeries: collapsed };
+    }
+  }
+
+  return base;
+}
+
+export function collapseBookCards(cards: BookCard[]): BookCard[] {
+  const seriesGroups = new Map<string, { firstIndex: number; books: BookCard[] }>();
+  const standalones: { index: number; card: BookCard }[] = [];
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i]!;
+    if (card.seriesName?.trim()) {
+      const key = card.seriesName.trim().toLowerCase();
+      const group = seriesGroups.get(key);
+      if (group) {
+        group.books.push(card);
+      } else {
+        seriesGroups.set(key, { firstIndex: i, books: [card] });
+      }
+    } else {
+      standalones.push({ index: i, card });
+    }
+  }
+
+  const result: { index: number; card: BookCard }[] = [];
+
+  for (const [, { firstIndex, books: group }] of seriesGroups) {
+    const sorted = [...group].sort((a, b) => {
+      if (a.seriesIndex !== null && b.seriesIndex !== null) return a.seriesIndex - b.seriesIndex;
+      if (a.seriesIndex !== null) return -1;
+      if (b.seriesIndex !== null) return 1;
+      return new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime();
+    });
+
+    const representative = { ...sorted[0]! };
+    const readCount = group.filter((b) => b.readStatus?.status === 'read').length;
+    const seriesLatestAddedAt =
+      [...group]
+        .map((b) => b.addedAt)
+        .sort()
+        .at(-1) ?? null;
+
+    const coverIds = sorted
+      .filter((b) => b.hasCover)
+      .slice(0, 4)
+      .map((b) => b.id);
+    const fallbackIds = sorted.slice(0, 4).map((b) => b.id);
+
+    representative.collapsedSeries = {
+      bookCount: group.length,
+      readCount,
+      coverBookIds: coverIds.length > 0 ? coverIds : fallbackIds,
+      seriesLatestAddedAt,
+    };
+    result.push({ index: firstIndex, card: representative });
+  }
+
+  for (const { index, card } of standalones) {
+    result.push({ index, card });
+  }
+
+  return result.sort((a, b) => a.index - b.index).map((r) => r.card);
 }

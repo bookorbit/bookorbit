@@ -181,7 +181,7 @@ describe('BookController', () => {
     await controller.getCover(7, makeUser(), reply, '"1234"');
 
     expect(reply.status).toHaveBeenCalledWith(304);
-    expect(headers['Cache-Control']).toBe('private, max-age=86400');
+    expect(headers['Cache-Control']).toBe('no-cache');
     expect(headers['ETag']).toBe('"1234"');
     expect(reply.send).toHaveBeenCalled();
     expect(mockCreateReadStream).not.toHaveBeenCalled();
@@ -195,7 +195,7 @@ describe('BookController', () => {
 
     await controller.getCover(7, makeUser(), reply, undefined);
 
-    expect(headers['Cache-Control']).toBe('private, max-age=86400');
+    expect(headers['Cache-Control']).toBe('no-cache');
     expect(headers['ETag']).toBe('"4321"');
     expect(reply.type).toHaveBeenCalledWith('image/png');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/tmp/cover.png');

@@ -4,6 +4,7 @@ import { useElementSize, useWindowSize } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import type { BookCard } from '@projectx/types'
 import BookCoverCard from './BookCoverCard.vue'
+import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
@@ -95,7 +96,9 @@ const scrollerStyle = computed(() => ({
     >
       <template #default="{ item: book }">
         <div class="book-grid-cell" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
+          <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" />
           <BookCoverCard
+            v-else
             :book="book"
             :selection-mode="selectionMode"
             :selected="isSelected?.(book.id) ?? false"

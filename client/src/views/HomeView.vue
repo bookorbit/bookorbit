@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, Filter, SlidersHorizontal, Telescope, X } from 'lucide-vue-next'
+import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, CheckSquare, Filter, Layers, SlidersHorizontal, Square, Telescope, X } from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -16,6 +17,7 @@ import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsLensDialog from '@/features/lens/components/SaveAsLensDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
+import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
@@ -57,7 +59,29 @@ usePageTitle(pageTitle)
 
 provide(COVER_ASPECT_RATIO_KEY, currentCoverAspectRatio)
 
-const { items: books, total, loading, initialized: booksInitialized, error, filter, sort, hasMore, load, clear } = useBookQuery(libraryId)
+const { getEffectivePreference, setPreference, prefs } = useSeriesCollapsePreference()
+const collapseEnabledRef = ref(libraryId.value !== null ? getEffectivePreference({ libraryId: libraryId.value }) : false)
+
+watch(libraryId, (id) => {
+  collapseEnabledRef.value = id !== null ? getEffectivePreference({ libraryId: id }) : false
+})
+
+watch(prefs, () => {
+  collapseEnabledRef.value = libraryId.value !== null ? getEffectivePreference({ libraryId: libraryId.value }) : false
+})
+
+const {
+  items: books,
+  total,
+  loading,
+  initialized: booksInitialized,
+  error,
+  filter,
+  sort,
+  hasMore,
+  load,
+  clear,
+} = useBookQuery(libraryId, collapseEnabledRef)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const { setBookContext, registerLoadMore } = useBookNavigation()
@@ -359,6 +383,14 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     promptDelete(book.id)
   }
 }
+
+async function handleToggleCollapse() {
+  if (libraryId.value === null) return
+  const next = !collapseEnabledRef.value
+  collapseEnabledRef.value = next
+  load(true)
+  await setPreference({ libraryId: libraryId.value }, next)
+}
 </script>
 
 <template>
@@ -410,6 +442,22 @@ function handleBookAction(book: BookCard, action: BookActionType) {
           </Tooltip>
         </div>
         <div class="hidden sm:block w-px h-5 bg-border shrink-0" />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+              :class="
+                collapseEnabledRef
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+              "
+              @click="handleToggleCollapse"
+            >
+              <Layers :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+        </Tooltip>
         <button
           @click="toggleFilterPanel"
           class="hidden sm:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
@@ -454,6 +502,13 @@ function handleBookAction(book: BookCard, action: BookActionType) {
             {{ mobileControlsBadgeCount }}
           </span>
         </button>
+      </template>
+      <template #mobile-menu>
+        <DropdownMenuItem @click="handleToggleCollapse">
+          <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
+          <Square v-else :size="14" class="mr-2" />
+          Collapse series
+        </DropdownMenuItem>
       </template>
     </ViewHeader>
 

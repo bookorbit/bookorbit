@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BooksPage } from '@projectx/types';
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
+import { assembleBookCards, collapseBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
@@ -201,13 +201,42 @@ export class CollectionService {
     }
   }
 
-  async getBooks(id: number, user: RequestUser, page: number, size: number): Promise<BooksPage> {
+  async getBooks(id: number, user: RequestUser, page: number, size: number, collapseSeries?: boolean): Promise<BooksPage> {
     const event = 'collection.get_books';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] collectionId=${id} userId=${user.id} page=${page} size=${size} - get collection books started`);
+    this.logger.log(
+      `[${event}] [start] collectionId=${id} userId=${user.id} page=${page} size=${size} collapseSeries=${collapseSeries ?? false} - get collection books started`,
+    );
     try {
       await this.findCollectionForUserOrThrow(id, user);
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+
+      if (collapseSeries) {
+        const allBookIds = await this.collectionRepo.findAllBookIds(id, libraryIds);
+        if (allBookIds.length === 0) {
+          this.logger.log(
+            `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=0 itemCount=0 - get collection books completed`,
+          );
+          return { items: [], total: 0, page, size };
+        }
+
+        const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(
+          allBookIds,
+          user.id,
+        );
+        const orderMap = new Map(allBookIds.map((bookId, index) => [bookId, index]));
+        const allItems = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows).sort(
+          (left, right) => (orderMap.get(left.id) ?? 0) - (orderMap.get(right.id) ?? 0),
+        );
+        const collapsed = collapseBookCards(allItems);
+        const pageItems = collapsed.slice(page * size, page * size + size);
+
+        this.logger.log(
+          `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${collapsed.length} itemCount=${pageItems.length} - get collection books completed`,
+        );
+        return { items: pageItems, total: collapsed.length, page, size };
+      }
+
       const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size);
       if (bookPage.bookIds.length === 0) {
         this.logger.log(

@@ -4,7 +4,7 @@ import type { BookCard, BookQuery, BooksPage, GroupRule, SortSpec } from '@proje
 
 export type { BookCard }
 
-export function useBookQuery(libraryId: Ref<number | null>) {
+export function useBookQuery(libraryId: Ref<number | null>, collapseEnabled: Ref<boolean> = ref(false)) {
   const items = ref<BookCard[]>([])
   const total = ref(0)
   const loading = ref(false)
@@ -34,6 +34,7 @@ export function useBookQuery(libraryId: Ref<number | null>) {
         filter: filter.value,
         sort: sort.value,
         pagination: { page: pagination.page, size: pagination.size },
+        ...(collapseEnabled.value ? { collapseSeries: true } : {}),
       }
 
       const res = await api(`/api/v1/libraries/${libraryId.value}/books`, {

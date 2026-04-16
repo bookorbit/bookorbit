@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
+import type { SQL } from 'drizzle-orm';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
@@ -29,7 +30,7 @@ import {
   resolveUploadPath,
 } from '@projectx/types';
 import type { AudiobookChapter, BookKoboState, BookMetadataLockField, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
-import { assembleBookCards } from './utils/assemble-book-cards';
+import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
@@ -219,20 +220,7 @@ export class BookService {
     this.assertPaginationWindow(query.pagination.page, query.pagination.size);
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
-    const orderBy = this.queryBuilder.buildOrderBy(query.sort, user.id);
-    const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
-      where,
-      orderBy,
-      limit: query.pagination.size,
-      offset: query.pagination.page * query.pagination.size,
-      userId: user.id,
-    });
-    return {
-      items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
-      total,
-      page: query.pagination.page,
-      size: query.pagination.size,
-    };
+    return this.executeBooksQuery(user.id, where, query);
   }
 
   async globalQuery(user: RequestUser, query: BookQuery): Promise<BooksPage> {
@@ -240,19 +228,42 @@ export class BookService {
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = libs.map((l) => l.id);
     const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });
-    const orderBy = this.queryBuilder.buildOrderBy(query.sort, user.id);
+    return this.executeBooksQuery(user.id, where, query);
+  }
+
+  private async executeBooksQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<BooksPage> {
+    const { page, size } = query.pagination;
+    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesFilter(query.filter);
+
+    if (shouldCollapse) {
+      const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCardsCollapsed({
+        where,
+        sort: query.sort,
+        limit: size,
+        offset: page * size,
+        userId,
+      });
+      return {
+        items: assembleCollapsedBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
+        total,
+        page,
+        size,
+      };
+    }
+
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId);
     const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
-      limit: query.pagination.size,
-      offset: query.pagination.page * query.pagination.size,
-      userId: user.id,
+      limit: size,
+      offset: page * size,
+      userId,
     });
     return {
       items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
       total,
-      page: query.pagination.page,
-      size: query.pagination.size,
+      page,
+      size,
     };
   }
 

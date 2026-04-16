@@ -511,6 +511,80 @@ export class BookQueryBuilder {
         throw new BadRequestException(`Invalid operator '${operator}' for isbn field`);
     }
   }
+
+  static hasSeriesFilter(node: GroupRule | Rule | undefined): boolean {
+    if (!node) return false;
+    if (node.type === 'rule') return node.field === 'series';
+    return node.rules.some((r) => BookQueryBuilder.hasSeriesFilter(r));
+  }
+
+  static buildCollapseOrderBy(sort: SortSpec[], userId: number): string {
+    if (sort.length === 0) return 'sort_title ASC NULLS LAST';
+    const parts: string[] = [];
+    for (const { field, dir } of sort) {
+      const D = dir.toUpperCase();
+      if (D !== 'ASC' && D !== 'DESC') continue;
+      switch (field) {
+        case 'title':
+        case 'series':
+          parts.push(`sort_title ${D} NULLS LAST`);
+          break;
+        case 'addedAt':
+          parts.push(`sort_added_at ${D} NULLS LAST`);
+          break;
+        case 'seriesIndex':
+          parts.push(`series_index ${D} NULLS LAST`);
+          if (!sort.some((s) => s.field === 'series')) {
+            parts.push(`sort_title ${D} NULLS LAST`);
+          }
+          break;
+        case 'publishedYear':
+          parts.push(`published_year ${D} NULLS LAST`);
+          break;
+        case 'rating':
+          parts.push(`rating ${D} NULLS LAST`);
+          break;
+        case 'publisher':
+          parts.push(`publisher ${D} NULLS LAST`);
+          break;
+        case 'pageCount':
+          parts.push(`page_count ${D} NULLS LAST`);
+          break;
+        case 'updatedAt':
+          parts.push(`updated_at ${D} NULLS LAST`);
+          break;
+        case 'author':
+          parts.push(
+            `(SELECT a.sort_name FROM book_authors ba INNER JOIN authors a ON ba.author_id = a.id WHERE ba.book_id = r.id ORDER BY ba.display_order LIMIT 1) ${D} NULLS LAST`,
+          );
+          break;
+        case 'fileSize':
+          parts.push(`(SELECT bf.size_bytes FROM book_files bf WHERE bf.id = r.primary_file_id) ${D} NULLS LAST`);
+          break;
+        case 'readProgress':
+          parts.push(
+            `(SELECT max(rp.percentage) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${userId}) ${D} NULLS LAST`,
+          );
+          break;
+        case 'lastReadAt':
+          parts.push(
+            `(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${userId}) ${D} NULLS LAST`,
+          );
+          break;
+        case 'finishedAt':
+          parts.push(`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${userId}) ${D} NULLS LAST`);
+          break;
+        case 'random': {
+          const daySeed = Math.floor(Date.now() / 86_400_000);
+          const scopedSeed = daySeed + userId;
+          parts.push(`md5(r.id::text || ':' || ${scopedSeed}::text) ${D}`);
+          parts.push(`r.id ${D}`);
+          break;
+        }
+      }
+    }
+    return parts.length > 0 ? parts.join(', ') : 'sort_title ASC NULLS LAST';
+  }
 }
 
 function escapeLikePattern(s: string): string {

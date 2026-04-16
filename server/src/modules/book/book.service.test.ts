@@ -101,6 +101,7 @@ function makeService() {
     withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
     findAllIds: vi.fn(),
+    findCardsCollapsed: vi.fn(),
   };
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
@@ -1358,6 +1359,174 @@ describe('BookService', () => {
       expect(result.page).toBe(1);
       expect(result.size).toBe(5);
       expect(result.items).toHaveLength(1);
+    });
+
+    it('queryForLibrary routes to findCardsCollapsed when collapseSeries is true', async () => {
+      const { service, queryBuilder, bookRepo } = makeService();
+      const user = makeUser({ id: 5 });
+      queryBuilder.buildWhere.mockReturnValue('WHERE' as never);
+      bookRepo.findCardsCollapsed.mockResolvedValue({
+        rows: [
+          {
+            id: 20,
+            status: 'present',
+            primaryFileId: null,
+            folderPath: '/books/series-rep',
+            addedAt: new Date('2024-01-01T00:00:00.000Z'),
+            title: 'First Book',
+            seriesName: 'The Arc',
+            seriesIndex: 1,
+            publishedYear: null,
+            language: null,
+            rating: null,
+            coverSource: null,
+            lockedFields: null,
+            bookCount: 3,
+            readCount: 1,
+            coverBookIds: [20],
+            seriesLatestAddedAt: new Date('2024-06-01T00:00:00.000Z'),
+          },
+        ],
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        progressRows: [],
+        statusRows: [],
+        total: 1,
+      });
+
+      const result = await service.queryForLibrary(user, 2, {
+        filter: null,
+        sort: [{ field: 'title', dir: 'asc' }],
+        pagination: { page: 0, size: 20 },
+        collapseSeries: true,
+      } as never);
+
+      expect(bookRepo.findCardsCollapsed).toHaveBeenCalledWith({
+        where: 'WHERE',
+        sort: [{ field: 'title', dir: 'asc' }],
+        limit: 20,
+        offset: 0,
+        userId: 5,
+      });
+      expect(bookRepo.findCards).not.toHaveBeenCalled();
+      expect(result.total).toBe(1);
+      expect(result.items[0]!.collapsedSeries).toBeDefined();
+      expect(result.items[0]!.collapsedSeries!.bookCount).toBe(3);
+    });
+
+    it('queryForLibrary uses normal findCards when collapseSeries is false', async () => {
+      const { service, queryBuilder, bookRepo } = makeService();
+      queryBuilder.buildWhere.mockReturnValue('WHERE' as never);
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findCards.mockResolvedValue({
+        rows: [],
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        progressRows: [],
+        statusRows: [],
+        total: 0,
+      });
+
+      await service.queryForLibrary(makeUser(), 1, {
+        filter: null,
+        sort: [],
+        pagination: { page: 0, size: 10 },
+        collapseSeries: false,
+      } as never);
+
+      expect(bookRepo.findCardsCollapsed).not.toHaveBeenCalled();
+      expect(bookRepo.findCards).toHaveBeenCalled();
+    });
+
+    it('queryForLibrary auto-disables collapse when a series filter is active', async () => {
+      const { service, queryBuilder, bookRepo } = makeService();
+      queryBuilder.buildWhere.mockReturnValue('WHERE' as never);
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findCards.mockResolvedValue({
+        rows: [],
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        progressRows: [],
+        statusRows: [],
+        total: 0,
+      });
+
+      const filterWithSeries = {
+        type: 'group',
+        join: 'AND',
+        rules: [{ type: 'rule', field: 'series', operator: 'contains', value: 'Dune' }],
+      };
+
+      await service.queryForLibrary(makeUser(), 1, {
+        filter: filterWithSeries,
+        sort: [],
+        pagination: { page: 0, size: 10 },
+        collapseSeries: true,
+      } as never);
+
+      expect(bookRepo.findCardsCollapsed).not.toHaveBeenCalled();
+      expect(bookRepo.findCards).toHaveBeenCalled();
+    });
+
+    it('globalQuery routes to findCardsCollapsed when collapseSeries is true', async () => {
+      const { service, libraryService, queryBuilder, bookRepo } = makeService();
+      const user = makeUser({ id: 3 });
+      libraryService.findAll.mockResolvedValue([{ id: 1 }]);
+      queryBuilder.buildWhere.mockReturnValue('GLOBAL_WHERE' as never);
+      bookRepo.findCardsCollapsed.mockResolvedValue({
+        rows: [],
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        progressRows: [],
+        statusRows: [],
+        total: 0,
+      });
+
+      await service.globalQuery(user, {
+        filter: null,
+        sort: [],
+        pagination: { page: 0, size: 10 },
+        collapseSeries: true,
+      } as never);
+
+      expect(bookRepo.findCardsCollapsed).toHaveBeenCalledWith(expect.objectContaining({ userId: 3 }));
+      expect(bookRepo.findCards).not.toHaveBeenCalled();
+    });
+
+    it('globalQuery auto-disables collapse when a series filter is active', async () => {
+      const { service, libraryService, queryBuilder, bookRepo } = makeService();
+      libraryService.findAll.mockResolvedValue([{ id: 1 }]);
+      queryBuilder.buildWhere.mockReturnValue('WHERE' as never);
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findCards.mockResolvedValue({
+        rows: [],
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        progressRows: [],
+        statusRows: [],
+        total: 0,
+      });
+
+      const filterWithSeries = {
+        type: 'group',
+        join: 'AND',
+        rules: [{ type: 'rule', field: 'series', operator: 'equals', value: 'Mistborn' }],
+      };
+
+      await service.globalQuery(makeUser(), {
+        filter: filterWithSeries,
+        sort: [],
+        pagination: { page: 0, size: 10 },
+        collapseSeries: true,
+      } as never);
+
+      expect(bookRepo.findCardsCollapsed).not.toHaveBeenCalled();
+      expect(bookRepo.findCards).toHaveBeenCalled();
     });
 
     it('globalQuery throws when pagination window exceeds configured limit', async () => {

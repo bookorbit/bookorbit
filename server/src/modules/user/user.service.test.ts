@@ -384,3 +384,125 @@ describe('UserService', () => {
     });
   });
 });
+
+describe('UserService.updateSeriesCollapsePreferences', () => {
+  let service: UserService;
+  const userRepo = {
+    findByUsername: vi.fn(),
+    findByEmail: vi.fn(),
+    findByOidcSubject: vi.fn(),
+    linkOidcIdentity: vi.fn(),
+    createOidcUser: vi.fn(),
+    setPermissions: vi.fn(),
+    generateResetToken: vi.fn(),
+    incrementTokenVersion: vi.fn(),
+    findByIdWithPermissions: vi.fn(),
+    create: vi.fn(),
+    findAll: vi.fn(),
+    findAssignable: vi.fn(),
+    update: vi.fn(),
+    countOtherSuperusers: vi.fn(),
+    delete: vi.fn(),
+    setSuperuser: vi.fn(),
+    assignViewerLibraries: vi.fn(),
+    findLibraryIdsByUserId: vi.fn(),
+    replaceViewerLibraries: vi.fn(),
+    findExistingLibraryIds: vi.fn(),
+  };
+  const config = { get: vi.fn() };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    config.get.mockReturnValue('http://localhost:5173');
+    service = new UserService(userRepo as any, config as any);
+  });
+
+  it('throws NotFoundException when user does not exist', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue(null);
+
+    await expect(service.updateSeriesCollapsePreferences(99, {})).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('initialises preferences when none exist and sets global flag', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 1, settings: {} });
+
+    await service.updateSeriesCollapsePreferences(1, { global: true });
+
+    expect(userRepo.update).toHaveBeenCalledWith(1, {
+      settings: {
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: {} },
+      },
+    });
+  });
+
+  it('merges global preference with existing prefs', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '3': true }, collections: { '7': false } },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { global: true });
+
+    expect(userRepo.update).toHaveBeenCalledWith(1, {
+      settings: {
+        seriesCollapsePreferences: { global: true, libraries: { '3': true }, collections: { '7': false } },
+      },
+    });
+  });
+
+  it('merges a library override without disturbing others', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '1': true }, collections: {} },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { libraries: { '2': false } });
+
+    expect(userRepo.update).toHaveBeenCalledWith(1, {
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '1': true, '2': false }, collections: {} },
+      },
+    });
+  });
+
+  it('merges a collection override without disturbing library overrides', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: { '5': false } },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { collections: { '9': true } });
+
+    expect(userRepo.update).toHaveBeenCalledWith(1, {
+      settings: {
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: { '5': false, '9': true } },
+      },
+    });
+  });
+
+  it('overwrites an existing override when the same key is provided again', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '3': true }, collections: {} },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { libraries: { '3': false } });
+
+    expect(userRepo.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          seriesCollapsePreferences: expect.objectContaining({ libraries: { '3': false } }),
+        }),
+      }),
+    );
+  });
+});

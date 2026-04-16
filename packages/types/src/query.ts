@@ -114,9 +114,40 @@ export type GroupRule = {
   rules: (Rule | GroupRule)[];
 };
 
-export type SortField = "author" | "title" | "series" | "seriesIndex" | "addedAt" | "updatedAt" | "publishedYear" | "pageCount" | "rating" | "publisher" | "fileSize" | "readProgress" | "lastReadAt" | "finishedAt" | "random";
+export type SortField =
+  | "author"
+  | "title"
+  | "series"
+  | "seriesIndex"
+  | "addedAt"
+  | "updatedAt"
+  | "publishedYear"
+  | "pageCount"
+  | "rating"
+  | "publisher"
+  | "fileSize"
+  | "readProgress"
+  | "lastReadAt"
+  | "finishedAt"
+  | "random";
 
-export const SORT_FIELDS: SortField[] = ["author", "title", "series", "seriesIndex", "addedAt", "updatedAt", "publishedYear", "pageCount", "rating", "publisher", "fileSize", "readProgress", "lastReadAt", "finishedAt", "random"];
+export const SORT_FIELDS: SortField[] = [
+  "author",
+  "title",
+  "series",
+  "seriesIndex",
+  "addedAt",
+  "updatedAt",
+  "publishedYear",
+  "pageCount",
+  "rating",
+  "publisher",
+  "fileSize",
+  "readProgress",
+  "lastReadAt",
+  "finishedAt",
+  "random",
+];
 
 export type SortSpec = {
   field: SortField;
@@ -127,4 +158,5 @@ export type BookQuery = {
   filter?: GroupRule;
   sort: SortSpec[];
   pagination: { page: number; size: number };
+  collapseSeries?: boolean;
 };

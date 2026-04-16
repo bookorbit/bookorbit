@@ -462,9 +462,9 @@ watch(seriesGridGap, (value) => {
 
   <!-- Grid -->
   <div
-    class="grid"
+    class="series-grid grid"
     :style="{
-      gridTemplateColumns: `repeat(auto-fill, minmax(${seriesCardWidth}px, 1fr))`,
+      '--series-card-width': `${seriesCardWidth}px`,
       gap: `${seriesGridGap}px`,
     }"
   >
@@ -495,3 +495,15 @@ watch(seriesGridGap, (value) => {
   <!-- Infinite scroll sentinel -->
   <div ref="sentinel" class="h-px" />
 </template>
+
+<style scoped>
+.series-grid {
+  grid-template-columns: repeat(auto-fill, minmax(var(--series-card-width), 1fr));
+}
+
+@media (max-width: 639px) {
+  .series-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

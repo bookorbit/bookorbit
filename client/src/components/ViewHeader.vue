@@ -204,6 +204,10 @@ function getIconComponent(name: string) {
             <SlidersHorizontal :size="14" class="mr-2" />
             Display
           </DropdownMenuItem>
+          <template v-if="$slots['mobile-menu']">
+            <DropdownMenuSeparator />
+            <slot name="mobile-menu" />
+          </template>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="emit('toggle-selection')">
             <CheckSquare v-if="selectionMode" :size="14" class="mr-2" />

@@ -124,6 +124,17 @@ export class CollectionRepository {
     };
   }
 
+  async findAllBookIds(collectionId: number, libraryIds: number[]): Promise<number[]> {
+    if (libraryIds.length === 0) return [];
+    const rows = await this.db
+      .select({ bookId: collectionBooks.bookId })
+      .from(collectionBooks)
+      .innerJoin(books, eq(books.id, collectionBooks.bookId))
+      .where(and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds)))
+      .orderBy(collectionBooks.addedAt, collectionBooks.bookId);
+    return rows.map((row) => row.bookId);
+  }
+
   async updateDisplayOrders(userId: number, order: { id: number; displayOrder: number }[]) {
     await this.db.transaction(async (tx) => {
       for (const item of order) {

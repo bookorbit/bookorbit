@@ -33,6 +33,7 @@ import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { MAX_USER_AVATAR_BYTES } from './user-avatar.service';
 import { UserAvatarService } from './user-avatar.service';
 import { UserService } from './user.service';
@@ -69,6 +70,12 @@ export class UserController {
   })
   updateMe(@CurrentUser() user: RequestUser, @Body() dto: UpdateMeDto) {
     return this.userService.updateMe(user.id, dto);
+  }
+
+  @Patch('me/series-collapse-preferences')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  updateSeriesCollapsePreferences(@CurrentUser() user: RequestUser, @Body() dto: UpdateSeriesCollapsePreferencesDto) {
+    return this.userService.updateSeriesCollapsePreferences(user.id, dto);
   }
 
   @Post('me/avatar')

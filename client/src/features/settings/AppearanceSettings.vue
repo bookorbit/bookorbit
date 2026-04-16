@@ -6,6 +6,7 @@ import { useDisplaySettings, type CardOverlayKey, type CoverSizeScope } from '@/
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
+import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 
 const themeStore = useThemeStore()
 const {
@@ -19,6 +20,13 @@ const {
   authorCoverSize,
   authorCoverShape,
 } = useDisplaySettings()
+
+const { prefs, setPreference } = useSeriesCollapsePreference()
+const globalCollapseEnabled = computed(() => prefs.value?.global ?? false)
+
+async function handleGlobalCollapseToggle(value: boolean) {
+  await setPreference('global', value)
+}
 
 const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
   { key: 'progress-bar', label: 'Progress bar', hint: 'Thin colored line along the bottom edge' },
@@ -263,7 +271,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           <p class="settings-label">Portrait cover size</p>
           <p class="settings-hint">Used for portrait libraries and views</p>
         </div>
-        <div class="w-full md:w-56">
+        <div class="w-full md:w-72">
           <div class="mb-1.5 flex items-center justify-between gap-3">
             <span class="text-xs text-muted-foreground">Cover size</span>
             <span class="text-xs font-medium tabular-nums text-foreground">{{ portraitCoverSize }}px</span>
@@ -290,7 +298,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           <p class="settings-label">Square cover size</p>
           <p class="settings-hint">Used for square libraries and views</p>
         </div>
-        <div class="w-full md:w-56">
+        <div class="w-full md:w-72">
           <div class="mb-1.5 flex items-center justify-between gap-3">
             <span class="text-xs text-muted-foreground">Cover size</span>
             <span class="text-xs font-medium tabular-nums text-foreground">{{ squareCoverSize }}px</span>
@@ -317,7 +325,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           <p class="settings-label">Portrait grid spacing</p>
           <p class="settings-hint">Gap between portrait covers</p>
         </div>
-        <div class="w-full md:w-56">
+        <div class="w-full md:w-72">
           <div class="mb-1.5 flex items-center justify-between gap-3">
             <span class="text-xs text-muted-foreground">Grid spacing</span>
             <span class="text-xs font-medium tabular-nums text-foreground">{{ portraitGridGap }}px</span>
@@ -344,7 +352,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           <p class="settings-label">Square grid spacing</p>
           <p class="settings-hint">Gap between square covers</p>
         </div>
-        <div class="w-full md:w-56">
+        <div class="w-full md:w-72">
           <div class="mb-1.5 flex items-center justify-between gap-3">
             <span class="text-xs text-muted-foreground">Grid spacing</span>
             <span class="text-xs font-medium tabular-nums text-foreground">{{ squareGridGap }}px</span>
@@ -372,7 +380,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           <p class="settings-label">Cover size</p>
           <p class="settings-hint">Width of author covers in the grid</p>
         </div>
-        <div class="w-full md:w-56">
+        <div class="w-full md:w-72">
           <div class="mb-1.5 flex items-center justify-between gap-3">
             <span class="text-xs text-muted-foreground">Cover size</span>
             <span class="text-xs font-medium tabular-nums text-foreground">{{ authorCoverSize }}px</span>
@@ -439,6 +447,22 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           </p>
         </div>
         <ToggleSwitch v-model="lensFilterExpanded" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Series -->
+  <div class="mt-8">
+    <p class="settings-group-label">Series</p>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
+        <div class="min-w-0">
+          <p class="settings-label">Collapse series by default</p>
+          <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
+            Group books in the same series into a single card in library and collection views
+          </p>
+        </div>
+        <ToggleSwitch :model-value="globalCollapseEnabled" @update:model-value="handleGlobalCollapseToggle" />
       </div>
     </div>
   </div>

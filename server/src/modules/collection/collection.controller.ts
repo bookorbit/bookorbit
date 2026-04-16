@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
@@ -151,9 +152,10 @@ export class CollectionController {
     @CurrentUser() user: RequestUser,
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
+    @Query('collapseSeries', new ParseBoolPipe({ optional: true })) collapseSeries?: boolean,
   ) {
     this.validateSizeQuery(size);
     this.validatePageQuery(page, size);
-    return this.collectionService.getBooks(id, user, page, size);
+    return this.collectionService.getBooks(id, user, page, size, collapseSeries);
   }
 }

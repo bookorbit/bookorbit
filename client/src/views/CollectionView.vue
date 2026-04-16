@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderOpen, Pencil, SlidersHorizontal, X } from 'lucide-vue-next'
+import { CheckSquare, FolderOpen, Layers, Pencil, SlidersHorizontal, Square, X } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
@@ -20,6 +21,7 @@ import { useBookNavigation } from '@/features/book/composables/useBookNavigation
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
+import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
@@ -43,7 +45,18 @@ const pageTitle = computed(() => {
 })
 usePageTitle(pageTitle)
 
-const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useCollectionBooks(collectionId)
+const { getEffectivePreference, setPreference, prefs } = useSeriesCollapsePreference()
+const collapseEnabledRef = ref(getEffectivePreference({ collectionId: collectionId.value }))
+
+watch(collectionId, (id) => {
+  collapseEnabledRef.value = getEffectivePreference({ collectionId: id })
+})
+
+watch(prefs, () => {
+  collapseEnabledRef.value = getEffectivePreference({ collectionId: collectionId.value })
+})
+
+const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useCollectionBooks(collectionId, collapseEnabledRef)
 const { setBookContext, registerLoadMore } = useBookNavigation()
 watch(
   [books, total],
@@ -191,6 +204,13 @@ function handleBookAction(book: BookCard, action: 'quick-view' | 'edit-metadata'
   }
 }
 
+async function handleToggleCollapse() {
+  const next = !collapseEnabledRef.value
+  collapseEnabledRef.value = next
+  load(true)
+  await setPreference({ collectionId: collectionId.value }, next)
+}
+
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 function checkSentinel() {
@@ -293,6 +313,23 @@ watch(
         <Tooltip>
           <TooltipTrigger as-child>
             <button
+              class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+              :class="
+                collapseEnabledRef
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+              "
+              @click="handleToggleCollapse"
+            >
+              <Layers :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
               v-if="collection"
               class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               @click="openCollectionEditor"
@@ -310,10 +347,29 @@ watch(
           <SlidersHorizontal :size="14" />
         </button>
       </template>
+      <template #mobile-menu>
+        <DropdownMenuItem @click="handleToggleCollapse">
+          <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
+          <Square v-else :size="14" class="mr-2" />
+          Collapse series
+        </DropdownMenuItem>
+      </template>
     </ViewHeader>
 
     <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
       <div class="flex flex-wrap items-center gap-2">
+        <button
+          class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+          :class="
+            collapseEnabledRef
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-input text-muted-foreground hover:bg-muted hover:text-foreground'
+          "
+          @click="handleToggleCollapse"
+        >
+          <Layers :size="13" />
+          <span>{{ collapseEnabledRef ? 'Expanded' : 'Collapse series' }}</span>
+        </button>
         <button
           v-if="collection"
           class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

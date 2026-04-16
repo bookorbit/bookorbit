@@ -1,4 +1,4 @@
-import { assembleBookCards } from './assemble-book-cards';
+import { assembleBookCards, assembleCollapsedBookCards, collapseBookCards } from './assemble-book-cards';
 
 function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleBookCards>[0][number]>) {
   return {
@@ -189,5 +189,247 @@ describe('assembleBookCards', () => {
 
     // 0 is a valid progress value, not null
     expect(card.readingProgress).toBe(0);
+  });
+});
+
+function makeCollapsedRow(id: number, overrides?: Record<string, unknown>) {
+  return {
+    id,
+    status: 'ready',
+    primaryFileId: null,
+    folderPath: `/books/folder-${id}`,
+    addedAt: new Date('2024-01-01T00:00:00.000Z'),
+    title: `Book ${id}`,
+    seriesName: 'Test Series',
+    seriesIndex: id,
+    publishedYear: null,
+    language: null,
+    rating: null,
+    coverSource: null,
+    lockedFields: null,
+    bookCount: 3,
+    readCount: 1,
+    coverBookIds: [id],
+    seriesLatestAddedAt: new Date('2024-06-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function makeBookCard(id: number, overrides?: Record<string, unknown>) {
+  return {
+    id,
+    status: 'ready',
+    title: `Book ${id}`,
+    authors: [] as string[],
+    seriesName: null as string | null,
+    seriesIndex: null as number | null,
+    files: [] as { id: number; format: string | null; role: string }[],
+    publishedYear: null,
+    language: null,
+    genres: [] as string[],
+    rating: null,
+    readingProgress: null,
+    readStatus: null as { status: string } | null,
+    addedAt: '2024-01-01T00:00:00.000Z',
+    hasCover: false,
+    hasMetadataLocks: false,
+    ...overrides,
+  };
+}
+
+describe('assembleCollapsedBookCards', () => {
+  it('sets collapsedSeries on rows with non-null bookCount', () => {
+    const rows = [makeCollapsedRow(1)];
+    const [card] = assembleCollapsedBookCards(rows, [], [], [], []);
+
+    expect(card!.collapsedSeries).toBeDefined();
+    expect(card!.collapsedSeries!.bookCount).toBe(3);
+    expect(card!.collapsedSeries!.readCount).toBe(1);
+    expect(card!.collapsedSeries!.coverBookIds).toEqual([1]);
+  });
+
+  it('does not set collapsedSeries on rows with null bookCount (standalones)', () => {
+    const rows = [makeCollapsedRow(1, { bookCount: null })];
+    const [card] = assembleCollapsedBookCards(rows, [], [], [], []);
+
+    expect(card!.collapsedSeries).toBeUndefined();
+  });
+
+  it('converts seriesLatestAddedAt Date to ISO string', () => {
+    const date = new Date('2024-06-15T12:00:00.000Z');
+    const rows = [makeCollapsedRow(1, { seriesLatestAddedAt: date })];
+    const [card] = assembleCollapsedBookCards(rows, [], [], [], []);
+
+    expect(card!.collapsedSeries!.seriesLatestAddedAt).toBe('2024-06-15T12:00:00.000Z');
+  });
+
+  it('sets seriesLatestAddedAt to null when date is null', () => {
+    const rows = [makeCollapsedRow(1, { seriesLatestAddedAt: null })];
+    const [card] = assembleCollapsedBookCards(rows, [], [], [], []);
+
+    expect(card!.collapsedSeries!.seriesLatestAddedAt).toBeNull();
+  });
+
+  it('sets coverBookIds to empty array when null', () => {
+    const rows = [makeCollapsedRow(1, { coverBookIds: null })];
+    const [card] = assembleCollapsedBookCards(rows, [], [], [], []);
+
+    expect(card!.collapsedSeries!.coverBookIds).toEqual([]);
+  });
+
+  it('preserves base card fields alongside collapsedSeries', () => {
+    const rows = [makeCollapsedRow(10, { title: 'Book Ten' })];
+    const authorRows = [{ bookId: 10, name: 'Author X' }];
+    const [card] = assembleCollapsedBookCards(rows, authorRows, [], [], []);
+
+    expect(card!.title).toBe('Book Ten');
+    expect(card!.authors).toEqual(['Author X']);
+    expect(card!.collapsedSeries).toBeDefined();
+  });
+});
+
+describe('collapseBookCards', () => {
+  it('returns empty array for empty input', () => {
+    expect(collapseBookCards([])).toEqual([]);
+  });
+
+  it('returns standalone books unchanged (no collapsedSeries)', () => {
+    const cards = [makeBookCard(1, { title: 'Alpha' }), makeBookCard(2, { title: 'Beta' })];
+    const result = collapseBookCards(cards);
+
+    expect(result).toHaveLength(2);
+    expect(result.every((c) => c.collapsedSeries === undefined)).toBe(true);
+  });
+
+  it('collapses multiple books in the same series into one card', () => {
+    const cards = [
+      makeBookCard(1, { seriesName: 'Dune', seriesIndex: 1 }),
+      makeBookCard(2, { seriesName: 'Dune', seriesIndex: 2 }),
+      makeBookCard(3, { seriesName: 'Dune', seriesIndex: 3 }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.collapsedSeries!.bookCount).toBe(3);
+  });
+
+  it('collapses series case-insensitively', () => {
+    const cards = [makeBookCard(1, { seriesName: 'DUNE', seriesIndex: 1 }), makeBookCard(2, { seriesName: 'dune', seriesIndex: 2 })];
+    const result = collapseBookCards(cards);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.collapsedSeries!.bookCount).toBe(2);
+  });
+
+  it('treats books with null seriesName as standalones', () => {
+    const cards = [makeBookCard(1, { seriesName: null }), makeBookCard(2, { seriesName: '  ' })];
+    const result = collapseBookCards(cards);
+
+    expect(result).toHaveLength(2);
+    expect(result.every((c) => c.collapsedSeries === undefined)).toBe(true);
+  });
+
+  it('picks representative with lowest seriesIndex', () => {
+    const cards = [
+      makeBookCard(3, { seriesName: 'Mistborn', seriesIndex: 3 }),
+      makeBookCard(1, { seriesName: 'Mistborn', seriesIndex: 1 }),
+      makeBookCard(2, { seriesName: 'Mistborn', seriesIndex: 2 }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.id).toBe(1);
+  });
+
+  it('falls back to addedAt order when seriesIndex is null', () => {
+    const cards = [
+      makeBookCard(2, { seriesName: 'Arc', seriesIndex: null, addedAt: '2024-03-01T00:00:00.000Z' }),
+      makeBookCard(1, { seriesName: 'Arc', seriesIndex: null, addedAt: '2024-01-01T00:00:00.000Z' }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.id).toBe(1);
+  });
+
+  it('prefers books with indexes over books without when sorting', () => {
+    const cards = [makeBookCard(2, { seriesName: 'Arc', seriesIndex: null }), makeBookCard(1, { seriesName: 'Arc', seriesIndex: 1 })];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.id).toBe(1);
+  });
+
+  it('counts readCount correctly', () => {
+    const cards = [
+      makeBookCard(1, { seriesName: 'Series', readStatus: { status: 'read' } }),
+      makeBookCard(2, { seriesName: 'Series', readStatus: { status: 'reading' } }),
+      makeBookCard(3, { seriesName: 'Series', readStatus: { status: 'read' } }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.collapsedSeries!.readCount).toBe(2);
+  });
+
+  it('includes bookCount equal to group size', () => {
+    const cards = [makeBookCard(1, { seriesName: 'S' }), makeBookCard(2, { seriesName: 'S' }), makeBookCard(3, { seriesName: 'S' })];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.collapsedSeries!.bookCount).toBe(3);
+  });
+
+  it('prefers books with covers for coverBookIds', () => {
+    const cards = [
+      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, hasCover: false }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, hasCover: true }),
+      makeBookCard(3, { seriesName: 'S', seriesIndex: 3, hasCover: true }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.collapsedSeries!.coverBookIds).toEqual([2, 3]);
+  });
+
+  it('falls back to all sorted books when none have covers', () => {
+    const cards = [
+      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, hasCover: false }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, hasCover: false }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.collapsedSeries!.coverBookIds).toEqual([1, 2]);
+  });
+
+  it('caps coverBookIds at 4', () => {
+    const cards = Array.from({ length: 6 }, (_, i) => makeBookCard(i + 1, { seriesName: 'BigSeries', seriesIndex: i + 1, hasCover: true }));
+    const result = collapseBookCards(cards);
+
+    expect(result[0]!.collapsedSeries!.coverBookIds).toHaveLength(4);
+  });
+
+  it('returns results in first-occurrence order, preserving input sequence', () => {
+    const cards = [
+      makeBookCard(1, { title: 'Zephyr', seriesName: null }),
+      makeBookCard(2, { seriesName: 'Amber', seriesIndex: 1, title: null }),
+      makeBookCard(3, { title: 'Mango', seriesName: null }),
+      makeBookCard(4, { seriesName: 'Cobalt', seriesIndex: 1, title: null }),
+    ];
+    const result = collapseBookCards(cards);
+
+    const keys = result.map((c) => (c.seriesName?.trim() ?? c.title ?? '').toLowerCase());
+    expect(keys).toEqual(['zephyr', 'amber', 'mango', 'cobalt']);
+  });
+
+  it('keeps multiple distinct series separate', () => {
+    const cards = [
+      makeBookCard(1, { seriesName: 'Alpha' }),
+      makeBookCard(2, { seriesName: 'Alpha' }),
+      makeBookCard(3, { seriesName: 'Beta' }),
+      makeBookCard(4, { seriesName: 'Beta' }),
+      makeBookCard(5, { seriesName: 'Beta' }),
+    ];
+    const result = collapseBookCards(cards);
+
+    expect(result).toHaveLength(2);
+    const alpha = result.find((c) => c.seriesName === 'Alpha');
+    const beta = result.find((c) => c.seriesName === 'Beta');
+    expect(alpha!.collapsedSeries!.bookCount).toBe(2);
+    expect(beta!.collapsedSeries!.bookCount).toBe(3);
   });
 });

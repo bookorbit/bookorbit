@@ -3,6 +3,8 @@ import { SQL, and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-o
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { SortSpec } from '@projectx/types';
+import { BookQueryBuilder } from './book-query-builder.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import {
@@ -32,6 +34,28 @@ type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 type MetadataUpdateExecutor = Pick<Db, 'update'>;
 type MetadataReadExecutor = Pick<Db, 'select'>;
+
+type CollapsedRawRow = {
+  id: number;
+  status: string;
+  primary_file_id: number | null;
+  folder_path: string;
+  added_at: string;
+  title: string | null;
+  series_name: string | null;
+  series_index: number | null;
+  published_year: number | null;
+  language: string | null;
+  rating: number | null;
+  cover_source: string | null;
+  locked_fields: string[] | null;
+  sort_title: string | null;
+  sort_added_at: string | null;
+  book_count: string | null;
+  read_count: string | null;
+  cover_book_ids: number[] | null;
+  total_count: string;
+};
 type PatternMetadataRow = {
   bookId: number;
   title: string | null;
@@ -154,6 +178,202 @@ export class BookRepository {
       offset: 0,
       userId,
     });
+  }
+
+  async findCardsCollapsed(opts: { where: SQL | undefined; sort: SortSpec[]; limit: number; offset: number; userId: number }): Promise<{
+    rows: Array<{
+      id: number;
+      status: string;
+      primaryFileId: number | null;
+      folderPath: string;
+      addedAt: Date;
+      title: string | null;
+      seriesName: string | null;
+      seriesIndex: number | null;
+      publishedYear: number | null;
+      language: string | null;
+      rating: number | null;
+      coverSource: string | null;
+      lockedFields: string[] | null;
+      bookCount: number | null;
+      readCount: number | null;
+      coverBookIds: number[] | null;
+      seriesLatestAddedAt: Date | null;
+    }>;
+    authorRows: { bookId: number; name: string }[];
+    fileRows: { bookId: number; id: number; format: string | null; role: string }[];
+    genreRows: { bookId: number; name: string }[];
+    progressRows: { bookFileId: number; percentage: number | null }[];
+    statusRows: {
+      bookId: number;
+      status: string;
+      source: string;
+      startedAt: Date | null;
+      finishedAt: Date | null;
+      updatedAt: Date;
+    }[];
+    total: number;
+  }> {
+    const { where, sort, limit, offset, userId } = opts;
+    const whereFragment = where ?? sql`1=1`;
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId);
+
+    const result = await this.db.execute<CollapsedRawRow>(sql`
+      WITH series_agg AS (
+        SELECT
+          NULLIF(lower(btrim(book_metadata.series_name)), '') AS norm_series,
+          books.library_id,
+          COUNT(*) AS book_count,
+          SUM(CASE WHEN user_book_status.status = 'read' THEN 1 ELSE 0 END) AS read_count,
+          MAX(books.added_at) AS latest_added_at
+        FROM books
+        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+        LEFT JOIN user_book_status ON user_book_status.book_id = books.id AND user_book_status.user_id = ${userId}
+        WHERE ${whereFragment}
+          AND NULLIF(lower(btrim(book_metadata.series_name)), '') IS NOT NULL
+        GROUP BY NULLIF(lower(btrim(book_metadata.series_name)), ''), books.library_id
+      ),
+      series_covers AS (
+        SELECT
+          sa.norm_series,
+          sa.library_id,
+          covers.cover_book_ids
+        FROM series_agg sa
+        CROSS JOIN LATERAL (
+          SELECT COALESCE(
+            ARRAY_AGG(sub.id ORDER BY sub.series_index ASC NULLS LAST, sub.added_at ASC),
+            ARRAY[]::int[]
+          ) AS cover_book_ids
+          FROM (
+            SELECT b2.id, bm2.series_index, b2.added_at
+            FROM books b2
+            JOIN book_metadata bm2 ON bm2.book_id = b2.id
+            WHERE NULLIF(lower(btrim(bm2.series_name)), '') = sa.norm_series
+              AND b2.library_id = sa.library_id
+            ORDER BY bm2.series_index ASC NULLS LAST, b2.added_at ASC
+            LIMIT 4
+          ) sub
+        ) covers
+      ),
+      representatives AS (
+        SELECT DISTINCT ON (books.library_id, COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), 'book_' || books.id::text))
+          books.id,
+          books.status,
+          books.primary_file_id,
+          books.folder_path,
+          books.added_at,
+          books.updated_at,
+          book_metadata.title,
+          book_metadata.series_name,
+          book_metadata.series_index,
+          book_metadata.published_year,
+          book_metadata.language,
+          book_metadata.rating,
+          book_metadata.cover_source,
+          book_metadata.locked_fields,
+          book_metadata.publisher,
+          book_metadata.page_count,
+          COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), lower(book_metadata.title)) AS sort_title,
+          COALESCE(sa.latest_added_at, books.added_at) AS sort_added_at,
+          sa.book_count,
+          sa.read_count,
+          sc.cover_book_ids
+        FROM books
+        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+        LEFT JOIN series_agg sa
+          ON sa.norm_series = NULLIF(lower(btrim(book_metadata.series_name)), '')
+          AND sa.library_id = books.library_id
+        LEFT JOIN series_covers sc
+          ON sc.norm_series = sa.norm_series
+          AND sc.library_id = sa.library_id
+        WHERE ${whereFragment}
+        ORDER BY
+          books.library_id,
+          COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), 'book_' || books.id::text),
+          book_metadata.series_index ASC NULLS LAST,
+          books.added_at ASC,
+          books.id ASC
+      )
+      SELECT r.*,
+        COUNT(*) OVER () AS total_count
+      FROM representatives r
+      ORDER BY ${sql.raw(orderBy)}
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    const rawRows = result.rows as CollapsedRawRow[];
+    const total = rawRows.length > 0 ? Number(rawRows[0].total_count) : 0;
+
+    const mappedRows = rawRows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      primaryFileId: r.primary_file_id,
+      folderPath: r.folder_path,
+      addedAt: new Date(r.added_at),
+      title: r.title,
+      seriesName: r.series_name,
+      seriesIndex: r.series_index,
+      publishedYear: r.published_year,
+      language: r.language,
+      rating: r.rating,
+      coverSource: r.cover_source,
+      lockedFields: r.locked_fields,
+      bookCount: r.book_count !== null ? Number(r.book_count) : null,
+      readCount: r.read_count !== null ? Number(r.read_count) : null,
+      coverBookIds: r.cover_book_ids,
+      seriesLatestAddedAt: r.sort_added_at ? new Date(r.sort_added_at) : null,
+    }));
+
+    const bookIds = mappedRows.map((r) => r.id);
+
+    const [authorRows, fileRows, genreRows] = await Promise.all([
+      bookIds.length > 0
+        ? this.db
+            .select({ bookId: bookAuthors.bookId, name: authors.name })
+            .from(bookAuthors)
+            .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+            .where(inArray(bookAuthors.bookId, bookIds))
+            .orderBy(bookAuthors.displayOrder)
+        : [],
+      bookIds.length > 0
+        ? this.db
+            .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+            .from(bookFiles)
+            .where(inArray(bookFiles.bookId, bookIds))
+        : ([] as { bookId: number; id: number; format: string | null; role: string }[]),
+      bookIds.length > 0
+        ? this.db
+            .select({ bookId: bookGenres.bookId, name: genres.name })
+            .from(bookGenres)
+            .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+            .where(inArray(bookGenres.bookId, bookIds))
+        : [],
+    ]);
+
+    const primaryFileIds = mappedRows.map((r) => r.primaryFileId).filter((id): id is number => id != null);
+    const [progressRows, statusRows] = await Promise.all([
+      primaryFileIds.length > 0
+        ? this.db
+            .select({ bookFileId: readingProgress.bookFileId, percentage: readingProgress.percentage })
+            .from(readingProgress)
+            .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
+        : Promise.resolve([]),
+      bookIds.length > 0
+        ? this.db
+            .select({
+              bookId: userBookStatus.bookId,
+              status: userBookStatus.status,
+              source: userBookStatus.source,
+              startedAt: userBookStatus.startedAt,
+              finishedAt: userBookStatus.finishedAt,
+              updatedAt: userBookStatus.updatedAt,
+            })
+            .from(userBookStatus)
+            .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds)))
+        : Promise.resolve([]),
+    ]);
+
+    return { rows: mappedRows, authorRows, fileRows, genreRows, progressRows, statusRows, total };
   }
 
   async findById(id: number) {

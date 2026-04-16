@@ -21,6 +21,7 @@ export interface UserSettings {
     tourCompleted?: boolean;
   };
   notificationPreferences?: import("./notification").NotificationPreferences;
+  seriesCollapsePreferences?: import("./series-collapse").SeriesCollapsePreferences;
 }
 
 export interface AuthUser {

@@ -16,6 +16,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import archiver from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
@@ -285,6 +286,7 @@ export class BookController {
     }
   }
 
+  @SkipThrottle()
   @Get(':id/cover')
   async getCover(
     @Param('id', ParseIntPipe) id: number,
@@ -298,17 +300,18 @@ export class BookController {
     const { mtimeMs } = await stat(coverPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
     if (ifNoneMatch === etag) {
-      reply.status(304).header('Cache-Control', 'private, max-age=86400').header('ETag', etag).send();
+      reply.status(304).header('Cache-Control', 'no-cache').header('ETag', etag).send();
       return;
     }
 
     const contentType = imageContentTypeFromPath(coverPath);
-    reply.header('Cache-Control', 'private, max-age=86400');
+    reply.header('Cache-Control', 'no-cache');
     reply.header('ETag', etag);
     reply.type(contentType);
     reply.send(createReadStream(coverPath));
   }
 
+  @SkipThrottle()
   @Get(':id/thumbnail')
   async getThumbnail(
     @Param('id', ParseIntPipe) id: number,
@@ -322,11 +325,11 @@ export class BookController {
     const { mtimeMs } = await stat(thumbnailPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
     if (ifNoneMatch === etag) {
-      reply.status(304).header('Cache-Control', 'private, max-age=86400').header('ETag', etag).send();
+      reply.status(304).header('Cache-Control', 'no-cache').header('ETag', etag).send();
       return;
     }
 
-    reply.header('Cache-Control', 'private, max-age=86400');
+    reply.header('Cache-Control', 'no-cache');
     reply.header('ETag', etag);
     reply.type('image/jpeg');
     reply.send(createReadStream(thumbnailPath));

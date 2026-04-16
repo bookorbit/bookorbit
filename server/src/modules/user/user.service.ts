@@ -3,12 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@projectx/types';
+import type { UserSettings } from '@projectx/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { UserRepository } from './user.repository';
 
 @Injectable()
@@ -252,5 +254,17 @@ export class UserService {
     if (missing.length > 0) {
       throw new BadRequestException(`Unknown library IDs: ${missing.join(', ')}`);
     }
+  }
+
+  async updateSeriesCollapsePreferences(userId: number, dto: UpdateSeriesCollapsePreferencesDto): Promise<void> {
+    const existing = await this.userRepo.findByIdWithPermissions(userId);
+    if (!existing) throw new NotFoundException('User not found');
+    const currentPrefs = (existing.settings as UserSettings)?.seriesCollapsePreferences ?? { global: false, libraries: {}, collections: {} };
+    const merged = {
+      global: dto.global !== undefined ? dto.global : currentPrefs.global,
+      libraries: { ...currentPrefs.libraries, ...(dto.libraries ?? {}) },
+      collections: { ...currentPrefs.collections, ...(dto.collections ?? {}) },
+    };
+    await this.userRepo.update(userId, { settings: { seriesCollapsePreferences: merged } });
   }
 }

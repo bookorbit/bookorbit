@@ -45,6 +45,7 @@ export type BookCard = {
   addedAt: string;
   hasCover: boolean;
   hasMetadataLocks: boolean;
+  collapsedSeries?: import("./series-collapse").CollapsedSeriesInfo;
 };
 
 export type BookDetailFile = {

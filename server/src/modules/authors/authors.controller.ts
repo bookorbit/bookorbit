@@ -16,6 +16,7 @@ import {
   Res,
   Sse,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
@@ -201,6 +202,7 @@ export class AuthorsController {
     return this.authorsService.findBooks(user, id, dto);
   }
 
+  @SkipThrottle()
   @Get(':id/thumbnail')
   async getThumbnail(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Res() reply: FastifyReply) {
     const thumbnailPath = await this.authorsService.getThumbnailPath(user, id);
@@ -216,6 +218,7 @@ export class AuthorsController {
     reply.send(createReadStream(thumbnailPath));
   }
 
+  @SkipThrottle()
   @Get(':id/image')
   async getImage(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Res() reply: FastifyReply) {
     const imagePath = await this.authorsService.getImagePath(user, id);
