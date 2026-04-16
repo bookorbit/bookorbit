@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import type { BooksPage } from '@projectx/types';
 import { assembleBookCards, collapseBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
+import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import { CollectionBooksDto } from './dto/collection-books.dto';
@@ -40,6 +41,7 @@ export class CollectionService {
     private readonly collectionRepo: CollectionRepository,
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
+    private readonly queryBuilder: BookQueryBuilder,
   ) {}
 
   private assertAccess(ownerId: number, user: RequestUser): void {
@@ -201,18 +203,19 @@ export class CollectionService {
     }
   }
 
-  async getBooks(id: number, user: RequestUser, page: number, size: number, collapseSeries?: boolean): Promise<BooksPage> {
+  async getBooks(id: number, user: RequestUser, page: number, size: number, collapseSeries?: boolean, q?: string): Promise<BooksPage> {
     const event = 'collection.get_books';
     const startedAt = Date.now();
     this.logger.log(
-      `[${event}] [start] collectionId=${id} userId=${user.id} page=${page} size=${size} collapseSeries=${collapseSeries ?? false} - get collection books started`,
+      `[${event}] [start] collectionId=${id} userId=${user.id} page=${page} size=${size} collapseSeries=${collapseSeries ?? false} hasSearch=${!!q?.trim()} - get collection books started`,
     );
     try {
       await this.findCollectionForUserOrThrow(id, user);
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const qWhere = q?.trim() ? this.queryBuilder.buildQuickSearch(q.trim()) : undefined;
 
       if (collapseSeries) {
-        const allBookIds = await this.collectionRepo.findAllBookIds(id, libraryIds);
+        const allBookIds = await this.collectionRepo.findAllBookIds(id, libraryIds, qWhere);
         if (allBookIds.length === 0) {
           this.logger.log(
             `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=0 itemCount=0 - get collection books completed`,
@@ -237,7 +240,7 @@ export class CollectionService {
         return { items: pageItems, total: collapsed.length, page, size };
       }
 
-      const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size);
+      const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size, qWhere);
       if (bookPage.bookIds.length === 0) {
         this.logger.log(
           `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${bookPage.total} itemCount=0 - get collection books completed`,

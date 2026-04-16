@@ -27,6 +27,7 @@ const SORT_FIELDS = [
 const bookQuerySchema = z.object({
   collapseSeries: z.boolean().optional(),
   filter: groupRuleSchema(5).optional(),
+  q: z.string().max(200).optional(),
   sort: z
     .array(
       z.object({

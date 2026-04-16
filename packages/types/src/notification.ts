@@ -16,41 +16,22 @@ export const NotificationType = {
   FileWriteBackFailed: "file_write_back_failed",
 } as const;
 
-export type NotificationType =
-  (typeof NotificationType)[keyof typeof NotificationType];
+export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
 
 export const NOTIFICATION_CATEGORIES = {
   scanning: [NotificationType.ScanCompleted, NotificationType.ScanFailed],
-  metadata: [
-    NotificationType.MetadataFetchCompleted,
-    NotificationType.MetadataFetchFailed,
-  ],
-  bookBucket: [
-    NotificationType.BookBucketReady,
-    NotificationType.BookBucketFinalized,
-  ],
-  authorEnrichment: [
-    NotificationType.AuthorEnrichmentCompleted,
-    NotificationType.AuthorEnrichmentFailed,
-  ],
+  metadata: [NotificationType.MetadataFetchCompleted, NotificationType.MetadataFetchFailed],
+  bookBucket: [NotificationType.BookBucketReady, NotificationType.BookBucketFinalized],
+  authorEnrichment: [NotificationType.AuthorEnrichmentCompleted, NotificationType.AuthorEnrichmentFailed],
   email: [NotificationType.EmailSent, NotificationType.EmailFailed],
   koboSync: [NotificationType.KoboSyncCompleted],
-  migration: [
-    NotificationType.MigrationCompleted,
-    NotificationType.MigrationFailed,
-  ],
-  fileWriteBack: [
-    NotificationType.FileWriteBackCompleted,
-    NotificationType.FileWriteBackFailed,
-  ],
+  migration: [NotificationType.MigrationCompleted, NotificationType.MigrationFailed],
+  fileWriteBack: [NotificationType.FileWriteBackCompleted, NotificationType.FileWriteBackFailed],
 } as const;
 
 export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
 
-export const NOTIFICATION_CATEGORY_LABELS: Record<
-  NotificationCategory,
-  string
-> = {
+export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
   scanning: "Library Scanning",
   metadata: "Metadata Fetching",
   bookBucket: "Book Bucket",

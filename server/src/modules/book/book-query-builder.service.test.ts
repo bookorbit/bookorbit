@@ -321,6 +321,94 @@ describe('field coverage smoke tests', () => {
   );
 });
 
+describe('buildQuickSearch', () => {
+  it('produces an OR of title/series ilike and author/narrator exists subqueries', () => {
+    const { builder } = makeBuilder();
+
+    const result = builder.buildQuickSearch('tolkien') as any;
+
+    expect(result).toMatchObject({ type: 'or' });
+    expect(result.clauses).toHaveLength(4);
+    expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%tolkien%' });
+    expect(result.clauses[1]).toMatchObject({ type: 'sql' });
+    expect(result.clauses[2]).toMatchObject({ type: 'ilike', pattern: '%tolkien%' });
+    expect(result.clauses[3]).toMatchObject({ type: 'sql' });
+  });
+
+  it('escapes LIKE special characters in q', () => {
+    const { builder } = makeBuilder();
+
+    const result = builder.buildQuickSearch('50% off') as any;
+
+    expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%50\\% off%' });
+    expect(result.clauses[2]).toMatchObject({ type: 'ilike', pattern: '%50\\% off%' });
+  });
+
+  it('escapes underscore in q', () => {
+    const { builder } = makeBuilder();
+
+    const result = builder.buildQuickSearch('book_one') as any;
+
+    expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%book\\_one%' });
+  });
+
+  it('calls db.select twice (once for authors, once for narrators)', () => {
+    const { builder, db } = makeBuilder();
+
+    builder.buildQuickSearch('dune');
+
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('buildWhere with q', () => {
+  it('ANDs q condition with library scope when q is present', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, { accessibleLibraryIds: [1], q: 'tolkien' }) as any;
+
+    expect(where).toMatchObject({ type: 'and' });
+    expect(where.clauses).toHaveLength(2);
+    expect(where.clauses[1]).toMatchObject({ type: 'or' });
+  });
+
+  it('ANDs q condition with existing filter', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }) as never, {
+      accessibleLibraryIds: [1],
+      q: 'frank',
+    }) as any;
+
+    expect(where.clauses).toHaveLength(3);
+    expect(where.clauses[2]).toMatchObject({ type: 'or' });
+  });
+
+  it('ignores q when empty string', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, { accessibleLibraryIds: [1], q: '' }) as any;
+
+    expect(where.clauses).toHaveLength(1);
+  });
+
+  it('ignores q when whitespace only', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, { accessibleLibraryIds: [1], q: '   ' }) as any;
+
+    expect(where.clauses).toHaveLength(1);
+  });
+
+  it('ignores q when undefined', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, { accessibleLibraryIds: [1] }) as any;
+
+    expect(where.clauses).toHaveLength(1);
+  });
+});
+
 describe('textRuleToSql (via title)', () => {
   it.each([
     ['contains', 'Dune', { type: 'ilike', pattern: '%Dune%' }],

@@ -82,7 +82,7 @@ describe('CollectionController', () => {
 
       await controller.getBooks(10, USER, 0, 50);
 
-      expect(service.getBooks).toHaveBeenCalledWith(10, USER, 0, 50, undefined);
+      expect(service.getBooks).toHaveBeenCalledWith(10, USER, 0, 50, undefined, undefined);
     });
 
     it('rejects invalid page and size boundaries', async () => {

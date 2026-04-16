@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { CheckSquare, Circle, LayoutGrid, List, MoreHorizontal, SlidersHorizontal, Square } from 'lucide-vue-next'
+import { nextTick, ref } from 'vue'
+import { CheckSquare, Circle, LayoutGrid, List, MoreHorizontal, Search, SlidersHorizontal, Square, X } from 'lucide-vue-next'
 import * as LucideIcons from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -31,6 +31,8 @@ withDefaults(
     gridGapMin?: number
     gridGapMax?: number
     gridGapStep?: number
+    searchable?: boolean
+    searchQuery?: string
   }>(),
   {
     coverSizeMin: 100,
@@ -48,12 +50,54 @@ const emit = defineEmits<{
   'update:viewMode': [value: 'grid' | 'list']
   'toggle-selection': []
   'update:coverShape': [value: 'square' | 'circle']
+  'update:searchQuery': [value: string]
 }>()
 
 const mobileDisplayOpen = ref(false)
+const mobileSearchOpen = ref(false)
+const searchActive = ref(false)
+const searchInputRef = ref<HTMLInputElement | null>(null)
+const mobileSearchInputRef = ref<HTMLInputElement | null>(null)
 
 function getIconComponent(name: string) {
   return (LucideIcons as Record<string, unknown>)[name] ?? null
+}
+
+function openSearch() {
+  if (searchActive.value) return
+  searchActive.value = true
+  nextTick(() => searchInputRef.value?.focus())
+}
+
+function openMobileSearch() {
+  mobileSearchOpen.value = true
+  nextTick(() => mobileSearchInputRef.value?.focus())
+}
+
+function closeMobileSearch() {
+  mobileSearchOpen.value = false
+}
+
+function clearSearchQuery() {
+  emit('update:searchQuery', '')
+}
+
+function closeSearch() {
+  searchActive.value = false
+  clearSearchQuery()
+}
+
+function handleSearchKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  if (mobileSearchOpen.value) {
+    closeMobileSearch()
+    return
+  }
+  closeSearch()
+}
+
+function handleSearchInput(event: Event) {
+  emit('update:searchQuery', (event.target as HTMLInputElement).value)
 }
 </script>
 
@@ -63,11 +107,38 @@ function getIconComponent(name: string) {
     <div class="flex items-center gap-2 flex-1 min-w-0">
       <component v-if="icon" :is="getIconComponent(icon)" :size="16" class="shrink-0 text-muted-foreground" />
       <span class="font-bold text-[16px] text-foreground/90 tracking-tight truncate">{{ title }}</span>
-      <span class="text-[12px] font-semibold text-primary/70 tabular-nums">({{ total.toLocaleString() }})</span>
+      <span class="text-[12px] font-semibold text-primary/70 tabular-nums shrink-0">({{ total.toLocaleString() }})</span>
     </div>
 
     <!-- Right -->
     <div class="flex items-center gap-2 shrink-0">
+      <!-- Desktop: search widget — left of sort/filter in toolbar slot -->
+      <div v-if="searchable" class="relative hidden md:flex items-center shrink-0">
+        <Search
+          :size="14"
+          class="absolute left-2 pointer-events-none z-10 transition-colors duration-200"
+          :class="searchActive ? 'text-primary/70' : 'text-muted-foreground/70'"
+        />
+        <input
+          ref="searchInputRef"
+          :value="searchQuery ?? ''"
+          @focus="openSearch"
+          @input="handleSearchInput"
+          @keydown="handleSearchKeydown"
+          type="text"
+          placeholder="Search title, author, series, narrator..."
+          class="h-8 text-[13px] focus:outline-none transition-all duration-300"
+          :class="
+            searchActive
+              ? 'w-44 lg:w-72 pl-8 pr-6 rounded-lg border border-primary/30 bg-primary/5 focus:ring-1 focus:ring-primary/30 cursor-text text-foreground placeholder:text-muted-foreground/60'
+              : 'w-8 pl-2.25 pr-0 rounded-lg border border-input bg-transparent hover:bg-primary/5 hover:border-muted-foreground/30 cursor-pointer text-transparent placeholder:text-transparent select-none'
+          "
+        />
+        <button v-if="searchActive" @click="closeSearch" class="absolute right-1.5 text-muted-foreground/70 hover:text-foreground transition-colors">
+          <X :size="13" />
+        </button>
+      </div>
+
       <slot name="toolbar" />
       <slot name="actions" />
 
@@ -208,6 +279,13 @@ function getIconComponent(name: string) {
             <DropdownMenuSeparator />
             <slot name="mobile-menu" />
           </template>
+          <template v-if="searchable">
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="openMobileSearch">
+              <Search :size="14" class="mr-2" />
+              Search
+            </DropdownMenuItem>
+          </template>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="emit('toggle-selection')">
             <CheckSquare v-if="selectionMode" :size="14" class="mr-2" />
@@ -283,6 +361,36 @@ function getIconComponent(name: string) {
             </button>
           </div>
         </div>
+      </div>
+    </SheetContent>
+  </Sheet>
+
+  <Sheet v-if="searchable" v-model:open="mobileSearchOpen">
+    <SheetContent side="top">
+      <SheetHeader>
+        <SheetTitle>Search</SheetTitle>
+      </SheetHeader>
+      <div class="space-y-3 px-4 pb-6">
+        <div class="flex h-9 items-center rounded-md border border-input bg-background px-2.5">
+          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
+          <input
+            ref="mobileSearchInputRef"
+            :value="searchQuery ?? ''"
+            @input="handleSearchInput"
+            @keydown="handleSearchKeydown"
+            type="search"
+            placeholder="Search title, author, series, narrator..."
+            class="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+          />
+          <button
+            v-if="(searchQuery ?? '').trim().length > 0"
+            class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground"
+            @click="clearSearchQuery"
+          >
+            <X :size="12" />
+          </button>
+        </div>
+        <Button variant="outline" size="sm" class="w-full" @click="closeMobileSearch">Done</Button>
       </div>
     </SheetContent>
   </Sheet>

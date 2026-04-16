@@ -22,6 +22,7 @@ import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
+import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
@@ -56,7 +57,16 @@ watch(prefs, () => {
   collapseEnabledRef.value = getEffectivePreference({ collectionId: collectionId.value })
 })
 
-const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useCollectionBooks(collectionId, collapseEnabledRef)
+const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
+
+const {
+  items: books,
+  total,
+  loading,
+  initialized: booksInitialized,
+  hasMore,
+  load,
+} = useCollectionBooks(collectionId, collapseEnabledRef, debouncedQuery)
 const { setBookContext, registerLoadMore } = useBookNavigation()
 watch(
   [books, total],
@@ -242,7 +252,11 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkSentinel)
 })
 
-watch(collectionId, () => load(true))
+watch(collectionId, () => {
+  clearSearch()
+  load(true)
+})
+watch(debouncedQuery, () => load(true))
 watch(
   loading,
   (isLoading) => {
@@ -307,6 +321,8 @@ watch(
       v-model:gridGap="gridGap"
       v-model:viewMode="viewMode"
       :selection-mode="selectionMode"
+      :searchable="true"
+      v-model:searchQuery="searchQuery"
       @toggle-selection="toggleSelectionMode"
     >
       <template #toolbar>

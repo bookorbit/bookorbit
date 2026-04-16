@@ -11,6 +11,7 @@ import {
   bookFiles,
   bookGenres,
   bookMetadata,
+  bookNarrators,
   books,
   bookTags,
   collectionBooks,
@@ -18,6 +19,7 @@ import {
   readingProgress,
   genres,
   libraries,
+  narrators,
   tags,
 } from '../../db/schema';
 
@@ -41,7 +43,7 @@ export class BookQueryBuilder {
 
   buildWhere(
     filter: GroupRule | null | undefined,
-    ctx: { accessibleLibraryIds: number[]; implicitLibraryId?: number; userId?: number },
+    ctx: { accessibleLibraryIds: number[]; implicitLibraryId?: number; userId?: number; q?: string },
   ): SQL | undefined {
     if (ctx.accessibleLibraryIds.length === 0) {
       return sql`1 = 0`;
@@ -57,7 +59,35 @@ export class BookQueryBuilder {
       clauses.push(this.groupToSql(filter, 0, ctx.userId));
     }
 
+    if (ctx.q?.trim()) {
+      clauses.push(this.buildQuickSearch(ctx.q.trim()));
+    }
+
     return and(...clauses);
+  }
+
+  buildQuickSearch(q: string): SQL {
+    const pattern = `%${q.replace(/[%_\\]/g, '\\$&')}%`;
+
+    const existsAuthor = (() => {
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(bookAuthors.authorId, authors.id))
+        .where(and(eq(bookAuthors.bookId, books.id), ilike(authors.name, pattern))!);
+      return sql`exists (${sq})`;
+    })();
+
+    const existsNarrator = (() => {
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(bookNarrators.narratorId, narrators.id))
+        .where(and(eq(bookNarrators.bookId, books.id), ilike(narrators.name, pattern))!);
+      return sql`exists (${sq})`;
+    })();
+
+    return or(ilike(bookMetadata.title, pattern), existsAuthor, ilike(bookMetadata.seriesName, pattern), existsNarrator)!;
   }
 
   buildOrderBy(sort: SortSpec[], userId?: number): SQL[] {

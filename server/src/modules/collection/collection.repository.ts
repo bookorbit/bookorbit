@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { SQL, and, count, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -93,7 +93,7 @@ export class CollectionRepository {
       .returning();
   }
 
-  async findBookIdsPage(collectionId: number, libraryIds: number[], page: number, size: number) {
+  async findBookIdsPage(collectionId: number, libraryIds: number[], page: number, size: number, extraWhere?: SQL) {
     if (libraryIds.length === 0) {
       return {
         bookIds: [],
@@ -103,7 +103,7 @@ export class CollectionRepository {
       };
     }
 
-    const where = and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds));
+    const where = and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds), ...(extraWhere ? [extraWhere] : []));
     const [rows, [{ total }]] = await Promise.all([
       this.db
         .select({ bookId: collectionBooks.bookId })
@@ -124,13 +124,13 @@ export class CollectionRepository {
     };
   }
 
-  async findAllBookIds(collectionId: number, libraryIds: number[]): Promise<number[]> {
+  async findAllBookIds(collectionId: number, libraryIds: number[], extraWhere?: SQL): Promise<number[]> {
     if (libraryIds.length === 0) return [];
     const rows = await this.db
       .select({ bookId: collectionBooks.bookId })
       .from(collectionBooks)
       .innerJoin(books, eq(books.id, collectionBooks.bookId))
-      .where(and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds)))
+      .where(and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds), ...(extraWhere ? [extraWhere] : [])))
       .orderBy(collectionBooks.addedAt, collectionBooks.bookId);
     return rows.map((row) => row.bookId);
   }

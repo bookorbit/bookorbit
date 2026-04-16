@@ -159,4 +159,5 @@ export type BookQuery = {
   sort: SortSpec[];
   pagination: { page: number; size: number };
   collapseSeries?: boolean;
+  q?: string;
 };

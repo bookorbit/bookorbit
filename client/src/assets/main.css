@@ -656,7 +656,7 @@
 
 .driver-popover-footer {
   margin-top: 0.875rem !important;
-  gap: 0.5rem !important;
+  gap: 1rem !important;
   padding-top: 0.625rem !important;
   border-top: 1px solid var(--border) !important;
 }
@@ -670,6 +670,7 @@
 
 .driver-popover-prev-btn,
 .driver-popover-prev-btn:focus {
+  gap: 1rem !important;
   all: unset !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -710,6 +711,10 @@
 
 .driver-popover-next-btn:hover {
   opacity: 0.88 !important;
+}
+
+.driver-popover-navigation-btns {
+  gap: 0.5rem !important;
 }
 
 .driver-popover-close-btn,

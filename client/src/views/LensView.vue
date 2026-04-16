@@ -20,6 +20,7 @@ import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useBookSelection } from '@/features/book/composables/useBookSelection'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
+import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -35,7 +36,8 @@ const lensId = computed(() => Number(route.params.id))
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
 const { coverSize, gridGap } = useViewDisplaySettings('lens', lensId, coverAspectRatio)
 
-const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useLens(lensId)
+const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
+const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useLens(lensId, debouncedQuery)
 const { setBookContext, registerLoadMore } = useBookNavigation()
 watch(
   [books, total],
@@ -241,6 +243,9 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkSentinel)
 })
 
+watch(lensId, () => clearSearch())
+watch(debouncedQuery, () => load(true))
+
 watch(
   loading,
   (isLoading) => {
@@ -298,6 +303,8 @@ watch(
       v-model:gridGap="gridGap"
       v-model:viewMode="viewMode"
       :selection-mode="selectionMode"
+      :searchable="true"
+      v-model:searchQuery="searchQuery"
       @toggle-selection="toggleSelectionMode"
     >
       <template #actions>

@@ -153,9 +153,10 @@ export class CollectionController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
     @Query('collapseSeries', new ParseBoolPipe({ optional: true })) collapseSeries?: boolean,
+    @Query('q') q?: string,
   ) {
     this.validateSizeQuery(size);
     this.validatePageQuery(page, size);
-    return this.collectionService.getBooks(id, user, page, size, collapseSeries);
+    return this.collectionService.getBooks(id, user, page, size, collapseSeries, q);
   }
 }

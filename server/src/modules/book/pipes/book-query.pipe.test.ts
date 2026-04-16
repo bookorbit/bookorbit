@@ -83,6 +83,25 @@ describe('BookQueryPipe', () => {
     ).toThrow(BadRequestException);
   });
 
+  it('accepts valid q string', () => {
+    const result = pipe.transform({ q: 'tolkien' });
+    expect(result.q).toBe('tolkien');
+  });
+
+  it('passes through without q', () => {
+    const result = pipe.transform({});
+    expect(result.q).toBeUndefined();
+  });
+
+  it('rejects q longer than 200 characters', () => {
+    expect(() => pipe.transform({ q: 'a'.repeat(201) })).toThrow(BadRequestException);
+  });
+
+  it('accepts q at exactly 200 characters', () => {
+    const result = pipe.transform({ q: 'a'.repeat(200) });
+    expect(result.q).toHaveLength(200);
+  });
+
   it('accepts all valid sort fields', () => {
     const validFields = ['author', 'title', 'series', 'seriesIndex', 'addedAt', 'updatedAt', 'publishedYear', 'pageCount', 'rating'];
     for (const field of validFields) {

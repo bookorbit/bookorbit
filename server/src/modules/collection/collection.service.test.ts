@@ -49,6 +49,7 @@ function makeService() {
     addBooks: vi.fn(),
     removeBooks: vi.fn(),
     findBookIdsPage: vi.fn(),
+    findAllBookIds: vi.fn(),
   };
 
   const bookReadService = {
@@ -61,8 +62,12 @@ function makeService() {
     findAccessibleLibraryIds: vi.fn(),
   };
 
-  const service = new CollectionService(collectionRepo as never, bookReadService as never, libraryService as never);
-  return { service, collectionRepo, bookReadService, libraryService };
+  const queryBuilder = {
+    buildQuickSearch: vi.fn().mockReturnValue({ type: 'quick-search' }),
+  };
+
+  const service = new CollectionService(collectionRepo as never, bookReadService as never, libraryService as never, queryBuilder as never);
+  return { service, collectionRepo, bookReadService, libraryService, queryBuilder };
 }
 
 describe('CollectionService', () => {
@@ -343,7 +348,7 @@ describe('CollectionService', () => {
       const result = await service.getBooks(10, makeUser(), 0, 50);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
-      expect(collectionRepo.findBookIdsPage).toHaveBeenCalledWith(10, [100, 101], 0, 50);
+      expect(collectionRepo.findBookIdsPage).toHaveBeenCalledWith(10, [100, 101], 0, 50, undefined);
       expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([2, 1], 1);
       expect(result.total).toBe(2);
       expect(result.items.map((item) => item.id)).toEqual([2, 1]);

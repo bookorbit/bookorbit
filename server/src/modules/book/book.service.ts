@@ -219,7 +219,12 @@ export class BookService {
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
     this.assertPaginationWindow(query.pagination.page, query.pagination.size);
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
-    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds: [libraryId], implicitLibraryId: libraryId, userId: user.id });
+    const where = this.queryBuilder.buildWhere(query.filter, {
+      accessibleLibraryIds: [libraryId],
+      implicitLibraryId: libraryId,
+      userId: user.id,
+      q: query.q,
+    });
     return this.executeBooksQuery(user.id, where, query);
   }
 
@@ -227,7 +232,7 @@ export class BookService {
     this.assertPaginationWindow(query.pagination.page, query.pagination.size);
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = libs.map((l) => l.id);
-    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id });
+    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id, q: query.q });
     return this.executeBooksQuery(user.id, where, query);
   }
 

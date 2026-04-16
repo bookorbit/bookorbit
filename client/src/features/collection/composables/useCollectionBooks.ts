@@ -4,7 +4,7 @@ import type { BookCard } from '@projectx/types'
 
 const PAGE_SIZE = 50
 
-export function useCollectionBooks(collectionId: Ref<number>, collapseEnabled: Ref<boolean> = ref(false)) {
+export function useCollectionBooks(collectionId: Ref<number>, collapseEnabled: Ref<boolean> = ref(false), q: Ref<string> = ref('')) {
   const items = ref<BookCard[]>([])
   const total = ref(0)
   const loading = ref(false)
@@ -23,6 +23,7 @@ export function useCollectionBooks(collectionId: Ref<number>, collapseEnabled: R
     try {
       const params = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })
       if (collapseEnabled.value) params.set('collapseSeries', 'true')
+      if (q.value.trim()) params.set('q', q.value.trim())
       const res = await api(`/api/v1/collections/${collectionId.value}/books?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to load collection books')
       const data = await res.json()

@@ -47,6 +47,6 @@ describe('LensController', () => {
     expect(lensService.reorder).toHaveBeenCalledWith({ order: [{ id: 1, displayOrder: 0 }] }, user);
     expect(lensService.update).toHaveBeenCalledWith(1, { name: 'Updated' }, user);
     expect(lensService.remove).toHaveBeenCalledWith(1, user);
-    expect(lensService.executeLens).toHaveBeenCalledWith(1, user, 2, 25);
+    expect(lensService.executeLens).toHaveBeenCalledWith(1, user, 2, 25, undefined);
   });
 });

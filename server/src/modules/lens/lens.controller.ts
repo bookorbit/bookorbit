@@ -69,7 +69,8 @@ export class LensController {
     @CurrentUser() user: RequestUser,
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
+    @Query('q') q?: string,
   ) {
-    return this.lensService.executeLens(id, user, page, size);
+    return this.lensService.executeLens(id, user, page, size, q);
   }
 }

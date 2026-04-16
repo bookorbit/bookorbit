@@ -4,7 +4,7 @@ import type { BookCard, BooksPage } from '@projectx/types'
 
 const PAGE_SIZE = 50
 
-export function useLens(lensId: Ref<number>) {
+export function useLens(lensId: Ref<number>, q: Ref<string> = ref('')) {
   const items = ref<BookCard[]>([])
   const total = ref(0)
   const loading = ref(false)
@@ -23,7 +23,8 @@ export function useLens(lensId: Ref<number>) {
     }
 
     try {
-      const res = await api(`/api/v1/lenses/${lensId.value}/books?page=${page.value}&size=${PAGE_SIZE}`)
+      const qParam = q.value.trim() ? `&q=${encodeURIComponent(q.value.trim())}` : ''
+      const res = await api(`/api/v1/lenses/${lensId.value}/books?page=${page.value}&size=${PAGE_SIZE}${qParam}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data: BooksPage = await res.json()

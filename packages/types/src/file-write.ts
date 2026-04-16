@@ -19,4 +19,3 @@ export type WriteLogEntry = {
   durationMs: number | null;
   errorMessage: string | null;
 };
-

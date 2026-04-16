@@ -17,6 +17,7 @@ import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsLensDialog from '@/features/lens/components/SaveAsLensDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
+import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
@@ -70,6 +71,8 @@ watch(prefs, () => {
   collapseEnabledRef.value = libraryId.value !== null ? getEffectivePreference({ libraryId: libraryId.value }) : false
 })
 
+const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
+
 const {
   items: books,
   total,
@@ -81,7 +84,7 @@ const {
   hasMore,
   load,
   clear,
-} = useBookQuery(libraryId, collapseEnabledRef)
+} = useBookQuery(libraryId, collapseEnabledRef, debouncedQuery)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
 const { setBookContext, registerLoadMore } = useBookNavigation()
@@ -292,7 +295,10 @@ onUnmounted(() => stopUploadCompletedListener())
 
 watch(libraryId, (newId) => {
   if (newId === null) clear()
+  clearSearch()
 })
+
+watch(debouncedQuery, () => load(true))
 
 watch(filter, () => load(true), { deep: true })
 watch(
@@ -403,6 +409,8 @@ async function handleToggleCollapse() {
       v-model:gridGap="gridGap"
       v-model:viewMode="viewMode"
       :selection-mode="selectionMode"
+      :searchable="true"
+      v-model:searchQuery="searchQuery"
       @toggle-selection="toggleSelectionMode"
     >
       <template #toolbar>

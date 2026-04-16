@@ -122,12 +122,12 @@ export class LensService {
     }
   }
 
-  async executeLens(id: number, user: RequestUser, page: number, size: number): Promise<BooksPage> {
+  async executeLens(id: number, user: RequestUser, page: number, size: number, q?: string): Promise<BooksPage> {
     const lens = await this.getLensOrThrow(id);
     this.assertReadAccess(lens, user);
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
 
-    const where = this.queryBuilder.buildWhere(lens.filter, { accessibleLibraryIds, userId: user.id });
+    const where = this.queryBuilder.buildWhere(lens.filter, { accessibleLibraryIds, userId: user.id, q });
     const orderBy = this.queryBuilder.buildOrderBy(lens.defaultSort ?? [], user.id);
     const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
       where,
