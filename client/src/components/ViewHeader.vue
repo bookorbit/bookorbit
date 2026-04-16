@@ -24,6 +24,8 @@ withDefaults(
     gridGap: number
     viewMode: 'grid' | 'list'
     selectionMode?: boolean
+    showSelection?: boolean
+    showViewModeToggle?: boolean
     coverShape?: 'square' | 'circle'
     coverSizeMin?: number
     coverSizeMax?: number
@@ -41,6 +43,8 @@ withDefaults(
     gridGapMin: 4,
     gridGapMax: 40,
     gridGapStep: 4,
+    showSelection: true,
+    showViewModeToggle: true,
   },
 )
 
@@ -144,6 +148,7 @@ function handleSearchInput(event: Event) {
 
       <!-- Select mode toggle -->
       <Button
+        v-if="showSelection"
         variant="ghost"
         size="sm"
         class="hidden md:flex h-8 gap-1.5 text-[11px] font-bold uppercase tracking-tight px-2.5 rounded-lg transition-all"
@@ -159,10 +164,10 @@ function handleSearchInput(event: Event) {
         Select
       </Button>
 
-      <div class="hidden md:block w-px h-3.5 bg-border/40 mx-1.5" />
+      <div v-if="showSelection" class="hidden md:block w-px h-3.5 bg-border/40 mx-1.5" />
 
       <!-- Desktop: view mode toggle -->
-      <div class="hidden md:flex items-center gap-0.5">
+      <div v-if="showViewModeToggle" class="hidden md:flex items-center gap-0.5">
         <Button
           variant="ghost"
           size="icon"
@@ -286,12 +291,14 @@ function handleSearchInput(event: Event) {
               Search
             </DropdownMenuItem>
           </template>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem @click="emit('toggle-selection')">
-            <CheckSquare v-if="selectionMode" :size="14" class="mr-2" />
-            <Square v-else :size="14" class="mr-2" />
-            {{ selectionMode ? 'Exit Select' : 'Select' }}
-          </DropdownMenuItem>
+          <template v-if="showSelection">
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="emit('toggle-selection')">
+              <CheckSquare v-if="selectionMode" :size="14" class="mr-2" />
+              <Square v-else :size="14" class="mr-2" />
+              {{ selectionMode ? 'Exit Select' : 'Select' }}
+            </DropdownMenuItem>
+          </template>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

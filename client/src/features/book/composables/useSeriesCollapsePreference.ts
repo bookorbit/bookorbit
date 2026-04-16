@@ -15,23 +15,42 @@ export function useSeriesCollapsePreference() {
     return resolveCollapsePreference(prefs.value, ctx)
   }
 
-  async function setPreference(ctx: { libraryId?: number; collectionId?: number } | 'global', value: boolean): Promise<void> {
+  let pendingUpdate: Promise<void> = Promise.resolve()
+
+  async function setPreference(ctx: { libraryId?: number; collectionId?: number } | 'global', value: boolean | null): Promise<void> {
+    const op = () => doSetPreference(ctx, value)
+    pendingUpdate = pendingUpdate.then(op, op)
+    return pendingUpdate
+  }
+
+  async function doSetPreference(ctx: { libraryId?: number; collectionId?: number } | 'global', value: boolean | null): Promise<void> {
     let body: Record<string, unknown>
     if (ctx === 'global') {
-      body = { global: value }
+      body = { global: value === null ? false : value }
     } else if (ctx.collectionId !== undefined) {
       body = { collections: { [String(ctx.collectionId)]: value } }
     } else if (ctx.libraryId !== undefined) {
       body = { libraries: { [String(ctx.libraryId)]: value } }
     } else {
-      body = { global: value }
+      body = { global: value === null ? false : value }
     }
 
     const current = prefs.value ?? { global: false, libraries: {}, collections: {} }
+    const nextLibraries = { ...current.libraries, ...(body.libraries as Record<string, boolean | null>) }
+    const nextCollections = { ...current.collections, ...(body.collections as Record<string, boolean | null>) }
+
+    // Remove null entries (deletion)
+    for (const [k, v] of Object.entries(nextLibraries)) {
+      if (v === null) delete nextLibraries[k]
+    }
+    for (const [k, v] of Object.entries(nextCollections)) {
+      if (v === null) delete nextCollections[k]
+    }
+
     const updated: SeriesCollapsePreferences = {
       global: body.global !== undefined ? (body.global as boolean) : (current.global ?? false),
-      libraries: { ...current.libraries, ...(body.libraries as Record<string, boolean>) },
-      collections: { ...current.collections, ...(body.collections as Record<string, boolean>) },
+      libraries: nextLibraries as Record<string, boolean>,
+      collections: nextCollections as Record<string, boolean>,
     }
 
     const previous = user.value?.settings ? { ...user.value.settings } : undefined

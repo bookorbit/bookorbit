@@ -215,12 +215,32 @@ export class CollectionService {
       const qWhere = q?.trim() ? this.queryBuilder.buildQuickSearch(q.trim()) : undefined;
 
       if (collapseSeries) {
+        const MAX_COLLAPSE_BOOKS = 5000;
         const allBookIds = await this.collectionRepo.findAllBookIds(id, libraryIds, qWhere);
         if (allBookIds.length === 0) {
           this.logger.log(
             `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=0 itemCount=0 - get collection books completed`,
           );
           return { items: [], total: 0, page, size };
+        }
+
+        if (allBookIds.length > MAX_COLLAPSE_BOOKS) {
+          this.logger.warn(
+            `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} bookCount=${allBookIds.length} cap=${MAX_COLLAPSE_BOOKS} - falling back to non-collapsed pagination`,
+          );
+          const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size, qWhere);
+          if (bookPage.bookIds.length === 0) {
+            return { items: [], total: bookPage.total, page, size };
+          }
+          const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(
+            bookPage.bookIds,
+            user.id,
+          );
+          const orderMap = new Map(bookPage.bookIds.map((bookId, index) => [bookId, index]));
+          const items = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows).sort(
+            (left, right) => (orderMap.get(left.id) ?? 0) - (orderMap.get(right.id) ?? 0),
+          );
+          return { items, total: bookPage.total, page, size };
         }
 
         const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(

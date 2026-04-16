@@ -7,7 +7,11 @@ const mockRouterPush = vi.fn<(...args: unknown[]) => unknown>()
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRouter: () => ({ push: mockRouterPush }) }
+  return {
+    ...actual,
+    useRouter: () => ({ push: mockRouterPush }),
+    useRoute: () => ({ fullPath: '/test-path' }),
+  }
 })
 
 vi.mock('../BookCoverPlaceholder.vue', () => ({
@@ -129,7 +133,11 @@ describe('CollapsedSeriesCard', () => {
 
     await wrapper.trigger('click')
 
-    expect(mockRouterPush).toHaveBeenCalledWith(`/series/${encodeURIComponent('The Arc')}`)
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      name: 'series-detail',
+      params: { seriesName: 'The Arc' },
+      query: { from: '/test-path' },
+    })
   })
 
   it('encodes series name with special characters in URL', async () => {
@@ -139,7 +147,11 @@ describe('CollapsedSeriesCard', () => {
 
     await wrapper.trigger('click')
 
-    expect(mockRouterPush).toHaveBeenCalledWith(`/series/${encodeURIComponent('The Wheel & Time')}`)
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      name: 'series-detail',
+      params: { seriesName: 'The Wheel & Time' },
+      query: { from: '/test-path' },
+    })
   })
 
   it('shows placeholder instead of img after @error fires', async () => {

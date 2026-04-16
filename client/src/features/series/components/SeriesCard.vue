@@ -4,21 +4,10 @@ import type { SeriesSummary } from '@projectx/types'
 import { BookCopy } from 'lucide-vue-next'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { useCoverStack } from '../composables/useCoverStack'
 import SeriesCompletionBar from './SeriesCompletionBar.vue'
 
-const MAX_VISIBLE = 7
-const COVER_WIDTH_PCT = 43
-const COVER_VERTICAL_MARGIN_PCT = 5.5
-const COVER_GROUP_WIDTH_BY_COUNT = {
-  1: 43,
-  2: 62,
-  3: 72,
-  4: 80,
-  5: 86,
-  6: 90,
-  7: 92,
-} satisfies Record<number, number>
-const DEFAULT_COVER_GROUP_WIDTH = COVER_GROUP_WIDTH_BY_COUNT[7]
+const HOVERED_COVER_Z_INDEX = 120
 
 const props = defineProps<{
   series: SeriesSummary
@@ -33,7 +22,9 @@ const fallbackStyle = computed(() => bookCoverStyle(props.series.name))
 const initial = computed(() => props.series.name.trim().charAt(0).toUpperCase() || '?')
 
 const failedCovers = ref(new Set<number>())
-const visibleCovers = computed(() => props.series.coverBookIds.filter((id) => !failedCovers.value.has(id)).slice(0, MAX_VISIBLE))
+const hoveredCoverId = ref<number | null>(null)
+const activeCoverIds = computed(() => props.series.coverBookIds.filter((id) => !failedCovers.value.has(id)))
+const { visibleCovers, baseStyles } = useCoverStack(activeCoverIds)
 
 const authorsLine = computed(() => {
   const a = props.series.authors
@@ -50,26 +41,47 @@ function handleClick() {
   emit('open', props.series.name)
 }
 
+function handleCoverHover(bookId: number) {
+  hoveredCoverId.value = bookId
+}
+
+function clearHoveredCover() {
+  hoveredCoverId.value = null
+}
+
 const coverStyles = computed(() => {
   const total = visibleCovers.value.length
   if (total === 0) return []
 
-  const groupWidth = COVER_GROUP_WIDTH_BY_COUNT[total as keyof typeof COVER_GROUP_WIDTH_BY_COUNT] ?? DEFAULT_COVER_GROUP_WIDTH
-  const step = total > 1 ? (groupWidth - COVER_WIDTH_PCT) / (total - 1) : 0
-  const startLeft = (100 - groupWidth) / 2
-  const center = (total - 1) / 2
+  const hoveredId = hoveredCoverId.value
+  const hoveredIndex = hoveredId == null ? -1 : visibleCovers.value.findIndex((id) => id === hoveredId)
+  const hasActiveHover = hoveredIndex >= 0
 
-  return visibleCovers.value.map((_, index) => ({
-    left: `${startLeft + step * index}%`,
-    bottom: `${COVER_VERTICAL_MARGIN_PCT}%`,
-    width: `${COVER_WIDTH_PCT}%`,
-    aspectRatio: '2 / 3',
-    zIndex: Math.round(total - Math.abs(index - center)) + 1,
-    boxShadow:
-      index === Math.round(center)
-        ? '0 18px 34px -20px rgba(15, 23, 42, 0.72), 0 8px 14px -12px rgba(15, 23, 42, 0.28)'
-        : '0 14px 26px -20px rgba(15, 23, 42, 0.58), 0 6px 12px -12px rgba(15, 23, 42, 0.22)',
-  }))
+  return baseStyles.value.map((base, index) => {
+    const isHovered = hasActiveHover && hoveredId === visibleCovers.value[index]
+    const distanceFromHovered = hasActiveHover ? Math.abs(index - hoveredIndex) : 0
+    const loweredScale = Math.max(0.95, 1 - distanceFromHovered * 0.03)
+    const loweredOffset = Math.min(4, distanceFromHovered * 1.4)
+
+    return {
+      ...base,
+      zIndex: hasActiveHover ? (isHovered ? HOVERED_COVER_Z_INDEX : base.zIndex) : base.zIndex,
+      transform: hasActiveHover
+        ? isHovered
+          ? 'translateY(-8px) scale(1.05)'
+          : `translateY(${loweredOffset}px) scale(${loweredScale})`
+        : 'translateY(0) scale(1)',
+      opacity: hasActiveHover ? (isHovered ? 1 : 0.58) : 1,
+      filter: hasActiveHover ? (isHovered ? 'brightness(1.08) saturate(1.14)' : 'brightness(0.78) saturate(0.74)') : 'none',
+      boxShadow: hasActiveHover
+        ? isHovered
+          ? '0 0 0 2px hsl(var(--primary) / 0.45), 0 24px 36px -20px rgba(15, 23, 42, 0.72), 0 10px 18px -14px rgba(15, 23, 42, 0.3)'
+          : '0 10px 18px -16px rgba(15, 23, 42, 0.4)'
+        : base.boxShadow,
+      transition: 'transform 190ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease, filter 180ms ease, box-shadow 220ms ease',
+      willChange: 'transform, opacity, filter',
+    }
+  })
 })
 </script>
 
@@ -81,6 +93,7 @@ const coverStyles = computed(() => {
       <div
         class="relative isolate overflow-hidden border-b border-border/60 bg-linear-to-b from-white/[0.035] via-background/5 to-black/[0.07]"
         style="aspect-ratio: 11 / 8"
+        @mouseleave="clearHoveredCover"
       >
         <div class="absolute inset-x-[21%] bottom-[5%] h-4 rounded-full bg-black/10 blur-2xl opacity-38" />
 
@@ -93,7 +106,13 @@ const coverStyles = computed(() => {
           </span>
         </div>
 
-        <div v-for="(bookId, i) in visibleCovers" :key="bookId" class="absolute overflow-hidden rounded-lg" :style="coverStyles[i] ?? {}">
+        <div
+          v-for="(bookId, i) in visibleCovers"
+          :key="bookId"
+          class="absolute overflow-hidden rounded-lg"
+          :style="coverStyles[i] ?? {}"
+          @mouseenter="handleCoverHover(bookId)"
+        >
           <img :src="coverUrl(bookId)" alt="" class="h-full w-full object-cover" loading="lazy" decoding="async" @error="handleCoverError(bookId)" />
         </div>
 

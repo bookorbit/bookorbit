@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { BookCard } from '@projectx/types'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
@@ -9,6 +9,7 @@ const props = defineProps<{
   book: BookCard
 }>()
 
+const route = useRoute()
 const router = useRouter()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
@@ -27,7 +28,7 @@ function handleCoverError(bookId: number) {
 }
 
 function handleClick() {
-  router.push(`/series/${encodeURIComponent(seriesName.value)}`)
+  router.push({ name: 'series-detail', params: { seriesName: seriesName.value }, query: { from: route.fullPath } })
 }
 
 function thumbnailUrl(bookId: number): string {

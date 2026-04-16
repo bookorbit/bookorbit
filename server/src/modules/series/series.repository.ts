@@ -39,6 +39,10 @@ export class SeriesRepository {
     return inArray(books.libraryId, libraryIds);
   }
 
+  private escapeLikePattern(s: string): string {
+    return s.replace(/[\\%_]/g, '\\$&');
+  }
+
   async findPage(params: {
     q?: string;
     page: number;
@@ -56,15 +60,16 @@ export class SeriesRepository {
     const conditions: SQL[] = [isNotNull(bookMetadata.seriesName), sql`btrim(${bookMetadata.seriesName}) != ''`, libraryFilter];
 
     if (params.q) {
-      conditions.push(ilike(bookMetadata.seriesName, `%${params.q}%`));
+      conditions.push(ilike(bookMetadata.seriesName, `%${this.escapeLikePattern(params.q)}%`));
     }
 
     if (params.author) {
+      const authorPattern = `%${this.escapeLikePattern(params.author)}%`;
       conditions.push(
         sql`${books.id} IN (
           SELECT ${bookAuthors.bookId} FROM ${bookAuthors}
           INNER JOIN ${authors} ON ${authors.id} = ${bookAuthors.authorId}
-          WHERE ${ilike(authors.name, `%${params.author}%`)}
+          WHERE ${ilike(authors.name, authorPattern)}
         )`,
       );
     }

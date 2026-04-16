@@ -4,23 +4,30 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Pencil } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
-import type { BookCard } from '@projectx/types'
+import type { BookCard, BookDetail } from '@projectx/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import { bookCoverStyle } from '@/features/book/lib/book-cover'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { usePageTitle } from '@/composables/usePageTitle'
+import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
+import { api } from '@/lib/api'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import SeriesCompletionBar from '../components/SeriesCompletionBar.vue'
 import SeriesGapBanner from '../components/SeriesGapBanner.vue'
+import { fetchSeriesBooks } from '../api/series'
 import { useSeriesDetail } from '../composables/useSeriesDetail'
+import { useCoverStack, MAX_VISIBLE as MAX_STACK_VISIBLE } from '../composables/useCoverStack'
 
 const route = useRoute()
 const router = useRouter()
 const { hasPermission } = usePermissions()
 const { setBookContext } = useBookNavigation()
+const { coverUrl } = useCoverVersions()
 
 const { portraitCoverSize, gridGap, viewMode } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
@@ -52,9 +59,54 @@ usePageTitle(pageTitle)
 
 const sentinel = ref<HTMLElement | null>(null)
 const openingSeriesEditor = ref(false)
+const loadingLeadBook = ref(false)
+const leadBookError = ref<string | null>(null)
+const leadDescriptionExpanded = ref(false)
+const leadGenresExpanded = ref(false)
+const leadCoverBookIds = ref<number[]>([])
+const failedLeadCovers = ref(new Set<number>())
+const leadBook = ref<{
+  id: number
+  title: string | null
+  seriesIndex: number | null
+  publishedYear: number | null
+  language: string | null
+  rating: number | null
+  genres: string[]
+  description: string | null
+} | null>(null)
 let observer: IntersectionObserver | null = null
+let leadBookRequestToken = 0
 
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
+const safeLeadDescription = useSafeHtml(() => leadBook.value?.description)
+const visibleSeriesAuthors = computed(() => (seriesInfo.value?.authors ?? []).slice(0, 5))
+const hiddenSeriesAuthorsCount = computed(() => Math.max(0, (seriesInfo.value?.authors.length ?? 0) - visibleSeriesAuthors.value.length))
+const leadFallbackStyle = computed(() => {
+  const name = seriesInfo.value?.name ?? seriesName.value
+  return bookCoverStyle(name || 'Series')
+})
+const leadInitial = computed(() => (seriesInfo.value?.name ?? seriesName.value).trim().charAt(0).toUpperCase() || '?')
+const activeCoverIds = computed(() => leadCoverBookIds.value.filter((id) => !failedLeadCovers.value.has(id)))
+const { visibleCovers: visibleLeadCoverBookIds, baseStyles: leadCoverStyles } = useCoverStack(activeCoverIds)
+const displayedLeadGenres = computed(() => {
+  const genres = leadBook.value?.genres ?? []
+  if (leadGenresExpanded.value || genres.length <= 8) return genres
+  return genres.slice(0, 8)
+})
+const hiddenLeadGenres = computed(() => {
+  const totalGenres = leadBook.value?.genres.length ?? 0
+  return Math.max(0, totalGenres - displayedLeadGenres.value.length)
+})
+const seriesBooksCoverSize = computed(() => Math.max(100, portraitCoverSize.value - 20))
+const leadMetaItems = computed(() => {
+  if (!leadBook.value) return []
+  const items: string[] = []
+  if (leadBook.value.publishedYear != null) items.push(String(leadBook.value.publishedYear))
+  if (leadBook.value.language) items.push(leadBook.value.language.toUpperCase())
+  if (leadBook.value.rating != null) items.push(`${leadBook.value.rating.toFixed(1)}★`)
+  return items
+})
 
 function handleBookAction(book: BookCard, action: string) {
   if (action === 'quick-view') {
@@ -73,6 +125,94 @@ function goBack() {
 function onLibraryFilterChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   libraryId.value = value ? Number(value) : null
+}
+
+function handleLeadCoverError(bookId: number) {
+  failedLeadCovers.value = new Set([...failedLeadCovers.value, bookId])
+}
+
+async function loadLeadBookPreview(preserveCurrent = false) {
+  if (!seriesName.value) {
+    leadBook.value = null
+    leadBookError.value = null
+    leadCoverBookIds.value = []
+    return
+  }
+
+  const token = ++leadBookRequestToken
+  loadingLeadBook.value = true
+  leadBookError.value = null
+  if (!preserveCurrent) {
+    leadBook.value = null
+    leadCoverBookIds.value = []
+    failedLeadCovers.value = new Set<number>()
+  }
+  leadDescriptionExpanded.value = false
+  leadGenresExpanded.value = false
+
+  try {
+    const firstPage = await fetchSeriesBooks(seriesName.value, {
+      page: 0,
+      size: MAX_STACK_VISIBLE,
+      sort: 'seriesIndex',
+      order: 'asc',
+      libraryId: libraryId.value,
+    })
+
+    if (token !== leadBookRequestToken) return
+    leadCoverBookIds.value = firstPage.items
+      .filter((book) => book.hasCover)
+      .map((book) => book.id)
+      .slice(0, MAX_STACK_VISIBLE)
+    const firstBook = firstPage.items[0]
+
+    if (!firstBook) {
+      leadBook.value = null
+      return
+    }
+
+    const baseLeadBook = {
+      id: firstBook.id,
+      title: firstBook.title,
+      seriesIndex: firstBook.seriesIndex,
+      publishedYear: firstBook.publishedYear,
+      language: firstBook.language,
+      rating: firstBook.rating,
+      genres: firstBook.genres,
+      description: null,
+    }
+    leadBook.value = baseLeadBook
+
+    const detailResponse = await api(`/api/v1/books/${firstBook.id}`)
+    if (token !== leadBookRequestToken) return
+
+    if (!detailResponse.ok) return
+
+    const detail = (await detailResponse.json()) as BookDetail
+    leadBook.value = {
+      id: firstBook.id,
+      title: detail.title ?? firstBook.title,
+      seriesIndex: firstBook.seriesIndex,
+      publishedYear: detail.publishedYear ?? firstBook.publishedYear,
+      language: detail.language ?? firstBook.language,
+      rating: detail.rating ?? firstBook.rating,
+      genres: detail.genres.length > 0 ? detail.genres : firstBook.genres,
+      description: detail.description,
+    }
+  } catch (err) {
+    if (token !== leadBookRequestToken) return
+    leadBookError.value = err instanceof Error ? err.message : 'Failed to load lead book details'
+  } finally {
+    if (token === leadBookRequestToken) loadingLeadBook.value = false
+  }
+}
+
+function toggleLeadGenresExpanded() {
+  leadGenresExpanded.value = !leadGenresExpanded.value
+}
+
+function toggleLeadDescriptionExpanded() {
+  leadDescriptionExpanded.value = !leadDescriptionExpanded.value
 }
 
 async function editSeriesMetadata() {
@@ -111,7 +251,7 @@ async function editSeriesMetadata() {
 
 onMounted(async () => {
   await fetchLibraries()
-  await loadBooks(true)
+  await loadBooks({ reset: true })
 
   observer = new IntersectionObserver(
     (entries) => {
@@ -142,12 +282,20 @@ watch(
 )
 
 watch([sort, order, libraryId], () => {
-  void loadBooks(true)
+  void loadBooks({ reset: true, keepPreviousData: true })
 })
 
 watch(seriesName, () => {
-  void loadBooks(true)
+  void loadBooks({ reset: true })
 })
+
+watch(
+  [seriesName, libraryId],
+  ([nextSeriesName], [prevSeriesName]) => {
+    void loadLeadBookPreview(nextSeriesName === prevSeriesName)
+  },
+  { immediate: true },
+)
 
 watch(
   loadingBooks,
@@ -182,27 +330,128 @@ watch(
 
       <!-- Series header -->
       <div v-if="seriesInfo" class="mb-4 rounded-xl border border-border/70 bg-card/60 p-4">
-        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div class="min-w-0">
-            <h1 class="text-xl font-bold text-foreground">{{ seriesInfo.name }}</h1>
-            <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span>{{ seriesInfo.bookCount }} {{ seriesInfo.bookCount === 1 ? 'book' : 'books' }}</span>
-              <span v-if="seriesInfo.authors.length > 0">by {{ seriesInfo.authors.join(', ') }}</span>
+        <div class="flex flex-col gap-4 md:flex-row md:items-start">
+          <div class="mx-auto w-full max-w-[360px] md:mx-0 md:w-[340px] md:shrink-0 lg:w-[360px]">
+            <div
+              class="relative isolate overflow-hidden rounded-xl border border-border/60 bg-linear-to-b from-white/[0.035] via-background/5 to-black/[0.07]"
+              style="aspect-ratio: 11 / 8"
+            >
+              <div class="pointer-events-none absolute -right-8 -top-12 h-36 w-36 rounded-full bg-primary/10 blur-3xl" />
+              <div class="pointer-events-none absolute -bottom-12 -left-10 h-32 w-32 rounded-full bg-primary/8 blur-3xl" />
+              <div class="absolute inset-x-[21%] bottom-[5%] h-4 rounded-full bg-black/10 blur-2xl opacity-38" />
+
+              <div
+                v-for="(bookId, i) in visibleLeadCoverBookIds"
+                :key="bookId"
+                class="absolute overflow-hidden rounded-lg"
+                :style="leadCoverStyles[i] ?? {}"
+              >
+                <img
+                  :src="coverUrl(bookId)"
+                  alt=""
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  @error="handleLeadCoverError(bookId)"
+                />
+              </div>
+
+              <div
+                v-if="visibleLeadCoverBookIds.length === 0"
+                class="absolute inset-x-[28.5%] bottom-[5.5%] top-[5.5%] flex select-none items-center justify-center rounded-[14px] text-4xl font-bold shadow-[0_12px_28px_-18px_rgba(15,23,42,0.7)]"
+                :style="{ background: leadFallbackStyle.background, color: leadFallbackStyle.color }"
+              >
+                {{ leadInitial }}
+              </div>
             </div>
           </div>
 
-          <button
-            v-if="canEditMetadata && books.length > 0"
-            class="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm transition-colors hover:bg-muted disabled:opacity-40 sm:px-3 md:w-auto"
-            :disabled="openingSeriesEditor || loadingBooks"
-            @click="editSeriesMetadata"
-          >
-            <Pencil :size="14" />
-            {{ openingSeriesEditor ? 'Preparing editor...' : 'Edit Series Metadata' }}
-          </button>
+          <div class="min-w-0 flex-1 md:border-l md:border-border/60 md:pl-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="min-w-0">
+                <h1 class="text-xl font-bold text-foreground">{{ seriesInfo.name }}</h1>
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span>{{ seriesInfo.bookCount }} {{ seriesInfo.bookCount === 1 ? 'book' : 'books' }}</span>
+                  <span v-if="visibleSeriesAuthors.length > 0">
+                    by {{ visibleSeriesAuthors.join(', ') }}
+                    <span v-if="hiddenSeriesAuthorsCount > 0"> +{{ hiddenSeriesAuthorsCount }} more</span>
+                  </span>
+                </div>
+              </div>
+
+              <button
+                v-if="canEditMetadata && books.length > 0"
+                class="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm transition-colors hover:bg-muted disabled:opacity-40 sm:px-3 md:w-auto"
+                :disabled="openingSeriesEditor || loadingBooks"
+                @click="editSeriesMetadata"
+              >
+                <Pencil :size="14" />
+                {{ openingSeriesEditor ? 'Preparing editor...' : 'Edit Series Metadata' }}
+              </button>
+            </div>
+
+            <SeriesCompletionBar :read-count="seriesInfo.readCount" :total-count="seriesInfo.bookCount" class="mt-3 max-w-xs" />
+            <SeriesGapBanner v-if="seriesInfo.possibleGaps.length > 0" :gaps="seriesInfo.possibleGaps" class="mt-3" />
+
+            <div class="mt-4 border-t border-border/60 pt-4">
+              <div class="mb-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/90">First in Series</p>
+                <p v-if="leadBook" class="mt-1 text-base font-semibold leading-tight text-foreground">
+                  {{ leadBook.title ?? 'Untitled' }}
+                  <span v-if="leadBook.seriesIndex != null" class="text-muted-foreground">#{{ leadBook.seriesIndex }}</span>
+                </p>
+                <p v-if="leadMetaItems.length > 0" class="mt-1 text-[11px] text-muted-foreground">
+                  {{ leadMetaItems.join(' • ') }}
+                </p>
+              </div>
+
+              <div v-if="loadingLeadBook && !leadBook" class="text-sm text-muted-foreground">Loading first book preview...</div>
+              <div v-else-if="leadBookError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {{ leadBookError }}
+              </div>
+              <div v-else-if="leadBook" class="space-y-3">
+                <div v-if="leadBook.genres.length" class="flex flex-wrap items-center gap-1.5">
+                  <span
+                    v-for="(genre, index) in displayedLeadGenres"
+                    :key="`${genre}-${index}`"
+                    class="rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary/85"
+                  >
+                    {{ genre }}
+                  </span>
+                  <button
+                    v-if="hiddenLeadGenres > 0"
+                    type="button"
+                    class="whitespace-nowrap text-xs font-medium text-foreground/75 transition-colors hover:text-foreground"
+                    @click="toggleLeadGenresExpanded"
+                  >
+                    {{ leadGenresExpanded ? 'Show less' : `+${hiddenLeadGenres} more` }}
+                  </button>
+                </div>
+
+                <div>
+                  <p class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Synopsis</p>
+                  <div v-if="leadBook.description">
+                    <div
+                      class="text-sm leading-relaxed text-foreground/85"
+                      :class="leadDescriptionExpanded ? '' : 'line-clamp-3'"
+                      v-html="safeLeadDescription"
+                    />
+                    <button
+                      type="button"
+                      class="mt-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      @click="toggleLeadDescriptionExpanded"
+                    >
+                      {{ leadDescriptionExpanded ? 'Show less' : 'Show more' }}
+                    </button>
+                  </div>
+                  <p v-else class="text-sm italic text-muted-foreground">No description available.</p>
+                </div>
+                <p v-if="loadingLeadBook" class="text-xs text-muted-foreground">Updating preview...</p>
+              </div>
+              <div v-else class="text-sm text-muted-foreground">No books available to preview.</div>
+            </div>
+          </div>
         </div>
-        <SeriesCompletionBar :read-count="seriesInfo.readCount" :total-count="seriesInfo.bookCount" class="mt-3 max-w-xs" />
-        <SeriesGapBanner v-if="seriesInfo.possibleGaps.length > 0" :gaps="seriesInfo.possibleGaps" class="mt-3" />
       </div>
 
       <!-- Loading state -->
@@ -212,34 +461,38 @@ watch(
 
       <!-- Books section -->
       <section v-if="seriesInfo" class="rounded-xl border border-border/70 bg-card/60 p-3">
-        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h2 class="text-sm font-semibold text-foreground">Books</h2>
-          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <select
-              v-model="sort"
-              class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-            >
-              <option value="seriesIndex">Series Order</option>
-              <option value="title">Title</option>
-              <option value="addedAt">Recently Added</option>
-            </select>
+        <div
+          class="sticky top-0 z-20 -mx-3 mb-3 border-b border-border/60 bg-card/92 px-3 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-card/78"
+        >
+          <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <h2 class="text-sm font-semibold text-foreground">Books</h2>
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <select
+                v-model="sort"
+                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
+              >
+                <option value="seriesIndex">Series Order</option>
+                <option value="title">Title</option>
+                <option value="addedAt">Recently Added</option>
+              </select>
 
-            <select
-              v-model="order"
-              class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-            >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
-            </select>
+              <select
+                v-model="order"
+                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
 
-            <select
-              :value="libraryId ?? ''"
-              class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-              @change="onLibraryFilterChange"
-            >
-              <option value="">All Libraries</option>
-              <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-            </select>
+              <select
+                :value="libraryId ?? ''"
+                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
+                @change="onLibraryFilterChange"
+              >
+                <option value="">All Libraries</option>
+                <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -251,7 +504,7 @@ watch(
         <VirtualBookGrid
           v-if="viewMode === 'grid' && books.length > 0"
           :books="books"
-          :cover-size="portraitCoverSize"
+          :cover-size="seriesBooksCoverSize"
           :grid-gap="gridGap"
           @action="handleBookAction"
         />

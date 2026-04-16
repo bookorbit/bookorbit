@@ -240,39 +240,71 @@ describe('SeriesService', () => {
     });
   });
 
-  describe('computeGaps (via findBooks)', () => {
+  describe('findBooks - library filter empty state', () => {
+    it('returns empty state when series exists in another library', async () => {
+      seriesRepo.findDetail
+        .mockResolvedValueOnce(null) // first call with scoped library [2]
+        .mockResolvedValueOnce({ name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: [1, 2, 3, 4, 5] }); // second call with all libraries [1, 2]
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
+
+      const result = await service.findBooks(reqUser(), 'Dune', { libraryId: 2 });
+
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.seriesInfo.name).toBe('Dune');
+      expect(result.seriesInfo.authors).toEqual(['Frank Herbert']);
+      expect(result.seriesInfo.possibleGaps).toEqual([]);
+      expect(result.seriesInfo.bookCount).toBe(0);
+    });
+
+    it('throws 404 when series does not exist in any library', async () => {
+      seriesRepo.findDetail.mockResolvedValue(null);
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
+
+      await expect(service.findBooks(reqUser(), 'Nonexistent', { libraryId: 1 })).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws 404 when no library filter and series not found', async () => {
+      seriesRepo.findDetail.mockResolvedValue(null);
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
+
+      await expect(service.findBooks(reqUser(), 'Nonexistent', {})).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('computeGaps edge cases', () => {
     beforeEach(() => {
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
     });
 
-    it('detects integer gaps', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 2, 5] });
-      const result = await service.findBooks(reqUser(), 'S', {});
-      expect(result.seriesInfo.possibleGaps).toEqual([3, 4]);
-    });
-
-    it('ignores decimal indices for gap detection', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 1.5, 3] });
-      const result = await service.findBooks(reqUser(), 'S', {});
-      expect(result.seriesInfo.possibleGaps).toEqual([2]);
-    });
-
-    it('returns empty gaps for single-book series', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 1, readCount: 0, authors: [], indices: [1] });
+    it('returns empty gaps when all indices are non-integer', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [0.5, 1.5, 2.5] });
       const result = await service.findBooks(reqUser(), 'S', {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
-    it('returns empty gaps for continuous series', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 2, 3] });
+    it('returns empty gaps when min index < 1', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [0, 5] });
       const result = await service.findBooks(reqUser(), 'S', {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
-    it('handles near-integer floating point values', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [1.001, 3.002] });
+    it('returns empty gaps when max index > 10000', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [1, 10001] });
+      const result = await service.findBooks(reqUser(), 'S', {});
+      expect(result.seriesInfo.possibleGaps).toEqual([]);
+    });
+
+    it('handles duplicate indices', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 1, 3] });
       const result = await service.findBooks(reqUser(), 'S', {});
       expect(result.seriesInfo.possibleGaps).toEqual([2]);
+    });
+
+    it('handles empty indices array', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      const result = await service.findBooks(reqUser(), 'S', {});
+      expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
   });
 });

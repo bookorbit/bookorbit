@@ -83,6 +83,20 @@ export class SeriesService {
     ]);
 
     if (!detail) {
+      if (dto.libraryId) {
+        const allLibraryIds = await this.resolveLibraryIds(user);
+        const existsInAnyLibrary = await this.seriesRepo.findDetail({ seriesName, userId: user.id, libraryIds: allLibraryIds });
+        if (existsInAnyLibrary) {
+          const emptyInfo: SeriesDetail = {
+            name: existsInAnyLibrary.name,
+            bookCount: 0,
+            readCount: 0,
+            authors: existsInAnyLibrary.authors,
+            possibleGaps: [],
+          };
+          return { items: [], total: 0, page, size, seriesInfo: emptyInfo };
+        }
+      }
       throw new NotFoundException('Series not found');
     }
 

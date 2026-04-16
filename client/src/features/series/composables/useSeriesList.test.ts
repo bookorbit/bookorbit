@@ -112,7 +112,18 @@ describe('useSeriesList', () => {
     expect(error.value).toBe('Failed to load series')
   })
 
-  it('does not load when already loading', async () => {
+  it('does not load when already loading (non-reset)', async () => {
+    // First load some data so hasMore becomes true
+    mockFetchSeries.mockResolvedValueOnce({
+      items: [{ name: 'Series A', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      total: 3,
+      page: 0,
+      size: 50,
+    })
+
+    const { loading, load } = useSeriesList()
+    await load(true)
+
     let resolveFn!: (v: SeriesPage) => void
     mockFetchSeries.mockImplementation(
       () =>
@@ -121,18 +132,96 @@ describe('useSeriesList', () => {
         }),
     )
 
-    const { loading, load } = useSeriesList()
-
-    const firstLoad = load(true)
+    const firstLoad = load()
     expect(loading.value).toBe(true)
 
-    const secondLoad = load(true)
+    const secondLoad = load()
 
-    resolveFn!({ items: [], total: 0, page: 0, size: 50 })
+    resolveFn!({ items: [], total: 3, page: 1, size: 50 })
     await firstLoad
     await secondLoad
 
-    expect(mockFetchSeries).toHaveBeenCalledTimes(1)
+    // Only the initial load + one additional load = 2 total calls
+    expect(mockFetchSeries).toHaveBeenCalledTimes(2)
+  })
+
+  it('allows reset load to supersede an in-flight non-reset load', async () => {
+    let resolveFirst!: (v: SeriesPage) => void
+    let resolveSecond!: (v: SeriesPage) => void
+    mockFetchSeries
+      .mockImplementationOnce(
+        () =>
+          new Promise<SeriesPage>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<SeriesPage>((resolve) => {
+            resolveSecond = resolve
+          }),
+      )
+
+    const { items, load } = useSeriesList()
+
+    const firstLoad = load(true)
+    const resetLoad = load(true)
+
+    // Resolve second (reset) first
+    resolveSecond!({
+      items: [{ name: 'Fresh', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      total: 1,
+      page: 0,
+      size: 50,
+    })
+    await resetLoad
+
+    // Resolve first (stale)
+    resolveFirst!({
+      items: [{ name: 'Stale', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      total: 1,
+      page: 0,
+      size: 50,
+    })
+    await firstLoad
+
+    // Stale response should be discarded
+    expect(items.value).toHaveLength(1)
+    expect(items.value[0]!.name).toBe('Fresh')
+  })
+
+  it('discards stale error when superseded by newer request', async () => {
+    let resolveSecond!: (v: SeriesPage) => void
+    mockFetchSeries
+      .mockImplementationOnce(
+        () =>
+          new Promise<SeriesPage>((_, reject) => {
+            setTimeout(() => reject(new Error('Stale error')), 10)
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<SeriesPage>((resolve) => {
+            resolveSecond = resolve
+          }),
+      )
+
+    const { error, items, load } = useSeriesList()
+
+    const firstLoad = load(true)
+    const resetLoad = load(true)
+
+    resolveSecond!({
+      items: [{ name: 'OK', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      total: 1,
+      page: 0,
+      size: 50,
+    })
+    await resetLoad
+    await firstLoad
+
+    expect(error.value).toBeNull()
+    expect(items.value[0]!.name).toBe('OK')
   })
 
   it('does not load more when no more items', async () => {

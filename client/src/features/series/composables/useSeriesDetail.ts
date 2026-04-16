@@ -5,6 +5,10 @@ import { fetchSeriesBooks } from '../api/series'
 import type { SeriesBookSort, SortDirection } from '../types/series'
 
 const PAGE_SIZE = 50
+type LoadOptions = {
+  reset?: boolean
+  keepPreviousData?: boolean
+}
 
 export function useSeriesDetail(seriesName: Ref<string>) {
   const seriesInfo = ref<SeriesDetail | null>(null)
@@ -21,43 +25,54 @@ export function useSeriesDetail(seriesName: Ref<string>) {
   const page = ref(0)
   const hasMore = computed(() => items.value.length < total.value)
 
-  async function load(reset = false): Promise<void> {
-    if (!seriesName.value) return
-    if (loading.value) return
-    if (!reset && !hasMore.value) return
+  let requestToken = 0
 
+  async function load(input: boolean | LoadOptions = false): Promise<void> {
+    const reset = typeof input === 'boolean' ? input : Boolean(input.reset)
+    const keepPreviousData = typeof input === 'boolean' ? false : Boolean(input.keepPreviousData)
+    if (!seriesName.value) return
+    if (!reset && loading.value) return
+    if (!reset && !hasMore.value) return
+    const requestPage = reset ? 0 : page.value
+
+    const token = ++requestToken
     loading.value = true
     error.value = null
 
     if (reset) {
-      page.value = 0
-      items.value = []
-      seriesInfo.value = null
-      total.value = 0
       notFound.value = false
+      page.value = 0
+      if (!keepPreviousData) {
+        items.value = []
+        seriesInfo.value = null
+        total.value = 0
+      }
     }
 
     try {
       const data = await fetchSeriesBooks(seriesName.value, {
-        page: page.value,
+        page: requestPage,
         size: PAGE_SIZE,
         sort: sort.value,
         order: order.value,
         libraryId: libraryId.value,
       })
 
+      if (token !== requestToken) return
+
       items.value = reset ? data.items : [...items.value, ...data.items]
       total.value = data.total
       seriesInfo.value = data.seriesInfo
-      page.value += 1
+      page.value = requestPage + 1
     } catch (err) {
+      if (token !== requestToken) return
       if (err instanceof Error && err.message.includes('404')) {
         notFound.value = true
       } else {
         error.value = err instanceof Error ? err.message : 'Failed to load series'
       }
     } finally {
-      loading.value = false
+      if (token === requestToken) loading.value = false
     }
   }
 

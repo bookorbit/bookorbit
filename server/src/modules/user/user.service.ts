@@ -265,6 +265,15 @@ export class UserService {
       libraries: { ...currentPrefs.libraries, ...(dto.libraries ?? {}) },
       collections: { ...currentPrefs.collections, ...(dto.collections ?? {}) },
     };
+
+    // Remove entries set to null (deletion of overrides)
+    for (const [k, v] of Object.entries(merged.libraries)) {
+      if (v === null) delete merged.libraries[k];
+    }
+    for (const [k, v] of Object.entries(merged.collections)) {
+      if (v === null) delete merged.collections[k];
+    }
+
     await this.userRepo.update(userId, { settings: { seriesCollapsePreferences: merged } });
   }
 }

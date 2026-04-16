@@ -22,13 +22,17 @@ export function useSeriesList() {
   const page = ref(0)
   const hasMore = computed(() => items.value.length < total.value)
 
+  let requestToken = 0
+
   async function load(reset = false): Promise<void> {
-    if (loading.value) return
+    if (!reset && loading.value) return
     if (!reset && !hasMore.value) return
 
+    const token = ++requestToken
     loading.value = true
     error.value = null
 
+    const requestPage = reset ? 0 : page.value
     if (reset) {
       page.value = 0
       items.value = []
@@ -37,7 +41,7 @@ export function useSeriesList() {
     try {
       const data = await fetchSeries({
         q: q.value.trim() || undefined,
-        page: page.value,
+        page: requestPage,
         size: PAGE_SIZE,
         sort: sort.value,
         order: order.value,
@@ -46,13 +50,16 @@ export function useSeriesList() {
         author: author.value?.trim() || undefined,
       })
 
+      if (token !== requestToken) return
+
       items.value = reset ? data.items : [...items.value, ...data.items]
       total.value = data.total
-      page.value += 1
+      page.value = requestPage + 1
     } catch (err) {
+      if (token !== requestToken) return
       error.value = err instanceof Error ? err.message : 'Failed to load series'
     } finally {
-      loading.value = false
+      if (token === requestToken) loading.value = false
     }
   }
 

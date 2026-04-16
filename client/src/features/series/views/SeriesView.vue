@@ -101,7 +101,7 @@ function syncRouteQuery() {
 }
 
 function openSeries(seriesName: string) {
-  void router.push({ name: 'series-detail', params: { seriesName } })
+  void router.push({ name: 'series-detail', params: { seriesName }, query: { from: route.fullPath } })
 }
 
 function setSortField(field: SeriesListSort) {
@@ -188,10 +188,16 @@ async function clearFilters() {
   suppressAutoReload.value = false
 }
 
-function handleFilterUpdate(field: 'libraryId' | 'completionStatus' | 'author', value: unknown) {
-  if (field === 'libraryId') libraryId.value = value as number | null
-  else if (field === 'completionStatus') completionStatus.value = value as CompletionStatus | null
-  else if (field === 'author') author.value = value as string | null
+function handleLibraryIdUpdate(value: number | null) {
+  libraryId.value = value
+}
+
+function handleCompletionStatusUpdate(value: CompletionStatus | null) {
+  completionStatus.value = value
+}
+
+function handleAuthorUpdate(value: string | null) {
+  author.value = value
 }
 
 function loadIfSentinelVisible() {
@@ -283,6 +289,8 @@ watch(seriesGridGap, (value) => {
     icon="Library"
     :total="total"
     :view-mode="viewMode"
+    :show-selection="false"
+    :show-view-mode-toggle="false"
     v-model:coverSize="seriesCardWidth"
     v-model:gridGap="seriesGridGap"
     :cover-size-min="SERIES_CARD_WIDTH_MIN"
@@ -437,9 +445,9 @@ watch(seriesGridGap, (value) => {
       :completion-status="completionStatus"
       :author="author"
       :active-count="activeFilterCount"
-      @update:library-id="handleFilterUpdate('libraryId', $event)"
-      @update:completion-status="handleFilterUpdate('completionStatus', $event)"
-      @update:author="handleFilterUpdate('author', $event)"
+      @update:library-id="handleLibraryIdUpdate"
+      @update:completion-status="handleCompletionStatusUpdate"
+      @update:author="handleAuthorUpdate"
       @clear="clearFilters"
     />
   </section>
@@ -453,9 +461,9 @@ watch(seriesGridGap, (value) => {
     :author="author"
     :active-count="activeFilterCount"
     closable
-    @update:library-id="handleFilterUpdate('libraryId', $event)"
-    @update:completion-status="handleFilterUpdate('completionStatus', $event)"
-    @update:author="handleFilterUpdate('author', $event)"
+    @update:library-id="handleLibraryIdUpdate"
+    @update:completion-status="handleCompletionStatusUpdate"
+    @update:author="handleAuthorUpdate"
     @clear="clearFilters"
     @close="closeFiltersPanel"
   />
