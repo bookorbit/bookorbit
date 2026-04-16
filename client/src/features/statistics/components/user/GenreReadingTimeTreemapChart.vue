@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme'
 import { getThemePalette, readCssColor } from '@/lib/echarts'
 import { useUserGenreReadingTime } from '../../composables/useUserGenreReadingTime'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_GENRES = 2
 
@@ -75,9 +76,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Genre Reading Time" :icon="Tag" :color-index="6" :loading :error :empty="isEmpty">
-    <div v-if="!hasEnoughData" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_GENRES }} genres with reading time
-    </div>
+    <ChartEmptyState
+      v-if="!hasEnoughData"
+      :icon="Tag"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_GENRES} genres with reading time for this chart.`"
+    />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

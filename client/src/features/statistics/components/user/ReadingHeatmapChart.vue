@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme'
 import { buildHeatmapPalette } from '../../heatmap-palette'
 import { useUserReadingHeatmap } from '../../composables/useUserReadingHeatmap'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_ACTIVE_DAYS = 5
 
@@ -135,9 +136,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Reading Heatmap" :icon="Calendar" :color-index="4" :loading :error :empty="isEmpty">
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need activity on at least {{ MIN_ACTIVE_DAYS }} days to show a reliable pattern
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="Calendar"
+      title="Not enough data yet"
+      :description="`Need activity on at least ${MIN_ACTIVE_DAYS} days for this chart.`"
+    />
     <div v-else class="h-full min-h-0 rounded-md px-2 py-2">
       <VChart :option autoresize class="h-full w-full" />
     </div>

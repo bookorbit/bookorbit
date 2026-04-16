@@ -5,6 +5,7 @@ import { Goal } from 'lucide-vue-next'
 
 import { useUserGoalTrajectory } from '../../composables/useUserGoalTrajectory'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 2
@@ -73,13 +74,18 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Pace vs Goal" :icon="Goal" :color-index="9" :loading :error :empty="isEmpty">
-    <div v-if="noCompletionsYet" class="text-muted-foreground flex h-full flex-col items-center justify-center gap-1 text-sm">
-      <p>No completed books in this window yet</p>
-      <p class="text-xs opacity-80">This chart plots completed books against your yearly goal.</p>
-    </div>
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_COMPLETIONS }} completions to show a stable trajectory
-    </div>
-    <VChart v-else-if="!noCompletionsYet" :option autoresize style="height: 100%" />
+    <ChartEmptyState
+      v-if="noCompletionsYet"
+      :icon="Goal"
+      title="No completed books yet"
+      description="Complete a book in this period to compare your pace against your yearly goal."
+    />
+    <ChartEmptyState
+      v-else-if="lowConfidence"
+      :icon="Goal"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+    />
+    <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

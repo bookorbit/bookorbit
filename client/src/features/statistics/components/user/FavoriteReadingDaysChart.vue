@@ -5,6 +5,7 @@ import { CalendarDays } from 'lucide-vue-next'
 
 import { useUserFavoriteReadingDays } from '../../composables/useUserFavoriteReadingDays'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MIN_EVENTS = 14
@@ -83,9 +84,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Favorite Reading Days" :icon="CalendarDays" :color-index="6" :loading :error :empty="isEmpty">
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_EVENTS }} reading events for a stable weekday pattern
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="CalendarDays"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_EVENTS} reading events for this chart.`"
+    />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

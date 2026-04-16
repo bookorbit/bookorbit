@@ -5,6 +5,7 @@ import { CalendarRange } from 'lucide-vue-next'
 
 import { useUserCompletionTimeline } from '../../composables/useUserCompletionTimeline'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 3
@@ -66,9 +67,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Completion Timeline" :icon="CalendarRange" :color-index="8" :loading :error :empty="isEmpty">
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_COMPLETIONS }} completed books for a reliable timeline
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="CalendarRange"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+    />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

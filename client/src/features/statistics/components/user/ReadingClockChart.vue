@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme'
 import { getThemePalette } from '@/lib/echarts'
 import { useUserPeakReadingHours } from '../../composables/useUserPeakReadingHours'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 // prettier-ignore
 const HOUR_LABELS = [
@@ -119,9 +120,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Reading Clock" :icon="Clock" :color-index="5" :loading :error :empty="isEmpty">
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_EVENTS }} sessions for a stable clock
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="Clock"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_EVENTS} reading sessions for this chart.`"
+    />
     <template v-else>
       <div v-if="peakHour" class="text-muted-foreground mb-1 text-center text-xs">
         Peak: <span class="text-foreground font-medium">{{ HOUR_LABELS[peakHour.hour] }}</span>

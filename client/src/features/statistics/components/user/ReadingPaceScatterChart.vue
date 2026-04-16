@@ -5,6 +5,7 @@ import { Zap } from 'lucide-vue-next'
 
 import { useUserReadingPace } from '../../composables/useUserReadingPace'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_SESSIONS = 10
 
@@ -60,9 +61,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Reading Pace" :icon="Zap" :color-index="2" :loading :error :empty="isEmpty">
-    <div v-if="!hasEnoughData" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_SESSIONS }} sessions with progress data
-    </div>
+    <ChartEmptyState
+      v-if="!hasEnoughData"
+      :icon="Zap"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_SESSIONS} sessions with progress data for this chart.`"
+    />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

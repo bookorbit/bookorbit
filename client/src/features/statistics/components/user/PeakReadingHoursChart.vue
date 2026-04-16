@@ -5,6 +5,7 @@ import { Clock3 } from 'lucide-vue-next'
 
 import { useUserPeakReadingHours } from '../../composables/useUserPeakReadingHours'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_EVENTS = 20
 
@@ -69,9 +70,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Peak Reading Hours" :icon="Clock3" :color-index="5" :loading :error :empty="isEmpty">
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_EVENTS }} reading events for a stable hourly profile
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="Clock3"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_EVENTS} reading events for this chart.`"
+    />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

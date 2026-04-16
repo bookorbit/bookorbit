@@ -5,6 +5,7 @@ import { BookCheck } from 'lucide-vue-next'
 
 import { useUserBooksCompleted } from '../../composables/useUserBooksCompleted'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 2
@@ -72,9 +73,12 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Books Completed" :icon="BookCheck" :color-index="3" :loading :error :empty="isEmpty">
-    <div v-if="!hasEnoughData" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Complete at least {{ MIN_COMPLETIONS }} books to see your curve
-    </div>
+    <ChartEmptyState
+      v-if="!hasEnoughData"
+      :icon="BookCheck"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+    />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

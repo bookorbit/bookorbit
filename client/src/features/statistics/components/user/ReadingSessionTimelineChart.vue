@@ -9,6 +9,7 @@ import { getFormatColor } from '@/features/book/lib/format-colors'
 import { fetchUserReadingSessionTimeline, updateUserReadingSessionTimelineSession } from '../../api/statistics.api'
 import { useStatisticsConfig } from '../../composables/useStatisticsConfig'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 const MAX_TRACKS = 3
@@ -721,10 +722,12 @@ function getUtcIsoWeekStart(year: number, week: number): Date {
       </p>
 
       <div class="border-border/60 bg-muted/5 min-h-0 flex-1 rounded-lg border p-2">
-        <div v-if="isEmpty" class="text-muted-foreground flex h-full flex-col items-center justify-center gap-1 text-center">
-          <p class="text-sm font-medium">No data yet</p>
-          <p class="text-xs opacity-70">No sessions for this week. Use Prev/Next or week selector.</p>
-        </div>
+        <ChartEmptyState
+          v-if="isEmpty"
+          :icon="CalendarRange"
+          title="No sessions this week"
+          description="Use Prev/Next or the week selector to view a different week."
+        />
 
         <VChart
           v-else

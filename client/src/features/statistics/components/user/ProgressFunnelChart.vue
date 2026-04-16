@@ -6,6 +6,7 @@ import { Waypoints } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useUserProgressFunnel } from '../../composables/useUserProgressFunnel'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 type FunnelMode = 'percent' | 'counts' | 'dropoff'
 const MODE_LABELS: Record<FunnelMode, string> = {
@@ -194,13 +195,18 @@ watchEffect(() => {
       </DropdownMenu>
     </template>
 
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_STARTED }} started books for a reliable funnel
-    </div>
-    <div v-else-if="showFlatState" class="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-sm">
-      <p>No observed drop-off in this window.</p>
-      <p class="text-xs opacity-80">Every started book progressed through all funnel stages.</p>
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="Waypoints"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_STARTED} started books for this chart.`"
+    />
+    <ChartEmptyState
+      v-else-if="showFlatState"
+      :icon="Waypoints"
+      title="No drop-off observed"
+      description="Every started book progressed through all funnel stages in this period."
+    />
     <div v-else class="flex h-full min-h-0 flex-col gap-2.5">
       <div class="flex flex-wrap gap-1.5 text-xs">
         <span class="border-border bg-muted/20 rounded-md border px-2 py-1">

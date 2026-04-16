@@ -5,6 +5,7 @@ import { Rabbit } from 'lucide-vue-next'
 
 import { useUserCompletionLatency } from '../../composables/useUserCompletionLatency'
 import ChartCard from '../ChartCard.vue'
+import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_COMPLETIONS = 5
 
@@ -59,9 +60,12 @@ function metric(value: number | null): string {
 
 <template>
   <ChartCard title="Completion Latency" :icon="Rabbit" :color-index="2" :loading :error :empty="isEmpty">
-    <div v-if="lowConfidence" class="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Need at least {{ MIN_COMPLETIONS }} completions for reliable latency insights
-    </div>
+    <ChartEmptyState
+      v-if="lowConfidence"
+      :icon="Rabbit"
+      title="Not enough data yet"
+      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+    />
     <div v-else class="flex h-full flex-col gap-3">
       <div class="text-muted-foreground grid grid-cols-3 gap-2 text-xs">
         <div class="rounded-md border px-2 py-1">
