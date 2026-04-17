@@ -1,76 +1,66 @@
 # Contributing to ProjectX
 
-Thanks for your interest in contributing! Whether you're fixing a bug, suggesting a feature, or improving docs, every contribution is appreciated.
+Thanks for your interest in contributing to ProjectX. Whether you are fixing a typo or building a major feature, this guide walks you through the process from start to finish.
 
-## What is ProjectX?
+**Companion docs:**
 
-ProjectX is a self-hostable digital library for managing and reading books and comics, with first-class Kobo device support.
-
-**Tech stack:**
-
-- **Frontend:** Vue 3, TypeScript, Tailwind CSS
-- **Backend:** NestJS, Fastify, Drizzle ORM
-- **Database:** PostgreSQL
-- **Deployment:** Docker
-
----
-
-## Project Structure
-
-```
-projectx/
-├── client/              # Vue 3 frontend
-├── server/              # NestJS backend
-│   └── src/
-│       ├── modules/     # Feature modules (one per domain)
-│       ├── db/          # Drizzle schema, migrations
-│       └── common/      # Guards, filters, decorators
-└── packages/
-    └── types/           # Shared types between client and server
-```
-
-> **Important:** Types shared between the frontend and backend live in `packages/types/` and are imported via the `@projectx/types` alias. Never duplicate shared types in both workspaces. Always add them here.
-
----
-
-## Before You Start
-
-> **Issue first, PR second.** Every pull request must be linked to an approved issue. If you want to work on something, open an issue and wait for a maintainer to explicitly approve it before writing any code. A thumbs up reaction or a comment saying "go ahead" on the issue counts as approval. PRs submitted without a linked, approved issue will be closed.
-
-This protects your time and ours: it ensures the work is wanted and you're heading in the right direction before investing effort.
-
-To set your PR up for success, make sure:
-
-- It is linked to an approved issue
-- It includes proof of manual testing (screenshots, screen recording, or test output)
-- It contains a single focused change, no bundled unrelated work
-- It is reasonably sized. PRs with 1000+ changed lines are hard to review. Split them up.
-- No new dependencies are added without prior discussion
-
-If you're unsure whether something fits the project's direction, open an issue and ask before building it.
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Local setup, architecture, commands, and technical reference.
+- [TESTING.md](TESTING.md) - Test architecture, E2E suites, coverage thresholds, and harness details.
+- [COMMIT_GUIDELINES.md](COMMIT_GUIDELINES.md) - Commit message format, types, scopes, and examples.
 
 ---
 
 ## Where to Start
 
-Not sure where to begin? Look for issues labeled:
+Not sure what to work on? Look for issues tagged with:
 
-- [`good first issue`](../../labels/good%20first%20issue) - small, well-scoped tasks ideal for newcomers
-- [`help wanted`](../../labels/help%20wanted) - tasks where a contribution would be especially welcome
+- [`good first issue`](../../labels/good%20first%20issue) - Scoped tasks with clear acceptance criteria. Great for your first contribution.
+- [`help wanted`](../../labels/help%20wanted) - Larger tasks where maintainer bandwidth is limited.
+
+If nothing there catches your eye, browse the open issues or propose something new.
+
+### Documentation Contributions
+
+Doc improvements are always welcome and have a lighter process:
+
+- No tests required.
+- Use the `docs/` branch prefix (e.g. `docs/fix-setup-instructions`).
+- Focus areas: fixing inaccuracies, improving examples, adding missing guides, clarifying confusing sections.
+
+The rest of this guide still applies (issue first, PR template, etc.), but expect a faster review cycle.
 
 ---
 
 ## Security Issues
 
-Please do not open public issues for security vulnerabilities. See [SECURITY.md](.github/SECURITY.md) for how to report them privately.
+Do **not** open public issues for security vulnerabilities. Use GitHub's [private vulnerability reporting](../../security/advisories/new) instead. See [SECURITY.md](.github/SECURITY.md) for details.
 
 ---
 
-## Getting Started
+## Contribution Workflow
 
-### Fork and Clone
+This is the end-to-end journey from idea to merged PR. Each phase builds on the previous one.
 
-[Fork the repository](../../fork) on GitHub, then clone your fork locally:
+### Phase 1: Find or Create an Issue
+
+> **Issue first, PR second.** Every pull request must link to an approved issue. PRs without one will be closed.
+
+- Browse [open issues](../../issues) for something you want to tackle.
+- If you have a new idea, open one using the [bug report](../../issues/new?template=bug_report.yml) or [feature request](../../issues/new?template=feature_request.yml) template.
+- Not sure if your idea fits the roadmap? Ask in a new issue before investing time.
+
+### Phase 2: Get Maintainer Approval
+
+Wait for explicit approval before writing code. Approval looks like:
+
+- A :+1: reaction on your issue.
+- A comment such as "go ahead", "approved", or "let's do it".
+
+This step prevents wasted effort on changes that conflict with the project direction. Small bug fixes with clear reproduction are usually approved quickly.
+
+### Phase 3: Fork and Clone
+
+[Fork the repository](../../fork), then clone your fork:
 
 ```bash
 git clone https://github.com/<your-username>/projectx.git
@@ -78,9 +68,127 @@ cd projectx
 git remote add upstream https://github.com/neonsolstice/projectx.git
 ```
 
-### Keep Your Fork in Sync
+> **Trusted contributors** with direct push access can skip the fork and work on branches in the main repository. The rest of this guide assumes the fork workflow.
 
-Before starting new work, pull the latest changes from upstream:
+### Phase 4: Set Up Your Environment
+
+If this is your first time:
+
+```bash
+pnpm setup
+```
+
+This handles everything: dependencies, PostgreSQL, migrations, and seed data. See [DEVELOPMENT.md](DEVELOPMENT.md) for prerequisites, manual setup steps, and troubleshooting.
+
+### Phase 5: Create Your Branch
+
+Always branch from the latest `main`:
+
+```bash
+git fetch upstream
+git checkout -b <prefix>/<short-description> upstream/main
+```
+
+Use these branch prefixes:
+
+| Prefix      | Use for                                | Example                          |
+| ----------- | -------------------------------------- | -------------------------------- |
+| `feat/`     | New features                           | `feat/reading-progress-sync`     |
+| `fix/`      | Bug fixes                              | `fix/pdf-page-count-off-by-one`  |
+| `refactor/` | Code restructuring                     | `refactor/library-scan-pipeline` |
+| `docs/`     | Documentation                          | `docs/opds-setup-guide`          |
+| `chore/`    | Maintenance (deps, tooling, CI, build) | `chore/bump-drizzle-v1`          |
+
+### Phase 6: Implement Your Change
+
+Start the dev server and get to work:
+
+```bash
+pnpm dev
+```
+
+Refer to [DEVELOPMENT.md](DEVELOPMENT.md) for architecture details, project structure, database workflows, and conventions. A few ground rules:
+
+- **One logical change per PR.** Do not bundle a bug fix with a refactor or unrelated cleanup.
+- **No unapproved dependencies.** Propose new dependencies in the linked issue first (see [Adding Dependencies](#adding-dependencies)).
+- **Keep the scope tight.** If you discover something unrelated that needs fixing, open a separate issue for it.
+
+### Phase 7: Write and Run Tests
+
+Testing expectations depend on what you changed:
+
+| Change type             | What is expected                                |
+| ----------------------- | ----------------------------------------------- |
+| Bug fix                 | Regression test proving the bug is fixed        |
+| New backend feature/API | Server unit tests for the new behavior          |
+| New frontend logic      | Client unit tests (composables, utilities)      |
+| UI-only change          | Manual verification evidence (screenshot/video) |
+| Refactor                | Existing tests stay green, no new tests needed  |
+
+Run the full test suite:
+
+```bash
+pnpm test
+```
+
+If your change touches an area covered by an existing E2E suite, run it locally before pushing: `pnpm run e2e:run -- <suite-id>`. Use `pnpm run e2e:list` to see available suites.
+
+For E2E tests, suite IDs, coverage thresholds, and the test harness, see [TESTING.md](TESTING.md).
+
+### Phase 8: Verify Code Quality
+
+The project has two automated gates that catch issues before they reach CI:
+
+- **Pre-commit hook** runs `lint-staged` on your staged files (ESLint + Prettier).
+- **Pre-push hook** runs `pnpm verify:fast` (lint + typecheck + tests). Your push is blocked if this fails.
+
+Before marking your PR ready for review, run the full quality gate yourself:
+
+```bash
+pnpm verify
+```
+
+See the [Code Quality](DEVELOPMENT.md#code-quality) section in DEVELOPMENT.md for individual commands.
+
+### Phase 9: Commit Your Work
+
+Follow the format in [COMMIT_GUIDELINES.md](COMMIT_GUIDELINES.md). The short version:
+
+```
+<type>(<scope>): <summary>
+```
+
+- **Type:** `feat`, `fix`, `db`, `perf`, `refactor`, `style`, `docs`, `test`, `build`, `ci`, `chore`, `security`, `revert`
+- **Scope** (optional): `auth`, `books`, `library`, `metadata`, `kobo`, `scanner`, etc.
+- **Summary:** Imperative mood, lowercase, no period. Describe what the commit does, not what you did.
+
+Examples: `feat(kobo): add shelf sync endpoint`, `fix(reader): correct page count for multi-volume PDFs`
+
+### Phase 10: Open a Pull Request
+
+Push your branch and open a PR against `main`:
+
+```bash
+git push origin feat/your-feature-name
+```
+
+When creating the PR:
+
+- **Fill out the PR template.** It asks for a summary, testing evidence, screenshots (if UI changed), and non-obvious decisions.
+- **Link your issue** with `Closes #123` in the description.
+- **Open as a draft** if you want early direction feedback before the code is complete.
+- **Disclose AI usage** if applicable. See [AI_POLICY.md](AI_POLICY.md) for the format and expectations.
+
+### Phase 11: Respond to Review
+
+- Expect feedback within a few days, sometimes sooner.
+- Push additional commits to address review comments. Do not force-push during review unless a reviewer asks you to.
+- Do not resolve review threads yourself. Let the reviewer confirm the fix.
+- If feedback is unclear, ask for clarification in the thread.
+
+### Phase 12: After Merge
+
+Your changes ship in a future release when maintainers cut one. Keep your fork in sync for your next contribution:
 
 ```bash
 git fetch upstream
@@ -91,167 +199,49 @@ git push origin main
 
 ---
 
-## Development Setup
+## Quick-Reference Checklist
 
-### Prerequisites
-
-- Node.js >= 24
-- pnpm >= 9
-- Docker
-
-### First-time setup
-
-```bash
-docker compose up -d          # start PostgreSQL
-cp server/.env.example server/.env
-pnpm install
-cd server && pnpm db:migrate
-```
-
-### Daily workflow
-
-```bash
-pnpm dev        # start server + client
-pnpm verify     # run all checks before pushing
-```
-
-Other useful commands:
-
-```bash
-pnpm verify:fast        # lint + typecheck + tests (pre-push gate)
-pnpm db:reset           # wipe and reseed local database
-pnpm e2e:list           # list available e2e suite ids
-```
-
----
-
-## Branch Naming
-
-Create branches from `main` using these prefixes:
-
-| Prefix      | Use for            | Example                          |
-| ----------- | ------------------ | -------------------------------- |
-| `feat/`     | New features       | `feat/reading-progress-sync`     |
-| `fix/`      | Bug fixes          | `fix/pdf-page-count-off-by-one`  |
-| `refactor/` | Code restructuring | `refactor/library-scan-pipeline` |
-| `docs/`     | Documentation      | `docs/opds-setup-guide`          |
-
----
-
-## Commit Messages
-
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>(<scope>): <subject>
-```
-
-**Types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
-
-Examples:
-
-```
-feat(library): add bulk metadata refresh for selected books
-fix(cbz): handle archives with no image files gracefully
-feat(opds): add pagination support to feed endpoints
-fix(stats): reading session duration calculation off after timezone change
-chore(deps): upgrade drizzle-orm to 0.31
-test(shelf): add coverage for concurrent shelf update race condition
-```
-
----
-
-## Testing Expectations
-
-`pnpm verify` must pass, but that is the minimum, not the goal. Here is what is expected per change type:
-
-| Change type         | Expected tests                                                             |
-| ------------------- | -------------------------------------------------------------------------- |
-| Bug fix             | A regression test that would have caught the bug                           |
-| New backend feature | Unit tests for the service, covering the main logic paths                  |
-| New API endpoint    | At minimum, a test for the happy path and error cases                      |
-| New composable      | Unit tests covering the reactive logic                                     |
-| UI-only change      | Manual testing with screenshot evidence in the PR                          |
-| Refactor            | Existing tests must continue to pass. Add none if coverage stays the same. |
-
-AI-generated tests deserve extra scrutiny. A test that always passes regardless of the implementation is worse than no test at all.
-
----
-
-## Adding Dependencies
-
-Do not add new dependencies without prior discussion in the linked issue. Every new dependency is a security surface, a bundle size cost, and a long-term maintenance burden.
-
-If a dependency is needed, explain in the issue: what it does, why an existing dependency or a small custom implementation won't work, and how actively it is maintained.
-
----
-
-## Breaking Changes and Self-Hosted Upgrades
-
-ProjectX users upgrade by pulling a new Docker image. A change that breaks an existing deployment without a documented upgrade path will not be merged until that path is clearly defined.
-
-If your PR introduces a breaking change (schema migration, removed API field, changed env var, modified config format):
-
-- Call it out explicitly in the PR description
-- Include the upgrade steps a user would need to follow
-- For schema changes, make sure a Drizzle migration is included. Never hand-write SQL.
-
----
-
-## Submitting a Pull Request
-
-Use a **draft PR** early if you want feedback on direction before the work is done. It signals the PR is not ready for review and avoids back-and-forth on a finished implementation that needs to be rethought.
-
-The project has two automatic gates you should be aware of:
-
-- **pre-commit:** runs `lint-staged` on your staged files. ESLint and Prettier are applied automatically. You do not need to format or lint manually before committing.
-- **pre-push:** runs `pnpm verify:fast` (lint + typecheck + tests). If this fails, the push is blocked. Fix the errors before pushing.
-
-`pnpm verify:fast` is a fast check but does not include the `app-smoke` e2e suite. Before opening a PR, run the full gate:
-
-```bash
-pnpm verify
-```
-
-Before marking your PR ready for review:
+Before marking your PR ready for review, confirm:
 
 - [ ] Linked to an approved issue
-- [ ] `pnpm verify` passes locally (includes `app-smoke`, stricter than pre-push)
-- [ ] You ran the full stack and manually verified the change works
-- [ ] UI changes include a screenshot or screen recording
-- [ ] Tests are included per the expectations above
-- [ ] No new dependencies added without prior discussion
 - [ ] Branch is up to date with `main`
-- [ ] The PR contains a single logical change
-
-When you open your PR, a template will appear. Fill it out completely.
-
-**Responding to feedback:** Address all review comments before asking for a re-review. Don't just resolve threads without fixing the underlying issue. PRs with no activity for 30 days after a review request will be closed. You are welcome to reopen when ready.
-
----
-
-## AI-Assisted Contributions
-
-Contributions using AI tools are welcome, but the quality bar is the same as human-written code. **If you ship it, you own it.**
-
-PRs where the contributor clearly never ran the code, didn't test it, or can't explain what it does make review very difficult and will be closed without detailed feedback.
-
-**If you use AI to help write code, you must still:**
-
-- **Run the code yourself.** Start the full stack and manually verify the change works. Trusting AI output without running it is not acceptable.
-- **Review every line.** You must be able to explain any part of your change during review. "The AI suggested it" is not an answer.
-- **Keep PRs focused.** One feature or fix per PR. Do not submit a dump of everything the AI generated.
-- **Scrutinize AI-generated tests.** They often pass trivially without asserting anything meaningful. Tests that don't validate real behavior will be rejected.
-- **Clean up.** Remove dead code, placeholder comments, empty catch blocks, and unnecessary boilerplate.
+- [ ] One logical change per PR
+- [ ] `pnpm verify` passes locally
+- [ ] Tests included per the [testing expectations table](#phase-7-write-and-run-tests)
+- [ ] Full-stack behavior manually validated
+- [ ] UI changes include screenshot or recording
+- [ ] PR template fully completed
+- [ ] No unintended files (build artifacts, `.env`, personal configs)
+- [ ] No unapproved new dependencies
 
 ---
 
-## What Happens After Merge
+## Policies
 
-Merged changes ship with the next release. There is no fixed release cadence. Releases happen when enough meaningful changes have accumulated. If your fix is urgent, mention it in the PR and it can be prioritized.
+### Adding Dependencies
+
+Do not add dependencies without prior discussion in the linked issue. If proposing one, document:
+
+- What problem it solves.
+- Why existing dependencies or a small custom implementation are insufficient.
+- Maintenance status and community activity of the package.
+
+### Breaking Changes and Self-Hosted Upgrades
+
+ProjectX is self-hosted. Any change that can break existing deployments must include a clear upgrade path before merge.
+
+If your PR introduces a breaking change (schema, API contract, environment variable, config format):
+
+- Call it out explicitly in the PR description.
+- Document the required upgrade steps.
+- Include Drizzle migrations for schema changes. Never hand-write migration SQL.
+
+### AI-Assisted Contributions
+
+See [AI_POLICY.md](AI_POLICY.md). The short version: disclose all AI usage in your PR description and make sure you understand every line of the diff.
 
 ---
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same license as this project.
+By contributing, you agree that your contributions are licensed under the same license as the project (AGPL-3.0).

@@ -1,30 +1,170 @@
 # Development Guide
 
-## Prerequisites
+Everything you need to work in this codebase: architecture, setup, workflows, conventions, and commands.
 
-- Node.js >= 24
-- pnpm >= 9
-- Docker
+For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRIBUTING.md). For test architecture and E2E suite details, see [TESTING.md](TESTING.md).
 
 ---
 
-## First-time Setup
+## Architecture Overview
+
+ProjectX is a pnpm monorepo with three workspaces: a Vue 3 single-page app, a NestJS API server, and a shared types package.
+
+```mermaid
+graph LR
+    Client["Client<br/><small>Vue 3 SPA</small><br/><small>localhost:5173</small>"]
+    Server["Server<br/><small>NestJS + Fastify</small><br/><small>localhost:3000/api</small>"]
+    DB["PostgreSQL<br/><small>Drizzle ORM</small>"]
+    WS["WebSocket<br/><small>Socket.IO</small>"]
+    Types["Shared Types<br/><small>@projectx/types</small>"]
+
+    Client -- "HTTP (fetch)" --> Server
+    Client <-. "real-time events" .-> WS
+    Server --> DB
+    Server --> WS
+    Types -.- Client
+    Types -.- Server
+```
+
+| Layer        | Tech                            | Location          |
+| ------------ | ------------------------------- | ----------------- |
+| Frontend     | Vue 3, Tailwind CSS v4, Vite    | `client/`         |
+| Backend      | NestJS 11, Fastify, Drizzle ORM | `server/`         |
+| Database     | PostgreSQL 16, pgvector         | Docker container  |
+| Shared types | TypeScript                      | `packages/types/` |
+| Real-time    | Socket.IO                       | Server + Client   |
+
+---
+
+## Project Structure
+
+```text
+projectx/
+├── client/                  # Vue 3 frontend
+│   └── src/
+│       ├── features/        # Feature modules (composables + components)
+│       ├── components/ui/   # Shared UI components
+│       ├── lib/             # API client, utilities
+│       ├── router/          # Vue Router config
+│       └── assets/          # Tailwind theme, static assets
+├── server/                  # NestJS backend
+│   └── src/
+│       ├── modules/         # Feature modules (controller + service + dto)
+│       ├── db/
+│       │   ├── schema/      # Drizzle table definitions (one file per domain)
+│       │   └── migrations/  # Generated SQL migrations
+│       ├── common/          # Guards, filters, decorators, pipes
+│       └── config/          # Typed config (app, db, auth)
+│   └── test/
+│       ├── e2e/             # E2E test helpers and harness
+│       └── *.e2e-spec.ts    # E2E test suites
+├── packages/
+│   └── types/               # Shared TypeScript types
+│       └── src/             # Exported via @projectx/types
+├── scripts/                 # Bootstrap, DB reset, E2E orchestration
+├── docker/                  # Postgres init scripts (extensions)
+├── .github/                 # CI workflows, PR/issue templates
+└── .husky/                  # Git hooks (pre-commit, pre-push)
+```
+
+> **Shared types** live in `packages/types/` and are imported as `@projectx/types`. Never duplicate types between client and server.
+
+---
+
+## Prerequisites
+
+- **Node.js** >= 24 - [nodejs.org](https://nodejs.org)
+- **pnpm** >= 9 - `npm install -g pnpm` (or see [pnpm.io](https://pnpm.io/installation))
+- **Docker** - [docs.docker.com/get-started/get-docker](https://docs.docker.com/get-started/get-docker/)
+
+---
+
+## First-Time Setup
+
+### Option A: One Command
 
 ```bash
 pnpm setup
 ```
 
-This creates `server/.env` from the example, installs all dependencies, starts PostgreSQL, runs migrations, and seeds baseline data.
+This runs all the steps below automatically. If it succeeds, skip to [Running the App](#running-the-app).
 
-If you prefer to do it manually:
+---
+
+### Option B: Step by Step
+
+#### Step 1 - Clone the repository
 
 ```bash
-pnpm run db:up                        # start PostgreSQL
-cp server/.env.example server/.env   # first time only
+git clone https://github.com/<your-username>/projectx.git
+cd projectx
+```
+
+If you are an external contributor, fork first and clone your fork. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+#### Step 2 - Create your environment file
+
+```bash
+cp server/.env.example server/.env
+```
+
+Only do this once. If `server/.env` already exists, skip this step. Copying again will overwrite any local changes you have made.
+
+The defaults in `.env.example` work out of the box for local development. You only need to edit this file if you want to change ports, point to a different database, or configure optional features like email.
+
+See the [Key Environment Variables](#key-environment-variables) section for what each variable does.
+
+#### Step 3 - Install dependencies
+
+```bash
 pnpm install
+```
+
+This installs dependencies for all three workspaces (server, client, packages/types) in one shot.
+
+#### Step 4 - Start PostgreSQL
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --wait
+```
+
+This starts a PostgreSQL 16 container (with the `pgvector` extension) on port 5432. The `--wait` flag blocks until the database is healthy. Data is persisted in a named Docker volume across restarts.
+
+> **Already have PostgreSQL running?** You can point `DATABASE_URL` in `server/.env` at your existing instance, but you will still need the `uuid-ossp`, `pg_trgm`, and `vector` extensions installed. Using Docker is the easiest path.
+
+#### Step 5 - Apply database migrations
+
+```bash
 pnpm run db:migrate
+```
+
+This creates all tables and indexes. Migrations are generated by Drizzle Kit and live in `server/src/db/migrations/`.
+
+#### Step 6 - Seed baseline data
+
+```bash
 pnpm run db:seed
 ```
+
+This populates the database with the data required for the app to function (default roles, permissions, initial settings). You only need to run this once.
+
+#### Step 7 - Start the app
+
+```bash
+pnpm dev
+```
+
+If everything worked, you will see the server, client, and types watcher start up. The app is ready when you see output from all three processes.
+
+---
+
+### Verifying Your Setup
+
+| Check                                    | Expected                                    |
+| ---------------------------------------- | ------------------------------------------- |
+| Open http://localhost:5173               | ProjectX login page loads                   |
+| Open http://localhost:3000/api/v1/health | Returns `{"status":"ok"}`                   |
+| `docker ps`                              | Shows `projectx-postgres` container running |
 
 ---
 
@@ -34,226 +174,101 @@ pnpm run db:seed
 pnpm dev
 ```
 
-Starts the server and client concurrently with hot reload.
+This starts the server, client, and types watcher concurrently with hot reload.
 
 | Service | URL                       |
 | ------- | ------------------------- |
-| API     | http://localhost:3000/api |
 | Client  | http://localhost:5173     |
+| API     | http://localhost:3000/api |
 
-If PostgreSQL stopped (e.g. after a machine restart):
+If PostgreSQL is not running, start it first with `pnpm run db:up`.
+
+<details>
+<summary>Running workspaces separately</summary>
 
 ```bash
-pnpm run db:up    # then pnpm dev
+# Terminal 1: Server
+cd server && pnpm start:dev
+
+# Terminal 2: Client
+cd client && pnpm dev
 ```
+
+If you are editing shared types (`packages/types/`), also start the types watcher:
+
+```bash
+# Terminal 3: Types (only needed when editing packages/types/)
+pnpm --filter @projectx/types dev
+```
+
+</details>
 
 ---
 
-## Database Workflows
+## Key Environment Variables
 
-### Apply pending migrations
+These are the variables you are most likely to need during development. See `server/.env.example` for the full list with comments.
 
-After pulling changes that include new migrations:
+| Variable        | Purpose                            | Default (dev)                                          |
+| --------------- | ---------------------------------- | ------------------------------------------------------ |
+| `DATABASE_URL`  | PostgreSQL connection string       | `postgres://projectx:projectx@localhost:5432/projectx` |
+| `PORT`          | Server listen port                 | `3000`                                                 |
+| `NODE_ENV`      | Runtime mode                       | `development`                                          |
+| `JWT_SECRET`    | Signing key for auth tokens        | `change-me-in-production`                              |
+| `APP_DATA_PATH` | Storage for covers, avatars, cache | `../local/data`                                        |
+| `APP_URL`       | Base URL for email links           | `http://localhost:5173`                                |
+
+---
+
+## Database
+
+### Schema Organization
+
+Database tables are defined as Drizzle `pgTable()` calls in `server/src/db/schema/`, one file per domain (e.g. `books.ts`, `auth.ts`, `kobo.ts`). All files are re-exported from `server/src/db/schema/index.ts`.
+
+Type inference uses `typeof table.$inferSelect` and `$inferInsert`. Never write manual type aliases for DB rows.
+
+### Common Commands
+
+| Command                                | What it does                                    |
+| -------------------------------------- | ----------------------------------------------- |
+| `pnpm run db:up`                       | Start PostgreSQL via Docker                     |
+| `pnpm run db:migrate`                  | Apply pending migrations                        |
+| `cd server && pnpm db:generate <name>` | Generate a migration from schema changes        |
+| `pnpm run db:seed`                     | Seed baseline data                              |
+| `pnpm run db:reset`                    | Drop everything, re-migrate, re-seed (dev only) |
+| `cd server && pnpm db:studio`          | Open Drizzle Studio (visual DB browser)         |
+
+### Making a Schema Change
+
+1. Edit the relevant file in `server/src/db/schema/`.
+2. Generate a migration: `cd server && pnpm db:generate describe-your-change`
+3. Review the generated SQL in `server/src/db/migrations/`.
+4. Apply it: `pnpm run db:migrate`
+
+Never hand-write migration SQL. Always let Drizzle Kit generate it from schema diffs.
+
+### Migration Strategy
+
+**Before production launch (current phase):** We maintain a single baseline migration (`0000_*.sql`). When adding new tables or columns, wipe the migrations folder and regenerate:
 
 ```bash
-pnpm run db:migrate
+rm -rf server/src/db/migrations
+docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d --wait
+cd server && pnpm db:generate baseline && pnpm run db:migrate
 ```
 
-### Add a schema change
+**After production launch:** Never wipe migrations. Every schema change gets its own incremental migration.
 
-1. Edit the relevant file in `server/src/db/schema/`
-2. Generate a migration:
-   ```bash
-   cd server && pnpm db:generate add-book-tags
-   ```
-   This creates a new SQL file in `server/src/db/migrations/`. Review it before applying.
-3. Apply it:
-   ```bash
-   pnpm run db:migrate
-   ```
+### Full Reset
 
-> **Pre-launch rule:** Before the app ships, maintain a single baseline migration (`0000_*.sql`) rather than stacking incremental ones. When adding a schema change pre-launch:
->
-> ```bash
-> rm -rf server/src/db/migrations
-> docker compose -f docker-compose.dev.yml down -v
-> pnpm run db:up
-> cd server && pnpm db:generate baseline
-> pnpm run db:migrate
-> ```
->
-> After go-live, never wipe migrations. Every change gets its own incremental migration.
-
-### Full database reset
-
-Wipes all data, re-runs migrations, re-seeds, and clears generated files (covers, author images):
+When local migration state is broken or you need a clean slate:
 
 ```bash
 pnpm run db:reset
 ```
 
-Use this when:
-
-- Migrations are in a broken or inconsistent state
-- A migration requires starting from scratch (e.g. column type change with no clean upgrade path)
-- You want a known-clean local state
-
-### Inspect the database
-
-```bash
-cd server && pnpm db:studio
-```
-
-Opens Drizzle Studio in your browser for browsing and editing tables directly.
-
----
-
-## Testing
-
-```bash
-pnpm run test              # all tests (server + client)
-pnpm run test:server       # server unit tests only
-pnpm run test:client       # client unit tests only
-pnpm run e2e:run -- all                      # run all e2e suites sequentially
-pnpm run e2e:run -- app-smoke                # app smoke suite (default DB)
-pnpm run e2e:run -- scanner-scenarios        # scanner scenario suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- scanner-file-operations  # scanner file operation suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- auth-session-security    # auth session security suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- auth-recovery-oidc-logout # auth recovery and OIDC logout suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- book-bucket-ingest-finalize  # Book Bucket ingest/finalize suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- metadata-write           # metadata write suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- metadata-lock            # metadata lock suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- authorization-matrix     # authorization matrix suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- opds-auth-catalog        # OPDS auth/catalog suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- reader-state-isolation   # reader state isolation suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- email-lifecycle          # email lifecycle suite (dedicated projectx_e2e DB)
-pnpm run e2e:run -- users-admin-lifecycle    # users admin lifecycle suite (dedicated projectx_e2e DB)
-pnpm run e2e:all                             # shortcut for running all suites
-pnpm run e2e:list                            # list supported suite ids
-```
-
-Watch mode while working on a specific area:
-
-```bash
-cd server && pnpm test:watch
-```
-
-Run a focused scanner scenario:
-
-```bash
-pnpm run e2e:run -- scanner-scenarios --testNamePattern=book-per-folder-disc-folder-flattening
-```
-
-### E2E runner architecture
-
-- All suite metadata lives in `scripts/e2e/suite-registry.mjs` (suite id, spec file, JUnit output, DB prep mode).
-- Local and CI use the same command: `pnpm run e2e:run -- <suite-id>`.
-- Use `all` as a composite suite id to run every configured suite in order, or use `pnpm run e2e:all`.
-- Dedicated-db suites auto-start local PostgreSQL when `CI != true`, then reset and migrate the e2e database through `pnpm run e2e:db:prepare`.
-- JUnit outputs are written to `test-results/server/`.
-
-### E2E suite details
-
-All suites write JUnit XML to `test-results/server/`. Dedicated-db suites also auto-start PostgreSQL locally (when needed) and use the `projectx_e2e` database.
-
-| Suite id                      | DB mode      | JUnit output                                | Extra artifacts                                  |
-| ----------------------------- | ------------ | ------------------------------------------- | ------------------------------------------------ |
-| `app-smoke`                   | default-db   | `app-smoke-e2e-junit.xml`                   | none                                             |
-| `scanner-scenarios`           | dedicated-db | `scanner-scenarios-e2e-junit.xml`           | `scanner-scenarios-e2e-scenarios.json`           |
-| `scanner-file-operations`     | dedicated-db | `scanner-file-operations-e2e-junit.xml`     | `scanner-file-operations-e2e-scenarios.json`     |
-| `auth-session-security`       | dedicated-db | `auth-session-security-e2e-junit.xml`       | none                                             |
-| `auth-recovery-oidc-logout`   | dedicated-db | `auth-recovery-oidc-logout-e2e-junit.xml`   | none                                             |
-| `book-bucket-ingest-finalize` | dedicated-db | `book-bucket-ingest-finalize-e2e-junit.xml` | `book-bucket-ingest-finalize-e2e-scenarios.json` |
-| `metadata-write`              | dedicated-db | `metadata-write-e2e-junit.xml`              | `metadata-write-e2e-scenarios.json`              |
-| `metadata-lock`               | dedicated-db | `metadata-lock-e2e-junit.xml`               | none                                             |
-| `authorization-matrix`        | dedicated-db | `authorization-matrix-e2e-junit.xml`        | none                                             |
-| `opds-auth-catalog`           | dedicated-db | `opds-auth-catalog-e2e-junit.xml`           | `opds-auth-catalog-e2e-scenarios.json`           |
-| `reader-state-isolation`      | dedicated-db | `reader-state-isolation-e2e-junit.xml`      | `reader-state-isolation-e2e-scenarios.json`      |
-| `email-lifecycle`             | dedicated-db | `email-lifecycle-e2e-junit.xml`             | `email-lifecycle-e2e-scenarios.json`             |
-| `users-admin-lifecycle`       | dedicated-db | `users-admin-lifecycle-e2e-junit.xml`       | `users-admin-lifecycle-e2e-scenarios.json`       |
-
-### E2E in CI (how to trigger)
-
-All suite workflows call the reusable `E2E Runner (reusable)` workflow, which runs:
-
-```bash
-pnpm run e2e:run -- <suite-id>
-```
-
-| Workflow name                       | Suite id                      | Triggered by                                                                |
-| ----------------------------------- | ----------------------------- | --------------------------------------------------------------------------- |
-| `E2E - App Smoke`                   | `app-smoke`                   | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Scanner Scenarios`           | `scanner-scenarios`           | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Scanner File Operations`     | `scanner-file-operations`     | `workflow_dispatch`, nightly schedule (`0 4 * * *`), `push`, `pull_request` |
-| `E2E - Auth Session Security`       | `auth-session-security`       | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Auth Recovery OIDC Logout`   | `auth-recovery-oidc-logout`   | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Book Bucket Ingest Finalize` | `book-bucket-ingest-finalize` | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Metadata Write`              | `metadata-write`              | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Metadata Lock`               | `metadata-lock`               | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Authorization Matrix`        | `authorization-matrix`        | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - OPDS Auth Catalog`           | `opds-auth-catalog`           | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Reader State Isolation`      | `reader-state-isolation`      | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Email Lifecycle`             | `email-lifecycle`             | `workflow_dispatch`, `push`, `pull_request`                                 |
-| `E2E - Users Admin Lifecycle`       | `users-admin-lifecycle`       | `workflow_dispatch`, `push`, `pull_request`                                 |
-
-Manual trigger steps:
-
-1. Open GitHub Actions.
-2. Select any `E2E - ...` workflow for the suite you want to run.
-3. Click **Run workflow**.
-
-Each run uploads `test-results/server/` as an artifact and publishes JUnit annotations from `test-results/server/*-e2e-junit.xml`.
-
----
-
-## Code Quality
-
-Run before pushing:
-
-```bash
-pnpm run verify:fast       # lint + typecheck + tests (same as pre-push hook)
-pnpm run verify            # above + e2e app-smoke suite (run before opening a PR)
-```
-
-Individual checks:
-
-```bash
-pnpm run lint:check        # check for lint errors
-pnpm run lint:fix          # auto-fix lint errors
-pnpm run typecheck         # server + client baseline typecheck
-pnpm run typecheck:full    # server + full client typecheck (slower)
-```
-
-Format:
-
-```bash
-cd server && npx prettier --write .
-cd client && npx prettier --write .
-```
-
----
-
-## Common Scenarios
-
-### Pulled changes that include a new migration
-
-```bash
-pnpm run db:migrate
-```
-
-### Pulled changes that changed the DB schema significantly and your local state is stale
-
-```bash
-pnpm run db:reset
-```
-
-### Something is wrong and you want a completely clean slate
-
-```bash
-pnpm run db:reset
-```
-
-If that is not enough (e.g. Docker volume is corrupted):
+If that is insufficient (e.g. corrupted Docker volumes), stop the container with `-v` to drop volumes, then start fresh:
 
 ```bash
 docker compose -f docker-compose.dev.yml down -v
@@ -261,3 +276,228 @@ pnpm run db:up
 pnpm run db:migrate
 pnpm run db:seed
 ```
+
+---
+
+## Testing
+
+| Command                          | What it runs                     |
+| -------------------------------- | -------------------------------- |
+| `pnpm run test`                  | Server + client unit tests       |
+| `pnpm run test:server`           | Server unit tests only           |
+| `pnpm run test:client`           | Client unit tests only           |
+| `cd server && pnpm test:watch`   | Server tests in watch mode       |
+| `pnpm run e2e:run -- <suite-id>` | Run a single E2E suite           |
+| `pnpm run e2e:all`               | Run all E2E suites sequentially  |
+| `pnpm run e2e:list`              | List available E2E suite IDs     |
+| `pnpm run coverage`              | Unit tests with coverage reports |
+
+Server unit tests use Vitest with `@nestjs/testing`. Client tests use Vitest with `@vue/test-utils` in a jsdom environment. Most E2E suites boot the full app against a dedicated test database; a few smoke-style suites run against the dev database.
+
+For test architecture, suite details, coverage thresholds, the E2E harness, and examples, see [TESTING.md](TESTING.md).
+
+---
+
+## Code Quality
+
+### Quality Gates
+
+| Command                  | What it checks                               | When to use                  |
+| ------------------------ | -------------------------------------------- | ---------------------------- |
+| `pnpm run verify:fast`   | Lint + typecheck + tests                     | Quick check while developing |
+| `pnpm run verify`        | Lint + typecheck + tests (full)              | Before opening a PR          |
+| `pnpm run verify:strict` | Format check + lint + full typecheck + tests | Strictest gate               |
+
+### Individual Checks
+
+| Command                 | What it does                           |
+| ----------------------- | -------------------------------------- |
+| `pnpm run lint:check`   | ESLint across server + client          |
+| `pnpm run lint:fix`     | ESLint auto-fix across server + client |
+| `pnpm run typecheck`    | TypeScript type checking               |
+| `pnpm run format`       | Prettier format across server + client |
+| `pnpm run format:check` | Prettier check (no write)              |
+
+### Git Hooks
+
+Two hooks run automatically via [Husky](https://typicode.github.io/husky/):
+
+- **Pre-commit:** Runs `lint-staged` on staged files. This auto-fixes lint issues and formats code with Prettier. You do not need to format manually before committing.
+- **Pre-push:** Runs `pnpm verify:fast`. Your push is blocked if lint, typecheck, or tests fail.
+
+---
+
+## Must-Know Conventions
+
+These are the rules that most commonly cause PR rejections. Following them from the start will save you review cycles.
+
+### Backend
+
+- **One module per feature.** Each domain lives in `server/src/modules/<feature>/` with its own controller, service, module, and `dto/` subfolder.
+- **DTOs for all input.** Request bodies are validated via `class-validator` decorators on DTO classes. The global `ValidationPipe` rejects unknown fields.
+- **Throw NestJS exceptions.** Use `NotFoundException`, `BadRequestException`, `ForbiddenException`, etc. Never throw raw `Error`.
+- **Multi-user ownership.** User-owned data needs a `userId` foreign key. Services must check ownership and throw `ForbiddenException` for non-owners.
+
+### Frontend
+
+- **Composition API only.** Every component uses `<script setup lang="ts">`. Never use the Options API.
+- **Bare method references in templates.** Write `@click="handleFoo"`, not `@click="handleFoo()"` or `@click="() => handleFoo()"`. This is enforced by ESLint and will block commits.
+- **Composables over stores.** Feature-local state lives in composables (`features/<name>/composables/use*.ts`). Use Pinia only when state genuinely needs to be shared app-wide.
+- **Native fetch only.** HTTP calls use the native `fetch` API. No axios or other HTTP clients.
+
+---
+
+## CI/CD Pipeline
+
+### What Runs on Pull Requests
+
+The CI workflow (`.github/workflows/ci.yml`) triggers on every PR to `main`:
+
+1. **Dependency review** - Checks for supply chain issues in new dependencies.
+2. **Change detection** - Determines which workspaces (server/client) have changed files.
+3. **Lint** - Runs ESLint and format checks on changed workspaces.
+4. **Type check** - Runs TypeScript checking on changed workspaces.
+5. **Tests** - Runs unit tests on changed workspaces with coverage.
+6. **E2E** - Selects and runs relevant E2E suites based on changed file paths.
+
+All jobs are conditional: if you only changed client code, server lint/typecheck/tests are skipped.
+
+### What Runs on Main
+
+The same pipeline plus:
+
+- **Container image build** (`.github/workflows/container-image.yml`) - Builds a Docker image and pushes to GitHub Container Registry.
+
+### E2E in CI
+
+E2E suites are dispatched automatically based on which files changed. On nightly builds and manual dispatches, all suites run. Each suite runs in its own job with a dedicated PostgreSQL service container.
+
+### Reading CI Failures
+
+- **Red lint job** - Run `pnpm run lint:check` locally to see the errors.
+- **Red typecheck job** - Run `pnpm run typecheck` locally.
+- **Red test job** - Run `pnpm run test` locally. Check the test report artifact for details.
+- **Red E2E job** - Run `pnpm run e2e:run -- <suite-id>` locally. Ensure your E2E database is prepared with `pnpm run e2e:db:prepare`.
+
+---
+
+## Troubleshooting
+
+**Migrations fail after pulling new changes**
+
+```bash
+pnpm run db:migrate
+```
+
+If that fails (e.g. conflicting migration state), do a full reset:
+
+```bash
+pnpm run db:reset
+```
+
+**Type errors after pulling**
+
+Rebuild dependencies and types:
+
+```bash
+pnpm install
+```
+
+The shared types package rebuilds automatically during install.
+
+**Pre-push hook is failing**
+
+Run the same command the hook uses to see the full error output:
+
+```bash
+pnpm run verify:fast
+```
+
+**E2E tests failing locally**
+
+Make sure the E2E database is prepared:
+
+```bash
+pnpm run e2e:db:prepare
+pnpm run e2e:run -- <suite-id>
+```
+
+**Port already in use**
+
+The server defaults to port 3000 (configured via `PORT` in `server/.env`) and the client to 5173 (Vite default). If either is occupied, find the process that owns it and stop it, or change the server port in `server/.env`.
+
+**Hot reload not picking up changes**
+
+Restart the dev server. If you changed `package.json` or installed new dependencies, run `pnpm install` first.
+
+**Docker volumes corrupted**
+
+Nuclear option. This destroys all local data. Stop the container with `-v` to drop volumes, then rebuild:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+pnpm run db:up
+pnpm run db:migrate
+pnpm run db:seed
+```
+
+---
+
+## Command Reference
+
+All commands are run from the repository root unless noted otherwise.
+
+### Setup
+
+| Command        | Description                                          |
+| -------------- | ---------------------------------------------------- |
+| `pnpm setup`   | One-command bootstrap (env, deps, DB, migrate, seed) |
+| `pnpm install` | Install all workspace dependencies                   |
+
+### Development
+
+| Command               | Description                                   |
+| --------------------- | --------------------------------------------- |
+| `pnpm dev`            | Start server + client + types with hot reload |
+| `pnpm run dev:server` | Start server only                             |
+| `pnpm run dev:client` | Start client only                             |
+
+### Database
+
+| Command                                | Description                              |
+| -------------------------------------- | ---------------------------------------- |
+| `pnpm run db:up`                       | Start PostgreSQL via Docker              |
+| `pnpm run db:migrate`                  | Apply pending migrations                 |
+| `cd server && pnpm db:generate <name>` | Generate migration from schema changes   |
+| `pnpm run db:seed`                     | Seed baseline data                       |
+| `pnpm run db:reset`                    | Drop, re-migrate, and re-seed (dev only) |
+| `cd server && pnpm db:studio`          | Open Drizzle Studio (DB browser)         |
+
+### Testing
+
+| Command                          | Description                      |
+| -------------------------------- | -------------------------------- |
+| `pnpm run test`                  | Run server + client unit tests   |
+| `pnpm run test:server`           | Run server unit tests            |
+| `pnpm run test:client`           | Run client unit tests            |
+| `cd server && pnpm test:watch`   | Server tests in watch mode       |
+| `pnpm run coverage`              | Unit tests with coverage reports |
+| `pnpm run coverage:server`       | Server coverage only             |
+| `pnpm run coverage:client`       | Client coverage only             |
+| `pnpm run e2e:run -- <suite-id>` | Run a single E2E suite           |
+| `pnpm run e2e:all`               | Run all E2E suites               |
+| `pnpm run e2e:list`              | List available suite IDs         |
+| `pnpm run e2e:db:prepare`        | Prepare the E2E database         |
+
+### Code Quality
+
+| Command                  | Description                                  |
+| ------------------------ | -------------------------------------------- |
+| `pnpm run verify`        | Full quality gate (lint + typecheck + tests) |
+| `pnpm run verify:fast`   | Quick quality gate                           |
+| `pnpm run verify:strict` | Strictest gate (adds format check)           |
+| `pnpm run lint:check`    | ESLint check (server + client)               |
+| `pnpm run lint:fix`      | ESLint auto-fix (server + client)            |
+| `pnpm run typecheck`     | TypeScript type checking                     |
+| `pnpm run format`        | Prettier format (server + client)            |
+| `pnpm run format:check`  | Prettier check without writing               |
