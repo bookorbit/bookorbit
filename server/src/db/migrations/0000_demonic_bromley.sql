@@ -430,6 +430,13 @@ CREATE TABLE "narrators" (
 	CONSTRAINT "narrators_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
+CREATE TABLE "library_dir_scan_state" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"library_folder_id" integer NOT NULL,
+	"dir_path" varchar(4096) NOT NULL,
+	"last_seen_mtime_ms" bigint NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "scan_jobs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"library_id" integer NOT NULL,
@@ -904,6 +911,7 @@ ALTER TABLE "book_tags" ADD CONSTRAINT "book_tags_book_id_books_id_fk" FOREIGN K
 ALTER TABLE "book_tags" ADD CONSTRAINT "book_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_narrators" ADD CONSTRAINT "book_narrators_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "book_narrators" ADD CONSTRAINT "book_narrators_narrator_id_narrators_id_fk" FOREIGN KEY ("narrator_id") REFERENCES "public"."narrators"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "library_dir_scan_state" ADD CONSTRAINT "library_dir_scan_state_library_folder_id_library_folders_id_fk" FOREIGN KEY ("library_folder_id") REFERENCES "public"."library_folders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scan_jobs" ADD CONSTRAINT "scan_jobs_library_id_libraries_id_fk" FOREIGN KEY ("library_id") REFERENCES "public"."libraries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "annotations" ADD CONSTRAINT "annotations_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "annotations" ADD CONSTRAINT "annotations_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -1031,6 +1039,8 @@ CREATE INDEX "bmfq_status_created_book_idx" ON "book_metadata_fetch_queue" USING
 CREATE INDEX "book_tags_tag_id_idx" ON "book_tags" USING btree ("tag_id");--> statement-breakpoint
 CREATE INDEX "book_narrators_narrator_id_idx" ON "book_narrators" USING btree ("narrator_id");--> statement-breakpoint
 CREATE INDEX "narrators_name_trgm_idx" ON "narrators" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
+CREATE UNIQUE INDEX "library_dir_scan_state_folder_dir_uidx" ON "library_dir_scan_state" USING btree ("library_folder_id","dir_path");--> statement-breakpoint
+CREATE INDEX "library_dir_scan_state_folder_idx" ON "library_dir_scan_state" USING btree ("library_folder_id");--> statement-breakpoint
 CREATE INDEX "scan_jobs_library_status_idx" ON "scan_jobs" USING btree ("library_id","status");--> statement-breakpoint
 CREATE INDEX "annotations_user_id_idx" ON "annotations" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "annotations_user_book_idx" ON "annotations" USING btree ("user_id","book_id");--> statement-breakpoint

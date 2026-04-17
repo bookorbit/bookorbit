@@ -115,3 +115,24 @@ describe('file disappears mid-poll', () => {
     await expect(promise).resolves.toBeUndefined();
   });
 });
+
+// ── knownMtimeMs parameter ────────────────────────────────────────────────────
+
+describe('knownMtimeMs parameter', () => {
+  it('skips the initial stat call when knownMtimeMs is provided and file is old', async () => {
+    const oldMtime = Date.now() - RECENTLY_MODIFIED_THRESHOLD_MS - 1;
+    await waitForStability('/path/old-book.epub', oldMtime);
+    expect(mockStat).not.toHaveBeenCalled();
+  });
+
+  it('still enters polling when knownMtimeMs indicates a recently modified file', async () => {
+    const recentMtime = Date.now() - 1_000;
+    mockStat.mockResolvedValue({ mtimeMs: recentMtime } as any);
+
+    const promise = waitForStability('/path/recent-book.epub', recentMtime);
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 4 + STABLE_DURATION_MS);
+    await promise;
+
+    expect(mockStat.mock.calls.length).toBeGreaterThan(0);
+  });
+});

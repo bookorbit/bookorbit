@@ -503,6 +503,42 @@ const structuralScenarios: StructuralScenario[] = [
     },
   },
   {
+    id: 'watcher-cross-library-root-files-burst',
+    trigger: 'watcher',
+    libraries: [
+      { key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' },
+      { key: 'b', rootDir: 'lib-b', mode: 'book_per_folder' },
+    ],
+    entries: [file('lib-a/one.epub'), file('lib-a/two.epub'), file('lib-a/three.epub')],
+    operations: [
+      { type: 'move', from: 'lib-a/one.epub', to: 'lib-b/one.epub' },
+      { type: 'move', from: 'lib-a/two.epub', to: 'lib-b/two.epub' },
+      { type: 'move', from: 'lib-a/three.epub', to: 'lib-b/three.epub' },
+    ],
+    expected: {
+      a: {
+        statusByFolder: {},
+        absentFolders: ['one.epub', 'two.epub', 'three.epub'],
+        presentCount: 0,
+        missingCount: 0,
+      },
+      b: {
+        statusByFolder: {
+          'one.epub': 'present',
+          'two.epub': 'present',
+          'three.epub': 'present',
+        },
+        fileOwners: {
+          'one.epub': 'one.epub',
+          'two.epub': 'two.epub',
+          'three.epub': 'three.epub',
+        },
+        presentCount: 3,
+        missingCount: 0,
+      },
+    },
+  },
+  {
     id: 'watcher-cross-library-folder-move',
     trigger: 'watcher',
     libraries: [
@@ -517,6 +553,36 @@ const structuralScenarios: StructuralScenario[] = [
         statusByFolder: { 'Incoming/Book': 'present' },
         fileOwners: { 'Incoming/Book/book.epub': 'Incoming/Book' },
         presentCount: 1,
+        missingCount: 0,
+      },
+    },
+  },
+  {
+    id: 'watcher-cross-library-grouping-folder-move',
+    trigger: 'watcher',
+    libraries: [
+      { key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' },
+      { key: 'b', rootDir: 'lib-b', mode: 'book_per_folder' },
+    ],
+    entries: [file('lib-a/AJ Carter/One/one.epub'), file('lib-a/AJ Carter/Two/two.epub')],
+    operations: [{ type: 'move', from: 'lib-a/AJ Carter', to: 'lib-b/AJ Carter' }],
+    expected: {
+      a: {
+        statusByFolder: {},
+        absentFolders: ['AJ Carter/One', 'AJ Carter/Two'],
+        presentCount: 0,
+        missingCount: 0,
+      },
+      b: {
+        statusByFolder: {
+          'AJ Carter/One': 'present',
+          'AJ Carter/Two': 'present',
+        },
+        fileOwners: {
+          'AJ Carter/One/one.epub': 'AJ Carter/One',
+          'AJ Carter/Two/two.epub': 'AJ Carter/Two',
+        },
+        presentCount: 2,
         missingCount: 0,
       },
     },

@@ -30,7 +30,10 @@ function makeService(db: any = {}) {
   const scannerService = {
     startScanAsync: vi.fn(),
     scanBookFolderAsync: vi.fn(),
+    scanBookDirectoryAsync: vi.fn(),
     isScanRunning: vi.fn().mockReturnValue(false),
+    bufferBooksUnavailableNotification: vi.fn(),
+    bufferBooksRestoredNotification: vi.fn(),
   } as unknown as ScannerService;
 
   const service = new FileWatcherService(db, processor, gateway, scannerService);
@@ -159,7 +162,11 @@ describe('FileWatcherService lifecycle and watcher controls', () => {
     (service as any).pendingFolderScanTimers.set('/books/b', { timer: folderTimerB, libraryId: 99 });
 
     const rescanTimer = setTimeout(() => undefined, 1000);
-    (service as any).pendingLibraryRescanTimers.set(11, rescanTimer);
+    (service as any).pendingCrossLibraryReconcileTimer = rescanTimer;
+    (service as any).pendingCrossLibraryReconcileLibraryIds.add(11);
+    (service as any).pendingCrossLibraryReconcileLibraryIds.add(99);
+    (service as any).watchedLibraryPaths.set(11, ['/books/a']);
+    (service as any).watchedLibraryPaths.set(99, ['/books/b']);
 
     const suppressionTimerA = setTimeout(() => undefined, 1000);
     const suppressionTimerB = setTimeout(() => undefined, 1000);
@@ -174,7 +181,10 @@ describe('FileWatcherService lifecycle and watcher controls', () => {
     expect((service as any).pendingTimers.has('/books/b')).toBe(true);
     expect((service as any).pendingFolderScanTimers.has('/books/a')).toBe(false);
     expect((service as any).pendingFolderScanTimers.has('/books/b')).toBe(true);
-    expect((service as any).pendingLibraryRescanTimers.has(11)).toBe(false);
+    expect((service as any).pendingCrossLibraryReconcileLibraryIds.has(11)).toBe(false);
+    expect((service as any).pendingCrossLibraryReconcileLibraryIds.has(99)).toBe(true);
+    expect((service as any).watchedLibraryPaths.has(11)).toBe(false);
+    expect((service as any).watchedLibraryPaths.has(99)).toBe(true);
     expect((service as any).suppressedDirScans.has(11)).toBe(false);
     expect((service as any).suppressedDirScanTimers.has('11:/books/new')).toBe(false);
     expect((service as any).suppressedDirScanTimers.has('12:/books/other')).toBe(true);
@@ -212,19 +222,18 @@ describe('FileWatcherService lifecycle and watcher controls', () => {
     await expect((service as any).reconcile()).rejects.toThrow('broken reconcile');
   });
 
-  it('debounces cross-library rescans and skips the source library', () => {
-    const { service, scannerService } = makeService();
+  it('debounces cross-library reconciles and skips the source library', () => {
+    const { service, processor } = makeService();
     (service as any).subscriptions.set(1, []);
     (service as any).subscriptions.set(2, []);
     (service as any).subscriptions.set(3, []);
 
-    (service as any).scheduleCrossLibraryRescan(1);
-    (service as any).scheduleCrossLibraryRescan(1);
+    (service as any).scheduleCrossLibraryReconcile(1);
+    (service as any).scheduleCrossLibraryReconcile(1);
 
     vi.advanceTimersByTime(1_500);
-    expect(scannerService.startScanAsync).toHaveBeenCalledWith(2);
-    expect(scannerService.startScanAsync).toHaveBeenCalledWith(3);
-    expect(scannerService.startScanAsync).toHaveBeenCalledTimes(2);
+    expect(processor.reconcileMissingBooks).toHaveBeenCalledWith([2, 3]);
+    expect(processor.reconcileMissingBooks).toHaveBeenCalledTimes(1);
   });
 
   it('suppresses folder scans temporarily for newly created directories', () => {
@@ -240,6 +249,7 @@ describe('FileWatcherService lifecycle and watcher controls', () => {
 
   it('logs errors when debounced process execution fails', async () => {
     const { service } = makeService();
+    (service as any).subscriptions.set(2, []);
     vi.spyOn(service as any, 'process').mockRejectedValue(new Error('process failed'));
 
     (service as any).schedule('delete', '/books/fail.epub', 2);

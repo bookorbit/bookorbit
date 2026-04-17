@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { eq, and } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DB } from '../../db/db.module';
+import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { LIBRARY_ACCESS_KEY, LibraryAccessLevel } from '../decorators/require-library-access.decorator';
 import { RequestUser } from '../types/request-user';

@@ -18,10 +18,7 @@ export class FileEventProcessorService {
   constructor(private readonly scannerRepo: ScannerRepository) {}
 
   async handleUnlink(absolutePath: string, scopeLibraryId?: number): Promise<FileEventResult> {
-    const row =
-      scopeLibraryId == null
-        ? await this.scannerRepo.findBookFileByAbsolutePath(absolutePath)
-        : await this.scannerRepo.findBookFileByAbsolutePath(absolutePath, scopeLibraryId);
+    const row = await this.scannerRepo.findBookFileByAbsolutePath(absolutePath, scopeLibraryId);
     if (!row) return { type: 'noop' };
 
     const { file, libraryId: rowLibraryId, primaryFileId } = row;
@@ -69,10 +66,7 @@ export class FileEventProcessorService {
   }
 
   async handleUnlinkDir(absolutePath: string, scopeLibraryId?: number): Promise<FileEventResult> {
-    const matched =
-      scopeLibraryId == null
-        ? await this.scannerRepo.findBooksByFolderPath(absolutePath)
-        : await this.scannerRepo.findBooksByFolderPath(absolutePath, scopeLibraryId);
+    const matched = await this.scannerRepo.findBooksByFolderPath(absolutePath, scopeLibraryId);
     if (matched.length === 0) return { type: 'noop' };
 
     const bookIds = matched.map((b) => b.id);
@@ -95,18 +89,24 @@ export class FileEventProcessorService {
     const { role, format } = classifyFile(absolutePath);
     if (role !== 'content') return { type: 'noop' };
 
-    const existing =
-      scopeLibraryId == null
-        ? await this.scannerRepo.findBookFileByAbsolutePath(absolutePath)
-        : await this.scannerRepo.findBookFileByAbsolutePath(absolutePath, scopeLibraryId);
+    const existing = await this.scannerRepo.findBookFileByAbsolutePath(absolutePath, scopeLibraryId);
     if (existing) {
+      // Check the file's own book first before searching for any missing book
+      const ownBook = await this.scannerRepo.findBookById(existing.file.bookId);
+      if (ownBook?.status === 'missing') {
+        await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
+        await this.refreshPrimaryFile(ownBook.id, existing.libraryId);
+        await this.scannerRepo.markBooksAsPresent([ownBook.id]);
+        this.logger.log(
+          `[scanner.file_event.create] [end] libraryId=${existing.libraryId} bookId=${ownBook.id} path="${absolutePath.replace(/"/g, '\\"')}" action=restore_own_book - own book restored`,
+        );
+        return { type: 'book-restored', libraryId: existing.libraryId, bookIds: [ownBook.id] };
+      }
+
+      // Own book isn't missing - fall through to folder-level missing book search
       const book =
-        (scopeLibraryId == null
-          ? await this.scannerRepo.findMissingBookByFolderPath(dirname(absolutePath))
-          : await this.scannerRepo.findMissingBookByFolderPath(dirname(absolutePath), scopeLibraryId)) ??
-        (scopeLibraryId == null
-          ? await this.scannerRepo.findMissingBookByFolderPath(absolutePath)
-          : await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
+        (await this.scannerRepo.findMissingBookByFolderPath(dirname(absolutePath), scopeLibraryId)) ??
+        (await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
       if (!book) return { type: 'noop' };
 
       await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
@@ -120,12 +120,8 @@ export class FileEventProcessorService {
 
     const folderPath = dirname(absolutePath);
     const book =
-      (scopeLibraryId == null
-        ? await this.scannerRepo.findMissingBookByFolderPath(folderPath)
-        : await this.scannerRepo.findMissingBookByFolderPath(folderPath, scopeLibraryId)) ??
-      (scopeLibraryId == null
-        ? await this.scannerRepo.findMissingBookByFolderPath(absolutePath)
-        : await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
+      (await this.scannerRepo.findMissingBookByFolderPath(folderPath, scopeLibraryId)) ??
+      (await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
     if (book) {
       const libraryFolderPath = await this.scannerRepo.findLibraryFolderPath(book.libraryFolderId);
       await this.scannerRepo.createBookFile({
@@ -146,44 +142,91 @@ export class FileEventProcessorService {
       return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
     }
 
+    // Before falling through to detectMovedFile (which may steal this file
+    // for the wrong book), check if the inode belongs to a file already tracked by a
+    // book at this folder path. This handles atomic-save patterns where an editor writes
+    // a new inode for the same logical file.
+    const ino = Number(fileStat.ino);
+    if (ino !== 0) {
+      const folderPath = dirname(absolutePath);
+      const ownBook =
+        (await this.scannerRepo.findMissingBookByFolderPath(folderPath, scopeLibraryId)) ??
+        (await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
+      if (ownBook) {
+        const ownFiles = await this.scannerRepo.findBookFilesByBookId(ownBook.id);
+        const matchingFile = ownFiles.find((f) => f.absolutePath === absolutePath);
+        if (matchingFile) {
+          await this.scannerRepo.updateBookFile(matchingFile.id, {
+            ...this.statToFileInfo(fileStat),
+            format,
+            role: 'content',
+          });
+          await this.refreshPrimaryFile(ownBook.id, ownBook.libraryId);
+          await this.scannerRepo.markBooksAsPresent([ownBook.id]);
+          this.logger.log(
+            `[scanner.file_event.create] [end] libraryId=${ownBook.libraryId} bookId=${ownBook.id} path="${absolutePath.replace(/"/g, '\\"')}" action=restore_own_book_by_path - own book restored by path match`,
+          );
+          return { type: 'book-restored', libraryId: ownBook.libraryId, bookIds: [ownBook.id] };
+        }
+      }
+    }
+
     return this.detectMovedFile(absolutePath, fileStat, scopeLibraryId);
   }
 
   async reconcileMissingBooks(libraryIds: number[]): Promise<FileEventResult[]> {
     const event = 'scanner.file_event.reconcile_missing';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] libraryCount=${libraryIds.length} - missing book reconcile started`);
+    const libraryIdsLabel = `[${libraryIds.join(',')}]`;
+    this.logger.log(`[${event}] [start] libraryCount=${libraryIds.length} libraryIds=${libraryIdsLabel} - missing book reconcile started`);
     try {
       const missing = await this.scannerRepo.findMissingBooksForLibraries(libraryIds);
       if (missing.length === 0) {
         this.logger.log(
-          `[${event}] [end] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} candidateCount=0 restoredCount=0 - missing book reconcile completed`,
+          `[${event}] [end] libraryCount=${libraryIds.length} libraryIds=${libraryIdsLabel} durationMs=${Date.now() - startedAt} candidateCount=0 restoredCount=0 - missing book reconcile completed`,
         );
         return [];
       }
 
+      // Cache settings per library to avoid repeated DB lookups
+      const settingsCache = new Map<number, { formatPriority: string[] }>();
+
       const results: FileEventResult[] = [];
 
+      // Batch processing - group by library for potential future optimization
       for (const book of missing) {
-        const result = await this.tryRestoreBook(book as { id: number; libraryId: number; libraryFolderId: number; folderPath: string });
+        if (!settingsCache.has(book.libraryId)) {
+          const settings = await this.scannerRepo.findLibrarySettings(book.libraryId);
+          settingsCache.set(book.libraryId, {
+            formatPriority: settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY,
+          });
+        }
+        const cached = settingsCache.get(book.libraryId)!;
+        const result = await this.tryRestoreBook(
+          book as { id: number; libraryId: number; libraryFolderId: number; folderPath: string },
+          cached.formatPriority,
+        );
         if (result.type !== 'noop') results.push(result);
       }
 
       this.logger.log(
-        `[${event}] [end] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} candidateCount=${missing.length} restoredCount=${results.length} - missing book reconcile completed`,
+        `[${event}] [end] libraryCount=${libraryIds.length} libraryIds=${libraryIdsLabel} durationMs=${Date.now() - startedAt} candidateCount=${missing.length} restoredCount=${results.length} - missing book reconcile completed`,
       );
       return results;
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
       this.logger.warn(
-        `[${event}] [fail] libraryCount=${libraryIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - missing book reconcile failed`,
+        `[${event}] [fail] libraryCount=${libraryIds.length} libraryIds=${libraryIdsLabel} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - missing book reconcile failed`,
       );
       throw err;
     }
   }
 
-  private async tryRestoreBook(book: { id: number; libraryId: number; libraryFolderId: number; folderPath: string }): Promise<FileEventResult> {
+  private async tryRestoreBook(
+    book: { id: number; libraryId: number; libraryFolderId: number; folderPath: string },
+    cachedFormatPriority?: string[],
+  ): Promise<FileEventResult> {
     const files = (await this.scannerRepo.findBookFilesByBookId(book.id))
       .filter((f) => f.role === 'content')
       .map((f) => ({ id: f.id, absolutePath: f.absolutePath, format: f.format, sizeBytes: f.sizeBytes }));
@@ -201,8 +244,9 @@ export class FileEventProcessorService {
       await this.scannerRepo.updateBookFile(file.id, this.statToFileInfo(file.stat));
     }
 
-    const settings = await this.scannerRepo.findLibrarySettings(book.libraryId);
-    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
+    // Use cached formatPriority when available
+    const formatPriority =
+      cachedFormatPriority ?? (await this.scannerRepo.findLibrarySettings(book.libraryId))?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
     const winner = this.pickPrimaryFile(existingContent, formatPriority);
 
     await this.scannerRepo.updateBookPrimaryFile(book.id, winner?.id ?? null);
@@ -218,13 +262,28 @@ export class FileEventProcessorService {
     fileStat: Awaited<ReturnType<typeof stat>>,
     scopeLibraryId?: number,
   ): Promise<FileEventResult> {
-    const match =
-      scopeLibraryId == null
-        ? await this.scannerRepo.findBookFileWithContextByIno(Number(fileStat.ino))
-        : await this.scannerRepo.findBookFileWithContextByIno(Number(fileStat.ino), scopeLibraryId);
+    const ino = Number(fileStat.ino);
+    if (ino === 0) return { type: 'noop' };
+
+    const match = await this.scannerRepo.findBookFileWithContextByIno(ino, scopeLibraryId);
     if (!match || match.file.absolutePath === newAbsolutePath) return { type: 'noop' };
 
     const { file, libraryId: rowLibraryId, folderPath: oldFolderPath, libraryFolderPath } = match;
+
+    // Partial move guard - for multi-file books, verify the old file is
+    // actually gone before reassigning. During a folder move, multiple events fire
+    // and some files may not have been unlinked yet.
+    const oldFileStillExists = await stat(file.absolutePath).then(
+      (s) => s.isFile(),
+      () => false,
+    );
+    if (oldFileStillExists) {
+      this.logger.log(
+        `[scanner.file_event.move] [end] libraryId=${rowLibraryId} bookId=${file.bookId} from="${file.absolutePath.replace(/"/g, '\\"')}" to="${newAbsolutePath.replace(/"/g, '\\"')}" action=skip_old_still_exists - old file still exists, deferring to scan`,
+      );
+      return { type: 'noop' };
+    }
+
     const newFolderPath = dirname(newAbsolutePath) === libraryFolderPath ? newAbsolutePath : dirname(newAbsolutePath);
     if (newFolderPath !== oldFolderPath) {
       const targetBooks = await this.scannerRepo.findBooksByFolderPath(newFolderPath, rowLibraryId);
@@ -304,10 +363,7 @@ export class FileEventProcessorService {
   }
 
   private async handleCreateDir(absolutePath: string, scopeLibraryId?: number): Promise<FileEventResult> {
-    const missingBooks =
-      scopeLibraryId == null
-        ? await this.scannerRepo.findMissingBooksByFolderPath(absolutePath)
-        : await this.scannerRepo.findMissingBooksByFolderPath(absolutePath, scopeLibraryId);
+    const missingBooks = await this.scannerRepo.findMissingBooksByFolderPath(absolutePath, scopeLibraryId);
     if (missingBooks.length > 0) {
       const restoredIds: number[] = [];
       const matchedLibraryId = missingBooks[0].libraryId;

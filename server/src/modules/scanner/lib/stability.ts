@@ -13,10 +13,10 @@ const RECENTLY_MODIFIED_THRESHOLD_MS = 60_000;
  * Skips the check entirely for files that haven't been touched in the last minute.
  * Returns silently if the file disappears — the caller handles the missing case.
  */
-export async function waitForStability(absolutePath: string): Promise<void> {
+export async function waitForStability(absolutePath: string, knownMtimeMs?: number): Promise<void> {
   try {
-    const s = await stat(absolutePath);
-    if (Date.now() - s.mtimeMs > RECENTLY_MODIFIED_THRESHOLD_MS) return;
+    const mtimeMs = knownMtimeMs ?? (await stat(absolutePath)).mtimeMs;
+    if (Date.now() - mtimeMs > RECENTLY_MODIFIED_THRESHOLD_MS) return;
   } catch {
     return;
   }

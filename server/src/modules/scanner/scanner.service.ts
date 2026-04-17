@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
+import { createHash } from 'crypto';
 
 import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanBooksAddedEvent, ScanProgressEvent } from '@projectx/types';
 import { NotificationType } from '@projectx/types';
@@ -13,14 +14,57 @@ import { readdir, stat } from 'fs/promises';
 import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole, isAudioFormat } from './lib/classify';
 import { fingerprintFile } from './lib/hash';
 import { waitForStability } from './lib/stability';
-import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
+import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate, type WalkResult } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 
+interface BookEntry {
+  id: number;
+  status: string;
+  folderPath: string;
+}
+
+interface FileByPathEntry {
+  id: number;
+  bookId: number;
+  ino: number;
+  sizeBytes: number | null;
+  mtime: Date | null;
+  hash: string | null;
+  sortOrder: number | null;
+}
+
+interface FileByInoEntry {
+  id: number;
+  bookId: number;
+  absolutePath: string;
+}
+
+interface ScanLookupMaps {
+  bookByFolderPath: Map<string, BookEntry>;
+  booksByParentDir: Map<string, BookEntry[]>;
+  fileByPath: Map<string, FileByPathEntry>;
+  fileByIno: Map<number, FileByInoEntry>;
+  fileIdsByBookId: Map<number, Set<number>>;
+}
+
+interface LibraryScanSettings {
+  allowedFormats: string[];
+  formatPriority: string[];
+  excludePatterns: string[];
+  organizationMode: OrganizationMode;
+}
+
+type TargetedScanJob = { type: 'book'; path: string; libraryId: number } | { type: 'directory'; path: string; libraryId: number };
+
 const METADATA_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'cbz', 'cbr', 'cb7', 'fb2', 'pdf', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
-const BATCH_SIZE = 3;
+const BATCH_SIZE = 10;
+const COVER_REFRESH_BATCH_SIZE = 5;
 const BOOK_EMIT_BUFFER_SIZE = 20;
 const BOOK_EMIT_FLUSH_INTERVAL_MS = 1000;
+const BOOK_STATUS_NOTIFY_DEBOUNCE_MS = 1000;
+const WATCHER_NOTIFY_DEBOUNCE_MS = 30_000;
+const TARGETED_BOOK_SCAN_MAX_CONCURRENCY = 8;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
 
 interface ScanCounts {
@@ -31,6 +75,14 @@ interface ScanCounts {
 
 function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
   return mode === 'book_per_file' ? 'book_per_file' : 'book_per_folder';
+}
+
+function formatBooksUnavailableMessage(count: number): string {
+  return count === 1 ? '1 book is no longer available on disk.' : `${count} books are no longer available on disk.`;
+}
+
+function formatBooksRestoredMessage(count: number): string {
+  return count === 1 ? '1 book was restored on disk.' : `${count} books were restored on disk.`;
 }
 
 @Injectable()
@@ -49,6 +101,87 @@ export class ScannerService implements OnApplicationBootstrap {
   // ── Live book emission buffer ──────────────────────────────────────────────
   private readonly bookEmitBuffer = new Map<number, number[]>();
   private readonly bookEmitTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  // ── Watcher change notification buffer (debounced, 30s) ───────────────────
+  private readonly watcherNotifyBuffer = new Map<number, { added: number; removed: number }>();
+  private readonly watcherNotifyTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  // ── Missing book notification buffer (debounced, 1s) ──────────────────────
+  private readonly booksUnavailableNotifyBuffer = new Map<number, Set<number>>();
+  private readonly booksUnavailableNotifyTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  // ── Restored book notification buffer (debounced, 1s) ─────────────────────
+  private readonly booksRestoredNotifyBuffer = new Map<number, Set<number>>();
+  private readonly booksRestoredNotifyTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  // ── Settings hash for incremental scan invalidation ────────────────────────
+  private readonly lastSettingsHash = new Map<number, string>();
+
+  // ── Targeted watcher scans ─────────────────────────────────────────────────
+  private readonly targetedBookScanQueue: TargetedScanJob[] = [];
+  private activeTargetedBookScans = 0;
+
+  private static computeSettingsHash(
+    allowedFormats: string[],
+    formatPriority: string[],
+    excludePatterns: string[],
+    organizationMode: string,
+  ): string {
+    const payload = JSON.stringify({ allowedFormats, formatPriority, excludePatterns, organizationMode });
+    return createHash('sha256').update(payload).digest('hex').slice(0, 16);
+  }
+
+  private static buildLookupMaps(
+    knownBooks: Array<{ id: number; status: string; folderPath: string }>,
+    knownFiles: Array<{
+      id: number;
+      bookId: number;
+      absolutePath: string;
+      ino: number;
+      sizeBytes: number | null;
+      mtime: Date | null;
+      hash: string | null;
+      sortOrder?: number | null;
+    }>,
+  ): ScanLookupMaps {
+    const bookByFolderPath = new Map<string, BookEntry>(
+      knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
+    );
+
+    const booksByParentDir = new Map<string, BookEntry[]>();
+    for (const b of knownBooks) {
+      const parentDir = dirname(b.folderPath);
+      let arr = booksByParentDir.get(parentDir);
+      if (!arr) {
+        arr = [];
+        booksByParentDir.set(parentDir, arr);
+      }
+      arr.push({ id: b.id, status: b.status, folderPath: b.folderPath });
+    }
+
+    const fileByPath = new Map<string, FileByPathEntry>(
+      knownFiles.map((f) => [
+        f.absolutePath,
+        { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash, sortOrder: f.sortOrder ?? null },
+      ]),
+    );
+
+    const fileByIno = new Map<number, FileByInoEntry>(
+      knownFiles.filter((f) => f.ino !== 0).map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
+    );
+
+    const fileIdsByBookId = new Map<number, Set<number>>();
+    for (const f of knownFiles) {
+      let s = fileIdsByBookId.get(f.bookId);
+      if (!s) {
+        s = new Set();
+        fileIdsByBookId.set(f.bookId, s);
+      }
+      s.add(f.id);
+    }
+
+    return { bookByFolderPath, booksByParentDir, fileByPath, fileByIno, fileIdsByBookId };
+  }
 
   private bufferBookForEmit(libraryId: number, bookId: number): void {
     let ids = this.bookEmitBuffer.get(libraryId);
@@ -95,14 +228,127 @@ export class ScannerService implements OnApplicationBootstrap {
     }
   }
 
+  bufferWatcherNotification(libraryId: number, delta: { added?: number; removed?: number }): void {
+    const current = this.watcherNotifyBuffer.get(libraryId) ?? { added: 0, removed: 0 };
+    current.added += delta.added ?? 0;
+    current.removed += delta.removed ?? 0;
+    this.watcherNotifyBuffer.set(libraryId, current);
+
+    const existing = this.watcherNotifyTimers.get(libraryId);
+    if (existing) clearTimeout(existing);
+    this.watcherNotifyTimers.set(
+      libraryId,
+      setTimeout(() => this.flushWatcherNotification(libraryId), WATCHER_NOTIFY_DEBOUNCE_MS),
+    );
+  }
+
+  bufferBooksUnavailableNotification(libraryId: number, bookIds: number[]): void {
+    if (bookIds.length === 0) return;
+    const current = this.booksUnavailableNotifyBuffer.get(libraryId) ?? new Set<number>();
+    for (const bookId of bookIds) current.add(bookId);
+    this.booksUnavailableNotifyBuffer.set(libraryId, current);
+
+    const existing = this.booksUnavailableNotifyTimers.get(libraryId);
+    if (existing) clearTimeout(existing);
+    this.booksUnavailableNotifyTimers.set(
+      libraryId,
+      setTimeout(() => this.flushBooksUnavailableNotification(libraryId), BOOK_STATUS_NOTIFY_DEBOUNCE_MS),
+    );
+  }
+
+  private flushBooksUnavailableNotification(libraryId: number): void {
+    const existing = this.booksUnavailableNotifyTimers.get(libraryId);
+    if (existing) clearTimeout(existing);
+    this.booksUnavailableNotifyTimers.delete(libraryId);
+
+    const bookIds = [...(this.booksUnavailableNotifyBuffer.get(libraryId) ?? [])];
+    this.booksUnavailableNotifyBuffer.delete(libraryId);
+    if (bookIds.length === 0) return;
+
+    const count = bookIds.length;
+    this.notificationService
+      .notify({
+        type: NotificationType.BooksUnavailable,
+        title: count === 1 ? 'Book unavailable' : 'Books unavailable',
+        message: formatBooksUnavailableMessage(count),
+        actionUrl: `/library/${libraryId}`,
+        scope: { kind: 'library', libraryId },
+        meta: { libraryId, count },
+      })
+      .catch(() => {});
+  }
+
+  bufferBooksRestoredNotification(libraryId: number, bookIds: number[]): void {
+    if (bookIds.length === 0) return;
+    const current = this.booksRestoredNotifyBuffer.get(libraryId) ?? new Set<number>();
+    for (const bookId of bookIds) current.add(bookId);
+    this.booksRestoredNotifyBuffer.set(libraryId, current);
+
+    const existing = this.booksRestoredNotifyTimers.get(libraryId);
+    if (existing) clearTimeout(existing);
+    this.booksRestoredNotifyTimers.set(
+      libraryId,
+      setTimeout(() => this.flushBooksRestoredNotification(libraryId), BOOK_STATUS_NOTIFY_DEBOUNCE_MS),
+    );
+  }
+
+  private flushBooksRestoredNotification(libraryId: number): void {
+    const existing = this.booksRestoredNotifyTimers.get(libraryId);
+    if (existing) clearTimeout(existing);
+    this.booksRestoredNotifyTimers.delete(libraryId);
+
+    const bookIds = [...(this.booksRestoredNotifyBuffer.get(libraryId) ?? [])];
+    this.booksRestoredNotifyBuffer.delete(libraryId);
+    if (bookIds.length === 0) return;
+
+    const count = bookIds.length;
+    this.notificationService
+      .notify({
+        type: NotificationType.BooksRestored,
+        title: count === 1 ? 'Book restored' : 'Books restored',
+        message: formatBooksRestoredMessage(count),
+        actionUrl: `/library/${libraryId}`,
+        scope: { kind: 'library', libraryId },
+        meta: { libraryId, count },
+      })
+      .catch(() => {});
+  }
+
+  private flushWatcherNotification(libraryId: number): void {
+    this.watcherNotifyTimers.delete(libraryId);
+    const delta = this.watcherNotifyBuffer.get(libraryId);
+    this.watcherNotifyBuffer.delete(libraryId);
+    if (!delta || (delta.added === 0 && delta.removed === 0)) return;
+
+    this.scannerRepo
+      .findLibraryName(libraryId)
+      .then((name) => {
+        const label = name ?? `Library ${libraryId}`;
+        const parts: string[] = [];
+        if (delta.added > 0) parts.push(`${delta.added} added`);
+        if (delta.removed > 0) parts.push(`${delta.removed} removed`);
+        return this.notificationService.notify({
+          type: NotificationType.ScanCompleted,
+          title: `${label} updated`,
+          message: parts.join(', '),
+          scope: { kind: 'library', libraryId },
+          meta: { libraryId },
+        });
+      })
+      .catch(() => {});
+  }
+
   async onApplicationBootstrap(): Promise<void> {
     await this.scannerRepo.failAllRunningJobs('Server restarted during scan');
   }
 
-  async startScan(libraryId: number, triggeredBy: 'manual' | 'watcher' | 'schedule'): Promise<{ jobId: number }> {
+  async startScan(libraryId: number, triggeredBy: 'manual' | 'watcher' | 'schedule', forceFullScan = false): Promise<{ jobId: number }> {
     const event = 'scanner.start_scan';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] libraryId=${libraryId} triggeredBy=${triggeredBy} - scan start requested`);
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} triggeredBy=${triggeredBy} forceFullScan=${forceFullScan} - scan start requested`);
+    if (!this.scanJobStore.acquireStartLock(libraryId)) {
+      throw new ConflictException(`A scan is already starting for library ${libraryId}`);
+    }
     try {
       if (this.scanJobStore.isRunning(libraryId)) {
         throw new ConflictException(`A scan is already running for library ${libraryId}`);
@@ -119,12 +365,25 @@ export class ScannerService implements OnApplicationBootstrap {
       const excludePatterns = settings?.excludePatterns ?? [];
       const organizationMode = normalizeOrganizationMode(settings?.organizationMode);
 
+      // Invalidate incremental scan cache when scan-affecting settings change.
+      // On first scan after restart (no stored hash), force full scan to avoid
+      // using stale dir state that was built under different settings.
+      const currentHash = ScannerService.computeSettingsHash(allowedFormats, formatPriority, excludePatterns, organizationMode);
+      const lastHash = this.lastSettingsHash.get(libraryId);
+      if (lastHash === undefined || lastHash !== currentHash) {
+        forceFullScan = true;
+        if (lastHash !== undefined) {
+          this.logger.log(`[scanner.start_scan] libraryId=${libraryId} - scan settings changed, forcing full rescan`);
+        }
+      }
+      this.lastSettingsHash.set(libraryId, currentHash);
+
       const job = await this.scannerRepo.createScanJob(libraryId, triggeredBy);
 
       this.scanJobStore.create(job.id, libraryId, 0);
       this.emitFromStore(libraryId, job.id, 'running');
 
-      this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns, organizationMode).catch((err) => {
+      this.runScan(libraryId, job.id, folders, allowedFormats, formatPriority, excludePatterns, organizationMode, forceFullScan).catch((err) => {
         const errorClass = err instanceof Error ? err.name : 'Error';
         const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
         this.logger.error(
@@ -143,6 +402,8 @@ export class ScannerService implements OnApplicationBootstrap {
         `[${event}] [fail] libraryId=${libraryId} triggeredBy=${triggeredBy} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - scan start failed`,
       );
       throw err;
+    } finally {
+      this.scanJobStore.releaseStartLock(libraryId);
     }
   }
 
@@ -161,12 +422,20 @@ export class ScannerService implements OnApplicationBootstrap {
       (async () => {
         let processed = 0;
         let refreshedCount = 0;
-        for (const row of candidates) {
-          const refreshed = await this.metadataService.refreshCoverForBook(row.bookId, row.absolutePath, row.format!);
-          processed++;
-          if (refreshed) {
-            refreshedCount++;
-            this.scanGateway.emitCoverRefreshed({ bookId: row.bookId, libraryId } satisfies CoverRefreshedEvent);
+        for (let i = 0; i < candidates.length; i += COVER_REFRESH_BATCH_SIZE) {
+          const batch = candidates.slice(i, i + COVER_REFRESH_BATCH_SIZE);
+          const results = await Promise.allSettled(
+            batch.map(async (row) => {
+              const refreshed = await this.metadataService.refreshCoverForBook(row.bookId, row.absolutePath, row.format!);
+              return { bookId: row.bookId, refreshed };
+            }),
+          );
+          for (const result of results) {
+            processed++;
+            if (result.status === 'fulfilled' && result.value.refreshed) {
+              refreshedCount++;
+              this.scanGateway.emitCoverRefreshed({ bookId: result.value.bookId, libraryId } satisfies CoverRefreshedEvent);
+            }
           }
           this.scanGateway.emitCoverRefreshProgress({
             libraryId,
@@ -199,10 +468,13 @@ export class ScannerService implements OnApplicationBootstrap {
   }
 
   startScanAsync(libraryId: number): void {
-    if (this.scanJobStore.isRunning(libraryId)) return;
-    this.startScan(libraryId, 'manual').catch((err) =>
+    if (this.scanJobStore.isRunning(libraryId) || this.scanJobStore.isStartLocked(libraryId)) {
+      this.scanJobStore.markPendingRescan(libraryId);
+      return;
+    }
+    this.startScan(libraryId, 'watcher').catch((err) =>
       this.logger.error(
-        `[scanner.start_scan] [fail] libraryId=${libraryId} triggeredBy=manual errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - auto-scan failed to start`,
+        `[scanner.start_scan] [fail] libraryId=${libraryId} triggeredBy=watcher errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - auto-scan failed to start`,
       ),
     );
   }
@@ -212,20 +484,52 @@ export class ScannerService implements OnApplicationBootstrap {
   }
 
   scanBookFolderAsync(filePath: string, libraryId: number): void {
-    this.scanBookFolder(filePath, libraryId).catch((err) =>
-      this.logger.error(
-        `[scanner.scan_book_folder] [fail] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - targeted folder scan failed`,
-      ),
+    this.targetedBookScanQueue.push({ type: 'book', path: filePath, libraryId });
+    this.drainTargetedBookScanQueue();
+  }
+
+  scanBookDirectoryAsync(dirPath: string, libraryId: number): void {
+    this.targetedBookScanQueue.push({ type: 'directory', path: dirPath, libraryId });
+    this.drainTargetedBookScanQueue();
+  }
+
+  private drainTargetedBookScanQueue(): void {
+    while (this.activeTargetedBookScans < TARGETED_BOOK_SCAN_MAX_CONCURRENCY && this.targetedBookScanQueue.length > 0) {
+      const job = this.targetedBookScanQueue.shift()!;
+      this.activeTargetedBookScans += 1;
+      const scan = job.type === 'directory' ? this.scanBookDirectory(job.path, job.libraryId) : this.scanBookFolder(job.path, job.libraryId);
+      scan
+        .catch((err) =>
+          job.type === 'directory'
+            ? this.logTargetedDirectoryScanFailure(job.path, job.libraryId, err)
+            : this.logTargetedBookScanFailure(job.path, job.libraryId, err),
+        )
+        .finally(() => {
+          this.activeTargetedBookScans -= 1;
+          this.drainTargetedBookScanQueue();
+        });
+    }
+  }
+
+  private logTargetedBookScanFailure(filePath: string, libraryId: number, err: unknown): void {
+    this.logger.error(
+      `[scanner.targeted_book_scan] [fail] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - targeted book scan failed`,
+    );
+  }
+
+  private logTargetedDirectoryScanFailure(dirPath: string, libraryId: number, err: unknown): void {
+    this.logger.error(
+      `[scanner.targeted_directory_scan] [fail] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - targeted directory scan failed`,
     );
   }
 
   private async scanBookFolder(filePath: string, libraryId: number): Promise<void> {
-    const event = 'scanner.scan_book_folder';
+    const event = 'scanner.targeted_book_scan';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" - targeted folder scan started`);
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\"')}" - targeted book scan started`);
     if (this.scanJobStore.isRunning(libraryId)) {
       this.logger.log(
-        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedDueToRunningFullScan=true - targeted folder scan completed`,
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedDueToRunningFullScan=true - targeted book scan completed`,
       );
       return;
     }
@@ -233,89 +537,299 @@ export class ScannerService implements OnApplicationBootstrap {
     const libraryFolder = allFolders.find((f) => filePath.startsWith(f.path + sep));
     if (!libraryFolder) {
       this.logger.log(
-        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} matchedLibraryFolder=false - targeted folder scan completed`,
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} matchedLibraryFolder=false - targeted book scan completed`,
       );
       return;
     }
 
-    const settings = await this.scannerRepo.findLibrarySettings(libraryId);
-    const allowedFormats = settings?.allowedFormats ?? [];
-    const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
-    const excludePatterns = settings?.excludePatterns ?? [];
-    const organizationMode = normalizeOrganizationMode(settings?.organizationMode);
+    const rawSettings = await this.scannerRepo.findLibrarySettings(libraryId);
+    const settings: LibraryScanSettings = {
+      allowedFormats: rawSettings?.allowedFormats ?? [],
+      formatPriority: rawSettings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY,
+      excludePatterns: rawSettings?.excludePatterns ?? [],
+      organizationMode: normalizeOrganizationMode(rawSettings?.organizationMode),
+    };
 
-    // In book_per_file mode each file is its own book — skip folder resolution entirely
-    // and build a single-file candidate directly from the changed file.
-    if (organizationMode === 'book_per_file') {
-      const { role, format } = classifyFile(filePath);
-      if (role !== 'content') {
-        this.logger.log(
-          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedNonContent=true - targeted folder scan completed`,
-        );
-        return;
-      }
-
-      const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
-      if (allowed && format !== null && !allowed.has(format)) {
-        this.logger.log(
-          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedByAllowedFormats=true - targeted folder scan completed`,
-        );
-        return;
-      }
-
-      const fileStat = await stat(filePath).catch(() => null);
-      if (!fileStat || !fileStat.isFile()) {
-        this.logger.log(
-          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateFound=false - targeted folder scan completed`,
-        );
-        return;
-      }
-
-      const candidate: BookCandidate = {
-        folderPath: filePath,
-        files: [
-          {
-            absolutePath: filePath,
-            relPath: relative(libraryFolder.path, filePath),
-            ino: Number(fileStat.ino),
-            sizeBytes: Number(fileStat.size),
-            mtime: fileStat.mtime,
-          },
-        ],
-      };
-
-      const knownBooks = await this.scannerRepo.findBooksByFolderPath(filePath, libraryId);
-      const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((b) => b.id));
-
-      const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
-        knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
-      );
-      const fileByPath = new Map<
-        string,
-        { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
-      >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
-      const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
-        knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
-      );
-
-      const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, bookByFolderPath, fileByPath, fileByIno, formatPriority);
-      this.logger.log(
-        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} - targeted folder scan completed`,
-      );
-      return;
+    if (settings.organizationMode === 'book_per_file') {
+      return this.handleScanBookPerFile(filePath, libraryId, libraryFolder, settings, event, startedAt);
     }
 
     const bookFolder = dirname(filePath);
-
-    // If the file sits directly inside the library root, a targeted scan would
-    // walk the entire root — treat it as a full scan instead.
     if (bookFolder === libraryFolder.path) {
-      this.startScanAsync(libraryId);
+      return this.handleScanRootLevelFile(filePath, libraryId, libraryFolder, settings, event, startedAt);
+    }
+
+    return this.handleScanFolderNormal(filePath, libraryId, libraryFolder, settings, event, startedAt);
+  }
+
+  private async scanBookDirectory(dirPath: string, libraryId: number): Promise<void> {
+    const event = 'scanner.targeted_directory_scan';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" - targeted directory scan started`);
+
+    if (this.scanJobStore.isRunning(libraryId)) {
       this.logger.log(
-        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} promotedToFullScan=true - targeted folder scan completed`,
+        `[${event}] [end] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} skippedDueToRunningFullScan=true - targeted directory scan completed`,
       );
       return;
     }
+
+    const allFolders = await this.scannerRepo.findLibraryFolders(libraryId);
+    const libraryFolder = allFolders.find((f) => dirPath === f.path || dirPath.startsWith(f.path + sep));
+    if (!libraryFolder) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} matchedLibraryFolder=false - targeted directory scan completed`,
+      );
+      return;
+    }
+
+    const rawSettings = await this.scannerRepo.findLibrarySettings(libraryId);
+    const settings: LibraryScanSettings = {
+      allowedFormats: rawSettings?.allowedFormats ?? [],
+      formatPriority: rawSettings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY,
+      excludePatterns: rawSettings?.excludePatterns ?? [],
+      organizationMode: normalizeOrganizationMode(rawSettings?.organizationMode),
+    };
+
+    const walkLogger = (msg: string) =>
+      this.logger.warn(
+        `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+      );
+
+    let candidates: BookCandidate[];
+    let skippedDirs: Set<string>;
+    try {
+      if (settings.organizationMode === 'book_per_file') {
+        const walkResult = await findLooseFileCandidates(dirPath, settings.excludePatterns, walkLogger);
+        candidates = walkResult.candidates;
+        skippedDirs = walkResult.skippedDirs;
+      } else {
+        const [singleCandidate, walkResult] = await Promise.all([
+          buildSingleBookCandidate(dirPath, libraryFolder.path, settings.excludePatterns, walkLogger),
+          findBookCandidates(dirPath, settings.excludePatterns, walkLogger),
+        ]);
+        const nestedCandidates = walkResult.candidates.filter(
+          (candidate) =>
+            !(candidate.files.length === 1 && candidate.files[0].absolutePath === candidate.folderPath && dirname(candidate.folderPath) === dirPath),
+        );
+        candidates = singleCandidate ? [singleCandidate, ...nestedCandidates] : nestedCandidates;
+        skippedDirs = walkResult.skippedDirs;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk target directory`,
+      );
+      return;
+    }
+
+    if (candidates.length === 0) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateCount=0 skippedDirCount=${skippedDirs.size} - targeted directory scan completed`,
+      );
+      return;
+    }
+
+    candidates = candidates.map((candidate) => ({
+      ...candidate,
+      files: candidate.files.map((file) => ({ ...file, relPath: relative(libraryFolder.path, file.absolutePath) })),
+    }));
+
+    const allowed = settings.allowedFormats.length > 0 ? new Set(settings.allowedFormats) : null;
+    if (allowed) {
+      candidates = candidates
+        .map((candidate) => ({
+          ...candidate,
+          files: candidate.files.filter((file) => {
+            const role = file.role ?? classifyFile(file.absolutePath).role;
+            const format = file.format ?? classifyFile(file.absolutePath).format;
+            return role !== 'content' || (format !== null && allowed.has(format));
+          }),
+        }))
+        .filter((candidate) => candidate.files.some((file) => (file.role ?? classifyFile(file.absolutePath).role) === 'content'));
+    }
+
+    const maps = await this.loadCandidateMaps(dirPath, libraryId);
+    const totals = { added: 0, updated: 0 };
+    const allRetainedFileIds = new Set<number>();
+    const seenBookIds = new Set<number>();
+    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+      const batch = candidates.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((candidate) => this.processCandidate(candidate, libraryId, libraryFolder.id, maps, settings.formatPriority, false)),
+      );
+      for (const result of results) {
+        seenBookIds.add(result.bookId);
+        for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
+        totals.added += result.added;
+        totals.updated += result.updated;
+        this.emitTargetedScanResult(libraryId, result);
+      }
+    }
+
+    const pruneCounts = { added: 0, updated: 0 };
+    for (const bookId of seenBookIds) {
+      await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts);
+    }
+    totals.updated += pruneCounts.updated;
+
+    this.logger.log(
+      `[${event}] [end] libraryId=${libraryId} path="${dirPath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateCount=${candidates.length} skippedDirCount=${skippedDirs.size} added=${totals.added} updated=${totals.updated} - targeted directory scan completed`,
+    );
+  }
+
+  private async loadCandidateMaps(folderPath: string, libraryId: number): Promise<ScanLookupMaps> {
+    const knownBooks = await this.scannerRepo.findBooksByFolderPath(folderPath, libraryId);
+    const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((b) => b.id));
+    return ScannerService.buildLookupMaps(
+      knownBooks.map((b) => ({ id: b.id, status: b.status, folderPath: b.folderPath })),
+      knownFiles.map((f) => ({
+        id: f.id,
+        bookId: f.bookId,
+        absolutePath: f.absolutePath,
+        ino: f.ino,
+        sizeBytes: f.sizeBytes,
+        mtime: f.mtime,
+        hash: f.hash,
+        sortOrder: f.sortOrder,
+      })),
+    );
+  }
+
+  private emitTargetedScanResult(libraryId: number, result: { added: number; bookId: number }): void {
+    if (result.added > 0) {
+      this.bufferBookForEmit(libraryId, result.bookId);
+      this.flushBookEmitBuffer(libraryId);
+      this.bufferWatcherNotification(libraryId, { added: result.added });
+    }
+  }
+
+  private async handleScanBookPerFile(
+    filePath: string,
+    libraryId: number,
+    libraryFolder: { id: number; path: string },
+    settings: LibraryScanSettings,
+    event: string,
+    startedAt: number,
+  ): Promise<void> {
+    const { role, format } = classifyFile(filePath);
+    if (role !== 'content') {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} skippedNonContent=true scanScope=file - targeted book scan completed`,
+      );
+      return;
+    }
+
+    const allowed = settings.allowedFormats.length > 0 ? new Set(settings.allowedFormats) : null;
+    if (allowed && format !== null && !allowed.has(format)) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} skippedByAllowedFormats=true scanScope=file - targeted book scan completed`,
+      );
+      return;
+    }
+
+    const fileStat = await stat(filePath).catch(() => null);
+    if (!fileStat || !fileStat.isFile()) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} candidateFound=false scanScope=file - targeted book scan completed`,
+      );
+      return;
+    }
+
+    const candidate: BookCandidate = {
+      folderPath: filePath,
+      files: [
+        {
+          absolutePath: filePath,
+          relPath: relative(libraryFolder.path, filePath),
+          ino: Number(fileStat.ino),
+          sizeBytes: Number(fileStat.size),
+          mtime: fileStat.mtime,
+          format,
+          role,
+        },
+      ],
+    };
+
+    const maps = await this.loadCandidateMaps(filePath, libraryId);
+    const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, maps, settings.formatPriority, false);
+    await this.pruneMissingBookFiles(result.bookId, result.retainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, {
+      added: 0,
+      updated: 0,
+    });
+    this.emitTargetedScanResult(libraryId, result);
+    this.logger.log(
+      `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} scanScope=file - targeted book scan completed`,
+    );
+  }
+
+  private async handleScanRootLevelFile(
+    filePath: string,
+    libraryId: number,
+    libraryFolder: { id: number; path: string },
+    settings: LibraryScanSettings,
+    event: string,
+    startedAt: number,
+  ): Promise<void> {
+    const fileStat = await stat(filePath).catch(() => null);
+    if (!fileStat || !fileStat.isFile()) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} candidateFound=false scanScope=root_file - targeted book scan completed`,
+      );
+      return;
+    }
+
+    const { role, format } = classifyFile(filePath);
+    if (role !== 'content') {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} skippedNonContent=true scanScope=root_file - targeted book scan completed`,
+      );
+      return;
+    }
+
+    const allowed = settings.allowedFormats.length > 0 ? new Set(settings.allowedFormats) : null;
+    if (allowed && format !== null && !allowed.has(format)) {
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} skippedByAllowedFormats=true scanScope=root_file - targeted book scan completed`,
+      );
+      return;
+    }
+
+    const candidate: BookCandidate = {
+      folderPath: filePath,
+      files: [
+        {
+          absolutePath: filePath,
+          relPath: relative(libraryFolder.path, filePath),
+          ino: Number(fileStat.ino),
+          sizeBytes: Number(fileStat.size),
+          mtime: fileStat.mtime,
+          format,
+          role,
+        },
+      ],
+    };
+
+    const maps = await this.loadCandidateMaps(filePath, libraryId);
+    const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, maps, settings.formatPriority, false);
+    await this.pruneMissingBookFiles(result.bookId, result.retainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, {
+      added: 0,
+      updated: 0,
+    });
+    this.emitTargetedScanResult(libraryId, result);
+    this.logger.log(
+      `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} scanScope=root_file - targeted book scan completed`,
+    );
+  }
+
+  private async handleScanFolderNormal(
+    filePath: string,
+    libraryId: number,
+    libraryFolder: { id: number; path: string },
+    settings: LibraryScanSettings,
+    event: string,
+    startedAt: number,
+  ): Promise<void> {
+    const bookFolder = dirname(filePath);
 
     // Walk up one level if this folder is a stem-named audio subfolder of its parent
     // (e.g. mp3 files in "BookTitle/" alongside "BookTitle.epub" in the parent).
@@ -339,60 +853,50 @@ export class ScannerService implements OnApplicationBootstrap {
 
     let candidate: BookCandidate | null;
     try {
-      candidate = await buildSingleBookCandidate(resolvedBookFolder, libraryFolder.path, excludePatterns, (msg) =>
+      candidate = await buildSingleBookCandidate(resolvedBookFolder, libraryFolder.path, settings.excludePatterns, (msg) =>
         this.logger.warn(
-          `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${resolvedBookFolder.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+          `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${resolvedBookFolder.replace(/"/g, '\\' + '"')}" error="${msg.replace(/"/g, '\\' + '"')}" - candidate walk warning`,
         ),
       );
     } catch (err) {
       this.logger.warn(
-        `[${event}] [fail] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk target folder`,
+        `[${event}] [fail] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} scanScope=folder errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\' + '"')}" - cannot walk target book folder`,
       );
       return;
     }
 
     if (!candidate) {
       this.logger.log(
-        `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateFound=false - targeted folder scan completed`,
+        `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} candidateFound=false scanScope=folder - targeted book scan completed`,
       );
       return;
     }
 
-    const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
+    const allowed = settings.allowedFormats.length > 0 ? new Set(settings.allowedFormats) : null;
     if (allowed) {
       const filtered = candidate.files.filter((f) => {
-        const { role, format } = classifyFile(f.absolutePath);
+        const role = f.role ?? classifyFile(f.absolutePath).role;
+        const format = f.format ?? classifyFile(f.absolutePath).format;
         return role !== 'content' || (format !== null && allowed.has(format));
       });
-      if (!filtered.some((f) => classifyFile(f.absolutePath).role === 'content')) {
+      if (!filtered.some((f) => (f.role ?? classifyFile(f.absolutePath).role) === 'content')) {
         this.logger.log(
-          `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} candidateFound=true skippedByAllowedFormats=true - targeted folder scan completed`,
+          `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} candidateFound=true skippedByAllowedFormats=true scanScope=folder - targeted book scan completed`,
         );
         return;
       }
       candidate = { ...candidate, files: filtered };
     }
 
-    // Load only books/files relevant to this specific folder (including any
-    // virtual stem-split children so the merge logic in upsertBook can run).
-    const knownBooks = await this.scannerRepo.findBooksByFolderPath(resolvedBookFolder, libraryId);
-    const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((b) => b.id));
-
-    const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
-      knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
-    );
-    const fileByPath = new Map<
-      string,
-      { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
-    >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
-    const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
-      knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
-    );
-
-    const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, bookByFolderPath, fileByPath, fileByIno, formatPriority);
-
+    const maps = await this.loadCandidateMaps(resolvedBookFolder, libraryId);
+    const result = await this.processCandidate(candidate, libraryId, libraryFolder.id, maps, settings.formatPriority, false);
+    await this.pruneMissingBookFiles(result.bookId, result.retainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, {
+      added: 0,
+      updated: 0,
+    });
+    this.emitTargetedScanResult(libraryId, result);
     this.logger.log(
-      `[${event}] [end] libraryId=${libraryId} filePath="${filePath.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} folder="${basename(resolvedBookFolder).replace(/"/g, '\\"')}" added=${result.added} updated=${result.updated} - targeted folder scan completed`,
+      `[${event}] [end] libraryId=${libraryId} path="${filePath.replace(/"/g, '\\' + '"')}" durationMs=${Date.now() - startedAt} scanScope=folder folder="${basename(resolvedBookFolder).replace(/"/g, '\\' + '"')}" added=${result.added} updated=${result.updated} - targeted book scan completed`,
     );
   }
 
@@ -404,10 +908,13 @@ export class ScannerService implements OnApplicationBootstrap {
     formatPriority: string[],
     excludePatterns: string[],
     organizationMode: OrganizationMode,
+    forceFullScan = false,
   ): Promise<void> {
     const event = 'scanner.run_scan';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] libraryId=${libraryId} jobId=${jobId} folderCount=${folders.length} - scan job started`);
+    this.logger.log(
+      `[${event}] [start] libraryId=${libraryId} jobId=${jobId} folderCount=${folders.length} forceFullScan=${forceFullScan} - scan job started`,
+    );
 
     let totalCandidates = 0;
 
@@ -421,19 +928,35 @@ export class ScannerService implements OnApplicationBootstrap {
 
       for (const folder of folders) {
         let candidates: BookCandidate[] = [];
+        let skippedDirs = new Set<string>();
+        let unchangedDirs = new Set<string>();
+        let dirMtimes = new Map<string, number>();
+
+        // Load stored dir mtimes for incremental scanning (unless forced full)
+        let knownDirMtimes: Map<string, number> | undefined;
+        if (!forceFullScan) {
+          try {
+            knownDirMtimes = await this.scannerRepo.findDirScanState(folder.id);
+          } catch {
+            // If loading fails, fall back to full scan for this folder
+          }
+        } else {
+          await this.scannerRepo.clearDirScanState(folder.id).catch(() => {});
+        }
+
         try {
-          candidates =
+          const walkLogger = (msg: string) =>
+            this.logger.warn(
+              `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
+            );
+          const walkResult: WalkResult =
             organizationMode === 'book_per_file'
-              ? await findLooseFileCandidates(folder.path, excludePatterns, (msg) =>
-                  this.logger.warn(
-                    `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
-                  ),
-                )
-              : await findBookCandidates(folder.path, excludePatterns, (msg) =>
-                  this.logger.warn(
-                    `[scanner.walk_candidates] [fail] libraryId=${libraryId} path="${folder.path.replace(/"/g, '\\"')}" error="${msg.replace(/"/g, '\\"')}" - candidate walk warning`,
-                  ),
-                );
+              ? await findLooseFileCandidates(folder.path, excludePatterns, walkLogger, knownDirMtimes)
+              : await findBookCandidates(folder.path, excludePatterns, walkLogger, knownDirMtimes);
+          candidates = walkResult.candidates;
+          skippedDirs = walkResult.skippedDirs;
+          unchangedDirs = walkResult.unchangedDirs;
+          dirMtimes = walkResult.dirMtimes;
         } catch (err) {
           this.logger.warn(
             `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} path="${folder.path.replace(/"/g, '\\"')}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - cannot walk folder`,
@@ -445,20 +968,34 @@ export class ScannerService implements OnApplicationBootstrap {
             .map((c) => ({
               ...c,
               files: c.files.filter((f) => {
-                const { role, format } = classifyFile(f.absolutePath);
+                const role = f.role ?? classifyFile(f.absolutePath).role;
+                const format = f.format ?? classifyFile(f.absolutePath).format;
                 return role !== 'content' || (format !== null && allowed.has(format));
               }),
             }))
-            .filter((c) => c.files.some((f) => classifyFile(f.absolutePath).role === 'content'));
+            .filter((c) => c.files.some((f) => (f.role ?? classifyFile(f.absolutePath).role) === 'content'));
         }
 
         totalCandidates += candidates.length;
         this.scanJobStore.setTotal(libraryId, totalCandidates);
 
-        const counts = await this.scanFolderCandidates(folder.id, libraryId, candidates, jobId, formatPriority);
+        const counts = await this.scanFolderCandidates(folder.id, libraryId, candidates, jobId, formatPriority, skippedDirs, unchangedDirs);
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;
+
+        // Persist dir scan state after successful folder processing
+        if (dirMtimes.size > 0) {
+          try {
+            const entries = [...dirMtimes].map(([dirPath, mtimeMs]) => ({ dirPath, mtimeMs }));
+            await this.scannerRepo.upsertDirScanState(folder.id, entries);
+            await this.scannerRepo.deleteStaleDirScanState(folder.id, new Set(dirMtimes.keys()));
+          } catch (err) {
+            this.logger.warn(
+              `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${folder.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - dir scan state persistence failed`,
+            );
+          }
+        }
       }
 
       await this.scannerRepo.completeScanJob(jobId, totals);
@@ -498,7 +1035,13 @@ export class ScannerService implements OnApplicationBootstrap {
         .catch(() => {});
     } finally {
       this.flushBookEmitBuffer(libraryId);
+      this.flushBooksUnavailableNotification(libraryId);
+      this.flushBooksRestoredNotification(libraryId);
       this.scanJobStore.delete(libraryId);
+
+      if (this.scanJobStore.consumePendingRescan(libraryId)) {
+        this.startScanAsync(libraryId);
+      }
     }
   }
 
@@ -508,11 +1051,13 @@ export class ScannerService implements OnApplicationBootstrap {
     candidates: BookCandidate[],
     jobId: number,
     formatPriority: string[],
+    skippedDirs: Set<string> = new Set(),
+    unchangedDirs: Set<string> = new Set(),
   ): Promise<ScanCounts> {
     const event = 'scanner.scan_folder_candidates';
     const startedAt = Date.now();
     this.logger.log(
-      `[${event}] [start] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} candidateCount=${candidates.length} - folder candidate scan started`,
+      `[${event}] [start] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} candidateCount=${candidates.length} skippedDirCount=${skippedDirs.size} unchangedDirCount=${unchangedDirs.size} - folder candidate scan started`,
     );
     try {
       const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
@@ -521,27 +1066,20 @@ export class ScannerService implements OnApplicationBootstrap {
         this.scannerRepo.findBookFilesByLibraryFolder(libraryFolderId),
       ]);
 
-      const bookByFolderPath = new Map<string, { id: number; status: string; folderPath: string }>(
-        knownBooks.map((b) => [b.folderPath, { id: b.id, status: b.status, folderPath: b.folderPath }]),
-      );
-      const fileByPath = new Map<
-        string,
-        { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }
-      >(knownFiles.map((f) => [f.absolutePath, { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, hash: f.hash }]));
-      const fileByIno = new Map<number, { id: number; bookId: number; absolutePath: string }>(
-        knownFiles.map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath }]),
-      );
+      const isFirstScan = knownBooks.length === 0 && knownFiles.length === 0;
+      const maps = ScannerService.buildLookupMaps(knownBooks, knownFiles);
+
       const seenBookIds = new Set<number>();
+      const allRetainedFileIds = new Set<number>();
 
       for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
         const batch = candidates.slice(i, i + BATCH_SIZE);
 
-        const results = await Promise.all(
-          batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, bookByFolderPath, fileByPath, fileByIno, formatPriority)),
-        );
+        const results = await Promise.all(batch.map((c) => this.processCandidate(c, libraryId, libraryFolderId, maps, formatPriority, isFirstScan)));
 
         for (const r of results) {
           seenBookIds.add(r.bookId);
+          for (const fid of r.retainedFileIds) allRetainedFileIds.add(fid);
           counts.addedCount += r.added;
           counts.updatedCount += r.updated;
           if (r.added > 0) {
@@ -556,12 +1094,39 @@ export class ScannerService implements OnApplicationBootstrap {
         }
       }
 
-      const missingIds = knownBooks.filter((b) => !seenBookIds.has(b.id)).map((b) => b.id);
+      // Deferred prune: delete book files not retained by any candidate.
+      // Must happen after ALL batches so cross-book file moves are visible.
+      const pruneCounts = { added: 0, updated: 0 };
+      for (const bookId of seenBookIds) {
+        await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts);
+      }
+      counts.updatedCount += pruneCounts.updated;
+
+      // Don't mark books as missing if their folder was skipped due to permission errors
+      const isUnderSkippedDir = (folderPath: string) => {
+        for (const dir of skippedDirs) {
+          if (folderPath === dir || folderPath.startsWith(dir + sep)) return true;
+        }
+        return false;
+      };
+      // Incremental scan: don't mark books as missing if their folder was unchanged
+      const isInUnchangedDir = (folderPath: string) => {
+        // For book_per_folder: folderPath is the dir itself
+        if (unchangedDirs.has(folderPath)) return true;
+        // For book_per_file: folderPath is the file path, check its parent dir
+        const parentDir = dirname(folderPath);
+        if (unchangedDirs.has(parentDir)) return true;
+        return false;
+      };
+      const missingIds = knownBooks
+        .filter((b) => !seenBookIds.has(b.id) && !isUnderSkippedDir(b.folderPath) && !isInUnchangedDir(b.folderPath))
+        .map((b) => b.id);
       if (missingIds.length > 0) {
         await this.scannerRepo.markBooksAsMissing(missingIds);
         counts.missingCount += missingIds.length;
         this.scanJobStore.increment(libraryId, { missing: missingIds.length });
         this.scanGateway.emitBookMissing({ libraryId, bookIds: missingIds } satisfies BookMissingEvent);
+        this.bufferBooksUnavailableNotification(libraryId, missingIds);
       }
 
       this.logger.log(
@@ -582,20 +1147,23 @@ export class ScannerService implements OnApplicationBootstrap {
     candidate: BookCandidate,
     libraryId: number,
     libraryFolderId: number,
-    bookByFolderPath: Map<string, { id: number; status: string; folderPath: string }>,
-    fileByPath: Map<string, { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
-    fileByIno: Map<number, { id: number; bookId: number; absolutePath: string }>,
+    maps: ScanLookupMaps,
     formatPriority: string[],
-  ): Promise<{ bookId: number; added: number; updated: number }> {
+    isFirstScan: boolean,
+  ): Promise<{ bookId: number; added: number; updated: number; retainedFileIds: Set<number> }> {
+    const { bookByFolderPath, booksByParentDir, fileByPath, fileByIno } = maps;
     const counts = { added: 0, updated: 0 };
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
     const retainedFileIds = new Set<number>();
 
-    const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, fileCounts);
+    const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, booksByParentDir, fileCounts);
+    // If the book was transferred from another library, its files exist globally
+    // but not in our local maps - we need global lookups even on a "first scan"
+    const skipGlobalLookups = isFirstScan && fileCounts.addedCount > 0;
     counts.added += fileCounts.addedCount;
     counts.updated += fileCounts.updatedCount;
 
-    // ── Phase 1: Register every file in bookFiles. No metadata extraction yet. ──
+    // Phase 1: Register every file in bookFiles. No metadata extraction yet.
     type RegisteredFile = {
       fileId: number;
       format: string | null;
@@ -609,7 +1177,8 @@ export class ScannerService implements OnApplicationBootstrap {
 
     for (let sortOrder = 0; sortOrder < candidate.files.length; sortOrder++) {
       const fileStat = candidate.files[sortOrder];
-      const { format, role } = classifyFile(fileStat.absolutePath);
+      const format = fileStat.format ?? classifyFile(fileStat.absolutePath).format;
+      const role = fileStat.role ?? classifyFile(fileStat.absolutePath).role;
 
       if (role === 'content' && fileStat.sizeBytes === 0) {
         this.logger.warn(
@@ -622,7 +1191,18 @@ export class ScannerService implements OnApplicationBootstrap {
       let processResult: { isNew: boolean; reassigned: boolean; fileId: number | null };
 
       try {
-        processResult = await this.processFile(fileStat, format, role, sortOrder, book.id, libraryFolderId, fileByPath, fileByIno, fileCount);
+        processResult = await this.processFile(
+          fileStat,
+          format,
+          role,
+          sortOrder,
+          book.id,
+          libraryFolderId,
+          fileByPath,
+          fileByIno,
+          fileCount,
+          skipGlobalLookups,
+        );
       } catch (err) {
         this.logger.warn(
           `[scanner.process_file] [fail] bookId=${book.id} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${(err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"')}" - file processing failed`,
@@ -645,9 +1225,7 @@ export class ScannerService implements OnApplicationBootstrap {
       }
     }
 
-    await this.pruneMissingBookFiles(book.id, retainedFileIds, fileByPath, fileByIno, counts);
-
-    // ── Phase 2: Pick winner (primary file) from all registered content files. ──
+    // Phase 2: Pick winner (primary file) from all registered content files.
     const contentFiles = registeredFiles.filter((f) => f.role === 'content');
 
     const winner =
@@ -657,9 +1235,9 @@ export class ScannerService implements OnApplicationBootstrap {
 
     await this.scannerRepo.updateBookPrimaryFile(book.id, winner?.fileId ?? null);
 
-    // ── Phase 3: Metadata extraction — winner-driven, triggered by new/reassigned files. ──
+    // Phase 3: Metadata extraction, winner-driven, triggered by new/reassigned files.
     //
-    // Design rules (agreed per architecture review):
+    // Design rules:
     //   - Text metadata (title, authors, cover, etc.) comes from winner only.
     //   - Audio-specific fields (chapters, narrators, duration) always come from audio if present.
     //   - Extraction only fires when the relevant source file is new or reassigned.
@@ -725,7 +1303,7 @@ export class ScannerService implements OnApplicationBootstrap {
       }
     }
 
-    return { bookId: book.id, ...counts };
+    return { bookId: book.id, ...counts, retainedFileIds };
   }
 
   private async upsertBook(
@@ -733,6 +1311,7 @@ export class ScannerService implements OnApplicationBootstrap {
     libraryId: number,
     libraryFolderId: number,
     bookByFolderPath: Map<string, { id: number; status: string; folderPath: string }>,
+    booksByParentDir: Map<string, Array<{ id: number; status: string; folderPath: string }>>,
     counts: ScanCounts,
   ) {
     const existing = bookByFolderPath.get(candidate.folderPath);
@@ -742,8 +1321,10 @@ export class ScannerService implements OnApplicationBootstrap {
       // turning what was a virtual multi-book folder into one real-directory book.
       // Find any known books whose folderPaths are virtual children of this directory
       // and pick the lowest-ID one as the survivor to preserve its reading progress.
-      const dirPrefix = candidate.folderPath + sep;
-      const virtualChildren = [...bookByFolderPath.values()].filter((b) => b.folderPath.startsWith(dirPrefix));
+      // Use pre-built parent-dir index instead of O(N) filter
+      const virtualChildren = (booksByParentDir.get(candidate.folderPath) ?? []).filter(
+        (b) => b.folderPath !== candidate.folderPath && b.folderPath.startsWith(candidate.folderPath + sep),
+      );
 
       if (virtualChildren.length > 0) {
         const survivor = virtualChildren.reduce((a, b) => (a.id < b.id ? a : b));
@@ -751,6 +1332,8 @@ export class ScannerService implements OnApplicationBootstrap {
         if (survivor.status === 'missing') {
           await this.scannerRepo.updateBookStatus(survivor.id, 'present');
           counts.updatedCount++;
+          this.scanGateway.emitBookRestored({ libraryId, bookIds: [survivor.id] });
+          this.bufferBooksRestoredNotification(libraryId, [survivor.id]);
         }
         bookByFolderPath.set(candidate.folderPath, { ...survivor, folderPath: candidate.folderPath });
         this.logger.log(
@@ -783,18 +1366,23 @@ export class ScannerService implements OnApplicationBootstrap {
     if (existing.status === 'missing') {
       await this.scannerRepo.updateBookStatus(existing.id, 'present');
       counts.updatedCount++;
+      this.scanGateway.emitBookRestored({ libraryId, bookIds: [existing.id] });
+      this.bufferBooksRestoredNotification(libraryId, [existing.id]);
     }
 
     // Drain any virtual siblings that share this real folder (created by old stem-split
     // logic or by detectMovedFile updating a book's folderPath to the real directory).
     // Marking them missing here ensures processFile will reassign their files to
-    // `existing`, and reconcile cannot restore them once their files are gone.
-    const dirPrefix = candidate.folderPath + sep;
-    const virtualSiblings = [...bookByFolderPath.values()].filter((b) => b.id !== existing.id && b.folderPath.startsWith(dirPrefix));
+    // "existing", and reconcile cannot restore them once their files are gone.
+    // Use pre-built parent-dir index instead of O(N) filter
+    const virtualSiblings = (booksByParentDir.get(candidate.folderPath) ?? []).filter(
+      (b) => b.id !== existing.id && b.folderPath !== candidate.folderPath && b.folderPath.startsWith(candidate.folderPath + sep),
+    );
     if (virtualSiblings.length > 0) {
       const siblingIds = virtualSiblings.map((b) => b.id);
       await this.scannerRepo.markBooksAsMissing(siblingIds);
       this.scanGateway.emitBookMissing({ libraryId, bookIds: siblingIds });
+      this.bufferBooksUnavailableNotification(libraryId, siblingIds);
       this.logger.log(
         `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${existing.id} folder="${candidate.folderPath.replace(/"/g, '\\"')}" drainedCount=${virtualSiblings.length} action=drain_virtual_siblings - virtual siblings drained`,
       );
@@ -811,7 +1399,7 @@ export class ScannerService implements OnApplicationBootstrap {
     counts: ScanCounts,
   ): Promise<{ id: number; status: string; folderPath: string } | null> {
     const contentFiles = candidate.files.filter((file) => {
-      const { role } = classifyFile(file.absolutePath);
+      const role = file.role ?? classifyFile(file.absolutePath).role;
       return role === 'content' && file.sizeBytes > 0;
     });
     if (contentFiles.length === 0) return null;
@@ -819,6 +1407,7 @@ export class ScannerService implements OnApplicationBootstrap {
     let sourceBookId: number | null = null;
 
     for (const file of contentFiles) {
+      if (file.ino === 0) continue;
       const byIno = await this.scannerRepo.findMissingBookFileWithContextByIno(file.ino);
       if (!byIno) continue;
       sourceBookId = byIno.file.bookId;
@@ -827,6 +1416,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     if (sourceBookId == null) {
       for (const file of contentFiles) {
+        if (file.ino === 0) continue;
         const byIno = await this.scannerRepo.findBookFileWithContextByIno(file.ino);
         if (!byIno || byIno.file.absolutePath === file.absolutePath) continue;
         if (byIno.libraryId === libraryId) continue;
@@ -885,60 +1475,69 @@ export class ScannerService implements OnApplicationBootstrap {
     sortOrder: number,
     bookId: number,
     libraryFolderId: number,
-    fileByPath: Map<string, { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
-    fileByIno: Map<number, { id: number; bookId: number; absolutePath: string }>,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
     counts: ScanCounts,
+    isFirstScan: boolean,
   ): Promise<{ isNew: boolean; reassigned: boolean; fileId: number | null }> {
-    await waitForStability(fileStat.absolutePath);
-
-    // 1. Path match — file didn't move.
     const byPath = fileByPath.get(fileStat.absolutePath);
     if (byPath) {
-      const changed = fileStat.sizeBytes !== byPath.sizeBytes || fileStat.mtime.getTime() !== byPath.mtime?.getTime();
-      const reassigned = byPath.bookId !== bookId;
-      if (changed || reassigned) {
-        await this.scannerRepo.updateBookFile(byPath.id, {
-          ...(reassigned && { bookId }),
-          libraryFolderId,
-          ino: fileStat.ino,
-          sizeBytes: fileStat.sizeBytes,
-          mtime: fileStat.mtime,
+      return this.resolveExistingFilePath(byPath, fileStat, format, role, sortOrder, bookId, libraryFolderId, fileByPath, fileByIno, counts);
+    }
+
+    await waitForStability(fileStat.absolutePath, fileStat.mtime.getTime());
+
+    if (fileStat.ino !== 0) {
+      const byInoResult = await this.resolveByLocalIno(fileStat, format, role, sortOrder, bookId, libraryFolderId, fileByPath, fileByIno, counts);
+      if (byInoResult) return byInoResult;
+
+      if (!isFirstScan) {
+        const byGlobalInoResult = await this.resolveByGlobalIno(
+          fileStat,
           format,
           role,
           sortOrder,
-        });
-        counts.updatedCount++;
-      } else {
-        // Always keep sort order current even when content is unchanged.
-        await this.scannerRepo.updateBookFile(byPath.id, { sortOrder });
+          bookId,
+          libraryFolderId,
+          fileByPath,
+          fileByIno,
+          counts,
+        );
+        if (byGlobalInoResult) return byGlobalInoResult;
       }
-      if (byPath.ino !== fileStat.ino) {
-        const previousIno = fileByIno.get(byPath.ino);
-        if (previousIno?.id === byPath.id) {
-          fileByIno.delete(byPath.ino);
-        }
-      }
-      fileByPath.set(fileStat.absolutePath, {
-        id: byPath.id,
-        bookId,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        hash: byPath.hash,
-      });
-      fileByIno.set(fileStat.ino, { id: byPath.id, bookId, absolutePath: fileStat.absolutePath });
-      return { isNew: false, reassigned: reassigned, fileId: byPath.id };
     }
 
-    // 2. Inode match — renamed/moved within the same filesystem.
-    const byIno = fileByIno.get(fileStat.ino);
-    if (byIno) {
-      const oldAbsolutePath = byIno.absolutePath;
-      await this.scannerRepo.updateBookFile(byIno.id, {
-        bookId,
+    return this.resolveByHashOrCreate(fileStat, format, role, sortOrder, bookId, libraryFolderId, fileByPath, fileByIno, counts, isFirstScan);
+  }
+
+  private async resolveExistingFilePath(
+    byPath: FileByPathEntry,
+    fileStat: FileStat,
+    format: string | null,
+    role: FileRole,
+    sortOrder: number,
+    bookId: number,
+    libraryFolderId: number,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
+    counts: ScanCounts,
+  ): Promise<{ isNew: boolean; reassigned: boolean; fileId: number }> {
+    const sizeUnchanged = fileStat.sizeBytes === byPath.sizeBytes;
+    const mtimeUnchanged = fileStat.mtime.getTime() === byPath.mtime?.getTime();
+    const reassigned = byPath.bookId !== bookId;
+    const sortOrderUnchanged = sortOrder === byPath.sortOrder;
+
+    if (sizeUnchanged && mtimeUnchanged && !reassigned && sortOrderUnchanged) {
+      return { isNew: false, reassigned: false, fileId: byPath.id };
+    }
+
+    await waitForStability(fileStat.absolutePath, fileStat.mtime.getTime());
+
+    if (!sizeUnchanged || !mtimeUnchanged || reassigned) {
+      await this.scannerRepo.updateBookFile(byPath.id, {
+        ...(reassigned && { bookId }),
         libraryFolderId,
-        absolutePath: fileStat.absolutePath,
-        relPath: fileStat.relPath,
+        ino: fileStat.ino,
         sizeBytes: fileStat.sizeBytes,
         mtime: fileStat.mtime,
         format,
@@ -946,23 +1545,85 @@ export class ScannerService implements OnApplicationBootstrap {
         sortOrder,
       });
       counts.updatedCount++;
-      const oldPathEntry = fileByPath.get(oldAbsolutePath);
-      if (oldPathEntry?.id === byIno.id) {
-        fileByPath.delete(oldAbsolutePath);
-      }
-      fileByPath.set(fileStat.absolutePath, {
-        id: byIno.id,
-        bookId,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        hash: oldPathEntry?.hash ?? null,
-      });
-      fileByIno.set(fileStat.ino, { id: byIno.id, bookId, absolutePath: fileStat.absolutePath });
-      return { isNew: false, reassigned: byIno.bookId !== bookId, fileId: byIno.id };
+    } else {
+      await this.scannerRepo.updateBookFile(byPath.id, { sortOrder });
     }
+    if (byPath.ino !== fileStat.ino) {
+      const previousIno = fileByIno.get(byPath.ino);
+      if (previousIno?.id === byPath.id) {
+        fileByIno.delete(byPath.ino);
+      }
+    }
+    fileByPath.set(fileStat.absolutePath, {
+      id: byPath.id,
+      bookId,
+      ino: fileStat.ino,
+      sizeBytes: fileStat.sizeBytes,
+      mtime: fileStat.mtime,
+      hash: byPath.hash,
+      sortOrder,
+    });
+    if (fileStat.ino !== 0) {
+      fileByIno.set(fileStat.ino, { id: byPath.id, bookId, absolutePath: fileStat.absolutePath });
+    }
+    return { isNew: false, reassigned, fileId: byPath.id };
+  }
 
-    // 3. Global inode match — cross-library move / rescan reconciliation.
+  private async resolveByLocalIno(
+    fileStat: FileStat,
+    format: string | null,
+    role: FileRole,
+    sortOrder: number,
+    bookId: number,
+    libraryFolderId: number,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
+    counts: ScanCounts,
+  ): Promise<{ isNew: boolean; reassigned: boolean; fileId: number } | null> {
+    const byIno = fileByIno.get(fileStat.ino);
+    if (!byIno) return null;
+
+    const oldAbsolutePath = byIno.absolutePath;
+    await this.scannerRepo.updateBookFile(byIno.id, {
+      bookId,
+      libraryFolderId,
+      absolutePath: fileStat.absolutePath,
+      relPath: fileStat.relPath,
+      sizeBytes: fileStat.sizeBytes,
+      mtime: fileStat.mtime,
+      format,
+      role,
+      sortOrder,
+    });
+    counts.updatedCount++;
+    const oldPathEntry = fileByPath.get(oldAbsolutePath);
+    if (oldPathEntry?.id === byIno.id) {
+      fileByPath.delete(oldAbsolutePath);
+    }
+    fileByPath.set(fileStat.absolutePath, {
+      id: byIno.id,
+      bookId,
+      ino: fileStat.ino,
+      sizeBytes: fileStat.sizeBytes,
+      mtime: fileStat.mtime,
+      hash: oldPathEntry?.hash ?? null,
+      sortOrder,
+    });
+    fileByIno.set(fileStat.ino, { id: byIno.id, bookId, absolutePath: fileStat.absolutePath });
+    return { isNew: false, reassigned: byIno.bookId !== bookId, fileId: byIno.id };
+  }
+
+  private async resolveByGlobalIno(
+    fileStat: FileStat,
+    format: string | null,
+    role: FileRole,
+    sortOrder: number,
+    bookId: number,
+    libraryFolderId: number,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
+    counts: ScanCounts,
+  ): Promise<{ isNew: boolean; reassigned: boolean; fileId: number } | null> {
     let globalByIno = await this.scannerRepo.findBookFileWithContextByIno(fileStat.ino);
     if (
       !globalByIno ||
@@ -973,45 +1634,60 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     if (
-      globalByIno &&
-      globalByIno.file.absolutePath !== fileStat.absolutePath &&
-      (globalByIno.file.bookId === bookId || globalByIno.bookStatus === 'missing')
+      !globalByIno ||
+      globalByIno.file.absolutePath === fileStat.absolutePath ||
+      !(globalByIno.file.bookId === bookId || globalByIno.bookStatus === 'missing')
     ) {
-      const oldAbsolutePath = globalByIno.file.absolutePath;
-      await this.scannerRepo.updateBookFile(globalByIno.file.id, {
-        bookId,
-        libraryFolderId,
-        absolutePath: fileStat.absolutePath,
-        relPath: fileStat.relPath,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        format,
-        role,
-        sortOrder,
-      });
-      counts.updatedCount++;
-      const oldPathEntry = fileByPath.get(oldAbsolutePath);
-      if (oldPathEntry?.id === globalByIno.file.id) {
-        fileByPath.delete(oldAbsolutePath);
-      }
-      const oldInoEntry = fileByIno.get(globalByIno.file.ino);
-      if (oldInoEntry?.id === globalByIno.file.id) {
-        fileByIno.delete(globalByIno.file.ino);
-      }
-      fileByPath.set(fileStat.absolutePath, {
-        id: globalByIno.file.id,
-        bookId,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        hash: globalByIno.file.hash,
-      });
-      fileByIno.set(fileStat.ino, { id: globalByIno.file.id, bookId, absolutePath: fileStat.absolutePath });
-      return { isNew: false, reassigned: globalByIno.file.bookId !== bookId, fileId: globalByIno.file.id };
+      return null;
     }
 
-    // 4. Hash match — cross-filesystem copy (expensive, last resort).
+    const oldAbsolutePath = globalByIno.file.absolutePath;
+    await this.scannerRepo.updateBookFile(globalByIno.file.id, {
+      bookId,
+      libraryFolderId,
+      absolutePath: fileStat.absolutePath,
+      relPath: fileStat.relPath,
+      ino: fileStat.ino,
+      sizeBytes: fileStat.sizeBytes,
+      mtime: fileStat.mtime,
+      format,
+      role,
+      sortOrder,
+    });
+    counts.updatedCount++;
+    const oldPathEntry = fileByPath.get(oldAbsolutePath);
+    if (oldPathEntry?.id === globalByIno.file.id) {
+      fileByPath.delete(oldAbsolutePath);
+    }
+    const oldInoEntry = fileByIno.get(globalByIno.file.ino);
+    if (oldInoEntry?.id === globalByIno.file.id) {
+      fileByIno.delete(globalByIno.file.ino);
+    }
+    fileByPath.set(fileStat.absolutePath, {
+      id: globalByIno.file.id,
+      bookId,
+      ino: fileStat.ino,
+      sizeBytes: fileStat.sizeBytes,
+      mtime: fileStat.mtime,
+      hash: globalByIno.file.hash,
+      sortOrder,
+    });
+    fileByIno.set(fileStat.ino, { id: globalByIno.file.id, bookId, absolutePath: fileStat.absolutePath });
+    return { isNew: false, reassigned: globalByIno.file.bookId !== bookId, fileId: globalByIno.file.id };
+  }
+
+  private async resolveByHashOrCreate(
+    fileStat: FileStat,
+    format: string | null,
+    role: FileRole,
+    sortOrder: number,
+    bookId: number,
+    libraryFolderId: number,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
+    counts: ScanCounts,
+    isFirstScan: boolean,
+  ): Promise<{ isNew: boolean; reassigned: boolean; fileId: number | null }> {
     let hash: string;
     try {
       hash = await fingerprintFile(fileStat.absolutePath);
@@ -1019,98 +1695,106 @@ export class ScannerService implements OnApplicationBootstrap {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'ENOENT' || code === 'EACCES') {
         this.logger.debug(
-          `[scanner.process_file] [end] bookId=${bookId} path="${fileStat.absolutePath.replace(/"/g, '\\"')}" action=skip_inaccessible - file no longer accessible`,
+          `[scanner.process_file] [end] bookId=${bookId} path="${fileStat.absolutePath.replace(/"/g, '\\' + '"')}" action=skip_inaccessible - file no longer accessible`,
         );
         return { isNew: false, reassigned: false, fileId: null };
       }
       throw err;
     }
-    const byHash = await this.scannerRepo.findBookFileByHash(hash, libraryFolderId);
-    if (byHash) {
-      const oldAbsolutePath = byHash.absolutePath;
-      await this.scannerRepo.updateBookFile(byHash.id, {
-        bookId,
-        libraryFolderId,
-        absolutePath: fileStat.absolutePath,
-        relPath: fileStat.relPath,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        format,
-        role,
-        sortOrder,
-      });
-      counts.updatedCount++;
-      const oldPathEntry = fileByPath.get(oldAbsolutePath);
-      if (oldPathEntry?.id === byHash.id) {
-        fileByPath.delete(oldAbsolutePath);
+
+    if (!isFirstScan) {
+      const byHash = await this.scannerRepo.findBookFileByHash(hash, libraryFolderId);
+      if (byHash) {
+        const oldAbsolutePath = byHash.absolutePath;
+        await this.scannerRepo.updateBookFile(byHash.id, {
+          bookId,
+          libraryFolderId,
+          absolutePath: fileStat.absolutePath,
+          relPath: fileStat.relPath,
+          ino: fileStat.ino,
+          sizeBytes: fileStat.sizeBytes,
+          mtime: fileStat.mtime,
+          format,
+          role,
+          sortOrder,
+        });
+        counts.updatedCount++;
+        const oldPathEntry = fileByPath.get(oldAbsolutePath);
+        if (oldPathEntry?.id === byHash.id) {
+          fileByPath.delete(oldAbsolutePath);
+        }
+        const oldInoEntry = fileByIno.get(byHash.ino);
+        if (oldInoEntry?.id === byHash.id) {
+          fileByIno.delete(byHash.ino);
+        }
+        fileByPath.set(fileStat.absolutePath, {
+          id: byHash.id,
+          bookId,
+          ino: fileStat.ino,
+          sizeBytes: fileStat.sizeBytes,
+          mtime: fileStat.mtime,
+          hash: byHash.hash,
+          sortOrder,
+        });
+        if (fileStat.ino !== 0) {
+          fileByIno.set(fileStat.ino, { id: byHash.id, bookId, absolutePath: fileStat.absolutePath });
+        }
+        return { isNew: false, reassigned: byHash.bookId !== bookId, fileId: byHash.id };
       }
-      const oldInoEntry = fileByIno.get(byHash.ino);
-      if (oldInoEntry?.id === byHash.id) {
-        fileByIno.delete(byHash.ino);
+
+      let globalByHash = await this.scannerRepo.findBookFileWithContextByHash(hash);
+      if (
+        !globalByHash ||
+        globalByHash.file.absolutePath === fileStat.absolutePath ||
+        (globalByHash.file.bookId !== bookId && globalByHash.bookStatus !== 'missing')
+      ) {
+        globalByHash = await this.scannerRepo.findMissingBookFileWithContextByHash(hash);
       }
-      fileByPath.set(fileStat.absolutePath, {
-        id: byHash.id,
-        bookId,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        hash: byHash.hash,
-      });
-      fileByIno.set(fileStat.ino, { id: byHash.id, bookId, absolutePath: fileStat.absolutePath });
-      return { isNew: false, reassigned: byHash.bookId !== bookId, fileId: byHash.id };
+
+      if (
+        globalByHash &&
+        globalByHash.file.absolutePath !== fileStat.absolutePath &&
+        (globalByHash.file.bookId === bookId || globalByHash.bookStatus === 'missing')
+      ) {
+        const oldAbsolutePath = globalByHash.file.absolutePath;
+        await this.scannerRepo.updateBookFile(globalByHash.file.id, {
+          bookId,
+          libraryFolderId,
+          absolutePath: fileStat.absolutePath,
+          relPath: fileStat.relPath,
+          ino: fileStat.ino,
+          sizeBytes: fileStat.sizeBytes,
+          mtime: fileStat.mtime,
+          hash,
+          format,
+          role,
+          sortOrder,
+        });
+        counts.updatedCount++;
+        const oldPathEntry = fileByPath.get(oldAbsolutePath);
+        if (oldPathEntry?.id === globalByHash.file.id) {
+          fileByPath.delete(oldAbsolutePath);
+        }
+        const oldInoEntry = fileByIno.get(globalByHash.file.ino);
+        if (oldInoEntry?.id === globalByHash.file.id) {
+          fileByIno.delete(globalByHash.file.ino);
+        }
+        fileByPath.set(fileStat.absolutePath, {
+          id: globalByHash.file.id,
+          bookId,
+          ino: fileStat.ino,
+          sizeBytes: fileStat.sizeBytes,
+          mtime: fileStat.mtime,
+          hash,
+          sortOrder,
+        });
+        if (fileStat.ino !== 0) {
+          fileByIno.set(fileStat.ino, { id: globalByHash.file.id, bookId, absolutePath: fileStat.absolutePath });
+        }
+        return { isNew: false, reassigned: globalByHash.file.bookId !== bookId, fileId: globalByHash.file.id };
+      }
     }
 
-    let globalByHash = await this.scannerRepo.findBookFileWithContextByHash(hash);
-    if (
-      !globalByHash ||
-      globalByHash.file.absolutePath === fileStat.absolutePath ||
-      (globalByHash.file.bookId !== bookId && globalByHash.bookStatus !== 'missing')
-    ) {
-      globalByHash = await this.scannerRepo.findMissingBookFileWithContextByHash(hash);
-    }
-
-    if (
-      globalByHash &&
-      globalByHash.file.absolutePath !== fileStat.absolutePath &&
-      (globalByHash.file.bookId === bookId || globalByHash.bookStatus === 'missing')
-    ) {
-      const oldAbsolutePath = globalByHash.file.absolutePath;
-      await this.scannerRepo.updateBookFile(globalByHash.file.id, {
-        bookId,
-        libraryFolderId,
-        absolutePath: fileStat.absolutePath,
-        relPath: fileStat.relPath,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        hash,
-        format,
-        role,
-        sortOrder,
-      });
-      counts.updatedCount++;
-      const oldPathEntry = fileByPath.get(oldAbsolutePath);
-      if (oldPathEntry?.id === globalByHash.file.id) {
-        fileByPath.delete(oldAbsolutePath);
-      }
-      const oldInoEntry = fileByIno.get(globalByHash.file.ino);
-      if (oldInoEntry?.id === globalByHash.file.id) {
-        fileByIno.delete(globalByHash.file.ino);
-      }
-      fileByPath.set(fileStat.absolutePath, {
-        id: globalByHash.file.id,
-        bookId,
-        ino: fileStat.ino,
-        sizeBytes: fileStat.sizeBytes,
-        mtime: fileStat.mtime,
-        hash,
-      });
-      fileByIno.set(fileStat.ino, { id: globalByHash.file.id, bookId, absolutePath: fileStat.absolutePath });
-      return { isNew: false, reassigned: globalByHash.file.bookId !== bookId, fileId: globalByHash.file.id };
-    }
-
-    // 5. Genuinely new file.
     const created = await this.scannerRepo.createBookFile({
       bookId,
       libraryFolderId,
@@ -1132,33 +1816,50 @@ export class ScannerService implements OnApplicationBootstrap {
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
       hash,
+      sortOrder,
     });
-    fileByIno.set(fileStat.ino, { id: created.id, bookId, absolutePath: fileStat.absolutePath });
+    if (fileStat.ino !== 0) {
+      fileByIno.set(fileStat.ino, { id: created.id, bookId, absolutePath: fileStat.absolutePath });
+    }
     return { isNew: true, reassigned: false, fileId: created.id };
   }
 
   private async pruneMissingBookFiles(
     bookId: number,
     retainedFileIds: Set<number>,
-    fileByPath: Map<string, { id: number; bookId: number; ino: number; sizeBytes: number | null; mtime: Date | null; hash: string | null }>,
-    fileByIno: Map<number, { id: number; bookId: number; absolutePath: string }>,
+    fileIdsByBookId: Map<number, Set<number>>,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
     counts: { added: number; updated: number },
   ): Promise<void> {
-    const existingFiles = await this.scannerRepo.findBookFilesByBookId(bookId);
+    // Use in-memory index instead of DB query per book
+    const knownFileIds = fileIdsByBookId.get(bookId);
+    if (!knownFileIds) return;
 
-    for (const existing of existingFiles) {
-      if (retainedFileIds.has(existing.id)) continue;
+    const missingIds: number[] = [];
+    for (const fileId of knownFileIds) {
+      if (!retainedFileIds.has(fileId)) {
+        missingIds.push(fileId);
+      }
+    }
+    if (missingIds.length === 0) return;
 
-      await this.scannerRepo.deleteBookFile(existing.id);
+    for (const fileId of missingIds) {
+      await this.scannerRepo.deleteBookFile(fileId);
       counts.updated += 1;
 
-      const byPathEntry = fileByPath.get(existing.absolutePath);
-      if (byPathEntry?.id === existing.id) {
-        fileByPath.delete(existing.absolutePath);
+      // Clean up in-memory maps
+      for (const [path, entry] of fileByPath) {
+        if (entry.id === fileId) {
+          fileByPath.delete(path);
+          break;
+        }
       }
-      const byInoEntry = fileByIno.get(existing.ino);
-      if (byInoEntry?.id === existing.id) {
-        fileByIno.delete(existing.ino);
+      for (const [ino, entry] of fileByIno) {
+        if (entry.id === fileId) {
+          fileByIno.delete(ino);
+          break;
+        }
       }
     }
   }

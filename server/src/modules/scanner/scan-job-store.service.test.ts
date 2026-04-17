@@ -155,3 +155,70 @@ describe('markEmitted', () => {
     expect(entry.lastEmitPct).toBe(0);
   });
 });
+
+// ── scanStartLock ─────────────────────────────────────────────────────────────
+
+describe('scanStartLock', () => {
+  it('acquireStartLock returns true on first call for a library', () => {
+    expect(make().acquireStartLock(1)).toBe(true);
+  });
+
+  it('acquireStartLock returns false when already locked', () => {
+    const store = make();
+    store.acquireStartLock(1);
+    expect(store.acquireStartLock(1)).toBe(false);
+  });
+
+  it('releaseStartLock allows re-acquire', () => {
+    const store = make();
+    store.acquireStartLock(1);
+    store.releaseStartLock(1);
+    expect(store.acquireStartLock(1)).toBe(true);
+  });
+
+  it('isStartLocked returns false before any acquire', () => {
+    expect(make().isStartLocked(1)).toBe(false);
+  });
+
+  it('isStartLocked returns true after acquire', () => {
+    const store = make();
+    store.acquireStartLock(1);
+    expect(store.isStartLocked(1)).toBe(true);
+  });
+
+  it('locks are independent per library', () => {
+    const store = make();
+    store.acquireStartLock(1);
+    expect(store.acquireStartLock(2)).toBe(true);
+    expect(store.isStartLocked(1)).toBe(true);
+    expect(store.isStartLocked(2)).toBe(true);
+  });
+});
+
+// ── pendingRescan ─────────────────────────────────────────────────────────────
+
+describe('pendingRescan', () => {
+  it('consumePendingRescan returns false when nothing is pending', () => {
+    expect(make().consumePendingRescan(1)).toBe(false);
+  });
+
+  it('markPendingRescan + consumePendingRescan returns true and clears', () => {
+    const store = make();
+    store.markPendingRescan(1);
+    expect(store.consumePendingRescan(1)).toBe(true);
+  });
+
+  it('consumePendingRescan returns false on second call (already consumed)', () => {
+    const store = make();
+    store.markPendingRescan(1);
+    store.consumePendingRescan(1);
+    expect(store.consumePendingRescan(1)).toBe(false);
+  });
+
+  it('pending rescans are independent per library', () => {
+    const store = make();
+    store.markPendingRescan(1);
+    expect(store.consumePendingRescan(2)).toBe(false);
+    expect(store.consumePendingRescan(1)).toBe(true);
+  });
+});

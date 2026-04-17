@@ -1,5 +1,5 @@
 {
-  "id": "3fabe569-c909-4ba3-9099-3f93343a59d1",
+  "id": "34c22f8f-a99c-4060-87e3-13c2a2216a65",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3995,6 +3995,90 @@
           "columns": ["name"]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.library_dir_scan_state": {
+      "name": "library_dir_scan_state",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "library_folder_id": {
+          "name": "library_folder_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dir_path": {
+          "name": "dir_path",
+          "type": "varchar(4096)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_seen_mtime_ms": {
+          "name": "last_seen_mtime_ms",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "library_dir_scan_state_folder_dir_uidx": {
+          "name": "library_dir_scan_state_folder_dir_uidx",
+          "columns": [
+            {
+              "expression": "library_folder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dir_path",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "library_dir_scan_state_folder_idx": {
+          "name": "library_dir_scan_state_folder_idx",
+          "columns": [
+            {
+              "expression": "library_folder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "library_dir_scan_state_library_folder_id_library_folders_id_fk": {
+          "name": "library_dir_scan_state_library_folder_id_library_folders_id_fk",
+          "tableFrom": "library_dir_scan_state",
+          "tableTo": "library_folders",
+          "columnsFrom": ["library_folder_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

@@ -45,7 +45,7 @@ export async function ensureSafeRemoteHost(hostname: string, options?: { allowLo
     return;
   }
 
-  let resolved;
+  let resolved: any[];
   try {
     resolved = await lookup(normalizedHost, { all: true, verbatim: true });
   } catch {
@@ -97,7 +97,5 @@ function isPrivateOrLocalV4(address: string): boolean {
   if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
   if (octets[0] === 192 && octets[1] === 168) return true;
   if (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) return true;
-  if (octets[0] >= 224) return true;
-
-  return false;
+  return octets[0] >= 224;
 }

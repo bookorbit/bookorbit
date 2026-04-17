@@ -1,6 +1,8 @@
 export const NotificationType = {
   ScanCompleted: "scan_completed",
   ScanFailed: "scan_failed",
+  BooksUnavailable: "books_unavailable",
+  BooksRestored: "books_restored",
   MetadataFetchCompleted: "metadata_fetch_completed",
   MetadataFetchFailed: "metadata_fetch_failed",
   BookBucketReady: "book_bucket_ready",
@@ -19,7 +21,7 @@ export const NotificationType = {
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
 
 export const NOTIFICATION_CATEGORIES = {
-  scanning: [NotificationType.ScanCompleted, NotificationType.ScanFailed],
+  scanning: [NotificationType.ScanCompleted, NotificationType.ScanFailed, NotificationType.BooksUnavailable, NotificationType.BooksRestored],
   metadata: [NotificationType.MetadataFetchCompleted, NotificationType.MetadataFetchFailed],
   bookBucket: [NotificationType.BookBucketReady, NotificationType.BookBucketFinalized],
   authorEnrichment: [NotificationType.AuthorEnrichmentCompleted, NotificationType.AuthorEnrichmentFailed],

@@ -15,9 +15,33 @@ export interface ScanEntry {
 @Injectable()
 export class ScanJobStore {
   private readonly byLibrary = new Map<number, ScanEntry>();
+  private readonly pendingRescan = new Set<number>();
+  private readonly scanStartLock = new Set<number>();
 
   isRunning(libraryId: number): boolean {
     return this.byLibrary.has(libraryId);
+  }
+
+  isStartLocked(libraryId: number): boolean {
+    return this.scanStartLock.has(libraryId);
+  }
+
+  acquireStartLock(libraryId: number): boolean {
+    if (this.scanStartLock.has(libraryId)) return false;
+    this.scanStartLock.add(libraryId);
+    return true;
+  }
+
+  releaseStartLock(libraryId: number): void {
+    this.scanStartLock.delete(libraryId);
+  }
+
+  markPendingRescan(libraryId: number): void {
+    this.pendingRescan.add(libraryId);
+  }
+
+  consumePendingRescan(libraryId: number): boolean {
+    return this.pendingRescan.delete(libraryId);
   }
 
   create(jobId: number, libraryId: number, total: number): ScanEntry {

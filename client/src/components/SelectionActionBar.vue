@@ -326,7 +326,7 @@ watch(
             <template v-if="count > 50">
               <input
                 v-model="deleteInput"
-                class="h-7 w-20 rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive"
+                class="h-7 w-24 rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive"
                 placeholder="Type DELETE"
               />
             </template>

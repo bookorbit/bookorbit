@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { X, FolderSync, BookOpen, PackageOpen, UserCheck, Mail, Tablet, ArrowRightLeft, FileDown } from 'lucide-vue-next'
+import {
+  X,
+  FolderSync,
+  BookOpen,
+  PackageOpen,
+  UserCheck,
+  Mail,
+  Tablet,
+  ArrowRightLeft,
+  FileDown,
+  TriangleAlert,
+  BookOpenCheck,
+} from 'lucide-vue-next'
 import type { NotificationItem } from '@projectx/types'
 import { useNotifications } from '../composables/useNotifications'
 
@@ -20,9 +32,13 @@ const FAILED_TYPES = new Set([
   'file_write_back_failed',
 ])
 
+const WARNING_TYPES = new Set(['books_unavailable'])
+
 const ICON_MAP: Record<string, typeof FolderSync> = {
   scan_completed: FolderSync,
   scan_failed: FolderSync,
+  books_unavailable: TriangleAlert,
+  books_restored: BookOpenCheck,
   metadata_fetch_completed: BookOpen,
   metadata_fetch_failed: BookOpen,
   book_bucket_ready: PackageOpen,
@@ -40,6 +56,7 @@ const ICON_MAP: Record<string, typeof FolderSync> = {
 
 const icon = computed(() => ICON_MAP[props.notification.type] ?? FolderSync)
 const isFailed = computed(() => FAILED_TYPES.has(props.notification.type))
+const isWarning = computed(() => WARNING_TYPES.has(props.notification.type))
 const relativeTime = computed(() => formatRelativeTime(props.notification.createdAt))
 
 function handleClick() {
@@ -72,8 +89,11 @@ function handleDismiss(e: Event) {
     @click="handleClick"
   >
     <div class="relative mt-0.5 shrink-0">
-      <div class="flex items-center justify-center rounded-lg p-1.5" :class="isFailed ? 'bg-destructive/10' : 'bg-green-500/10'">
-        <component :is="icon" :size="15" :class="isFailed ? 'text-destructive' : 'text-green-500'" />
+      <div
+        class="flex items-center justify-center rounded-lg p-1.5"
+        :class="isFailed ? 'bg-destructive/10' : isWarning ? 'bg-amber-500/10' : 'bg-green-500/10'"
+      >
+        <component :is="icon" :size="15" :class="isFailed ? 'text-destructive' : isWarning ? 'text-amber-500' : 'text-green-500'" />
       </div>
       <span v-if="!notification.read" class="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
     </div>

@@ -1,7 +1,7 @@
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
-import { classifyFile, isPrimaryFormat, isAudioFormat } from './classify';
+import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
 export interface FileStat {
   absolutePath: string;
@@ -9,6 +9,8 @@ export interface FileStat {
   ino: number;
   sizeBytes: number;
   mtime: Date;
+  format: string | null;
+  role: FileRole;
 }
 
 export interface BookCandidate {
@@ -16,7 +18,15 @@ export interface BookCandidate {
   files: FileStat[]; // all files in this folder
 }
 
+export interface WalkResult {
+  candidates: BookCandidate[];
+  skippedDirs: Set<string>;
+  unchangedDirs: Set<string>;
+  dirMtimes: Map<string, number>;
+}
+
 const MAX_PATH_LENGTH = 4096;
+const DIR_CONCURRENCY_LIMIT = 50;
 
 // Matches common disc subdirectory names: "CD 1", "Disc 2", "Disk03", "Part A", "Side IV"
 // but avoids broad matches like "Discography".
@@ -66,13 +76,54 @@ function buildExcludeMatcher(patterns: string[]): (name: string) => boolean {
   };
 }
 
+async function statFilesIntoAcc(
+  filePaths: string[],
+  dir: string,
+  libraryRoot: string,
+  acc: Map<string, FileStat[]>,
+  logger?: (msg: string) => void,
+): Promise<void> {
+  const statResults = await Promise.all(
+    filePaths.map(async (full) => {
+      const s = await stat(full).catch((err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return null;
+        throw err;
+      });
+      return s ? { full, s } : null;
+    }),
+  );
+  for (const entry of statResults) {
+    if (!entry) continue;
+    const { full, s } = entry;
+    const ino = Number(s.ino);
+    if (ino === 0) {
+      logger?.(`File has inode 0 (likely network mount), rename detection disabled: ${full}`);
+    }
+    if (!acc.has(dir)) acc.set(dir, []);
+    const { format, role } = classifyFile(full);
+    acc.get(dir)!.push({
+      absolutePath: full,
+      relPath: relative(libraryRoot, full),
+      ino,
+      sizeBytes: s.size,
+      mtime: s.mtime,
+      format,
+      role,
+    });
+  }
+}
+
 // Recursively collect files, grouped by their parent directory.
 async function collectByDir(
   dir: string,
   libraryRoot: string,
   acc: Map<string, FileStat[]>,
   shouldExclude: (name: string) => boolean,
+  skippedDirs: Set<string>,
   logger?: (msg: string) => void,
+  knownDirMtimes?: Map<string, number>,
+  unchangedDirs?: Set<string>,
+  dirMtimes?: Map<string, number>,
 ): Promise<void> {
   let entries;
   try {
@@ -81,9 +132,20 @@ async function collectByDir(
     const code = (err as NodeJS.ErrnoException).code;
     if (code === 'EACCES' || code === 'EPERM') {
       logger?.(`Permission denied reading folder, skipping: ${dir}`);
+      skippedDirs.add(dir);
       return;
     }
     throw err;
+  }
+
+  // Record this directory's mtime for incremental scan state
+  if (dirMtimes) {
+    try {
+      const dirStat = await stat(dir);
+      dirMtimes.set(dir, Math.round(dirStat.mtimeMs));
+    } catch {
+      // Dir was readable (readdir succeeded) but stat failed - unusual, just skip mtime tracking
+    }
   }
 
   const subdirs: string[] = [];
@@ -106,31 +168,50 @@ async function collectByDir(
     }
   }
 
-  if (filePaths.length > 0) {
-    const statResults = await Promise.all(
-      filePaths.map(async (full) => {
-        const s = await stat(full).catch((err: NodeJS.ErrnoException) => {
-          if (err.code === 'ENOENT') return null;
-          throw err;
-        });
-        return s ? { full, s } : null;
-      }),
-    );
-    for (const entry of statResults) {
-      if (!entry) continue;
-      const { full, s } = entry;
-      if (!acc.has(dir)) acc.set(dir, []);
-      acc.get(dir)!.push({
-        absolutePath: full,
-        relPath: relative(libraryRoot, full),
-        ino: s.ino,
-        sizeBytes: s.size,
-        mtime: s.mtime,
-      });
+  // Leaf-level mtime skip: if this dir has files, check if its mtime is unchanged.
+  // Safety rules:
+  // 1. Never skip disc dirs (they get flattened into parent)
+  // 2. Never skip dirs with disc subdirs (flattening merges disc files into parent,
+  //    so parent must always have its own files scanned for a complete candidate)
+  // 3. Never skip non-root dirs if parent dir's mtime changed (parent may have new files
+  //    that turn this dir into a stem-named subdir needing flattening).
+  //    Root is exempt: root-level files are never stem-merged into a parent (see
+  //    buildBookCandidates: parent === libraryFolderPath is explicitly skipped).
+  const hasDiscSubdirs = subdirs.some((s) => isDiscDirectory(basename(s)));
+  const canSkip = knownDirMtimes && unchangedDirs && dirMtimes && filePaths.length > 0 && !isDiscDirectory(basename(dir)) && !hasDiscSubdirs;
+
+  if (canSkip) {
+    // For non-root dirs, also require parent mtime to be unchanged (guards stem-named merging).
+    // Root has no library parent, so this check is skipped — root-level files are never
+    // stem-merged and the stem-flattening loop explicitly skips root children.
+    let parentChanged = false;
+    if (dir !== libraryRoot) {
+      const parentDir = dirname(dir);
+      const parentStoredMtime = knownDirMtimes!.get(parentDir);
+      const parentCurrentMtime = dirMtimes!.get(parentDir);
+      parentChanged = parentStoredMtime === undefined || parentCurrentMtime === undefined || parentStoredMtime !== parentCurrentMtime;
+    }
+
+    const storedMtime = knownDirMtimes!.get(dir);
+    const currentMtime = dirMtimes!.get(dir);
+    if (!parentChanged && storedMtime !== undefined && currentMtime !== undefined && storedMtime === currentMtime) {
+      unchangedDirs!.add(dir);
+    } else {
+      await statFilesIntoAcc(filePaths, dir, libraryRoot, acc, logger);
+    }
+  } else {
+    if (filePaths.length > 0) {
+      await statFilesIntoAcc(filePaths, dir, libraryRoot, acc, logger);
     }
   }
 
-  await Promise.all(subdirs.map((full) => collectByDir(full, libraryRoot, acc, shouldExclude, logger)));
+  // Bounded concurrency: process subdirs in chunks to avoid EMFILE
+  for (let i = 0; i < subdirs.length; i += DIR_CONCURRENCY_LIMIT) {
+    const chunk = subdirs.slice(i, i + DIR_CONCURRENCY_LIMIT);
+    await Promise.all(
+      chunk.map((full) => collectByDir(full, libraryRoot, acc, shouldExclude, skippedDirs, logger, knownDirMtimes, unchangedDirs, dirMtimes)),
+    );
+  }
 }
 
 /**
@@ -154,10 +235,14 @@ export async function findBookCandidates(
   libraryFolderPath: string,
   excludePatterns: string[] = [],
   logger?: (msg: string) => void,
-): Promise<BookCandidate[]> {
+  knownDirMtimes?: Map<string, number>,
+): Promise<WalkResult> {
   const byDir = new Map<string, FileStat[]>();
   const shouldExclude = buildExcludeMatcher(excludePatterns);
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, logger);
+  const skippedDirs = new Set<string>();
+  const unchangedDirs = new Set<string>();
+  const dirMtimes = new Map<string, number>();
+  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, skippedDirs, logger, knownDirMtimes, unchangedDirs, dirMtimes);
 
   // Flatten disc subdirectories (e.g. "CD 1", "Disc 2") into their parent.
   // Collect disc dirs first to avoid mutating the map while iterating.
@@ -213,8 +298,7 @@ export async function findBookCandidates(
     // If any primary file is an audio format, treat the entire folder as one audiobook.
     // Files are natural-sorted by basename so playback order is deterministic.
     const hasAudio = primaryFiles.some((f) => {
-      const { format } = classifyFile(f.absolutePath);
-      return format !== null && isAudioFormat(format);
+      return f.format !== null && f.format !== undefined && isAudioFormat(f.format);
     });
 
     if (hasAudio) {
@@ -227,7 +311,7 @@ export async function findBookCandidates(
     candidates.push({ folderPath: dir, files });
   }
 
-  return candidates;
+  return { candidates, skippedDirs, unchangedDirs, dirMtimes };
 }
 
 /**
@@ -246,10 +330,14 @@ export async function findLooseFileCandidates(
   libraryFolderPath: string,
   excludePatterns: string[] = [],
   logger?: (msg: string) => void,
-): Promise<BookCandidate[]> {
+  knownDirMtimes?: Map<string, number>,
+): Promise<WalkResult> {
   const byDir = new Map<string, FileStat[]>();
   const shouldExclude = buildExcludeMatcher(excludePatterns);
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, logger);
+  const skippedDirs = new Set<string>();
+  const unchangedDirs = new Set<string>();
+  const dirMtimes = new Map<string, number>();
+  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, skippedDirs, logger, knownDirMtimes, unchangedDirs, dirMtimes);
 
   const candidates: BookCandidate[] = [];
 
@@ -261,7 +349,7 @@ export async function findLooseFileCandidates(
     }
   }
 
-  return candidates;
+  return { candidates, skippedDirs, unchangedDirs, dirMtimes };
 }
 
 /**
@@ -337,7 +425,16 @@ export async function buildSingleBookCandidate(
     filePaths.map(async (full) => {
       const s = await stat(full).catch(() => null);
       if (!s) return null;
-      return { absolutePath: full, relPath: relative(libraryFolderPath, full), ino: s.ino, sizeBytes: s.size, mtime: s.mtime } satisfies FileStat;
+      const { format, role } = classifyFile(full);
+      return {
+        absolutePath: full,
+        relPath: relative(libraryFolderPath, full),
+        ino: Number(s.ino),
+        sizeBytes: s.size,
+        mtime: s.mtime,
+        format,
+        role,
+      } satisfies FileStat;
     }),
   );
 

@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { bigint, check, index, integer, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { libraries } from './libraries';
+import { libraryFolders } from './libraries';
 
 export const scanJobs = pgTable(
   'scan_jobs',
@@ -31,3 +32,21 @@ export const scanJobs = pgTable(
 
 export type ScanJob = typeof scanJobs.$inferSelect;
 export type NewScanJob = typeof scanJobs.$inferInsert;
+
+export const libraryDirScanState = pgTable(
+  'library_dir_scan_state',
+  {
+    id: serial('id').primaryKey(),
+    libraryFolderId: integer('library_folder_id')
+      .notNull()
+      .references(() => libraryFolders.id, { onDelete: 'cascade' }),
+    dirPath: varchar('dir_path', { length: 4096 }).notNull(),
+    lastSeenMtimeMs: bigint('last_seen_mtime_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => [
+    uniqueIndex('library_dir_scan_state_folder_dir_uidx').on(t.libraryFolderId, t.dirPath),
+    index('library_dir_scan_state_folder_idx').on(t.libraryFolderId),
+  ],
+);
+
+export type LibraryDirScanState = typeof libraryDirScanState.$inferSelect;

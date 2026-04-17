@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, like, ne, or, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, genres, libraryFolders, libraries, scanJobs } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, genres, libraries, libraryFolders, scanJobs } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -56,6 +56,11 @@ export class ScannerRepository {
   async findLibraryFolderPath(libraryFolderId: number): Promise<string | null> {
     const [row] = await this.db.select({ path: libraryFolders.path }).from(libraryFolders).where(eq(libraryFolders.id, libraryFolderId)).limit(1);
     return row?.path ?? null;
+  }
+
+  async findLibraryName(libraryId: number): Promise<string | null> {
+    const [row] = await this.db.select({ name: libraries.name }).from(libraries).where(eq(libraries.id, libraryId)).limit(1);
+    return row?.name ?? null;
   }
 
   // ── Books ──────────────────────────────────────────────────────────────────
@@ -151,6 +156,7 @@ export class ScannerRepository {
         sizeBytes: bookFiles.sizeBytes,
         mtime: bookFiles.mtime,
         hash: bookFiles.hash,
+        sortOrder: bookFiles.sortOrder,
       })
       .from(bookFiles)
       .where(eq(bookFiles.libraryFolderId, libraryFolderId));
@@ -167,8 +173,7 @@ export class ScannerRepository {
 
   async createBookFile(data: typeof bookFiles.$inferInsert) {
     const rows = await this.db.insert(bookFiles).values(data).returning();
-    const file = rows[0]!;
-    return file;
+    return rows[0]!;
   }
 
   async updateBookFile(id: number, data: Partial<typeof bookFiles.$inferInsert>) {
@@ -193,7 +198,7 @@ export class ScannerRepository {
   }
 
   async findBooksByFolderPath(folderPath: string, libraryId?: number) {
-    const folderScope = or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%'));
+    const folderScope = or(eq(books.folderPath, folderPath), and(gte(books.folderPath, folderPath + '/'), lt(books.folderPath, folderPath + '0')));
     const whereClause = libraryId == null ? folderScope : and(eq(books.libraryId, libraryId), folderScope);
     return this.db.select().from(books).where(whereClause);
   }
@@ -208,7 +213,7 @@ export class ScannerRepository {
   }
 
   async findMissingBooksByFolderPath(folderPath: string, libraryId?: number) {
-    const folderScope = or(eq(books.folderPath, folderPath), like(books.folderPath, folderPath + '/%'));
+    const folderScope = or(eq(books.folderPath, folderPath), and(gte(books.folderPath, folderPath + '/'), lt(books.folderPath, folderPath + '0')));
     const whereClause =
       libraryId == null
         ? and(folderScope, eq(books.status, 'missing'))
@@ -330,6 +335,11 @@ export class ScannerRepository {
     await this.db.update(books).set({ folderPath, updatedAt: new Date() }).where(eq(books.id, bookId));
   }
 
+  async findBookById(bookId: number) {
+    const [row] = await this.db.select().from(books).where(eq(books.id, bookId)).limit(1);
+    return row ?? null;
+  }
+
   async findBookCardData(bookIds: number[]) {
     if (bookIds.length === 0) return { rows: [], authorRows: [], fileRows: [], genreRows: [] };
 
@@ -371,5 +381,51 @@ export class ScannerRepository {
     ]);
 
     return { rows, authorRows, fileRows, genreRows };
+  }
+
+  // ── Dir Scan State (Incremental Scan) ────────────────────────────────────
+
+  async findDirScanState(libraryFolderId: number): Promise<Map<string, number>> {
+    const rows = await this.db
+      .select({ dirPath: schema.libraryDirScanState.dirPath, lastSeenMtimeMs: schema.libraryDirScanState.lastSeenMtimeMs })
+      .from(schema.libraryDirScanState)
+      .where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
+    return new Map(rows.map((r) => [r.dirPath, r.lastSeenMtimeMs]));
+  }
+
+  async upsertDirScanState(libraryFolderId: number, entries: Array<{ dirPath: string; mtimeMs: number }>): Promise<void> {
+    if (entries.length === 0) return;
+    const CHUNK = 500;
+    for (let i = 0; i < entries.length; i += CHUNK) {
+      const chunk = entries.slice(i, i + CHUNK);
+      await this.db
+        .insert(schema.libraryDirScanState)
+        .values(chunk.map((e) => ({ libraryFolderId, dirPath: e.dirPath, lastSeenMtimeMs: Math.round(e.mtimeMs) })))
+        .onConflictDoUpdate({
+          target: [schema.libraryDirScanState.libraryFolderId, schema.libraryDirScanState.dirPath],
+          set: { lastSeenMtimeMs: sql`excluded.last_seen_mtime_ms` },
+        });
+    }
+  }
+
+  async deleteStaleDirScanState(libraryFolderId: number, validPaths: Set<string>): Promise<void> {
+    if (validPaths.size === 0) {
+      await this.db.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
+      return;
+    }
+    const allRows = await this.db
+      .select({ id: schema.libraryDirScanState.id, dirPath: schema.libraryDirScanState.dirPath })
+      .from(schema.libraryDirScanState)
+      .where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
+    const staleIds = allRows.filter((r) => !validPaths.has(r.dirPath)).map((r) => r.id);
+    if (staleIds.length === 0) return;
+    const CHUNK = 500;
+    for (let i = 0; i < staleIds.length; i += CHUNK) {
+      await this.db.delete(schema.libraryDirScanState).where(inArray(schema.libraryDirScanState.id, staleIds.slice(i, i + CHUNK)));
+    }
+  }
+
+  async clearDirScanState(libraryFolderId: number): Promise<void> {
+    await this.db.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
   }
 }
