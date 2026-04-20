@@ -237,7 +237,9 @@ const isRatingLocked = computed(() => isLocked('rating'))
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
 
-const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
+const coverSeed = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? String(props.book.id))
+const coverStyle = computed(() => bookCoverStyle(coverSeed.value))
+const coverPlaceholderTitle = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? null)
 const hasCover = computed(() => props.book.coverSource !== null)
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
@@ -720,10 +722,10 @@ watch(
           <div v-if="hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
           <BookCoverPlaceholder
             v-if="!hasCover || coverFailed"
-            :title="book.title"
+            :title="coverPlaceholderTitle"
             :author-line="book.authors.map((a) => a.name).join(', ') || null"
             :is-audio="isPrimaryAudio"
-            :seed="book.title ?? String(book.id)"
+            :seed="coverSeed"
           />
         </div>
       </div>
@@ -945,10 +947,10 @@ watch(
           <div v-if="hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
           <BookCoverPlaceholder
             v-if="!hasCover || coverFailed"
-            :title="book.title"
+            :title="coverPlaceholderTitle"
             :author-line="book.authors.map((a) => a.name).join(', ') || null"
             :is-audio="isPrimaryAudio"
-            :seed="book.title ?? String(book.id)"
+            :seed="coverSeed"
           />
         </div>
 

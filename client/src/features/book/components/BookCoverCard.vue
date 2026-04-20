@@ -188,7 +188,8 @@ function openAuthorBrowse() {
   void router.push({ name: 'authors', query: { q: authorQuery.value } })
 }
 
-const showAuthorOnHover = computed(() => coverLoaded.value && !!authorLine.value)
+const showHoverText = computed(() => coverLoaded.value || !props.book.hasCover || coverFailed.value)
+const showAuthorOnHover = computed(() => showHoverText.value && !!authorLine.value)
 const hoverTitleClampClass = computed(() => (coverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
 
 const { downloadFile, exportBooks } = useBookDownload()
@@ -380,7 +381,7 @@ async function handleSetStatus(status: ReadStatus) {
         <!-- Bottom: title/author -->
         <div class="shrink-0 flex flex-col pr-10">
           <div class="flex items-start justify-between gap-2">
-            <p v-if="coverLoaded" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
+            <p v-if="showHoverText" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
               {{ book.title ?? '-' }}
             </p>
             <div v-else class="flex-1" />

@@ -204,7 +204,21 @@ onUnmounted(() => {
   }
 })
 
+const displayTitle = computed(() => {
+  if (!detail.value) return 'Untitled'
+  if (detail.value.title) return detail.value.title
+  const currentFile = audioFiles.value[currentFileIndex.value]
+  if (currentFile?.filename) return currentFile.filename
+  return detail.value.folderPath.split('/').pop() || 'Untitled'
+})
+
 // ── Media Session ─────────────────────────────────────────────────────────────
+
+watch(displayTitle, (newTitle) => {
+  if ('mediaSession' in navigator && navigator.mediaSession.metadata) {
+    navigator.mediaSession.metadata.title = newTitle
+  }
+})
 
 function updateMediaPlaybackState() {
   if ('mediaSession' in navigator) {
@@ -576,7 +590,7 @@ onMounted(async () => {
 
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: detailRes.title ?? 'Untitled',
+        title: displayTitle.value,
         artist: detailRes.authors.map((a: { name: string }) => a.name).join(', '),
         artwork: detailRes.coverSource ? [{ src: `/api/v1/books/${props.bookId}/cover`, sizes: '512x512', type: 'image/jpeg' }] : [],
       })
@@ -657,7 +671,7 @@ onMounted(async () => {
             <ChevronLeft class="w-5 h-5" />
           </button>
           <div class="flex-1 min-w-0 px-1">
-            <p class="text-sm font-semibold truncate">{{ detail.title ?? 'Untitled' }}</p>
+            <p class="text-sm font-semibold truncate">{{ displayTitle }}</p>
             <p v-if="detail.audioMetadata?.narrators.length" class="text-xs text-white/55 truncate">
               {{ detail.audioMetadata.narrators.map((n) => n.name).join(', ') }}
             </p>
@@ -692,12 +706,7 @@ onMounted(async () => {
             />
             <!-- Cover -->
             <div class="absolute inset-0 rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl">
-              <img
-                v-if="detail.coverSource"
-                :src="`/api/v1/books/${props.bookId}/cover`"
-                class="w-full h-full object-cover"
-                :alt="detail.title ?? 'Cover'"
-              />
+              <img v-if="detail.coverSource" :src="`/api/v1/books/${props.bookId}/cover`" class="w-full h-full object-cover" :alt="displayTitle" />
               <div v-else class="w-full h-full flex items-center justify-center bg-white/5">
                 <BookOpen class="w-16 h-16 text-white/25" />
               </div>
@@ -706,7 +715,7 @@ onMounted(async () => {
 
           <!-- Title / author / chapter -->
           <div class="text-center max-w-xs w-full">
-            <p class="font-semibold text-lg leading-tight truncate">{{ detail.title ?? 'Untitled' }}</p>
+            <p class="font-semibold text-lg leading-tight truncate">{{ displayTitle }}</p>
             <p v-if="detail.authors.length" class="text-sm text-white/60 mt-0.5 truncate">
               {{ detail.authors.map((a) => a.name).join(', ') }}
             </p>

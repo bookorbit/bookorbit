@@ -39,6 +39,14 @@ vi.mock('@/features/book/composables/useCoverVersions', () => ({
 }))
 vi.mock('@/features/book/lib/book-cover', () => ({
   bookCoverStyle: () => ({ background: 'oklch(0.22 0.07 200)', color: 'oklch(0.92 0.03 200)' }),
+  bookCoverPalette: () => ({
+    gradient: 'linear-gradient(150deg, oklch(0.22 0.07 200) 0%, oklch(0.28 0.05 220) 100%)',
+    from: 'oklch(0.22 0.07 200)',
+    to: 'oklch(0.28 0.05 220)',
+    color: 'oklch(0.99 0.025 200)',
+    accent: 'oklch(0.82 0.16 200)',
+    textMuted: 'oklch(0.92 0.08 200)',
+  }),
   titleFontSizeClass: () => 'text-[11cqi]',
 }))
 

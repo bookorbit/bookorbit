@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@projectx/types'
+import { FORMAT_TO_GROUP } from '@projectx/types'
 import { bookCoverStyle } from '../lib/book-cover'
+import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import { api } from '@/lib/api'
 import { computed, inject, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -56,6 +58,7 @@ const seriesLine = computed(() => {
 
 const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
 
 const metaLine = computed(() => {
@@ -140,18 +143,18 @@ function openAuthorBrowse() {
     <div
       class="w-16 rounded shrink-0 overflow-hidden relative"
       :class="isMissing ? 'opacity-50 grayscale' : ''"
-      :style="[{ aspectRatio: coverAspectRatio }, !coverLoaded || coverFailed ? coverStyle : {}]"
+      :style="[{ aspectRatio: coverAspectRatio }, !book.hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
     >
       <!-- Blurred background fill for mismatched aspect ratios -->
       <img
-        v-if="coverLoaded && !coverFailed"
+        v-if="book.hasCover && coverLoaded && !coverFailed"
         :src="coverSrc"
         class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-50"
         aria-hidden="true"
         loading="lazy"
       />
       <img
-        v-if="!coverFailed"
+        v-if="book.hasCover && !coverFailed"
         :src="coverSrc"
         class="absolute inset-0 w-full h-full object-contain"
         loading="lazy"
@@ -159,6 +162,13 @@ function openAuthorBrowse() {
         :alt="book.title ?? ''"
         @load="coverLoaded = true"
         @error="coverFailed = true"
+      />
+      <BookCoverPlaceholder
+        v-if="!book.hasCover || coverFailed"
+        :title="book.title"
+        :author-line="authorLine"
+        :is-audio="isAudiobook"
+        :seed="book.title ?? String(book.id)"
       />
     </div>
 

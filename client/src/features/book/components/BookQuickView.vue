@@ -11,6 +11,7 @@ import { getProviderColor } from '@/lib/provider-colors'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { bookCoverStyle } from '../lib/book-cover'
+import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import { getFormatColor } from '../lib/format-colors'
 import { FORMAT_TO_GROUP } from '@projectx/types'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
@@ -57,7 +58,9 @@ watch(
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => (detail.value ? coverUrl(detail.value.id, 'cover') : null))
 
-const coverStyle = computed(() => (detail.value ? bookCoverStyle(detail.value.title ?? String(detail.value.id)) : {}))
+const coverSeed = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? String(detail.value.id)) : ''))
+const coverPlaceholderTitle = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? null) : null))
+const coverStyle = computed(() => (detail.value ? bookCoverStyle(coverSeed.value) : {}))
 
 const seriesLine = computed(() => {
   if (!detail.value?.seriesName) return null
@@ -207,18 +210,26 @@ function toggleGenres() {
             <div v-else-if="detail" class="flex gap-4 items-start">
               <!-- Cover -->
               <div
-                class="w-24 shrink-0 rounded overflow-hidden shadow-md cursor-zoom-in"
-                :style="[{ aspectRatio: coverAspectRatio }, coverLoaded ? {} : coverStyle]"
+                class="w-24 shrink-0 rounded overflow-hidden shadow-md relative"
+                :class="detail.coverSource && !coverFailed ? 'cursor-zoom-in' : ''"
+                :style="[{ aspectRatio: coverAspectRatio }, !detail.coverSource || !coverLoaded || coverFailed ? coverStyle : {}]"
                 @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
               >
                 <img
-                  v-if="!coverFailed"
+                  v-if="detail.coverSource && !coverFailed"
                   :src="coverSrc!"
                   class="w-full h-full object-contain transition-opacity duration-200"
                   :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
                   :alt="detail.title ?? ''"
                   @load="coverLoaded = true"
                   @error="coverFailed = true"
+                />
+                <BookCoverPlaceholder
+                  v-if="!detail.coverSource || coverFailed"
+                  :title="coverPlaceholderTitle"
+                  :author-line="authorLine"
+                  :is-audio="isPrimaryAudio"
+                  :seed="coverSeed"
                 />
               </div>
 
