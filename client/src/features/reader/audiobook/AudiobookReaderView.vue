@@ -43,6 +43,11 @@ const showSettings = ref(false)
 const showSleepTimer = ref(false)
 const showSpeedPicker = ref(false)
 
+const sleepButtonRef = ref<HTMLButtonElement | null>(null)
+const speedButtonRef = ref<HTMLButtonElement | null>(null)
+const sleepPopoverStyle = ref<Record<string, string>>({})
+const speedPopoverStyle = ref<Record<string, string>>({})
+
 // Reset chapters tab to default when sheet closes
 watch(showChapters, (val) => {
   if (!val) chaptersTab.value = 'chapters'
@@ -244,12 +249,38 @@ function skipBack() {
   if (!queue) return
   queue.seek(queue.position() - settings.skipBackSeconds.value)
   session.onActivity()
+  spawnSkipBubble(skipBackBtnRef.value, `-${settings.skipBackSeconds.value}s`)
 }
 
 function skipForward() {
   if (!queue) return
   queue.seek(queue.position() + settings.skipForwardSeconds.value)
   session.onActivity()
+  spawnSkipBubble(skipForwardBtnRef.value, `+${settings.skipForwardSeconds.value}s`)
+}
+
+// ── Skip bubbles ──────────────────────────────────────────────────────────────
+
+interface SkipBubble {
+  id: number
+  label: string
+  x: number
+  y: number
+}
+
+const skipBackBtnRef = ref<HTMLButtonElement | null>(null)
+const skipForwardBtnRef = ref<HTMLButtonElement | null>(null)
+let bubbleIdCounter = 0
+const skipBubbles = ref<SkipBubble[]>([])
+
+function spawnSkipBubble(btnEl: HTMLButtonElement | null, label: string) {
+  if (!btnEl) return
+  const rect = btnEl.getBoundingClientRect()
+  const id = ++bubbleIdCounter
+  skipBubbles.value.push({ id, label, x: rect.left + rect.width / 2, y: rect.top })
+  setTimeout(() => {
+    skipBubbles.value = skipBubbles.value.filter((b) => b.id !== id)
+  }, 700)
 }
 
 function prevTrack() {
@@ -313,16 +344,12 @@ function seekToAbsoluteSeconds(absoluteSecs: number, closeSheet = false) {
   session.onActivity()
 }
 
-function handleTotalSeek(event: Event) {
-  if (!queue) return
-  const targetSecs = parseFloat((event.target as HTMLInputElement).value)
-  seekToAbsoluteSeconds(targetSecs)
-}
-
 function handleVolumeChange(event: Event) {
   const val = parseFloat((event.target as HTMLInputElement).value)
   settings.setVolume(val)
 }
+
+const volumeTrackStyle = computed(() => ({ '--volume-pct': Math.round(settings.volume.value * 100) + '%' }))
 
 function selectSpeed(speed: number) {
   settings.setPlaybackSpeed(speed)
@@ -337,6 +364,36 @@ function speedDown() {
 function speedUp() {
   const next = Math.round((settings.playbackSpeed.value + 0.05) * 100) / 100
   settings.setPlaybackSpeed(Math.min(3.0, next))
+}
+
+function openSleepTimer() {
+  if (sleepButtonRef.value) {
+    const rect = sleepButtonRef.value.getBoundingClientRect()
+    const popoverWidth = 172
+    const left = Math.max(12, Math.min(window.innerWidth - popoverWidth - 12, rect.left + rect.width / 2 - popoverWidth / 2))
+    sleepPopoverStyle.value = {
+      top: rect.top + 'px',
+      left: left + 'px',
+      width: popoverWidth + 'px',
+      transform: 'translateY(calc(-100% - 8px))',
+    }
+  }
+  showSleepTimer.value = !showSleepTimer.value
+}
+
+function openSpeedPicker() {
+  if (speedButtonRef.value) {
+    const rect = speedButtonRef.value.getBoundingClientRect()
+    const popoverWidth = 156
+    const left = Math.max(12, Math.min(window.innerWidth - popoverWidth - 12, rect.left + rect.width / 2 - popoverWidth / 2))
+    speedPopoverStyle.value = {
+      top: rect.top + 'px',
+      left: left + 'px',
+      width: popoverWidth + 'px',
+      transform: 'translateY(calc(-100% - 8px))',
+    }
+  }
+  showSpeedPicker.value = !showSpeedPicker.value
 }
 
 function seekToChapter(chapter: AudiobookChapter) {
@@ -444,20 +501,46 @@ function cancelSleepTimer() {
   showSleepTimer.value = false
 }
 
-// ── Scrubber hover tooltip ────────────────────────────────────────────────────
+// ── Scrubber drag ─────────────────────────────────────────────────────────────
 
 const scrubberEl = ref<HTMLDivElement | null>(null)
 const scrubberHoverSeconds = ref<number | null>(null)
+const isDragging = ref(false)
+const dragPositionPct = ref<number | null>(null)
+const scrubberProgressPct = computed(() => (dragPositionPct.value !== null ? dragPositionPct.value : progressPct.value))
 
-function handleScrubberMove(e: MouseEvent) {
-  if (!scrubberEl.value || !totalBookDuration.value) return
+function computeScrubberPct(clientX: number): number {
+  if (!scrubberEl.value) return 0
   const rect = scrubberEl.value.getBoundingClientRect()
-  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
-  scrubberHoverSeconds.value = (x / rect.width) * totalBookDuration.value
+  return Math.max(0, Math.min((clientX - rect.left) / rect.width, 1))
+}
+
+function handleScrubberPointerDown(e: PointerEvent) {
+  if (!scrubberEl.value || !totalBookDuration.value) return
+  e.preventDefault()
+  isDragging.value = true
+  scrubberEl.value.setPointerCapture(e.pointerId)
+  dragPositionPct.value = computeScrubberPct(e.clientX) * 100
+  scrubberHoverSeconds.value = (dragPositionPct.value / 100) * totalBookDuration.value
+}
+
+function handleScrubberPointerMove(e: PointerEvent) {
+  if (!scrubberEl.value || !totalBookDuration.value) return
+  const pct = computeScrubberPct(e.clientX)
+  scrubberHoverSeconds.value = pct * totalBookDuration.value
+  if (isDragging.value) dragPositionPct.value = pct * 100
+}
+
+function handleScrubberPointerUp(e: PointerEvent) {
+  if (!isDragging.value || !scrubberEl.value || !totalBookDuration.value) return
+  isDragging.value = false
+  const pct = computeScrubberPct(e.clientX)
+  dragPositionPct.value = null
+  seekToAbsoluteSeconds(pct * totalBookDuration.value)
 }
 
 function handleScrubberLeave() {
-  scrubberHoverSeconds.value = null
+  if (!isDragging.value) scrubberHoverSeconds.value = null
 }
 
 // ── Computed helpers ──────────────────────────────────────────────────────────
@@ -726,7 +809,14 @@ onMounted(async () => {
 
           <!-- Progress bar with chapter ticks, bookmark ticks, and hover tooltip -->
           <div class="w-full max-w-sm">
-            <div ref="scrubberEl" class="relative py-3 group" @mousemove="handleScrubberMove" @mouseleave="handleScrubberLeave">
+            <div
+              ref="scrubberEl"
+              class="relative py-3 scrubber-rail"
+              @pointerdown="handleScrubberPointerDown"
+              @pointermove="handleScrubberPointerMove"
+              @pointerup="handleScrubberPointerUp"
+              @pointerleave="handleScrubberLeave"
+            >
               <!-- Hover tooltip -->
               <div
                 v-if="scrubberHoverSeconds !== null"
@@ -743,31 +833,27 @@ onMounted(async () => {
 
               <!-- Track background + fill -->
               <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[3px] rounded-full bg-white/20 pointer-events-none">
-                <div class="absolute inset-y-0 left-0 rounded-full bg-white" :style="{ width: progressPct + '%' }" />
+                <div class="absolute inset-y-0 left-0 rounded-full bg-white" :style="{ width: scrubberProgressPct + '%' }" />
               </div>
               <!-- Chapter tick marks -->
               <div
                 v-for="tick in chapterTicks"
                 :key="tick.startMs"
-                class="absolute top-1/2 w-[2px] h-[10px] -translate-y-1/2 -translate-x-1/2 bg-white/35 rounded-full pointer-events-none"
+                class="absolute top-1/2 w-[1.5px] h-[7px] -translate-y-1/2 -translate-x-1/2 bg-white/35 rounded-full pointer-events-none"
                 :style="{ left: tick.pct + '%' }"
               />
               <!-- Bookmark tick marks -->
               <div
                 v-for="tick in bookmarkTicks"
                 :key="tick.id"
-                class="absolute top-1/2 w-[2px] h-[10px] -translate-y-1/2 -translate-x-1/2 bg-amber-400/80 rounded-full pointer-events-none"
+                class="absolute top-1/2 w-[1.5px] h-[7px] -translate-y-1/2 -translate-x-1/2 bg-amber-400/80 rounded-full pointer-events-none"
                 :style="{ left: tick.pct + '%' }"
               />
-              <!-- Scrubber (transparent but interactive) -->
-              <input
-                type="range"
-                :min="0"
-                :max="totalBookDuration || 1"
-                :value="absolutePositionSeconds"
-                step="1"
-                class="scrubber w-full relative z-10"
-                @input="handleTotalSeek"
+              <!-- Thumb -->
+              <div
+                class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white pointer-events-none scrubber-thumb"
+                :class="{ 'scrubber-thumb-dragging': isDragging }"
+                :style="{ left: scrubberProgressPct + '%' }"
               />
             </div>
             <div class="flex justify-between text-xs text-white/45 -mt-1 tabular-nums">
@@ -789,7 +875,11 @@ onMounted(async () => {
             </button>
 
             <!-- Skip back with seconds overlay -->
-            <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" @click="skipBack">
+            <button
+              ref="skipBackBtnRef"
+              class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+              @click="skipBack"
+            >
               <span class="relative inline-flex items-center justify-center w-7 h-7">
                 <RotateCcw class="w-full h-full" />
                 <span class="absolute text-[8px] font-bold leading-none mt-0.5">{{ settings.skipBackSeconds.value }}</span>
@@ -809,7 +899,11 @@ onMounted(async () => {
             </div>
 
             <!-- Skip forward with seconds overlay -->
-            <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" @click="skipForward">
+            <button
+              ref="skipForwardBtnRef"
+              class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+              @click="skipForward"
+            >
               <span class="relative inline-flex items-center justify-center w-7 h-7">
                 <RotateCw class="w-full h-full" />
                 <span class="absolute text-[8px] font-bold leading-none mt-0.5">{{ settings.skipForwardSeconds.value }}</span>
@@ -831,9 +925,10 @@ onMounted(async () => {
           <div class="flex items-center justify-around w-full max-w-sm">
             <!-- Speed picker button -->
             <button
+              ref="speedButtonRef"
               class="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl hover:bg-white/10 transition-colors"
               :class="showSpeedPicker ? 'bg-white/15 text-white' : 'text-white/65'"
-              @click="showSpeedPicker = !showSpeedPicker"
+              @click="openSpeedPicker"
             >
               <span class="flex items-center gap-1 text-sm font-bold leading-5">
                 {{ settings.playbackSpeed.value }}x
@@ -867,9 +962,10 @@ onMounted(async () => {
             <!-- Sleep timer -->
             <div class="relative">
               <button
+                ref="sleepButtonRef"
                 class="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-colors"
                 :class="sleepTimerActive ? 'bg-white/15 text-white' : 'hover:bg-white/10 text-white/65'"
-                @click="showSleepTimer = !showSleepTimer"
+                @click="openSleepTimer"
               >
                 <Moon class="w-5 h-5" />
                 <span class="text-[10px] font-medium tracking-wide">
@@ -884,10 +980,7 @@ onMounted(async () => {
       <!-- Sleep timer picker -->
       <Transition name="fade">
         <div v-if="showSleepTimer" class="absolute inset-0 z-30" @click="showSleepTimer = false">
-          <div
-            class="absolute bottom-36 right-4 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl min-w-[10rem]"
-            @click.stop
-          >
+          <div class="absolute bg-black/85 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl" :style="sleepPopoverStyle" @click.stop>
             <p class="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-2">Sleep timer</p>
             <div class="flex flex-col gap-0.5">
               <button
@@ -898,7 +991,13 @@ onMounted(async () => {
               >
                 {{ mins }} minutes
               </button>
-              <button class="text-sm text-left px-3 py-2 rounded-xl transition-colors hover:bg-white/10 text-white" @click="setEndOfChapterSleep">
+              <button
+                class="text-sm text-left px-3 py-2 rounded-xl transition-colors text-white"
+                :class="detail?.audioMetadata?.chapters?.length ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'"
+                :disabled="!detail?.audioMetadata?.chapters?.length"
+                :title="!detail?.audioMetadata?.chapters?.length ? 'No chapters available' : undefined"
+                @click="setEndOfChapterSleep"
+              >
                 End of chapter
               </button>
               <template v-if="sleepTimerActive">
@@ -926,15 +1025,12 @@ onMounted(async () => {
       <!-- Speed picker popover -->
       <Transition name="fade">
         <div v-if="showSpeedPicker" class="absolute inset-0 z-30" @click="showSpeedPicker = false">
-          <div
-            class="absolute bottom-36 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl min-w-[9rem]"
-            @click.stop
-          >
+          <div class="absolute bg-black/85 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl" :style="speedPopoverStyle" @click.stop>
             <p class="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-2">Playback speed</p>
             <!-- Fine-grained stepper -->
             <div class="flex items-center justify-between px-2 mb-2 gap-2">
               <button
-                class="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white disabled:opacity-30"
+                class="w-7 h-7 flex items-center justify-center rounded-full transition-colors text-white disabled:opacity-30 bg-primary/15 hover:bg-primary/30"
                 :disabled="settings.playbackSpeed.value <= 0.5"
                 @click="speedDown"
               >
@@ -942,7 +1038,7 @@ onMounted(async () => {
               </button>
               <span class="text-sm font-bold text-white tabular-nums w-10 text-center">{{ settings.playbackSpeed.value }}x</span>
               <button
-                class="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white disabled:opacity-30"
+                class="w-7 h-7 flex items-center justify-center rounded-full transition-colors text-white disabled:opacity-30 bg-primary/15 hover:bg-primary/30"
                 :disabled="settings.playbackSpeed.value >= 3.0"
                 @click="speedUp"
               >
@@ -955,8 +1051,8 @@ onMounted(async () => {
               <button
                 v-for="speed in SPEEDS"
                 :key="speed"
-                class="text-sm text-left px-3 py-2 rounded-xl transition-colors"
-                :class="settings.playbackSpeed.value === speed ? 'bg-white/20 text-white font-semibold' : 'hover:bg-white/10 text-white/70'"
+                class="text-sm text-left px-3 py-2 rounded-xl transition-colors font-medium"
+                :class="settings.playbackSpeed.value === speed ? 'bg-primary/25 text-primary font-semibold' : 'hover:bg-white/10 text-white/70'"
                 @click="selectSpeed(speed)"
               >
                 {{ speed }}x
@@ -975,21 +1071,21 @@ onMounted(async () => {
       <Transition name="slide-up">
         <div
           v-if="showChapters"
-          class="absolute inset-x-0 bottom-0 z-30 bg-black/80 backdrop-blur-2xl rounded-t-2xl max-h-[70%] flex flex-col border-t border-white/10"
+          class="absolute inset-x-0 bottom-0 z-30 mx-auto bg-black/80 backdrop-blur-2xl rounded-t-2xl max-h-[70vh] flex flex-col border-t border-white/10 md:max-w-lg md:mb-6 md:rounded-2xl md:border"
         >
           <!-- Sheet header with tabs -->
           <div class="flex items-center justify-between px-5 py-4 shrink-0">
             <div class="flex gap-1">
               <button
                 class="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                :class="chaptersTab === 'chapters' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/10'"
+                :class="chaptersTab === 'chapters' ? 'bg-primary/25 text-primary' : 'text-white/50 hover:text-white/80 hover:bg-white/10'"
                 @click="chaptersTab = 'chapters'"
               >
                 Chapters
               </button>
               <button
                 class="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                :class="chaptersTab === 'bookmarks' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/10'"
+                :class="chaptersTab === 'bookmarks' ? 'bg-primary/25 text-primary' : 'text-white/50 hover:text-white/80 hover:bg-white/10'"
                 @click="chaptersTab = 'bookmarks'"
               >
                 Bookmarks
@@ -1057,7 +1153,7 @@ onMounted(async () => {
       <Transition name="slide-up">
         <div
           v-if="showSettings"
-          class="absolute inset-x-0 bottom-0 z-30 bg-black/80 backdrop-blur-2xl rounded-t-2xl border-t border-white/10 shadow-2xl p-5"
+          class="absolute inset-x-0 bottom-0 z-30 mx-auto bg-black/80 backdrop-blur-2xl rounded-t-2xl border-t border-white/10 shadow-2xl p-5 md:max-w-lg md:mb-6 md:rounded-2xl md:border"
         >
           <div class="flex items-center justify-between mb-5">
             <p class="font-semibold text-sm">Player settings</p>
@@ -1106,6 +1202,7 @@ onMounted(async () => {
                 step="0.05"
                 :value="settings.volume.value"
                 class="volume-slider flex-1"
+                :style="volumeTrackStyle"
                 @input="handleVolumeChange"
               />
               <span class="text-xs text-white/45 tabular-nums w-8 text-right">{{ Math.round(settings.volume.value * 100) }}%</span>
@@ -1114,6 +1211,16 @@ onMounted(async () => {
         </div>
       </Transition>
     </template>
+
+    <!-- Skip bubbles -->
+    <div
+      v-for="bubble in skipBubbles"
+      :key="bubble.id"
+      class="fixed pointer-events-none z-50 select-none skip-bubble"
+      :style="{ left: bubble.x + 'px', top: bubble.y + 'px' }"
+    >
+      {{ bubble.label }}
+    </div>
   </div>
 </template>
 
@@ -1138,65 +1245,66 @@ onMounted(async () => {
   animation: pulse-ring 1.8s ease-out infinite;
 }
 
-/* ── Scrubber (progress range input) ─────────────────────── */
-.scrubber {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  height: 24px;
+/* ── Scrubber (custom drag) ───────────────────────────────── */
+.scrubber-rail {
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
 }
 
-.scrubber::-webkit-slider-runnable-track {
-  background: transparent;
-  height: 24px;
-}
-
-.scrubber::-webkit-slider-thumb {
-  -webkit-appearance: none;
+.scrubber-thumb {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
-  background: white;
-  margin-top: 5px;
   box-shadow:
     0 0 8px rgba(255, 255, 255, 0.5),
     0 2px 4px rgba(0, 0, 0, 0.4);
-  cursor: pointer;
   opacity: 0;
   transition:
     opacity 0.15s,
-    transform 0.15s;
+    width 0.1s,
+    height 0.1s;
 }
 
-.scrubber:hover::-webkit-slider-thumb,
-.scrubber:active::-webkit-slider-thumb {
+.scrubber-rail:hover .scrubber-thumb,
+.scrubber-thumb-dragging {
   opacity: 1;
-  transform: scale(1.2);
 }
 
-/* Always show thumb on touch devices (no hover state) */
+.scrubber-thumb-dragging {
+  width: 18px !important;
+  height: 18px !important;
+  box-shadow:
+    0 0 12px rgba(255, 255, 255, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.5) !important;
+}
+
 @media (hover: none) {
-  .scrubber::-webkit-slider-thumb {
+  .scrubber-thumb {
     opacity: 1;
   }
 }
 
-.scrubber::-moz-range-track {
-  background: transparent;
-  height: 24px;
+/* ── Skip bubble animation ────────────────────────────────── */
+@keyframes skip-fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 40px));
+  }
 }
 
-.scrubber::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: white;
-  border: none;
-  box-shadow:
-    0 0 8px rgba(255, 255, 255, 0.5),
-    0 2px 4px rgba(0, 0, 0, 0.4);
-  cursor: pointer;
+.skip-bubble {
+  animation: skip-fly 0.6s ease-out forwards;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: white;
+  text-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
 }
 
 /* ── Volume slider ────────────────────────────────────────── */
@@ -1210,7 +1318,7 @@ onMounted(async () => {
 
 .volume-slider::-webkit-slider-runnable-track {
   height: 3px;
-  background: rgba(255, 255, 255, 0.25);
+  background: linear-gradient(to right, white var(--volume-pct, 50%), rgba(255, 255, 255, 0.25) var(--volume-pct, 50%));
   border-radius: 9999px;
 }
 
@@ -1222,6 +1330,12 @@ onMounted(async () => {
   background: white;
   margin-top: -4.5px;
   cursor: pointer;
+}
+
+.volume-slider::-moz-range-progress {
+  background: white;
+  height: 3px;
+  border-radius: 9999px;
 }
 
 .volume-slider::-moz-range-track {
