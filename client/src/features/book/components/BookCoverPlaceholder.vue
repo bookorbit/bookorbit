@@ -80,36 +80,6 @@ const authorDisplay = computed(() => {
   return a.length > max ? `${a.slice(0, max - 1)}\u2026` : a
 })
 
-// Precomputed corner diamond point strings for the outer frame.
-const cornerDiamondPoints = computed(() => {
-  const { w, h, m } = vb.value
-  const r = 3
-  const corners = [
-    { cx: m, cy: m },
-    { cx: w - m, cy: m },
-    { cx: w - m, cy: h - m },
-    { cx: m, cy: h - m },
-  ]
-  return corners.map(({ cx, cy }) => `${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`)
-})
-
-// Divider: two lines flanking a center diamond at y=236.
-const divider = computed(() => {
-  const { cx, w, m } = vb.value
-  const y = 236
-  const gap = 6
-  const r = 3.5
-  const edgePad = props.isAudio ? m + 50 : m + 15
-  return {
-    lx1: edgePad,
-    lx2: cx - gap,
-    rx1: cx + gap,
-    rx2: w - edgePad,
-    pts: `${cx},${y - r} ${cx + r},${y} ${cx},${y + r} ${cx - r},${y}`,
-    y,
-  }
-})
-
 // Clip path to keep all text safely within the inner frame.
 // Generated once per instance so each SVG on the page has a unique ID.
 const clipId = Math.random().toString(36).slice(2, 8)
@@ -118,43 +88,62 @@ const clipId = Math.random().toString(36).slice(2, 8)
 <template>
   <svg :viewBox="`0 0 ${vb.w} ${vb.h}`" xmlns="http://www.w3.org/2000/svg" class="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid meet">
     <defs>
+      <linearGradient :id="`grad-${clipId}`" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" :stop-color="p.from" />
+        <stop offset="100%" :stop-color="p.to" />
+      </linearGradient>
       <clipPath :id="clipId">
-        <rect :x="vb.m + 5" :y="vb.m + 5" :width="vb.w - (vb.m + 5) * 2" :height="vb.h - (vb.m + 5) * 2" />
+        <rect :x="vb.m + 15" :y="vb.m + 15" :width="vb.w - (vb.m + 15) * 2" :height="vb.h - (vb.m + 15) * 2" />
       </clipPath>
     </defs>
 
     <!-- Background -->
-    <rect :width="vb.w" :height="vb.h" :fill="p.from" />
+    <rect :width="vb.w" :height="vb.h" :fill="`url(#grad-${clipId})`" />
 
-    <!-- Outer decorative frame -->
-    <rect :x="vb.m" :y="vb.m" :width="vb.w - vb.m * 2" :height="vb.h - vb.m * 2" fill="none" :stroke="p.accent" stroke-width="1" opacity="0.5" />
+    <!-- Variation 9: Diamond Lattice -->
+    <g :stroke="p.accent" fill="none" opacity="0.15" stroke-width="0.5">
+      <path v-for="i in 10" :key="`d1-${i}`" :d="`M ${-50 + i * 40},0 L ${vb.w + 50 + i * 40},${vb.h}`" />
+      <path v-for="i in 10" :key="`d2-${i}`" :d="`M ${vb.w + 50 - i * 40},0 L ${-50 - i * 40},${vb.h}`" />
 
-    <!-- Inner frame -->
-    <rect
-      :x="vb.m + 5"
-      :y="vb.m + 5"
-      :width="vb.w - (vb.m + 5) * 2"
-      :height="vb.h - (vb.m + 5) * 2"
-      fill="none"
-      :stroke="p.accent"
-      stroke-width="0.4"
-      opacity="0.25"
-    />
+      <!-- Small accent diamonds at intersections -->
+      <g opacity="0.4" :fill="p.accent" stroke="none">
+        <template v-for="x in 4" :key="`x-${x}`">
+          <rect
+            v-for="y in 6"
+            :key="`y-${y}`"
+            :x="(vb.w / 5) * x - 1.5"
+            :y="(vb.h / 7) * y - 1.5"
+            width="3"
+            height="3"
+            transform="rotate(45)"
+            style="transform-origin: center"
+          />
+        </template>
+      </g>
+    </g>
 
-    <!-- Corner diamond ornaments -->
-    <polygon v-for="(pts, i) in cornerDiamondPoints" :key="i" :points="pts" :fill="p.accent" opacity="0.65" />
+    <!-- Decorative Internal Frame -->
+    <g :stroke="p.accent" fill="none" opacity="0.6">
+      <rect :x="vb.m + 5" :y="vb.m + 5" :width="vb.w - (vb.m + 5) * 2" :height="vb.h - (vb.m + 5) * 2" stroke-width="0.8" />
+      <path :d="`M ${vb.m},${vb.m + 15} V ${vb.m} H ${vb.m + 15}`" stroke-width="2" />
+      <path :d="`M ${vb.w - vb.m},${vb.m + 15} V ${vb.m} H ${vb.w - vb.m - 15}`" stroke-width="2" />
+      <path :d="`M ${vb.w - vb.m},${vb.h - vb.m - 15} V ${vb.h - vb.m} H ${vb.w - vb.m - 15}`" stroke-width="2" />
+      <path :d="`M ${vb.m},${vb.h - vb.m - 15} V ${vb.h - vb.m} H ${vb.m + 15}`" stroke-width="2" />
+    </g>
 
-    <!-- Text clipped to the inner frame area -->
+    <!-- Text Layer -->
     <g :clip-path="`url(#${clipId})`">
       <!-- Title -->
-      <text :x="vb.cx" :y="titleY" :font-size="fsize" font-weight="900" font-family="inherit" text-anchor="middle" :fill="p.color">
+      <text :x="vb.cx" :y="titleY" :font-size="fsize" font-weight="800" font-family="inherit" text-anchor="middle" :fill="p.color">
         <tspan v-for="(line, i) in lines" :key="i" :x="vb.cx" :dy="i === 0 ? 0 : lh">{{ line }}</tspan>
       </text>
 
-      <!-- Divider: line — diamond — line -->
-      <line :x1="divider.lx1" :y1="divider.y" :x2="divider.lx2" :y2="divider.y" :stroke="p.accent" stroke-width="0.8" opacity="0.65" />
-      <polygon :points="divider.pts" :fill="p.accent" opacity="0.65" />
-      <line :x1="divider.rx1" :y1="divider.y" :x2="divider.rx2" :y2="divider.y" :stroke="p.accent" stroke-width="0.8" opacity="0.65" />
+      <!-- Lattice Divider -->
+      <g :fill="p.accent" opacity="0.8">
+        <circle :cx="vb.cx" :cy="236" r="3" />
+        <line :x1="vb.cx - 35" :y1="236" :x2="vb.cx - 8" :y2="236" :stroke="p.accent" stroke-width="1" />
+        <line :x1="vb.cx + 8" :y1="236" :x2="vb.cx + 35" :y2="236" :stroke="p.accent" stroke-width="1" />
+      </g>
 
       <!-- Author -->
       <text
@@ -162,10 +151,11 @@ const clipId = Math.random().toString(36).slice(2, 8)
         :x="vb.cx"
         :y="authorY"
         :font-size="authorFsize"
-        font-weight="500"
+        font-weight="600"
         font-family="inherit"
         text-anchor="middle"
         :fill="p.textMuted"
+        style="letter-spacing: 0.05em"
       >
         {{ authorDisplay }}
       </text>

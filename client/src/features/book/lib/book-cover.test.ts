@@ -83,10 +83,10 @@ describe('bookCoverPalette', () => {
     expect(hues.size).toBeGreaterThan(10)
   })
 
-  it('always produces dark backgrounds', () => {
+  it('always produces vibrant backgrounds', () => {
     for (let i = 0; i < 50; i++) {
       const p = bookCoverPalette(`seed-${i}`)
-      expect(p.from).toMatch(/^oklch\(0\.[1-3]/)
+      expect(p.from).toMatch(/^oklch\(0\.[4-7]/)
     }
   })
 

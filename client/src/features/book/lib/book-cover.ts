@@ -21,22 +21,26 @@ export function bookCoverPalette(seed: string): BookCoverPalette {
   const n2 = (n >>> 8) & 0xff
   const n3 = (n >>> 16) & 0xff
 
-  const bgL = 0.14 + (n2 % 10) * 0.018
-  const bgC = 0.06 + (n3 % 8) * 0.015
-  const from = `oklch(${bgL.toFixed(3)} ${bgC.toFixed(3)} ${Math.round(hue)})`
-  const toL = Math.min(0.35, bgL + 0.06)
-  const toC = Math.max(0.02, bgC - 0.02)
-  const to = `oklch(${toL.toFixed(3)} ${toC.toFixed(3)} ${Math.round((hue + 20) % 360)})`
+  // Base Lightness: 0.45 to 0.75 (Clean and vibrant)
+  const baseL = 0.45 + (n2 % 6) * 0.05
+  const baseC = 0.12 + (n3 % 5) * 0.02
+  const from = `oklch(${baseL.toFixed(3)} ${baseC.toFixed(3)} ${Math.round(hue)})`
 
-  const color = `oklch(0.99 0.025 ${Math.round(hue)})`
+  // Gradient: 20% lightness drop
+  const toL = baseL - 0.2
+  const to = `oklch(${toL.toFixed(3)} ${baseC.toFixed(3)} ${Math.round(hue)})`
 
-  const accentL = 0.7 + (n2 % 7) * 0.03
-  const accentC = 0.14 + (n3 % 6) * 0.025
-  const accent = `oklch(${accentL.toFixed(3)} ${accentC.toFixed(3)} ${Math.round(hue)})`
-  const textMuted = `oklch(${(accentL + 0.1).toFixed(3)} ${Math.max(0.04, accentC - 0.08).toFixed(3)} ${Math.round(hue)})`
+  // Text: Purest tint
+  const color = `oklch(0.99 0.01 ${Math.round(hue)})`
+
+  // Accent: Brightest highlight
+  const accentL = Math.min(0.95, baseL + 0.35)
+  const accent = `oklch(${accentL.toFixed(3)} ${Math.max(0.02, baseC - 0.08).toFixed(3)} ${Math.round(hue)})`
+
+  const textMuted = `oklch(0.9 0.02 ${Math.round(hue)})`
 
   return {
-    gradient: `linear-gradient(150deg, ${from} 0%, ${to} 100%)`,
+    gradient: `linear-gradient(135deg, ${from} 0%, ${to} 100%)`,
     from,
     to,
     color,
