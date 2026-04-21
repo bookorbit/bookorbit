@@ -80,6 +80,7 @@ export const bookMetadata = pgTable(
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
     index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
     index('bm_language_idx').on(t.language),
+    index('bm_language_trgm_idx').using('gin', t.language.op('gin_trgm_ops')),
     index('bm_published_year_idx').on(t.publishedYear),
     index('bm_series_name_index_idx').on(t.seriesName, t.seriesIndex),
     index('bm_isbn10_idx').on(t.isbn10),
@@ -155,10 +156,14 @@ export const authorEnrichmentQueue = pgTable(
   ],
 );
 
-export const genres = pgTable('genres', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 200 }).notNull().unique(),
-});
+export const genres = pgTable(
+  'genres',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 200 }).notNull().unique(),
+  },
+  (t) => [index('genres_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
+);
 
 export const bookGenres = pgTable(
   'book_genres',
@@ -173,10 +178,14 @@ export const bookGenres = pgTable(
   (t) => [primaryKey({ columns: [t.bookId, t.genreId] }), index('book_genres_genre_id_idx').on(t.genreId)],
 );
 
-export const tags = pgTable('tags', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 200 }).notNull().unique(),
-});
+export const tags = pgTable(
+  'tags',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 200 }).notNull().unique(),
+  },
+  (t) => [index('tags_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
+);
 
 export const bookTags = pgTable(
   'book_tags',

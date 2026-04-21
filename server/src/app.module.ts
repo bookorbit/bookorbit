@@ -54,6 +54,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { MigrationModule } from './modules/migration/migration.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SeriesModule } from './modules/series/series.module';
+import { EntityManagerModule } from './modules/entity-manager/entity-manager.module';
 
 @Module({
   imports: [
@@ -116,6 +117,7 @@ import { SeriesModule } from './modules/series/series.module';
     MigrationModule,
     NotificationModule,
     SeriesModule,
+    EntityManagerModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

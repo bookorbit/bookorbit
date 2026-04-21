@@ -29,30 +29,6 @@ export type MergeAuthorsResult = {
   affectedBookCount: number;
 };
 
-export type AuthorDuplicateSuggestion = {
-  left: AuthorSummary;
-  right: AuthorSummary;
-  confidence: number;
-  reasons: string[];
-};
-
-export type AuthorInsightsRow = {
-  id: number;
-  name: string;
-  bookCount: number;
-  lastAddedAt: string | null;
-  metric: number;
-  secondaryMetric?: number | null;
-};
-
-export type AuthorInsights = {
-  generatedAt: string;
-  windowDays: number;
-  newAuthors: AuthorInsightsRow[];
-  mostRead: AuthorInsightsRow[];
-  unreadBacklog: AuthorInsightsRow[];
-};
-
 export const AuthorMetadataProviderKey = {
   AUDNEXUS: "audnexus",
 } as const;

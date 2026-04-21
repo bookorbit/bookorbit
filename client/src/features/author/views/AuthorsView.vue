@@ -1,29 +1,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, CheckCheck, Filter, Lightbulb, RefreshCcw, Search, SlidersHorizontal, Trash2, X } from 'lucide-vue-next'
+import { ArrowUpDown, CheckCheck, Filter, RefreshCcw, Search, SlidersHorizontal, Trash2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
-import type { AuthorDuplicateSuggestion } from '@projectx/types'
-import { bulkRefreshAuthorsMetadata, deleteAuthors, mergeAuthors, refreshAuthorMetadata } from '../api/author'
+import { bulkRefreshAuthorsMetadata, deleteAuthors, refreshAuthorMetadata } from '../api/author'
 import AuthorCard from '../components/AuthorCard.vue'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
-import AuthorDuplicateSuggestionsPanel from '../components/AuthorDuplicateSuggestionsPanel.vue'
 import AuthorFilters from '../components/AuthorFilters.vue'
-import AuthorInsightsPanel from '../components/AuthorInsightsPanel.vue'
 import AuthorListRow from '../components/AuthorListRow.vue'
-import { useAuthorInsights } from '../composables/useAuthorInsights'
 import { useAuthorSelection } from '../composables/useAuthorSelection'
 import { useAuthorsList } from '../composables/useAuthorsList'
-import { useDuplicateSuggestions } from '../composables/useDuplicateSuggestions'
 import { useRefreshingAuthors } from '../composables/useRefreshingAuthors'
 import type { AuthorListSort, SortDirection } from '../types/author'
 
@@ -33,8 +27,6 @@ const { gridGap, viewMode, authorCoverSize, authorCoverShape } = useDisplaySetti
 const { libraries, fetchLibraries } = useLibraries()
 const { hasPermission, isSuperuser } = usePermissions()
 const { items, total, loading, error, hasMore, q, sort, order, libraryId, hasPhoto, minBookCount, load } = useAuthorsList()
-const { insights, loading: loadingInsights, error: insightsError, load: loadInsights } = useAuthorInsights()
-const { suggestions, loading: loadingSuggestions, error: suggestionsError, load: loadSuggestions } = useDuplicateSuggestions()
 const { markRefreshing, clearRefreshing, isRefreshing } = useRefreshingAuthors()
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleAuthor, rangeSelectTo, selectAll, isSelected } =
   useAuthorSelection()
@@ -42,8 +34,6 @@ const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelec
 const hydrating = ref(true)
 const suppressAutoReload = ref(false)
 const filtersOpen = ref(false)
-const showSecondaryPanels = ref(false)
-const secondarySheetOpen = ref(false)
 const mobileControlsExpanded = ref(false)
 const mobileSearchOpen = ref(false)
 const initialLoadComplete = ref(false)
@@ -54,7 +44,6 @@ const mobileSearchInput = ref<HTMLInputElement | null>(null)
 let observer: IntersectionObserver | null = null
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const quickMerging = ref(false)
 const bulkRefreshing = ref(false)
 const bulkDeleting = ref(false)
 const deletingAuthorId = ref<number | null>(null)
@@ -62,9 +51,6 @@ const confirmingBulkDelete = ref(false)
 
 const pendingDeleteIds = ref<number[]>([])
 const deleteDialogOpen = ref(false)
-
-const pendingQuickMerge = ref<AuthorDuplicateSuggestion | null>(null)
-const quickMergeDialogOpen = ref(false)
 
 const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata'))
 const canDeleteAuthors = computed(() => isSuperuser.value)
@@ -91,8 +77,6 @@ const activeFilterCount = computed(() => {
 })
 const mobileControlsBadgeCount = computed(() => activeFilterCount.value + (!isDefaultSort.value ? 1 : 0))
 
-const secondaryVisible = computed(() => showSecondaryPanels.value || secondarySheetOpen.value)
-
 const deleteDialogLoading = computed(() => {
   if (bulkDeleting.value) return true
   if (pendingDeleteIds.value.length !== 1) return false
@@ -109,16 +93,6 @@ const deleteDialogDescription = computed(() => {
     return 'This removes selected authors from the catalog and unlinks them from associated books. This action cannot be undone.'
   }
   return 'This removes the author from the catalog and unlinks it from associated books. This action cannot be undone.'
-})
-
-const quickMergeDialogTitle = computed(() => {
-  if (!pendingQuickMerge.value) return 'Merge duplicate authors?'
-  return `Merge "${pendingQuickMerge.value.right.name}" into "${pendingQuickMerge.value.left.name}"?`
-})
-
-const quickMergeDialogDescription = computed(() => {
-  if (!pendingQuickMerge.value) return 'This cannot be undone.'
-  return `${pendingQuickMerge.value.right.name} will be merged into ${pendingQuickMerge.value.left.name}. This cannot be undone.`
 })
 
 function showRefreshResultToast(updated: { imageUrl?: string | null }) {
@@ -200,14 +174,6 @@ function closeFiltersPanel() {
   filtersOpen.value = false
 }
 
-function toggleSecondaryPanels() {
-  showSecondaryPanels.value = !showSecondaryPanels.value
-}
-
-function openSecondarySheet() {
-  secondarySheetOpen.value = true
-}
-
 function isMobileViewport() {
   return typeof window !== 'undefined' && window.innerWidth < 640
 }
@@ -281,7 +247,6 @@ async function clearFilters() {
 
   syncRouteQuery()
   await load(true)
-  await maybeLoadSecondaryPanels()
   filtersOpen.value = false
   collapseMobileControlsIfNeeded()
 
@@ -312,7 +277,6 @@ async function refreshSelectedAuthorsMetadata() {
       }
       clearRefreshing([event.authorId])
     })
-    await maybeLoadSecondaryPanels()
 
     if (result.failed > 0) {
       toast.warning(`Refreshed ${result.updated} author(s), ${result.failed} failed`)
@@ -341,7 +305,6 @@ async function refreshSingleAuthorMetadata(authorId: number) {
       next[index] = { ...current, ...updated }
       items.value = next
     }
-    void maybeLoadSecondaryPanels()
     showRefreshResultToast(updated)
   } catch (actionError) {
     toast.error(actionError instanceof Error ? actionError.message : 'Failed to refresh author metadata')
@@ -384,7 +347,7 @@ async function confirmDeleteAuthors() {
 
   try {
     const result = await deleteAuthors({ authorIds: ids })
-    await Promise.all([load(true), maybeLoadSecondaryPanels()])
+    await load(true)
     if (ids.length > 1) exitSelectionMode()
 
     const noun = result.deletedAuthorIds.length === 1 ? 'author' : 'authors'
@@ -398,61 +361,6 @@ async function confirmDeleteAuthors() {
       bulkDeleting.value = false
     }
     pendingDeleteIds.value = []
-  }
-}
-
-async function loadPhase4Panels() {
-  await Promise.all([loadInsights(libraryId.value), loadSuggestions(libraryId.value)])
-}
-
-async function maybeLoadSecondaryPanels() {
-  if (!secondaryVisible.value) return
-  await loadPhase4Panels()
-}
-
-function waitForTimeout(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
-
-async function requestQuickMergeSuggestion(suggestion: AuthorDuplicateSuggestion) {
-  if (quickMerging.value) return
-  pendingQuickMerge.value = suggestion
-
-  if (secondarySheetOpen.value) {
-    secondarySheetOpen.value = false
-    await nextTick()
-    await waitForTimeout(320)
-  }
-
-  quickMergeDialogOpen.value = true
-}
-
-function cancelQuickMerge() {
-  if (quickMerging.value) return
-  quickMergeDialogOpen.value = false
-  pendingQuickMerge.value = null
-}
-
-async function confirmQuickMergeSuggestion() {
-  const suggestion = pendingQuickMerge.value
-  if (!suggestion || quickMerging.value) return
-
-  quickMergeDialogOpen.value = false
-  quickMerging.value = true
-  try {
-    await mergeAuthors({
-      targetAuthorId: suggestion.left.id,
-      sourceAuthorIds: [suggestion.right.id],
-    })
-    toast.success(`Merged ${suggestion.right.name} into ${suggestion.left.name}`)
-    await Promise.all([load(true), maybeLoadSecondaryPanels()])
-  } catch (actionError) {
-    toast.error(actionError instanceof Error ? actionError.message : 'Failed to merge suggested duplicate')
-  } finally {
-    quickMerging.value = false
-    pendingQuickMerge.value = null
   }
 }
 
@@ -501,7 +409,6 @@ watch([sort, order, libraryId, hasPhoto, minBookCount], () => {
   if (selectionMode.value) exitSelectionMode()
   syncRouteQuery()
   void load(true)
-  void maybeLoadSecondaryPanels()
   collapseMobileControlsIfNeeded()
 })
 
@@ -521,15 +428,6 @@ watch(
     if (!isLoading) loadIfSentinelVisible()
   },
   { flush: 'post' },
-)
-
-watch(
-  secondaryVisible,
-  (visible) => {
-    if (!visible) return
-    void loadPhase4Panels()
-  },
-  { immediate: false },
 )
 
 watch(
@@ -665,36 +563,6 @@ watch(
         </span>
       </button>
     </template>
-
-    <template #actions>
-      <button
-        class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
-        :class="
-          showSecondaryPanels
-            ? 'border-primary text-primary bg-primary/10'
-            : 'border-input text-muted-foreground hover:bg-muted hover:text-foreground'
-        "
-        @click="toggleSecondaryPanels"
-      >
-        <Lightbulb :size="14" />
-      </button>
-
-      <button
-        class="hidden h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
-        @click="toggleSecondaryPanels"
-      >
-        <Lightbulb :size="13" />
-        {{ showSecondaryPanels ? 'Hide Insights' : 'Show Insights' }}
-      </button>
-
-      <button
-        class="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex md:hidden"
-        title="Author insights"
-        @click="openSecondarySheet"
-      >
-        <Lightbulb :size="14" />
-      </button>
-    </template>
   </ViewHeader>
 
   <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
@@ -806,20 +674,6 @@ watch(
       @clear="clearFilters"
       @close="closeFiltersPanel"
     />
-
-    <div v-if="showSecondaryPanels" class="mb-4 space-y-3">
-      <AuthorInsightsPanel :insights="insights" :loading="loadingInsights" :error="insightsError" />
-
-      <AuthorDuplicateSuggestionsPanel
-        :suggestions="suggestions"
-        :loading="loadingSuggestions"
-        :error="suggestionsError"
-        :can-merge="isSuperuser"
-        :merging="quickMerging"
-        @open-author="openAuthor"
-        @quick-merge="requestQuickMergeSuggestion"
-      />
-    </div>
 
     <div v-if="error" class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
       {{ error }}
@@ -985,26 +839,6 @@ watch(
     </template>
   </SelectionActionBar>
 
-  <Sheet v-model:open="secondarySheetOpen">
-    <SheetContent side="bottom" class="max-h-[85vh]">
-      <SheetHeader>
-        <SheetTitle>Author Insights</SheetTitle>
-      </SheetHeader>
-      <div class="mt-4 space-y-3 overflow-y-auto pb-2 pr-1">
-        <AuthorInsightsPanel :insights="insights" :loading="loadingInsights" :error="insightsError" />
-        <AuthorDuplicateSuggestionsPanel
-          :suggestions="suggestions"
-          :loading="loadingSuggestions"
-          :error="suggestionsError"
-          :can-merge="isSuperuser"
-          :merging="quickMerging"
-          @open-author="openAuthor"
-          @quick-merge="requestQuickMergeSuggestion"
-        />
-      </div>
-    </SheetContent>
-  </Sheet>
-
   <AuthorConfirmDialog
     :open="deleteDialogOpen"
     :title="deleteDialogTitle"
@@ -1014,15 +848,5 @@ watch(
     destructive
     @confirm="confirmDeleteAuthors"
     @cancel="cancelDeleteAuthors"
-  />
-
-  <AuthorConfirmDialog
-    :open="quickMergeDialogOpen"
-    :title="quickMergeDialogTitle"
-    :description="quickMergeDialogDescription"
-    confirm-label="Merge"
-    :loading="quickMerging"
-    @confirm="confirmQuickMergeSuggestion"
-    @cancel="cancelQuickMerge"
   />
 </template>

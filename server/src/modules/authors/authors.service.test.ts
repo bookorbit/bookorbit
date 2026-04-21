@@ -18,11 +18,6 @@ describe('AuthorsService', () => {
     mergeAuthors: vi.fn(),
     deleteAuthors: vi.fn(),
     findRelatedLibraryIds: vi.fn(),
-    findAuthorsForDuplicatePool: vi.fn(),
-    findAuthorsAddedSince: vi.fn(),
-    findMostReadAuthors: vi.fn(),
-    findAuthorBookPairs: vi.fn(),
-    findStartedBookIdsForUser: vi.fn(),
     findByIdForEnrichment: vi.fn(),
     updateAuthorDescriptionIfEmpty: vi.fn(),
   };
@@ -312,32 +307,6 @@ describe('AuthorsService', () => {
     await expect(service.findBooks(reqUser(), 99, {})).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('listDuplicateSuggestions returns [] when duplicate pool is too small', async () => {
-    authorsRepo.findAuthorsForDuplicatePool.mockResolvedValue([
-      { id: 1, name: 'Only One', sortName: null, description: null, bookCount: 1, lastAddedAt: null },
-    ]);
-
-    await expect(service.listDuplicateSuggestions(reqUser(), {})).resolves.toEqual([]);
-  });
-
-  it('listDuplicateSuggestions scores and returns likely duplicates', async () => {
-    authorsRepo.findAuthorsForDuplicatePool.mockResolvedValue([
-      { id: 1, name: 'John Smith', sortName: null, description: null, bookCount: 7, lastAddedAt: null },
-      { id: 2, name: 'John Smith', sortName: null, description: null, bookCount: 2, lastAddedAt: null },
-      { id: 3, name: 'Jane Doe', sortName: null, description: null, bookCount: 5, lastAddedAt: null },
-    ]);
-
-    const suggestions = await service.listDuplicateSuggestions(reqUser(), { minConfidence: 0.9, limit: 5, poolSize: 50 });
-
-    expect(suggestions).toHaveLength(1);
-    expect(suggestions[0]).toEqual(
-      expect.objectContaining({
-        confidence: 0.98,
-      }),
-    );
-    expect(suggestions[0]?.reasons).toContain('same canonical name');
-  });
-
   it('returns metadata providers directly from the metadata fetch service', () => {
     authorMetadataFetchService.listProviders.mockReturnValue([{ key: 'audnexus', label: 'Audnexus', identifiable: true }]);
 
@@ -371,71 +340,6 @@ describe('AuthorsService', () => {
 
     expect(stream).toBe(mockStream);
     expect(authorMetadataFetchService.stream).toHaveBeenCalledWith({ name: 'Jane', region: 'us', limit: 5 }, { keys: ['audnexus'] });
-  });
-
-  it('getInsights returns empty collections when no libraries are accessible', async () => {
-    libraryService.findAll.mockResolvedValue([]);
-
-    const insights = await service.getInsights(reqUser(), {});
-
-    expect(insights.newAuthors).toEqual([]);
-    expect(insights.mostRead).toEqual([]);
-    expect(insights.unreadBacklog).toEqual([]);
-  });
-
-  it('getInsights computes unread backlog and filters mostRead rows with zero metric', async () => {
-    authorsRepo.findAuthorsAddedSince.mockResolvedValue([
-      {
-        id: 1,
-        name: 'A',
-        sortName: null,
-        description: null,
-        bookCount: 2,
-        lastAddedAt: new Date('2026-01-01T00:00:00Z'),
-        metric: 2,
-        secondaryMetric: null,
-      },
-    ]);
-    authorsRepo.findMostReadAuthors.mockResolvedValue([
-      {
-        id: 2,
-        name: 'B',
-        sortName: null,
-        description: null,
-        bookCount: 3,
-        lastAddedAt: new Date('2026-01-02T00:00:00Z'),
-        metric: 0,
-        secondaryMetric: 10,
-      },
-      {
-        id: 3,
-        name: 'C',
-        sortName: null,
-        description: null,
-        bookCount: 4,
-        lastAddedAt: new Date('2026-01-03T00:00:00Z'),
-        metric: 1,
-        secondaryMetric: 50,
-      },
-    ]);
-    authorsRepo.findAuthorBookPairs.mockResolvedValue([
-      { authorId: 1, name: 'A', sortName: null, description: null, bookId: 10, addedAt: new Date('2026-01-02T00:00:00Z') },
-      { authorId: 1, name: 'A', sortName: null, description: null, bookId: 10, addedAt: new Date('2026-01-02T00:00:00Z') },
-      { authorId: 1, name: 'A', sortName: null, description: null, bookId: 11, addedAt: new Date('2026-01-04T00:00:00Z') },
-    ]);
-    authorsRepo.findStartedBookIdsForUser.mockResolvedValue([10]);
-
-    const insights = await service.getInsights(reqUser(), { limit: 5, windowDays: 30 });
-
-    expect(insights.mostRead).toHaveLength(1);
-    expect(insights.mostRead[0]?.id).toBe(3);
-    expect(insights.unreadBacklog[0]).toEqual(
-      expect.objectContaining({
-        id: 1,
-        metric: 1,
-        secondaryMetric: 2,
-      }),
-    );
   });
 
   it('update returns current detail when no mutable fields are provided', async () => {

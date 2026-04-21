@@ -222,6 +222,20 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: (to) => `Series · ${firstText(to.params.seriesName) ?? 'Series'}` },
       },
       {
+        path: '/tools',
+        component: () => import('@/features/tools/views/ToolsView.vue'),
+        children: [
+          { path: '', redirect: { name: 'tools-entity-manager' } },
+          {
+            path: 'entity-manager',
+            name: 'tools-entity-manager',
+            component: () => import('@/features/tools/entity-manager/views/EntityManagerView.vue'),
+            meta: { title: 'Entity Manager' },
+          },
+          { path: ':pathMatch(.*)*', redirect: { name: 'tools-entity-manager' } },
+        ],
+      },
+      {
         path: '/book/:bookId',
         name: 'book-detail',
         component: () => import('@/views/BookDetailView.vue'),

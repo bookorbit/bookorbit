@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, desc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, desc, eq, ilike, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, readingProgress } from '../../db/schema';
+import { authors, bookAuthors, bookMetadata, books } from '../../db/schema';
 import { AuthorBookSort } from './dto/list-author-books.dto';
 import { AuthorListSort, SortDirection } from './dto/list-authors.dto';
 
@@ -21,26 +21,6 @@ type AuthorSummaryRow = {
 
 type AuthorBookIdRow = {
   id: number;
-};
-
-type AuthorInsightRow = {
-  id: number;
-  name: string;
-  sortName: string | null;
-  description: string | null;
-  bookCount: number;
-  lastAddedAt: Date | null;
-  metric: number;
-  secondaryMetric: number | null;
-};
-
-type AuthorBookPairRow = {
-  authorId: number;
-  name: string;
-  sortName: string | null;
-  description: string | null;
-  bookId: number;
-  addedAt: Date;
 };
 
 @Injectable()
@@ -250,107 +230,6 @@ export class AuthorsRepository {
       .from(bookAuthors)
       .where(inArray(bookAuthors.authorId, authorIds));
     return Number(total);
-  }
-
-  async findAuthorsForDuplicatePool(libraryIds: number[], limit: number): Promise<AuthorSummaryRow[]> {
-    if (libraryIds.length === 0) return [];
-    return this.db
-      .select({
-        id: authors.id,
-        name: authors.name,
-        sortName: authors.sortName,
-        description: authors.description,
-        bookCount: sql<number>`count(distinct ${books.id})::int`,
-        lastAddedAt: max(books.addedAt),
-      })
-      .from(authors)
-      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-      .innerJoin(books, eq(books.id, bookAuthors.bookId))
-      .where(inArray(books.libraryId, libraryIds))
-      .groupBy(authors.id, authors.name, authors.sortName, authors.description)
-      .orderBy(desc(sql<number>`count(distinct ${books.id})`), asc(authors.sortName), asc(authors.name))
-      .limit(limit);
-  }
-
-  async findAuthorsAddedSince(libraryIds: number[], since: Date, limit: number): Promise<AuthorInsightRow[]> {
-    if (libraryIds.length === 0) return [];
-    return this.db
-      .select({
-        id: authors.id,
-        name: authors.name,
-        sortName: authors.sortName,
-        description: authors.description,
-        bookCount: sql<number>`count(distinct ${books.id})::int`,
-        lastAddedAt: max(books.addedAt),
-        metric: sql<number>`count(distinct ${books.id})::int`,
-        secondaryMetric: sql<number | null>`null`,
-      })
-      .from(authors)
-      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-      .innerJoin(books, eq(books.id, bookAuthors.bookId))
-      .where(and(inArray(books.libraryId, libraryIds), gte(books.addedAt, since)))
-      .groupBy(authors.id, authors.name, authors.sortName, authors.description)
-      .orderBy(desc(sql<number>`count(distinct ${books.id})`), desc(max(books.addedAt)), asc(authors.sortName), asc(authors.name))
-      .limit(limit);
-  }
-
-  async findMostReadAuthors(libraryIds: number[], since: Date, limit: number): Promise<AuthorInsightRow[]> {
-    if (libraryIds.length === 0) return [];
-    return this.db
-      .select({
-        id: authors.id,
-        name: authors.name,
-        sortName: authors.sortName,
-        description: authors.description,
-        bookCount: sql<number>`count(distinct ${books.id})::int`,
-        lastAddedAt: max(books.addedAt),
-        metric: sql<number>`count(distinct ${readingProgress.userId})::int`,
-        secondaryMetric: sql<number | null>`round(avg(${readingProgress.percentage})::numeric, 2)::float`,
-      })
-      .from(authors)
-      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-      .innerJoin(books, eq(books.id, bookAuthors.bookId))
-      .leftJoin(bookFiles, eq(bookFiles.bookId, books.id))
-      .leftJoin(
-        readingProgress,
-        and(eq(readingProgress.bookFileId, bookFiles.id), gte(readingProgress.updatedAt, since), gt(readingProgress.percentage, 0)),
-      )
-      .where(inArray(books.libraryId, libraryIds))
-      .groupBy(authors.id, authors.name, authors.sortName, authors.description)
-      .orderBy(
-        desc(sql<number>`count(distinct ${readingProgress.userId})`),
-        desc(sql<number>`avg(${readingProgress.percentage})`),
-        desc(sql<number>`count(distinct ${books.id})`),
-      )
-      .limit(limit);
-  }
-
-  async findAuthorBookPairs(libraryIds: number[]): Promise<AuthorBookPairRow[]> {
-    if (libraryIds.length === 0) return [];
-    return this.db
-      .select({
-        authorId: authors.id,
-        name: authors.name,
-        sortName: authors.sortName,
-        description: authors.description,
-        bookId: books.id,
-        addedAt: books.addedAt,
-      })
-      .from(authors)
-      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-      .innerJoin(books, eq(books.id, bookAuthors.bookId))
-      .where(inArray(books.libraryId, libraryIds));
-  }
-
-  async findStartedBookIdsForUser(userId: number, libraryIds: number[]): Promise<number[]> {
-    if (libraryIds.length === 0) return [];
-    const rows = await this.db
-      .selectDistinct({ bookId: bookFiles.bookId })
-      .from(readingProgress)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingProgress.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .where(and(eq(readingProgress.userId, userId), gt(readingProgress.percentage, 0), inArray(books.libraryId, libraryIds)));
-    return rows.map((row) => row.bookId);
   }
 
   async findRelatedLibraryIds(authorIds: number[]): Promise<number[]> {

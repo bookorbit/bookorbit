@@ -76,8 +76,6 @@ function makeReply() {
 function makeController() {
   const authorsService = {
     findAll: vi.fn(),
-    getInsights: vi.fn(),
-    listDuplicateSuggestions: vi.fn(),
     listMetadataProviders: vi.fn(),
     searchMetadata: vi.fn(),
     streamMetadata: vi.fn(),

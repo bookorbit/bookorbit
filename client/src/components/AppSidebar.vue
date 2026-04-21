@@ -102,6 +102,7 @@ const {
 const isDashboardActive = computed(() => route.name === 'dashboard')
 const isAuthorsActive = computed(() => route.name === 'authors' || route.name === 'author-detail')
 const isSeriesActive = computed(() => route.name === 'series' || route.name === 'series-detail')
+const isToolsActive = computed(() => typeof route.name === 'string' && route.name.startsWith('tools-'))
 
 const activeLibraryId = computed(() => {
   const id = route.params.id
@@ -217,6 +218,14 @@ onUnmounted(() => stopLibraryUploadListener())
               :icon="Icons.Library"
               label="Series"
               @click="navigateFromSidebar({ name: 'series' })"
+            />
+            <SidebarNavItem
+              v-if="hasPermission('manage_libraries')"
+              :is-active="isToolsActive"
+              tooltip="Tools"
+              :icon="Icons.Wrench"
+              label="Tools"
+              @click="navigateFromSidebar({ name: 'tools-entity-manager' })"
             />
           </SidebarMenu>
         </SidebarGroupContent>

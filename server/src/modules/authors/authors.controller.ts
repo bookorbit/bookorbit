@@ -34,10 +34,8 @@ import { AuthorAutoEnrichmentConfigDto } from './dto/author-auto-enrichment-conf
 import { BulkAuthorIdsDto } from './dto/bulk-author-ids.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
-import { ListAuthorInsightsDto } from './dto/list-author-insights.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
 import { ListAuthorsDto } from './dto/list-authors.dto';
-import { ListDuplicateSuggestionsDto } from './dto/list-duplicate-suggestions.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
 import { PreviewAuthorEnrichmentCountDto } from './dto/preview-author-enrichment-count.dto';
@@ -58,16 +56,6 @@ export class AuthorsController {
   @Get()
   findAll(@CurrentUser() user: RequestUser, @Query() dto: ListAuthorsDto) {
     return this.authorsService.findAll(user, dto);
-  }
-
-  @Get('insights')
-  findInsights(@CurrentUser() user: RequestUser, @Query() dto: ListAuthorInsightsDto) {
-    return this.authorsService.getInsights(user, dto);
-  }
-
-  @Get('suggestions/duplicates')
-  findDuplicateSuggestions(@CurrentUser() user: RequestUser, @Query() dto: ListDuplicateSuggestionsDto) {
-    return this.authorsService.listDuplicateSuggestions(user, dto);
   }
 
   @Get('metadata/providers')

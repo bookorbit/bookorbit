@@ -6,9 +6,6 @@ import type {
   AuthorDetail,
   AuthorMetadataCandidate,
   AuthorMetadataProviderInfo,
-  AuthorDuplicateSuggestion,
-  AuthorInsights,
-  AuthorInsightsRow,
   AuthorSummary,
   AuthorsPage,
   BooksPage,
@@ -28,10 +25,8 @@ import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchest
 import { AuthorsRepository } from './authors.repository';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
-import { ListAuthorInsightsDto } from './dto/list-author-insights.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
 import { ListAuthorsDto } from './dto/list-authors.dto';
-import { ListDuplicateSuggestionsDto } from './dto/list-duplicate-suggestions.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
@@ -131,38 +126,6 @@ export class AuthorsService {
     return { items, total: page.total, page: page.page, size: page.size };
   }
 
-  async listDuplicateSuggestions(user: RequestUser, dto: ListDuplicateSuggestionsDto): Promise<AuthorDuplicateSuggestion[]> {
-    const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
-    if (libraryIds.length === 0) return [];
-
-    const minConfidence = dto.minConfidence ?? 0.82;
-    const limit = dto.limit ?? 20;
-    const poolSize = dto.poolSize ?? 250;
-
-    const authors = await this.authorsRepo.findAuthorsForDuplicatePool(libraryIds, poolSize);
-    if (authors.length < 2) return [];
-
-    const suggestions: AuthorDuplicateSuggestion[] = [];
-    for (let i = 0; i < authors.length; i += 1) {
-      for (let j = i + 1; j < authors.length; j += 1) {
-        const left = authors[i]!;
-        const right = authors[j]!;
-        const score = this.scorePotentialDuplicate(left, right);
-        if (!score || score.confidence < minConfidence) continue;
-
-        suggestions.push({
-          left: this.mapAuthorSummary(left),
-          right: this.mapAuthorSummary(right),
-          confidence: score.confidence,
-          reasons: score.reasons,
-        });
-      }
-    }
-
-    suggestions.sort((a, b) => b.confidence - a.confidence || b.left.bookCount - a.left.bookCount || b.right.bookCount - a.right.bookCount);
-    return suggestions.slice(0, limit);
-  }
-
   listMetadataProviders(): AuthorMetadataProviderInfo[] {
     return this.authorMetadataFetchService.listProviders();
   }
@@ -227,80 +190,6 @@ export class AuthorsService {
       },
       { keys: dto.providers },
     );
-  }
-
-  async getInsights(user: RequestUser, dto: ListAuthorInsightsDto): Promise<AuthorInsights> {
-    const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
-    const limit = dto.limit ?? 8;
-    const windowDays = dto.windowDays ?? 30;
-    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-
-    if (libraryIds.length === 0) {
-      return {
-        generatedAt: new Date().toISOString(),
-        windowDays,
-        newAuthors: [],
-        mostRead: [],
-        unreadBacklog: [],
-      };
-    }
-
-    const [newRows, mostReadRows, authorBookPairs, startedBookIds] = await Promise.all([
-      this.authorsRepo.findAuthorsAddedSince(libraryIds, since, limit),
-      this.authorsRepo.findMostReadAuthors(libraryIds, since, limit),
-      this.authorsRepo.findAuthorBookPairs(libraryIds),
-      this.authorsRepo.findStartedBookIdsForUser(user.id, libraryIds),
-    ]);
-
-    const startedSet = new Set(startedBookIds);
-    const unreadByAuthor = new Map<number, { name: string; bookCount: number; unreadCount: number; lastAddedAt: Date | null }>();
-    const seenBookIdsByAuthor = new Map<number, Set<number>>();
-
-    for (const row of authorBookPairs) {
-      const seen = seenBookIdsByAuthor.get(row.authorId) ?? new Set<number>();
-      if (seen.has(row.bookId)) continue;
-      seen.add(row.bookId);
-      seenBookIdsByAuthor.set(row.authorId, seen);
-
-      const current = unreadByAuthor.get(row.authorId) ?? {
-        name: row.name,
-        bookCount: 0,
-        unreadCount: 0,
-        lastAddedAt: null,
-      };
-
-      current.bookCount += 1;
-      if (!startedSet.has(row.bookId)) {
-        current.unreadCount += 1;
-      }
-      if (!current.lastAddedAt || current.lastAddedAt < row.addedAt) {
-        current.lastAddedAt = row.addedAt;
-      }
-      unreadByAuthor.set(row.authorId, current);
-    }
-
-    const unreadBacklog = [...unreadByAuthor.entries()]
-      .filter(([, row]) => row.unreadCount > 0)
-      .sort((a, b) => b[1].unreadCount - a[1].unreadCount || b[1].bookCount - a[1].bookCount)
-      .slice(0, limit)
-      .map(
-        ([id, row]): AuthorInsightsRow => ({
-          id,
-          name: row.name,
-          bookCount: row.bookCount,
-          lastAddedAt: row.lastAddedAt ? row.lastAddedAt.toISOString() : null,
-          metric: row.unreadCount,
-          secondaryMetric: row.bookCount,
-        }),
-      );
-
-    return {
-      generatedAt: new Date().toISOString(),
-      windowDays,
-      newAuthors: newRows.map((row) => this.mapInsightRow(row)),
-      mostRead: mostReadRows.filter((row) => row.metric > 0).map((row) => this.mapInsightRow(row)),
-      unreadBacklog,
-    };
   }
 
   async update(user: RequestUser, authorId: number, dto: UpdateAuthorDto): Promise<AuthorDetail> {
@@ -615,24 +504,6 @@ export class AuthorsService {
     };
   }
 
-  private mapInsightRow(row: {
-    id: number;
-    name: string;
-    bookCount: number;
-    lastAddedAt: Date | null;
-    metric: number;
-    secondaryMetric: number | null;
-  }): AuthorInsightsRow {
-    return {
-      id: row.id,
-      name: row.name,
-      bookCount: row.bookCount,
-      lastAddedAt: row.lastAddedAt ? row.lastAddedAt.toISOString() : null,
-      metric: row.metric,
-      secondaryMetric: row.secondaryMetric,
-    };
-  }
-
   private async refreshEnrichmentInternal(
     authorId: number,
   ): Promise<{ descriptionUpdated: boolean; imageUpdated: boolean; provider: string | null }> {
@@ -657,95 +528,6 @@ export class AuthorsService {
       imageUpdated: result.imageUpdated,
       provider: result.provider,
     };
-  }
-
-  private scorePotentialDuplicate(
-    left: { id: number; name: string; sortName: string | null },
-    right: { id: number; name: string; sortName: string | null },
-  ): { confidence: number; reasons: string[] } | null {
-    const leftSet = this.buildCanonicalSet(left.name, left.sortName);
-    const rightSet = this.buildCanonicalSet(right.name, right.sortName);
-
-    const reasons: string[] = [];
-    let confidence = 0;
-
-    for (const candidate of leftSet) {
-      if (candidate && rightSet.has(candidate)) {
-        confidence = Math.max(confidence, 0.98);
-        reasons.push('same canonical name');
-        break;
-      }
-    }
-
-    const leftPrimary = this.normalizeName(left.name);
-    const rightPrimary = this.normalizeName(right.name);
-
-    if (leftPrimary && rightPrimary) {
-      const similarity = this.diceCoefficient(leftPrimary, rightPrimary);
-      if (similarity >= 0.94) {
-        confidence = Math.max(confidence, 0.93);
-        reasons.push('very high name similarity');
-      } else if (similarity >= 0.88) {
-        confidence = Math.max(confidence, 0.86);
-        reasons.push('high name similarity');
-      }
-
-      if (leftPrimary.includes(rightPrimary) || rightPrimary.includes(leftPrimary)) {
-        confidence = Math.max(confidence, 0.84);
-        reasons.push('one name contains the other');
-      }
-    }
-
-    if (confidence === 0) return null;
-    return {
-      confidence: Math.round(confidence * 100) / 100,
-      reasons: [...new Set(reasons)],
-    };
-  }
-
-  private buildCanonicalSet(name: string, sortName: string | null): Set<string> {
-    const values = [name, sortName ?? ''].map((value) => this.normalizeName(value)).filter(Boolean);
-    return new Set(values);
-  }
-
-  private normalizeName(value: string): string {
-    return value
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  private diceCoefficient(left: string, right: string): number {
-    if (left === right) return 1;
-    if (left.length < 2 || right.length < 2) return 0;
-
-    const bigrams = (input: string): string[] => {
-      const parts: string[] = [];
-      for (let i = 0; i < input.length - 1; i += 1) {
-        parts.push(input.slice(i, i + 2));
-      }
-      return parts;
-    };
-
-    const leftPairs = bigrams(left);
-    const rightPairs = bigrams(right);
-    const leftCounts = new Map<string, number>();
-
-    for (const pair of leftPairs) {
-      leftCounts.set(pair, (leftCounts.get(pair) ?? 0) + 1);
-    }
-
-    let intersection = 0;
-    for (const pair of rightPairs) {
-      const count = leftCounts.get(pair) ?? 0;
-      if (count > 0) {
-        leftCounts.set(pair, count - 1);
-        intersection += 1;
-      }
-    }
-
-    return (2 * intersection) / (leftPairs.length + rightPairs.length);
   }
 
   private async sleep(ms: number): Promise<void> {

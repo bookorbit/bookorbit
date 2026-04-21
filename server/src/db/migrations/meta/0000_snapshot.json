@@ -1,5 +1,5 @@
 {
-  "id": "34c22f8f-a99c-4060-87e3-13c2a2216a65",
+  "id": "22ebd475-2378-4449-a919-bcaf86d4c48d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3466,6 +3466,22 @@
           "method": "btree",
           "with": {}
         },
+        "bm_language_trgm_idx": {
+          "name": "bm_language_trgm_idx",
+          "columns": [
+            {
+              "expression": "language",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
         "bm_published_year_idx": {
           "name": "bm_published_year_idx",
           "columns": [
@@ -3821,7 +3837,24 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "genres_name_trgm_idx": {
+          "name": "genres_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -3852,7 +3885,24 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "tags_name_trgm_idx": {
+          "name": "tags_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -8055,6 +8105,236 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dismissed_duplicate_pairs": {
+      "name": "dismissed_duplicate_pairs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id_a": {
+          "name": "entity_id_a",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id_b": {
+          "name": "entity_id_b",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_by": {
+          "name": "dismissed_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dismissed_duplicate_pairs_entity_a_idx": {
+          "name": "dismissed_duplicate_pairs_entity_a_idx",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id_a",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dismissed_duplicate_pairs_entity_b_idx": {
+          "name": "dismissed_duplicate_pairs_entity_b_idx",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id_b",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dismissed_duplicate_pairs_dismissed_by_users_id_fk": {
+          "name": "dismissed_duplicate_pairs_dismissed_by_users_id_fk",
+          "tableFrom": "dismissed_duplicate_pairs",
+          "tableTo": "users",
+          "columnsFrom": ["dismissed_by"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "dismissed_duplicate_pairs_unique": {
+          "name": "dismissed_duplicate_pairs_unique",
+          "nullsNotDistinct": false,
+          "columns": ["entity_type", "entity_id_a", "entity_id_b"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dismissed_inline_duplicate_pairs": {
+      "name": "dismissed_inline_duplicate_pairs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_a": {
+          "name": "value_a",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_b": {
+          "name": "value_b",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_by": {
+          "name": "dismissed_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dismissed_inline_pairs_entity_a_idx": {
+          "name": "dismissed_inline_pairs_entity_a_idx",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "value_a",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dismissed_inline_pairs_entity_b_idx": {
+          "name": "dismissed_inline_pairs_entity_b_idx",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "value_b",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dismissed_inline_duplicate_pairs_dismissed_by_users_id_fk": {
+          "name": "dismissed_inline_duplicate_pairs_dismissed_by_users_id_fk",
+          "tableFrom": "dismissed_inline_duplicate_pairs",
+          "tableTo": "users",
+          "columnsFrom": ["dismissed_by"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "dismissed_inline_duplicate_pairs_unique": {
+          "name": "dismissed_inline_duplicate_pairs_unique",
+          "nullsNotDistinct": false,
+          "columns": ["entity_type", "value_a", "value_b"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

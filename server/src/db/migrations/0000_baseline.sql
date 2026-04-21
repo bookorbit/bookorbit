@@ -867,6 +867,28 @@ CREATE TABLE "notifications" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "dismissed_duplicate_pairs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"entity_type" varchar(50) NOT NULL,
+	"entity_id_a" integer NOT NULL,
+	"entity_id_b" integer NOT NULL,
+	"reason" text,
+	"dismissed_by" integer NOT NULL,
+	"dismissed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "dismissed_duplicate_pairs_unique" UNIQUE("entity_type","entity_id_a","entity_id_b")
+);
+--> statement-breakpoint
+CREATE TABLE "dismissed_inline_duplicate_pairs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"entity_type" varchar(50) NOT NULL,
+	"value_a" varchar(500) NOT NULL,
+	"value_b" varchar(500) NOT NULL,
+	"reason" text,
+	"dismissed_by" integer NOT NULL,
+	"dismissed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "dismissed_inline_duplicate_pairs_unique" UNIQUE("entity_type","value_a","value_b")
+);
+--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -975,6 +997,8 @@ ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_book_file_id_book_fi
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_provider_id_email_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."email_providers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."email_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dismissed_duplicate_pairs" ADD CONSTRAINT "dismissed_duplicate_pairs_dismissed_by_users_id_fk" FOREIGN KEY ("dismissed_by") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dismissed_inline_duplicate_pairs" ADD CONSTRAINT "dismissed_inline_duplicate_pairs_dismissed_by_users_id_fk" FOREIGN KEY ("dismissed_by") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_audit_user_id" ON "audit_log" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_resource" ON "audit_log" USING btree ("resource","resource_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_action" ON "audit_log" USING btree ("action");--> statement-breakpoint
@@ -1028,6 +1052,7 @@ CREATE INDEX "bm_title_lower_idx" ON "book_metadata" USING btree (lower("title")
 CREATE INDEX "bm_series_trgm_idx" ON "book_metadata" USING gin ("series_name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_publisher_trgm_idx" ON "book_metadata" USING gin ("publisher" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_language_idx" ON "book_metadata" USING btree ("language");--> statement-breakpoint
+CREATE INDEX "bm_language_trgm_idx" ON "book_metadata" USING gin ("language" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_published_year_idx" ON "book_metadata" USING btree ("published_year");--> statement-breakpoint
 CREATE INDEX "bm_series_name_index_idx" ON "book_metadata" USING btree ("series_name","series_index");--> statement-breakpoint
 CREATE INDEX "bm_isbn10_idx" ON "book_metadata" USING btree ("isbn10");--> statement-breakpoint
@@ -1037,6 +1062,8 @@ CREATE INDEX "bmfq_status_idx" ON "book_metadata_fetch_queue" USING btree ("stat
 CREATE INDEX "bmfq_created_at_idx" ON "book_metadata_fetch_queue" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "bmfq_status_created_book_idx" ON "book_metadata_fetch_queue" USING btree ("status","created_at","book_id");--> statement-breakpoint
 CREATE INDEX "book_tags_tag_id_idx" ON "book_tags" USING btree ("tag_id");--> statement-breakpoint
+CREATE INDEX "genres_name_trgm_idx" ON "genres" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "tags_name_trgm_idx" ON "tags" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "book_narrators_narrator_id_idx" ON "book_narrators" USING btree ("narrator_id");--> statement-breakpoint
 CREATE INDEX "narrators_name_trgm_idx" ON "narrators" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE UNIQUE INDEX "library_dir_scan_state_folder_dir_uidx" ON "library_dir_scan_state" USING btree ("library_folder_id","dir_path");--> statement-breakpoint
@@ -1089,4 +1116,8 @@ CREATE INDEX "email_send_log_created_at_idx" ON "email_send_log" USING btree ("c
 CREATE INDEX "email_send_log_status_next_retry_idx" ON "email_send_log" USING btree ("status","next_retry_at");--> statement-breakpoint
 CREATE INDEX "notifications_user_id_idx" ON "notifications" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "notifications_user_unread_idx" ON "notifications" USING btree ("user_id","read");--> statement-breakpoint
-CREATE INDEX "notifications_created_at_idx" ON "notifications" USING btree ("created_at");
+CREATE INDEX "notifications_created_at_idx" ON "notifications" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "dismissed_duplicate_pairs_entity_a_idx" ON "dismissed_duplicate_pairs" USING btree ("entity_type","entity_id_a");--> statement-breakpoint
+CREATE INDEX "dismissed_duplicate_pairs_entity_b_idx" ON "dismissed_duplicate_pairs" USING btree ("entity_type","entity_id_b");--> statement-breakpoint
+CREATE INDEX "dismissed_inline_pairs_entity_a_idx" ON "dismissed_inline_duplicate_pairs" USING btree ("entity_type","value_a");--> statement-breakpoint
+CREATE INDEX "dismissed_inline_pairs_entity_b_idx" ON "dismissed_inline_duplicate_pairs" USING btree ("entity_type","value_b");

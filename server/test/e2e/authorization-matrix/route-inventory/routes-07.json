@@ -226,5 +226,65 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/tools/tools.controller.ts",
+    "className": "ToolsController",
+    "methodName": "scanAuthorDuplicates",
+    "httpMethod": "GET",
+    "path": "/tools/authors/duplicates/scan",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/tools/tools.controller.ts",
+    "className": "ToolsController",
+    "methodName": "merge",
+    "httpMethod": "POST",
+    "path": "/tools/authors/duplicates/merge",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/tools/tools.controller.ts",
+    "className": "ToolsController",
+    "methodName": "batchMerge",
+    "httpMethod": "POST",
+    "path": "/tools/authors/duplicates/batch-merge",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/tools/tools.controller.ts",
+    "className": "ToolsController",
+    "methodName": "dismiss",
+    "httpMethod": "POST",
+    "path": "/tools/authors/duplicates/dismiss",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/tools/tools.controller.ts",
+    "className": "ToolsController",
+    "methodName": "undismiss",
+    "httpMethod": "DELETE",
+    "path": "/tools/authors/duplicates/dismiss",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

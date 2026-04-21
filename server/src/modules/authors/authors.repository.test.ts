@@ -131,11 +131,6 @@ describe('AuthorsRepository', () => {
     await expect(repo.findVisibleAuthorIds([], [1])).resolves.toEqual([]);
     await expect(repo.findVisibleAuthorIds([1], [])).resolves.toEqual([]);
     await expect(repo.countDistinctBooks([])).resolves.toBe(0);
-    await expect(repo.findAuthorsForDuplicatePool([], 10)).resolves.toEqual([]);
-    await expect(repo.findAuthorsAddedSince([], new Date(), 10)).resolves.toEqual([]);
-    await expect(repo.findMostReadAuthors([], new Date(), 10)).resolves.toEqual([]);
-    await expect(repo.findAuthorBookPairs([])).resolves.toEqual([]);
-    await expect(repo.findStartedBookIdsForUser(1, [])).resolves.toEqual([]);
     await expect(repo.findRelatedLibraryIds([])).resolves.toEqual([]);
     await expect(repo.mergeAuthors(1, [])).resolves.toBeUndefined();
     await expect(repo.deleteAuthors([])).resolves.toBeUndefined();
@@ -155,13 +150,11 @@ describe('AuthorsRepository', () => {
   });
 
   it('converts sql numeric aggregates from strings to numbers', async () => {
-    const { db, selectBuilder, selectDistinctBuilder } = makeDb();
+    const { db, selectBuilder } = makeDb();
     selectBuilder.where.mockResolvedValueOnce([{ total: '4' }]);
-    selectDistinctBuilder.where.mockResolvedValueOnce([{ bookId: 91 }, { bookId: 92 }]);
     const repo = new AuthorsRepository(db as never);
 
     await expect(repo.countDistinctBooks([1, 2])).resolves.toBe(4);
-    await expect(repo.findStartedBookIdsForUser(7, [2])).resolves.toEqual([91, 92]);
   });
 
   it('findByIdForEnrichment returns null when no row is found', async () => {
@@ -331,43 +324,6 @@ describe('AuthorsRepository', () => {
     const repo = new AuthorsRepository(db as never);
 
     await expect(repo.updateAuthorDescriptionIfEmpty(12, 'Bio')).resolves.toBe(false);
-  });
-
-  it('returns author insight and pair query rows for non-empty libraries', async () => {
-    const { db, selectBuilder } = makeDb();
-    selectBuilder.limit
-      .mockResolvedValueOnce([{ id: 1, name: 'A' }])
-      .mockResolvedValueOnce([{ id: 2, name: 'B' }])
-      .mockResolvedValueOnce([{ id: 3, name: 'C', metric: 5 }]);
-    selectBuilder.where
-      .mockReturnValueOnce(selectBuilder)
-      .mockReturnValueOnce(selectBuilder)
-      .mockReturnValueOnce(selectBuilder)
-      .mockResolvedValueOnce([
-        {
-          authorId: 10,
-          name: 'Pair Author',
-          sortName: null,
-          description: null,
-          bookId: 88,
-          addedAt: new Date('2026-01-03T00:00:00Z'),
-        },
-      ]);
-    const repo = new AuthorsRepository(db as never);
-
-    await expect(repo.findAuthorsForDuplicatePool([1], 10)).resolves.toEqual([{ id: 1, name: 'A' }]);
-    await expect(repo.findAuthorsAddedSince([1], new Date('2026-01-01T00:00:00Z'), 10)).resolves.toEqual([{ id: 2, name: 'B' }]);
-    await expect(repo.findMostReadAuthors([1], new Date('2026-01-01T00:00:00Z'), 10)).resolves.toEqual([{ id: 3, name: 'C', metric: 5 }]);
-    await expect(repo.findAuthorBookPairs([1])).resolves.toEqual([
-      {
-        authorId: 10,
-        name: 'Pair Author',
-        sortName: null,
-        description: null,
-        bookId: 88,
-        addedAt: new Date('2026-01-03T00:00:00Z'),
-      },
-    ]);
   });
 
   it('mergeAuthors inserts deduplicated links and deletes source relations inside one transaction', async () => {

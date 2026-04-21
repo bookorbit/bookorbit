@@ -64,6 +64,13 @@ export enum AuditAction {
   AuthorEnrichmentResume = "author.enrichment.resume",
   AuthorEnrichmentCancel = "author.enrichment.cancel",
 
+  EntityManagerMerge = "entity_manager.merge",
+  EntityManagerRename = "entity_manager.rename",
+  EntityManagerDelete = "entity_manager.delete",
+  EntityManagerSplit = "entity_manager.split",
+  EntityManagerDismiss = "entity_manager.dismiss",
+  EntityManagerUndismiss = "entity_manager.undismiss",
+
   AppSettingsUpdate = "app_settings.update",
 
   KoboDeviceRegister = "kobo.device.register",
@@ -102,11 +109,17 @@ export enum AuditResource {
   BookBucketFile = "book_bucket_file",
   Author = "author",
   AppSettings = "app_settings",
+  Genre = "genre",
+  Tag = "tag",
   KoboDevice = "kobo_device",
   EmailProvider = "email_provider",
   EmailTemplate = "email_template",
   EmailRecipient = "email_recipient",
   EmailRecipientGroup = "email_recipient_group",
+  Narrator = "narrator",
+  Publisher = "publisher",
+  Language = "language",
+  Series = "series",
   OidcIdentity = "oidc_identity",
 }
 

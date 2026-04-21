@@ -17,6 +17,7 @@ const viewKey = computed(() => {
   const name = String(route.name)
   if (BOOK_ROUTE_NAMES.has(name)) return name
   if (name.startsWith('settings-')) return 'settings'
+  if (name.startsWith('tools-')) return 'tools'
   return route.path
 })
 </script>
@@ -32,7 +33,7 @@ const viewKey = computed(() => {
       <div class="px-4 pt-2 flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent">
         <router-view v-slot="{ Component }">
           <Transition name="page" mode="out-in">
-            <div :key="viewKey" :class="{ 'h-full': viewKey === 'settings' || BOOK_ROUTE_NAMES.has(viewKey) }">
+            <div :key="viewKey" :class="{ 'h-full': viewKey === 'settings' || viewKey === 'tools' || BOOK_ROUTE_NAMES.has(viewKey) }">
               <component :is="Component" />
             </div>
           </Transition>

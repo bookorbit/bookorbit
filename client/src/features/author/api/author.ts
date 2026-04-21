@@ -1,14 +1,5 @@
 import { api } from '@/lib/api'
-import type {
-  AuthorsPage,
-  AuthorDetail,
-  AuthorDuplicateSuggestion,
-  AuthorInsights,
-  AuthorMetadataCandidate,
-  AuthorMetadataProviderKey,
-  BooksPage,
-  MergeAuthorsResult,
-} from '@projectx/types'
+import type { AuthorsPage, AuthorDetail, AuthorMetadataCandidate, AuthorMetadataProviderKey, BooksPage, MergeAuthorsResult } from '@projectx/types'
 import type { AuthorBookSort, AuthorListSort, SortDirection } from '../types/author'
 
 type ListAuthorsParams = {
@@ -43,19 +34,6 @@ export type MergeAuthorsPayload = {
 
 export type DeleteAuthorsPayload = {
   authorIds: number[]
-}
-
-type AuthorInsightsParams = {
-  libraryId?: number | null
-  windowDays?: number
-  limit?: number
-}
-
-type DuplicateSuggestionsParams = {
-  libraryId?: number | null
-  limit?: number
-  poolSize?: number
-  minConfidence?: number
 }
 
 type AuthorMetadataSearchParams = {
@@ -159,29 +137,6 @@ export async function deleteAuthors(payload: DeleteAuthorsPayload): Promise<{ de
     body: JSON.stringify(payload),
   })
   if (!res.ok) throw new Error('Failed to delete authors')
-  return res.json()
-}
-
-export async function fetchAuthorInsights(params: AuthorInsightsParams): Promise<AuthorInsights> {
-  const query = toQuery({
-    libraryId: params.libraryId ?? undefined,
-    windowDays: params.windowDays ?? undefined,
-    limit: params.limit ?? undefined,
-  })
-  const res = await api(`/api/v1/authors/insights${query}`)
-  if (!res.ok) throw new Error('Failed to load author insights')
-  return res.json()
-}
-
-export async function fetchDuplicateAuthorSuggestions(params: DuplicateSuggestionsParams): Promise<AuthorDuplicateSuggestion[]> {
-  const query = toQuery({
-    libraryId: params.libraryId ?? undefined,
-    limit: params.limit ?? undefined,
-    poolSize: params.poolSize ?? undefined,
-    minConfidence: params.minConfidence ?? undefined,
-  })
-  const res = await api(`/api/v1/authors/suggestions/duplicates${query}`)
-  if (!res.ok) throw new Error('Failed to load duplicate suggestions')
   return res.json()
 }
 

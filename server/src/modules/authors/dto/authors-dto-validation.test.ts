@@ -7,10 +7,8 @@ import { AuthorMetadataProviderKey } from '@projectx/types';
 import { BulkAuthorIdsDto } from './bulk-author-ids.dto';
 import { DeleteAuthorsDto } from './delete-authors.dto';
 import { ListAuthorBooksDto } from './list-author-books.dto';
-import { ListAuthorInsightsDto } from './list-author-insights.dto';
 import { ListAuthorMetadataDto } from './list-author-metadata.dto';
 import { ListAuthorsDto } from './list-authors.dto';
-import { ListDuplicateSuggestionsDto } from './list-duplicate-suggestions.dto';
 import { LookupAuthorMetadataDto } from './lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './merge-authors.dto';
 import { PreviewAuthorEnrichmentCountDto } from './preview-author-enrichment-count.dto';
@@ -61,14 +59,10 @@ describe('Authors DTO validation', () => {
     expect((await errorsFor(ListAuthorsDto, { order: 'up' })).length).toBeGreaterThan(0);
   });
 
-  it('validates books/insights/suggestion query boundaries', async () => {
+  it('validates books query boundaries', async () => {
     expect((await errorsFor(ListAuthorBooksDto, { page: '0', size: '50', sort: 'title', order: 'asc', libraryId: '1' })).length).toBe(0);
-    expect((await errorsFor(ListAuthorInsightsDto, { libraryId: '1', windowDays: '30', limit: '10' })).length).toBe(0);
-    expect((await errorsFor(ListDuplicateSuggestionsDto, { libraryId: '1', limit: '50', poolSize: '200', minConfidence: '0.8' })).length).toBe(0);
 
     expect((await errorsFor(ListAuthorBooksDto, { size: '101' })).length).toBeGreaterThan(0);
-    expect((await errorsFor(ListAuthorInsightsDto, { windowDays: '366' })).length).toBeGreaterThan(0);
-    expect((await errorsFor(ListDuplicateSuggestionsDto, { minConfidence: '0.1' })).length).toBeGreaterThan(0);
   });
 
   it('normalizes metadata provider query values and rejects unknown providers', async () => {

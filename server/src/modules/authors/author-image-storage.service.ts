@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { lookup } from 'dns/promises';
-import { access, mkdir, readdir, stat, unlink, writeFile } from 'fs/promises';
+import { access, copyFile, mkdir, readdir, rm, stat, unlink, writeFile } from 'fs/promises';
 import { constants as fsConstants } from 'fs';
 import { isIP } from 'net';
 import { join } from 'path';
@@ -110,6 +110,41 @@ export class AuthorImageStorageService {
     } catch {
       return `/api/v1/authors/${authorId}/image`;
     }
+  }
+
+  async deleteAuthorDir(authorId: number): Promise<void> {
+    const dir = this.authorDir(authorId);
+    await rm(dir, { recursive: true, force: true }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[author.image.delete_dir] [fail] authorId=${authorId} error="${message.replace(/"/g, '\\"')}" - author image directory cleanup failed`,
+      );
+    });
+  }
+
+  async promoteImage(sourceAuthorId: number, targetAuthorId: number): Promise<boolean> {
+    const sourceDir = this.authorDir(sourceAuthorId);
+    const targetDir = this.authorDir(targetAuthorId);
+
+    const sourceFiles = await readdir(sourceDir).catch(() => [] as string[]);
+    const photoFile = sourceFiles.find((f) => f.startsWith('photo.'));
+    if (!photoFile) return false;
+
+    await mkdir(targetDir, { recursive: true });
+
+    const targetFiles = await readdir(targetDir).catch(() => [] as string[]);
+    for (const file of targetFiles.filter((f) => f.startsWith('photo.') || f === 'thumbnail.jpg')) {
+      await unlink(join(targetDir, file)).catch(() => {});
+    }
+
+    await copyFile(join(sourceDir, photoFile), join(targetDir, photoFile));
+    const thumbSource = join(sourceDir, 'thumbnail.jpg');
+    const thumbTarget = join(targetDir, 'thumbnail.jpg');
+    if (await this.isReadable(thumbSource)) {
+      await copyFile(thumbSource, thumbTarget);
+    }
+
+    return true;
   }
 
   private authorDir(authorId: number): string {

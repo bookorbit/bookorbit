@@ -63,5 +63,6 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider];
     AuthorsService,
     AuthorsRepository,
   ],
+  exports: [AuthorsService, AuthorsRepository, AuthorImageStorageService, AuthorEnrichmentOrchestratorService],
 })
 export class AuthorsModule {}
