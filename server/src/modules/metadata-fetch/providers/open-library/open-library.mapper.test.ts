@@ -122,5 +122,17 @@ describe('OpenLibraryMapper', () => {
 
       expect(result.publishedYear).toBeUndefined();
     });
+
+    it('should return undefined for a sub-4-digit publish date', () => {
+      const mockWork: Partial<OpenLibraryWork> = {
+        key: '/works/OL1',
+        title: 'Short Date',
+        first_publish_date: '19',
+      };
+
+      const result = mapOpenLibraryWork(mockWork as OpenLibraryWork);
+
+      expect(result.publishedYear).toBeUndefined();
+    });
   });
 });

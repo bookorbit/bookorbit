@@ -5,7 +5,8 @@ import { GoogleVolumeItem } from './google.types';
 function parseYear(dateString: string | undefined): number | undefined {
   if (!dateString) return undefined;
   const year = parseInt(dateString.substring(0, 4), 10);
-  return Number.isNaN(year) ? undefined : year;
+  if (Number.isNaN(year) || year < 1000 || year > 2200) return undefined;
+  return year;
 }
 
 export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {

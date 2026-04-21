@@ -1,6 +1,6 @@
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
-import { EPUB_PROVIDER_IDENTIFIER_PREFIXES } from '../../file-write.constants';
+import { EPUB_PROVIDER_IDENTIFIER_SCHEMES } from '../../file-write.constants';
 import { BOOKORBIT_NS_PREFIX as APP_WRITE_NAMESPACE, BOOKORBIT_NS_URI as APP_NS_URI } from '../shared/bookorbit-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 
@@ -264,11 +264,11 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
     }
   }
 
-  // Provider identifiers - plain dc:identifier with urn: text, no scheme/id attributes (matches Booklore)
+  // Provider identifiers — opf:scheme attribute style (interoperable with Calibre and most readers)
   for (const field of EPUB_PROVIDER_IDENTIFIER_KEYS) {
     const value = payload[field];
     if (typeof value === 'string' && value !== '') {
-      nodes.push(makeTextNode('dc:identifier', `${EPUB_PROVIDER_IDENTIFIER_PREFIXES[field]}${value}`));
+      nodes.push(makeTextNode('dc:identifier', value, { '@_opf:scheme': EPUB_PROVIDER_IDENTIFIER_SCHEMES[field] }));
     }
   }
 
@@ -350,6 +350,13 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
     }
   }
 
+  // Ensure xmlns:opf is declared so opf:scheme attributes on dc:identifier (and opf:role/opf:file-as
+  // on dc:creator in EPUB2) resolve to a bound namespace. Many EPUB3 files omit this declaration;
+  // adding it to <package> is valid and covers the whole subtree.
+  if (!attr(pkgAttrs, '@_xmlns:opf')) {
+    pkgAttrs['@_xmlns:opf'] = 'http://www.idpf.org/2007/opf';
+  }
+
   const pkgContent = getPkgContentAll(pkgNode);
   const metaChildren = findMetadataChildren(pkgContent);
   const { cleaned, uidNode } = stripMetadata(metaChildren, uidRef);
@@ -362,5 +369,5 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
   return { newOpfXml, fieldsWritten: resolveFieldsWritten(payload) };
 }
 
-type EpubProviderIdentifierKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_PREFIXES;
-const EPUB_PROVIDER_IDENTIFIER_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_PREFIXES) as EpubProviderIdentifierKey[];
+type EpubProviderIdentifierKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_SCHEMES;
+const EPUB_PROVIDER_IDENTIFIER_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_SCHEMES) as EpubProviderIdentifierKey[];

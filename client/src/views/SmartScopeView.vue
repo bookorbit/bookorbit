@@ -12,6 +12,7 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import { toast } from 'vue-sonner'
 import { useSmartScope } from '@/features/smart-scope/composables/useSmartScope'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
@@ -167,9 +168,13 @@ async function handleDelete() {
     return
   }
   deleting.value = true
+  const name = smartScope.value?.name ?? 'Smart scope'
   try {
     await deleteSmartScope(smartScopeId.value)
-    router.push({ name: 'home' })
+    toast.success(`"${name}" deleted`)
+    router.push({ name: 'dashboard' })
+  } catch {
+    toast.error(`Failed to delete "${name}"`)
   } finally {
     deleting.value = false
     confirmSmartScopeDelete.value = false

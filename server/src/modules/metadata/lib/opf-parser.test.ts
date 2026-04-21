@@ -138,6 +138,25 @@ describe('parseOpf', () => {
   });
 
   describe('ISBN parsing', () => {
+    it('detects bare ISBN-13 from unique identifier with no scheme', () => {
+      const xml = epub3Opf(`<dc:identifier id="bookid">9780008337193</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.isbn13).toBe('9780008337193');
+    });
+
+    it('detects bare ISBN-10 from identifier with no scheme', () => {
+      const xml = epub2Opf(`<dc:identifier id="bookid">0441013597</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.isbn10).toBe('0441013597');
+    });
+
+    it('does not treat a short numeric id with no scheme as an ISBN', () => {
+      const xml = epub2Opf(`<dc:identifier id="bookid">12345</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.isbn10).toBeNull();
+      expect(r.isbn13).toBeNull();
+    });
+
     it('parses ISBN-13 from identifier with scheme isbn', () => {
       const xml = epub2Opf(`
         <dc:identifier opf:scheme="ISBN">9780441013593</dc:identifier>
@@ -272,18 +291,122 @@ describe('parseOpf', () => {
       expect(parseOpf(xml).description).toBe('A science fiction classic.');
     });
 
-    it('parses tags from subject elements', () => {
+    it('parses genres from subject elements', () => {
       const xml = epub2Opf(`
         <dc:subject>Science Fiction</dc:subject>
         <dc:subject>Space Opera</dc:subject>
       `);
       const r = parseOpf(xml);
-      expect(r.tags).toEqual(['Science Fiction', 'Space Opera']);
+      expect(r.genres).toEqual(['Science Fiction', 'Space Opera']);
+      expect(r.tags).toHaveLength(0);
     });
 
-    it('returns empty tags array when no subjects', () => {
+    it('returns empty tags array when no bookorbit:tags meta', () => {
       const r = parseOpf(epub2Opf(''));
       expect(r.tags).toHaveLength(0);
+    });
+  });
+
+  describe('provider identifiers', () => {
+    it('parses Google Books ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="GOOGLE">RPyFDwAAQBAJ</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.googleBooksId).toBe('RPyFDwAAQBAJ');
+    });
+
+    it('parses Amazon ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="AMAZON">198893706X</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.amazonId).toBe('198893706X');
+    });
+
+    it('parses Goodreads ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="GOODREADS">42129393</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.goodreadsId).toBe('42129393');
+    });
+
+    it('parses OpenLibrary ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="OPENLIBRARY">OL20652610W</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.openLibraryId).toBe('OL20652610W');
+    });
+
+    it('parses Hardcover ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="HARDCOVER">new-orleans-rush</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.hardcoverId).toBe('new-orleans-rush');
+    });
+
+    it('parses iTunes ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="ITUNES">123456789</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.itunesId).toBe('123456789');
+    });
+
+    it('parses provider IDs from legacy urn: format (backward compat)', () => {
+      const xml = epub2Opf(`
+        <dc:identifier>urn:google:RPyFDwAAQBAJ</dc:identifier>
+        <dc:identifier>urn:amazon:198893706X</dc:identifier>
+        <dc:identifier>urn:goodreads:42129393</dc:identifier>
+        <dc:identifier>urn:openlibrary:OL20652610W</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.googleBooksId).toBe('RPyFDwAAQBAJ');
+      expect(r.amazonId).toBe('198893706X');
+      expect(r.goodreadsId).toBe('42129393');
+      expect(r.openLibraryId).toBe('OL20652610W');
+    });
+
+    it('opf:scheme format wins over urn: when both are present for the same provider', () => {
+      // urn: appears first in document order — scheme should still win
+      const xml = epub2Opf(`
+        <dc:identifier>urn:google:OLD_URN_VALUE</dc:identifier>
+        <dc:identifier opf:scheme="GOOGLE">SCHEME_VALUE</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.googleBooksId).toBe('SCHEME_VALUE');
+    });
+
+    it('opf:scheme wins even when urn: appears after it in document order', () => {
+      const xml = epub2Opf(`
+        <dc:identifier opf:scheme="AMAZON">SCHEME_ASIN</dc:identifier>
+        <dc:identifier>urn:amazon:URN_ASIN</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.amazonId).toBe('SCHEME_ASIN');
+    });
+
+    it('parses all providers together from a mixed real-world file (opf:scheme format)', () => {
+      const xml = epub2Opf(`
+        <dc:identifier opf:scheme="ISBN">9781635766271</dc:identifier>
+        <dc:identifier opf:scheme="GOOGLE">RPyFDwAAQBAJ</dc:identifier>
+        <dc:identifier opf:scheme="AMAZON">198893706X</dc:identifier>
+        <dc:identifier opf:scheme="GOODREADS">42129393</dc:identifier>
+        <dc:identifier opf:scheme="OPENLIBRARY">OL20652610W</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.isbn13).toBe('9781635766271');
+      expect(r.googleBooksId).toBe('RPyFDwAAQBAJ');
+      expect(r.amazonId).toBe('198893706X');
+      expect(r.goodreadsId).toBe('42129393');
+      expect(r.openLibraryId).toBe('OL20652610W');
+    });
+
+    it('is case-insensitive for opf:scheme values', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="google">lowercaseId</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.googleBooksId).toBe('lowercaseId');
+    });
+
+    it('returns null for all provider IDs when no identifiers present', () => {
+      const r = parseOpf(epub2Opf(''));
+      expect(r.googleBooksId).toBeNull();
+      expect(r.amazonId).toBeNull();
+      expect(r.goodreadsId).toBeNull();
+      expect(r.hardcoverId).toBeNull();
+      expect(r.openLibraryId).toBeNull();
+      expect(r.itunesId).toBeNull();
     });
   });
 

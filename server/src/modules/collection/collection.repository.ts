@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { books, collectionBooks, collections } from '../../db/schema';
+import { bookMetadata, books, collectionBooks, collections } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -109,11 +109,17 @@ export class CollectionRepository {
         .select({ bookId: collectionBooks.bookId })
         .from(collectionBooks)
         .innerJoin(books, eq(books.id, collectionBooks.bookId))
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(where)
         .orderBy(collectionBooks.addedAt, collectionBooks.bookId)
         .limit(size)
         .offset(page * size),
-      this.db.select({ total: count() }).from(collectionBooks).innerJoin(books, eq(books.id, collectionBooks.bookId)).where(where),
+      this.db
+        .select({ total: count() })
+        .from(collectionBooks)
+        .innerJoin(books, eq(books.id, collectionBooks.bookId))
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(where),
     ]);
 
     return {
@@ -130,6 +136,7 @@ export class CollectionRepository {
       .select({ bookId: collectionBooks.bookId })
       .from(collectionBooks)
       .innerJoin(books, eq(books.id, collectionBooks.bookId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(and(eq(collectionBooks.collectionId, collectionId), inArray(books.libraryId, libraryIds), ...(extraWhere ? [extraWhere] : [])))
       .orderBy(collectionBooks.addedAt, collectionBooks.bookId);
     return rows.map((row) => row.bookId);

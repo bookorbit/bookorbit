@@ -62,12 +62,14 @@ describe('CollectionRepository', () => {
     const firstLimit = vi.fn().mockReturnValue({ offset: firstOffset });
     const firstOrderBy = vi.fn().mockReturnValue({ limit: firstLimit });
     const firstWhere = vi.fn().mockReturnValue({ orderBy: firstOrderBy });
-    const firstInnerJoin = vi.fn().mockReturnValue({ where: firstWhere });
+    const firstInnerJoin2 = vi.fn().mockReturnValue({ where: firstWhere });
+    const firstInnerJoin = vi.fn().mockReturnValue({ innerJoin: firstInnerJoin2 });
     const firstFrom = vi.fn().mockReturnValue({ innerJoin: firstInnerJoin });
     const firstSelect = { from: firstFrom };
 
     const secondWhere = vi.fn().mockResolvedValue([{ total: '2' }]);
-    const secondInnerJoin = vi.fn().mockReturnValue({ where: secondWhere });
+    const secondInnerJoin2 = vi.fn().mockReturnValue({ where: secondWhere });
+    const secondInnerJoin = vi.fn().mockReturnValue({ innerJoin: secondInnerJoin2 });
     const secondFrom = vi.fn().mockReturnValue({ innerJoin: secondInnerJoin });
     const secondSelect = { from: secondFrom };
 

@@ -54,6 +54,9 @@ export class SmartScopeService {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     return Promise.all(
       smartScopes.map(async (smartScope) => {
+        if (!smartScope.filter) {
+          return { ...smartScope, bookCount: 0 };
+        }
         const where = this.queryBuilder.buildWhere(smartScope.filter, { accessibleLibraryIds, userId: user.id });
         const bookCount = await this.bookReadService.countWhere(where);
         return { ...smartScope, bookCount };
@@ -125,6 +128,11 @@ export class SmartScopeService {
   async executeSmartScope(id: number, user: RequestUser, page: number, size: number, q?: string): Promise<BooksPage> {
     const smartScope = await this.getSmartScopeOrThrow(id);
     this.assertReadAccess(smartScope, user);
+
+    if (!smartScope.filter) {
+      return { items: [], total: 0, page, size };
+    }
+
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
 
     const where = this.queryBuilder.buildWhere(smartScope.filter, { accessibleLibraryIds, userId: user.id, q });

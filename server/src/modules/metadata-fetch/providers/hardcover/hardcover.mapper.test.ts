@@ -87,6 +87,16 @@ describe('mapSearchDocument', () => {
     expect(mapSearchDocument(doc).publishedYear).toBeUndefined();
   });
 
+  it('returns undefined publishedYear when release_year is out of range', () => {
+    const doc: HardcoverSearchDocument = { ...baseDocument, release_year: 19, release_date: undefined };
+    expect(mapSearchDocument(doc).publishedYear).toBeUndefined();
+  });
+
+  it('returns undefined publishedYear when release_date is sub-4-digit', () => {
+    const doc: HardcoverSearchDocument = { ...baseDocument, release_year: undefined, release_date: '19' };
+    expect(mapSearchDocument(doc).publishedYear).toBeUndefined();
+  });
+
   it('picks isbn13 and isbn10 from the isbns array', () => {
     const doc: HardcoverSearchDocument = { ...baseDocument, isbns: ['9780756404079', '0756404079', '9990000000000'] };
     const result = mapSearchDocument(doc);

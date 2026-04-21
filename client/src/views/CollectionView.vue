@@ -158,18 +158,8 @@ async function handleRemoveFromCollection() {
   }
 }
 
-function handleCollectionDeleted(deletedId: number) {
+function handleCollectionDeleted() {
   editCollectionOpen.value = false
-  collectionNotFound.value = false
-
-  const nextCollection = collections.value.find((item) => item.id !== deletedId)
-  if (nextCollection) {
-    router.replace({ name: 'collection', params: { id: nextCollection.id } })
-  } else {
-    router.replace({ name: 'dashboard' })
-  }
-
-  toast.success('Collection deleted')
 }
 
 function isMobileViewport() {

@@ -192,42 +192,69 @@ export function parseOpf(xml: string): ParsedOpf {
     authors.push({ name, sortName: sortName?.trim() || null });
   }
 
-  // ── Identifiers → ISBN ─────────────────────────────────────────────────────
+  // ── Identifiers → ISBN + provider IDs ─────────────────────────────────────
   let isbn10: string | null = null;
   let isbn13: string | null = null;
-  let googleBooksId: string | null = null;
-  let goodreadsId: string | null = null;
-  let amazonId: string | null = null;
-  let hardcoverId: string | null = null;
-  let openLibraryId: string | null = null;
-  let itunesId: string | null = null;
+
+  // Two-pass collection: opf:scheme-based identifiers take priority over urn:-based ones
+  // regardless of document order. Collect both sets first, then resolve.
+  let schemeGoogleBooksId: string | null = null;
+  let schemeGoodreadsId: string | null = null;
+  let schemeAmazonId: string | null = null;
+  let schemeHardcoverId: string | null = null;
+  let schemeOpenLibraryId: string | null = null;
+  let schemeItunesId: string | null = null;
+
+  let urnGoogleBooksId: string | null = null;
+  let urnGoodreadsId: string | null = null;
+  let urnAmazonId: string | null = null;
+  let urnHardcoverId: string | null = null;
+  let urnOpenLibraryId: string | null = null;
+  let urnItunesId: string | null = null;
 
   for (const ident of toArray(metadata['identifier'])) {
     const mo = (typeof ident === 'object' && ident !== null ? ident : {}) as Record<string, unknown>;
-    const scheme = ((mo['@_opf:scheme'] ?? mo['@_scheme'] ?? '') as string).toLowerCase();
+    const scheme = ((mo['@_opf:scheme'] ?? mo['@_scheme'] ?? '') as string).toLowerCase().trim();
     const value = getText(ident);
     if (!value) continue;
 
-    if (scheme === 'isbn' || value.toLowerCase().includes('isbn')) {
+    const looksLikeBareIsbn = scheme === '' && /^[\d\s-]{9,17}$/.test(value) && /^\d{9}[\dX]$|^\d{13}$/.test(value.replace(/[\s-]/g, ''));
+    if (scheme === 'isbn' || value.toLowerCase().includes('isbn') || looksLikeBareIsbn) {
       const parsed = parseIsbn(value);
       isbn10 ??= parsed.isbn10;
       isbn13 ??= parsed.isbn13;
     }
 
-    if (value.startsWith('urn:goodreads:')) goodreadsId ??= value.slice('urn:goodreads:'.length) || null;
-    if (value.startsWith('urn:amazon:')) amazonId ??= value.slice('urn:amazon:'.length) || null;
-    if (value.startsWith('urn:hardcover:')) hardcoverId ??= value.slice('urn:hardcover:'.length) || null;
-    if (value.startsWith('urn:google:')) googleBooksId ??= value.slice('urn:google:'.length) || null;
-    if (value.startsWith('urn:openlibrary:')) openLibraryId ??= value.slice('urn:openlibrary:'.length) || null;
-    if (value.startsWith('urn:itunes:')) itunesId ??= value.slice('urn:itunes:'.length) || null;
+    // opf:scheme-based provider identifiers (preferred format)
+    if (scheme === 'google') schemeGoogleBooksId ??= value || null;
+    if (scheme === 'amazon') schemeAmazonId ??= value || null;
+    if (scheme === 'goodreads') schemeGoodreadsId ??= value || null;
+    if (scheme === 'hardcover') schemeHardcoverId ??= value || null;
+    if (scheme === 'openlibrary') schemeOpenLibraryId ??= value || null;
+    if (scheme === 'itunes') schemeItunesId ??= value || null;
+
+    // urn:-prefixed provider identifiers (legacy / backward-compat)
+    if (value.startsWith('urn:goodreads:')) urnGoodreadsId ??= value.slice('urn:goodreads:'.length) || null;
+    if (value.startsWith('urn:amazon:')) urnAmazonId ??= value.slice('urn:amazon:'.length) || null;
+    if (value.startsWith('urn:hardcover:')) urnHardcoverId ??= value.slice('urn:hardcover:'.length) || null;
+    if (value.startsWith('urn:google:')) urnGoogleBooksId ??= value.slice('urn:google:'.length) || null;
+    if (value.startsWith('urn:openlibrary:')) urnOpenLibraryId ??= value.slice('urn:openlibrary:'.length) || null;
+    if (value.startsWith('urn:itunes:')) urnItunesId ??= value.slice('urn:itunes:'.length) || null;
   }
+
+  // opf:scheme wins over urn: when both are present
+  const googleBooksId = schemeGoogleBooksId ?? urnGoogleBooksId;
+  const goodreadsId = schemeGoodreadsId ?? urnGoodreadsId;
+  const amazonId = schemeAmazonId ?? urnAmazonId;
+  const hardcoverId = schemeHardcoverId ?? urnHardcoverId;
+  const openLibraryId = schemeOpenLibraryId ?? urnOpenLibraryId;
+  const itunesId = schemeItunesId ?? urnItunesId;
 
   isbn10 ??= propertyMeta('bookorbit:isbn10') ?? namedMeta('bookorbit:isbn10');
 
   // ── Genres and tags ────────────────────────────────────────────────────────
   const genres = toArray(metadata['subject']).map(getText).filter(Boolean);
-  const bookOrbitTags = parseBookOrbitTags(propertyMeta('bookorbit:tags') ?? namedMeta('bookorbit:tags'));
-  const tags = bookOrbitTags.length > 0 ? bookOrbitTags : genres;
+  const tags = parseBookOrbitTags(propertyMeta('bookorbit:tags') ?? namedMeta('bookorbit:tags'));
   const pageCount = parseNumber(propertyMeta('bookorbit:page_count') ?? namedMeta('bookorbit:page_count'));
   const rating = parseNumber(propertyMeta('bookorbit:rating') ?? namedMeta('bookorbit:rating'));
 

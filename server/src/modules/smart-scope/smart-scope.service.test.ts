@@ -90,7 +90,7 @@ describe('SmartScopeService', () => {
     await expect(service.findOne(5, makeUser({ id: 12 }))).resolves.toEqual(smartScope);
   });
 
-  it('findAll builds counts with user-accessible library IDs', async () => {
+  it('findAll returns bookCount=0 without querying for filter-less smart scopes', async () => {
     const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService } = makeService();
     const user = makeUser({ id: 8 });
     const firstSmartScope = makeSmartScope({ id: 1, filter: null });
@@ -101,15 +101,15 @@ describe('SmartScopeService', () => {
 
     smartScopeRepo.findAllForUser.mockResolvedValue([firstSmartScope, secondSmartScope]);
     libraryService.findAccessibleLibraryIds.mockResolvedValue([2, 3]);
-    queryBuilder.buildWhere.mockReturnValueOnce('where-1').mockReturnValueOnce('where-2');
-    bookReadService.countWhere.mockResolvedValueOnce(4).mockResolvedValueOnce(7);
+    queryBuilder.buildWhere.mockReturnValueOnce('where-2');
+    bookReadService.countWhere.mockResolvedValueOnce(7);
 
     const result = await service.findAll(user);
 
-    expect(queryBuilder.buildWhere).toHaveBeenNthCalledWith(1, firstSmartScope.filter, { accessibleLibraryIds: [2, 3], userId: 8 });
-    expect(queryBuilder.buildWhere).toHaveBeenNthCalledWith(2, secondSmartScope.filter, { accessibleLibraryIds: [2, 3], userId: 8 });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(1);
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(secondSmartScope.filter, { accessibleLibraryIds: [2, 3], userId: 8 });
     expect(result).toEqual([
-      { ...firstSmartScope, bookCount: 4 },
+      { ...firstSmartScope, bookCount: 0 },
       { ...secondSmartScope, bookCount: 7 },
     ]);
   });
@@ -271,6 +271,18 @@ describe('SmartScopeService', () => {
     smartScopeRepo.findById.mockResolvedValue([makeSmartScope({ userId: 100, isPublic: false })]);
 
     await expect(service.executeSmartScope(5, makeUser({ id: 12, isSuperuser: false }), 0, 20)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('executeSmartScope returns empty page without querying when filter is null', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService } = makeService();
+    smartScopeRepo.findById.mockResolvedValue([makeSmartScope({ id: 5, userId: 12, filter: null })]);
+
+    const result = await service.executeSmartScope(5, makeUser({ id: 12 }), 0, 25);
+
+    expect(libraryService.findAccessibleLibraryIds).not.toHaveBeenCalled();
+    expect(queryBuilder.buildWhere).not.toHaveBeenCalled();
+    expect(bookReadService.findCards).not.toHaveBeenCalled();
+    expect(result).toEqual({ items: [], total: 0, page: 0, size: 25 });
   });
 
   it('executeSmartScope builds query and returns paginated books page', async () => {

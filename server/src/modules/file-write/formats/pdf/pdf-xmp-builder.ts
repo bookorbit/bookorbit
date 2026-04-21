@@ -1,5 +1,5 @@
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
-import { EPUB_PROVIDER_IDENTIFIER_PREFIXES } from '../../file-write.constants';
+import { EPUB_PROVIDER_IDENTIFIER_SCHEMES } from '../../file-write.constants';
 import { BOOKORBIT_NS_PREFIX, BOOKORBIT_NS_URI } from '../shared/bookorbit-ns';
 
 function escapeXml(value: string): string {
@@ -119,5 +119,5 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
   ].join('\n');
 }
 
-type ProviderIdKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_PREFIXES;
-const PROVIDER_ID_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_PREFIXES) as ProviderIdKey[];
+type ProviderIdKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_SCHEMES;
+const PROVIDER_ID_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_SCHEMES) as ProviderIdKey[];

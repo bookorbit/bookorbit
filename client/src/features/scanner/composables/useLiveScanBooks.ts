@@ -20,15 +20,24 @@ export function useLiveScanBooks(libraryId: Ref<number | null>, existingBooks: R
     const batch = buffer
     buffer = []
 
+    const batchById = new Map(batch.map((b) => [b.id, b]))
     const existingIdSet = new Set(existingBooks.value.map((b) => b.id))
-    const deduped = batch.filter((b) => !existingIdSet.has(b.id))
-    if (deduped.length === 0) return
 
-    existingBooks.value = [...deduped, ...existingBooks.value]
-    if (total) total.value += deduped.length
+    const newBooks = batch.filter((b) => !existingIdSet.has(b.id))
+    const hasUpdates = batch.some((b) => existingIdSet.has(b.id))
 
-    if (deduped.length <= ANIMATE_BATCH_LIMIT) {
-      const ids = new Set(deduped.map((b) => b.id))
+    if (newBooks.length === 0 && !hasUpdates) return
+
+    let updated = existingBooks.value
+    if (hasUpdates) {
+      updated = existingBooks.value.map((b) => batchById.get(b.id) ?? b)
+    }
+
+    existingBooks.value = newBooks.length > 0 ? [...newBooks, ...updated] : updated
+    if (newBooks.length > 0 && total) total.value += newBooks.length
+
+    if (newBooks.length > 0 && newBooks.length <= ANIMATE_BATCH_LIMIT) {
+      const ids = new Set(newBooks.map((b) => b.id))
       newBookIds.value = new Set([...newBookIds.value, ...ids])
       setTimeout(() => {
         const current = new Set(newBookIds.value)

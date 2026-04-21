@@ -73,6 +73,19 @@ describe('GoogleMapper', () => {
     expect(result.publishedYear).toBe(1925);
   });
 
+  it('should return undefined for a sub-4-digit publishedDate', () => {
+    const mockItem: Partial<GoogleVolumeItem> = {
+      id: 'vol123',
+      volumeInfo: {
+        title: 'Short Date',
+        publishedDate: '19',
+      } as any,
+    };
+
+    const result = mapGoogleVolume(mockItem as GoogleVolumeItem);
+    expect(result.publishedYear).toBeUndefined();
+  });
+
   it('should handle missing industryIdentifiers', () => {
     const mockItem: Partial<GoogleVolumeItem> = {
       id: 'vol123',

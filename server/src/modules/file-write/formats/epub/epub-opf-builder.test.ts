@@ -62,6 +62,87 @@ describe('epub-opf-builder', () => {
     expect(result.fieldsWritten).toEqual(['title', 'subtitle', 'authors', 'genres', 'seriesName', 'seriesIndex', 'tags']);
   });
 
+  it('writes provider IDs using opf:scheme attribute format', () => {
+    const opf = `
+      <package version="2.0" unique-identifier="uid">
+        <metadata xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, {
+      googleBooksId: 'RPyFDwAAQBAJ',
+      amazonId: '198893706X',
+      goodreadsId: '42129393',
+      openLibraryId: 'OL20652610W',
+      hardcoverId: 'new-orleans-rush',
+      itunesId: '123456789',
+    });
+
+    expect(result.newOpfXml).toContain('opf:scheme="GOOGLE"');
+    expect(result.newOpfXml).toContain('>RPyFDwAAQBAJ<');
+    expect(result.newOpfXml).toContain('opf:scheme="AMAZON"');
+    expect(result.newOpfXml).toContain('>198893706X<');
+    expect(result.newOpfXml).toContain('opf:scheme="GOODREADS"');
+    expect(result.newOpfXml).toContain('opf:scheme="OPENLIBRARY"');
+    expect(result.newOpfXml).toContain('opf:scheme="HARDCOVER"');
+    expect(result.newOpfXml).toContain('opf:scheme="ITUNES"');
+    // Must not use old urn: prefix style
+    expect(result.newOpfXml).not.toContain('urn:google:');
+    expect(result.newOpfXml).not.toContain('urn:amazon:');
+    expect(result.newOpfXml).not.toContain('urn:goodreads:');
+  });
+
+  it('adds xmlns:opf to <package> when not already declared', () => {
+    const opf = `
+      <package version="3.0" unique-identifier="uid">
+        <metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, { googleBooksId: 'testId' });
+
+    expect(result.newOpfXml).toContain('xmlns:opf="http://www.idpf.org/2007/opf"');
+  });
+
+  it('does not duplicate xmlns:opf when already present on <package>', () => {
+    const opf = `
+      <package version="2.0" unique-identifier="uid" xmlns:opf="http://www.idpf.org/2007/opf">
+        <metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, { googleBooksId: 'testId' });
+
+    const count = (result.newOpfXml.match(/xmlns:opf/g) ?? []).length;
+    expect(count).toBe(1);
+  });
+
+  it('strips legacy urn: provider identifiers and replaces with opf:scheme format', () => {
+    const opf = `
+      <package version="2.0" unique-identifier="uid" xmlns:opf="http://www.idpf.org/2007/opf">
+        <metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+          <dc:identifier>urn:google:OLD_VALUE</dc:identifier>
+          <dc:identifier>urn:amazon:OLD_ASIN</dc:identifier>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, { googleBooksId: 'NEW_GOOGLE', amazonId: 'NEW_ASIN' });
+
+    expect(result.newOpfXml).toContain('opf:scheme="GOOGLE"');
+    expect(result.newOpfXml).toContain('>NEW_GOOGLE<');
+    expect(result.newOpfXml).not.toContain('urn:google:');
+    expect(result.newOpfXml).not.toContain('OLD_VALUE');
+    expect(result.newOpfXml).not.toContain('OLD_ASIN');
+  });
+
   it('supports OPF documents with opf:metadata element', () => {
     const opf = `
       <package version="2.0" unique-identifier="uid">

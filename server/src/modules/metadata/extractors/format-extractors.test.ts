@@ -96,7 +96,49 @@ describe('metadata format extractors', () => {
     await expect(new EpubFormatExtractor().extract('/books/test.epub')).resolves.toBeNull();
   });
 
-  it('epub extractor falls back to tags when genres are missing and tolerates cover extraction errors', async () => {
+  it('epub extractor maps all ParsedOpf fields including external IDs, pageCount, rating, and tags', async () => {
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: 'Book One',
+      description: 'A classic',
+      isbn10: null,
+      isbn13: '9780441013593',
+      publisher: 'Ace',
+      publishedYear: 1965,
+      language: 'en',
+      seriesName: 'Dune Chronicles',
+      seriesIndex: 1,
+      authors: [{ name: 'Frank Herbert', sortName: null }],
+      genres: ['Science Fiction'],
+      tags: ['SF', 'Classic'],
+      rating: 9,
+      pageCount: 412,
+      googleBooksId: 'abc123',
+      goodreadsId: '234248',
+      amazonId: 'B00B7NPRY8',
+      hardcoverId: null,
+      openLibraryId: 'OL7353617M',
+      itunesId: null,
+    });
+    mockExtractEpubCover.mockResolvedValue(Buffer.from('cover'));
+
+    await expect(new EpubFormatExtractor().extract('/books/dune.epub')).resolves.toEqual(
+      expect.objectContaining({
+        title: 'Dune',
+        isbn13: '9780441013593',
+        genres: ['Science Fiction'],
+        tags: ['SF', 'Classic'],
+        rating: 9,
+        pageCount: 412,
+        googleBooksId: 'abc123',
+        goodreadsId: '234248',
+        amazonId: 'B00B7NPRY8',
+        openLibraryId: 'OL7353617M',
+      }),
+    );
+  });
+
+  it('epub extractor returns genres and tags separately and tolerates cover extraction errors', async () => {
     mockExtractEpubMetadata.mockResolvedValue({
       title: 'Dune',
       subtitle: 'Book One',
@@ -111,13 +153,22 @@ describe('metadata format extractors', () => {
       authors: [{ name: 'Frank Herbert', sortName: null }],
       genres: [],
       tags: ['Science Fiction'],
+      rating: null,
+      pageCount: null,
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      openLibraryId: null,
+      itunesId: null,
     });
     mockExtractEpubCover.mockRejectedValue(new Error('cover unavailable'));
 
     await expect(new EpubFormatExtractor().extract('/books/test.epub')).resolves.toEqual(
       expect.objectContaining({
         title: 'Dune',
-        genres: ['Science Fiction'],
+        genres: [],
+        tags: ['Science Fiction'],
         cover: null,
       }),
     );

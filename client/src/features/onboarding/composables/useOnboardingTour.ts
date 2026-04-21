@@ -16,37 +16,16 @@ export function useOnboardingTour() {
   }
 
   function buildSteps(): DriveStep[] {
-    const hasWelcomeCard = document.querySelector('[data-tour="welcome-card"]') !== null
-
-    const firstStep: DriveStep = hasWelcomeCard
-      ? {
-          element: '[data-tour="welcome-card"]',
-          popover: {
-            title: 'Your library is empty',
-            description: 'Create a library to start organizing and reading your books. Point it to a folder and it will do the rest.',
-            side: 'top',
-            align: 'center',
-          },
-        }
-      : {
-          element: '[data-tour="settings-nav"]',
-          popover: {
-            title: 'Create your first library',
-            description: 'Head to Settings to create your first library and start scanning your books.',
-            side: 'right',
-            align: 'start',
-          },
-        }
-
     const candidates: DriveStep[] = [
-      firstStep,
+      // Left sidebar - top to bottom
       {
         element: '[data-tour="sidebar-libraries"]',
         popover: {
           title: 'Your libraries live here',
-          description: 'Once created, your libraries appear here. Click any library to browse its books.',
+          description: 'Libraries appear here once created. Use the + button to add your first one, then click any library to browse its books.',
           side: 'right',
           align: 'start',
+          showButtons: ['next', 'close'],
         },
       },
       {
@@ -69,6 +48,7 @@ export function useOnboardingTour() {
           align: 'start',
         },
       },
+      // Header - left to right
       {
         element: '[data-tour="global-search"]',
         popover: {
@@ -79,20 +59,20 @@ export function useOnboardingTour() {
         },
       },
       {
-        element: '[data-tour="statistics-btn"]',
+        element: '[data-tour="book-dock-btn"]',
         popover: {
-          title: 'Reading statistics',
-          description:
-            'Explore 33+ charts covering your reading pace, genre breakdown, session patterns, top authors, and more. Your full reading history at a glance.',
+          title: 'Book Dock',
+          description: 'Uploaded files wait here. Review metadata, set the target library, then finalize to add them to your collection.',
           side: 'bottom',
           align: 'end',
         },
       },
       {
-        element: '[data-tour="appearance-picker"]',
+        element: '[data-tour="statistics-btn"]',
         popover: {
-          title: 'Make it yours',
-          description: 'Customize your theme, accent color, and background from the appearance menu.',
+          title: 'Reading statistics',
+          description:
+            'Explore 33+ charts covering your reading pace, genre breakdown, session patterns, top authors, and more. Your full reading history at a glance.',
           side: 'bottom',
           align: 'end',
         },
@@ -107,10 +87,10 @@ export function useOnboardingTour() {
         },
       },
       {
-        element: '[data-tour="book-dock-btn"]',
+        element: '[data-tour="appearance-picker"]',
         popover: {
-          title: 'Book Dock',
-          description: 'Uploaded files wait here. Review metadata, set the target library, then finalize to add them to your collection.',
+          title: 'Make it yours',
+          description: 'Customize your theme, accent color, and background from the appearance menu.',
           side: 'bottom',
           align: 'end',
         },

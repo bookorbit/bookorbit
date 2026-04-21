@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { X } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
 import type { Collection } from '@bookorbit/types'
 
 const props = defineProps<{ open: boolean; collection: Collection }>()
-const emit = defineEmits<{ close: []; deleted: [id: number] }>()
+const emit = defineEmits<{ close: []; deleted: [id: number, name: string] }>()
 
+const router = useRouter()
 const { updateCollection, deleteCollection } = useCollections()
 
 const name = ref('')
@@ -15,6 +18,7 @@ const icon = ref('')
 const syncToKobo = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
+const confirmingDelete = ref(false)
 const error = ref<string | null>(null)
 const trimmedName = computed(() => name.value.trim())
 const trimmedIcon = computed(() => icon.value.trim())
@@ -27,6 +31,7 @@ watch(
       icon.value = props.collection.icon ?? ''
       syncToKobo.value = props.collection.syncToKobo
       error.value = null
+      confirmingDelete.value = false
     }
   },
 )
@@ -52,16 +57,39 @@ async function submit() {
   }
 }
 
-async function handleDelete() {
-  if (!confirm(`Delete collection "${props.collection.name}"? This cannot be undone.`)) return
+function handleDeleteClick() {
+  if (confirmingDelete.value) confirmDelete()
+  else promptDelete()
+}
+
+function handleCancelClick() {
+  if (confirmingDelete.value) cancelDelete()
+  else emit('close')
+}
+
+function promptDelete() {
+  confirmingDelete.value = true
+  error.value = null
+}
+
+function cancelDelete() {
+  confirmingDelete.value = false
+}
+
+async function confirmDelete() {
+  const id = props.collection.id
+  const name = props.collection.name
   deleting.value = true
   error.value = null
   try {
-    await deleteCollection(props.collection.id)
-    emit('deleted', props.collection.id)
+    await deleteCollection(id)
+    toast.success(`"${name}" deleted`)
+    router.replace({ name: 'dashboard' })
+    emit('deleted', id, name)
     emit('close')
   } catch {
     error.value = 'Failed to delete collection'
+    confirmingDelete.value = false
   } finally {
     deleting.value = false
   }
@@ -120,26 +148,34 @@ async function handleDelete() {
             <button
               type="button"
               :disabled="saving || deleting"
-              class="h-9 px-4 rounded-md border border-destructive/30 bg-destructive/10 text-sm font-medium text-destructive hover:bg-destructive/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              @click="handleDelete"
+              class="h-9 px-4 rounded-md border text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="
+                confirmingDelete
+                  ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
+                  : 'border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15'
+              "
+              @click="handleDeleteClick"
             >
-              {{ deleting ? 'Deleting...' : 'Delete collection' }}
+              {{ deleting ? 'Deleting...' : confirmingDelete ? 'Confirm?' : 'Delete collection' }}
             </button>
 
-            <button
-              type="button"
-              @click="emit('close')"
-              class="h-9 px-4 rounded-md border border-input bg-background text-sm text-foreground hover:bg-muted transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              :disabled="!trimmedName || !trimmedIcon || saving || deleting"
-              class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {{ saving ? 'Saving...' : 'Save' }}
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                :disabled="saving || deleting"
+                class="h-9 px-4 rounded-md border border-input bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                @click="handleCancelClick"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                :disabled="!trimmedName || !trimmedIcon || saving || deleting"
+                class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {{ saving ? 'Saving...' : 'Save' }}
+              </button>
+            </div>
           </div>
         </form>
       </div>

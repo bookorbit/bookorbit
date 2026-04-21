@@ -3,10 +3,13 @@ import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 import { HardcoverBookWithEditions, HardcoverCachedContributor, HardcoverEdition, HardcoverSearchDocument } from './hardcover.types';
 
 function parseYear(releaseYear: number | undefined | null, releaseDate: string | undefined): number | undefined {
-  if (releaseYear != null) return releaseYear;
+  if (releaseYear != null) {
+    return releaseYear >= 1000 && releaseYear <= 2200 ? releaseYear : undefined;
+  }
   if (!releaseDate) return undefined;
   const year = parseInt(releaseDate.substring(0, 4), 10);
-  return Number.isNaN(year) ? undefined : year;
+  if (Number.isNaN(year) || year < 1000 || year > 2200) return undefined;
+  return year;
 }
 
 function extractAuthorsFromContributors(contributors: HardcoverCachedContributor[] | undefined): string[] {

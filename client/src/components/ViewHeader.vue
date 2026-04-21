@@ -121,7 +121,7 @@ function handleSearchInput(event: Event) {
         <Search
           :size="14"
           class="absolute left-2 pointer-events-none z-10 transition-colors duration-200"
-          :class="searchActive ? 'text-primary/70' : 'text-muted-foreground/70'"
+          :class="searchActive ? 'text-primary' : 'text-muted-foreground'"
         />
         <input
           ref="searchInputRef"

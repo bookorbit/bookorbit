@@ -64,11 +64,11 @@ export const COMIC_INFO_PROVIDER_WEB_URL_BUILDERS: Record<ComicInfoProviderKey, 
   openLibraryId: (id: string) => `https://openlibrary.org/works/${id}`,
 };
 
-export const EPUB_PROVIDER_IDENTIFIER_PREFIXES = {
-  goodreadsId: 'urn:goodreads:',
-  amazonId: 'urn:amazon:',
-  hardcoverId: 'urn:hardcover:',
-  googleBooksId: 'urn:google:',
-  openLibraryId: 'urn:openlibrary:',
-  itunesId: 'urn:itunes:',
+export const EPUB_PROVIDER_IDENTIFIER_SCHEMES = {
+  goodreadsId: 'GOODREADS',
+  amazonId: 'AMAZON',
+  hardcoverId: 'HARDCOVER',
+  googleBooksId: 'GOOGLE',
+  openLibraryId: 'OPENLIBRARY',
+  itunesId: 'ITUNES',
 } as const satisfies Partial<Record<BookWritePayloadKey, string>>;
