@@ -1,4 +1,4 @@
-import type { ChordDiagramData } from '@projectx/types'
+import type { ChordDiagramData } from '@bookorbit/types'
 
 import { fetchGenreCooccurrence } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

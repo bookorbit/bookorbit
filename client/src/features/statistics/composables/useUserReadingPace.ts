@@ -1,4 +1,4 @@
-import type { UserReadingPacePoint } from '@projectx/types'
+import type { UserReadingPacePoint } from '@bookorbit/types'
 
 import { fetchUserReadingPace } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

@@ -36,19 +36,19 @@ describe('buildXmp', () => {
       new Set(['goodreadsId', 'tags']),
     );
 
-    expect(xmp).toContain('<projectx:goodreadsId>44767458</projectx:goodreadsId>');
-    expect(xmp).toContain('<projectx:tags>');
+    expect(xmp).toContain('<bookorbit:goodreadsId>44767458</bookorbit:goodreadsId>');
+    expect(xmp).toContain('<bookorbit:tags>');
     expect(xmp).toContain('<rdf:li>space</rdf:li>');
     expect(xmp).not.toContain('googleBooksId');
   });
 
   it('writes series only when both seriesName and seriesIndex are selected and present', () => {
     const withBoth = buildXmp({ seriesName: 'Dune', seriesIndex: 1 }, new Set(['seriesName', 'seriesIndex']));
-    expect(withBoth).toContain('<projectx:seriesName>Dune</projectx:seriesName>');
-    expect(withBoth).toContain('<projectx:seriesIndex>1</projectx:seriesIndex>');
+    expect(withBoth).toContain('<bookorbit:seriesName>Dune</bookorbit:seriesName>');
+    expect(withBoth).toContain('<bookorbit:seriesIndex>1</bookorbit:seriesIndex>');
 
     const missingMask = buildXmp({ seriesName: 'Dune', seriesIndex: 1 }, new Set(['seriesName']));
-    expect(missingMask).not.toContain('projectx:seriesName');
-    expect(missingMask).not.toContain('projectx:seriesIndex');
+    expect(missingMask).not.toContain('bookorbit:seriesName');
+    expect(missingMask).not.toContain('bookorbit:seriesIndex');
   });
 });

@@ -6,7 +6,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
-import type { OpdsUser, OpdsSortOrder } from '@projectx/types'
+import type { OpdsUser, OpdsSortOrder } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
 
 const { hasPermission } = usePermissions()

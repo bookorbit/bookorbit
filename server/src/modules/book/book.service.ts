@@ -28,8 +28,8 @@ import {
   Permission,
   isAudioFormat,
   resolveUploadPath,
-} from '@projectx/types';
-import type { AudiobookChapter, BookKoboState, BookMetadataLockField, BookQuery, BooksPage, MetadataField, ReadStatus } from '@projectx/types';
+} from '@bookorbit/types';
+import type { AudiobookChapter, BookKoboState, BookMetadataLockField, BookQuery, BooksPage, MetadataField, ReadStatus } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';

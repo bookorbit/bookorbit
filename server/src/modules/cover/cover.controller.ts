@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Req, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

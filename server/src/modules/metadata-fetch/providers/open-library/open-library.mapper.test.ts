@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
 import { OpenLibraryDoc, OpenLibraryWork } from './open-library.types';

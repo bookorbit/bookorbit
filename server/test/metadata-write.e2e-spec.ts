@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { eq } from 'drizzle-orm';
-import { Permission, type LibraryFileSyncProgressEvent } from '@projectx/types';
+import { Permission, type LibraryFileSyncProgressEvent } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { BookService, type MetadataUpdateFailpoint } from '../src/modules/book/book.service';

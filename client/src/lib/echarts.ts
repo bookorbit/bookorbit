@@ -225,16 +225,16 @@ function buildTheme(accent: string, dark: boolean) {
   }
 }
 
-export function getProjectxThemeName(mode: ProjectxThemeMode = 'dark', accent: string = DEFAULT_ACCENT): string {
+export function getBookorbitThemeName(mode: ProjectxThemeMode = 'dark', accent: string = DEFAULT_ACCENT): string {
   const resolvedAccent = accent in ACCENT_PRIMARY ? accent : DEFAULT_ACCENT
-  return `projectx-${mode}-${resolvedAccent}`
+  return `bookorbit-${mode}-${resolvedAccent}`
 }
 
 export function initChartThemes(): void {
   if (themeRegistered) return
   for (const mode of THEME_MODES) {
     for (const accent of Object.keys(ACCENT_PRIMARY)) {
-      registerTheme(getProjectxThemeName(mode, accent), buildTheme(accent, mode === 'dark'))
+      registerTheme(getBookorbitThemeName(mode, accent), buildTheme(accent, mode === 'dark'))
     }
   }
   themeRegistered = true

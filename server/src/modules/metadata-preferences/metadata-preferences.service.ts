@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@projectx/types';
+import { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

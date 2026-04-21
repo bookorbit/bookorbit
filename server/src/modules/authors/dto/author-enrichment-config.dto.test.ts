@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
-import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
+import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
 
 import { AuthorAutoEnrichmentConfigDto } from './author-auto-enrichment-config.dto';
 import { PreviewAuthorEnrichmentCountDto } from './preview-author-enrichment-count.dto';

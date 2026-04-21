@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Permission, type AuthorEnrichmentStatusEvent } from '@projectx/types';
+import { Permission, type AuthorEnrichmentStatusEvent } from '@bookorbit/types';
 import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';

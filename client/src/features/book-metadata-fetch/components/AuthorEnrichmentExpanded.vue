@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { X, Play, Square, AlertTriangle } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type { AuthorEnrichmentStatusEvent } from '@projectx/types'
+import type { AuthorEnrichmentStatusEvent } from '@bookorbit/types'
 import { useAuthorEnrichmentActions } from '@/features/settings/composables/useAuthorEnrichmentActions'
 
 const props = defineProps<{

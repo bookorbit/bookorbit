@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { BookMetadataFetchConfig } from '@projectx/types'
+import type { BookMetadataFetchConfig } from '@bookorbit/types'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useBookMetadataFetchConfig } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchConfig'
 import GlobalAutoFetchConfig from './components/GlobalAutoFetchConfig.vue'

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { MetadataScoreField, MetadataScoreWeights } from '@projectx/types';
+import type { MetadataScoreField, MetadataScoreWeights } from '@bookorbit/types';
 
 export type ScoreData = {
   title: string | null;

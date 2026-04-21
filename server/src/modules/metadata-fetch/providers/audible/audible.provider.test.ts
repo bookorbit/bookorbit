@@ -1,4 +1,4 @@
-import type { ProviderConfigurations } from '@projectx/types';
+import type { ProviderConfigurations } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { fetchWithThrottle } from '../../fetch-with-throttle';

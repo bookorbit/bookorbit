@@ -1,4 +1,4 @@
-import type { ReadStatus, ReadStatusSource } from '@projectx/types';
+import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 
 export const READ_STATUSES: readonly ReadStatus[] = ['unread', 'want_to_read', 'reading', 'on_hold', 'rereading', 'read', 'skimmed', 'abandoned'];
 

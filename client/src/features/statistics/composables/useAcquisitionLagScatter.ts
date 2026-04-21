@@ -1,4 +1,4 @@
-import type { AcquisitionLagPoint, StatisticsResult } from '@projectx/types'
+import type { AcquisitionLagPoint, StatisticsResult } from '@bookorbit/types'
 
 import { fetchAcquisitionLagScatter } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

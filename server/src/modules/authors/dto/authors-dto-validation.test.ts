@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
 import { BulkAuthorIdsDto } from './bulk-author-ids.dto';
 import { DeleteAuthorsDto } from './delete-authors.dto';

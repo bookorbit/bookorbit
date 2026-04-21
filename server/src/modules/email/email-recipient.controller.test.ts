@@ -1,4 +1,4 @@
-import { AuditAction, AuditResource } from '@projectx/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';

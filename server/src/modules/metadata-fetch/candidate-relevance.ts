@@ -1,4 +1,4 @@
-import { MetadataCandidate } from '@projectx/types';
+import { MetadataCandidate } from '@bookorbit/types';
 import { distance } from 'fastest-levenshtein';
 
 import { MetadataSearchParams } from './providers/metadata-search-params';

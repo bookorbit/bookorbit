@@ -1,4 +1,4 @@
-import { MetadataCandidate, MetadataProviderKey, type ITunesCoverResolution } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderKey, type ITunesCoverResolution } from '@bookorbit/types';
 import { ITunesResult } from './itunes.types';
 
 function mapCoverUrl(artworkUrl100: string | undefined, coverResolution: ITunesCoverResolution): string | undefined {

@@ -14,7 +14,7 @@ import {
   TriangleAlert,
   BookOpenCheck,
 } from 'lucide-vue-next'
-import type { NotificationItem } from '@projectx/types'
+import type { NotificationItem } from '@bookorbit/types'
 import { useNotifications } from '../composables/useNotifications'
 
 const props = defineProps<{ notification: NotificationItem }>()
@@ -41,8 +41,8 @@ const ICON_MAP: Record<string, typeof FolderSync> = {
   books_restored: BookOpenCheck,
   metadata_fetch_completed: BookOpen,
   metadata_fetch_failed: BookOpen,
-  book_bucket_ready: PackageOpen,
-  book_bucket_finalized: PackageOpen,
+  book_dock_ready: PackageOpen,
+  book_dock_finalized: PackageOpen,
   author_enrichment_completed: UserCheck,
   author_enrichment_failed: UserCheck,
   email_sent: Mail,
@@ -79,14 +79,18 @@ function handleDismiss(e: Event) {
 </script>
 
 <template>
-  <button
-    class="group relative flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-all hover:shadow-sm"
+  <div
+    class="group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-all hover:shadow-sm"
     :class="
       notification.read
         ? 'border-border/30 bg-muted/20 hover:border-border/50 hover:bg-muted/40'
         : 'border-border/60 bg-card shadow-sm hover:bg-muted/30'
     "
+    role="button"
+    tabindex="0"
     @click="handleClick"
+    @keydown.enter="handleClick"
+    @keydown.space.prevent="handleClick"
   >
     <div class="relative mt-0.5 shrink-0">
       <div
@@ -116,5 +120,5 @@ function handleDismiss(e: Event) {
     >
       <X :size="14" />
     </button>
-  </button>
+  </div>
 </template>

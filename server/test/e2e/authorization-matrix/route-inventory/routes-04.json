@@ -372,11 +372,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
     "methodName": "findAll",
     "httpMethod": "GET",
-    "path": "/lenses",
+    "path": "/smart-scopes",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,
@@ -384,11 +384,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
     "methodName": "findOne",
     "httpMethod": "GET",
-    "path": "/lenses/:id",
+    "path": "/smart-scopes/:id",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,
@@ -396,11 +396,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
     "methodName": "create",
     "httpMethod": "POST",
-    "path": "/lenses",
+    "path": "/smart-scopes",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,
@@ -408,11 +408,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
     "methodName": "reorder",
     "httpMethod": "POST",
-    "path": "/lenses/reorder",
+    "path": "/smart-scopes/reorder",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,
@@ -420,11 +420,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
     "methodName": "update",
     "httpMethod": "PATCH",
-    "path": "/lenses/:id",
+    "path": "/smart-scopes/:id",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,
@@ -432,11 +432,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
     "methodName": "remove",
     "httpMethod": "DELETE",
-    "path": "/lenses/:id",
+    "path": "/smart-scopes/:id",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,
@@ -444,11 +444,11 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/lens/lens.controller.ts",
-    "className": "LensController",
-    "methodName": "executeLens",
+    "file": "server/src/modules/smart-scope/smart-scope.controller.ts",
+    "className": "SmartScopeController",
+    "methodName": "executeSmartScope",
     "httpMethod": "GET",
-    "path": "/lenses/:id/books",
+    "path": "/smart-scopes/:id/books",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": false,

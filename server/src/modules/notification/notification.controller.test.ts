@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { NotificationController } from './notification.controller';

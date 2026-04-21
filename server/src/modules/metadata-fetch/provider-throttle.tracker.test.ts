@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 

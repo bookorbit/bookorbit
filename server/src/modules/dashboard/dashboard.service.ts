@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
-import type { BookCard } from '@projectx/types';
+import type { BookCard } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookReadService } from '../book/book-read.service';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
-import { LensService } from '../lens/lens.service';
+import { SmartScopeService } from '../smart-scope/smart-scope.service';
 import { LibraryService } from '../library/library.service';
 import { DashboardRepository } from './dashboard.repository';
 import { ScrollerType } from './dto/scroller-type.enum';
@@ -17,7 +17,7 @@ export class DashboardService {
     private readonly dashboardRepo: DashboardRepository,
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
-    private readonly lensService: LensService,
+    private readonly smartScopeService: SmartScopeService,
   ) {}
 
   private async loadCardsByIds(bookIds: number[], userId: number): Promise<BookCard[]> {
@@ -28,14 +28,14 @@ export class DashboardService {
     return bookIds.map((id) => cardsById.get(id)).filter((card): card is BookCard => card != null);
   }
 
-  async getScroller(type: ScrollerType, user: RequestUser, limit: number, lensId?: number): Promise<BookCard[]> {
+  async getScroller(type: ScrollerType, user: RequestUser, limit: number, smartScopeId?: number): Promise<BookCard[]> {
     const clampedLimit = Math.min(Math.max(1, limit), MAX_LIMIT);
 
-    if (type === ScrollerType.LENS) {
-      if (!lensId || lensId <= 0) {
-        throw new BadRequestException('lensId is required and must be a positive integer when scroller type is lens');
+    if (type === ScrollerType.SMART_SCOPE) {
+      if (!smartScopeId || smartScopeId <= 0) {
+        throw new BadRequestException('smartScopeId is required and must be a positive integer when scroller type is smartScope');
       }
-      const result = await this.lensService.executeLens(lensId, user, 0, clampedLimit);
+      const result = await this.smartScopeService.executeSmartScope(smartScopeId, user, 0, clampedLimit);
       return result.items;
     }
 

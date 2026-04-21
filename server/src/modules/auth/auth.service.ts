@@ -19,7 +19,7 @@ import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { AuditAction } from '@projectx/types';
+import { AuditAction } from '@bookorbit/types';
 
 import { APP_SETTING_KEYS } from '../../common/constants/app-settings.constants';
 import { DB } from '../../db/db.module';

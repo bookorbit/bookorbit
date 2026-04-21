@@ -41,8 +41,8 @@ import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
-import { Permission, AuditAction, AuditResource } from '@projectx/types';
-import type { BookQuery } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
+import type { BookQuery } from '@bookorbit/types';
 import { UpdateBookMetadataLocksDto } from '../book-metadata-lock/dto/update-book-metadata-locks.dto';
 
 function stripLoneSurrogates(value: string): string {

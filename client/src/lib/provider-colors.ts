@@ -1,4 +1,4 @@
-import type { MetadataProviderKey } from '@projectx/types'
+import type { MetadataProviderKey } from '@bookorbit/types'
 
 const PROVIDER_HEX: Record<string, string> = {
   google: '#34A853',

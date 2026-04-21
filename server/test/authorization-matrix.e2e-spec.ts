@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 import { ConfigService } from '@nestjs/config';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 
 import { createCoverToken } from '../src/modules/opds/opds-auth.guard';
@@ -18,7 +18,7 @@ import {
   createLibraryWithFolder,
   createOpdsUser,
   createReadingSession,
-  createBookBucketRow,
+  createBookDockRow,
   createUserAndLogin,
   grantLibraryAccess,
   locateBookByAbsolutePath,
@@ -85,7 +85,7 @@ interface Personas {
   koboActive: TestUserSession;
   koboDisabled: TestUserSession;
   koboRevoked: TestUserSession;
-  bookBucketUser: TestUserSession;
+  bookDockUser: TestUserSession;
   uploadUser: TestUserSession;
   ownerUser: TestUserSession;
   otherUser: TestUserSession;
@@ -172,7 +172,7 @@ describe('Authorization matrix (e2e)', () => {
       koboActive: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboDisabled: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboRevoked: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
-      bookBucketUser: await createUserAndLogin(ctx, { permissions: [Permission.BookBucketAccess] }),
+      bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess] }),
       uploadUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
@@ -183,7 +183,7 @@ describe('Authorization matrix (e2e)', () => {
       grantLibraryAccess(ctx, personas.allPermsUser.userId, libraryA.libraryId, 'owner'),
       grantLibraryAccess(ctx, personas.allPermsUser.userId, libraryB.libraryId, 'owner'),
       grantLibraryAccess(ctx, personas.metadataEditor.userId, libraryA.libraryId, 'viewer'),
-      grantLibraryAccess(ctx, personas.bookBucketUser.userId, libraryA.libraryId, 'viewer'),
+      grantLibraryAccess(ctx, personas.bookDockUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.ownerUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsOwner.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsIntruder.userId, libraryA.libraryId, 'viewer'),
@@ -370,9 +370,9 @@ describe('Authorization matrix (e2e)', () => {
           path: '/opds-users',
           token: 'allPerms',
         },
-        [Permission.BookBucketAccess]: {
+        [Permission.BookDockAccess]: {
           method: 'GET',
-          path: '/book-bucket/summary',
+          path: '/book-dock/summary',
           token: 'allPerms',
         },
         [Permission.EmailSend]: {
@@ -835,60 +835,60 @@ describe('Authorization matrix (e2e)', () => {
       expectError(addInaccessibleBook, 403, 'No access to this library');
     });
 
-    it('enforces lens private read and owner-only write rules', async () => {
-      const privateLensResponse = await ctx.app.inject({
+    it('enforces smartScope private read and owner-only write rules', async () => {
+      const privateSmartScopeResponse = await ctx.app.inject({
         method: 'POST',
-        url: '/api/v1/lenses',
+        url: '/api/v1/smart-scopes',
         headers: authHeader(personas.ownerUser.accessToken),
         payload: {
-          name: `authz-private-lens-${randomUUID()}`,
+          name: `authz-private-smartScope-${randomUUID()}`,
           icon: 'Aperture',
           defaultSort: [],
           isPublic: false,
         },
       });
-      expect(privateLensResponse.statusCode).toBe(201);
-      const privateLensId = (privateLensResponse.json() as { id: number }).id;
+      expect(privateSmartScopeResponse.statusCode).toBe(201);
+      const privateSmartScopeId = (privateSmartScopeResponse.json() as { id: number }).id;
 
       const foreignRead = await ctx.app.inject({
         method: 'GET',
-        url: `/api/v1/lenses/${privateLensId}`,
+        url: `/api/v1/smart-scopes/${privateSmartScopeId}`,
         headers: authHeader(personas.otherUser.accessToken),
       });
-      expectError(foreignRead, 403, 'No access to this lens');
+      expectError(foreignRead, 403, 'No access to this smartScope');
 
       const foreignUpdate = await ctx.app.inject({
         method: 'PATCH',
-        url: `/api/v1/lenses/${privateLensId}`,
+        url: `/api/v1/smart-scopes/${privateSmartScopeId}`,
         headers: authHeader(personas.otherUser.accessToken),
         payload: { name: 'rename' },
       });
-      expectError(foreignUpdate, 403, 'Cannot modify this lens');
+      expectError(foreignUpdate, 403, 'Cannot modify this smartScope');
 
       const foreignDelete = await ctx.app.inject({
         method: 'DELETE',
-        url: `/api/v1/lenses/${privateLensId}`,
+        url: `/api/v1/smart-scopes/${privateSmartScopeId}`,
         headers: authHeader(personas.otherUser.accessToken),
       });
-      expectError(foreignDelete, 403, 'Cannot delete this lens');
+      expectError(foreignDelete, 403, 'Cannot delete this smartScope');
 
-      const publicLensResponse = await ctx.app.inject({
+      const publicSmartScopeResponse = await ctx.app.inject({
         method: 'POST',
-        url: '/api/v1/lenses',
+        url: '/api/v1/smart-scopes',
         headers: authHeader(personas.ownerUser.accessToken),
         payload: {
-          name: `authz-public-lens-${randomUUID()}`,
+          name: `authz-public-smartScope-${randomUUID()}`,
           icon: 'Aperture',
           defaultSort: [],
           isPublic: true,
         },
       });
-      expect(publicLensResponse.statusCode).toBe(201);
-      const publicLensId = (publicLensResponse.json() as { id: number }).id;
+      expect(publicSmartScopeResponse.statusCode).toBe(201);
+      const publicSmartScopeId = (publicSmartScopeResponse.json() as { id: number }).id;
 
       const publicRead = await ctx.app.inject({
         method: 'GET',
-        url: `/api/v1/lenses/${publicLensId}`,
+        url: `/api/v1/smart-scopes/${publicSmartScopeId}`,
         headers: authHeader(personas.otherUser.accessToken),
       });
       expect(publicRead.statusCode).toBe(200);
@@ -926,14 +926,14 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('service authz - library scoped data and mixed batch semantics', () => {
-    it('returns mixed-result finalize envelope for Book Bucket authorization failures', async () => {
-      const accessibleRow = await createBookBucketRow(ctx, {
+    it('returns mixed-result finalize envelope for Book Dock authorization failures', async () => {
+      const accessibleRow = await createBookDockRow(ctx, {
         fileName: `authz-finalize-ok-${randomUUID()}.fb2`,
         targetLibraryId: libraryA.libraryId,
         targetFolderId: libraryA.libraryFolderId,
         status: 'ready',
       });
-      const inaccessibleRow = await createBookBucketRow(ctx, {
+      const inaccessibleRow = await createBookDockRow(ctx, {
         fileName: `authz-finalize-denied-${randomUUID()}.fb2`,
         targetLibraryId: libraryB.libraryId,
         targetFolderId: libraryB.libraryFolderId,
@@ -942,8 +942,8 @@ describe('Authorization matrix (e2e)', () => {
 
       const response = await ctx.app.inject({
         method: 'POST',
-        url: '/api/v1/book-bucket/finalize',
-        headers: authHeader(personas.bookBucketUser.accessToken),
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(personas.bookDockUser.accessToken),
         payload: {
           fileIds: [accessibleRow.id, inaccessibleRow.id],
         },

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Check, ChevronDown, ChevronUp, ClipboardCopy, FileText, Info, Loader2, RotateCcw, Save } from 'lucide-vue-next'
-import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN, PATTERN_TOKENS } from '@projectx/types'
+import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN, PATTERN_TOKENS } from '@bookorbit/types'
 import { toast } from 'vue-sonner'
 import { useMediaQuery } from '@vueuse/core'
 import { useFileNamingPattern } from './composables/useFileNamingPattern'

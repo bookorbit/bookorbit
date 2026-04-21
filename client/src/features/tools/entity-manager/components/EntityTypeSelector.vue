@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ALL_ENTITY_TYPES, type EntityType } from '@projectx/types'
+import { ALL_ENTITY_TYPES, type EntityType } from '@bookorbit/types'
 
 defineProps<{ modelValue: EntityType }>()
 const emit = defineEmits<{ 'update:modelValue': [value: EntityType] }>()

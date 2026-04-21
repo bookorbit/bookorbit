@@ -2,7 +2,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { ChevronDown, ChevronUp, Plus, Pencil, Trash2, Star, Share2, Wifi, Server } from 'lucide-vue-next'
-import { Permission } from '@projectx/types'
+import { Permission } from '@bookorbit/types'
 import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAuth } from '@/features/auth/composables/useAuth'

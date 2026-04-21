@@ -12,7 +12,7 @@ import type {
   RenameResult,
   SplitResult,
   BulkDeleteResult,
-} from '@projectx/types';
+} from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';

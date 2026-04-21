@@ -1,4 +1,4 @@
-import { ComicMetadataFields, MetadataCandidate, MetadataProviderKey } from '@projectx/types';
+import { ComicMetadataFields, MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ComicVineIssue, ComicVinePersonCredit } from './comicvine.types';
 

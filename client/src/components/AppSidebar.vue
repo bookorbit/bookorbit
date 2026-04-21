@@ -17,14 +17,14 @@ import {
 import SidebarNavItem from '@/components/sidebar/SidebarNavItem.vue'
 import SidebarSectionHeader from '@/components/sidebar/SidebarSectionHeader.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
-import { useLenses } from '@/features/lens/composables/useLenses'
+import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useDraggableOrder } from '@/composables/useDraggableOrder'
-import type { Library } from '@projectx/types'
-import CreateLensDialog from '@/features/lens/components/CreateLensDialog.vue'
+import type { Library } from '@bookorbit/types'
+import CreateSmartScopeDialog from '@/features/smart-scope/components/CreateSmartScopeDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
@@ -36,10 +36,10 @@ function resolveIcon(name: string | null | undefined, fallback: Component): Comp
 }
 
 function useSidebarSection(key: string) {
-  const isOpen = ref(localStorage.getItem(`projectx:sidebar:${key}`) !== 'false')
+  const isOpen = ref(localStorage.getItem(`bookorbit:sidebar:${key}`) !== 'false')
   function toggle() {
     isOpen.value = !isOpen.value
-    localStorage.setItem(`projectx:sidebar:${key}`, String(isOpen.value))
+    localStorage.setItem(`bookorbit:sidebar:${key}`, String(isOpen.value))
   }
   return { isOpen, toggle }
 }
@@ -48,7 +48,7 @@ const router = useRouter()
 const route = useRoute()
 const { isMobile, setOpenMobile } = useSidebar()
 const { libraries, fetchLibraries, refreshLibraries, reorderLibraries } = useLibraries()
-const { lenses, fetchLenses, reorderLenses } = useLenses()
+const { smartScopes, fetchSmartScopes, reorderSmartScopes } = useSmartScopes()
 const { collections, fetchCollections, reorderCollections } = useCollections()
 const { hasPermission } = usePermissions()
 const { subscribeLibrary, getProgress, progressMap } = useScanProgress()
@@ -69,16 +69,16 @@ watch(progressMap, (map) => {
 })
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 
-const createLensOpen = ref(false)
+const createSmartScopeOpen = ref(false)
 const createCollectionOpen = ref(false)
 const createLibraryOpen = ref(false)
 
 const { isOpen: librariesOpen, toggle: toggleLibraries } = useSidebarSection('libraries')
-const { isOpen: lensesOpen, toggle: toggleLenses } = useSidebarSection('lenses')
+const { isOpen: smartScopesOpen, toggle: toggleSmartScopes } = useSidebarSection('smart-scopes')
 const { isOpen: collectionsOpen, toggle: toggleCollections } = useSidebarSection('collections')
 
 const isReorderingLibraries = ref(false)
-const isReorderingLenses = ref(false)
+const isReorderingSmartScopes = ref(false)
 const isReorderingCollections = ref(false)
 
 const {
@@ -88,10 +88,10 @@ const {
 } = useDraggableOrder({ source: libraries, persist: reorderLibraries })
 
 const {
-  localItems: localLenses,
-  onDragStart: onLensDragStart,
-  onDragEnd: onLensDragEnd,
-} = useDraggableOrder({ source: lenses, persist: reorderLenses })
+  localItems: localSmartScopes,
+  onDragStart: onSmartScopeDragStart,
+  onDragEnd: onSmartScopeDragEnd,
+} = useDraggableOrder({ source: smartScopes, persist: reorderSmartScopes })
 
 const {
   localItems: localCollections,
@@ -109,9 +109,9 @@ const activeLibraryId = computed(() => {
   return route.name === 'library' && id ? Number(id) : null
 })
 
-const activeLensId = computed(() => {
+const activeSmartScopeId = computed(() => {
   const id = route.params.id
-  return route.name === 'lens' && id ? Number(id) : null
+  return route.name === 'smartScope' && id ? Number(id) : null
 })
 
 const activeCollectionId = computed(() => {
@@ -142,7 +142,7 @@ onMounted(async () => {
   for (const lib of libraries.value) {
     subscribeLibrary(lib.id)
   }
-  fetchLenses()
+  fetchSmartScopes()
   fetchCollections()
 })
 
@@ -156,7 +156,7 @@ onUnmounted(() => stopLibraryUploadListener())
 </script>
 
 <template>
-  <CreateLensDialog :open="createLensOpen" @close="createLensOpen = false" />
+  <CreateSmartScopeDialog :open="createSmartScopeOpen" @close="createSmartScopeOpen = false" />
   <CreateCollectionDialog :open="createCollectionOpen" @close="createCollectionOpen = false" />
   <LibraryCreatorModal v-if="createLibraryOpen" @close="createLibraryOpen = false" @saved="onLibrarySaved" />
 
@@ -171,30 +171,20 @@ onUnmounted(() => stopLibraryUploadListener())
           :class="iconRadiusClass"
           style="background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklch, var(--primary) 75%, transparent) 100%)"
         >
-          <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true">
-            <path
-              d="M5 2.5A1.5 1.5 0 016.5 1h9A1.5 1.5 0 0117 2.5v15a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 015 17.5V2.5z"
-              fill="var(--primary-foreground)"
-              opacity="0.25"
-            />
-            <path d="M3 4a1 1 0 011-1h8.5A1.5 1.5 0 0114 4.5V17a1.5 1.5 0 01-1.5 1.5H4a1 1 0 01-1-1V4z" fill="var(--primary-foreground)" />
-            <line x1="6" y1="7.5" x2="11.5" y2="7.5" stroke="var(--primary)" stroke-width="1.3" stroke-linecap="round" />
-            <line x1="6" y1="10.5" x2="11.5" y2="10.5" stroke="var(--primary)" stroke-width="1.3" stroke-linecap="round" opacity="0.7" />
-            <line x1="6" y1="13.5" x2="9.5" y2="13.5" stroke="var(--primary)" stroke-width="1.3" stroke-linecap="round" opacity="0.4" />
-          </svg>
+          <Icons.Orbit class="h-5 w-5 text-primary-foreground" />
         </div>
         <!-- Brand name -->
         <div class="flex flex-col leading-none group-data-[collapsible=icon]:hidden">
           <span class="text-lg font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
-            Project<span class="text-primary"> Q</span>
+            Book<span class="text-primary"> Orbit</span>
           </span>
-          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">Library Control</span>
+          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">Your Reading Space</span>
         </div>
       </div>
     </SidebarHeader>
 
     <SidebarContent>
-      <!-- Dashboard / Book Bucket / Authors -->
+      <!-- Dashboard / Book Dock / Authors -->
       <SidebarGroup>
         <SidebarGroupContent>
           <SidebarMenu>
@@ -317,60 +307,60 @@ onUnmounted(() => stopLibraryUploadListener())
 
       <SidebarSeparator />
 
-      <!-- Lenses -->
+      <!-- SmartScopes -->
       <SidebarGroup>
         <SidebarSectionHeader
-          data-tour="sidebar-lenses"
-          label="Lenses"
-          :is-open="lensesOpen"
-          :collapsed-count="lenses.length"
+          data-tour="sidebar-smartScopes"
+          label="Smart Scopes"
+          :is-open="smartScopesOpen"
+          :collapsed-count="smartScopes.length"
           :can-add="true"
-          add-title="New Lens"
-          :can-reorder="lenses.length > 1"
-          :is-reordering="isReorderingLenses"
-          @toggle="toggleLenses"
-          @add="createLensOpen = true"
-          @toggle-reorder="isReorderingLenses = !isReorderingLenses"
+          add-title="New Smart Scope"
+          :can-reorder="smartScopes.length > 1"
+          :is-reordering="isReorderingSmartScopes"
+          @toggle="toggleSmartScopes"
+          @add="createSmartScopeOpen = true"
+          @toggle-reorder="isReorderingSmartScopes = !isReorderingSmartScopes"
         />
         <Transition name="section">
-          <div v-if="lensesOpen">
+          <div v-if="smartScopesOpen">
             <SidebarGroupContent>
               <VueDraggable
-                v-model="localLenses"
+                v-model="localSmartScopes"
                 tag="ul"
                 :animation="150"
                 handle=".drag-handle"
-                :disabled="!isReorderingLenses"
+                :disabled="!isReorderingSmartScopes"
                 class="contents"
-                @start="onLensDragStart"
-                @end="onLensDragEnd"
+                @start="onSmartScopeDragStart"
+                @end="onSmartScopeDragEnd"
               >
                 <SidebarNavItem
-                  v-for="lens in localLenses"
-                  :key="lens.id"
-                  :is-active="activeLensId === lens.id"
-                  :tooltip="lens.name"
-                  :icon="resolveIcon(lens.icon, Icons.Aperture)"
-                  :label="lens.name"
-                  @click="navigateFromSidebar({ name: 'lens', params: { id: lens.id } })"
+                  v-for="smartScope in localSmartScopes"
+                  :key="smartScope.id"
+                  :is-active="activeSmartScopeId === smartScope.id"
+                  :tooltip="smartScope.name"
+                  :icon="resolveIcon(smartScope.icon, Icons.Aperture)"
+                  :label="smartScope.name"
+                  @click="navigateFromSidebar({ name: 'smartScope', params: { id: smartScope.id } })"
                 >
                   <template #badge>
                     <span
-                      v-if="lens.bookCount != null && lens.bookCount > 0"
+                      v-if="smartScope.bookCount != null && smartScope.bookCount > 0"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ lens.bookCount.toLocaleString() }}
+                      {{ smartScope.bookCount.toLocaleString() }}
                     </span>
                     <Icons.GripVertical
-                      v-if="isReorderingLenses"
+                      v-if="isReorderingSmartScopes"
                       class="drag-handle ml-1 h-3.5 w-3.5 shrink-0 cursor-grab text-primary/60 group-data-[collapsible=icon]:hidden"
                       @click.stop
                     />
                   </template>
                 </SidebarNavItem>
               </VueDraggable>
-              <div v-if="localLenses.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No lenses yet</span>
+              <div v-if="localSmartScopes.length === 0">
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No Smart Scopes yet</span>
               </div>
             </SidebarGroupContent>
           </div>

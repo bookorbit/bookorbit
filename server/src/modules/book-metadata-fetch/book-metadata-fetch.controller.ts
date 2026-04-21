@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
-import { type BookMetadataFetchConfig, type BookMetadataFetchConfigOverride, Permission } from '@projectx/types';
+import { type BookMetadataFetchConfig, type BookMetadataFetchConfigOverride, Permission } from '@bookorbit/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';

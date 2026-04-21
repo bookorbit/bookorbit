@@ -1,6 +1,6 @@
 import { computed, onUnmounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 
 export interface SearchParams {
   title?: string

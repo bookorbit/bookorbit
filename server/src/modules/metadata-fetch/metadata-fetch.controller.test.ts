@@ -1,4 +1,4 @@
-import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
+import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot } from '@bookorbit/types';
 import type { Mocked } from 'vitest';
 import { firstValueFrom, of, toArray } from 'rxjs';
 

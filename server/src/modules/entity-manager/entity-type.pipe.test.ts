@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { ALL_ENTITY_TYPES } from '@projectx/types';
+import { ALL_ENTITY_TYPES } from '@bookorbit/types';
 
 import { EntityTypePipe } from './entity-type.pipe';
 

@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { X, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type { AuthorEnrichmentFailedPage } from '@projectx/types'
+import type { AuthorEnrichmentFailedPage } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuthorEnrichmentActions } from '@/features/settings/composables/useAuthorEnrichmentActions'
 

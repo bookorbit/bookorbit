@@ -50,11 +50,11 @@ export function useOnboardingTour() {
         },
       },
       {
-        element: '[data-tour="sidebar-lenses"]',
+        element: '[data-tour="sidebar-smartScopes"]',
         popover: {
-          title: 'Lenses - smart filters',
+          title: 'SmartScopes - smart filters',
           description:
-            'Lenses are saved filter rules that always stay up to date. Define criteria once - like "unread sci-fi" - and browse that slice of your library instantly.',
+            'SmartScopes are saved filter rules that always stay up to date. Define criteria once - like "unread sci-fi" - and browse that slice of your library instantly.',
           side: 'right',
           align: 'start',
         },
@@ -101,15 +101,15 @@ export function useOnboardingTour() {
         element: '[data-tour="upload-button"]',
         popover: {
           title: 'Upload books',
-          description: 'Upload books directly from your browser. They land in the Book Bucket for metadata review before being added to a library.',
+          description: 'Upload books directly from your browser. They land in the Book Dock for metadata review before being added to a library.',
           side: 'bottom',
           align: 'end',
         },
       },
       {
-        element: '[data-tour="book-bucket-btn"]',
+        element: '[data-tour="book-dock-btn"]',
         popover: {
-          title: 'Book Bucket',
+          title: 'Book Dock',
           description: 'Uploaded files wait here. Review metadata, set the target library, then finalize to add them to your collection.',
           side: 'bottom',
           align: 'end',

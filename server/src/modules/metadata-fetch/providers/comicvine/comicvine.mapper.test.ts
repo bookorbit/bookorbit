@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { mapIssueToCandidate } from './comicvine.mapper';
 import type { ComicVineIssue } from './comicvine.types';

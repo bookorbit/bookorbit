@@ -22,13 +22,13 @@ import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
 import { map, Observable } from 'rxjs';
 
-import { Permission, AuditAction, AuditResource } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
-import type { AuthorMetadataCandidate } from '@projectx/types';
+import type { AuthorMetadataCandidate } from '@bookorbit/types';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorAutoEnrichmentConfigDto } from './dto/author-auto-enrichment-config.dto';
 import { BulkAuthorIdsDto } from './dto/bulk-author-ids.dto';

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { BookOpen, Plus, Users } from 'lucide-vue-next'
-import type { Library } from '@projectx/types'
+import type { Library } from '@bookorbit/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 

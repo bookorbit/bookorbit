@@ -14,7 +14,7 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 @ValidatorConstraint({ name: 'atLeastOneSearchTerm', async: false })
 class AtLeastOneSearchTermConstraint implements ValidatorConstraintInterface {

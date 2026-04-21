@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { z } from 'zod';
 
-import type { BookQuery } from '@projectx/types';
+import type { BookQuery } from '@bookorbit/types';
 
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../../common/constants/pagination.constants';
 import { groupRuleSchema } from '../utils/group-rule.validator';

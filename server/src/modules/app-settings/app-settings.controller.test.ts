@@ -9,7 +9,7 @@ function makeService(): jest.Mocked<AppSettingsService> {
     listSettings: vi.fn().mockResolvedValue([]),
     getValue: vi.fn(),
     update: vi.fn(),
-    isBookBucketAutoFetchEnabled: vi.fn(),
+    isBookDockAutoFetchEnabled: vi.fn(),
     getAuthorsAutoEnrichmentWriteMode: vi.fn(),
     isAuthorsProviderAudnexusEnabled: vi.fn(),
     getUploadPattern: vi.fn(),
@@ -114,7 +114,7 @@ describe('AppSettingsController', () => {
           displayName: 'Keycloak',
           enabled: true,
           issuerUri: 'https://kc.example.com',
-          clientId: 'projectx',
+          clientId: 'bookorbit',
           clientSecret: 'secret',
           scopes: 'openid',
           iconUrl: null,
@@ -123,7 +123,7 @@ describe('AppSettingsController', () => {
       const result = await controller.getOidcProvidersPublic();
       expect(result).toHaveLength(1);
       expect(result[0]).not.toHaveProperty('clientSecret');
-      expect(result[0].clientId).toBe('projectx');
+      expect(result[0].clientId).toBe('bookorbit');
     });
 
     it('getOidcProvider masks clientSecret', async () => {

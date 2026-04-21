@@ -1,6 +1,6 @@
 import { IsBoolean, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ITUNES_COVER_RESOLUTIONS } from '@projectx/types';
+import { ITUNES_COVER_RESOLUTIONS } from '@bookorbit/types';
 
 export class GoogleProviderConfigDto {
   @IsOptional() @IsBoolean() enabled?: boolean;

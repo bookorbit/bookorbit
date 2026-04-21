@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetLibrariesDto } from './dto/set-libraries.dto';

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from './provider-config.service';
 

@@ -1,14 +1,14 @@
-name: projectx-dev
+name: bookorbit-dev
 
 services:
   postgres:
-    container_name: projectx-dev-db
+    container_name: bookorbit-dev-db
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DEV_POSTGRES_USER:-projectx}
-      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-projectx}
-      POSTGRES_DB: ${DEV_POSTGRES_DB:-projectx}
+      POSTGRES_USER: ${DEV_POSTGRES_USER:-bookorbit}
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-bookorbit}
+      POSTGRES_DB: ${DEV_POSTGRES_DB:-bookorbit}
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "${DEV_POSTGRES_PORT:-5432}:5432"

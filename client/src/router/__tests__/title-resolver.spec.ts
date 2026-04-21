@@ -12,15 +12,15 @@ function routeWithMeta(title: string | ((route: RouteLocationNormalizedLoaded) =
 
 describe('resolveRouteTitle', () => {
   it('uses string route title', () => {
-    expect(resolveRouteTitle(routeWithMeta('Authors'))).toBe('Authors · Projectx')
+    expect(resolveRouteTitle(routeWithMeta('Authors'))).toBe('Authors · BookOrbit')
   })
 
   it('uses function route title', () => {
     const route = routeWithMeta(() => 'Audit Log')
-    expect(resolveRouteTitle(route)).toBe('Audit Log · Projectx')
+    expect(resolveRouteTitle(route)).toBe('Audit Log · BookOrbit')
   })
 
   it('falls back to app title when route title is missing', () => {
-    expect(resolveRouteTitle(routeWithMeta(undefined))).toBe('Projectx')
+    expect(resolveRouteTitle(routeWithMeta(undefined))).toBe('BookOrbit')
   })
 })

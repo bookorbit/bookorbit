@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 import CollapsedSeriesCard from '../CollapsedSeriesCard.vue'
 
 const mockRouterPush = vi.fn<(...args: unknown[]) => unknown>()

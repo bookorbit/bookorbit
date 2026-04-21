@@ -31,7 +31,7 @@ const portraitGridGap = ref(storage.get('portraitGridGap', gridGap.value))
 const squareGridGap = ref(storage.get('squareGridGap', gridGap.value))
 const viewMode = ref<'grid' | 'list'>(storage.get('viewMode', 'grid'))
 const cardOverlays = ref<CardOverlayKey[]>(normalizeCardOverlays(storage.get('cardOverlays', DEFAULT_CARD_OVERLAYS)))
-const lensFilterExpanded = ref(storage.get('lensFilterExpanded', true))
+const smartScopeFilterExpanded = ref(storage.get('smartScopeFilterExpanded', true))
 const authorCoverSize = ref(Math.max(storage.get('authorCoverSize', 120), 100))
 const authorCoverShape = ref<AuthorCoverShape>(storage.get('authorCoverShape', 'circle'))
 
@@ -43,7 +43,7 @@ watch(portraitGridGap, (v) => storage.set('portraitGridGap', v))
 watch(squareGridGap, (v) => storage.set('squareGridGap', v))
 watch(viewMode, (v) => storage.set('viewMode', v))
 watch(cardOverlays, (v) => storage.set('cardOverlays', normalizeCardOverlays(v)), { deep: true })
-watch(lensFilterExpanded, (v) => storage.set('lensFilterExpanded', v))
+watch(smartScopeFilterExpanded, (v) => storage.set('smartScopeFilterExpanded', v))
 watch(authorCoverSize, (v) => storage.set('authorCoverSize', v))
 watch(authorCoverShape, (v) => storage.set('authorCoverShape', v))
 
@@ -57,7 +57,7 @@ export function useDisplaySettings() {
     squareGridGap,
     viewMode,
     cardOverlays,
-    lensFilterExpanded,
+    smartScopeFilterExpanded,
     authorCoverSize,
     authorCoverShape,
   }

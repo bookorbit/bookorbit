@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AuthorAutoEnrichmentWriteMode, AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorAutoEnrichmentWriteMode, AuthorMetadataProviderKey } from '@bookorbit/types';
 
 import { AuthorMetadataFetchService } from './metadata/author-metadata-fetch.service';
 import { AuthorImageStorageError, AuthorImageStorageService } from './author-image-storage.service';

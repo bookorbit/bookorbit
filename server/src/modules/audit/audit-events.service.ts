@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'events';
 
-import type { AuditAction, AuditResource } from '@projectx/types';
+import type { AuditAction, AuditResource } from '@bookorbit/types';
 
 export const AUDIT_EVENT = 'audit.log';
 

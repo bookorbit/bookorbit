@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import type { ReadStatus, UserBookStatus } from '@projectx/types';
+import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import type { UserBookStatusRow } from '../../db/schema';
 import { isReadStatus, isReadStatusSource } from './user-book-status.constants';

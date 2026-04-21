@@ -11,7 +11,7 @@ const HOURLY_WINDOW_MS = 3_600_000;
 const VOLUME_CACHE_TTL_MS = 10 * 60 * 1_000;
 const VOLUME_CACHE_MAX_SIZE = 50;
 
-const USER_AGENT = 'ProjectX/1.0 (Book and Comic Library Manager)';
+const USER_AGENT = 'BookOrbit/1.0 (Book and Comic Library Manager)';
 
 const VOLUME_FIELDS = 'id,name,publisher,start_year,count_of_issues,description,deck,image,site_detail_url';
 const ISSUE_LIST_FIELDS =

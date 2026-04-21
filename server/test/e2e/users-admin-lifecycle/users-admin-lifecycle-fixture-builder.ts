@@ -5,20 +5,20 @@ import { join } from 'path';
 export interface UsersAdminLifecycleFixtureRoot {
   rootPath: string;
   booksPath: string;
-  bookBucketPath: string;
+  bookDockPath: string;
   cleanup: () => Promise<void>;
 }
 
 export async function createUsersAdminLifecycleFixtureRoot(prefix = 'users-admin-lifecycle-e2e-'): Promise<UsersAdminLifecycleFixtureRoot> {
   const rootPath = await mkdtemp(join(tmpdir(), prefix));
   const booksPath = join(rootPath, 'books');
-  const bookBucketPath = join(booksPath, 'book-bucket');
-  await mkdir(bookBucketPath, { recursive: true });
+  const bookDockPath = join(booksPath, 'book-dock');
+  await mkdir(bookDockPath, { recursive: true });
 
   return {
     rootPath,
     booksPath,
-    bookBucketPath,
+    bookDockPath,
     cleanup: async () => {
       await rm(rootPath, { recursive: true, force: true });
     },

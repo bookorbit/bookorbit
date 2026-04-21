@@ -30,11 +30,11 @@ import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
-import { useBookBucketSummary } from '@/features/book-bucket/composables/useBookBucketSummary'
+import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import NotificationSheet from '@/features/notifications/components/NotificationSheet.vue'
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types'
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 
 const router = useRouter()
@@ -43,17 +43,17 @@ const { user, logout } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
-const { summary: bookBucketSummary, fetchSummary: fetchBookBucketSummary, subscribe: subscribeBookBucketSummary } = useBookBucketSummary()
+const { summary: bookDockSummary, fetchSummary: fetchBookDockSummary, subscribe: subscribeBookDockSummary } = useBookDockSummary()
 const { subscribe: subscribeNotifications } = useNotifications()
 const themeStore = useThemeStore()
 
-const isBookBucketActive = computed(() => route.name === 'book-bucket')
+const isBookDockActive = computed(() => route.name === 'book-dock')
 const isStatisticsActive = computed(() => route.name === 'statistics')
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 
-function navigateToBookBucket() {
-  router.push({ name: 'book-bucket' })
+function navigateToBookDock() {
+  router.push({ name: 'book-dock' })
 }
 
 function navigateToStatistics() {
@@ -151,9 +151,9 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
-  if (hasPermission('book_bucket_access')) {
-    fetchBookBucketSummary()
-    subscribeBookBucketSummary()
+  if (hasPermission('book_dock_access')) {
+    fetchBookDockSummary()
+    subscribeBookDockSummary()
   }
   if (hasPermission('notification_access')) {
     subscribeNotifications()
@@ -459,14 +459,14 @@ function formatBadgeClass(fmt: string): string {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-44">
-            <DropdownMenuItem v-if="hasPermission('book_bucket_access')" @click="navigateToBookBucket">
+            <DropdownMenuItem v-if="hasPermission('book_dock_access')" @click="navigateToBookDock">
               <PackageOpen :size="15" class="mr-2 text-muted-foreground" />
-              Book Bucket
+              Book Dock
               <span
-                v-if="bookBucketSummary.total > 0"
+                v-if="bookDockSummary.total > 0"
                 class="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
               >
-                {{ bookBucketSummary.total }}
+                {{ bookDockSummary.total }}
               </span>
             </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToStatistics">
@@ -514,34 +514,34 @@ function formatBadgeClass(fmt: string): string {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <!-- Group 1: Content (Book Bucket, Statistics, Upload) -->
+        <!-- Group 1: Content (Book Dock, Statistics, Upload) -->
         <div class="hidden md:flex items-center gap-2.5">
-          <!-- Book Bucket button -->
-          <Tooltip v-if="hasPermission('book_bucket_access')">
+          <!-- Book Dock button -->
+          <Tooltip v-if="hasPermission('book_dock_access')">
             <TooltipTrigger as-child>
               <Button
-                data-tour="book-bucket-btn"
+                data-tour="book-dock-btn"
                 variant="ghost"
                 size="icon"
                 class="relative h-8 w-8 border transition-colors"
                 :class="[
-                  isBookBucketActive
+                  isBookDockActive
                     ? 'border-primary/80 bg-primary/8 text-primary'
                     : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
                   iconRadiusClass,
                 ]"
-                @click="navigateToBookBucket"
+                @click="navigateToBookDock"
               >
                 <PackageOpen :size="15" />
                 <span
-                  v-if="bookBucketSummary.total > 0"
+                  v-if="bookDockSummary.total > 0"
                   class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
                 >
-                  {{ bookBucketSummary.total }}
+                  {{ bookDockSummary.total }}
                 </span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Book Bucket</TooltipContent>
+            <TooltipContent>Book Dock</TooltipContent>
           </Tooltip>
 
           <!-- Notifications button -->

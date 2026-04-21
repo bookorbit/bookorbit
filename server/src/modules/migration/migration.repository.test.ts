@@ -83,7 +83,7 @@ describe('MigrationRepository', () => {
       sourceId: 1,
       profileId: 2,
       planArtifactId: 3,
-      targetKey: 'projectx',
+      targetKey: 'bookorbit',
       state: 'running',
       currentStage: 'init',
       triggeredByUserId: 7,
@@ -102,7 +102,7 @@ describe('MigrationRepository', () => {
     const from = vi.fn().mockReturnValue({ where });
     const select = vi.fn().mockReturnValue({ from });
 
-    const insertReturning = vi.fn().mockResolvedValue([{ id: 101, targetKey: 'projectx' }]);
+    const insertReturning = vi.fn().mockResolvedValue([{ id: 101, targetKey: 'bookorbit' }]);
     const insertValues = vi.fn().mockReturnValue({ returning: insertReturning });
     const insert = vi.fn().mockReturnValue({ values: insertValues });
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
@@ -132,11 +132,11 @@ describe('MigrationRepository', () => {
 
     expect(insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
-        targetKey: 'projectx',
+        targetKey: 'bookorbit',
       }),
     );
     expect(result).toEqual({
-      run: { id: 101, targetKey: 'projectx' },
+      run: { id: 101, targetKey: 'bookorbit' },
       activeRun: null,
     });
   });

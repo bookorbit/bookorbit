@@ -1,4 +1,4 @@
-import type { UserCompletionLatencyDistribution } from '@projectx/types'
+import type { UserCompletionLatencyDistribution } from '@bookorbit/types'
 
 import { fetchUserCompletionLatency } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

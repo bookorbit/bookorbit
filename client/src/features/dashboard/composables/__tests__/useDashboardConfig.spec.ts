@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const STORAGE_KEY = 'projectx:dashboard:config'
+const STORAGE_KEY = 'bookorbit:dashboard:config'
 
 describe('useDashboardConfig', () => {
   beforeEach(() => {
@@ -15,12 +15,12 @@ describe('useDashboardConfig', () => {
         scrollers: [
           {
             id: 99,
-            type: 'lens',
+            type: 'smart-scope',
             label: 'Unread Favorites',
             enabled: 'false',
             order: 7,
             limit: '12',
-            lensId: '42',
+            smartScopeId: '42',
           },
         ],
       }),
@@ -32,12 +32,12 @@ describe('useDashboardConfig', () => {
     expect(scrollers.value).toEqual([
       {
         id: '99',
-        type: 'lens',
+        type: 'smart-scope',
         label: 'Unread Favorites',
         enabled: false,
         order: 1,
         limit: 12,
-        lensId: 42,
+        smartScopeId: 42,
       },
     ])
   })
@@ -49,7 +49,7 @@ describe('useDashboardConfig', () => {
     expect(scrollers.value).toEqual(DEFAULT_SCROLLERS)
     expect(scrollers.value).not.toBe(DEFAULT_SCROLLERS)
 
-    addScroller('lens')
+    addScroller('smart-scope')
 
     expect(scrollers.value).toHaveLength(4)
     expect(DEFAULT_SCROLLERS).toHaveLength(3)

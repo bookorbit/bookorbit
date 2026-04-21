@@ -1,5 +1,5 @@
 import { Validate } from 'class-validator';
-import type { FieldPreferenceOverrides } from '@projectx/types';
+import type { FieldPreferenceOverrides } from '@bookorbit/types';
 
 import { IsFieldPreferencesMapConstraint } from './update-global-preferences.dto';
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Loader2, Save } from 'lucide-vue-next'
-import type { MetadataProviderKey, ProviderConfigurations, ProviderStatus, ProviderThrottleRuntimeState } from '@projectx/types'
+import type { MetadataProviderKey, ProviderConfigurations, ProviderStatus, ProviderThrottleRuntimeState } from '@bookorbit/types'
 import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{

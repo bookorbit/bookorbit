@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in ProjectX
+description: Report a bug in BookOrbit
 title: "[Bug] "
 labels: ["bug"]
 body:
@@ -35,7 +35,7 @@ body:
     attributes:
       label: Your setup
       placeholder: |
-        - ProjectX version/image tag: latest
+        - BookOrbit version/image tag: latest
         - Deployment: Docker / manual
         - OS: Ubuntu 22.04
         - Browser: Firefox 124

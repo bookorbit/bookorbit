@@ -10,7 +10,7 @@ import {
   MetadataProviderKey,
   MERGE_STRATEGIES,
   MergeStrategy,
-} from '@projectx/types';
+} from '@bookorbit/types';
 
 const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
   MetadataProviderKey.GOODREADS,

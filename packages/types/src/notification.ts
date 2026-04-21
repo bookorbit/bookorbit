@@ -5,8 +5,8 @@ export const NotificationType = {
   BooksRestored: "books_restored",
   MetadataFetchCompleted: "metadata_fetch_completed",
   MetadataFetchFailed: "metadata_fetch_failed",
-  BookBucketReady: "book_bucket_ready",
-  BookBucketFinalized: "book_bucket_finalized",
+  BookDockReady: "book_dock_ready",
+  BookDockFinalized: "book_dock_finalized",
   AuthorEnrichmentCompleted: "author_enrichment_completed",
   AuthorEnrichmentFailed: "author_enrichment_failed",
   EmailSent: "email_sent",
@@ -23,7 +23,7 @@ export type NotificationType = (typeof NotificationType)[keyof typeof Notificati
 export const NOTIFICATION_CATEGORIES = {
   scanning: [NotificationType.ScanCompleted, NotificationType.ScanFailed, NotificationType.BooksUnavailable, NotificationType.BooksRestored],
   metadata: [NotificationType.MetadataFetchCompleted, NotificationType.MetadataFetchFailed],
-  bookBucket: [NotificationType.BookBucketReady, NotificationType.BookBucketFinalized],
+  bookDock: [NotificationType.BookDockReady, NotificationType.BookDockFinalized],
   authorEnrichment: [NotificationType.AuthorEnrichmentCompleted, NotificationType.AuthorEnrichmentFailed],
   email: [NotificationType.EmailSent, NotificationType.EmailFailed],
   koboSync: [NotificationType.KoboSyncCompleted],
@@ -36,7 +36,7 @@ export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
 export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
   scanning: "Library Scanning",
   metadata: "Metadata Fetching",
-  bookBucket: "Book Bucket",
+  bookDock: "Book Dock",
   authorEnrichment: "Author Enrichment",
   email: "Email Delivery",
   koboSync: "Kobo Sync",

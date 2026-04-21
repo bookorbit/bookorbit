@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 
-import { SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@projectx/types'
+import { SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@bookorbit/types'
 
-const STORAGE_KEY = 'projectx:dashboard:config'
+const STORAGE_KEY = 'bookorbit:dashboard:config'
 const MAX_SCROLLERS = 6
 
 export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
@@ -15,7 +15,7 @@ export const SCROLLER_LABELS: Record<ScrollerType, string> = {
   'continue-reading': 'Continue Reading',
   'recently-added': 'Recently Added',
   random: 'Discover Something New',
-  lens: 'Lens',
+  'smart-scope': 'Smart Scope',
 }
 
 const VALID_SCROLLER_TYPES = new Set<ScrollerType>(SCROLLER_TYPES)
@@ -48,7 +48,7 @@ function normalizePositiveNumber(value: unknown, fallback: number): number {
   return fallback
 }
 
-function normalizeLensId(value: unknown): number | undefined {
+function normalizeSmartScopeId(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
   if (typeof value === 'string') {
     const parsed = Number(value)
@@ -71,7 +71,7 @@ function normalizeScroller(value: unknown, index: number): ScrollerConfig | null
 
   const type = raw.type as ScrollerType
   const label = typeof raw.label === 'string' && raw.label.trim().length > 0 ? raw.label.trim() : SCROLLER_LABELS[type]
-  const lensId = type === 'lens' ? normalizeLensId(raw.lensId) : undefined
+  const smartScopeId = type === 'smart-scope' ? normalizeSmartScopeId(raw.smartScopeId) : undefined
 
   return {
     id: normalizeId(raw.id, String(index + 1)),
@@ -80,7 +80,7 @@ function normalizeScroller(value: unknown, index: number): ScrollerConfig | null
     enabled: normalizeBoolean(raw.enabled, true),
     order: index + 1,
     limit: normalizePositiveNumber(raw.limit, 20),
-    ...(lensId === undefined ? {} : { lensId }),
+    ...(smartScopeId === undefined ? {} : { smartScopeId }),
   }
 }
 

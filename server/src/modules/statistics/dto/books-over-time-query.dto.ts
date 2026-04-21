@@ -1,6 +1,6 @@
 import { IsEnum, IsOptional } from 'class-validator';
 
-import type { StatisticsDateRange, StatisticsGranularity } from '@projectx/types';
+import type { StatisticsDateRange, StatisticsGranularity } from '@bookorbit/types';
 
 import { StatisticsFilterQueryDto } from './statistics-filter-query.dto';
 

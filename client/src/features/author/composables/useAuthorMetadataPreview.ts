@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 
-import type { AuthorMetadataCandidate } from '@projectx/types'
+import type { AuthorMetadataCandidate } from '@bookorbit/types'
 import { streamAuthorMetadataCandidates } from '../api/author'
 
 export function useAuthorMetadataPreview(authorName: Ref<string>) {

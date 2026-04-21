@@ -7,7 +7,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
-import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 
 import { AppModule } from '../../src/app.module';
 import { GlobalExceptionFilter } from '../../src/common/filters/http-exception.filter';

@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

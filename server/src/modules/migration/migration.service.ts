@@ -422,7 +422,7 @@ function jsonByteLength(value: unknown): number {
 
 function normalizeTargetKey(value: string | undefined): string {
   const normalized = value?.trim();
-  return normalized ? normalized : 'projectx';
+  return normalized ? normalized : 'bookorbit';
 }
 
 function latestDate(...dates: Date[]): Date {

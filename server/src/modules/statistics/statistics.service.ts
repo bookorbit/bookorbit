@@ -22,7 +22,7 @@ import type {
   StorageByFormatItem,
   TopAuthorItem,
   TopSeriesItem,
-} from '@projectx/types';
+} from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { BooksOverTimeQueryDto } from './dto/books-over-time-query.dto';

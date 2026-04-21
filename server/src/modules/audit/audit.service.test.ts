@@ -1,5 +1,5 @@
 import { APP_SETTING_KEYS, DEFAULT_AUDIT_RETENTION_DAYS } from '../../common/constants/app-settings.constants';
-import { AuditAction } from '@projectx/types';
+import { AuditAction } from '@bookorbit/types';
 import { AUDIT_EVENT, AuditEventsService } from './audit-events.service';
 import { AuditService } from './audit.service';
 

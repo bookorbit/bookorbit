@@ -20,7 +20,7 @@ import { ComicMetadataRepository } from './comic-metadata.repository';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
-import { type ComicMetadataFields, isAudioFormat } from '@projectx/types';
+import { type ComicMetadataFields, isAudioFormat } from '@bookorbit/types';
 import { parseAudioDuration } from './extractors/audio.extractor';
 import { AudioFormatExtractor } from './extractors/audio-format.extractor';
 import { ComicFormatExtractor } from './extractors/comic-format.extractor';

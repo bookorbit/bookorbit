@@ -1,4 +1,4 @@
-import type { FormatShareOverTimeItem, StatisticsResult } from '@projectx/types'
+import type { FormatShareOverTimeItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchFormatShareOverTime } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

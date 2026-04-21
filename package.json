@@ -1,10 +1,10 @@
 {
-  "name": "projectx",
+  "name": "bookorbit",
   "private": true,
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "setup": "bash ./scripts/bootstrap/local.sh",
-    "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @projectx/types dev\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @bookorbit/types dev\" \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cd client && npm run dev -- --host",
     "dev:server": "cd server && npm run start:dev",
     "verify:fast": "pnpm run lint:check && pnpm run typecheck && pnpm run test",
@@ -47,7 +47,7 @@
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.2"
+    "prettier": "^3.8.3"
   },
   "lint-staged": {
     "*.{md,json,yml,yaml}": [

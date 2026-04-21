@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 
-import type { AuthorDetail } from '@projectx/types'
+import type { AuthorDetail } from '@bookorbit/types'
 import { fetchAuthor } from '../api/author'
 
 export function useAuthorDetail(authorId: Ref<number>) {

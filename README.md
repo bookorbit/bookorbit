@@ -1,6 +1,6 @@
-# ProjectX
+# BookOrbit
 
-[![CI](https://github.com/neonsolstice/projectx/actions/workflows/ci.yml/badge.svg)](https://github.com/neonsolstice/projectx/actions/workflows/ci.yml)
+[![CI](https://github.com/neonsolstice/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/neonsolstice/bookorbit/actions/workflows/ci.yml)
 
 A self-hostable book and library management app with Kobo device support. Organize your epub, pdf, and cbz collections, track reading progress, and sync with your Kobo.
 
@@ -19,8 +19,8 @@ A self-hostable book and library management app with Kobo device support. Organi
 ### Setup
 
 ```bash
-git clone <repo-url> projectx
-cd projectx
+git clone <repo-url> bookorbit
+cd bookorbit
 pnpm setup
 ```
 
@@ -62,11 +62,11 @@ Both must be running. The client proxies all `/api` and `/socket.io` requests to
 ## Project Structure
 
 ```
-projectx/
+bookorbit/
 ├── client/             Vue 3 frontend (Vite + Tailwind CSS v4)
 ├── server/             NestJS 11 backend (Fastify + Drizzle ORM)
 ├── packages/
-│   └── types/          Shared TypeScript types (@projectx/types)
+│   └── types/          Shared TypeScript types (@bookorbit/types)
 ├── docker/
 │   └── postgres/       Postgres init scripts (extensions)
 ├── local/              Local dev data (covers, docs) - gitignored
@@ -82,7 +82,7 @@ This is a **pnpm workspace**. The three packages are:
 
 - **`server/`** - NestJS API. Modules live in `src/modules/`, one folder per feature. Database schema is in `src/db/schema/`.
 - **`client/`** - Vue 3 SPA. Feature code lives in `src/features/`, shared components in `src/components/ui/`.
-- **`packages/types/`** - Shared types imported as `@projectx/types` by both server and client. Add any type that crosses the API boundary here.
+- **`packages/types/`** - Shared types imported as `@bookorbit/types` by both server and client. Add any type that crosses the API boundary here.
 
 ---
 
@@ -203,7 +203,7 @@ The fastest way to learn the patterns is to follow an existing module:
 
 - **Backend:** Look at `server/src/modules/bookmark/` for a minimal example (controller, service, repository, DTO, module). Copy it, rename, and adapt.
 - **Frontend:** Look at `client/src/features/collection/` for a full feature (composables for state/API, components for UI).
-- **Shared types:** If the feature adds API request/response shapes, add them in `packages/types/src/` and import via `@projectx/types`.
+- **Shared types:** If the feature adds API request/response shapes, add them in `packages/types/src/` and import via `@bookorbit/types`.
 
 ---
 
@@ -211,16 +211,16 @@ The fastest way to learn the patterns is to follow an existing module:
 
 Server environment is configured in `server/.env` for local development. Production compose uses the repo-root `.env` created from `.env.example`.
 
-| Variable                  | Default                                                | Description                                                |
-| ------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
-| `DATABASE_URL`            | `postgres://projectx:projectx@localhost:5432/projectx` | PostgreSQL connection string                               |
-| `PORT`                    | `3000`                                                 | Server port                                                |
-| `NODE_ENV`                | `development`                                          | Environment mode                                           |
-| `JWT_SECRET`              | `change-me-in-production`                              | JWT signing secret                                         |
-| `SETUP_BOOTSTRAP_TOKEN`   | (empty)                                                | Required in production for initial `/api/v1/auth/setup`    |
-| `APP_DATA_PATH`           | `../local/data`                                        | App data directory for cover images (not where books live) |
-| `APP_URL`                 | `http://localhost:5173`                                | Client URL (used in emails)                                |
-| `NODE_MAX_OLD_SPACE_SIZE` | `2048`                                                 | Docker Node.js heap limit in MB                            |
+| Variable                  | Default                                                   | Description                                                |
+| ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| `DATABASE_URL`            | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` | PostgreSQL connection string                               |
+| `PORT`                    | `3000`                                                    | Server port                                                |
+| `NODE_ENV`                | `development`                                             | Environment mode                                           |
+| `JWT_SECRET`              | `change-me-in-production`                                 | JWT signing secret                                         |
+| `SETUP_BOOTSTRAP_TOKEN`   | (empty)                                                   | Required in production for initial `/api/v1/auth/setup`    |
+| `APP_DATA_PATH`           | `../local/data`                                           | App data directory for cover images (not where books live) |
+| `APP_URL`                 | `http://localhost:5173`                                   | Client URL (used in emails)                                |
+| `NODE_MAX_OLD_SPACE_SIZE` | `2048`                                                    | Docker Node.js heap limit in MB                            |
 
 ## Production Deploy
 
@@ -243,7 +243,7 @@ For production compose, `BOOKS_HOST_PATH` is the only host folder most users nee
 Generated app data and PostgreSQL live in explicit folders beside the compose file:
 
 ```text
-./data/app       generated covers, author images, staging files, and Book Bucket uploads
+./data/app       generated covers, author images, staging files, and Book Dock uploads
 ./data/postgres  PostgreSQL data
 ```
 
@@ -297,7 +297,7 @@ pnpm db:reset
 - **Backend:** NestJS 11 on Fastify. Global prefix `/api`. Auth via JWT (access + refresh tokens in httpOnly cookies). RBAC with permissions system.
 - **Frontend:** Vue 3 Composition API (`<script setup>`). Tailwind CSS v4 for styling. Feature-local state in composables, not global stores.
 - **Database:** PostgreSQL 16 via Drizzle ORM. Migrations generated by Drizzle Kit.
-- **Shared types:** `@projectx/types` package ensures API contracts stay in sync.
+- **Shared types:** `@bookorbit/types` package ensures API contracts stay in sync.
 
 ---
 
@@ -359,7 +359,7 @@ The default compose uses `./data/app` for generated app data. The container repa
 
 If this still happens, make sure the folder mounted at `/data` is writable by `PUID:PGID`. Avoid adding `user:` to the app service, because startup cannot repair ownership when it is forced to start as a non-root user.
 
-### `Cannot find module '@projectx/types'`
+### `Cannot find module '@bookorbit/types'`
 
 The shared types package needs to be built or the workspace link is broken:
 

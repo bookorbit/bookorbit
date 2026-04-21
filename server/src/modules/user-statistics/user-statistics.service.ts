@@ -19,7 +19,7 @@ import type {
   UserReadingSurvivalPoint,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
-} from '@projectx/types';
+} from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { UserDailyReadingQueryDto } from './dto/user-daily-reading-query.dto';

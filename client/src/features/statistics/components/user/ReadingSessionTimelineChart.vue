@@ -3,7 +3,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import VChart from 'vue-echarts'
 import { CalendarRange } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type { UserReadingSessionTimeline, UserReadingSessionTimelineItem } from '@projectx/types'
+import type { UserReadingSessionTimeline, UserReadingSessionTimelineItem } from '@bookorbit/types'
 
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { fetchUserReadingSessionTimeline, updateUserReadingSessionTimelineSession } from '../../api/statistics.api'

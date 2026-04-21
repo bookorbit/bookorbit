@@ -1,5 +1,5 @@
 import { PDFDocument, PDFName } from 'pdf-lib';
-import { PROJECTX_NS_PREFIX, PROJECTX_NS_URI } from '../../../common/projectx-ns';
+import { BOOKORBIT_NS_PREFIX, BOOKORBIT_NS_URI } from '../../../common/bookorbit-ns';
 import { extractXmpXml, parseXmp } from './pdf-xmp-reader';
 
 // Wraps XMP content in standard RDF envelope
@@ -9,7 +9,7 @@ function xmpDoc(body: string): string {
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about=""
       xmlns:dc="http://purl.org/dc/elements/1.1/"
-      xmlns:${PROJECTX_NS_PREFIX}="${PROJECTX_NS_URI}">
+      xmlns:${BOOKORBIT_NS_PREFIX}="${BOOKORBIT_NS_URI}">
       ${body}
     </rdf:Description>
   </rdf:RDF>
@@ -122,69 +122,69 @@ describe('parseXmp', () => {
     });
   });
 
-  describe('projectx: namespace fields', () => {
-    it('parses projectx:subtitle', () => {
-      const r = parseXmp(xmpDoc('<projectx:subtitle>A Novel</projectx:subtitle>'));
+  describe('bookorbit: namespace fields', () => {
+    it('parses bookorbit:subtitle', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:subtitle>A Novel</bookorbit:subtitle>'));
       expect(r?.subtitle).toBe('A Novel');
     });
 
-    it('parses projectx:isbn13 - preserves leading zeros', () => {
+    it('parses bookorbit:isbn13 - preserves leading zeros', () => {
       // parseTagValue: false prevents numeric conversion that would destroy leading zeros
-      const r = parseXmp(xmpDoc('<projectx:isbn13>9780441013593</projectx:isbn13>'));
+      const r = parseXmp(xmpDoc('<bookorbit:isbn13>9780441013593</bookorbit:isbn13>'));
       expect(r?.isbn13).toBe('9780441013593');
     });
 
-    it('parses projectx:isbn10', () => {
-      const r = parseXmp(xmpDoc('<projectx:isbn10>0441013597</projectx:isbn10>'));
+    it('parses bookorbit:isbn10', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:isbn10>0441013597</bookorbit:isbn10>'));
       expect(r?.isbn10).toBe('0441013597');
     });
 
-    it('parses projectx:seriesName', () => {
-      const r = parseXmp(xmpDoc('<projectx:seriesName>Dune Chronicles</projectx:seriesName>'));
+    it('parses bookorbit:seriesName', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:seriesName>Dune Chronicles</bookorbit:seriesName>'));
       expect(r?.seriesName).toBe('Dune Chronicles');
     });
 
-    it('parses projectx:seriesIndex as number', () => {
-      const r = parseXmp(xmpDoc('<projectx:seriesIndex>3</projectx:seriesIndex>'));
+    it('parses bookorbit:seriesIndex as number', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:seriesIndex>3</bookorbit:seriesIndex>'));
       expect(r?.seriesIndex).toBe(3);
     });
 
-    it('parses projectx:tags list', () => {
+    it('parses bookorbit:tags list', () => {
       const r = parseXmp(
         xmpDoc(`
-        <projectx:tags>
+        <bookorbit:tags>
           <rdf:Seq>
             <rdf:li>favorites</rdf:li>
             <rdf:li>to-read</rdf:li>
           </rdf:Seq>
-        </projectx:tags>
+        </bookorbit:tags>
       `),
       );
       expect(r?.tags).toEqual(['favorites', 'to-read']);
     });
 
-    it('parses projectx:rating', () => {
-      const r = parseXmp(xmpDoc('<projectx:rating>4.5</projectx:rating>'));
+    it('parses bookorbit:rating', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:rating>4.5</bookorbit:rating>'));
       expect(r?.rating).toBe(4.5);
     });
 
-    it('parses projectx:pageCount', () => {
-      const r = parseXmp(xmpDoc('<projectx:pageCount>412</projectx:pageCount>'));
+    it('parses bookorbit:pageCount', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:pageCount>412</bookorbit:pageCount>'));
       expect(r?.pageCount).toBe(412);
     });
 
-    it('parses projectx:googleBooksId', () => {
-      const r = parseXmp(xmpDoc('<projectx:googleBooksId>abc123</projectx:googleBooksId>'));
+    it('parses bookorbit:googleBooksId', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:googleBooksId>abc123</bookorbit:googleBooksId>'));
       expect(r?.googleBooksId).toBe('abc123');
     });
 
-    it('parses projectx:goodreadsId', () => {
-      const r = parseXmp(xmpDoc('<projectx:goodreadsId>1234567</projectx:goodreadsId>'));
+    it('parses bookorbit:goodreadsId', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:goodreadsId>1234567</bookorbit:goodreadsId>'));
       expect(r?.goodreadsId).toBe('1234567');
     });
 
-    it('parses projectx:amazonId', () => {
-      const r = parseXmp(xmpDoc('<projectx:amazonId>B001234567</projectx:amazonId>'));
+    it('parses bookorbit:amazonId', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:amazonId>B001234567</bookorbit:amazonId>'));
       expect(r?.amazonId).toBe('B001234567');
     });
   });
@@ -197,8 +197,8 @@ describe('parseXmp', () => {
     <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
       <dc:title>Merged Title</dc:title>
     </rdf:Description>
-    <rdf:Description rdf:about="" xmlns:${PROJECTX_NS_PREFIX}="${PROJECTX_NS_URI}">
-      <projectx:seriesName>Merged Series</projectx:seriesName>
+    <rdf:Description rdf:about="" xmlns:${BOOKORBIT_NS_PREFIX}="${BOOKORBIT_NS_URI}">
+      <bookorbit:seriesName>Merged Series</bookorbit:seriesName>
     </rdf:Description>
   </rdf:RDF>
 </x:xmpmeta>`;

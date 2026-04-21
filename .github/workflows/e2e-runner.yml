@@ -30,7 +30,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: "24"
   PNPM_VERSION: "10"
-  E2E_DATABASE_URL: postgres://projectx:projectx@localhost:5432/projectx_e2e
+  E2E_DATABASE_URL: postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e
   NODE_ENV: test
   JWT_SECRET: scanner-e2e-secret-1234
   JWT_EXPIRES_IN: 15m
@@ -47,13 +47,13 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: projectx
-          POSTGRES_PASSWORD: projectx
-          POSTGRES_DB: projectx
+          POSTGRES_USER: bookorbit
+          POSTGRES_PASSWORD: bookorbit
+          POSTGRES_DB: bookorbit
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U projectx"
+          --health-cmd="pg_isready -U bookorbit"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20

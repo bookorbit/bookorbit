@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
 import { AUTHOR_METADATA_PROVIDERS } from './constants';
 import { AuthorMetadataProvider } from './providers/author-metadata-provider';

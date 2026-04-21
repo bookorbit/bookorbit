@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NOTIFICATION_CATEGORIES, Permission } from '@projectx/types';
-import type { NotificationCategory, NotificationItem, NotificationType, NotificationPreferences } from '@projectx/types';
+import { NOTIFICATION_CATEGORIES, Permission } from '@bookorbit/types';
+import type { NotificationCategory, NotificationItem, NotificationType, NotificationPreferences } from '@bookorbit/types';
 
 import { NotificationGateway } from './notification.gateway';
 import { NotificationRepository } from './notification.repository';

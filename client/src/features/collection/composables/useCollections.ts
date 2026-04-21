@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { Collection } from '@projectx/types'
+import type { Collection } from '@bookorbit/types'
 
 const collections = ref<Collection[]>([])
 let loaded = false

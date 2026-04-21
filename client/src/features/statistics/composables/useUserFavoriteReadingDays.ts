@@ -1,4 +1,4 @@
-import type { UserFavoriteDayStat } from '@projectx/types'
+import type { UserFavoriteDayStat } from '@bookorbit/types'
 
 import { fetchUserFavoriteReadingDays } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AuthorMetadataCandidate, AuthorMetadataProviderInfo, AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataCandidate, AuthorMetadataProviderInfo, AuthorMetadataProviderKey } from '@bookorbit/types';
 import { from, merge, Observable, switchMap, take } from 'rxjs';
 
 import { AuthorMetadataProviderRegistry } from './provider-registry';

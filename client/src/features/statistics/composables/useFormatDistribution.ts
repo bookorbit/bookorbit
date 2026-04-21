@@ -1,4 +1,4 @@
-import type { FormatDistributionItem, StatisticsResult } from '@projectx/types'
+import type { FormatDistributionItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchFormatDistribution } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

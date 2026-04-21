@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import type { PdfReaderSettings } from '@projectx/types'
+import type { PdfReaderSettings } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 

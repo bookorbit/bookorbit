@@ -30,7 +30,7 @@ import { useCbz } from './composables/useCbz'
 import { useCbzSettings } from './composables/useCbzSettings'
 import type { BgColor, Direction, FitMode, ScrollMode, SpreadAlignment, ViewMode, WidePageSingletonMode } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
-import type { CbxReaderSettings } from '@projectx/types'
+import type { CbxReaderSettings } from '@bookorbit/types'
 import { DEFAULT_WIDE_PAGE_RATIO_THRESHOLD, createCbzSpreadLayout } from './lib/spread-layout'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {

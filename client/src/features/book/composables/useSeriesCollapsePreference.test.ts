@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import type { AuthUser } from '@projectx/types'
+import type { AuthUser } from '@bookorbit/types'
 
 vi.mock('@/features/auth/composables/useAuth', () => ({
   useAuth: vi.fn<() => unknown>(),

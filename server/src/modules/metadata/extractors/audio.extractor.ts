@@ -3,7 +3,7 @@ import { open } from 'fs/promises';
 import mediaInfoFactory from 'mediainfo.js';
 import * as mm from 'music-metadata';
 
-import type { AudiobookChapter } from '@projectx/types';
+import type { AudiobookChapter } from '@bookorbit/types';
 
 export interface AudioExtractResult {
   title: string | null;

@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { Permission } from '@projectx/types';
-import type { UserSettings } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
+import type { UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';

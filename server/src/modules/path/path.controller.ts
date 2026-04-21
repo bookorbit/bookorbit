@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { Controller, Get, Query } from '@nestjs/common';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';

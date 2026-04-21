@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookDetail, ComicMetadataFields } from '@projectx/types'
+import type { BookDetail, ComicMetadataFields } from '@bookorbit/types'
 import { useCoverVersions } from './useCoverVersions'
 import { toast } from 'vue-sonner'
 

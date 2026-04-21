@@ -192,7 +192,7 @@ export class MigrationRepository {
       'sourceId' | 'profileId' | 'planArtifactId' | 'targetKey' | 'state' | 'currentStage' | 'triggeredByUserId' | 'startedAt'
     >,
   ): Promise<{ run: typeof schema.migrationRuns.$inferSelect | null; activeRun: typeof schema.migrationRuns.$inferSelect | null }> {
-    const targetKey = values.targetKey ?? 'projectx';
+    const targetKey = values.targetKey ?? 'bookorbit';
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${buildRunLockKey()}))`);
 

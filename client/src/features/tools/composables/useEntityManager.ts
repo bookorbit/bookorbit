@@ -8,7 +8,7 @@ import {
   type DismissedPairInfo,
   type EntityType,
   type EntityTypeCapabilities,
-} from '@projectx/types'
+} from '@bookorbit/types'
 
 import * as entityManagerApi from '../api/entity-manager'
 

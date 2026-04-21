@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import type { EpubReaderSettings } from '@projectx/types'
+import type { EpubReaderSettings } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import { themes } from '@/features/reader/epub/constants/themes'
 import { Check } from 'lucide-vue-next'

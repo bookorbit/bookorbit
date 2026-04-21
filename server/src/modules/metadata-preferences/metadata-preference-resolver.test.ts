@@ -1,4 +1,4 @@
-import { ALL_METADATA_FIELDS, MetadataFetchPreferences, MetadataProviderKey } from '@projectx/types';
+import { ALL_METADATA_FIELDS, MetadataFetchPreferences, MetadataProviderKey } from '@bookorbit/types';
 
 import { MetadataPreferenceResolver } from './metadata-preference-resolver';
 

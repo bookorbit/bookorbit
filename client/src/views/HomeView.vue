@@ -14,7 +14,7 @@ import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
-import SaveAsLensDialog from '@/features/lens/components/SaveAsLensDialog.vue'
+import SaveAsSmartScopeDialog from '@/features/smart-scope/components/SaveAsSmartScopeDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
@@ -36,7 +36,7 @@ import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
-import type { GroupRule, SortSpec } from '@projectx/types'
+import type { GroupRule, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
@@ -107,12 +107,12 @@ onUnmounted(() => {
   registerLoadMore(null)
 })
 
-const FILTER_STORAGE_PREFIX = 'projectx:filter:library:'
+const FILTER_STORAGE_PREFIX = 'bookorbit:filter:library:'
 function getFilterKey(id: number) {
   return `${FILTER_STORAGE_PREFIX}${id}`
 }
 
-const SORT_STORAGE_PREFIX = 'projectx:sort:library:'
+const SORT_STORAGE_PREFIX = 'bookorbit:sort:library:'
 function getSortKey(id: number) {
   return `${SORT_STORAGE_PREFIX}${id}`
 }
@@ -356,7 +356,7 @@ function toggleSelectionMode() {
 const addToCollectionOpen = ref(false)
 const bulkTagsOpen = ref(false)
 const sendBookOpen = ref(false)
-const saveAsLensOpen = ref(false)
+const saveAsSmartScopeOpen = ref(false)
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
@@ -593,14 +593,14 @@ async function handleToggleCollapse() {
                 <TooltipTrigger as-child>
                   <button
                     v-if="activeFilterCount > 0"
-                    @click="saveAsLensOpen = true"
+                    @click="saveAsSmartScopeOpen = true"
                     class="flex items-center gap-1.5 h-7 px-3 rounded-md border border-input text-xs font-medium text-muted-foreground bg-background hover:text-foreground hover:bg-muted transition-colors"
                   >
                     <Telescope :size="13" />
-                    Save as Lens
+                    Save as Smart Scope
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Save this filter as a named lens</TooltipContent>
+                <TooltipContent>Save this filter as a named Smart Scope</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger as-child>
@@ -739,7 +739,7 @@ async function handleToggleCollapse() {
 
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 
-  <SaveAsLensDialog :open="saveAsLensOpen" :filter="filter" :sort="sort" @close="saveAsLensOpen = false" />
+  <SaveAsSmartScopeDialog :open="saveAsSmartScopeOpen" :filter="filter" :sort="sort" @close="saveAsSmartScopeOpen = false" />
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 </template>

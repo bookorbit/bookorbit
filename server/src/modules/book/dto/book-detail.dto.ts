@@ -1,4 +1,4 @@
-import type { AudiobookChapter, BookMetadataLockField, ComicMetadataFields, NarratorRef, ProviderIds, UserBookStatus } from '@projectx/types';
+import type { AudiobookChapter, BookMetadataLockField, ComicMetadataFields, NarratorRef, ProviderIds, UserBookStatus } from '@bookorbit/types';
 
 export class BookFileDto {
   id: number;

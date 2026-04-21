@@ -1,5 +1,5 @@
-import { Permission } from '@projectx/types';
-import { AuditAction, AuditResource } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 import {
   Body,
   BadRequestException,

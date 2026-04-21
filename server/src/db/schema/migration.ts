@@ -103,7 +103,7 @@ export const migrationRuns = pgTable(
       .notNull()
       .references(() => migrationProfiles.id, { onDelete: 'cascade' }),
     planArtifactId: integer('plan_artifact_id').references(() => migrationPlanArtifacts.id, { onDelete: 'set null' }),
-    targetKey: varchar('target_key', { length: 100 }).notNull().default('projectx'),
+    targetKey: varchar('target_key', { length: 100 }).notNull().default('bookorbit'),
     state: varchar('state', { length: 32 }).notNull().default('draft'),
     currentStage: varchar('current_stage', { length: 64 }),
     triggeredByUserId: integer('triggered_by_user_id').references(() => users.id, { onDelete: 'set null' }),

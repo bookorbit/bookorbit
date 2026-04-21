@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, computed, ref, watch } from 'vue'
 import { RefreshCw, Search, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { AuditAction } from '@projectx/types'
+import { AuditAction } from '@bookorbit/types'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import { useAuditLog } from './useAuditLog'
 import { useMediaQuery } from '@vueuse/core'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import { BookOpen } from 'lucide-vue-next'
-import type { MetadataCandidate, MetadataProviderInfo } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderInfo } from '@bookorbit/types'
 import { getProviderLabel, hideOnError, providerBadgeStyle } from '../../../lib/metadata-fetch'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 

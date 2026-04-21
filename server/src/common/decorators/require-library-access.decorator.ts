@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import type { AccessLevel } from '@projectx/types';
+import type { AccessLevel } from '@bookorbit/types';
 
 export const LIBRARY_ACCESS_KEY = 'libraryAccess';
 export type LibraryAccessLevel = AccessLevel;

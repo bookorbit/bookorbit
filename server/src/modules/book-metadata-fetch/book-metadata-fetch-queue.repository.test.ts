@@ -18,7 +18,7 @@ vi.mock('drizzle-orm', () => {
 });
 
 import { and, eq, sql } from 'drizzle-orm';
-import type { BookMetadataFetchConfig } from '@projectx/types';
+import type { BookMetadataFetchConfig } from '@bookorbit/types';
 
 import { bookMetadata, bookMetadataFetchQueue, bookNarrators, books } from '../../db/schema';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';

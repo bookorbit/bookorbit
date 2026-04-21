@@ -1,4 +1,4 @@
-import type { StatisticsResult, TopSeriesItem } from '@projectx/types'
+import type { StatisticsResult, TopSeriesItem } from '@bookorbit/types'
 
 import { fetchTopSeries } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

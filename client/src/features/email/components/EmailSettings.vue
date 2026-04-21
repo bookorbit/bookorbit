@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Permission } from '@projectx/types'
+import { Permission } from '@bookorbit/types'
 import ProvidersTab from './ProvidersTab.vue'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import RecipientsTab from './RecipientsTab.vue'

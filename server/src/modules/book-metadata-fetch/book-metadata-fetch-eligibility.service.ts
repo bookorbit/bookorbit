@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BookMetadataFetchConfig, MetadataField } from '@projectx/types';
+import type { BookMetadataFetchConfig, MetadataField } from '@bookorbit/types';
 
 export interface BookEligibilityData {
   metadataScore: number | null;

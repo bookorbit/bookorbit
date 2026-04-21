@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, ne } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { WriteResult, WriteLogEntry } from '@projectx/types';
+import type { WriteResult, WriteLogEntry } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, fileWriteLog, genres, libraries, tags, bookTags } from '../../db/schema';

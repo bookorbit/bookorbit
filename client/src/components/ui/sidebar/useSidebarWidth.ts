@@ -1,7 +1,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { storage } from '@/services/storage'
 
-const STORAGE_KEY = 'projectx:sidebar:width'
+const STORAGE_KEY = 'bookorbit:sidebar:width'
 
 export const SIDEBAR_WIDTH_DEFAULT_PX = 256
 export const SIDEBAR_WIDTH_MIN_PX = 224

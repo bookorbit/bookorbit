@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CoverSearchResult } from '@projectx/types';
+import { CoverSearchResult } from '@bookorbit/types';
 import { COVER_PROXY_USER_AGENT } from '../constants';
 import { CoverProvider, CoverSearchParams, DUCKDUCKGO_PROVIDER_KEY } from './cover-provider';
 

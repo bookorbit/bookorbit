@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { BookMetadataFetchConfig, BookMetadataFetchConfigOverride, BookMetadataFetchLibraryConfig } from '@projectx/types';
+import type { BookMetadataFetchConfig, BookMetadataFetchConfigOverride, BookMetadataFetchLibraryConfig } from '@bookorbit/types';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 

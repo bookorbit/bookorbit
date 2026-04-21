@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
-import type { AuthorEnrichmentFailedPage } from '@projectx/types';
-import { NotificationType } from '@projectx/types';
+import type { AuthorEnrichmentFailedPage } from '@bookorbit/types';
+import { NotificationType } from '@bookorbit/types';
 
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';

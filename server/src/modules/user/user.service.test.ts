@@ -4,7 +4,7 @@ vi.mock('crypto', () => ({ randomBytes: vi.fn() }));
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { UserService } from './user.service';
 

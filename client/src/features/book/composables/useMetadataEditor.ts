@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import { FORMAT_TO_GROUP, type BookDetail } from '@projectx/types'
+import { FORMAT_TO_GROUP, type BookDetail } from '@bookorbit/types'
 
 const ROOT_FIELDS = [
   'title',

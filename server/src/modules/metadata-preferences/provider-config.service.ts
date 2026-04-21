@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { MetadataProviderKey, ProviderConfigurations, ProviderStatus } from '@projectx/types';
+import { MetadataProviderKey, ProviderConfigurations, ProviderStatus } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

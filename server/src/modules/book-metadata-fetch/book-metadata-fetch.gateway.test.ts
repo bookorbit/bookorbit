@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { BOOK_METADATA_FETCH_STATUS_EVENT, BookMetadataFetchGateway } from './book-metadata-fetch.gateway';
 

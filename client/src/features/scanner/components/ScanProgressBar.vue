@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ScanProgressEvent } from '@projectx/types'
+import type { ScanProgressEvent } from '@bookorbit/types'
 
 const props = defineProps<{
   progress: ScanProgressEvent | undefined

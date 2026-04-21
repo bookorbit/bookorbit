@@ -145,16 +145,16 @@ describe('OidcDiscoveryService', () => {
     it('accepts issuer with sub-path (e.g. Keycloak realm)', async () => {
       const keycloakDoc = {
         ...RAW_DOC,
-        issuer: 'http://localhost:8080/realms/projectx',
-        authorization_endpoint: 'http://localhost:8080/realms/projectx/auth',
-        token_endpoint: 'http://localhost:8080/realms/projectx/token',
-        jwks_uri: 'http://localhost:8080/realms/projectx/jwks',
+        issuer: 'http://localhost:8080/realms/bookorbit',
+        authorization_endpoint: 'http://localhost:8080/realms/bookorbit/auth',
+        token_endpoint: 'http://localhost:8080/realms/bookorbit/token',
+        jwks_uri: 'http://localhost:8080/realms/bookorbit/jwks',
         userinfo_endpoint: undefined,
         end_session_endpoint: undefined,
       };
       mockFetchSuccess(keycloakDoc as never);
       const service = makeService();
-      await expect(service.getDiscoveryDoc('http://localhost:8080/realms/projectx')).resolves.toBeDefined();
+      await expect(service.getDiscoveryDoc('http://localhost:8080/realms/bookorbit')).resolves.toBeDefined();
     });
   });
 

@@ -10,7 +10,7 @@ import type {
   MergeResult,
   RenameResult,
   SplitResult,
-} from '@projectx/types'
+} from '@bookorbit/types'
 
 function toQuery(params: Record<string, string | number | undefined>): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined)

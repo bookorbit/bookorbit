@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
-import type { MetadataCandidate, MetadataProviderKey, MetadataSource } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderKey, MetadataSource } from '@bookorbit/types'
 import { useMetadataDiff } from '../useMetadataDiff'
 
 describe('useMetadataDiff', () => {

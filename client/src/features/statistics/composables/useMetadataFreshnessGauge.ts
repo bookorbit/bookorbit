@@ -1,4 +1,4 @@
-import type { MetadataFreshnessGauge } from '@projectx/types'
+import type { MetadataFreshnessGauge } from '@bookorbit/types'
 
 import { fetchMetadataFreshnessGauge } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

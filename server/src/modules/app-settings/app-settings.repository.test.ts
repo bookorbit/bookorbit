@@ -68,9 +68,9 @@ describe('AppSettingsRepository', () => {
 
   describe('findMany', () => {
     it('returns rows for provided keys', async () => {
-      const rows = [{ key: 'book_bucket_auto_finalize_enabled', value: 'true' }];
+      const rows = [{ key: 'book_dock_auto_finalize_enabled', value: 'true' }];
       db.where.mockResolvedValue(rows);
-      const result = await repo.findMany([APP_SETTING_KEYS.BOOK_BUCKET_AUTO_FINALIZE_ENABLED]);
+      const result = await repo.findMany([APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_ENABLED]);
       expect(result).toEqual(rows);
     });
 

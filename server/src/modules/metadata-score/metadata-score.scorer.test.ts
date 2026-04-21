@@ -1,4 +1,4 @@
-import { DEFAULT_METADATA_SCORE_WEIGHTS, type MetadataScoreWeights } from '@projectx/types';
+import { DEFAULT_METADATA_SCORE_WEIGHTS, type MetadataScoreWeights } from '@bookorbit/types';
 
 import { MetadataScoreScorer, type ScoreData } from './metadata-score.scorer';
 

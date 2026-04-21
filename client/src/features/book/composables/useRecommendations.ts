@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-import type { BookRecommendation } from '@projectx/types'
+import type { BookRecommendation } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export function useRecommendations() {

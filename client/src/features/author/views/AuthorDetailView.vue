@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
-import type { AuthorSummary, BookCard } from '@projectx/types'
+import type { AuthorSummary, BookCard } from '@bookorbit/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'

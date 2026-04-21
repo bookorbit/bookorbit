@@ -16,7 +16,7 @@ const {
   portraitGridGap,
   squareGridGap,
   cardOverlays,
-  lensFilterExpanded,
+  smartScopeFilterExpanded,
   authorCoverSize,
   authorCoverShape,
 } = useDisplaySettings()
@@ -435,18 +435,18 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
     </div>
   </div>
 
-  <!-- Lenses -->
+  <!-- SmartScopes -->
   <div class="mt-8">
-    <p class="settings-group-label">Lenses</p>
+    <p class="settings-group-label">Smart Scopes</p>
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
       <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
           <p class="settings-label">Show filter preview by default</p>
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
-            Expand the active filter and sort summary when opening a lens
+            Expand the active filter and sort summary when opening a smartScope
           </p>
         </div>
-        <ToggleSwitch v-model="lensFilterExpanded" />
+        <ToggleSwitch v-model="smartScopeFilterExpanded" />
       </div>
     </div>
   </div>

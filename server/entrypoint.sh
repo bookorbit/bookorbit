@@ -2,7 +2,7 @@
 set -e
 
 log() {
-  echo "ProjectX startup: $*" >&2
+  echo "BookOrbit startup: $*" >&2
 }
 
 ensure_dir() {
@@ -22,7 +22,7 @@ is_managed_data_path() {
 
 fix_owner() {
   dir="$1"
-  if [ "${PROJECTX_FIX_PERMISSIONS:-true}" != "true" ]; then
+  if [ "${BOOKORBIT_FIX_PERMISSIONS:-true}" != "true" ]; then
     return 0
   fi
   if ! is_managed_data_path "$dir"; then
@@ -36,7 +36,7 @@ fix_owner() {
 
 check_writable_as_user() {
   dir="$1"
-  if ! su-exec "$APP_UID:$APP_GID" sh -c 'touch "$1/.projectx-permission-test" && rm -f "$1/.projectx-permission-test"' sh "$dir"; then
+  if ! su-exec "$APP_UID:$APP_GID" sh -c 'touch "$1/.bookorbit-permission-test" && rm -f "$1/.bookorbit-permission-test"' sh "$dir"; then
     log "$dir is not writable by UID:GID $APP_UID:$APP_GID."
     log "Set PUID/PGID to a NAS user with write access, or fix the host folder ownership/ACLs."
     exit 1
@@ -45,7 +45,7 @@ check_writable_as_user() {
 
 check_writable_current_user() {
   dir="$1"
-  if ! touch "$dir/.projectx-permission-test" || ! rm -f "$dir/.projectx-permission-test"; then
+  if ! touch "$dir/.bookorbit-permission-test" || ! rm -f "$dir/.bookorbit-permission-test"; then
     log "$dir is not writable by the current container user $(id -u):$(id -g)."
     log "Remove the compose user override, set PUID/PGID, or fix the host folder ownership/ACLs."
     exit 1

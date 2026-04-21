@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
 
-import { PROJECTX_NS_PREFIX } from '../../../common/projectx-ns';
+import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
 
 export interface XmpParsed {
   title: string | null;
@@ -132,7 +132,7 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     }
   }
 
-  const px = PROJECTX_NS_PREFIX;
+  const px = BOOKORBIT_NS_PREFIX;
 
   return {
     title: str(merged['dc:title']),

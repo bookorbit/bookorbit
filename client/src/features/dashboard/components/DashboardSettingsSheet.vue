@@ -2,16 +2,16 @@
 import { ref, watch } from 'vue'
 import { ChevronDown, ChevronUp, GripVertical, Plus, RotateCcw, Trash2 } from 'lucide-vue-next'
 
-import type { ScrollerConfig, ScrollerType } from '@projectx/types'
+import type { ScrollerConfig, ScrollerType } from '@bookorbit/types'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { useLenses } from '@/features/lens/composables/useLenses'
+import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { DEFAULT_SCROLLERS, SCROLLER_LABELS, useDashboardConfig } from '../composables/useDashboardConfig'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 
 const { scrollers, saveScrollers, MAX_SCROLLERS } = useDashboardConfig()
-const { lenses, fetchLenses } = useLenses()
+const { smartScopes, fetchSmartScopes } = useSmartScopes()
 
 const draft = ref<ScrollerConfig[]>([])
 
@@ -20,7 +20,7 @@ watch(
   (isOpen) => {
     if (isOpen) {
       draft.value = (Array.isArray(scrollers.value) ? scrollers.value : DEFAULT_SCROLLERS).map((s) => ({ ...s }))
-      fetchLenses()
+      fetchSmartScopes()
     }
   },
 )
@@ -56,7 +56,7 @@ function onDragEnd() {
 }
 
 // ── Add / Remove ─────────────────────────────────────────────
-const ALL_TYPES: ScrollerType[] = ['continue-reading', 'recently-added', 'random', 'lens']
+const ALL_TYPES: ScrollerType[] = ['continue-reading', 'recently-added', 'random', 'smart-scope']
 
 function addScroller() {
   if (draft.value.length >= MAX_SCROLLERS) return
@@ -101,19 +101,19 @@ function moveDown(index: number) {
 }
 
 function onTypeChange(scroller: ScrollerConfig) {
-  if (scroller.type === 'lens') {
-    const firstLens = lenses.value[0]
-    scroller.lensId = firstLens?.id
-    scroller.label = firstLens?.name ?? 'Lens'
+  if (scroller.type === 'smart-scope') {
+    const firstSmartScope = smartScopes.value[0]
+    scroller.smartScopeId = firstSmartScope?.id
+    scroller.label = firstSmartScope?.name ?? 'SmartScope'
   } else {
-    scroller.lensId = undefined
+    scroller.smartScopeId = undefined
     scroller.label = SCROLLER_LABELS[scroller.type]
   }
 }
 
-function onLensChange(scroller: ScrollerConfig) {
-  const lens = lenses.value.find((l) => l.id === scroller.lensId)
-  if (lens) scroller.label = lens.name
+function onSmartScopeChange(scroller: ScrollerConfig) {
+  const smartScope = smartScopes.value.find((l) => l.id === scroller.smartScopeId)
+  if (smartScope) scroller.label = smartScope.name
 }
 
 // ── Save / Reset / Close ─────────────────────────────────────
@@ -196,7 +196,7 @@ function resetToDefault() {
                 @change="onTypeChange(scroller)"
               >
                 <option v-for="t in ALL_TYPES" :key="t" :value="t">
-                  {{ t === 'lens' ? 'Lens' : SCROLLER_LABELS[t] }}
+                  {{ SCROLLER_LABELS[t] }}
                 </option>
               </select>
 
@@ -210,18 +210,18 @@ function resetToDefault() {
               </button>
             </div>
 
-            <!-- Lens picker (shown only when type = lens) -->
-            <div v-if="scroller.type === 'lens'" class="border-t border-border/50 px-3 pb-2.5 pt-2">
-              <label class="mb-1.5 block text-[11px] font-medium text-muted-foreground">Lens</label>
+            <!-- SmartScope picker (shown only when type = smartScope) -->
+            <div v-if="scroller.type === 'smart-scope'" class="border-t border-border/50 px-3 pb-2.5 pt-2">
+              <label class="mb-1.5 block text-[11px] font-medium text-muted-foreground">Smart Scope</label>
               <select
-                v-if="lenses.length > 0"
-                v-model="scroller.lensId"
+                v-if="smartScopes.length > 0"
+                v-model="scroller.smartScopeId"
                 class="h-8 w-full appearance-none rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                @change="onLensChange(scroller)"
+                @change="onSmartScopeChange(scroller)"
               >
-                <option v-for="lens in lenses" :key="lens.id" :value="lens.id">{{ lens.name }}</option>
+                <option v-for="smartScope in smartScopes" :key="smartScope.id" :value="smartScope.id">{{ smartScope.name }}</option>
               </select>
-              <p v-else class="text-xs text-muted-foreground">No lenses yet. Create one from the sidebar.</p>
+              <p v-else class="text-xs text-muted-foreground">No Smart Scopes yet. Create one from the sidebar.</p>
             </div>
           </div>
         </div>

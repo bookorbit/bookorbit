@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsPositive, Max, Min } from 'class-validator';
-import { AuditAction, AuditResource } from '@projectx/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 
 export class AuditLogQueryDto {
   @IsOptional()

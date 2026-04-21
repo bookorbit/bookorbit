@@ -1,7 +1,7 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN } from '@projectx/types';
+import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN } from '@bookorbit/types';
 
 vi.mock('../../common/utils/ssrf.utils', () => ({
   ensureSafeUrl: vi.fn().mockImplementation((url: string) => Promise.resolve(new URL(url.replace(/\/$/, '')))),
@@ -79,25 +79,25 @@ describe('AppSettingsService', () => {
     });
   });
 
-  describe('isBookBucketAutoFetchEnabled', () => {
+  describe('isBookDockAutoFetchEnabled', () => {
     it('returns true by default when setting is absent', async () => {
       repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.isBookBucketAutoFetchEnabled()).toBe(true);
+      expect(await service.isBookDockAutoFetchEnabled()).toBe(true);
     });
 
     it('returns false when value is "false"', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'book_bucket_auto_fetch_metadata', value: 'false' } as never);
-      expect(await service.isBookBucketAutoFetchEnabled()).toBe(false);
+      repo.findByKey.mockResolvedValue({ key: 'book_dock_auto_fetch_metadata', value: 'false' } as never);
+      expect(await service.isBookDockAutoFetchEnabled()).toBe(false);
     });
 
     it('returns true when value is "true"', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'book_bucket_auto_fetch_metadata', value: 'true' } as never);
-      expect(await service.isBookBucketAutoFetchEnabled()).toBe(true);
+      repo.findByKey.mockResolvedValue({ key: 'book_dock_auto_fetch_metadata', value: 'true' } as never);
+      expect(await service.isBookDockAutoFetchEnabled()).toBe(true);
     });
 
     it('returns true when value is unrecognised', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'book_bucket_auto_fetch_metadata', value: 'yes' } as never);
-      expect(await service.isBookBucketAutoFetchEnabled()).toBe(true);
+      repo.findByKey.mockResolvedValue({ key: 'book_dock_auto_fetch_metadata', value: 'yes' } as never);
+      expect(await service.isBookDockAutoFetchEnabled()).toBe(true);
     });
   });
 
@@ -142,7 +142,7 @@ describe('AppSettingsService', () => {
         enabled: true,
         providerName: 'Keycloak',
         issuerUri: 'https://kc.example.com/realms/main',
-        clientId: 'projectx',
+        clientId: 'bookorbit',
         clientSecret: 'secret',
         scopes: 'openid profile email groups',
         claimMapping: { username: 'preferred_username', name: 'name', email: 'email', groups: 'groups' },
@@ -157,7 +157,7 @@ describe('AppSettingsService', () => {
       const stored = {
         enabled: true,
         issuerUri: 'https://kc.example.com/realms/main',
-        clientId: 'projectx',
+        clientId: 'bookorbit',
         claimMapping: { username: 'upn' },
       };
       repo.findByKey.mockResolvedValue({ key: 'oidc_config', value: JSON.stringify(stored) } as never);
@@ -165,7 +165,7 @@ describe('AppSettingsService', () => {
       const config = await service.getOidcConfig();
       expect(config.enabled).toBe(true);
       expect(config.providerName).toBe('');
-      expect(config.clientId).toBe('projectx');
+      expect(config.clientId).toBe('bookorbit');
       expect(config.claimMapping.username).toBe('upn');
       expect(config.claimMapping.groups).toBe('groups');
       expect(config.autoProvision.allowLocalLinking).toBe(true);
@@ -284,8 +284,8 @@ describe('AppSettingsService', () => {
     });
     it('passes allowLocal: true when nodeEnv is development', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
-      await service.testOidcConnection('https://auth.projectx.local:9093');
-      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://auth.projectx.local:9093', { allowLocal: true });
+      await service.testOidcConnection('https://auth.bookorbit.app:9093');
+      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://auth.bookorbit.app:9093', { allowLocal: true });
       vi.unstubAllGlobals();
     });
 
@@ -312,11 +312,11 @@ describe('AppSettingsService', () => {
 
     it('parses stored values correctly', async () => {
       repo.findMany.mockResolvedValue([
-        { key: 'book_bucket_auto_finalize_enabled', value: 'true' },
-        { key: 'book_bucket_auto_finalize_threshold', value: '90' },
-        { key: 'book_bucket_auto_finalize_library_id', value: '5' },
-        { key: 'book_bucket_auto_finalize_folder_id', value: '12' },
-        { key: 'book_bucket_auto_finalize_metadata_mode', value: 'fetched_only' },
+        { key: 'book_dock_auto_finalize_enabled', value: 'true' },
+        { key: 'book_dock_auto_finalize_threshold', value: '90' },
+        { key: 'book_dock_auto_finalize_library_id', value: '5' },
+        { key: 'book_dock_auto_finalize_folder_id', value: '12' },
+        { key: 'book_dock_auto_finalize_metadata_mode', value: 'fetched_only' },
       ] as never);
 
       const result = await service.getAutoFinalizeSettings();
@@ -329,8 +329,8 @@ describe('AppSettingsService', () => {
 
     it('returns null for library/folder when values are not valid numbers', async () => {
       repo.findMany.mockResolvedValue([
-        { key: 'book_bucket_auto_finalize_library_id', value: 'abc' },
-        { key: 'book_bucket_auto_finalize_folder_id', value: '' },
+        { key: 'book_dock_auto_finalize_library_id', value: 'abc' },
+        { key: 'book_dock_auto_finalize_folder_id', value: '' },
       ] as never);
 
       const result = await service.getAutoFinalizeSettings();
@@ -340,14 +340,14 @@ describe('AppSettingsService', () => {
     });
 
     it('falls back to safe_merge when metadata mode is invalid', async () => {
-      repo.findMany.mockResolvedValue([{ key: 'book_bucket_auto_finalize_metadata_mode', value: 'invalid_mode' }] as never);
+      repo.findMany.mockResolvedValue([{ key: 'book_dock_auto_finalize_metadata_mode', value: 'invalid_mode' }] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.metadataMode).toBe('safe_merge');
     });
 
     it('accepts embedded_only as a valid metadata mode', async () => {
-      repo.findMany.mockResolvedValue([{ key: 'book_bucket_auto_finalize_metadata_mode', value: 'embedded_only' }] as never);
+      repo.findMany.mockResolvedValue([{ key: 'book_dock_auto_finalize_metadata_mode', value: 'embedded_only' }] as never);
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.metadataMode).toBe('embedded_only');

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post } from '@nestjs/common';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { UpdateWeightsDto } from './dto/update-weights.dto';
 import { MetadataRecalculationTrigger, MetadataScoreService } from './metadata-score.service';

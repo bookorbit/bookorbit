@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
-import type { ProviderConfigurations } from '@projectx/types'
+import type { ProviderConfigurations } from '@bookorbit/types'
 import ProviderConfigPanel from './components/ProviderConfigPanel.vue'
 import { useProviderConfig } from './composables/useProviderConfig'
 import { useProviderThrottleRuntime } from './composables/useProviderThrottleRuntime'

@@ -503,7 +503,7 @@ export class MigrationImportRepository {
 
     if (bookIds.length === 0) return { primaryFilesByBookId, audiobookPrimaryFilesByBookId };
 
-    const { isAudioFormat } = await import('@projectx/types');
+    const { isAudioFormat } = await import('@bookorbit/types');
 
     const rows = await this.db
       .select({

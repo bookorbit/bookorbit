@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GroupRule, Rule } from '@projectx/types'
+import type { GroupRule, Rule } from '@bookorbit/types'
 import { ruleToParts } from '@/features/book/lib/filter-labels'
 
 defineProps<{

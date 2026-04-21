@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { KoboDevice, KoboDeviceWithToken } from '@projectx/types'
+import type { KoboDevice, KoboDeviceWithToken } from '@bookorbit/types'
 
 const devices = ref<KoboDevice[]>([])
 let fetchPromise: Promise<void> | null = null

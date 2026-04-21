@@ -1,6 +1,6 @@
 import { onMounted, ref, watch } from 'vue'
 
-import type { StatisticsFilterConfig } from '@projectx/types'
+import type { StatisticsFilterConfig } from '@bookorbit/types'
 import { useStatisticsConfig } from './useStatisticsConfig'
 
 interface UseStatisticsQueryOptions<T> {

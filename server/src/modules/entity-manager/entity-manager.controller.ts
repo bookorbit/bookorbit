@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 
-import { AuditAction, type EntityType, INLINE_ENTITY_TYPES, Permission } from '@projectx/types';
+import { AuditAction, type EntityType, INLINE_ENTITY_TYPES, Permission } from '@bookorbit/types';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';

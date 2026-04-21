@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search } from 'lucide-vue-next'
-import type { BrowseEntityItem, DuplicateCluster } from '@projectx/types'
+import type { BrowseEntityItem, DuplicateCluster } from '@bookorbit/types'
 
 import { useEntityManager, type EntityManagerMode } from '../../composables/useEntityManager'
 import DuplicateClusterCard from '../components/DuplicateClusterCard.vue'

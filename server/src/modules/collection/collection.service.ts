@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BooksPage } from '@projectx/types';
+import type { BooksPage } from '@bookorbit/types';
 import { assembleBookCards, collapseBookCards } from '../book/utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookQueryBuilder } from '../book/book-query-builder.service';

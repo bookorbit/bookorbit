@@ -1,5 +1,5 @@
 import { onUnmounted, ref, type Ref } from 'vue'
-import type { BookCard, ScanBooksAddedEvent } from '@projectx/types'
+import type { BookCard, ScanBooksAddedEvent } from '@bookorbit/types'
 import { getSocket } from './useScanProgress'
 
 const THROTTLE_MS = 500

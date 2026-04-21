@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CoverSearchResult } from '@projectx/types';
+import { CoverSearchResult } from '@bookorbit/types';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ProviderConfigurations } from '@projectx/types';
+import { ProviderConfigurations } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { GoogleProvider } from './google.provider';

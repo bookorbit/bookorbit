@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { BookMetadataLockField } from '@projectx/types';
+import type { BookMetadataLockField } from '@bookorbit/types';
 import { eq, inArray } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 

@@ -1,6 +1,6 @@
 import { Client } from 'pg';
 
-const DEFAULT_E2E_DATABASE_URL = 'postgres://projectx:projectx@localhost:5432/projectx_e2e';
+const DEFAULT_E2E_DATABASE_URL = 'postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e';
 const CONNECT_RETRY_ATTEMPTS = 30;
 const CONNECT_RETRY_DELAY_MS = 1000;
 

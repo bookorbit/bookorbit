@@ -1,4 +1,4 @@
-import type { OidcCallbackResponse, OidcProviderPublic } from '@projectx/types'
+import type { OidcCallbackResponse, OidcProviderPublic } from '@bookorbit/types'
 
 export async function generatePkce(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const array = new Uint8Array(32)

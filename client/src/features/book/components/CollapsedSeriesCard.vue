@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 

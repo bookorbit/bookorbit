@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import type { RequestUser } from '../types/request-user';
 
 import { PermissionService } from './permission.service';

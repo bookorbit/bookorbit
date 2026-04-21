@@ -1,4 +1,4 @@
-import type { UserSessionArchetypePoint } from '@projectx/types'
+import type { UserSessionArchetypePoint } from '@bookorbit/types'
 
 import { fetchUserSessionArchetypes } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

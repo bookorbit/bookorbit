@@ -1,5 +1,5 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { PERMISSION_KEY } from '../decorators/require-permission.decorator';

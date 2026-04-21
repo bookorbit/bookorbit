@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
-import type { BookMetadataFetchReason, MetadataField } from '@projectx/types';
-import { MetadataProviderKey, NotificationType } from '@projectx/types';
+import type { BookMetadataFetchReason, MetadataField } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { BookReadService } from '../book/book-read.service';
 import * as schema from '../../db/schema';

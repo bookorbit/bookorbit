@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, reactive, ref, watch } from 'vue'
 import { Search, BookOpen, Loader2, PencilLine } from 'lucide-vue-next'
-import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
+import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 import MetadataResultCard from './MetadataResultCard.vue'
 import { providerActivePillStyle } from '../../../lib/metadata-fetch'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'

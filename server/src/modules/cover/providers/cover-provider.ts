@@ -1,4 +1,4 @@
-import { CoverSearchResult } from '@projectx/types';
+import { CoverSearchResult } from '@bookorbit/types';
 
 export const DUCKDUCKGO_PROVIDER_KEY = 'duckduckgo' as const;
 export const ITUNES_PROVIDER_KEY = 'itunes' as const;

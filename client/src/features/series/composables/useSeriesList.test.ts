@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { SeriesPage } from '@projectx/types'
+import type { SeriesPage } from '@bookorbit/types'
 
 vi.mock('../api/series', () => ({
   fetchSeries: vi.fn<typeof import('../api/series').fetchSeries>(),

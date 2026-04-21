@@ -31,7 +31,7 @@ describe('App settings DTO validation', () => {
           enabled: true,
           providerName: 'Keycloak',
           issuerUri: 'https://id.example.com/realms/main',
-          clientId: 'projectx',
+          clientId: 'bookorbit',
           clientSecret: 'secret',
           scopes: 'openid profile email',
           claimMapping: {

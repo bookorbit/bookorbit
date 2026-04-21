@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { OidcAutoProvision, OidcClaimMapping } from '@projectx/types';
+import type { OidcAutoProvision, OidcClaimMapping } from '@bookorbit/types';
 
 import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { OidcProviderRepository } from './oidc-provider.repository';

@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { BadRequestException, Controller, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

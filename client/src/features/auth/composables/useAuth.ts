@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { AuthUser, AuthResponse } from '@projectx/types'
+import type { AuthUser, AuthResponse } from '@bookorbit/types'
 import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
 import router from '@/router'
 import { useSetupStatus } from './useSetupStatus'

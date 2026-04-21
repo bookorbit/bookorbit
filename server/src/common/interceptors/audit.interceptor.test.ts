@@ -38,10 +38,10 @@ describe('AuditInterceptor', () => {
       get: vi.fn().mockImplementation((key: string) => {
         if (key !== AUDITABLE_KEY) return undefined;
         return {
-          action: 'lens.create',
-          resource: 'lens',
+          action: 'smart_scope.create',
+          resource: 'smart_scope',
           getResourceId: (_req: unknown, body: { id: number }) => body.id,
-          description: (_req: unknown, body: { name: string }) => `Created lens ${body.name}`,
+          description: (_req: unknown, body: { name: string }) => `Created Smart Scope ${body.name}`,
         };
       }),
     };
@@ -65,10 +65,10 @@ describe('AuditInterceptor', () => {
     expect(auditEvents.emit).toHaveBeenCalledWith(AUDIT_EVENT, {
       userId: 7,
       actorUsername: 'reader',
-      action: 'lens.create',
-      resource: 'lens',
+      action: 'smart_scope.create',
+      resource: 'smart_scope',
       resourceId: 22,
-      description: 'Created lens Favorites',
+      description: 'Created Smart Scope Favorites',
       ip: '10.0.0.8',
     });
   });

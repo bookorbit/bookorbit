@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { MigrationProgressGateway } from './migration-progress.gateway';

@@ -1,4 +1,4 @@
-import type { MetadataScoreWeights } from '@projectx/types';
+import type { MetadataScoreWeights } from '@bookorbit/types';
 
 import type { ScorePage } from './metadata-score.repository';
 import { MetadataRecalculationTrigger, MetadataScoreService } from './metadata-score.service';

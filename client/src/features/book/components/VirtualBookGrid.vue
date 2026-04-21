@@ -2,7 +2,7 @@
 import { computed, inject, ref } from 'vue'
 import { useElementSize, useWindowSize } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'

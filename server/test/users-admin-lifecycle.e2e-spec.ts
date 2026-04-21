@@ -2,8 +2,8 @@ import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
-import type { Permission } from '@projectx/types';
-import { Permission as PermissionEnum } from '@projectx/types';
+import type { Permission } from '@bookorbit/types';
+import { Permission as PermissionEnum } from '@bookorbit/types';
 
 import {
   authHeader,
@@ -66,7 +66,7 @@ function parseTokenFromResetUrl(resetUrl: string): string {
 }
 
 function buildMultipartBody(fileName: string, content: Buffer, contentType: string): { body: Buffer; boundary: string } {
-  const boundary = `----projectx-users-admin-${randomUUID()}`;
+  const boundary = `----bookorbit-users-admin-${randomUUID()}`;
   const preamble = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${contentType}\r\n\r\n`,
     'utf8',

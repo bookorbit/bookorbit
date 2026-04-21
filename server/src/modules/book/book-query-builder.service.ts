@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { GroupRule, Rule, SortField, SortSpec } from '@projectx/types';
+import type { GroupRule, Rule, SortField, SortSpec } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import {

@@ -25,7 +25,7 @@ import {
   Zap,
 } from 'lucide-vue-next'
 
-import { DEFAULT_LIBRARY_CHART_ORDER, DEFAULT_USER_CHART_ORDER, type StatisticsChartId } from '@projectx/types'
+import { DEFAULT_LIBRARY_CHART_ORDER, DEFAULT_USER_CHART_ORDER, type StatisticsChartId } from '@bookorbit/types'
 
 export type StatisticsChartSize = '1x1' | '2x1' | '2x2' | '1x2' | '3x1' | '4x1'
 export type StatisticsChartCategory = 'library' | 'user'

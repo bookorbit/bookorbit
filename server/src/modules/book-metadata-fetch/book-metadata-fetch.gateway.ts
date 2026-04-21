@@ -1,7 +1,7 @@
 import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Permission, type BookMetadataFetchStatusEvent } from '@projectx/types';
+import { Permission, type BookMetadataFetchStatusEvent } from '@bookorbit/types';
 import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';

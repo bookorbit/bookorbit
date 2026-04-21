@@ -1,4 +1,4 @@
-import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@bookorbit/types';
 
 export type AuthorMetadataSearchParams = {
   name: string;

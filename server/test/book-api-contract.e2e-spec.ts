@@ -3,7 +3,7 @@ import { rm } from 'fs/promises';
 import { join } from 'path';
 
 import * as unzipper from 'unzipper';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import {
   authHeader,

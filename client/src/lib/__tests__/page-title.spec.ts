@@ -10,7 +10,7 @@ describe('formatPageTitle', () => {
   })
 
   it('formats non-empty leaf title', () => {
-    expect(formatPageTitle('Authors')).toBe('Authors · Projectx')
-    expect(formatPageTitle('  Dashboard  ')).toBe('Dashboard · Projectx')
+    expect(formatPageTitle('Authors')).toBe('Authors · BookOrbit')
+    expect(formatPageTitle('  Dashboard  ')).toBe('Dashboard · BookOrbit')
   })
 })

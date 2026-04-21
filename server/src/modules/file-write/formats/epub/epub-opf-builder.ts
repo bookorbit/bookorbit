@@ -1,7 +1,7 @@
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
 import { EPUB_PROVIDER_IDENTIFIER_PREFIXES } from '../../file-write.constants';
-import { PROJECTX_NS_PREFIX as APP_WRITE_NAMESPACE, PROJECTX_NS_URI as APP_NS_URI } from '../shared/projectx-ns';
+import { BOOKORBIT_NS_PREFIX as APP_WRITE_NAMESPACE, BOOKORBIT_NS_URI as APP_NS_URI } from '../shared/bookorbit-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 
 const writerParser = new XMLParser({
@@ -166,9 +166,9 @@ function stripMetadata(children: OrderedNode[], uidRef: string): { cleaned: Orde
         const refId = refines.startsWith('#') ? refines.slice(1) : refines;
         if (creatorIds.has(refId) || collectionIds.has(refId)) continue;
       }
-      // Strip projectx: named metas
+      // Strip bookorbit: named metas
       if (name.startsWith(`${APP_WRITE_NAMESPACE}:`)) continue;
-      // Strip projectx: property metas
+      // Strip bookorbit: property metas
       if (prop.startsWith(`${APP_WRITE_NAMESPACE}:`)) continue;
     }
 
@@ -194,7 +194,7 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
     }
   }
 
-  // subtitle (EPUB3 as second dc:title, EPUB2 as projectx:subtitle meta)
+  // subtitle (EPUB3 as second dc:title, EPUB2 as bookorbit:subtitle meta)
   if (payload.subtitle != null) {
     if (epubVersion === 3) {
       nodes.push(makeTextNode('dc:title', payload.subtitle, { '@_id': 't-sub' }));
@@ -339,7 +339,7 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
   const epubVersion = detectEpubVersion(pkgAttrs);
   const uidRef = getUniqueIdentifierRef(pkgAttrs);
 
-  // Ensure projectx namespace prefix is declared on the <package> element for EPUB3.
+  // Ensure bookorbit namespace prefix is declared on the <package> element for EPUB3.
   // pkgAttrs is a live reference to the :@ object inside the parsed tree, so
   // mutating it directly is sufficient - no need to walk children.
   if (epubVersion === 3) {

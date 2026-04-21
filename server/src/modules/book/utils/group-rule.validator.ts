@@ -1,9 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
-import type { GroupRule, Rule } from '@projectx/types';
+import type { GroupRule, Rule } from '@bookorbit/types';
 
-// Constants inlined to avoid a runtime require() of the @projectx/types TS source.
+// Constants inlined to avoid a runtime require() of the @bookorbit/types TS source.
 // Keep in sync with packages/types/src/query.ts.
 const RULE_FIELDS = [
   'title',

@@ -5,7 +5,7 @@
     "Permission.ManageMetadataConfig": 32,
     "Permission.EmailSend": 30,
     "Permission.LibraryEditMetadata": 23,
-    "Permission.BookBucketAccess": 17,
+    "Permission.BookDockAccess": 17,
     "Permission.ManageAppSettings": 14,
     "Permission.ManageLibraries": 13,
     "Permission.ManageUsers": 10,

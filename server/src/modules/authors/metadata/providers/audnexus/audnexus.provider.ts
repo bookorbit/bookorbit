@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@bookorbit/types';
 
 import { AuthorMetadataProviderError, AuthorMetadataSearchParams, IdentifiableAuthorMetadataProvider } from '../author-metadata-provider';
 import { AudnexusAuthorResponse } from './audnexus.types';

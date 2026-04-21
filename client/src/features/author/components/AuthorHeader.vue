@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { AuthorDetail } from '@projectx/types'
+import type { AuthorDetail } from '@bookorbit/types'
 import { MoreHorizontal, Pencil, RefreshCcw, Trash2, UsersRound, X } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 

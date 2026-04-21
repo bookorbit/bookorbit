@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
-import { AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
 export class ListAuthorMetadataDto {
   @IsString()

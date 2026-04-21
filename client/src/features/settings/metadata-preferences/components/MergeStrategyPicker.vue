@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MergeStrategy } from '@projectx/types'
+import type { MergeStrategy } from '@bookorbit/types'
 
 defineProps<{ modelValue: MergeStrategy; disabled?: boolean }>()
 defineEmits<{ 'update:modelValue': [value: MergeStrategy] }>()

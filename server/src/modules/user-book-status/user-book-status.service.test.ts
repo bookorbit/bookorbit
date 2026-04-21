@@ -1,5 +1,5 @@
 import { InternalServerErrorException } from '@nestjs/common';
-import type { ReadStatus, ReadStatusSource } from '@projectx/types';
+import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserBookStatusRow } from '../../db/schema';

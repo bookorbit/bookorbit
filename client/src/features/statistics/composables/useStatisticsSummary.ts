@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 
-import type { StatisticsSummary } from '@projectx/types'
+import type { StatisticsSummary } from '@bookorbit/types'
 
 import { fetchStatisticsSummary } from '../api/statistics.api'
 import { useStatisticsConfig } from './useStatisticsConfig'

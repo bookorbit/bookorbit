@@ -1,5 +1,5 @@
 import { ref, reactive } from 'vue'
-import type { AuditLogEntry, AuditLogPage } from '@projectx/types'
+import type { AuditLogEntry, AuditLogPage } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 interface AuditFilters {

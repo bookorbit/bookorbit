@@ -1,4 +1,4 @@
-import type { PageCountDistributionItem, StatisticsResult } from '@projectx/types'
+import type { PageCountDistributionItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchPageCountDistribution } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

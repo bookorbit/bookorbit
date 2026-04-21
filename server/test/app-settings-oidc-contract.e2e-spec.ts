@@ -11,7 +11,7 @@ import { Test } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { hash } from 'bcryptjs';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { AppModule } from '../src/app.module';
 import { GlobalExceptionFilter } from '../src/common/filters/http-exception.filter';

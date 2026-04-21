@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { READER_GROUP_DEFAULTS, getFormatGroup, type ReaderFormatGroup } from '@projectx/types';
+import { READER_GROUP_DEFAULTS, getFormatGroup, type ReaderFormatGroup } from '@bookorbit/types';
 import { z } from 'zod';
 
 import type { RequestUser } from '../../common/types/request-user';

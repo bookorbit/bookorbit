@@ -48,10 +48,10 @@ describe('OpdsBookService', () => {
     await expect(userService.getAccessibleLibraryIds(7, false)).resolves.toEqual([2, 3]);
   });
 
-  it('handles getBooksPage access checks and lens delegation', async () => {
+  it('handles getBooksPage access checks and smartScope delegation', async () => {
     const { service } = makeService([[{ userId: 999 }], [{ userId: 7 }]]);
     const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
-    const lensSpy = vi.spyOn(service as never, 'getBooksByLens');
+    const smartScopeSpy = vi.spyOn(service as never, 'getBooksBySmartScope');
     const paginatedSpy = vi.spyOn(service as never, 'paginatedBookQuery');
 
     accessSpy.mockResolvedValueOnce([]);
@@ -64,9 +64,9 @@ describe('OpdsBookService', () => {
     await expect(service.getBooksPage(7, 'recent', 1, 50, { collectionId: 11 })).rejects.toThrow(ForbiddenException);
 
     accessSpy.mockResolvedValueOnce([1, 2]);
-    lensSpy.mockResolvedValueOnce({ entries: [{ id: 5 }], total: 1 });
-    await expect(service.getBooksPage(7, 'recent', 3, 25, { lensId: 4 })).resolves.toEqual({ entries: [{ id: 5 }], total: 1 });
-    expect(lensSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25);
+    smartScopeSpy.mockResolvedValueOnce({ entries: [{ id: 5 }], total: 1 });
+    await expect(service.getBooksPage(7, 'recent', 3, 25, { smartScopeId: 4 })).resolves.toEqual({ entries: [{ id: 5 }], total: 1 });
+    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25);
 
     accessSpy.mockResolvedValueOnce([1, 2]);
     paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 9 }], total: 1 });
@@ -129,11 +129,11 @@ describe('OpdsBookService', () => {
     await expect(service.getDistinctSeries(1)).resolves.toEqual([{ name: 'Dune', bookCount: 2 }]);
   });
 
-  it('returns user collections and lenses', async () => {
+  it('returns user collections and smartScopes', async () => {
     const { service } = makeService([[{ id: 4, name: 'Favorites', bookCount: 1 }], [{ id: 7, name: 'Unread', icon: 'sparkles' }]]);
 
     await expect(service.getUserCollections(8)).resolves.toEqual([{ id: 4, name: 'Favorites', bookCount: 1 }]);
-    await expect(service.getUserLenses(8)).resolves.toEqual([{ id: 7, name: 'Unread', icon: 'sparkles' }]);
+    await expect(service.getUserSmartScopes(8)).resolves.toEqual([{ id: 7, name: 'Unread', icon: 'sparkles' }]);
   });
 
   it('enforces validateBookAccess ownership checks', async () => {
@@ -160,20 +160,20 @@ describe('OpdsBookService', () => {
     });
   });
 
-  it('returns no lens books when lens is missing or private to another user', async () => {
+  it('returns no smartScope books when smartScope is missing or private to another user', async () => {
     const { service } = makeService([[], [{ id: 5, userId: 99, isPublic: false, filter: null }]]);
 
-    await expect((service as never).getBooksByLens(7, 5, [1], 'recent', 1, 25)).resolves.toEqual({ entries: [], total: 0 });
-    await expect((service as never).getBooksByLens(7, 5, [1], 'recent', 1, 25)).resolves.toEqual({ entries: [], total: 0 });
+    await expect((service as never).getBooksBySmartScope(7, 5, [1], 'recent', 1, 25)).resolves.toEqual({ entries: [], total: 0 });
+    await expect((service as never).getBooksBySmartScope(7, 5, [1], 'recent', 1, 25)).resolves.toEqual({ entries: [], total: 0 });
   });
 
-  it('builds lens filters and delegates lens pagination', async () => {
+  it('builds smartScope filters and delegates smartScope pagination', async () => {
     const { service, queryBuilder } = makeService([[{ id: 9, userId: 7, isPublic: false, filter: { op: 'and' } }]], {
       buildWhere: vi.fn().mockReturnValue({ kind: 'where' }),
     });
     const paginatedSpy = vi.spyOn(service as never, 'paginatedBookQuery').mockResolvedValue({ entries: [{ id: 1 }], total: 1 });
 
-    await expect((service as never).getBooksByLens(7, 9, [1, 2], 'title_desc', 2, 10)).resolves.toEqual({ entries: [{ id: 1 }], total: 1 });
+    await expect((service as never).getBooksBySmartScope(7, 9, [1, 2], 'title_desc', 2, 10)).resolves.toEqual({ entries: [{ id: 1 }], total: 1 });
     expect(queryBuilder.buildWhere).toHaveBeenCalledWith({ op: 'and' }, { accessibleLibraryIds: [1, 2], userId: 7 });
     expect(paginatedSpy).toHaveBeenCalledTimes(1);
   });

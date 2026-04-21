@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { fetchWithThrottle } from '../../fetch-with-throttle';

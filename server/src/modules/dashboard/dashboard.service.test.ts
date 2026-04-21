@@ -34,12 +34,12 @@ function makeService() {
   const libraryService = {
     findAccessibleLibraryIds: vi.fn(),
   };
-  const lensService = {
-    executeLens: vi.fn(),
+  const smartScopeService = {
+    executeSmartScope: vi.fn(),
   };
 
-  const service = new DashboardService(dashboardRepo as never, bookReadService as never, libraryService as never, lensService as never);
-  return { service, dashboardRepo, bookReadService, libraryService, lensService };
+  const service = new DashboardService(dashboardRepo as never, bookReadService as never, libraryService as never, smartScopeService as never);
+  return { service, dashboardRepo, bookReadService, libraryService, smartScopeService };
 }
 
 function makeFindCardsResult(idsInRowOrder: number[]) {
@@ -72,24 +72,24 @@ describe('DashboardService', () => {
     vi.clearAllMocks();
   });
 
-  it('rejects lens scroller calls when lensId is missing or invalid', async () => {
-    const { service, lensService } = makeService();
+  it('rejects smartScope scroller calls when smartScopeId is missing or invalid', async () => {
+    const { service, smartScopeService } = makeService();
 
-    await expect(service.getScroller(ScrollerType.LENS, makeUser(), 20, 0)).rejects.toThrow(BadRequestException);
-    await expect(service.getScroller(ScrollerType.LENS, makeUser(), 20, -2)).rejects.toThrow(BadRequestException);
+    await expect(service.getScroller(ScrollerType.SMART_SCOPE, makeUser(), 20, 0)).rejects.toThrow(BadRequestException);
+    await expect(service.getScroller(ScrollerType.SMART_SCOPE, makeUser(), 20, -2)).rejects.toThrow(BadRequestException);
 
-    expect(lensService.executeLens).not.toHaveBeenCalled();
+    expect(smartScopeService.executeSmartScope).not.toHaveBeenCalled();
   });
 
-  it('executes lens scroller with max limit clamp and returns lens items', async () => {
-    const { service, lensService } = makeService();
+  it('executes smartScope scroller with max limit clamp and returns smartScope items', async () => {
+    const { service, smartScopeService } = makeService();
     const user = makeUser({ id: 7 });
     const items = [{ id: 11 }, { id: 12 }];
-    lensService.executeLens.mockResolvedValue({ items, total: 2, page: 0, size: 50 });
+    smartScopeService.executeSmartScope.mockResolvedValue({ items, total: 2, page: 0, size: 50 });
 
-    const result = await service.getScroller(ScrollerType.LENS, user, 999, 88);
+    const result = await service.getScroller(ScrollerType.SMART_SCOPE, user, 999, 88);
 
-    expect(lensService.executeLens).toHaveBeenCalledWith(88, user, 0, 50);
+    expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(88, user, 0, 50);
     expect(result).toEqual(items);
   });
 

@@ -1,14 +1,14 @@
-import type { AuthorAutoEnrichmentConfig, OidcAutoProvision, OidcBaseConfig, OidcClaimMapping } from '@projectx/types';
+import type { AuthorAutoEnrichmentConfig, OidcAutoProvision, OidcBaseConfig, OidcClaimMapping } from '@bookorbit/types';
 
 export const APP_SETTING_KEYS = {
   ALLOW_REGISTRATION: 'allow_registration',
   OPDS_ENABLED: 'opds_enabled',
-  BOOK_BUCKET_AUTO_FETCH_METADATA: 'book_bucket_auto_fetch_metadata',
-  BOOK_BUCKET_AUTO_FINALIZE_ENABLED: 'book_bucket_auto_finalize_enabled',
-  BOOK_BUCKET_AUTO_FINALIZE_THRESHOLD: 'book_bucket_auto_finalize_threshold',
-  BOOK_BUCKET_AUTO_FINALIZE_LIBRARY_ID: 'book_bucket_auto_finalize_library_id',
-  BOOK_BUCKET_AUTO_FINALIZE_FOLDER_ID: 'book_bucket_auto_finalize_folder_id',
-  BOOK_BUCKET_AUTO_FINALIZE_METADATA_MODE: 'book_bucket_auto_finalize_metadata_mode',
+  BOOK_DOCK_AUTO_FETCH_METADATA: 'book_dock_auto_fetch_metadata',
+  BOOK_DOCK_AUTO_FINALIZE_ENABLED: 'book_dock_auto_finalize_enabled',
+  BOOK_DOCK_AUTO_FINALIZE_THRESHOLD: 'book_dock_auto_finalize_threshold',
+  BOOK_DOCK_AUTO_FINALIZE_LIBRARY_ID: 'book_dock_auto_finalize_library_id',
+  BOOK_DOCK_AUTO_FINALIZE_FOLDER_ID: 'book_dock_auto_finalize_folder_id',
+  BOOK_DOCK_AUTO_FINALIZE_METADATA_MODE: 'book_dock_auto_finalize_metadata_mode',
   AUTHORS_AUTO_ENRICHMENT_ENABLED: 'authors_auto_enrichment_enabled',
   AUTHORS_AUTO_ENRICHMENT_WRITE_MODE: 'authors_auto_enrichment_write_mode',
   AUTHORS_AUTO_ENRICHMENT_CONFIG: 'authors_auto_enrichment_config',

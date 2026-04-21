@@ -1,4 +1,4 @@
-import { AuthorMetadataProviderKey } from '@projectx/types';
+import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
 import { AudnexusAuthorMetadataProvider } from './audnexus.provider';
 

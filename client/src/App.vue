@@ -3,7 +3,7 @@ import { computed, provide } from 'vue'
 import { INIT_OPTIONS_KEY, THEME_KEY } from 'vue-echarts'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { useThemeStore } from '@/stores/theme'
-import { getProjectxThemeName, initChartThemes } from '@/lib/echarts'
+import { getBookorbitThemeName, initChartThemes } from '@/lib/echarts'
 import ChangePasswordDialog from '@/features/auth/ChangePasswordDialog.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -16,7 +16,7 @@ initChartThemes()
 provide(INIT_OPTIONS_KEY, { renderer: 'svg' })
 provide(
   THEME_KEY,
-  computed(() => getProjectxThemeName(themeStore.theme, themeStore.accent)),
+  computed(() => getBookorbitThemeName(themeStore.theme, themeStore.accent)),
 )
 </script>
 

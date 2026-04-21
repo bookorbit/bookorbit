@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
-import type { FieldPreferenceOverrides } from '@projectx/types'
+import type { FieldPreferenceOverrides } from '@bookorbit/types'
 import { Info } from 'lucide-vue-next'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import GlobalPreferencePanel from './components/GlobalPreferencePanel.vue'

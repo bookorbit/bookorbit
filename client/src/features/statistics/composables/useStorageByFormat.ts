@@ -1,4 +1,4 @@
-import type { StatisticsResult, StorageByFormatItem } from '@projectx/types'
+import type { StatisticsResult, StorageByFormatItem } from '@bookorbit/types'
 
 import { fetchStorageByFormat } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

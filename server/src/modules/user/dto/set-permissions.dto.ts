@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { IsArray, IsEnum } from 'class-validator';
 
 export class SetPermissionsDto {

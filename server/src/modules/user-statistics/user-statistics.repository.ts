@@ -12,7 +12,7 @@ import type {
   UserReadingPacePoint,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
-} from '@projectx/types';
+} from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

@@ -17,6 +17,6 @@
     ]
   },
   "moduleNameMapper": {
-    "^@projectx/types$": "<rootDir>/../packages/types/src/index.ts"
+    "^@bookorbit/types$": "<rootDir>/../packages/types/src/index.ts"
   }
 }

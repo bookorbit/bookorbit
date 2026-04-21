@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 
-import type { WriteResult } from '@projectx/types';
+import type { WriteResult } from '@bookorbit/types';
 import { getSevenZip, type SevenZipFS } from '../../../../common/sevenzip';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';

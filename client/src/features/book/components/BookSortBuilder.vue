@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-vue-next'
-import type { SortField, SortSpec } from '@projectx/types'
-import { SORT_FIELDS } from '@projectx/types'
+import type { SortField, SortSpec } from '@bookorbit/types'
+import { SORT_FIELDS } from '@bookorbit/types'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 

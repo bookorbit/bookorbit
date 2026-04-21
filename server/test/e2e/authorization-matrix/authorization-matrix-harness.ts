@@ -8,14 +8,14 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { mkdir, stat } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Permission, BookBucketMetadata } from '@projectx/types';
+import type { Permission, BookDockMetadata } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
+import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { makeMetadataNoopMock, seedLibrary, waitForScanCompletion, type MetadataNoopMock } from '../app-harness';
 import {
   buildFb2Fixture,
@@ -69,14 +69,14 @@ export interface LocatedBookFile {
   format: string | null;
 }
 
-export interface CreateBookBucketRowInput {
+export interface CreateBookDockRowInput {
   fileName?: string;
   content?: string | Buffer;
-  status?: typeof schema.bookBucketFiles.$inferInsert.status;
+  status?: typeof schema.bookDockFiles.$inferInsert.status;
   format?: string;
-  embeddedMetadata?: BookBucketMetadata | null;
-  selectedMetadata?: BookBucketMetadata | null;
-  fetchedMetadata?: BookBucketMetadata | null;
+  embeddedMetadata?: BookDockMetadata | null;
+  selectedMetadata?: BookDockMetadata | null;
+  fetchedMetadata?: BookDockMetadata | null;
   targetLibraryId?: number | null;
   targetFolderId?: number | null;
   confidence?: number | null;
@@ -129,12 +129,12 @@ export async function createAuthorizationMatrixE2EContext(): Promise<Authorizati
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopBookBucketWatcher(app);
+  await stopBookDockWatcher(app);
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
-  await setSettingValue(db, 'book_bucket_auto_fetch_metadata', 'false');
-  await setSettingValue(db, 'book_bucket_auto_finalize_enabled', 'false');
+  await setSettingValue(db, 'book_dock_auto_fetch_metadata', 'false');
+  await setSettingValue(db, 'book_dock_auto_finalize_enabled', 'false');
   await setSettingValue(db, 'opds_enabled', 'true');
 
   return {
@@ -320,18 +320,18 @@ export async function createBookCoverArtifacts(
   await writeFixtureFile(ctx.fixture.booksPath, `covers/${bookId}/thumbnail.jpg`, thumbnailContent);
 }
 
-export async function createBookBucketRow(
+export async function createBookDockRow(
   ctx: AuthorizationMatrixE2EContext,
-  input: CreateBookBucketRowInput = {},
-): Promise<typeof schema.bookBucketFiles.$inferSelect> {
-  const fileName = input.fileName ?? `authz-book-bucket-${randomUUID()}.fb2`;
+  input: CreateBookDockRowInput = {},
+): Promise<typeof schema.bookDockFiles.$inferSelect> {
+  const fileName = input.fileName ?? `authz-book-dock-${randomUUID()}.fb2`;
   const content = input.content ?? buildFb2Fixture({ title: `Authorization Matrix ${randomUUID()}`, authors: ['Fixture Author'] });
   const format = input.format ?? fileName.split('.').pop()?.toLowerCase() ?? 'fb2';
-  const absolutePath = await writeFixtureFile(ctx.fixture.booksPath, `book-bucket/${fileName}`, content);
+  const absolutePath = await writeFixtureFile(ctx.fixture.booksPath, `book-dock/${fileName}`, content);
   const fileStat = await stat(absolutePath);
 
   const [row] = await ctx.db
-    .insert(schema.bookBucketFiles)
+    .insert(schema.bookDockFiles)
     .values({
       fileName,
       absolutePath,
@@ -444,7 +444,7 @@ export async function uploadLibraryFile(
 }
 
 function buildMultipartBody(fileName: string, content: Buffer, contentType: string): { body: Buffer; boundary: string } {
-  const boundary = `----projectx-authz-${randomUUID()}`;
+  const boundary = `----bookorbit-authz-${randomUUID()}`;
   const preamble = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${contentType}\r\n\r\n`,
     'utf8',
@@ -453,8 +453,8 @@ function buildMultipartBody(fileName: string, content: Buffer, contentType: stri
   return { body: Buffer.concat([preamble, content, closing]), boundary };
 }
 
-async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(BookBucketWatcherService);
+async function stopBookDockWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookDockWatcherService);
   await watcher.onModuleDestroy();
 }
 

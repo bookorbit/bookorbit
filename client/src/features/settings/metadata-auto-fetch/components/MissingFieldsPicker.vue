@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { MetadataField } from '@projectx/types'
-import { ALL_METADATA_FIELDS } from '@projectx/types'
+import type { MetadataField } from '@bookorbit/types'
+import { ALL_METADATA_FIELDS } from '@bookorbit/types'
 
 const props = defineProps<{
   modelValue: MetadataField[]

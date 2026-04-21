@@ -1,6 +1,6 @@
 # AI Usage Policy
 
-ProjectX is maintained by real people. Every pull request, issue, and discussion is read and reviewed by humans who give their time to this project. Submitting unreviewed, untested AI output shifts the burden of that review onto maintainers - that is the problem this policy addresses. It is not a problem with AI tools themselves.
+BookOrbit is maintained by real people. Every pull request, issue, and discussion is read and reviewed by humans who give their time to this project. Submitting unreviewed, untested AI output shifts the burden of that review onto maintainers - that is the problem this policy addresses. It is not a problem with AI tools themselves.
 
 ## The Rules
 
@@ -39,9 +39,9 @@ AI tools make specific, recurring mistakes on this codebase. Be especially caref
 
 **NestJS decorator and module mistakes.** AI frequently invents decorator options, misuses pipes, omits required module imports, or generates module wiring that looks plausible but is wrong. Check every decorator and every module registration.
 
-**Ownership and multi-tenancy logic.** ProjectX is a multi-user app. Every query that touches user-owned data must filter by `userId`. AI-generated service methods routinely omit this. A missed ownership check is a data exposure bug, not a style issue. This applies to every module that manages libraries, books, collections, reading sessions, annotations, and preferences.
+**Ownership and multi-tenancy logic.** BookOrbit is a multi-user app. Every query that touches user-owned data must filter by `userId`. AI-generated service methods routinely omit this. A missed ownership check is a data exposure bug, not a style issue. This applies to every module that manages libraries, books, collections, reading sessions, annotations, and preferences.
 
-**Authorization patterns.** We have specific conventions for permission gates: `@RequirePermission(...)` on the backend, `usePermissions()` on the frontend, and the `LensService` superuser-bypass pattern. AI does not know these patterns and will generate code that bypasses them or reimplements them incorrectly. Write auth and permission logic yourself.
+**Authorization patterns.** We have specific conventions for permission gates: `@RequirePermission(...)` on the backend, `usePermissions()` on the frontend, and the `SmartScopeService` superuser-bypass pattern. AI does not know these patterns and will generate code that bypasses them or reimplements them incorrectly. Write auth and permission logic yourself.
 
 **Tests that prove nothing.** AI-generated tests often mock the exact thing being tested, assert on shallow output without triggering the real path, or simply confirm that a function returns without throwing. Before submitting a test, ask: would this test fail if the implementation were broken? If the answer is no, the test is not worth having.
 

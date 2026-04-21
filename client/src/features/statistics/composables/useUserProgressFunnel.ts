@@ -1,4 +1,4 @@
-import type { UserProgressFunnelComparison } from '@projectx/types'
+import type { UserProgressFunnelComparison } from '@bookorbit/types'
 
 import { fetchUserProgressFunnel } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

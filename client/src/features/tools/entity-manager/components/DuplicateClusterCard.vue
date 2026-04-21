@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Check, ChevronDown, ChevronUp, UserMinus, X } from 'lucide-vue-next'
-import type { DuplicateCluster, EntityTypeCapabilities } from '@projectx/types'
+import type { DuplicateCluster, EntityTypeCapabilities } from '@bookorbit/types'
 
 const props = defineProps<{
   cluster: DuplicateCluster

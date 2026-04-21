@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BOOK_FORMATS } from '@projectx/types'
+import { BOOK_FORMATS } from '@bookorbit/types'
 
 const props = defineProps<{
   modelValue: string[]

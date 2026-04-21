@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-import type { EntityType } from '@projectx/types';
+import type { EntityType } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { EntityManagerService } from './entity-manager.service';
 import type { EntityStrategy, RawCandidatePair } from './strategies/entity-strategy.interface';

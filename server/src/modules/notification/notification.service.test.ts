@@ -1,4 +1,4 @@
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import type { NotifyPayload } from './notification.service';
 import { NotificationService } from './notification.service';

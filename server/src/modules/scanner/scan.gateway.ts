@@ -12,7 +12,7 @@ import type {
   CoverRefreshProgressEvent,
   ScanBooksAddedEvent,
   ScanProgressEvent,
-} from '@projectx/types';
+} from '@bookorbit/types';
 import { AuthService } from '../auth/auth.service';
 import { ScanJobStore } from './scan-job-store.service';
 

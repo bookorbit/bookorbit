@@ -9,7 +9,7 @@ import {
   type StatisticsFilterConfig,
   type StatisticsGranularity,
   type StatisticsSettings,
-} from '@projectx/types'
+} from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { LIBRARY_CHART_IDS, STATISTICS_CHART_IDS, STATISTICS_CHART_META, USER_CHART_IDS } from '../statistics-chart-meta'

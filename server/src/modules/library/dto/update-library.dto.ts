@@ -15,7 +15,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import type { CoverAspectRatio, OrganizationMode } from '@projectx/types';
+import type { CoverAspectRatio, OrganizationMode } from '@bookorbit/types';
 
 import {
   LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,

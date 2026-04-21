@@ -8,7 +8,7 @@ import type {
   MigrationPlanSummary,
   MigrationRunApi,
   MigrationRunMetricApi,
-} from '@projectx/types'
+} from '@bookorbit/types'
 
 export type MigrationRunState = SharedMigrationRunState
 export type MigrationSourceCapabilities = SharedMigrationSourceCapabilities

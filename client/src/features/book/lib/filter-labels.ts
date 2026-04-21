@@ -1,4 +1,4 @@
-import type { Rule, RuleField, RuleOperator, SortField } from '@projectx/types'
+import type { Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
 
 export const SORT_FIELD_LABELS: Record<SortField, string> = {
   author: 'Author',

@@ -1,5 +1,5 @@
 import { IsIn } from 'class-validator';
-import type { AccessLevel } from '@projectx/types';
+import type { AccessLevel } from '@bookorbit/types';
 
 import { LIBRARY_ACCESS_LEVELS } from '../library.constants';
 

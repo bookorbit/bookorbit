@@ -1167,7 +1167,7 @@ function formatSourceCountLabel(key: string) {
               <p class="text-xs text-muted-foreground">
                 Path mappings translate source file paths to target paths so books can be matched by file location. For example, if your Booklore
                 library stored files under <code class="font-mono">/books/Large</code> and the same files now live under
-                <code class="font-mono">/srv/projectx/books/Large</code>, add that mapping here. Books are also matched by ISBN, file hash, and
+                <code class="font-mono">/srv/bookorbit/books/Large</code>, add that mapping here. Books are also matched by ISBN, file hash, and
                 title/author regardless of path mappings - path mapping is only one of four strategies and does not limit which source books are
                 included in the migration.
               </p>

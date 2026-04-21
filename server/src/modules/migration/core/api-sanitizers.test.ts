@@ -58,7 +58,7 @@ function makeRun(overrides: Partial<MigrationRun> = {}): MigrationRun {
     sourceId: 1,
     profileId: 2,
     planArtifactId: 3,
-    targetKey: 'projectx',
+    targetKey: 'bookorbit',
     state: 'running',
     currentStage: 'init',
     triggeredByUserId: 1,
@@ -141,7 +141,7 @@ describe('sanitizePlanArtifactForApi', () => {
 describe('sanitizeRunForApi', () => {
   it('preserves targetKey and strips triggeredByUserId', () => {
     const result = sanitizeRunForApi(makeRun());
-    expect(result.targetKey).toBe('projectx');
+    expect(result.targetKey).toBe('bookorbit');
     expect(result).not.toHaveProperty('triggeredByUserId');
   });
 

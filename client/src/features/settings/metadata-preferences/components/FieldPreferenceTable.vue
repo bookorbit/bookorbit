@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core'
-import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@projectx/types'
+import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@bookorbit/types'
 import FieldGroupSection from './FieldGroupSection.vue'
 import ProviderReservoir from './ProviderReservoir.vue'
 import { Info } from 'lucide-vue-next'

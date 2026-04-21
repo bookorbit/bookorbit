@@ -1,6 +1,6 @@
-# Contributing to ProjectX
+# Contributing to BookOrbit
 
-Thanks for your interest in contributing to ProjectX. Whether you are fixing a typo or building a major feature, this guide walks you through the process from start to finish.
+Thanks for your interest in contributing to BookOrbit. Whether you are fixing a typo or building a major feature, this guide walks you through the process from start to finish.
 
 **Companion docs:**
 
@@ -63,9 +63,9 @@ This step prevents wasted effort on changes that conflict with the project direc
 [Fork the repository](../../fork), then clone your fork:
 
 ```bash
-git clone https://github.com/<your-username>/projectx.git
-cd projectx
-git remote add upstream https://github.com/neonsolstice/projectx.git
+git clone https://github.com/<your-username>/bookorbit.git
+cd bookorbit
+git remote add upstream https://github.com/neonsolstice/bookorbit.git
 ```
 
 > **Trusted contributors** with direct push access can skip the fork and work on branches in the main repository. The rest of this guide assumes the fork workflow.
@@ -228,7 +228,7 @@ Do not add dependencies without prior discussion in the linked issue. If proposi
 
 ### Breaking Changes and Self-Hosted Upgrades
 
-ProjectX is self-hosted. Any change that can break existing deployments must include a clear upgrade path before merge.
+BookOrbit is self-hosted. Any change that can break existing deployments must include a clear upgrade path before merge.
 
 If your PR introduces a breaking change (schema, API contract, environment variable, config format):
 

@@ -2,7 +2,7 @@
 import { computed, ref, useAttrs } from 'vue'
 import { Aperture, BookMarked, ChevronLeft, ChevronRight, RefreshCw, Shuffle, Sparkles } from 'lucide-vue-next'
 
-import type { BookCard, ScrollerType } from '@projectx/types'
+import type { BookCard, ScrollerType } from '@bookorbit/types'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -18,12 +18,12 @@ const props = defineProps<{
   type: ScrollerType
   title: string
   limit?: number
-  lensId?: number
+  smartScopeId?: number
 }>()
 
 const attrs = useAttrs()
 
-const { books, loading, error, refresh } = useDashboardScroller(props.type, props.limit, props.lensId)
+const { books, loading, error, refresh } = useDashboardScroller(props.type, props.limit, props.smartScopeId)
 
 const scrollEl = ref<HTMLElement | null>(null)
 
@@ -34,7 +34,7 @@ function scrollBy(delta: number) {
 const typeIcon = computed(() => {
   if (props.type === 'continue-reading') return BookMarked
   if (props.type === 'recently-added') return Sparkles
-  if (props.type === 'lens') return Aperture
+  if (props.type === 'smart-scope') return Aperture
   return Shuffle
 })
 
@@ -131,7 +131,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
       <p class="text-sm text-muted-foreground">
         <template v-if="type === 'continue-reading'">No books in progress yet. Start reading one to see it here.</template>
         <template v-else-if="type === 'recently-added'">No books in your library yet.</template>
-        <template v-else-if="type === 'lens'">No books match this lens.</template>
+        <template v-else-if="type === 'smart-scope'">No books match this smartScope.</template>
         <template v-else>No books found.</template>
       </p>
     </div>

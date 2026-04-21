@@ -3,7 +3,7 @@ import { access, mkdir, readFile } from 'fs/promises';
 import { basename, join } from 'path';
 
 import { and, eq } from 'drizzle-orm';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { waitForCondition, waitForScanCompletion } from './e2e/app-harness';
@@ -37,7 +37,7 @@ function expectError(response: InjectResponse, status: number, messageFragment?:
 }
 
 function buildMultipartBody(file?: { fileName: string; content: Buffer; contentType?: string }): { body: Buffer; boundary: string } {
-  const boundary = `----projectx-library-admin-${randomUUID()}`;
+  const boundary = `----bookorbit-library-admin-${randomUUID()}`;
   if (!file) {
     return {
       boundary,

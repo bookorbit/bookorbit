@@ -1,4 +1,4 @@
-import type { PublicationDecadeItem, StatisticsResult } from '@projectx/types'
+import type { PublicationDecadeItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchPublicationDecade } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

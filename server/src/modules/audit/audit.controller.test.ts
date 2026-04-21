@@ -1,4 +1,4 @@
-import { AuditAction, AuditResource } from '@projectx/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 
 import { AuditController } from './audit.controller';
 

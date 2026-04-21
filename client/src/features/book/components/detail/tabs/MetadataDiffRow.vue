@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
 import { ArrowLeft, RotateCcw, CheckCircle2, X, ZoomIn, Layers } from 'lucide-vue-next'
-import type { MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
+import type { MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 import type { DiffField, DiffFieldKey } from '../../../composables/useMetadataDiff'
 import { hideOnError, providerBadgeStyle } from '../../../lib/metadata-fetch'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'

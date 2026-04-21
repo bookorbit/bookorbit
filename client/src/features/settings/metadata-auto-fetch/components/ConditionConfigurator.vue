@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BookMetadataFetchConditions, MetadataField } from '@projectx/types'
+import type { BookMetadataFetchConditions, MetadataField } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import MissingFieldsPicker from './MissingFieldsPicker.vue'
 

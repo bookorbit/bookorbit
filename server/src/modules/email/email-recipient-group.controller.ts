@@ -1,4 +1,4 @@
-import { Permission, AuditAction, AuditResource } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

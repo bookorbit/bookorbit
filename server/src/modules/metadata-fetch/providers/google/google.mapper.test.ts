@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { mapGoogleVolume } from './google.mapper';
 import { GoogleVolumeItem } from './google.types';

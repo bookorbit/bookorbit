@@ -1,5 +1,5 @@
 import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 import type { Mocked } from 'vitest';
 import { firstValueFrom, toArray } from 'rxjs';
 

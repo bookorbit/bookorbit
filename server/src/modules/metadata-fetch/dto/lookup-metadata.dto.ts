@@ -1,6 +1,6 @@
 import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 export class LookupMetadataDto {
   @IsEnum(MetadataProviderKey)

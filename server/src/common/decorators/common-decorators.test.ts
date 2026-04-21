@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { AuditAction, AuditResource, Permission } from '@projectx/types';
+import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
 import { AllowDefaultPassword, ALLOW_DEFAULT_PASSWORD_KEY } from './allow-default-password.decorator';
 import { Auditable, AUDITABLE_KEY } from './auditable.decorator';
@@ -11,9 +11,9 @@ import { RequirePermission, PERMISSION_KEY } from './require-permission.decorato
 describe('common decorators', () => {
   it('stores metadata for auth, permission, library access, and audit options', () => {
     const auditableOptions = {
-      action: AuditAction.LensCreate,
-      resource: AuditResource.Lens,
-      description: 'Created lens',
+      action: AuditAction.SmartScopeCreate,
+      resource: AuditResource.SmartScope,
+      description: 'Created smartScope',
     };
 
     class DecoratedController {

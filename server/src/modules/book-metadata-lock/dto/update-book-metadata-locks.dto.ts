@@ -1,5 +1,5 @@
-import type { BookMetadataLockField } from '@projectx/types';
-import { BOOK_METADATA_LOCK_FIELDS } from '@projectx/types';
+import type { BookMetadataLockField } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS } from '@bookorbit/types';
 import { ArrayUnique, IsArray, IsIn } from 'class-validator';
 
 export class UpdateBookMetadataLocksDto {

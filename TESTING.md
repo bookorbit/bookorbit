@@ -1,6 +1,6 @@
 # Testing Guide
 
-ProjectX has three layers of tests:
+BookOrbit has three layers of tests:
 
 - **Server unit tests:** isolated tests for NestJS services, controllers, repositories, and utilities. Dependencies are mocked; no database required.
 - **Client unit tests:** tests for Vue composables and pure utility functions using a jsdom environment.
@@ -56,7 +56,7 @@ scripts/e2e/
   run-suite.mjs          <- orchestrator: preps DB if needed, then runs vitest
   select-matrix.mjs      <- CI smart matrix: picks suites based on changed file paths
   list-matrix.mjs        <- full matrix: all suites (used by manual workflow dispatch)
-  prepare-db.sh          <- drops, re-creates, and migrates the projectx_e2e schema
+  prepare-db.sh          <- drops, re-creates, and migrates the bookorbit_e2e schema
 
 server/
   vitest.config.e2e.ts   <- separate vitest config (forks pool, sequential files)
@@ -73,20 +73,20 @@ server/
 - `pool: 'forks'`: each spec file runs in a separate process for full isolation
 - `fileParallelism: false`: spec files within a run execute sequentially
 - `setupFiles: ['test/e2e.setup.ts']`: runs before every suite; mocks `waitForStability`
-- `DATABASE_URL` is always overridden to `E2E_DATABASE_URL` (defaults to `projectx_e2e`), so
+- `DATABASE_URL` is always overridden to `E2E_DATABASE_URL` (defaults to `bookorbit_e2e`), so
   E2E tests never touch the dev database
 
 ### DB modes
 
 Every suite runs in one of two modes:
 
-| Mode         | `prepareDedicatedDatabase` | Database used                                          | When to use                                      |
-| ------------ | -------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
-| default-db   | `false`                    | `E2E_DATABASE_URL` with no reset before run            | Fast smoke tests that don't write data           |
-| dedicated-db | `true`                     | `projectx_e2e` dropped and re-migrated before each run | Any test that writes data or needs a clean state |
+| Mode         | `prepareDedicatedDatabase` | Database used                                           | When to use                                      |
+| ------------ | -------------------------- | ------------------------------------------------------- | ------------------------------------------------ |
+| default-db   | `false`                    | `E2E_DATABASE_URL` with no reset before run             | Fast smoke tests that don't write data           |
+| dedicated-db | `true`                     | `bookorbit_e2e` dropped and re-migrated before each run | Any test that writes data or needs a clean state |
 
 For dedicated-db suites, `run-suite.mjs` automatically runs `pnpm run e2e:db:prepare` before
-launching vitest. This drops and re-creates the `projectx_e2e` schema and applies all
+launching vitest. This drops and re-creates the `bookorbit_e2e` schema and applies all
 migrations fresh.
 
 ### Running E2E tests
@@ -108,7 +108,7 @@ pnpm run e2e:run -- scanner-scenarios --testNamePattern=book-per-folder-flat-roo
 E2E_DATABASE_URL=postgres://... pnpm run e2e:run -- scanner-scenarios
 ```
 
-The default E2E database URL is `postgres://projectx:projectx@localhost:5432/projectx_e2e`.
+The default E2E database URL is `postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e`.
 PostgreSQL must be running locally (start it with `pnpm run db:up` if needed).
 
 > **Override the database:** Use `E2E_DATABASE_URL`, not `DATABASE_URL`. The vitest config
@@ -120,26 +120,26 @@ check that your env vars match the values in `server/.env.example`.
 
 ### Suite reference
 
-| Suite ID                      | Lane  | DB mode      | Timeout | Description                                                                                                           |
-| ----------------------------- | ----- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `guard-mechanics`             | smoke | default-db   | 30 min  | `@Public` / `@RequirePermission` guard wiring; uses its own minimal NestJS testing module, not the shared app harness |
-| `scanner-scenarios`           | full  | dedicated-db | 45 min  | File organization scenario matrix for the library scanner                                                             |
-| `scanner-file-operations`     | full  | dedicated-db | 60 min  | File add/remove/rename operations and scanner reconciliation                                                          |
-| `auth-session-security`       | full  | dedicated-db | 50 min  | Cookie flags, token rotation, concurrent sessions                                                                     |
-| `auth-recovery-oidc-logout`   | full  | dedicated-db | 50 min  | Password reset flow and OIDC logout                                                                                   |
-| `book-bucket-ingest-finalize` | full  | dedicated-db | 45 min  | Book Bucket upload ingest and finalize flow                                                                           |
-| `metadata-write`              | full  | dedicated-db | 60 min  | Metadata write operations (field updates, bulk edits)                                                                 |
-| `metadata-lock`               | full  | dedicated-db | 60 min  | Metadata lock enforcement across operations                                                                           |
-| `migration-booklore`          | full  | dedicated-db | 70 min  | Booklore v1 to ProjectX data migration                                                                                |
-| `authorization-matrix`        | full  | dedicated-db | 60 min  | Permission enforcement across all protected routes                                                                    |
-| `book-api-contract`           | full  | dedicated-db | 60 min  | Book API response shape and field contract                                                                            |
-| `app-settings-oidc-contract`  | full  | dedicated-db | 60 min  | App settings and OIDC configuration contract                                                                          |
-| `library-admin-workflows`     | full  | dedicated-db | 60 min  | Library create/update/delete admin workflows                                                                          |
-| `reader-format-delivery`      | full  | dedicated-db | 60 min  | Book file serving and format delivery                                                                                 |
-| `opds-auth-catalog`           | full  | dedicated-db | 45 min  | OPDS feed authentication and catalog structure                                                                        |
-| `email-lifecycle`             | full  | dedicated-db | 45 min  | Email provider, template, and send lifecycle                                                                          |
-| `reader-state-isolation`      | full  | dedicated-db | 45 min  | Reading progress, bookmarks, and annotations isolated per user                                                        |
-| `users-admin-lifecycle`       | full  | dedicated-db | 50 min  | User create/update/delete admin lifecycle                                                                             |
+| Suite ID                     | Lane  | DB mode      | Timeout | Description                                                                                                           |
+| ---------------------------- | ----- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `guard-mechanics`            | smoke | default-db   | 30 min  | `@Public` / `@RequirePermission` guard wiring; uses its own minimal NestJS testing module, not the shared app harness |
+| `scanner-scenarios`          | full  | dedicated-db | 45 min  | File organization scenario matrix for the library scanner                                                             |
+| `scanner-file-operations`    | full  | dedicated-db | 60 min  | File add/remove/rename operations and scanner reconciliation                                                          |
+| `auth-session-security`      | full  | dedicated-db | 50 min  | Cookie flags, token rotation, concurrent sessions                                                                     |
+| `auth-recovery-oidc-logout`  | full  | dedicated-db | 50 min  | Password reset flow and OIDC logout                                                                                   |
+| `book-dock-ingest-finalize`  | full  | dedicated-db | 45 min  | Book Dock upload ingest and finalize flow                                                                             |
+| `metadata-write`             | full  | dedicated-db | 60 min  | Metadata write operations (field updates, bulk edits)                                                                 |
+| `metadata-lock`              | full  | dedicated-db | 60 min  | Metadata lock enforcement across operations                                                                           |
+| `migration-booklore`         | full  | dedicated-db | 70 min  | Booklore v1 to BookOrbit data migration                                                                               |
+| `authorization-matrix`       | full  | dedicated-db | 60 min  | Permission enforcement across all protected routes                                                                    |
+| `book-api-contract`          | full  | dedicated-db | 60 min  | Book API response shape and field contract                                                                            |
+| `app-settings-oidc-contract` | full  | dedicated-db | 60 min  | App settings and OIDC configuration contract                                                                          |
+| `library-admin-workflows`    | full  | dedicated-db | 60 min  | Library create/update/delete admin workflows                                                                          |
+| `reader-format-delivery`     | full  | dedicated-db | 60 min  | Book file serving and format delivery                                                                                 |
+| `opds-auth-catalog`          | full  | dedicated-db | 45 min  | OPDS feed authentication and catalog structure                                                                        |
+| `email-lifecycle`            | full  | dedicated-db | 45 min  | Email provider, template, and send lifecycle                                                                          |
+| `reader-state-isolation`     | full  | dedicated-db | 45 min  | Reading progress, bookmarks, and annotations isolated per user                                                        |
+| `users-admin-lifecycle`      | full  | dedicated-db | 50 min  | User create/update/delete admin lifecycle                                                                             |
 
 JUnit XML output for each suite is written to `test-results/server/<suite-id>-e2e-junit.xml`.
 

@@ -1,5 +1,5 @@
 {
-  "id": "22ebd475-2378-4449-a919-bcaf86d4c48d",
+  "id": "c229dc64-65a0-42a3-907d-e5a2bd75e111",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1405,7 +1405,7 @@
           "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'projectx'"
+          "default": "'bookorbit'"
         },
         "state": {
           "name": "state",
@@ -2728,8 +2728,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.lenses": {
-      "name": "lenses",
+    "public.smart_scopes": {
+      "name": "smart_scopes",
       "schema": "",
       "columns": {
         "id": {
@@ -2800,9 +2800,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "lenses_user_id_users_id_fk": {
-          "name": "lenses_user_id_users_id_fk",
-          "tableFrom": "lenses",
+        "smart_scopes_user_id_users_id_fk": {
+          "name": "smart_scopes_user_id_users_id_fk",
+          "tableFrom": "smart_scopes",
           "tableTo": "users",
           "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
@@ -2812,8 +2812,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "lenses_user_id_name_unique": {
-          "name": "lenses_user_id_name_unique",
+        "smart_scopes_user_id_name_unique": {
+          "name": "smart_scopes_user_id_name_unique",
           "nullsNotDistinct": false,
           "columns": ["user_id", "name"]
         }
@@ -6667,8 +6667,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.book_bucket_files": {
-      "name": "book_bucket_files",
+    "public.book_dock_files": {
+      "name": "book_dock_files",
       "schema": "",
       "columns": {
         "id": {
@@ -6790,8 +6790,8 @@
         }
       },
       "indexes": {
-        "book_bucket_files_status_idx": {
-          "name": "book_bucket_files_status_idx",
+        "book_dock_files_status_idx": {
+          "name": "book_dock_files_status_idx",
           "columns": [
             {
               "expression": "status",
@@ -6805,8 +6805,8 @@
           "method": "btree",
           "with": {}
         },
-        "book_bucket_files_uploaded_by_idx": {
-          "name": "book_bucket_files_uploaded_by_idx",
+        "book_dock_files_uploaded_by_idx": {
+          "name": "book_dock_files_uploaded_by_idx",
           "columns": [
             {
               "expression": "uploaded_by",
@@ -6822,27 +6822,27 @@
         }
       },
       "foreignKeys": {
-        "book_bucket_files_target_library_id_libraries_id_fk": {
-          "name": "book_bucket_files_target_library_id_libraries_id_fk",
-          "tableFrom": "book_bucket_files",
+        "book_dock_files_target_library_id_libraries_id_fk": {
+          "name": "book_dock_files_target_library_id_libraries_id_fk",
+          "tableFrom": "book_dock_files",
           "tableTo": "libraries",
           "columnsFrom": ["target_library_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "book_bucket_files_target_folder_id_library_folders_id_fk": {
-          "name": "book_bucket_files_target_folder_id_library_folders_id_fk",
-          "tableFrom": "book_bucket_files",
+        "book_dock_files_target_folder_id_library_folders_id_fk": {
+          "name": "book_dock_files_target_folder_id_library_folders_id_fk",
+          "tableFrom": "book_dock_files",
           "tableTo": "library_folders",
           "columnsFrom": ["target_folder_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "book_bucket_files_uploaded_by_users_id_fk": {
-          "name": "book_bucket_files_uploaded_by_users_id_fk",
-          "tableFrom": "book_bucket_files",
+        "book_dock_files_uploaded_by_users_id_fk": {
+          "name": "book_dock_files_uploaded_by_users_id_fk",
+          "tableFrom": "book_dock_files",
           "tableTo": "users",
           "columnsFrom": ["uploaded_by"],
           "columnsTo": ["id"],
@@ -6852,21 +6852,21 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "book_bucket_files_absolute_path_unique": {
-          "name": "book_bucket_files_absolute_path_unique",
+        "book_dock_files_absolute_path_unique": {
+          "name": "book_dock_files_absolute_path_unique",
           "nullsNotDistinct": false,
           "columns": ["absolute_path"]
         }
       },
       "policies": {},
       "checkConstraints": {
-        "book_bucket_files_status_chk": {
-          "name": "book_bucket_files_status_chk",
-          "value": "\"book_bucket_files\".\"status\" in ('pending', 'extracting', 'fetching', 'ready', 'error')"
+        "book_dock_files_status_chk": {
+          "name": "book_dock_files_status_chk",
+          "value": "\"book_dock_files\".\"status\" in ('pending', 'extracting', 'fetching', 'ready', 'error')"
         },
-        "book_bucket_files_confidence_range_chk": {
-          "name": "book_bucket_files_confidence_range_chk",
-          "value": "\"book_bucket_files\".\"confidence\" is null or (\"book_bucket_files\".\"confidence\" >= 0 and \"book_bucket_files\".\"confidence\" <= 100)"
+        "book_dock_files_confidence_range_chk": {
+          "name": "book_dock_files_confidence_range_chk",
+          "value": "\"book_dock_files\".\"confidence\" is null or (\"book_dock_files\".\"confidence\" >= 0 and \"book_dock_files\".\"confidence\" <= 100)"
         }
       },
       "isRLSEnabled": false

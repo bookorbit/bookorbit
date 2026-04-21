@@ -35,7 +35,7 @@ import type {
   StorageByFormatItem,
   TopAuthorItem,
   TopSeriesItem,
-} from '@projectx/types'
+} from '@bookorbit/types'
 
 async function parseResult<T>(res: Response): Promise<StatisticsResult<T>> {
   if (!res.ok) throw new Error(`Statistics request failed: ${res.status}`)

@@ -1,6 +1,6 @@
 import { computed, reactive, ref, watch, type Ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookCard, BookQuery, BooksPage, GroupRule, SortSpec } from '@projectx/types'
+import type { BookCard, BookQuery, BooksPage, GroupRule, SortSpec } from '@bookorbit/types'
 
 export type { BookCard }
 

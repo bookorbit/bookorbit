@@ -1,6 +1,6 @@
 import { computed } from 'vue'
-import type { SeriesCollapsePreferences } from '@projectx/types'
-import { resolveCollapsePreference } from '@projectx/types'
+import type { SeriesCollapsePreferences } from '@bookorbit/types'
+import { resolveCollapsePreference } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { api } from '@/lib/api'
 

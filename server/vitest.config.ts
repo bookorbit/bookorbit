@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     alias: {
-      '@projectx/types': path.resolve(__dirname, '../packages/types/src/index.ts'),
+      '@bookorbit/types': path.resolve(__dirname, '../packages/types/src/index.ts'),
     },
   },
   test: {

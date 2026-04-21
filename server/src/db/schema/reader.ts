@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { check, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
-import type { ReadStatus, ReadStatusSource } from '@projectx/types';
+import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 
 import { bookFiles, books } from './books';
 import { libraries } from './libraries';

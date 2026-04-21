@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 import { mapAudibleProduct } from './audible.mapper';
 import type { AudibleProduct } from './audible.types';
 

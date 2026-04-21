@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { AuditLogQueryDto } from './dto/audit-log-query.dto';

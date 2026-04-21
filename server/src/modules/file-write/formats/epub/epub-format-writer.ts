@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { WriteResult } from '@projectx/types';
+import type { WriteResult } from '@bookorbit/types';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';
 import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';

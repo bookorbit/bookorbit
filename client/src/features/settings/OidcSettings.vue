@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { generatePkce } from '@/features/auth/composables/useOidc'
 import { toast } from 'vue-sonner'
-import { Permission, PERMISSION_LABELS } from '@projectx/types'
+import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
 import { ArrowLeft, Plus, ShieldCheck, Trash2 } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -630,7 +630,7 @@ async function deleteGroupMapping(id: number) {
       <!-- Group Mappings (only in edit mode) -->
       <div v-if="viewMode === 'edit'">
         <p class="settings-group-label">Group Mappings</p>
-        <p class="mb-3 text-xs text-muted-foreground">Map OIDC group claims to ProjectX permissions. Synced on every login.</p>
+        <p class="mb-3 text-xs text-muted-foreground">Map OIDC group claims to BookOrbit permissions. Synced on every login.</p>
         <div class="border border-border rounded-lg overflow-hidden bg-card shadow-sm">
           <div v-if="groupMappings.length > 0" class="divide-y divide-border">
             <div v-for="mapping in groupMappings" :key="mapping.id" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5">

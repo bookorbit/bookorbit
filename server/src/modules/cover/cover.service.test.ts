@@ -1,6 +1,6 @@
 import { type LookupAddress, lookup } from 'dns/promises';
 import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
-import type { CoverSearchResult } from '@projectx/types';
+import type { CoverSearchResult } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover';

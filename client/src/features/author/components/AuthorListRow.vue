@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { AuthorSummary } from '@projectx/types'
+import type { AuthorSummary } from '@bookorbit/types'
 import { ArrowRight, BookCopy, Check, Clock3, Loader2 } from 'lucide-vue-next'
 
 const props = defineProps<{

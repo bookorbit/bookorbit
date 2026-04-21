@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'fs';
 import { access, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 
-import type { CoverRefreshedEvent } from '@projectx/types';
+import type { CoverRefreshedEvent } from '@bookorbit/types';
 import { COVER_CUSTOM_FILE_PREFIX, COVER_THUMBNAIL_FILE_NAME, bookCoverDirPath } from '../../../common/book-cover-storage';
 import { generateThumbnail, imageExt } from '../../metadata/lib/cover';
 import { MigrationRepository } from '../migration.repository';

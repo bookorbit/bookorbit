@@ -14,7 +14,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride } from '@projectx/types';
+import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride } from '@bookorbit/types';
 
 export const libraries = pgTable(
   'libraries',

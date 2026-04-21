@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesPage, SeriesSummary } from '@projectx/types';
+import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesPage, SeriesSummary } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';

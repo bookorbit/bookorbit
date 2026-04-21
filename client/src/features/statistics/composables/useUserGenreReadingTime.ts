@@ -1,4 +1,4 @@
-import type { UserGenreReadingTimeItem } from '@projectx/types'
+import type { UserGenreReadingTimeItem } from '@bookorbit/types'
 
 import { fetchUserGenreReadingTime } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

@@ -7,7 +7,7 @@ import {
   resolveDownloadFilename,
   resolveUploadPath,
   validatePattern,
-} from '@projectx/types';
+} from '@bookorbit/types';
 
 // ── Shared fixtures ───────────────────────────────────────────────────────────
 

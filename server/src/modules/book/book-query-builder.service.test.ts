@@ -27,7 +27,7 @@ vi.mock('drizzle-orm', () => {
 import { BadRequestException } from '@nestjs/common';
 import { ilike, sql } from 'drizzle-orm';
 
-import { FIELD_OPERATORS, type RuleField, type RuleOperator } from '@projectx/types';
+import { FIELD_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
 
 import { BookQueryBuilder } from './book-query-builder.service';
 

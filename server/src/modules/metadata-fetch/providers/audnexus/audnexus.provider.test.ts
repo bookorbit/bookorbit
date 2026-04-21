@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MetadataProviderKey, ProviderConfigurations } from '@projectx/types';
+import { MetadataProviderKey, ProviderConfigurations } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { ProviderThrottleError } from '../../provider-throttle.error';

@@ -3,7 +3,7 @@ import type { MockedFunction } from 'vitest';
 import { access, readdir, rm, stat } from 'fs/promises';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseFb2File } from '../metadata/lib/fb2-parser';

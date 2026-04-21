@@ -68,7 +68,7 @@ function parseNumber(raw: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseProjectxTags(raw: string | null): string[] {
+function parseBookOrbitTags(raw: string | null): string[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -167,7 +167,7 @@ export function parseOpf(xml: string): ParsedOpf {
     }
     title ??= getText(rawTitles[0]);
   }
-  subtitle ??= namedMeta('projectx:subtitle');
+  subtitle ??= namedMeta('bookorbit:subtitle');
 
   // ── Authors ────────────────────────────────────────────────────────────────
   const authors: { name: string; sortName: string | null }[] = [];
@@ -222,14 +222,14 @@ export function parseOpf(xml: string): ParsedOpf {
     if (value.startsWith('urn:itunes:')) itunesId ??= value.slice('urn:itunes:'.length) || null;
   }
 
-  isbn10 ??= propertyMeta('projectx:isbn10') ?? namedMeta('projectx:isbn10');
+  isbn10 ??= propertyMeta('bookorbit:isbn10') ?? namedMeta('bookorbit:isbn10');
 
   // ── Genres and tags ────────────────────────────────────────────────────────
   const genres = toArray(metadata['subject']).map(getText).filter(Boolean);
-  const projectxTags = parseProjectxTags(propertyMeta('projectx:tags') ?? namedMeta('projectx:tags'));
-  const tags = projectxTags.length > 0 ? projectxTags : genres;
-  const pageCount = parseNumber(propertyMeta('projectx:page_count') ?? namedMeta('projectx:page_count'));
-  const rating = parseNumber(propertyMeta('projectx:rating') ?? namedMeta('projectx:rating'));
+  const bookOrbitTags = parseBookOrbitTags(propertyMeta('bookorbit:tags') ?? namedMeta('bookorbit:tags'));
+  const tags = bookOrbitTags.length > 0 ? bookOrbitTags : genres;
+  const pageCount = parseNumber(propertyMeta('bookorbit:page_count') ?? namedMeta('bookorbit:page_count'));
+  const rating = parseNumber(propertyMeta('bookorbit:rating') ?? namedMeta('bookorbit:rating'));
 
   // ── Series (Calibre EPUB2, then EPUB3) ────────────────────────────────────
   let seriesName: string | null = namedMeta('calibre:series');

@@ -15,7 +15,7 @@ import {
   Query,
 } from '@nestjs/common';
 
-import { AuditAction, AuditResource } from '@projectx/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';

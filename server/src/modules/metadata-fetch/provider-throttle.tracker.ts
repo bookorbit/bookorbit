@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot, ProviderThrottleRuntimeState } from '@projectx/types';
+import { MetadataProviderKey, ProviderThrottleRuntimeSnapshot, ProviderThrottleRuntimeState } from '@bookorbit/types';
 
 const DEFAULT_SCHEDULE = [120, 300, 600, 1800, 3600];
 

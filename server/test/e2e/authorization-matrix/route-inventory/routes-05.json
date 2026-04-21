@@ -290,9 +290,9 @@
   {
     "file": "server/src/modules/opds/opds.controller.ts",
     "className": "OpdsController",
-    "methodName": "lenses",
+    "methodName": "smart-scopes",
     "httpMethod": "GET",
-    "path": "/opds/lenses",
+    "path": "/opds/smart-scopes",
     "permissions": [],
     "libraryAccess": [],
     "isPublic": true,
@@ -588,12 +588,12 @@
     "useGuards": []
   },
   {
-    "file": "server/src/modules/book-bucket/book-bucket.controller.ts",
-    "className": "BookBucketController",
+    "file": "server/src/modules/book-dock/book-dock.controller.ts",
+    "className": "BookDockController",
     "methodName": "listFiles",
     "httpMethod": "GET",
-    "path": "/book-bucket/files",
-    "permissions": ["Permission.BookBucketAccess"],
+    "path": "/book-dock/files",
+    "permissions": ["Permission.BookDockAccess"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,

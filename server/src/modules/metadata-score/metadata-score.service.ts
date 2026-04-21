@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { MetadataScoreWeights } from '@projectx/types';
+import type { MetadataScoreWeights } from '@bookorbit/types';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { MetadataScoreRepository } from './metadata-score.repository';
 import { MetadataScoreScorer, type ScoreData } from './metadata-score.scorer';

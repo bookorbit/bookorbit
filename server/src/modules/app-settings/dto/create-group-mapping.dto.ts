@@ -1,5 +1,5 @@
 import { IsIn, IsString, MaxLength } from 'class-validator';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 export class CreateGroupMappingDto {
   @IsString()

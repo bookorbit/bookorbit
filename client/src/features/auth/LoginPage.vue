@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { OidcProviderPublic } from '@projectx/types'
+import type { OidcProviderPublic } from '@bookorbit/types'
 import { Moon, Sun, Wallpaper } from 'lucide-vue-next'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { useAuth } from './composables/useAuth'
@@ -227,7 +227,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
 
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
       <div class="text-center mb-8 animate-fade-up">
-        <h1 class="text-2xl font-serif font-semibold text-foreground">project<span class="text-primary">x</span></h1>
+        <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
         <p class="text-sm text-muted-foreground mt-1">Sign in to your account</p>
       </div>
 

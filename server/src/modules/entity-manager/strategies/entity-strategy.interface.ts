@@ -1,4 +1,4 @@
-import type { EntityType } from '@projectx/types';
+import type { EntityType } from '@bookorbit/types';
 
 export interface RawCandidatePair {
   idA: number | string;

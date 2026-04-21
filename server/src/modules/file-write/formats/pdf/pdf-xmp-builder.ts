@@ -1,6 +1,6 @@
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import { EPUB_PROVIDER_IDENTIFIER_PREFIXES } from '../../file-write.constants';
-import { PROJECTX_NS_PREFIX, PROJECTX_NS_URI } from '../shared/projectx-ns';
+import { BOOKORBIT_NS_PREFIX, BOOKORBIT_NS_URI } from '../shared/bookorbit-ns';
 
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -30,7 +30,7 @@ function normalizeGoodreadsId(id: string): string {
 }
 
 export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string {
-  const px = PROJECTX_NS_PREFIX;
+  const px = BOOKORBIT_NS_PREFIX;
   const now = new Date().toISOString();
   const lines: string[] = [];
 
@@ -110,7 +110,7 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
     '      rdf:about=""',
     '      xmlns:dc="http://purl.org/dc/elements/1.1/"',
     '      xmlns:xmp="http://ns.adobe.com/xap/1.0/"',
-    `      xmlns:${px}="${PROJECTX_NS_URI}">`,
+    `      xmlns:${px}="${BOOKORBIT_NS_URI}">`,
     body,
     '    </rdf:Description>',
     '  </rdf:RDF>',

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, gte, lte, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { AuditAction, AuditResource } from '@projectx/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

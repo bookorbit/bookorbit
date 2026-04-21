@@ -1,4 +1,4 @@
-import type { BooksAddedDataPoint, StatisticsResult } from '@projectx/types'
+import type { BooksAddedDataPoint, StatisticsResult } from '@bookorbit/types'
 
 import { fetchBooksAddedOverTime } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

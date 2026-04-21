@@ -1,4 +1,4 @@
-import type { LanguageDistributionItem, StatisticsResult } from '@projectx/types'
+import type { LanguageDistributionItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchLanguageDistribution } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

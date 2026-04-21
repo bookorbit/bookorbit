@@ -1,4 +1,4 @@
-import type { PublicationYearPoint, StatisticsResult } from '@projectx/types'
+import type { PublicationYearPoint, StatisticsResult } from '@bookorbit/types'
 
 import { fetchPublicationYearTimeline } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

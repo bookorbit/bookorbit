@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import type { ProviderConfigurations, ProviderStatus } from '@projectx/types'
+import type { ProviderConfigurations, ProviderStatus } from '@bookorbit/types'
 
 export function useProviderConfig() {
   const config = ref<ProviderConfigurations | null>(null)

@@ -11,8 +11,8 @@ import { ConfigService } from '@nestjs/config';
 import { readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
-import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
-import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
+import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteService } from '../file-write/file-write.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';

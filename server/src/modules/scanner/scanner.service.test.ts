@@ -11,7 +11,7 @@ vi.mock('fs/promises', async (importOriginal) => {
 });
 
 import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
-import { NotificationType } from '@projectx/types';
+import { NotificationType } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';

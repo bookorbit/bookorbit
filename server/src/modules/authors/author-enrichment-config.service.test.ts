@@ -1,4 +1,4 @@
-import type { AuthorAutoEnrichmentConfig } from '@projectx/types';
+import type { AuthorAutoEnrichmentConfig } from '@bookorbit/types';
 
 import { DEFAULT_AUTHOR_ENRICHMENT_CONFIG, AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 

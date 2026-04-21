@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import { Search, Loader2, X, Image as ImageIcon, Check } from 'lucide-vue-next'
-import type { CoverSearchResult } from '@projectx/types'
+import type { CoverSearchResult } from '@bookorbit/types'
 
 const props = defineProps<{
   initialTitle: string

@@ -1,4 +1,4 @@
-import type { LibraryMetadataCompletenessItem, StatisticsResult } from '@projectx/types'
+import type { LibraryMetadataCompletenessItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchLibraryMetadataCompleteness } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

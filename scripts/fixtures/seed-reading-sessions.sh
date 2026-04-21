@@ -14,8 +14,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-POSTGRES_USER="${POSTGRES_USER:-projectx}"
-POSTGRES_DB="${POSTGRES_DB:-projectx}"
+POSTGRES_USER="${POSTGRES_USER:-bookorbit}"
+POSTGRES_DB="${POSTGRES_DB:-bookorbit}"
 TARGET_USER_ID="${1:-1}"
 
 echo "Seeding reading sessions for user_id=${TARGET_USER_ID}..."

@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import type { BookCard, ReadStatus, UserBookStatus } from '@projectx/types'
+import type { BookCard, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
 import { useCoverVersions } from './useCoverVersions'

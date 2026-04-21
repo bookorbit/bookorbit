@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { AuthorSummary } from '@projectx/types'
+import type { AuthorSummary } from '@bookorbit/types'
 import { BookCopy, Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'

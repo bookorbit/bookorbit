@@ -60,11 +60,11 @@ onMounted(() => {
       <template v-else>
         <DashboardScroller
           v-for="(scroller, index) in enabledScrollers"
-          :key="`${scroller.id}-${scroller.type}-${scroller.lensId ?? 0}`"
+          :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}`"
           :type="scroller.type"
           :title="scroller.label"
           :limit="scroller.limit"
-          :lens-id="scroller.lensId"
+          :smartScope-id="scroller.smartScopeId"
           class="animate-fade-up"
           :style="{ animationDelay: `${index * 100}ms` }"
         />

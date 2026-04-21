@@ -143,7 +143,7 @@ function parseProjectxManagedNotes(notes: string | null): Map<string, string> {
   for (const line of notes.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    const match = trimmed.match(/^\[projectx:([^\]]+)\]\s*(.*)$/);
+    const match = trimmed.match(/^\[bookorbit:([^\]]+)\]\s*(.*)$/);
     if (!match) continue;
     const [, key, value] = match;
     fields.set(key, value.trim());

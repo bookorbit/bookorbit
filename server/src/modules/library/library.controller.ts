@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
-import { Permission, AuditAction, AuditResource } from '@projectx/types';
-import type { BookQuery, LibraryFileSyncProgressEvent } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
+import type { BookQuery, LibraryFileSyncProgressEvent } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';

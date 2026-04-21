@@ -23,7 +23,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-vue-next'
-import type { AudiobookChapter, BookDetail, BookDetailFile } from '@projectx/types'
+import type { AudiobookChapter, BookDetail, BookDetailFile } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAudioProgress } from './composables/useAudioProgress'
 import { useAudioQueue } from './composables/useAudioQueue'

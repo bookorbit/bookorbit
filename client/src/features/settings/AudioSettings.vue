@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import type { AudioReaderSettings } from '@projectx/types'
+import type { AudioReaderSettings } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 

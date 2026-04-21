@@ -1,4 +1,4 @@
-import type { MetadataProviderInfo, MetadataProviderKey } from '@projectx/types'
+import type { MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 
 export { getProviderColor, providerBadgeStyle, providerActivePillStyle } from '@/lib/provider-colors'
 

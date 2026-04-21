@@ -1,4 +1,4 @@
-import type { RefreshResponse } from '@projectx/types'
+import type { RefreshResponse } from '@bookorbit/types'
 
 let _accessToken: string | null = null
 let _onAuthFailure: (() => void) | null = null

@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';

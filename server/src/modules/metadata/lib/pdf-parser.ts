@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { PDFDocument } from 'pdf-lib';
 
-import { PROJECTX_NS_PREFIX } from '../../../common/projectx-ns';
+import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
 import { extractPdfCover } from './pdf-cover';
 import { extractXmpXml, parseXmp, type XmpParsed } from './pdf-xmp-reader';
 
@@ -94,7 +94,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
     const infoProducer = clean(doc.getProducer());
     const infoSubject = clean(doc.getSubject());
     const infoKeywords = splitCommaList(clean(doc.getKeywords()));
-    const isProjectXInfo = infoCreator === PROJECTX_NS_PREFIX;
+    const isBookorbitInfo = infoCreator === BOOKORBIT_NS_PREFIX;
 
     const infoAuthors = infoAuthorRaw
       ? infoAuthorRaw
@@ -118,7 +118,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       subtitle: xmp?.subtitle ?? null,
       authors: hasXmp ? xmp.authors : infoAuthors,
       description: hasXmp ? xmp.description : infoSubject,
-      publisher: hasXmp ? (xmp.publisher ?? null) : isProjectXInfo ? infoProducer : null,
+      publisher: hasXmp ? (xmp.publisher ?? null) : isBookorbitInfo ? infoProducer : null,
       publishedYear: xmp?.publishedYear ?? null,
       language: xmp?.language ?? null,
       genres: xmp?.genres?.length ? xmp.genres : [],
@@ -129,7 +129,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       seriesName: xmp?.seriesName ?? null,
       seriesIndex: xmp?.seriesIndex ?? null,
       rating: xmp?.rating ?? null,
-      pageCount: hasXmp ? (xmp.pageCount ?? (isProjectXInfo ? null : doc.getPageCount())) : doc.getPageCount(),
+      pageCount: hasXmp ? (xmp.pageCount ?? (isBookorbitInfo ? null : doc.getPageCount())) : doc.getPageCount(),
       googleBooksId: xmp?.googleBooksId ?? null,
       goodreadsId: xmp?.goodreadsId ?? null,
       amazonId: xmp?.amazonId ?? null,

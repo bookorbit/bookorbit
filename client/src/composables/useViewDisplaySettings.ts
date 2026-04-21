@@ -1,26 +1,26 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import type { CoverAspectRatio } from '@projectx/types'
+import type { CoverAspectRatio } from '@bookorbit/types'
 import { storage } from '@/services/storage'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 
-type ViewType = 'library' | 'lens' | 'collection'
+type ViewType = 'library' | 'smartScope' | 'collection'
 type CoverShapeGroup = 'portrait' | 'square'
 
 function coverSizeKey(type: ViewType, id: number, group: CoverShapeGroup) {
-  return `projectx:coverSize:${type}:${id}:${group}`
+  return `bookorbit:coverSize:${type}:${id}:${group}`
 }
 
 function gridGapKey(type: ViewType, id: number, group: CoverShapeGroup) {
-  return `projectx:gridGap:${type}:${id}:${group}`
+  return `bookorbit:gridGap:${type}:${id}:${group}`
 }
 
 function legacyCoverSizeKey(type: ViewType, id: number) {
-  return `projectx:coverSize:${type}:${id}`
+  return `bookorbit:coverSize:${type}:${id}`
 }
 
 function legacyGridGapKey(type: ViewType, id: number) {
-  return `projectx:gridGap:${type}:${id}`
+  return `bookorbit:gridGap:${type}:${id}`
 }
 
 export function useViewDisplaySettings(

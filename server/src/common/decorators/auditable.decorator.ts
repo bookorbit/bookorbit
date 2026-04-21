@@ -1,7 +1,7 @@
 import { SetMetadata } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 
-import type { AuditAction, AuditResource } from '@projectx/types';
+import type { AuditAction, AuditResource } from '@bookorbit/types';
 
 export const AUDITABLE_KEY = 'auditable';
 

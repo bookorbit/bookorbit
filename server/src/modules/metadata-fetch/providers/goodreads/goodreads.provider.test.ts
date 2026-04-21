@@ -1,4 +1,4 @@
-import { ProviderConfigurations } from '@projectx/types';
+import { ProviderConfigurations } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { ProviderThrottleError } from '../../provider-throttle.error';

@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { Library } from '@projectx/types'
+import type { Library } from '@bookorbit/types'
 
 const libraries = ref<Library[]>([])
 const loading = ref(false)

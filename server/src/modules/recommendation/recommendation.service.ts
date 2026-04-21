@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BookRecommendation } from '@projectx/types';
+import type { BookRecommendation } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookReadService } from '../book/book-read.service';

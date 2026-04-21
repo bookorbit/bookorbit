@@ -26,15 +26,15 @@ importers:
 
   client:
     dependencies:
+      "@bookorbit/types":
+        specifier: workspace:*
+        version: link:../packages/types
       "@fontsource-variable/fraunces":
         specifier: ^5.2.9
         version: 5.2.9
       "@fontsource-variable/inter":
         specifier: ^5.2.8
         version: 5.2.8
-      "@projectx/types":
-        specifier: workspace:*
-        version: link:../packages/types
       "@tailwindcss/vite":
         specifier: ^4.2.4
         version: 4.2.4(vite@8.0.9(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
@@ -189,6 +189,9 @@ importers:
       7z-wasm:
         specifier: ^1.2.0
         version: 1.2.0
+      "@bookorbit/types":
+        specifier: workspace:*
+        version: link:../packages/types
       "@fastify/compress":
         specifier: ^8.3.1
         version: 8.3.1
@@ -243,9 +246,6 @@ importers:
       "@parcel/watcher":
         specifier: ^2.5.6
         version: 2.5.6
-      "@projectx/types":
-        specifier: workspace:*
-        version: link:../packages/types
       "@types/archiver":
         specifier: ^7.0.0
         version: 7.0.0

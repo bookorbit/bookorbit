@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { UserPlus, Pencil, KeyRound, Trash2, ShieldCheck, MoreVertical } from 'lucide-vue-next'
 import { api } from '@/lib/api'
-import type { AuthUser } from '@projectx/types'
+import type { AuthUser } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'

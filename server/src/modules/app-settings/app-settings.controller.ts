@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
 
-import { Permission, AuditAction, AuditResource } from '@projectx/types';
+import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';

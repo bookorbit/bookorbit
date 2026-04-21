@@ -1,7 +1,7 @@
 import { reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS } from '@projectx/types'
-import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@projectx/types'
+import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS } from '@bookorbit/types'
+import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@bookorbit/types'
 
 export { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS }
 

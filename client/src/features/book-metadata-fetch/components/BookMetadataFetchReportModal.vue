@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { X, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type { BookMetadataFetchFailedPage } from '@projectx/types'
+import type { BookMetadataFetchFailedPage } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useBookMetadataFetchActions } from '../composables/useBookMetadataFetchActions'
 

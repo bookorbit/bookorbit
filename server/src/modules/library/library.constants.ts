@@ -1,4 +1,4 @@
-import type { AccessLevel, CoverAspectRatio, OrganizationMode } from '@projectx/types';
+import type { AccessLevel, CoverAspectRatio, OrganizationMode } from '@bookorbit/types';
 
 export const LIBRARY_ACCESS_LEVELS = ['viewer', 'editor', 'owner'] as const satisfies readonly AccessLevel[];
 export const LIBRARY_COVER_ASPECT_RATIOS = ['2/3', '1/1'] as const satisfies readonly CoverAspectRatio[];

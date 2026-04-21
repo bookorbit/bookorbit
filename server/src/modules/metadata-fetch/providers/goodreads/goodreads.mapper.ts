@@ -1,4 +1,4 @@
-import { MetadataCandidate, MetadataProviderKey } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { GoodreadsApolloBook, GoodreadsApolloContributor, GoodreadsApolloSeries } from './goodreads.types';
 

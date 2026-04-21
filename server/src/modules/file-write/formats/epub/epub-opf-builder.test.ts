@@ -50,7 +50,7 @@ describe('epub-opf-builder', () => {
       tags: ['Classic'],
     });
 
-    expect(result.newOpfXml).toContain('projectx: https://projectx.app/metadata/1.0/');
+    expect(result.newOpfXml).toContain('bookorbit: https://bookorbit.app/metadata/1.0/');
     expect(result.newOpfXml).toContain('urn:uuid:abc');
     expect(result.newOpfXml).toContain('New Title');
     expect(result.newOpfXml).toContain('Frank Herbert');

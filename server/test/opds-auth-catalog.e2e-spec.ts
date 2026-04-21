@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { eq } from 'drizzle-orm';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { ConfigService } from '@nestjs/config';
 
 import { createCoverToken } from '../src/modules/opds/opds-auth.guard';
@@ -86,8 +86,8 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
 
   let ownerCollectionId!: number;
   let foreignCollectionId!: number;
-  let ownerLensId!: number;
-  let foreignLensId!: number;
+  let ownerSmartScopeId!: number;
+  let foreignSmartScopeId!: number;
 
   let visibleAuthorName!: string;
   let hiddenAuthorName!: string;
@@ -187,27 +187,27 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
 
     await ctx.db.insert(schema.collectionBooks).values({ collectionId: foreignCollectionId, bookId: visibleBookAlpha.bookId });
 
-    const [ownerLens] = await ctx.db
-      .insert(schema.lenses)
+    const [ownerSmartScope] = await ctx.db
+      .insert(schema.smartScopes)
       .values({
         userId: owner.userId,
-        name: `owner-lens-${randomUUID().slice(0, 8)}`,
+        name: `owner-smartScope-${randomUUID().slice(0, 8)}`,
         filter: null,
         isPublic: false,
       })
-      .returning({ id: schema.lenses.id });
-    ownerLensId = ownerLens.id;
+      .returning({ id: schema.smartScopes.id });
+    ownerSmartScopeId = ownerSmartScope.id;
 
-    const [foreignLens] = await ctx.db
-      .insert(schema.lenses)
+    const [foreignSmartScope] = await ctx.db
+      .insert(schema.smartScopes)
       .values({
         userId: intruder.userId,
-        name: `foreign-lens-${randomUUID().slice(0, 8)}`,
+        name: `foreign-smartScope-${randomUUID().slice(0, 8)}`,
         filter: null,
         isPublic: false,
       })
-      .returning({ id: schema.lenses.id });
-    foreignLensId = foreignLens.id;
+      .returning({ id: schema.smartScopes.id });
+    foreignSmartScopeId = foreignSmartScope.id;
 
     await setSetting(ctx, 'opds_enabled', 'true');
   }, 120_000);
@@ -397,7 +397,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(searchResponse.body).toContain('/api/v1/opds/catalog?q={searchTerms}');
     });
 
-    it('scopes libraries, collections, lenses, authors, and series to the authenticated parent user', async () => {
+    it('scopes libraries, collections, smartScopes, authors, and series to the authenticated parent user', async () => {
       const librariesResponse = await opdsGet('/api/v1/opds/libraries', ownerCredentials);
       expect(librariesResponse.statusCode).toBe(200);
       expect(librariesResponse.body).toContain(`libraryId=${visibleLibrary.libraryId}`);
@@ -408,10 +408,10 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(collectionsResponse.body).toContain(`collectionId=${ownerCollectionId}`);
       expect(collectionsResponse.body).not.toContain(`collectionId=${foreignCollectionId}`);
 
-      const lensesResponse = await opdsGet('/api/v1/opds/lenses', ownerCredentials);
-      expect(lensesResponse.statusCode).toBe(200);
-      expect(lensesResponse.body).toContain(`lensId=${ownerLensId}`);
-      expect(lensesResponse.body).not.toContain(`lensId=${foreignLensId}`);
+      const smartScopesResponse = await opdsGet('/api/v1/opds/smart-scopes', ownerCredentials);
+      expect(smartScopesResponse.statusCode).toBe(200);
+      expect(smartScopesResponse.body).toContain(`smartScopeId=${ownerSmartScopeId}`);
+      expect(smartScopesResponse.body).not.toContain(`smartScopeId=${foreignSmartScopeId}`);
 
       const authorsResponse = await opdsGet('/api/v1/opds/authors', ownerCredentials);
       expect(authorsResponse.statusCode).toBe(200);
@@ -449,8 +449,8 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       const invalidCollectionFilterResponse = await opdsGet('/api/v1/opds/catalog?collectionId=oops', ownerCredentials);
       expectError(invalidCollectionFilterResponse, 400, 'collectionId must be a positive integer');
 
-      const invalidLensFilterResponse = await opdsGet('/api/v1/opds/catalog?lensId=bad', ownerCredentials);
-      expectError(invalidLensFilterResponse, 400, 'lensId must be a positive integer');
+      const invalidSmartScopeFilterResponse = await opdsGet('/api/v1/opds/catalog?smartScopeId=bad', ownerCredentials);
+      expectError(invalidSmartScopeFilterResponse, 400, 'smartScopeId must be a positive integer');
 
       const foreignCollectionResponse = await opdsGet(`/api/v1/opds/catalog?collectionId=${foreignCollectionId}`, ownerCredentials);
       expectError(foreignCollectionResponse, 403, 'No access to this collection');
@@ -459,13 +459,13 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(ownerCollectionResponse.statusCode).toBe(200);
       expect(ownerCollectionResponse.body).toContain('Visible Alpha');
 
-      const ownerLensResponse = await opdsGet(`/api/v1/opds/catalog?lensId=${ownerLensId}`, ownerCredentials);
-      expect(ownerLensResponse.statusCode).toBe(200);
-      expect(ownerLensResponse.body).toContain('<opensearch:totalResults>2</opensearch:totalResults>');
+      const ownerSmartScopeResponse = await opdsGet(`/api/v1/opds/catalog?smartScopeId=${ownerSmartScopeId}`, ownerCredentials);
+      expect(ownerSmartScopeResponse.statusCode).toBe(200);
+      expect(ownerSmartScopeResponse.body).toContain('<opensearch:totalResults>2</opensearch:totalResults>');
 
-      const foreignLensResponse = await opdsGet(`/api/v1/opds/catalog?lensId=${foreignLensId}`, ownerCredentials);
-      expect(foreignLensResponse.statusCode).toBe(200);
-      expect(foreignLensResponse.body).toContain('<opensearch:totalResults>0</opensearch:totalResults>');
+      const foreignSmartScopeResponse = await opdsGet(`/api/v1/opds/catalog?smartScopeId=${foreignSmartScopeId}`, ownerCredentials);
+      expect(foreignSmartScopeResponse.statusCode).toBe(200);
+      expect(foreignSmartScopeResponse.body).toContain('<opensearch:totalResults>0</opensearch:totalResults>');
 
       const searchResponse = await opdsGet('/api/v1/opds/catalog?q=Visible Alpha', ownerCredentials);
       expect(searchResponse.statusCode).toBe(200);

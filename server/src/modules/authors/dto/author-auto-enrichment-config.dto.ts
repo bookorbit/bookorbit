@@ -1,4 +1,4 @@
-import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
+import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsDefined, IsEnum, ValidateNested } from 'class-validator';
 import { AuthorEnrichmentConditionsDto } from './author-enrichment-conditions.dto';

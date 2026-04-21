@@ -156,7 +156,7 @@ describe('parsePdfFile', () => {
     );
   });
 
-  it('falls back to the native PDF page count when XMP omits projectx:pageCount', async () => {
+  it('falls back to the native PDF page count when XMP omits bookorbit:pageCount', async () => {
     mockExtractXmpXml.mockReturnValue('<xmp/>');
     mockParseXmp.mockReturnValue({
       title: 'XMP Title',
@@ -187,10 +187,10 @@ describe('parsePdfFile', () => {
     expect(parsed?.pageCount).toBe(123);
   });
 
-  it('does not fall back to Info dictionary publisher/pageCount for projectx-authored PDFs when XMP is present', async () => {
+  it('does not fall back to Info dictionary publisher/pageCount for bookorbit-authored PDFs when XMP is present', async () => {
     mockPdfLoad.mockResolvedValue(
       makePdfDoc({
-        getCreator: () => 'projectx',
+        getCreator: () => 'bookorbit',
         getProducer: () => 'Legacy Publisher',
       }) as never,
     );
@@ -225,10 +225,10 @@ describe('parsePdfFile', () => {
     expect(parsed?.pageCount).toBeNull();
   });
 
-  it('falls back to legacy ProjectX producer metadata when XMP publisher is absent', async () => {
+  it('falls back to legacy BookOrbit producer metadata when XMP publisher is absent', async () => {
     mockPdfLoad.mockResolvedValue(
       makePdfDoc({
-        getCreator: () => 'projectx',
+        getCreator: () => 'bookorbit',
         getProducer: () => 'Legacy Publisher',
       }) as never,
     );

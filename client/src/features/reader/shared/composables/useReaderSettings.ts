@@ -9,7 +9,7 @@ import {
   type ReaderSettings,
   READER_GROUP_DEFAULTS,
   getFormatGroup,
-} from '@projectx/types'
+} from '@bookorbit/types'
 
 // -- Shared localStorage helpers --
 

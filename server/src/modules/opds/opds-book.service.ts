@@ -12,12 +12,12 @@ import {
   books,
   collections,
   collectionBooks,
-  lenses,
+  smartScopes,
   libraries,
   userLibraryAccess,
 } from '../../db/schema';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
-import type { GroupRule } from '@projectx/types';
+import type { GroupRule } from '@bookorbit/types';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -97,7 +97,7 @@ export class OpdsBookService {
     sortOrder: OpdsSortOrder,
     page: number,
     size: number,
-    filters?: { libraryId?: number; collectionId?: number; lensId?: number; author?: string; series?: string; q?: string },
+    filters?: { libraryId?: number; collectionId?: number; smartScopeId?: number; author?: string; series?: string; q?: string },
     isSuperuser = false,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
@@ -118,8 +118,8 @@ export class OpdsBookService {
       }
     }
 
-    if (filters?.lensId) {
-      return this.getBooksByLens(userId, filters.lensId, accessibleIds, sortOrder, page, size);
+    if (filters?.smartScopeId) {
+      return this.getBooksBySmartScope(userId, filters.smartScopeId, accessibleIds, sortOrder, page, size);
     }
 
     const clauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
@@ -245,16 +245,16 @@ export class OpdsBookService {
       .orderBy(collections.name);
   }
 
-  async getUserLenses(userId: number) {
+  async getUserSmartScopes(userId: number) {
     return this.db
       .select({
-        id: lenses.id,
-        name: lenses.name,
-        icon: lenses.icon,
+        id: smartScopes.id,
+        name: smartScopes.name,
+        icon: smartScopes.icon,
       })
-      .from(lenses)
-      .where(eq(lenses.userId, userId))
-      .orderBy(lenses.name);
+      .from(smartScopes)
+      .where(eq(smartScopes.userId, userId))
+      .orderBy(smartScopes.name);
   }
 
   async validateBookAccess(bookId: number, userId: number, isSuperuser = false): Promise<void> {
@@ -297,19 +297,19 @@ export class OpdsBookService {
     };
   }
 
-  private async getBooksByLens(
+  private async getBooksBySmartScope(
     userId: number,
-    lensId: number,
+    smartScopeId: number,
     accessibleIds: number[],
     sortOrder: OpdsSortOrder,
     page: number,
     size: number,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
-    const [lens] = await this.db.select().from(lenses).where(eq(lenses.id, lensId)).limit(1);
-    if (!lens) return { entries: [], total: 0 };
-    if (!lens.isPublic && lens.userId !== userId) return { entries: [], total: 0 };
+    const [smartScope] = await this.db.select().from(smartScopes).where(eq(smartScopes.id, smartScopeId)).limit(1);
+    if (!smartScope) return { entries: [], total: 0 };
+    if (!smartScope.isPublic && smartScope.userId !== userId) return { entries: [], total: 0 };
 
-    const where = this.queryBuilder.buildWhere(lens.filter as GroupRule | null, { accessibleLibraryIds: accessibleIds, userId });
+    const where = this.queryBuilder.buildWhere(smartScope.filter as GroupRule | null, { accessibleLibraryIds: accessibleIds, userId });
     const statusClause = eq(books.status, 'present');
     const combinedWhere = where ? and(where, statusClause) : statusClause;
     return this.paginatedBookQuery(combinedWhere!, sortOrder, page, size);

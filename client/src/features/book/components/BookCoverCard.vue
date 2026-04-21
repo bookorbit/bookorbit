@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { BookCard, BookFileRef } from '@projectx/types'
-import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
+import type { BookCard, BookFileRef } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import { getFormatColor } from '../lib/format-colors'
 import { computed, inject, ref, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
@@ -26,7 +26,7 @@ import {
   TriangleAlert,
 } from 'lucide-vue-next'
 import { useBookStatus, STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS } from '../composables/useBookStatus'
-import type { ReadStatus } from '@projectx/types'
+import type { ReadStatus } from '@bookorbit/types'
 import {
   DropdownMenu,
   DropdownMenuContent,

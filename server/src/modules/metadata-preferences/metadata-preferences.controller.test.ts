@@ -1,5 +1,5 @@
 import type { Mocked } from 'vitest';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { MetadataPreferencesController } from './metadata-preferences.controller';
 import { MetadataPreferencesService } from './metadata-preferences.service';

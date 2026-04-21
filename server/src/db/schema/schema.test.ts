@@ -1,14 +1,14 @@
 import { bookMetadata } from './metadata';
 import { users, appSettings } from './auth';
 import { opdsUsers } from './opds';
-import { bookBucketFiles } from './book-bucket';
+import { bookDockFiles } from './book-dock';
 import { libraries } from './libraries';
 import { books, bookFiles } from './books';
 import { emailProviders } from './email-providers';
 import { emailTemplates } from './email-templates';
 import { collections } from './collections';
 import { emailPreferences } from './email-preferences';
-import { lenses } from './lenses';
+import { smartScopes } from './smart-scopes';
 import { koboSyncSettings, koboLibrarySnapshots, koboReadingStates } from './kobo';
 import { emailRecipients, emailRecipientGroups } from './email-recipients';
 import { readerDefaultPreferences, readerPreferences, readingProgress, annotations, userReadingDailyStats } from './reader';
@@ -79,7 +79,7 @@ describe('Database Schema Logic', () => {
     testOnUpdate('users.updatedAt', users.updatedAt);
     testOnUpdate('appSettings.updatedAt', appSettings.updatedAt);
     testOnUpdate('opdsUsers.updatedAt', opdsUsers.updatedAt);
-    testOnUpdate('bookBucketFiles.updatedAt', bookBucketFiles.updatedAt);
+    testOnUpdate('bookDockFiles.updatedAt', bookDockFiles.updatedAt);
     testOnUpdate('libraries.updatedAt', libraries.updatedAt);
     testOnUpdate('books.updatedAt', books.updatedAt);
     testOnUpdate('bookFiles.updatedAt', bookFiles.updatedAt);
@@ -88,7 +88,7 @@ describe('Database Schema Logic', () => {
     testOnUpdate('emailTemplates.updatedAt', emailTemplates.updatedAt);
     testOnUpdate('collections.updatedAt', collections.updatedAt);
     testOnUpdate('emailPreferences.updatedAt', emailPreferences.updatedAt);
-    testOnUpdate('lenses.updatedAt', lenses.updatedAt);
+    testOnUpdate('smartScopes.updatedAt', smartScopes.updatedAt);
     testOnUpdate('koboSyncSettings.updatedAt', koboSyncSettings.updatedAt);
     testOnUpdate('koboLibrarySnapshots.updatedAt', koboLibrarySnapshots.updatedAt);
     testOnUpdate('koboReadingStates.updatedAt', koboReadingStates.updatedAt);

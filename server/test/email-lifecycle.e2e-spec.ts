@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { desc, eq } from 'drizzle-orm';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { createEpubFixture } from './e2e/email/email-fixture-builder';
@@ -524,7 +524,7 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
     it('uses explicit templateId over recipient default and applies provider from fields', async () => {
       const providerCreateResponse = await apiAs(superManager, 'POST', '/api/v1/email/providers', {
         ...buildProviderPayload(ctx, 'sender-provider'),
-        fromName: 'ProjectX Bot',
+        fromName: 'BookOrbit Bot',
         fromAddress: 'bot@example.com',
       });
       expect(providerCreateResponse.statusCode).toBe(201);
@@ -575,7 +575,7 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
       const [captured] = ctx.smtpSink.getMessages();
       const fromHeader = extractSmtpHeader(captured.raw, 'from');
       const subjectHeader = extractSmtpHeader(captured.raw, 'subject');
-      expect(fromHeader).toContain('ProjectX Bot <bot@example.com>');
+      expect(fromHeader).toContain('BookOrbit Bot <bot@example.com>');
       expect(subjectHeader).toBe('Override Email Lifecycle Book');
       expect(subjectHeader).not.toContain('Recipient');
 

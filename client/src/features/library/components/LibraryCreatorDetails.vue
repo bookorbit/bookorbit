@@ -4,7 +4,7 @@ import * as LucideIcons from 'lucide-vue-next'
 import { Library, Search, X } from 'lucide-vue-next'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { CoverAspectRatio } from '@projectx/types'
+import type { CoverAspectRatio } from '@bookorbit/types'
 
 const ASPECT_RATIO_OPTIONS: { value: CoverAspectRatio; label: string }[] = [
   { value: '2/3', label: 'Portrait' },

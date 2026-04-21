@@ -10,7 +10,7 @@ import type {
   AuthorsPage,
   BooksPage,
   MergeAuthorsResult,
-} from '@projectx/types';
+} from '@bookorbit/types';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';

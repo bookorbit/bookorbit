@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner'
-import type { BookMissingEvent, BookMovedEvent, BookRestoredEvent } from '@projectx/types'
+import type { BookMissingEvent, BookMovedEvent, BookRestoredEvent } from '@bookorbit/types'
 import { getSocket } from '@/features/scanner/composables/useScanProgress'
 
 type BookIdsCallback = (bookIds: number[]) => void

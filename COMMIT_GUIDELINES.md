@@ -30,7 +30,7 @@ The **footer** is optional. Use it to reference issues, close PRs, or document b
   │       └─ Scope (optional): auth|books|library|metadata|kobo|opds|reader|
   │                             collections|annotations|authors|series|cover|
   │                             users|stats|notifications|settings|scanner|
-  │                             email|audit|lens|types|docker|deps|server|client
+  │                             email|audit|smart-scope|types|docker|deps|server|client
   │
   └─ Type: feat|fix|db|perf|refactor|style|docs|test|build|ci|chore|security|revert
 ```
@@ -86,7 +86,7 @@ Use one scope from the table below. If a change affects multiple areas, use the 
 | `scanner`       | File scanner and upload pipeline                              |
 | `email`         | Email providers, templates, and send preferences              |
 | `audit`         | Audit logging and event tracking                              |
-| `lens`          | Custom lenses and collection views                            |
+| `smart-scope`   | Custom Smart Scopes and collection views                      |
 | `types`         | Shared types in `packages/types/`                             |
 | `docker`        | Dockerfile and Docker Compose files                           |
 | `deps`          | Dependency upgrades (pair with `build` or `chore`)            |

@@ -27,7 +27,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()

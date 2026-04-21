@@ -1,8 +1,8 @@
-name: projectx
+name: bookorbit
 
 services:
   app:
-    container_name: projectx-app
+    container_name: bookorbit-app
     image: ${APP_IMAGE?required}
     restart: unless-stopped
     init: true
@@ -58,7 +58,7 @@ services:
       start_period: 20s
 
   postgres:
-    container_name: projectx-db
+    container_name: bookorbit-db
     image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
     restart: unless-stopped
     environment:

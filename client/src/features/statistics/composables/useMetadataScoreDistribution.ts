@@ -1,4 +1,4 @@
-import type { MetadataScoreDistribution } from '@projectx/types'
+import type { MetadataScoreDistribution } from '@bookorbit/types'
 
 import { fetchMetadataScoreDistribution } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

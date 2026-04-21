@@ -24,8 +24,8 @@ import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateRenderer } from './epub/composables/useFoliate'
-import type { EpubReaderSettings } from '@projectx/types'
-import { getFormatGroup } from '@projectx/types'
+import type { EpubReaderSettings } from '@bookorbit/types'
+import { getFormatGroup } from '@bookorbit/types'
 
 const route = useRoute()
 const router = useRouter()

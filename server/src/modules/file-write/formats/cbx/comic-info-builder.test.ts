@@ -60,14 +60,14 @@ describe('buildComicInfoXml', () => {
     expect(parsed.ComicInfo.Number).toBe('1');
     expect(parsed.ComicInfo.CommunityRating).toBe('4.0');
     expect(parsed.ComicInfo.Web).toBe('https://www.goodreads.com/book/show/44767458-dune');
-    expect(parsed.ComicInfo.Notes).toContain('[projectx:subtitle] Anniversary Edition');
-    expect(parsed.ComicInfo.Notes).toContain('[projectx:isbn10] 0441172717');
+    expect(parsed.ComicInfo.Notes).toContain('[bookorbit:subtitle] Anniversary Edition');
+    expect(parsed.ComicInfo.Notes).toContain('[bookorbit:isbn10] 0441172717');
     expect(parsed.ComicInfo['@_xmlns:xsi']).toBeDefined();
     expect(parsed.ComicInfo['@_xmlns:xsd']).toBeDefined();
   });
 
-  it('keeps existing non-projectx note lines while replacing managed lines', () => {
-    const existing = `<?xml version="1.0"?><ComicInfo><Notes>Manual note\n[projectx:subtitle] old\n[projectx:goodreadsId] 1</Notes></ComicInfo>`;
+  it('keeps existing non-bookorbit note lines while replacing managed lines', () => {
+    const existing = `<?xml version="1.0"?><ComicInfo><Notes>Manual note\n[bookorbit:subtitle] old\n[bookorbit:goodreadsId] 1</Notes></ComicInfo>`;
 
     const xml = buildComicInfoXml(
       existing,
@@ -82,13 +82,13 @@ describe('buildComicInfoXml', () => {
     const notes = parsed.ComicInfo.Notes;
 
     expect(notes).toContain('Manual note');
-    expect(notes).toContain('[projectx:subtitle] new subtitle');
-    expect(notes).toContain('[projectx:goodreadsId] 2');
-    expect(notes).not.toContain('[projectx:subtitle] old');
+    expect(notes).toContain('[bookorbit:subtitle] new subtitle');
+    expect(notes).toContain('[bookorbit:goodreadsId] 2');
+    expect(notes).not.toContain('[bookorbit:subtitle] old');
   });
 
   it('does not overwrite provider-derived Web/Notes when provider fields are excluded from field mask', () => {
-    const existing = `<?xml version="1.0"?><ComicInfo><Web>https://www.goodreads.com/book/show/111</Web><Notes>[projectx:goodreadsId] 111</Notes></ComicInfo>`;
+    const existing = `<?xml version="1.0"?><ComicInfo><Web>https://www.goodreads.com/book/show/111</Web><Notes>[bookorbit:goodreadsId] 111</Notes></ComicInfo>`;
 
     const xml = buildComicInfoXml(
       existing,
@@ -102,7 +102,7 @@ describe('buildComicInfoXml', () => {
     const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
 
     expect(parsed.ComicInfo.Web).toBe('https://www.goodreads.com/book/show/111');
-    expect(parsed.ComicInfo.Notes).toContain('[projectx:goodreadsId] 111');
-    expect(parsed.ComicInfo.Notes).not.toContain('[projectx:goodreadsId] 222');
+    expect(parsed.ComicInfo.Notes).toContain('[bookorbit:goodreadsId] 111');
+    expect(parsed.ComicInfo.Notes).not.toContain('[bookorbit:goodreadsId] 222');
   });
 });

@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { ChordDiagramData, StatisticsDateRange, StatisticsGranularity } from '@projectx/types';
-import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
+import type { ChordDiagramData, StatisticsDateRange, StatisticsGranularity } from '@bookorbit/types';
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

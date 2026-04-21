@@ -1,5 +1,5 @@
 import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, Permission, ProviderThrottleRuntimeSnapshot } from '@projectx/types';
+import { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, Permission, ProviderThrottleRuntimeSnapshot } from '@bookorbit/types';
 import { map, Observable } from 'rxjs';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

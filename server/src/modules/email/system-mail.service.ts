@@ -104,7 +104,7 @@ export class SystemMailService {
         <table width="100%" style="max-width:520px;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);">
           <tr>
             <td style="background:#18181b;padding:24px 32px;">
-              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.3px;">Project X</p>
+              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.3px;">BookOrbit</p>
             </td>
           </tr>
           <tr>

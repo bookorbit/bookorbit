@@ -1,4 +1,4 @@
-import type { MetadataProviderKey } from '@projectx/types'
+import type { MetadataProviderKey } from '@bookorbit/types'
 
 export interface ProviderDragItem {
   key: MetadataProviderKey

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
 import { toast } from 'vue-sonner'
-import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@projectx/types'
+import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@bookorbit/types'
 import { getAccessToken } from '@/lib/api'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 

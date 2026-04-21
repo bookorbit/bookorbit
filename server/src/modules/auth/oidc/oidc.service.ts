@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Unauthorize
 import { ConfigService } from '@nestjs/config';
 import { compare } from 'bcryptjs';
 import type { FastifyReply } from 'fastify';
-import { AuditAction, AuditResource, OidcCallbackResponse, OidcErrorCode, Permission } from '@projectx/types';
-import type { OidcAutoProvision, OidcClaimMapping } from '@projectx/types';
+import { AuditAction, AuditResource, OidcCallbackResponse, OidcErrorCode, Permission } from '@bookorbit/types';
+import type { OidcAutoProvision, OidcClaimMapping } from '@bookorbit/types';
 
 import { AUDIT_EVENT, AuditEventsService } from '../../audit/audit-events.service';
 import { OidcProviderService } from '../../app-settings/oidc-provider.service';

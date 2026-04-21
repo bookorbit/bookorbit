@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { LibraryFileSyncProgressEvent } from '@projectx/types'
+import type { LibraryFileSyncProgressEvent } from '@bookorbit/types'
 
 export interface FileSyncStats {
   processed: number

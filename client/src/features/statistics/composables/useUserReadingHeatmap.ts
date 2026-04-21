@@ -1,4 +1,4 @@
-import type { UserDailyReadingStat } from '@projectx/types'
+import type { UserDailyReadingStat } from '@bookorbit/types'
 
 import { fetchUserReadingHeatmap } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

@@ -2,8 +2,8 @@
 import { ref, watch, computed } from 'vue'
 import { ChevronDown, X } from 'lucide-vue-next'
 import { api } from '@/lib/api'
-import { Permission, PERMISSION_LABELS } from '@projectx/types'
-import type { AuthUser } from '@projectx/types'
+import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
+import type { AuthUser } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
 
 interface Library {
@@ -28,7 +28,7 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   },
   {
     label: 'Devices & Access',
-    permissions: [Permission.KoboSync, Permission.OpdsAccess, Permission.BookBucketAccess],
+    permissions: [Permission.KoboSync, Permission.OpdsAccess, Permission.BookDockAccess],
   },
   {
     label: 'Email',

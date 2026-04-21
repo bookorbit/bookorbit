@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { RequestUser } from '../types/request-user';
 
 @Injectable()

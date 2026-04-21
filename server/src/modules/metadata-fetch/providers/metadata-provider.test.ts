@@ -1,5 +1,5 @@
 import { isIdentifiable, MetadataProvider } from './metadata-provider';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 describe('MetadataProvider Utils', () => {
   describe('isIdentifiable', () => {

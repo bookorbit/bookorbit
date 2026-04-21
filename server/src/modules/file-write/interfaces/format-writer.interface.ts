@@ -1,4 +1,4 @@
-import type { WriteResult } from '@projectx/types';
+import type { WriteResult } from '@bookorbit/types';
 import type { BookWritePayload } from './book-write-payload.interface';
 import type { FormatWriteOptions } from './format-write-options.interface';
 

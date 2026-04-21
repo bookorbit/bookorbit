@@ -119,7 +119,7 @@ function buildNotes(existing: string | null, payload: BookWritePayload, fieldMas
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      const match = trimmed.match(/^\[projectx:([^\]]+)\]\s*(.*)$/);
+      const match = trimmed.match(/^\[bookorbit:([^\]]+)\]\s*(.*)$/);
       if (match) {
         const [, key, value] = match;
         if (managedKeys.has(key)) {
@@ -137,13 +137,13 @@ function buildNotes(existing: string | null, payload: BookWritePayload, fieldMas
 
   for (const [key, val] of ids) {
     if (fieldMask.has(key)) {
-      if (val != null && val !== '') lines.push(`[projectx:${key}] ${val}`);
+      if (val != null && val !== '') lines.push(`[bookorbit:${key}] ${val}`);
       continue;
     }
 
     const existingVal = existingManaged.get(String(key));
     if (existingVal != null && existingVal !== '') {
-      lines.push(`[projectx:${key}] ${existingVal}`);
+      lines.push(`[bookorbit:${key}] ${existingVal}`);
     }
   }
 

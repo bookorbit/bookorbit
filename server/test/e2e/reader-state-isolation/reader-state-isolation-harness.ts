@@ -7,14 +7,14 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { mkdir } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
+import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { makeMetadataNoopMock, seedLibrary, waitForScanCompletion } from '../app-harness';
 import { createReaderStateIsolationFixtureRoot, type ReaderStateIsolationFixtureRoot } from './reader-state-isolation-fixture-builder';
 
@@ -94,7 +94,7 @@ export async function createReaderStateIsolationE2EContext(): Promise<ReaderStat
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopBookBucketWatcher(app);
+  await stopBookDockWatcher(app);
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
@@ -262,8 +262,8 @@ export async function grantLibraryAccess(
     });
 }
 
-async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(BookBucketWatcherService);
+async function stopBookDockWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookDockWatcherService);
   await watcher.onModuleDestroy();
 }
 

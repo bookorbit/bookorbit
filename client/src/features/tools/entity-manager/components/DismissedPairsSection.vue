@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RotateCcw } from 'lucide-vue-next'
-import type { DismissedPairInfo } from '@projectx/types'
+import type { DismissedPairInfo } from '@bookorbit/types'
 
 defineProps<{
   pairs: DismissedPairInfo[]

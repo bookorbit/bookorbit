@@ -1,4 +1,4 @@
-import type { LargestBookItem, StatisticsResult } from '@projectx/types'
+import type { LargestBookItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchLargestBooks } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

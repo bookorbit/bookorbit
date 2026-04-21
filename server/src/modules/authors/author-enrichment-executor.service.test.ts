@@ -1,4 +1,4 @@
-import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
+import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
 
 import { AuthorImageStorageError } from './author-image-storage.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';

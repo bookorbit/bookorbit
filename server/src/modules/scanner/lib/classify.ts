@@ -1,5 +1,5 @@
 import { extname, basename } from 'path';
-import { DEFAULT_FORMAT_PRIORITY } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 
 export const AUDIO_FORMATS = new Set(['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
 

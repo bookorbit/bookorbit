@@ -1,4 +1,4 @@
-# ProjectX - Client
+# BookOrbit - Client
 
 Vue 3 SPA built with Vite and Tailwind CSS v4.
 
@@ -25,7 +25,7 @@ src/
 │   ├── book/           Book detail, covers, metadata
 │   ├── library/        Library management
 │   ├── collection/     Book collections
-│   ├── lens/           Saved search views
+│   ├── smart-scope/           Saved search views
 │   ├── scanner/        Scan progress UI
 │   ├── reader/         Book reader (epub, pdf, cbz)
 │   ├── settings/       User settings
@@ -54,4 +54,4 @@ pnpm test:cov           # run unit tests with coverage
 - HTTP calls use the native `fetch` API via `src/lib/api.ts`.
 - Styling with Tailwind CSS v4 utility classes. Theme tokens are CSS variables in `src/assets/main.css`.
 - Icons from `lucide-vue-next` only.
-- Shared types imported from `@projectx/types`.
+- Shared types imported from `@bookorbit/types`.

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
-import type { Collection } from '@projectx/types'
+import type { Collection } from '@bookorbit/types'
 
 const props = defineProps<{ open: boolean; collection: Collection }>()
 const emit = defineEmits<{ close: []; deleted: [id: number] }>()

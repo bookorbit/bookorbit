@@ -7,7 +7,7 @@ import type {
   MetadataProviderKey,
   MetadataSource,
   ProviderIds,
-} from '@projectx/types'
+} from '@bookorbit/types'
 import { getProviderLabel } from '../lib/metadata-fetch'
 
 type ComicDiffFieldKey =

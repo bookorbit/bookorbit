@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createReadStream } from 'fs';
 
-import { NotificationType } from '@projectx/types';
+import { NotificationType } from '@bookorbit/types';
 import type { BookFile } from '../../db/schema';
 import type { RequestUser } from '../../common/types/request-user';
 import { NotificationService } from '../notification/notification.service';

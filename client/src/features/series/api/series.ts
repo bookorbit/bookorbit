@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { SeriesBooksPage, SeriesPage } from '@projectx/types'
+import type { SeriesBooksPage, SeriesPage } from '@bookorbit/types'
 import type { CompletionStatus, SeriesBookSort, SeriesListSort, SortDirection } from '../types/series'
 
 type ListSeriesParams = {

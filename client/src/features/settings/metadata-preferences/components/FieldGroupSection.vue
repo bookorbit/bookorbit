@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChevronDown, ChevronRight } from 'lucide-vue-next'
-import type { FieldPreference, MetadataField, ProviderStatus } from '@projectx/types'
+import type { FieldPreference, MetadataField, ProviderStatus } from '@bookorbit/types'
 import FieldRow from './FieldRow.vue'
 
 const props = withDefaults(

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { AuditAction } from '@projectx/types';
+import { AuditAction } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { KoboUserController } from './kobo-user.controller';

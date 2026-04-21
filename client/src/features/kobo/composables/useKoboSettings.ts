@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { KoboSyncSettings } from '@projectx/types'
+import type { KoboSyncSettings } from '@bookorbit/types'
 
 const settings = ref<KoboSyncSettings>({
   readingThreshold: 1,

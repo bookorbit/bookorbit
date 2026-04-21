@@ -1,5 +1,5 @@
 import { IsString, MaxLength, registerDecorator, ValidationOptions } from 'class-validator';
-import { validatePattern } from '@projectx/types';
+import { validatePattern } from '@bookorbit/types';
 
 function IsValidPattern(options?: ValidationOptions) {
   return function (object: object, propertyName: string) {

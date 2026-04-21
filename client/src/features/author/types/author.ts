@@ -1,4 +1,4 @@
-import type { AuthorDetail, AuthorSummary } from '@projectx/types'
+import type { AuthorDetail, AuthorSummary } from '@bookorbit/types'
 
 export type SortDirection = 'asc' | 'desc'
 export type AuthorListSort = 'name' | 'sortName' | 'bookCount' | 'lastAddedAt' | 'lastEnrichedAt'

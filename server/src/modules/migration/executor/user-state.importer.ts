@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ReadStatus, ReadStatusSource } from '@projectx/types';
+import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 
 import type { SourceBook, SourceBookmark } from '../adapters/source-adapter.types';
 import { MigrationRepository } from '../migration.repository';

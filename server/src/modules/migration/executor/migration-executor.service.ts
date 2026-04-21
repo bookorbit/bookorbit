@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { MigrationProgressEvent } from '@projectx/types';
-import { NotificationType } from '@projectx/types';
+import type { MigrationProgressEvent } from '@bookorbit/types';
+import { NotificationType } from '@bookorbit/types';
 import { NotificationService } from '../../notification/notification.service';
 import { asRecord } from '../core/coerce';
 import { parseConnectionConfig } from '../core/connection-config';

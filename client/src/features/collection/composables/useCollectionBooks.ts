@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 
 const PAGE_SIZE = 50
 

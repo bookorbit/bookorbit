@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AuthorAutoEnrichmentConfig } from '@projectx/types';
+import type { AuthorAutoEnrichmentConfig } from '@bookorbit/types';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 

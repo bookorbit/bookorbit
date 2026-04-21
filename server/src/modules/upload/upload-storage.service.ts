@@ -18,7 +18,7 @@ export class UploadStorageService {
    * Streams the multipart file to a temp path on disk.
    */
   async streamToTemp(source: Readable): Promise<{ tempPath: string; sizeBytes: number }> {
-    const tempPath = join(tmpdir(), `projectx-upload-${randomUUID()}`);
+    const tempPath = join(tmpdir(), `bookorbit-upload-${randomUUID()}`);
     const writeStream = createWriteStream(tempPath);
 
     try {

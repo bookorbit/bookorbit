@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { api } from '@/lib/api'
-import { BOOK_METADATA_LOCK_FIELDS, type BookDetail, type BookMetadataLockField } from '@projectx/types'
+import { BOOK_METADATA_LOCK_FIELDS, type BookDetail, type BookMetadataLockField } from '@bookorbit/types'
 
 function normalizeLockedFields(fields: readonly BookMetadataLockField[]): BookMetadataLockField[] {
   const unique = new Set(fields)

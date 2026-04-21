@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import type { AudioReaderSettings } from '@projectx/types'
-import { AUDIO_READER_DEFAULTS } from '@projectx/types'
+import type { AudioReaderSettings } from '@bookorbit/types'
+import { AUDIO_READER_DEFAULTS } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 
 export function useAudioSettings(onSpeedChange: (rate: number) => void, onVolumeChange: (vol: number) => void) {

@@ -15,7 +15,7 @@ import PdfToolbar from './components/PdfToolbar.vue'
 import PdfFindBar from './components/FindBar.vue'
 import PdfSidebar from './components/PdfSidebar.vue'
 import type { PageDim } from './composables/usePdf'
-import type { PdfReaderSettings } from '@projectx/types'
+import type { PdfReaderSettings } from '@bookorbit/types'
 
 const props = defineProps<{ bookId: number; fileId: number }>()
 const router = useRouter()

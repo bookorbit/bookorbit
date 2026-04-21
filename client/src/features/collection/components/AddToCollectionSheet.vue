@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
-import type { Collection } from '@projectx/types'
+import type { Collection } from '@bookorbit/types'
 
 const props = defineProps<{
   open: boolean

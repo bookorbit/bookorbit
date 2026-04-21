@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { SeriesSummary } from '@projectx/types'
+import type { SeriesSummary } from '@bookorbit/types'
 import { BookCopy } from 'lucide-vue-next'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'

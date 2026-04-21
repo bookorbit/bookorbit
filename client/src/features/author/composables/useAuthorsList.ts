@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 
-import type { AuthorSummary } from '@projectx/types'
+import type { AuthorSummary } from '@bookorbit/types'
 import { fetchAuthors } from '../api/author'
 import type { AuthorListSort, SortDirection } from '../types/author'
 

@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RefreshCw, Save } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import type { AuthorAutoEnrichmentConfig } from '@projectx/types'
+import type { AuthorAutoEnrichmentConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuthorEligibleCountPreview } from './composables/useAuthorEligibleCountPreview'
 

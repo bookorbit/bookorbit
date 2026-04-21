@@ -20,7 +20,7 @@ describe('Architecture boundaries', () => {
     const allowlist = [
       'src/modules/authors/authors.controller.ts',
       'src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts',
-      'src/modules/book-bucket/book-bucket.controller.ts',
+      'src/modules/book-dock/book-dock.controller.ts',
     ].sort();
 
     const allFiles = await listFilesRecursive(modulesRoot);
@@ -63,8 +63,8 @@ describe('Architecture boundaries', () => {
       'src/modules/scanner/file-watcher.service.ts',
       'src/modules/seed/cleanup.service.ts',
       'src/modules/seed/seed.service.ts',
-      'src/modules/book-bucket/book-bucket-finalize.service.ts',
-      'src/modules/book-bucket/book-bucket.service.ts',
+      'src/modules/book-dock/book-dock-finalize.service.ts',
+      'src/modules/book-dock/book-dock.service.ts',
       'src/modules/upload/upload-processor.service.ts',
       'src/modules/upload/upload.service.ts',
       'src/modules/app-settings/oidc-group-mapping-admin.service.ts',

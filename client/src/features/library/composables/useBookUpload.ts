@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { getAccessToken } from '@/lib/api'
-import type { UploadResult } from '@projectx/types'
+import type { UploadResult } from '@bookorbit/types'
 
 export const SUPPORTED_FORMATS = ['epub', 'kepub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2', 'm4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac']
 export const SUPPORTED_FORMATS_ACCEPT = SUPPORTED_FORMATS.map((f) => `.${f}`).join(',')

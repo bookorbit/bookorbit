@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolveCollapsePreference } from '@projectx/types';
-import type { SeriesCollapsePreferences } from '@projectx/types';
+import { resolveCollapsePreference } from '@bookorbit/types';
+import type { SeriesCollapsePreferences } from '@bookorbit/types';
 
 describe('resolveCollapsePreference', () => {
   it('returns false when prefs is undefined', () => {

@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import sharp from 'sharp';
 
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { resolveUserAvatarUrl } from '../../common/utils/user-avatar-url';
 import { UserAvatarStorageService } from './user-avatar-storage.service';

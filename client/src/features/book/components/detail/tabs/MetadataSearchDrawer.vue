@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { X, Sparkles } from 'lucide-vue-next'
-import { isAudioFormat } from '@projectx/types'
-import type { BookDetail, BookMetadataLockField, MetadataCandidate, MetadataSource } from '@projectx/types'
+import { isAudioFormat } from '@bookorbit/types'
+import type { BookDetail, BookMetadataLockField, MetadataCandidate, MetadataSource } from '@bookorbit/types'
 import { useMetadataSearch } from '../../../composables/useMetadataSearch'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'

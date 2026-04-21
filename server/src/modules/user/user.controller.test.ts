@@ -6,7 +6,7 @@ vi.mock('fs', () => ({
   createReadStream: vi.fn(),
 }));
 
-import { AuditAction, Permission } from '@projectx/types';
+import { AuditAction, Permission } from '@bookorbit/types';
 import { BadRequestException } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';

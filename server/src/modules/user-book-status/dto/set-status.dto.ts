@@ -1,5 +1,5 @@
 import { IsIn } from 'class-validator';
-import type { ReadStatus } from '@projectx/types';
+import type { ReadStatus } from '@bookorbit/types';
 import { READ_STATUSES } from '../user-book-status.constants';
 
 export class SetStatusDto {

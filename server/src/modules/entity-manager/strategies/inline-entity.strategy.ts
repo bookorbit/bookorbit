@@ -2,7 +2,7 @@ import { BadRequestException, Inject } from '@nestjs/common';
 import { asc, count, eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { InlineEntityType } from '@projectx/types';
+import type { InlineEntityType } from '@bookorbit/types';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { bookMetadata } from '../../../db/schema';

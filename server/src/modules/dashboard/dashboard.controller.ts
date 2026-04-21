@@ -13,9 +13,9 @@ export class DashboardController {
   getScroller(
     @Param('type', new ParseEnumPipe(ScrollerType)) type: ScrollerType,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-    @Query('lensId', new DefaultValuePipe(0), ParseIntPipe) lensId: number,
+    @Query('smartScopeId', new DefaultValuePipe(0), ParseIntPipe) smartScopeId: number,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.dashboardService.getScroller(type, user, limit, lensId);
+    return this.dashboardService.getScroller(type, user, limit, smartScopeId);
   }
 }

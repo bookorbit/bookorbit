@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { OidcCallbackResponse } from '@projectx/types'
-import { OidcErrorCode } from '@projectx/types'
+import type { OidcCallbackResponse } from '@bookorbit/types'
+import { OidcErrorCode } from '@bookorbit/types'
 import { setAccessToken } from '@/lib/api'
 import { useAuth } from './composables/useAuth'
 import { useOidc, OidcLoginError } from './composables/useOidc'
@@ -79,7 +79,7 @@ onMounted(async () => {
 <template>
   <div class="min-h-screen flex items-center justify-center bg-background px-4">
     <div class="w-full max-w-sm text-center">
-      <h1 class="text-2xl font-serif font-semibold text-foreground mb-6">project<span class="text-primary">x</span></h1>
+      <h1 class="text-2xl font-serif font-semibold text-foreground mb-6">Book<span class="text-primary"> Orbit</span></h1>
 
       <div v-if="!error" class="space-y-3">
         <div class="flex justify-center">

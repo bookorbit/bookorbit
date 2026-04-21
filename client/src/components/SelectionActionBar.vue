@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { STATUS_ICONS, STATUS_OPTIONS } from '@/features/book/composables/useBookStatus'
-import type { ReadStatus } from '@projectx/types'
+import type { ReadStatus } from '@bookorbit/types'
 import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
 
 export type ExportScope = 'primary' | 'all' | 'audio'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags, BookOpen, FileEdit } from 'lucide-vue-next'
-import type { CoverAspectRatio, Library, OrganizationMode } from '@projectx/types'
+import type { CoverAspectRatio, Library, OrganizationMode } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useLibraryCreator } from '../composables/useLibraryCreator'
 import LibraryCreatorDetails from './LibraryCreatorDetails.vue'

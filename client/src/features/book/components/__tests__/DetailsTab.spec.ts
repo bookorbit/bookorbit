@@ -12,7 +12,7 @@ beforeEach(() => {
   )
 })
 import DetailsTab from '../detail/tabs/DetailsTab.vue'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 vi.mock('vue-router', async (importOriginal) => {

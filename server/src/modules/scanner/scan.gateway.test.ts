@@ -1,4 +1,4 @@
-import type { BookMissingEvent, CoverRefreshedEvent, ScanProgressEvent } from '@projectx/types';
+import type { BookMissingEvent, CoverRefreshedEvent, ScanProgressEvent } from '@bookorbit/types';
 
 import { ScanGateway } from './scan.gateway';
 

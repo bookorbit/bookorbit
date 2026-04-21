@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail } from '@bookorbit/types'
 
 export function useBookDetail() {
   const detail = ref<BookDetail | null>(null)

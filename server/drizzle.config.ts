@@ -5,6 +5,6 @@ export default {
   out: './src/db/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgres://projectx:projectx@postgres:5432/projectx',
+    url: process.env.DATABASE_URL ?? 'postgres://bookorbit:bookorbit@postgres:5432/bookorbit',
   },
 } satisfies Config;

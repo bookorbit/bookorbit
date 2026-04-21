@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { BookCard, BookFileRef } from '@projectx/types'
-import { FORMAT_TO_GROUP } from '@projectx/types'
+import type { BookCard, BookFileRef } from '@bookorbit/types'
+import { FORMAT_TO_GROUP } from '@bookorbit/types'
 import { bookCoverStyle } from '../lib/book-cover'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import { api } from '@/lib/api'

@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 
-import { FIELD_OPERATORS, RULE_OPERATORS, type RuleField, type RuleOperator } from '@projectx/types';
+import { FIELD_OPERATORS, RULE_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
 
 import { validateGroupRule, groupRuleSchema } from './group-rule.validator';
 

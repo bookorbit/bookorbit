@@ -220,7 +220,7 @@ jobs:
           if [[ "$PACKAGE" == "server" ]]; then
             pnpm --filter server type-check
           else
-            pnpm --filter @projectx/types build
+            pnpm --filter @bookorbit/types build
             pnpm --filter client type-check
           fi
 

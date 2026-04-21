@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 
-import type { SeriesSummary } from '@projectx/types'
+import type { SeriesSummary } from '@bookorbit/types'
 import { fetchSeries } from '../api/series'
 import type { CompletionStatus, SeriesListSort, SortDirection } from '../types/series'
 

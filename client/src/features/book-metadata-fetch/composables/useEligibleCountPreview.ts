@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
-import type { BookMetadataFetchConditions } from '@projectx/types'
+import type { BookMetadataFetchConditions } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export function useEligibleCountPreview(conditions: Ref<BookMetadataFetchConditions | null>, libraryId?: number) {

@@ -5,7 +5,7 @@ import type {
   BookMetadataFetchReason,
   BookMetadataFetchStatus,
   MetadataField,
-} from '@projectx/types';
+} from '@bookorbit/types';
 import type { SQL } from 'drizzle-orm';
 import { and, asc, count, eq, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';

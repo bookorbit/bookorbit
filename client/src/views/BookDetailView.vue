@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, provide, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import type { BookDetail, BookMetadataLockField } from '@projectx/types'
+import type { BookDetail, BookMetadataLockField } from '@bookorbit/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
 import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'

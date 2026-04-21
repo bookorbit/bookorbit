@@ -4,7 +4,7 @@ import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
 
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

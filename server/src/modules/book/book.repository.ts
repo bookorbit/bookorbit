@@ -3,7 +3,7 @@ import { SQL, and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-o
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { SortSpec } from '@projectx/types';
+import type { SortSpec } from '@bookorbit/types';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';

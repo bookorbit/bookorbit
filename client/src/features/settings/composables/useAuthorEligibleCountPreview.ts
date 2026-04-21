@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
-import type { AuthorEnrichmentConditions } from '@projectx/types'
+import type { AuthorEnrichmentConditions } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export function useAuthorEligibleCountPreview(conditions: Ref<AuthorEnrichmentConditions | null>) {

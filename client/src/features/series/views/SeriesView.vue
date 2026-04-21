@@ -19,8 +19,8 @@ const { viewMode } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
 const { items, total, loading, error, hasMore, q, sort, order, libraryId, completionStatus, author, load } = useSeriesList()
 
-const SERIES_CARD_WIDTH_STORAGE_KEY = 'projectx:seriesCardWidth'
-const SERIES_GRID_GAP_STORAGE_KEY = 'projectx:seriesGridGap'
+const SERIES_CARD_WIDTH_STORAGE_KEY = 'bookorbit:seriesCardWidth'
+const SERIES_GRID_GAP_STORAGE_KEY = 'bookorbit:seriesGridGap'
 const SERIES_CARD_WIDTH_DEFAULT = 260
 const SERIES_CARD_WIDTH_MIN = 240
 const SERIES_CARD_WIDTH_MAX = 420

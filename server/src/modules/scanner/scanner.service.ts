@@ -1,8 +1,8 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 
-import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanBooksAddedEvent, ScanProgressEvent } from '@projectx/types';
-import { NotificationType } from '@projectx/types';
+import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanBooksAddedEvent, ScanProgressEvent } from '@bookorbit/types';
+import { NotificationType } from '@bookorbit/types';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { NotificationService } from '../notification/notification.service';

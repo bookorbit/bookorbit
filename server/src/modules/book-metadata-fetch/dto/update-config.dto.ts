@@ -1,8 +1,8 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, Max, Min, ValidateNested } from 'class-validator';
-import type { BookMetadataFetchConditions, BookMetadataFetchConfig, MetadataField } from '@projectx/types';
+import type { BookMetadataFetchConditions, BookMetadataFetchConfig, MetadataField } from '@bookorbit/types';
 
-import { ALL_METADATA_FIELDS } from '@projectx/types';
+import { ALL_METADATA_FIELDS } from '@bookorbit/types';
 
 class ScoreConditionDto {
   @IsBoolean()

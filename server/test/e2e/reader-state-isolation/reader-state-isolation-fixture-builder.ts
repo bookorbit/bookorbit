@@ -7,7 +7,7 @@ export { createCbzFixture, createEpubFixture, createZipArchiveFixture } from '..
 export interface ReaderStateIsolationFixtureRoot {
   rootPath: string;
   booksPath: string;
-  bookBucketPath: string;
+  bookDockPath: string;
   cleanup: () => Promise<void>;
 }
 
@@ -20,13 +20,13 @@ function assertRelativePath(path: string): void {
 export async function createReaderStateIsolationFixtureRoot(prefix = 'reader-state-isolation-e2e-'): Promise<ReaderStateIsolationFixtureRoot> {
   const rootPath = await mkdtemp(join(tmpdir(), prefix));
   const booksPath = join(rootPath, 'books');
-  const bookBucketPath = join(booksPath, 'book-bucket');
-  await mkdir(bookBucketPath, { recursive: true });
+  const bookDockPath = join(booksPath, 'book-dock');
+  await mkdir(bookDockPath, { recursive: true });
 
   return {
     rootPath,
     booksPath,
-    bookBucketPath,
+    bookDockPath,
     cleanup: async () => {
       await rm(rootPath, { recursive: true, force: true });
     },

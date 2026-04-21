@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import type { BookCard, SeriesBooksPage } from '@projectx/types'
+import type { BookCard, SeriesBooksPage } from '@bookorbit/types'
 
 vi.mock('../api/series', () => ({
   fetchSeriesBooks: vi.fn<typeof import('../api/series').fetchSeriesBooks>(),

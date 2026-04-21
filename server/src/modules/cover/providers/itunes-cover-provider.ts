@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CoverSearchResult, type ITunesCoverResolution } from '@projectx/types';
+import { CoverSearchResult, type ITunesCoverResolution } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../metadata-preferences/provider-config.service';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';

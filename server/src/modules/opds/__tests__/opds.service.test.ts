@@ -35,8 +35,8 @@ describe('OpdsService', () => {
 
       expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
       expect(xml).toContain('<feed xmlns="http://www.w3.org/2005/Atom"');
-      expect(xml).toContain('<title>projectx OPDS Catalog</title>');
-      expect(xml).toContain('<id>urn:projectx:root</id>');
+      expect(xml).toContain('<title>bookorbit OPDS Catalog</title>');
+      expect(xml).toContain('<id>urn:bookorbit:root</id>');
     });
 
     it('contains all expected navigation entries', () => {
@@ -48,7 +48,7 @@ describe('OpdsService', () => {
       expect(xml).toContain('Random Books');
       expect(xml).toContain('Libraries');
       expect(xml).toContain('Collections');
-      expect(xml).toContain('Lenses');
+      expect(xml).toContain('SmartScopes');
       expect(xml).toContain('Authors');
       expect(xml).toContain('Series');
     });
@@ -125,7 +125,7 @@ describe('OpdsService', () => {
       const book = sampleBook();
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -145,7 +145,7 @@ describe('OpdsService', () => {
       const book = sampleBook();
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -166,7 +166,7 @@ describe('OpdsService', () => {
       const book = sampleBook({ hasCover: false });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -185,7 +185,7 @@ describe('OpdsService', () => {
       const book = sampleBook();
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -202,7 +202,7 @@ describe('OpdsService', () => {
       const book = sampleBook({ seriesName: null, seriesIndex: null });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -219,7 +219,7 @@ describe('OpdsService', () => {
       const book = sampleBook();
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -235,14 +235,14 @@ describe('OpdsService', () => {
 
     it('includes totalResults element', () => {
       const service = makeService();
-      const xml = service.generateAcquisitionFeed('Catalog', 'urn:projectx:catalog', [], 42, 1, 50, `${BASE}/catalog?page=1&size=50`, 'test-token');
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 42, 1, 50, `${BASE}/catalog?page=1&size=50`, 'test-token');
 
       expect(xml).toContain('<opensearch:totalResults>42</opensearch:totalResults>');
     });
 
     it('adds pagination links for multi-page results', () => {
       const service = makeService();
-      const xml = service.generateAcquisitionFeed('Catalog', 'urn:projectx:catalog', [], 100, 2, 10, `${BASE}/catalog?size=10&page=2`, 'test-token');
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 100, 2, 10, `${BASE}/catalog?size=10&page=2`, 'test-token');
 
       expect(xml).toContain('rel="previous"');
       expect(xml).toContain('rel="next"');
@@ -252,7 +252,7 @@ describe('OpdsService', () => {
 
     it('generates correct pagination URLs', () => {
       const service = makeService();
-      const xml = service.generateAcquisitionFeed('Catalog', 'urn:projectx:catalog', [], 100, 2, 10, `${BASE}/catalog?size=10&page=2`, 'test-token');
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 100, 2, 10, `${BASE}/catalog?size=10&page=2`, 'test-token');
 
       expect(xml).toContain(`${BASE}/catalog?size=10&amp;page=1`);
       expect(xml).toContain(`${BASE}/catalog?size=10&amp;page=3`);
@@ -263,7 +263,7 @@ describe('OpdsService', () => {
       const service = makeService();
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [],
         100,
         2,
@@ -279,7 +279,7 @@ describe('OpdsService', () => {
 
     it('omits previous/first links on page 1', () => {
       const service = makeService();
-      const xml = service.generateAcquisitionFeed('Catalog', 'urn:projectx:catalog', [], 100, 1, 10, `${BASE}/catalog?size=10&page=1`, 'test-token');
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 100, 1, 10, `${BASE}/catalog?size=10&page=1`, 'test-token');
 
       expect(xml).not.toContain('rel="previous"');
       expect(xml).not.toContain('rel="first"');
@@ -288,7 +288,7 @@ describe('OpdsService', () => {
 
     it('omits next/last links on last page', () => {
       const service = makeService();
-      const xml = service.generateAcquisitionFeed('Catalog', 'urn:projectx:catalog', [], 20, 2, 10, `${BASE}/catalog?size=10&page=2`, 'test-token');
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 20, 2, 10, `${BASE}/catalog?size=10&page=2`, 'test-token');
 
       expect(xml).not.toContain('rel="next"');
       expect(xml).not.toContain('rel="last"');
@@ -305,7 +305,7 @@ describe('OpdsService', () => {
       });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -327,7 +327,7 @@ describe('OpdsService', () => {
       const xml = service.generateOpenSearchDescription();
 
       expect(xml).toContain('<OpenSearchDescription');
-      expect(xml).toContain('<ShortName>projectx OPDS</ShortName>');
+      expect(xml).toContain('<ShortName>bookorbit OPDS</ShortName>');
       expect(xml).toContain('{searchTerms}');
       expect(xml).toContain(`${BASE}/catalog?q={searchTerms}`);
     });
@@ -339,7 +339,7 @@ describe('OpdsService', () => {
       const book = sampleBook({ title: 'Rock & Roll <Vol. 1> "Greatest"' });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,
@@ -360,7 +360,7 @@ describe('OpdsService', () => {
       const book = sampleBook({ authors: ["O'Brien & Sons"] });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
-        'urn:projectx:catalog',
+        'urn:bookorbit:catalog',
         [book],
         1,
         1,

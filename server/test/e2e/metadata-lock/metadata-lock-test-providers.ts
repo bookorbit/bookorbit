@@ -1,4 +1,4 @@
-import { type AudiobookChapter, type MetadataCandidate, MetadataProviderKey } from '@projectx/types';
+import { type AudiobookChapter, type MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import type { IdentifiableProvider } from '../../../src/modules/metadata-fetch/providers/metadata-provider';
 

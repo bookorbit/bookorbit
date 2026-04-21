@@ -8,7 +8,7 @@ import type {
   MetadataProviderKey,
   MetadataSource,
   ProviderIds,
-} from '@projectx/types'
+} from '@bookorbit/types'
 import { useMetadataDiff, type DiffFieldKey, type MetadataPatch } from '../../../composables/useMetadataDiff'
 import { getProviderColor, getProviderLabel, hideOnError, providerActivePillStyle } from '../../../lib/metadata-fetch'
 import MetadataDiffRow from './MetadataDiffRow.vue'

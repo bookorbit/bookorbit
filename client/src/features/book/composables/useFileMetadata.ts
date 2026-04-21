@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { ComicMetadataFields } from '@projectx/types'
+import type { ComicMetadataFields } from '@bookorbit/types'
 
 export interface FileMetadata {
   title?: string | null

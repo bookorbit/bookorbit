@@ -3,7 +3,7 @@ import { shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { CalendarRange } from 'lucide-vue-next'
 
-import type { AcquisitionLagPoint } from '@projectx/types'
+import type { AcquisitionLagPoint } from '@bookorbit/types'
 import { useAcquisitionLagScatter } from '../../composables/useAcquisitionLagScatter'
 import ChartCard from '../ChartCard.vue'
 

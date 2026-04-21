@@ -1,6 +1,6 @@
 import { Logger, NotFoundException } from '@nestjs/common';
 import type { Mocked } from 'vitest';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { MetadataPreferenceResolver } from './metadata-preference-resolver';
 import { MetadataPreferencesService } from './metadata-preferences.service';

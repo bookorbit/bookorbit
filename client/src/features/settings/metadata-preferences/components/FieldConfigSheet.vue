@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { X, ChevronUp, ChevronDown } from 'lucide-vue-next'
-import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@projectx/types'
+import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import MergeStrategyPicker from './MergeStrategyPicker.vue'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 

@@ -6,13 +6,13 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { mkdir } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
+import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { seedLibrary, waitForScanCompletion } from '../app-harness';
 import { createOpdsFixtureRoot, type OpdsFixtureRoot, writeFixtureFile } from './opds-fixture-builder';
 
@@ -89,7 +89,7 @@ export async function createOpdsE2EContext(): Promise<OpdsE2EContext> {
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopBookBucketWatcher(app);
+  await stopBookDockWatcher(app);
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
@@ -328,8 +328,8 @@ function makeMetadataNoopMock(): Pick<
   };
 }
 
-async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(BookBucketWatcherService);
+async function stopBookDockWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookDockWatcherService);
   await watcher.onModuleDestroy();
 }
 

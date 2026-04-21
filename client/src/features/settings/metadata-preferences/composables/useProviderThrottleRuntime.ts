@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { MetadataProviderKey, ProviderThrottleRuntimeSnapshot, ProviderThrottleRuntimeState } from '@projectx/types'
+import type { MetadataProviderKey, ProviderThrottleRuntimeSnapshot, ProviderThrottleRuntimeState } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export function useProviderThrottleRuntime() {

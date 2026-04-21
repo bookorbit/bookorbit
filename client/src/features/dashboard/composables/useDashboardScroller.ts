@@ -1,9 +1,9 @@
 import { onMounted, ref } from 'vue'
 
-import type { BookCard, ScrollerType } from '@projectx/types'
+import type { BookCard, ScrollerType } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
-export function useDashboardScroller(type: ScrollerType, limit = 20, lensId?: number) {
+export function useDashboardScroller(type: ScrollerType, limit = 20, smartScopeId?: number) {
   const books = ref<BookCard[]>([])
   const loading = ref(true)
   const error = ref(false)
@@ -13,7 +13,7 @@ export function useDashboardScroller(type: ScrollerType, limit = 20, lensId?: nu
     error.value = false
     try {
       const params = new URLSearchParams({ limit: String(limit) })
-      if (type === 'lens' && lensId) params.set('lensId', String(lensId))
+      if (type === 'smart-scope' && smartScopeId) params.set('smartScopeId', String(smartScopeId))
       const res = await api(`/api/v1/dashboard/scrollers/${type}?${params}`)
       if (!res.ok) throw new Error()
       books.value = await res.json()

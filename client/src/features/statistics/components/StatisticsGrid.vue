@@ -2,7 +2,7 @@
 import { type Component, defineAsyncComponent } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 
-import type { ChartConfigEntry, StatisticsChartId } from '@projectx/types'
+import type { ChartConfigEntry, StatisticsChartId } from '@bookorbit/types'
 import { STATISTICS_CHART_META, type StatisticsChartSize } from '../statistics-chart-meta'
 import { useStatisticsConfig } from '../composables/useStatisticsConfig'
 

@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
-import type { MigrationProgressEvent } from '@projectx/types'
+import type { MigrationProgressEvent } from '@bookorbit/types'
 import { getAccessToken } from '@/lib/api'
 
 let socket: Socket | null = null

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail } from '@bookorbit/types'
 
 import { useMetadataLocks } from '../useMetadataLocks'
 
@@ -76,7 +76,7 @@ describe('useMetadataLocks', () => {
   })
 
   it('lockAll sends every lockable field', async () => {
-    const { BOOK_METADATA_LOCK_FIELDS } = await import('@projectx/types')
+    const { BOOK_METADATA_LOCK_FIELDS } = await import('@bookorbit/types')
     const allLocked = makeBook({ lockedFields: [...BOOK_METADATA_LOCK_FIELDS] })
     apiMock.mockResolvedValue({ ok: true, json: async () => allLocked })
 

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { BookMetadataFetchConfig, BookMetadataFetchConfigOverride, BookMetadataFetchLibraryConfig } from '@projectx/types'
+import type { BookMetadataFetchConfig, BookMetadataFetchConfigOverride, BookMetadataFetchLibraryConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 const globalConfig = ref<BookMetadataFetchConfig | null>(null)

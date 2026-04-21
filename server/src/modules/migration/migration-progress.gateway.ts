@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import { Permission, type MigrationProgressEvent, type MigrationRunState } from '@projectx/types';
+import { Permission, type MigrationProgressEvent, type MigrationRunState } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from '../auth/auth.service';
 import { MigrationRepository } from './migration.repository';

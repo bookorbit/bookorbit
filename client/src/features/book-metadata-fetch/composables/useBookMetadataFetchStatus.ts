@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
-import type { BookMetadataFetchStatusEvent } from '@projectx/types'
+import type { BookMetadataFetchStatusEvent } from '@bookorbit/types'
 import { getAccessToken } from '@/lib/api'
 
 const status = ref<BookMetadataFetchStatusEvent>({

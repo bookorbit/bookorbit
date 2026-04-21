@@ -1,13 +1,13 @@
 import path from 'path';
 import { defineConfig } from 'vitest/config';
 
-const e2eDatabaseUrl = process.env.E2E_DATABASE_URL ?? 'postgres://projectx:projectx@localhost:5432/projectx_e2e';
+const e2eDatabaseUrl = process.env.E2E_DATABASE_URL ?? 'postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e';
 
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     alias: {
-      '@projectx/types': path.resolve(__dirname, '../packages/types/src/index.ts'),
+      '@bookorbit/types': path.resolve(__dirname, '../packages/types/src/index.ts'),
     },
   },
   test: {

@@ -2,7 +2,7 @@
 import { computed, shallowRef, watch } from 'vue'
 import VChart from 'vue-echarts'
 import { GitMerge } from 'lucide-vue-next'
-import type { ChordDiagramData } from '@projectx/types'
+import type { ChordDiagramData } from '@bookorbit/types'
 
 import { useGenreCooccurrence } from '../../composables/useGenreCooccurrence'
 import ChartCard from '../ChartCard.vue'

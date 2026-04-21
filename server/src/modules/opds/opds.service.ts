@@ -10,19 +10,19 @@ export class OpdsService {
   generateRootNavigation(): string {
     const now = new Date().toISOString();
     return this.wrapFeed(
-      'projectx OPDS Catalog',
-      'urn:projectx:root',
+      'bookorbit OPDS Catalog',
+      'urn:bookorbit:root',
       now,
       [xmlLink('self', BASE, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), xmlLink('search', `${BASE}/search.opds`, OPDS_MIME_SEARCH)],
       [
-        this.navEntry('urn:projectx:all', 'All Books', 'Browse the full catalog', `${BASE}/catalog`, now),
-        this.navEntry('urn:projectx:recent', 'Recent Books', 'Recently added books', `${BASE}/recent`, now),
-        this.navEntry('urn:projectx:surprise', 'Random Books', '25 random picks', `${BASE}/surprise`, now),
-        this.navEntry('urn:projectx:libraries', 'Libraries', 'Browse by library', `${BASE}/libraries`, now),
-        this.navEntry('urn:projectx:collections', 'Collections', 'Browse your collections', `${BASE}/collections`, now),
-        this.navEntry('urn:projectx:lenses', 'Lenses', 'Browse your lenses', `${BASE}/lenses`, now),
-        this.navEntry('urn:projectx:authors', 'Authors', 'Browse by author', `${BASE}/authors`, now),
-        this.navEntry('urn:projectx:series', 'Series', 'Browse by series', `${BASE}/series`, now),
+        this.navEntry('urn:bookorbit:all', 'All Books', 'Browse the full catalog', `${BASE}/catalog`, now),
+        this.navEntry('urn:bookorbit:recent', 'Recent Books', 'Recently added books', `${BASE}/recent`, now),
+        this.navEntry('urn:bookorbit:surprise', 'Random Books', '25 random picks', `${BASE}/surprise`, now),
+        this.navEntry('urn:bookorbit:libraries', 'Libraries', 'Browse by library', `${BASE}/libraries`, now),
+        this.navEntry('urn:bookorbit:collections', 'Collections', 'Browse your collections', `${BASE}/collections`, now),
+        this.navEntry('urn:bookorbit:smartScopes', 'SmartScopes', 'Browse your smartScopes', `${BASE}/smart-scopes`, now),
+        this.navEntry('urn:bookorbit:authors', 'Authors', 'Browse by author', `${BASE}/authors`, now),
+        this.navEntry('urn:bookorbit:series', 'Series', 'Browse by series', `${BASE}/series`, now),
       ],
     );
   }
@@ -30,53 +30,59 @@ export class OpdsService {
   generateLibrariesNavigation(libs: { id: number; name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = libs.map((lib) =>
-      this.navEntry(`urn:projectx:library:${lib.id}`, lib.name, `${lib.bookCount} books`, `${BASE}/catalog?libraryId=${lib.id}`, now),
+      this.navEntry(`urn:bookorbit:library:${lib.id}`, lib.name, `${lib.bookCount} books`, `${BASE}/catalog?libraryId=${lib.id}`, now),
     );
-    return this.wrapFeed('Libraries', 'urn:projectx:libraries', now, [xmlLink('self', `${BASE}/libraries`, OPDS_MIME_NAV)], entries);
+    return this.wrapFeed('Libraries', 'urn:bookorbit:libraries', now, [xmlLink('self', `${BASE}/libraries`, OPDS_MIME_NAV)], entries);
   }
 
   generateCollectionsNavigation(cols: { id: number; name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = cols.map((col) =>
-      this.navEntry(`urn:projectx:collection:${col.id}`, col.name, `${col.bookCount} books`, `${BASE}/catalog?collectionId=${col.id}`, now),
+      this.navEntry(`urn:bookorbit:collection:${col.id}`, col.name, `${col.bookCount} books`, `${BASE}/catalog?collectionId=${col.id}`, now),
     );
-    return this.wrapFeed('Collections', 'urn:projectx:collections', now, [xmlLink('self', `${BASE}/collections`, OPDS_MIME_NAV)], entries);
+    return this.wrapFeed('Collections', 'urn:bookorbit:collections', now, [xmlLink('self', `${BASE}/collections`, OPDS_MIME_NAV)], entries);
   }
 
-  generateLensesNavigation(items: { id: number; name: string; icon: string | null }[]): string {
+  generateSmartScopesNavigation(items: { id: number; name: string; icon: string | null }[]): string {
     const now = new Date().toISOString();
-    const entries = items.map((lens) =>
-      this.navEntry(`urn:projectx:lens:${lens.id}`, lens.name, 'Dynamic lens', `${BASE}/catalog?lensId=${lens.id}`, now),
+    const entries = items.map((smartScope) =>
+      this.navEntry(
+        `urn:bookorbit:smartScope:${smartScope.id}`,
+        smartScope.name,
+        'Dynamic smartScope',
+        `${BASE}/catalog?smartScopeId=${smartScope.id}`,
+        now,
+      ),
     );
-    return this.wrapFeed('Lenses', 'urn:projectx:lenses', now, [xmlLink('self', `${BASE}/lenses`, OPDS_MIME_NAV)], entries);
+    return this.wrapFeed('SmartScopes', 'urn:bookorbit:smartScopes', now, [xmlLink('self', `${BASE}/smart-scopes`, OPDS_MIME_NAV)], entries);
   }
 
   generateAuthorsNavigation(items: { name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = items.map((a) =>
       this.navEntry(
-        `urn:projectx:author:${encodeURIComponent(a.name)}`,
+        `urn:bookorbit:author:${encodeURIComponent(a.name)}`,
         a.name,
         `${a.bookCount} books`,
         `${BASE}/catalog?author=${encodeURIComponent(a.name)}`,
         now,
       ),
     );
-    return this.wrapFeed('Authors', 'urn:projectx:authors', now, [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV)], entries);
+    return this.wrapFeed('Authors', 'urn:bookorbit:authors', now, [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV)], entries);
   }
 
   generateSeriesNavigation(items: { name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = items.map((s) =>
       this.navEntry(
-        `urn:projectx:series:${encodeURIComponent(s.name)}`,
+        `urn:bookorbit:series:${encodeURIComponent(s.name)}`,
         s.name,
         `${s.bookCount} books`,
         `${BASE}/catalog?series=${encodeURIComponent(s.name)}`,
         now,
       ),
     );
-    return this.wrapFeed('Series', 'urn:projectx:series', now, [xmlLink('self', `${BASE}/series`, OPDS_MIME_NAV)], entries);
+    return this.wrapFeed('Series', 'urn:bookorbit:series', now, [xmlLink('self', `${BASE}/series`, OPDS_MIME_NAV)], entries);
   }
 
   generateAcquisitionFeed(
@@ -121,8 +127,8 @@ export class OpdsService {
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">',
-      `  ${xmlEl('ShortName', 'projectx OPDS')}`,
-      `  ${xmlEl('Description', 'Search the projectx book catalog')}`,
+      `  ${xmlEl('ShortName', 'bookorbit OPDS')}`,
+      `  ${xmlEl('Description', 'Search the bookorbit book catalog')}`,
       `  <Url type="${esc(OPDS_MIME_ACQ)}" template="${esc(BASE)}/catalog?q={searchTerms}"/>`,
       '  <InputEncoding>UTF-8</InputEncoding>',
       '  <OutputEncoding>UTF-8</OutputEncoding>',
@@ -134,7 +140,7 @@ export class OpdsService {
     const lines: string[] = [];
     lines.push('<entry>');
     lines.push(`  ${xmlEl('title', book.title)}`);
-    lines.push(`  ${xmlEl('id', `urn:projectx:book:${book.id}`)}`);
+    lines.push(`  ${xmlEl('id', `urn:bookorbit:book:${book.id}`)}`);
     lines.push(`  ${xmlEl('updated', book.updatedAt.toISOString())}`);
 
     for (const author of book.authors) {

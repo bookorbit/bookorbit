@@ -6,7 +6,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { useKoboDevices } from '@/features/kobo/composables/useKoboDevices'
 import { useKoboSettings } from '@/features/kobo/composables/useKoboSettings'
-import type { KoboDevice } from '@projectx/types'
+import type { KoboDevice } from '@bookorbit/types'
 
 const { devices, fetchDevices, createDevice, renameDevice, revokeDevice } = useKoboDevices()
 const { settings, fetchSettings, updateSettings } = useKoboSettings()

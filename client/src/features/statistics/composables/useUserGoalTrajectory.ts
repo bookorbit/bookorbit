@@ -1,4 +1,4 @@
-import type { UserGoalTrajectory } from '@projectx/types'
+import type { UserGoalTrajectory } from '@bookorbit/types'
 
 import { fetchUserGoalTrajectory } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

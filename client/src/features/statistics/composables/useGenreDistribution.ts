@@ -1,4 +1,4 @@
-import type { GenreDistributionItem, StatisticsResult } from '@projectx/types'
+import type { GenreDistributionItem, StatisticsResult } from '@bookorbit/types'
 
 import { fetchGenreDistribution } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

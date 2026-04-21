@@ -4,12 +4,12 @@ import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { PDFDocument, PDFName } from 'pdf-lib';
 
-import type { WriteResult } from '@projectx/types';
+import type { WriteResult } from '@bookorbit/types';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';
 import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
-import { PROJECTX_NS_PREFIX } from '../shared/projectx-ns';
+import { BOOKORBIT_NS_PREFIX } from '../shared/bookorbit-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 import { buildXmp } from './pdf-xmp-builder';
 
@@ -56,7 +56,7 @@ function applyInfoDict(pdfDoc: PDFDocument, payload: BookWritePayload, fieldMask
     pdfDoc.setCreationDate(new Date(payload.publishedYear, 0, 1));
   }
 
-  pdfDoc.setCreator(PROJECTX_NS_PREFIX);
+  pdfDoc.setCreator(BOOKORBIT_NS_PREFIX);
 
   const keywords: string[] = [];
   if (fieldMask.has('genres') && payload.genres?.length) keywords.push(...payload.genres);

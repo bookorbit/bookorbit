@@ -213,7 +213,7 @@ export class AuthorImageStorageService {
         signal: controller.signal,
         redirect: 'manual',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; ProjectX/1.0; +https://projectx.local)',
+          'User-Agent': 'Mozilla/5.0 (compatible; BookOrbit/1.0; +https://bookorbit.app)',
           Accept: 'image/*',
         },
       });

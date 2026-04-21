@@ -1,6 +1,6 @@
 import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { createCoverToken, OpdsAuthGuard } from '../opds-auth.guard';
 import type { OpdsRequestUser } from '../opds-auth.guard';
@@ -82,14 +82,14 @@ describe('OpdsAuthGuard', () => {
     const guard = makeGuard();
     const { context, reply } = mockContext(undefined);
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
-    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
   });
 
   it('returns 401 when Authorization is not Basic', async () => {
     const guard = makeGuard();
     const { context, reply } = mockContext('Bearer xyz');
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
-    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
   });
 
   it('returns 401 when decoded credentials have no colon', async () => {
@@ -97,14 +97,14 @@ describe('OpdsAuthGuard', () => {
     const header = `Basic ${Buffer.from('nocolon').toString('base64')}`;
     const { context, reply } = mockContext(header);
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
-    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
   });
 
   it('returns 401 when credentials are invalid', async () => {
     const guard = makeGuard({ validateResult: null });
     const { context, reply } = mockContext(basicHeader('bad', 'creds'));
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
-    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
   });
 
   it('returns 401 when parent user is inactive', async () => {
@@ -130,7 +130,7 @@ describe('OpdsAuthGuard', () => {
     const token = createCoverToken(1, TEST_SECRET);
     const { context, reply } = mockContext(undefined, token, '/api/v1/opds/libraries');
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
-    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+    expect(reply.header).toHaveBeenCalledWith('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
   });
 
   it('accepts token auth on image routes', async () => {

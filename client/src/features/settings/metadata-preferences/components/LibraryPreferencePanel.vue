@@ -8,8 +8,8 @@ import type {
   MetadataFetchPreferences,
   MetadataField,
   ProviderStatus,
-} from '@projectx/types'
-import { ALL_METADATA_FIELDS } from '@projectx/types'
+} from '@bookorbit/types'
+import { ALL_METADATA_FIELDS } from '@bookorbit/types'
 import FieldPreferenceTable from './FieldPreferenceTable.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'

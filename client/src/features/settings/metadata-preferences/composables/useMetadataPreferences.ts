@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import type { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@projectx/types'
-import { ALL_METADATA_FIELDS } from '@projectx/types'
+import type { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@bookorbit/types'
+import { ALL_METADATA_FIELDS } from '@bookorbit/types'
 
 export function useMetadataPreferences() {
   const globalPrefs = ref<MetadataFetchPreferences | null>(null)

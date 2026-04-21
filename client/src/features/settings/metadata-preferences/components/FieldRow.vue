@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { AlertTriangle, RotateCcw, Settings2 } from 'lucide-vue-next'
-import type { FieldPreference, MetadataField, ProviderStatus } from '@projectx/types'
+import type { FieldPreference, MetadataField, ProviderStatus } from '@bookorbit/types'
 import MergeStrategyPicker from './MergeStrategyPicker.vue'
 import ProviderChipList from './ProviderChipList.vue'
 import FieldConfigSheet from './FieldConfigSheet.vue'

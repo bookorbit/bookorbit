@@ -6,7 +6,7 @@ import {
   MetadataFetchPreferences,
   MetadataField,
   MetadataProviderKey,
-} from '@projectx/types';
+} from '@bookorbit/types';
 import { of } from 'rxjs';
 
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';

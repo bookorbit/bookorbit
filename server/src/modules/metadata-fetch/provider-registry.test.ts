@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderRegistry } from './provider-registry';
 import { MetadataProvider } from './providers/metadata-provider';

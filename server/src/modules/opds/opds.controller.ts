@@ -69,10 +69,10 @@ export class OpdsController {
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
-  @Get('lenses')
-  async lenses(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const items = await this.opdsBookService.getUserLenses(user.userId);
-    const xml = this.opdsService.generateLensesNavigation(items);
+  @Get('smart-scopes')
+  async smartScopes(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
+    const items = await this.opdsBookService.getUserSmartScopes(user.userId);
+    const xml = this.opdsService.generateSmartScopesNavigation(items);
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
@@ -97,7 +97,7 @@ export class OpdsController {
     @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
     @Query('libraryId') libraryIdStr?: string,
     @Query('collectionId') collectionIdStr?: string,
-    @Query('lensId') lensIdStr?: string,
+    @Query('smartScopeId') smartScopeIdStr?: string,
     @Query('author') author?: string,
     @Query('series') series?: string,
     @Query('q') q?: string,
@@ -110,11 +110,11 @@ export class OpdsController {
     const filters: Record<string, string | number> = {};
     const libraryId = this.parseOptionalPositiveInt('libraryId', libraryIdStr);
     const collectionId = this.parseOptionalPositiveInt('collectionId', collectionIdStr);
-    const lensId = this.parseOptionalPositiveInt('lensId', lensIdStr);
+    const smartScopeId = this.parseOptionalPositiveInt('smartScopeId', smartScopeIdStr);
 
     if (libraryId !== undefined) filters.libraryId = libraryId;
     if (collectionId !== undefined) filters.collectionId = collectionId;
-    if (lensId !== undefined) filters.lensId = lensId;
+    if (smartScopeId !== undefined) filters.smartScopeId = smartScopeId;
     if (author) filters.author = author;
     if (series) filters.series = series;
     if (q) filters.q = q;
@@ -137,7 +137,7 @@ export class OpdsController {
     const feedTitle = q ? `Search: ${q}` : 'Catalog';
     const xml = this.opdsService.generateAcquisitionFeed(
       feedTitle,
-      'urn:projectx:catalog',
+      'urn:bookorbit:catalog',
       entries,
       total,
       clampedPage,
@@ -163,7 +163,7 @@ export class OpdsController {
     const selfPath = `/api/v1/opds/recent?page=${clampedPage}&size=${clampedSize}`;
     const xml = this.opdsService.generateAcquisitionFeed(
       'Recent Books',
-      'urn:projectx:recent',
+      'urn:bookorbit:recent',
       entries,
       total,
       clampedPage,
@@ -179,7 +179,7 @@ export class OpdsController {
     const entries = await this.opdsBookService.getRandomBooks(user.userId, 25, user.isSuperuser);
     const xml = this.opdsService.generateAcquisitionFeed(
       'Random Books',
-      'urn:projectx:surprise',
+      'urn:bookorbit:surprise',
       entries,
       entries.length,
       1,

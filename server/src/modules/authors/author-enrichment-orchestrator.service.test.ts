@@ -1,4 +1,4 @@
-import { AuthorAutoEnrichmentWriteMode } from '@projectx/types';
+import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
 
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';

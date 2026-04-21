@@ -147,10 +147,10 @@ export const routes: RouteRecordRaw[] = [
             meta: { maxWidth: 'max-w-6xl', title: 'File Naming' },
           },
           {
-            path: 'admin/book-bucket',
-            name: 'settings-admin-book-bucket',
-            component: () => import('@/features/settings/BookBucketSettings.vue'),
-            meta: { title: 'Book Bucket Settings' },
+            path: 'admin/book-dock',
+            name: 'settings-admin-book-dock',
+            component: () => import('@/features/settings/BookDockSettings.vue'),
+            meta: { title: 'Book Dock Settings' },
           },
           {
             path: 'admin/maintenance',
@@ -168,10 +168,10 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
-        path: '/book-bucket',
-        name: 'book-bucket',
-        component: () => import('@/views/BookBucketView.vue'),
-        meta: { title: 'Book Bucket' },
+        path: '/book-dock',
+        name: 'book-dock',
+        component: () => import('@/views/BookDockView.vue'),
+        meta: { title: 'Book Dock' },
       },
       {
         path: '/statistics',
@@ -186,10 +186,10 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: (to) => fallbackById('Library', numericParam(to, 'id')) },
       },
       {
-        path: '/lens/:id',
-        name: 'lens',
-        component: () => import('@/views/LensView.vue'),
-        meta: { title: (to) => fallbackById('Lens', numericParam(to, 'id')) },
+        path: '/smart-scope/:id',
+        name: 'smartScope',
+        component: () => import('@/views/SmartScopeView.vue'),
+        meta: { title: (to) => fallbackById('SmartScope', numericParam(to, 'id')) },
       },
       {
         path: '/collection/:id',

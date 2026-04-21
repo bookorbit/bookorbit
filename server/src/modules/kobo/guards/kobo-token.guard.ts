@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
 import { PermissionService } from '../../../common/services/permission.service';

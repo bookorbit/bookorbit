@@ -7,7 +7,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { mkdir } from 'fs/promises';
 import { and, desc, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';

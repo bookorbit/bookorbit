@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, reactive, ref, type PropType } from 'vue'
 import { mount } from '@vue/test-utils'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail } from '@bookorbit/types'
 import BookDetailView from '../BookDetailView.vue'
 
 const mockState = vi.hoisted(() => ({

@@ -1,11 +1,11 @@
-import type { Library, SortSpec } from '@projectx/types'
+import type { Library, SortSpec } from '@bookorbit/types'
 import { useRouter } from 'vue-router'
 import { useLibraries } from './useLibraries'
 
 const DEFAULT_SORT_FOR_NEW_LIBRARY: SortSpec[] = [{ field: 'addedAt', dir: 'desc' }]
 
 function setDefaultSortForLibrary(libraryId: number) {
-  const sortKey = `projectx:sort:library:${libraryId}`
+  const sortKey = `bookorbit:sort:library:${libraryId}`
   localStorage.setItem(sortKey, JSON.stringify(DEFAULT_SORT_FOR_NEW_LIBRARY))
 }
 

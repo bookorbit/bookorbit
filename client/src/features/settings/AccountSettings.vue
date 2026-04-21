@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import type { OidcProviderPublic } from '@projectx/types'
+import type { OidcProviderPublic } from '@bookorbit/types'
 import { ChevronDown, ChevronUp, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Upload } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'

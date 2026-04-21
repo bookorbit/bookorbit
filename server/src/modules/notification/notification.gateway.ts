@@ -2,8 +2,8 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Permission } from '@projectx/types';
-import type { NotificationItem } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
+import type { NotificationItem } from '@bookorbit/types';
 import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';

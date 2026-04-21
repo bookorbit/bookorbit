@@ -6,7 +6,7 @@ export const appConfig = registerAs('app', () => ({
 }));
 
 export const dbConfig = registerAs('db', () => ({
-  url: process.env.DATABASE_URL ?? 'postgres://projectx:projectx@localhost:5432/projectx',
+  url: process.env.DATABASE_URL ?? 'postgres://bookorbit:bookorbit@localhost:5432/bookorbit',
 }));
 
 export const authConfig = registerAs('auth', () => ({

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
 import { api, getAccessToken } from '@/lib/api'
-import type { NotificationItem, NotificationPage } from '@projectx/types'
+import type { NotificationItem, NotificationPage } from '@bookorbit/types'
 
 const PAGE_SIZE = 20
 

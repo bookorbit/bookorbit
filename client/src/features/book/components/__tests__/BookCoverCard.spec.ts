@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import BookCoverCard from '../BookCoverCard.vue'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 import { ref } from 'vue'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'

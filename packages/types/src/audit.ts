@@ -50,11 +50,11 @@ export enum AuditAction {
   CollectionBooksAdd = "collection.books.add",
   CollectionBooksRemove = "collection.books.remove",
 
-  LensCreate = "lens.create",
-  LensUpdate = "lens.update",
-  LensDelete = "lens.delete",
+  SmartScopeCreate = "smart_scope.create",
+  SmartScopeUpdate = "smart_scope.update",
+  SmartScopeDelete = "smart_scope.delete",
 
-  BookBucketFinalize = "book_bucket.finalize",
+  BookDockFinalize = "book_dock.finalize",
 
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
@@ -105,8 +105,8 @@ export enum AuditResource {
   Library = "library",
   Book = "book",
   Collection = "collection",
-  Lens = "lens",
-  BookBucketFile = "book_bucket_file",
+  SmartScope = "smart_scope",
+  BookDockFile = "book_dock_file",
   Author = "author",
   AppSettings = "app_settings",
   Genre = "genre",

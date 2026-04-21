@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ChevronDown, Download } from 'lucide-vue-next'
-import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@projectx/types'
-import type { BookDetailFile } from '@projectx/types'
+import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import type { BookDetailFile } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getFormatColor } from '@/features/book/lib/format-colors'

@@ -1,5 +1,5 @@
 import { Controller, Body, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put } from '@nestjs/common';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { UpdateGlobalPreferencesDto } from './dto/update-global-preferences.dto';

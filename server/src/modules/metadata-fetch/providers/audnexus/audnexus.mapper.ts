@@ -1,4 +1,4 @@
-import { AudiobookChapter, MetadataCandidate, MetadataProviderKey } from '@projectx/types';
+import { AudiobookChapter, MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { stripHtml } from '../provider-utils';
 import { AudNexusBook, AudNexusChaptersResponse } from './audnexus.types';

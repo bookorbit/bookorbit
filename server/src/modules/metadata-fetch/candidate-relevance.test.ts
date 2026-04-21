@@ -1,4 +1,4 @@
-import { MetadataCandidate } from '@projectx/types';
+import { MetadataCandidate } from '@bookorbit/types';
 import { describe, expect, it } from 'vitest';
 
 import { filterAndRank } from './candidate-relevance';

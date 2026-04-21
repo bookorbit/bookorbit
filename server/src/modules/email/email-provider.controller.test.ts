@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import type { RequestUser } from '../../common/types/request-user';
 import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
-import { AuditAction, AuditResource, Permission } from '@projectx/types';
+import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 import { EmailProviderController } from './email-provider.controller';
 import type { CreateEmailProviderDto } from './dto/create-email-provider.dto';
 import type { UpdateEmailProviderDto } from './dto/update-email-provider.dto';

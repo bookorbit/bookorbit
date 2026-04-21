@@ -10,7 +10,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { Test } from '@nestjs/testing';
 import { and, count, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { DEFAULT_FORMAT_PRIORITY, MetadataProviderKey } from '@projectx/types';
+import { DEFAULT_FORMAT_PRIORITY, MetadataProviderKey } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
@@ -395,7 +395,7 @@ export async function waitForCondition(check: () => Promise<void>, timeoutMs = 1
 }
 
 function buildMultipartBody(fileName: string, content: Buffer, contentType: string): { body: Buffer; boundary: string } {
-  const boundary = `----projectx-metadata-lock-${randomUUID()}`;
+  const boundary = `----bookorbit-metadata-lock-${randomUUID()}`;
   const preamble = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${contentType}\r\n\r\n`,
     'utf8',

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
-import { ALL_ENTITY_TYPES, type EntityType } from '@projectx/types';
+import { ALL_ENTITY_TYPES, type EntityType } from '@bookorbit/types';
 
 @Injectable()
 export class EntityTypePipe implements PipeTransform<string, EntityType> {

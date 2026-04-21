@@ -1,6 +1,6 @@
 import { basename } from 'path';
 
-import type { BookCard, CollapsedSeriesInfo, UserBookStatus } from '@projectx/types';
+import type { BookCard, CollapsedSeriesInfo, UserBookStatus } from '@bookorbit/types';
 
 type BookRow = {
   id: number;

@@ -1,4 +1,4 @@
-# ProjectX - Server
+# BookOrbit - Server
 
 NestJS 11 backend running on Fastify.
 
@@ -21,7 +21,7 @@ src/modules/
 ├── library/        Library management
 ├── scanner/        File system scanning, metadata extraction
 ├── collection/     User book collections
-├── lens/           Saved search/filter views
+├── smart-scope/           Saved search/filter views
 ├── user/           User management
 ├── role/           Roles and permissions (RBAC)
 ├── metadata/       Book metadata providers

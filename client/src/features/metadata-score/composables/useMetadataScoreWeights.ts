@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import type { MetadataScoreWeights } from '@projectx/types'
-import { DEFAULT_METADATA_SCORE_WEIGHTS } from '@projectx/types'
+import type { MetadataScoreWeights } from '@bookorbit/types'
+import { DEFAULT_METADATA_SCORE_WEIGHTS } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 const weights = ref<MetadataScoreWeights>({ ...DEFAULT_METADATA_SCORE_WEIGHTS })

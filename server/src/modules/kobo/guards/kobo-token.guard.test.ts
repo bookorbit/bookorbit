@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { KoboTokenGuard } from './kobo-token.guard';
 

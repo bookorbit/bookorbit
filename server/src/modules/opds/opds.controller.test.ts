@@ -23,7 +23,7 @@ function makeController() {
     generateRootNavigation: vi.fn().mockReturnValue('<root />'),
     generateLibrariesNavigation: vi.fn().mockReturnValue('<libraries />'),
     generateCollectionsNavigation: vi.fn().mockReturnValue('<collections />'),
-    generateLensesNavigation: vi.fn().mockReturnValue('<lenses />'),
+    generateSmartScopesNavigation: vi.fn().mockReturnValue('<smartScopes />'),
     generateAuthorsNavigation: vi.fn().mockReturnValue('<authors />'),
     generateSeriesNavigation: vi.fn().mockReturnValue('<series />'),
     generateAcquisitionFeed: vi.fn().mockReturnValue('<feed />'),
@@ -32,7 +32,7 @@ function makeController() {
   const opdsBookService = {
     getAccessibleLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Main', bookCount: 10 }]),
     getUserCollections: vi.fn().mockResolvedValue([{ id: 4, name: 'Favorites', bookCount: 2 }]),
-    getUserLenses: vi.fn().mockResolvedValue([{ id: 7, name: 'Unread', icon: 'sparkles' }]),
+    getUserSmartScopes: vi.fn().mockResolvedValue([{ id: 7, name: 'Unread', icon: 'sparkles' }]),
     getDistinctAuthors: vi.fn().mockResolvedValue([{ name: 'Frank Herbert', bookCount: 3 }]),
     getDistinctSeries: vi.fn().mockResolvedValue([
       { name: null, bookCount: 1 },
@@ -97,13 +97,13 @@ describe('OpdsController', () => {
 
     await controller.libraries(user, makeReply());
     await controller.collections(user, makeReply());
-    await controller.lenses(user, makeReply());
+    await controller.smartScopes(user, makeReply());
     await controller.authors(user, makeReply());
     await controller.series(user, makeReply());
 
     expect(opdsBookService.getAccessibleLibraries).toHaveBeenCalledWith(8, false);
     expect(opdsBookService.getUserCollections).toHaveBeenCalledWith(8);
-    expect(opdsBookService.getUserLenses).toHaveBeenCalledWith(8);
+    expect(opdsBookService.getUserSmartScopes).toHaveBeenCalledWith(8);
     expect(opdsBookService.getDistinctAuthors).toHaveBeenCalledWith(8, false);
     expect(opdsBookService.getDistinctSeries).toHaveBeenCalledWith(8, false);
     expect(opdsService.generateSeriesNavigation).toHaveBeenCalledWith([{ name: 'Dune', bookCount: 2 }]);
@@ -124,7 +124,7 @@ describe('OpdsController', () => {
       {
         libraryId: 2,
         collectionId: 11,
-        lensId: 15,
+        smartScopeId: 15,
         author: 'Frank Herbert',
         series: 'Dune',
         q: 'arrakis',
@@ -133,7 +133,7 @@ describe('OpdsController', () => {
     );
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Search: arrakis',
-      'urn:projectx:catalog',
+      'urn:bookorbit:catalog',
       [{ id: 1 }],
       1,
       1,
@@ -167,7 +167,7 @@ describe('OpdsController', () => {
     expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(12, 25, false);
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Random Books',
-      'urn:projectx:surprise',
+      'urn:bookorbit:surprise',
       [{ id: 3 }],
       1,
       1,

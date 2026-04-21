@@ -4,7 +4,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 import { PermissionService } from '../../common/services/permission.service';
 import { OpdsUserService } from './opds-user.service';
 import { UserService } from '../user/user.service';
@@ -65,7 +65,7 @@ export class OpdsAuthGuard implements CanActivate {
     if (tokenParam) {
       const requestPath = stripQuery(request.url ?? '');
       if (!isTokenImagePath(requestPath)) {
-        reply.header('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+        reply.header('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
         throw new UnauthorizedException('Basic authentication required');
       }
 
@@ -91,14 +91,14 @@ export class OpdsAuthGuard implements CanActivate {
 
     const authHeader = request.headers.authorization;
     if (!authHeader?.startsWith('Basic ')) {
-      reply.header('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+      reply.header('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
       throw new UnauthorizedException('Basic authentication required');
     }
 
     const decoded = Buffer.from(authHeader.slice(6), 'base64').toString();
     const colonIndex = decoded.indexOf(':');
     if (colonIndex === -1) {
-      reply.header('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+      reply.header('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -107,7 +107,7 @@ export class OpdsAuthGuard implements CanActivate {
 
     const result = await this.opdsUserService.validateCredentials(username, password);
     if (!result) {
-      reply.header('WWW-Authenticate', 'Basic realm="projectx OPDS"');
+      reply.header('WWW-Authenticate', 'Basic realm="bookorbit OPDS"');
       throw new UnauthorizedException('Invalid credentials');
     }
 

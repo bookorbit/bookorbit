@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ChevronLeft, ChevronRight, GitMerge, MoreHorizontal, Pencil, Search, Scissors, Trash2, X } from 'lucide-vue-next'
-import type { BrowseEntityItem, EntityTypeCapabilities } from '@projectx/types'
+import type { BrowseEntityItem, EntityTypeCapabilities } from '@bookorbit/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const props = defineProps<{

@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
 import { HardcoverBookWithEditions, HardcoverSearchDocument } from './hardcover.types';

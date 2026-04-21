@@ -1,4 +1,4 @@
-import type { BookMetadataFetchConfig } from '@projectx/types';
+import type { BookMetadataFetchConfig } from '@bookorbit/types';
 
 import { BookMetadataFetchEligibilityService, type BookEligibilityData } from './book-metadata-fetch-eligibility.service';
 

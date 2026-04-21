@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import type { BookDetail } from '@projectx/types'
+import type { BookDetail } from '@bookorbit/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import EditMetadataTab from '@/features/book/components/detail/tabs/EditMetadataTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'

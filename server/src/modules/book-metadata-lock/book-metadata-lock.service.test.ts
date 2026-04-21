@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 import { UpdateBookMetadataDto } from '../book/dto/update-book-metadata.dto';
 import { BookMetadataLockService } from './book-metadata-lock.service';

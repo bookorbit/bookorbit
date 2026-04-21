@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { PERMISSION_KEY } from '../decorators/require-permission.decorator';

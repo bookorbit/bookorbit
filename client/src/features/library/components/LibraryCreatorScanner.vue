@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Plus, X } from 'lucide-vue-next'
-import type { OrganizationMode } from '@projectx/types'
+import type { OrganizationMode } from '@bookorbit/types'
 import { FORMAT_LABELS } from '../composables/useLibraryCreator'
 
 const props = defineProps<{

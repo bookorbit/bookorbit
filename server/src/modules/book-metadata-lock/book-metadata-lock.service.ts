@@ -1,5 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { BOOK_METADATA_LOCK_FIELDS, MetadataProviderKey, type BookMetadataLockField, type ComicMetadataFields } from '@projectx/types';
+import { BOOK_METADATA_LOCK_FIELDS, MetadataProviderKey, type BookMetadataLockField, type ComicMetadataFields } from '@bookorbit/types';
 
 import { UpdateBookMetadataDto } from '../book/dto/update-book-metadata.dto';
 import type { ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';

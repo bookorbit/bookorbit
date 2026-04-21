@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { Save } from 'lucide-vue-next'
-import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_LABELS, type NotificationCategory, type NotificationPreferences } from '@projectx/types'
+import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_LABELS, type NotificationCategory, type NotificationPreferences } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { api } from '@/lib/api'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'

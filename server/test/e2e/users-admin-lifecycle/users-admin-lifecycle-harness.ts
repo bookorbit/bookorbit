@@ -8,13 +8,13 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { mkdir } from 'fs/promises';
 import { eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Permission } from '@projectx/types';
+import type { Permission } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
-import { BookBucketWatcherService } from '../../../src/modules/book-bucket/book-bucket-watcher.service';
+import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { makeMetadataNoopMock, seedLibrary } from '../app-harness';
 import { createUsersAdminLifecycleFixtureRoot, type UsersAdminLifecycleFixtureRoot } from './users-admin-lifecycle-fixture-builder';
 
@@ -93,7 +93,7 @@ export async function createUsersAdminLifecycleE2EContext(): Promise<UsersAdminL
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  await stopBookBucketWatcher(app);
+  await stopBookDockWatcher(app);
 
   const db = app.get<Db>(DB);
   const adminToken = await getAdminToken(app, db);
@@ -243,8 +243,8 @@ export async function setUserActive(ctx: UsersAdminLifecycleE2EContext, userId: 
   await ctx.db.update(schema.users).set({ active }).where(eq(schema.users.id, userId));
 }
 
-async function stopBookBucketWatcher(app: NestFastifyApplication): Promise<void> {
-  const watcher = app.get(BookBucketWatcherService);
+async function stopBookDockWatcher(app: NestFastifyApplication): Promise<void> {
+  const watcher = app.get(BookDockWatcherService);
   await watcher.onModuleDestroy();
 }
 

@@ -1,4 +1,4 @@
-import type { UserCompletionTimelinePoint } from '@projectx/types'
+import type { UserCompletionTimelinePoint } from '@bookorbit/types'
 
 import { fetchUserCompletionTimeline } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

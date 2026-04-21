@@ -1,4 +1,4 @@
-import type { LibraryIntegrityGauge } from '@projectx/types'
+import type { LibraryIntegrityGauge } from '@bookorbit/types'
 
 import { fetchLibraryIntegrityGauge } from '../api/statistics.api'
 import { useStatisticsQuery } from './useStatisticsQuery'

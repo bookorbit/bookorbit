@@ -31,7 +31,7 @@ describe('EmailProviderResolver', () => {
     port: 587,
     username: 'test-user',
     plainPassword: 'decrypted-password',
-    fromName: 'ProjectX Bot',
+    fromName: 'BookOrbit Bot',
     fromAddress: 'bot@example.com',
     auth: true,
     ssl: false,
@@ -72,7 +72,7 @@ describe('EmailProviderResolver', () => {
       expect(result.providerId).toBe(10);
       expect(result.config.password).toBe('decrypted-password');
       expect(result.config.host).toBe('smtp.test.com');
-      expect(result.config.fromName).toBe('ProjectX Bot');
+      expect(result.config.fromName).toBe('BookOrbit Bot');
       expect(result.config.fromAddress).toBe('bot@example.com');
     });
 

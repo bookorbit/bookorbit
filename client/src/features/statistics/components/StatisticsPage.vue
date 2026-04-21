@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Check, ChevronDown, GripVertical, Settings2 } from 'lucide-vue-next'
 import { VueDraggable } from 'vue-draggable-plus'
 
-import type { ChartConfigEntry, StatisticsChartId } from '@projectx/types'
+import type { ChartConfigEntry, StatisticsChartId } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'

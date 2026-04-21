@@ -27,7 +27,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { CoverModule } from './modules/cover/cover.module';
 import { KoboModule } from './modules/kobo/kobo.module';
 import { LibraryModule } from './modules/library/library.module';
-import { LensModule } from './modules/lens/lens.module';
+import { SmartScopeModule } from './modules/smart-scope/smart-scope.module';
 import { OpdsModule } from './modules/opds/opds.module';
 import { PathModule } from './modules/path/path.module';
 import { MetadataFetchModule } from './modules/metadata-fetch/metadata-fetch.module';
@@ -40,7 +40,7 @@ import { ScannerModule } from './modules/scanner/scanner.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { EmailModule } from './modules/email/email.module';
 import { EpubModule } from './modules/reader/epub/epub.module';
-import { BookBucketModule } from './modules/book-bucket/book-bucket.module';
+import { BookDockModule } from './modules/book-dock/book-dock.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthorsModule } from './modules/authors/authors.module';
@@ -89,7 +89,7 @@ import { EntityManagerModule } from './modules/entity-manager/entity-manager.mod
     CatalogModule,
     CoverModule,
     CollectionModule,
-    LensModule,
+    SmartScopeModule,
     ScannerModule,
     MetadataModule,
     NarratorModule,
@@ -106,7 +106,7 @@ import { EntityManagerModule } from './modules/entity-manager/entity-manager.mod
     CbzModule,
     ReaderPreferencesModule,
     EpubModule,
-    BookBucketModule,
+    BookDockModule,
     EmailModule,
     MetadataScoreModule,
     StatisticsModule,

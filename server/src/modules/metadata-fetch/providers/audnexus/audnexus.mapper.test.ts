@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MetadataProviderKey } from '@projectx/types';
+import { MetadataProviderKey } from '@bookorbit/types';
 import { mapAudNexusBook } from './audnexus.mapper';
 import type { AudNexusBook, AudNexusChaptersResponse } from './audnexus.types';
 

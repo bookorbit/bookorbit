@@ -76,7 +76,7 @@ function createService(overrides: Partial<Record<string, unknown>> = {}): Migrat
           sourceId: 1,
           profileId: 2,
           planArtifactId: 100,
-          targetKey: 'projectx',
+          targetKey: 'bookorbit',
           state: 'running',
           currentStage: 'init',
           triggeredByUserId: 1,
@@ -110,7 +110,7 @@ describe('MigrationService', () => {
       service.startLiveRun(
         {
           planArtifactId: 100,
-          targetKey: 'projectx',
+          targetKey: 'bookorbit',
         },
         1,
       ),
@@ -123,7 +123,7 @@ describe('MigrationService', () => {
       sourceId: 1,
       profileId: 2,
       planArtifactId: 100,
-      targetKey: 'projectx',
+      targetKey: 'bookorbit',
       state: 'running',
       currentStage: 'init',
       triggeredByUserId: 1,
@@ -151,14 +151,14 @@ describe('MigrationService', () => {
       createRunWithLock: vi.fn(() => Promise.resolve({ run, activeRun: null })),
     });
 
-    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).resolves.toEqual({
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).resolves.toEqual({
       id: 78,
       sourceId: 1,
       profileId: 2,
       planArtifactId: 100,
       state: 'running',
       currentStage: 'init',
-      targetKey: 'projectx',
+      targetKey: 'bookorbit',
       startedAt: run.startedAt,
       endedAt: null,
       errorMessage: null,
@@ -185,7 +185,7 @@ describe('MigrationService', () => {
       ),
     });
 
-    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   describe('cancelRun', () => {
@@ -195,7 +195,7 @@ describe('MigrationService', () => {
         sourceId: 1,
         profileId: 2,
         planArtifactId: 100,
-        targetKey: 'projectx',
+        targetKey: 'bookorbit',
         state: 'failed',
         currentStage: 'cancelled',
         triggeredByUserId: 1,
@@ -212,7 +212,7 @@ describe('MigrationService', () => {
             sourceId: 1,
             profileId: 2,
             planArtifactId: 100,
-            targetKey: 'projectx',
+            targetKey: 'bookorbit',
             state: 'running',
             currentStage: 'shared_overlays',
             triggeredByUserId: 1,
@@ -249,7 +249,7 @@ describe('MigrationService', () => {
             sourceId: 1,
             profileId: 2,
             planArtifactId: 100,
-            targetKey: 'projectx',
+            targetKey: 'bookorbit',
             currentStage: 'completed',
             triggeredByUserId: 1,
             startedAt: new Date(),
@@ -273,7 +273,7 @@ describe('MigrationService', () => {
             sourceId: 1,
             profileId: 2,
             planArtifactId: 100,
-            targetKey: 'projectx',
+            targetKey: 'bookorbit',
             currentStage: 'init',
             triggeredByUserId: 1,
             startedAt: new Date(),
@@ -309,7 +309,7 @@ describe('MigrationService', () => {
       ),
     });
 
-    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects live run when source has never been validated', async () => {
@@ -341,7 +341,7 @@ describe('MigrationService', () => {
       ),
     });
 
-    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects live run when dry-run plan is stale', async () => {
@@ -374,7 +374,7 @@ describe('MigrationService', () => {
       ),
     });
 
-    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects live run when target users no longer exist', async () => {
@@ -410,7 +410,7 @@ describe('MigrationService', () => {
       ),
     });
 
-    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'projectx' }, 1)).rejects.toThrow('Target users no longer exist');
+    await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).rejects.toThrow('Target users no longer exist');
   });
 
   describe('retryFailedRun', () => {
@@ -421,7 +421,7 @@ describe('MigrationService', () => {
         sourceId: 1,
         profileId: 2,
         planArtifactId: 100,
-        targetKey: 'projectx',
+        targetKey: 'bookorbit',
         state: 'running',
         currentStage: 'user_state',
         triggeredByUserId: 1,
@@ -438,7 +438,7 @@ describe('MigrationService', () => {
             sourceId: 1,
             profileId: 2,
             planArtifactId: 100,
-            targetKey: 'projectx',
+            targetKey: 'bookorbit',
             state: 'failed',
             currentStage: 'user_state',
             triggeredByUserId: 1,
@@ -477,7 +477,7 @@ describe('MigrationService', () => {
             sourceId: 1,
             profileId: 2,
             planArtifactId: 100,
-            targetKey: 'projectx',
+            targetKey: 'bookorbit',
             currentStage: 'shared_overlays',
             triggeredByUserId: 1,
             startedAt: new Date(),
@@ -511,7 +511,7 @@ describe('MigrationService', () => {
             sourceId: 1,
             profileId: 2,
             planArtifactId: 100,
-            targetKey: 'projectx',
+            targetKey: 'bookorbit',
             currentStage: 'user_state',
             triggeredByUserId: 1,
             startedAt: new Date(),
@@ -871,7 +871,7 @@ describe('MigrationService', () => {
               sourceId: 1,
               profileId: 2,
               planArtifactId: 3,
-              targetKey: 'projectx',
+              targetKey: 'bookorbit',
               state: 'running',
               currentStage: 'init',
               triggeredByUserId: 1,

@@ -1,6 +1,6 @@
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AUTHOR_ENRICHMENT_STATUS_EVENT } from './author-enrichment.gateway';
-import { Permission } from '@projectx/types';
+import { Permission } from '@bookorbit/types';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };

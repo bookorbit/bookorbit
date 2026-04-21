@@ -7,7 +7,7 @@ import { hash } from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import mysql from 'mysql2/promise';
 
-import type { Permission } from '@projectx/types';
+import type { Permission } from '@bookorbit/types';
 import { coverDirPath } from '../../../src/modules/metadata/lib/cover';
 import * as schema from '../../../src/db/schema';
 import { closeE2EContext, createE2EContext, seedLibrary, type Db, type E2EContext, waitForCondition } from '../app-harness';
@@ -52,7 +52,7 @@ export interface JsonResponse<T> {
 }
 
 export async function createMigrationBookloreE2EContext(): Promise<MigrationBookloreE2EContext> {
-  const fixtureRoot = await mkdtemp(join(tmpdir(), 'projectx-migration-booklore-'));
+  const fixtureRoot = await mkdtemp(join(tmpdir(), 'bookorbit-migration-booklore-'));
   const booksPath = join(fixtureRoot, 'books');
   const sourceMediaRoot = join(fixtureRoot, 'booklore-media');
   const envSnapshot: EnvSnapshot = {
@@ -347,7 +347,7 @@ async function loginForToken(ctx: MigrationBookloreE2EContext, username: string,
 async function startMariaDbContainer(): Promise<MariaDbService> {
   await runCommand('docker', ['version', '--format', '{{.Server.Version}}']);
 
-  const containerName = `projectx-migration-booklore-${randomUUID()}`;
+  const containerName = `bookorbit-migration-booklore-${randomUUID()}`;
   const database = 'booklore';
   const user = 'booklore';
   const password = 'booklore-secret';

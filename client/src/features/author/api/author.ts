@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { AuthorsPage, AuthorDetail, AuthorMetadataCandidate, AuthorMetadataProviderKey, BooksPage, MergeAuthorsResult } from '@projectx/types'
+import type { AuthorsPage, AuthorDetail, AuthorMetadataCandidate, AuthorMetadataProviderKey, BooksPage, MergeAuthorsResult } from '@bookorbit/types'
 import type { AuthorBookSort, AuthorListSort, SortDirection } from '../types/author'
 
 type ListAuthorsParams = {

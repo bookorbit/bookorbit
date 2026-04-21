@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { and, eq, inArray } from 'drizzle-orm';
-import { EPUB_READER_DEFAULTS } from '@projectx/types';
+import { EPUB_READER_DEFAULTS } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { createEpubFixture, writeFixtureFile } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';

@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
 import BookListRow from '../BookListRow.vue'
-import type { BookCard } from '@projectx/types'
+import type { BookCard } from '@bookorbit/types'
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()

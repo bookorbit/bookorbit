@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { UserPlus, Trash2 } from 'lucide-vue-next'
 import { api } from '@/lib/api'
-import type { LibraryAccessEntry } from '@projectx/types'
+import type { LibraryAccessEntry } from '@bookorbit/types'
 
 const props = defineProps<{
   libraryId: number | null

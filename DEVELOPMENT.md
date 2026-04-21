@@ -8,7 +8,7 @@ For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRI
 
 ## Architecture Overview
 
-ProjectX is a pnpm monorepo with three workspaces: a Vue 3 single-page app, a NestJS API server, and a shared types package.
+BookOrbit is a pnpm monorepo with three workspaces: a Vue 3 single-page app, a NestJS API server, and a shared types package.
 
 ```mermaid
 graph LR
@@ -16,7 +16,7 @@ graph LR
     Server["Server<br/><small>NestJS + Fastify</small><br/><small>localhost:3000/api</small>"]
     DB["PostgreSQL<br/><small>Drizzle ORM</small>"]
     WS["WebSocket<br/><small>Socket.IO</small>"]
-    Types["Shared Types<br/><small>@projectx/types</small>"]
+    Types["Shared Types<br/><small>@bookorbit/types</small>"]
 
     Client -- "HTTP (fetch)" --> Server
     Client <-. "real-time events" .-> WS
@@ -39,7 +39,7 @@ graph LR
 ## Project Structure
 
 ```text
-projectx/
+bookorbit/
 ├── client/                  # Vue 3 frontend
 │   └── src/
 │       ├── features/        # Feature modules (composables + components)
@@ -60,14 +60,14 @@ projectx/
 │       └── *.e2e-spec.ts    # E2E test suites
 ├── packages/
 │   └── types/               # Shared TypeScript types
-│       └── src/             # Exported via @projectx/types
+│       └── src/             # Exported via @bookorbit/types
 ├── scripts/                 # Bootstrap, DB reset, E2E orchestration
 ├── docker/                  # Postgres init scripts (extensions)
 ├── .github/                 # CI workflows, PR/issue templates
 └── .husky/                  # Git hooks (pre-commit, pre-push)
 ```
 
-> **Shared types** live in `packages/types/` and are imported as `@projectx/types`. Never duplicate types between client and server.
+> **Shared types** live in `packages/types/` and are imported as `@bookorbit/types`. Never duplicate types between client and server.
 
 ---
 
@@ -96,8 +96,8 @@ This runs all the steps below automatically. If it succeeds, skip to [Running th
 #### Step 1 - Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/projectx.git
-cd projectx
+git clone https://github.com/<your-username>/bookorbit.git
+cd bookorbit
 ```
 
 If you are an external contributor, fork first and clone your fork. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
@@ -160,11 +160,11 @@ If everything worked, you will see the server, client, and types watcher start u
 
 ### Verifying Your Setup
 
-| Check                                    | Expected                                    |
-| ---------------------------------------- | ------------------------------------------- |
-| Open http://localhost:5173               | ProjectX login page loads                   |
-| Open http://localhost:3000/api/v1/health | Returns `{"status":"ok"}`                   |
-| `docker ps`                              | Shows `projectx-postgres` container running |
+| Check                                    | Expected                                   |
+| ---------------------------------------- | ------------------------------------------ |
+| Open http://localhost:5173               | BookOrbit login page loads                 |
+| Open http://localhost:3000/api/v1/health | Returns `{"status":"ok"}`                  |
+| `docker ps`                              | Shows `bookorbit-dev-db` container running |
 
 ---
 
@@ -198,7 +198,7 @@ If you are editing shared types (`packages/types/`), also start the types watche
 
 ```bash
 # Terminal 3: Types (only needed when editing packages/types/)
-pnpm --filter @projectx/types dev
+pnpm --filter @bookorbit/types dev
 ```
 
 </details>
@@ -209,14 +209,14 @@ pnpm --filter @projectx/types dev
 
 These are the variables you are most likely to need during development. See `server/.env.example` for the full list with comments.
 
-| Variable        | Purpose                            | Default (dev)                                          |
-| --------------- | ---------------------------------- | ------------------------------------------------------ |
-| `DATABASE_URL`  | PostgreSQL connection string       | `postgres://projectx:projectx@localhost:5432/projectx` |
-| `PORT`          | Server listen port                 | `3000`                                                 |
-| `NODE_ENV`      | Runtime mode                       | `development`                                          |
-| `JWT_SECRET`    | Signing key for auth tokens        | `change-me-in-production`                              |
-| `APP_DATA_PATH` | Storage for covers, avatars, cache | `../local/data`                                        |
-| `APP_URL`       | Base URL for email links           | `http://localhost:5173`                                |
+| Variable        | Purpose                            | Default (dev)                                             |
+| --------------- | ---------------------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`  | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
+| `PORT`          | Server listen port                 | `3000`                                                    |
+| `NODE_ENV`      | Runtime mode                       | `development`                                             |
+| `JWT_SECRET`    | Signing key for auth tokens        | `change-me-in-production`                                 |
+| `APP_DATA_PATH` | Storage for covers, avatars, cache | `../local/data`                                           |
+| `APP_URL`       | Base URL for email links           | `http://localhost:5173`                                   |
 
 ---
 
