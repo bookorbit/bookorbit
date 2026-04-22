@@ -128,7 +128,7 @@ function onSaved(newResetUrl?: string) {
   <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
 
   <div v-else class="space-y-3">
-    <div class="hidden md:block rounded-lg border border-border overflow-hidden">
+    <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
       <table class="w-full text-sm">
         <thead class="bg-muted/50">
           <tr>
@@ -218,7 +218,7 @@ function onSaved(newResetUrl?: string) {
     </div>
 
     <div class="md:hidden space-y-3">
-      <div v-for="user in users" :key="user.id" class="rounded-lg border border-border bg-card px-4 py-3.5">
+      <div v-for="user in users" :key="user.id" class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
         <div class="flex items-start justify-between gap-3">
           <p class="text-sm font-medium text-foreground leading-5">{{ user.name }}</p>
           <span
@@ -275,7 +275,7 @@ function onSaved(newResetUrl?: string) {
     @click.self="deleteConfirmUser = null"
   >
     <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
-    <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+    <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
       <p class="text-base font-semibold text-foreground">Delete user?</p>
       <p class="mt-1 text-sm text-muted-foreground">Delete user "{{ deleteConfirmUser.username }}". This action cannot be undone.</p>
       <div class="mt-4 flex items-center justify-end gap-2">

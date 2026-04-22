@@ -119,7 +119,7 @@ async function runAuthorBackfillAll() {
       </button>
     </div>
   </div>
-  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
     <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
       <div>
         <p class="settings-label">Enable auto author enrichment</p>

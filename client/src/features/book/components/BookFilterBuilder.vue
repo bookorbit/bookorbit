@@ -454,7 +454,7 @@ function showValueToInput(operator: RuleOperator): boolean {
 
       <!-- Nested group -->
       <div v-else-if="node.kind === 'group'" class="flex items-start gap-2">
-        <div class="flex-1 rounded-xl border border-primary/20 bg-primary/3 p-3">
+        <div class="flex-1 rounded-lg border border-primary/20 bg-primary/3 p-3">
           <div class="flex items-center justify-between mb-3">
             <span class="text-[10px] font-semibold uppercase tracking-widest text-primary/50">Group</span>
           </div>

@@ -80,7 +80,7 @@ function handleDismiss(e: Event) {
 
 <template>
   <div
-    class="group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-all hover:shadow-sm"
+    class="group relative flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-left transition-all hover:shadow-sm"
     :class="
       notification.read
         ? 'border-border/30 bg-muted/20 hover:border-border/50 hover:bg-muted/40'

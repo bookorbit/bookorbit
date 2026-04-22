@@ -189,7 +189,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
       <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="emit('close')" />
 
       <div
-        class="relative flex flex-col w-full max-w-3xl bg-background rounded-xl shadow-2xl overflow-hidden border border-border"
+        class="relative flex flex-col w-full max-w-3xl bg-background rounded-lg shadow-2xl overflow-hidden border border-border"
         style="height: min(90vh, 720px)"
       >
         <!-- ── MOBILE: Nav list (edit mode only — create goes straight to content) ── -->
@@ -344,7 +344,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
           <!-- Left sidebar -->
           <nav class="flex flex-col w-48 shrink-0 bg-muted/40 border-r border-border">
             <div class="px-4 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
-              <span class="text-sm font-semibold text-foreground font-serif truncate">{{ title }}</span>
+              <span class="font-semibold text-foreground font-serif truncate">{{ title }}</span>
               <button
                 class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 ml-1"
                 @click="emit('close')"

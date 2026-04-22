@@ -9,7 +9,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="emit('cancel')" />
-      <div class="relative z-10 w-full max-w-sm mx-4 bg-card border border-border rounded-xl shadow-2xl p-6">
+      <div class="relative z-10 w-full max-w-sm mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-start gap-4 mb-5">
           <div class="shrink-0 h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
             <Trash2 class="text-destructive" :size="18" />

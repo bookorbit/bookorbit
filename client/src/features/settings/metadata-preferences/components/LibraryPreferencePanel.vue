@@ -118,7 +118,7 @@ function onSave() {
 
 <template>
   <div
-    class="border border-border rounded-xl bg-card overflow-hidden shadow-sm transition-all"
+    class="border border-border rounded-lg bg-card overflow-hidden shadow-xs transition-all"
     :class="open ? 'ring-1 ring-primary/20' : 'hover:border-primary/30'"
   >
     <!-- Accordion toggle row -->

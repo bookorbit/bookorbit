@@ -58,11 +58,11 @@ const canOpenImageLightbox = computed(() => Boolean(props.imageUrl))
 </script>
 
 <template>
-  <section class="overflow-hidden rounded-xl border border-border/70 bg-card/80">
+  <section class="overflow-hidden rounded-lg border border-border/70 bg-card/80">
     <div class="bg-gradient-to-b from-primary/8 via-background/0 to-transparent p-4">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div
-          class="h-44 w-32 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted/40 shadow-sm"
+          class="h-44 w-32 shrink-0 overflow-hidden rounded-lg border border-border/70 bg-muted/40 shadow-sm"
           :class="canOpenImageLightbox ? 'cursor-zoom-in' : ''"
           @click="canOpenImageLightbox && (imageLightboxOpen = true)"
         >
@@ -150,7 +150,7 @@ const canOpenImageLightbox = computed(() => Boolean(props.imageUrl))
       >
         <X class="size-5" />
       </button>
-      <img :src="imageUrl" :alt="`${author.name} portrait`" class="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl" @click.stop />
+      <img :src="imageUrl" :alt="`${author.name} portrait`" class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" @click.stop />
     </div>
   </Teleport>
 </template>

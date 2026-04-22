@@ -256,7 +256,7 @@ function availableRecipients(group: EmailGroup) {
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
-      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">Delete group?</p>
         <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirm.name }}". This action cannot be undone.</p>
         <div class="mt-4 flex items-center justify-end gap-2">

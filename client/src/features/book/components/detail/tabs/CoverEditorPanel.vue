@@ -97,7 +97,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
   <div class="flex flex-row gap-5 md:gap-3 lg:flex-col">
     <!-- Cover image -->
     <div
-      class="relative w-36 shrink-0 lg:w-full overflow-hidden rounded-xl bg-muted shadow-md cursor-zoom-in"
+      class="relative w-36 shrink-0 lg:w-full overflow-hidden rounded-lg bg-muted shadow-md cursor-zoom-in"
       :style="{ aspectRatio: coverAspectRatio }"
       @click="lightboxOpen = true"
     >
@@ -122,7 +122,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         >
           <X class="size-5" />
         </button>
-        <img :src="activeSrc" :alt="book.title ?? ''" class="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl object-contain" @click.stop />
+        <img :src="activeSrc" :alt="book.title ?? ''" class="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl object-contain" @click.stop />
       </div>
     </Teleport>
 

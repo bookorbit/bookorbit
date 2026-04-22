@@ -188,7 +188,7 @@ function targetSummary(file: BookDockFile): string {
 </script>
 
 <template>
-  <div class="rounded-xl border border-border bg-card overflow-hidden">
+  <div class="rounded-lg border border-border bg-card overflow-hidden">
     <div v-if="!initialized && loading && !items.length" data-test="book-dock-loading-skeleton" class="divide-y divide-border">
       <div v-for="n in 5" :key="n" class="flex items-center gap-3 px-4 py-3 animate-pulse">
         <div class="size-4 rounded bg-muted" />
@@ -297,7 +297,7 @@ function targetSummary(file: BookDockFile): string {
             </div>
           </HoverCardTrigger>
           <HoverCardPortal>
-            <HoverCardContent side="top" align="start" :side-offset="8" class="z-50 rounded-xl border border-border bg-popover p-3 shadow-xl">
+            <HoverCardContent side="top" align="start" :side-offset="8" class="z-50 rounded-lg border border-border bg-popover p-3 shadow-xl">
               <div class="flex items-center gap-3">
                 <div class="flex flex-col items-center gap-1.5">
                   <div class="relative w-36 h-54 rounded-lg bg-muted overflow-hidden ring-1 ring-border flex items-center justify-center">

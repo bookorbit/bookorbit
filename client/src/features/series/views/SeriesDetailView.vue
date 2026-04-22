@@ -329,11 +329,11 @@ watch(
       </div>
 
       <!-- Series header -->
-      <div v-if="seriesInfo" class="mb-4 rounded-xl border border-border/70 bg-card/60 p-4">
+      <div v-if="seriesInfo" class="mb-4 rounded-lg border border-border/70 bg-card/60 p-4">
         <div class="flex flex-col gap-4 md:flex-row md:items-start">
           <div class="mx-auto w-full max-w-[360px] md:mx-0 md:w-[340px] md:shrink-0 lg:w-[360px]">
             <div
-              class="relative isolate overflow-hidden rounded-xl border border-border/60 bg-linear-to-b from-white/[0.035] via-background/5 to-black/[0.07]"
+              class="relative isolate overflow-hidden rounded-lg border border-border/60 bg-linear-to-b from-white/[0.035] via-background/5 to-black/[0.07]"
               style="aspect-ratio: 11 / 8"
             >
               <div class="pointer-events-none absolute -right-8 -top-12 h-36 w-36 rounded-full bg-primary/10 blur-3xl" />
@@ -455,12 +455,12 @@ watch(
       </div>
 
       <!-- Loading state -->
-      <div v-if="loadingBooks && !seriesInfo" class="mb-4 rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
+      <div v-if="loadingBooks && !seriesInfo" class="mb-4 rounded-lg border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
         Loading series...
       </div>
 
       <!-- Books section -->
-      <section v-if="seriesInfo" class="rounded-xl border border-border/70 bg-card/60 p-3">
+      <section v-if="seriesInfo" class="rounded-lg border border-border/70 bg-card/60 p-3">
         <div
           class="sticky top-0 z-20 -mx-3 mb-3 border-b border-border/60 bg-card/92 px-3 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-card/78"
         >

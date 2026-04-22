@@ -87,14 +87,14 @@ const fontFamilies: { id: string | null; label: string }[] = [
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.flow === 'paginated' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.flow === 'paginated' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ flow: 'paginated' })"
             >
               Paginated
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.flow === 'scrolled' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.flow === 'scrolled' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ flow: 'scrolled' })"
             >
               Scrolled

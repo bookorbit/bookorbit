@@ -149,7 +149,7 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
         ref="panelRef"
         :style="panelStyle"
         data-icon-picker-panel
-        class="flex flex-col rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
+        class="flex flex-col rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
       >
         <!-- Search bar -->
         <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">

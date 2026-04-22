@@ -184,7 +184,7 @@ onMounted(() => {
     <!-- Book metadata fetch card -->
     <button
       v-if="isBookFetchActive"
-      class="relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-60"
+      class="relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-lg bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-60"
       :class="status.paused ? 'opacity-70' : ''"
       @click="toggleExpanded"
     >
@@ -207,7 +207,7 @@ onMounted(() => {
     <!-- Author enrichment card -->
     <button
       v-if="isAuthorActive"
-      class="relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-60"
+      class="relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-lg bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-60"
       :class="authorStatus.paused ? 'opacity-70' : ''"
       @click="toggleAuthorExpanded"
     >

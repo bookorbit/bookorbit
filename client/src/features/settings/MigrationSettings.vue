@@ -994,7 +994,7 @@ function formatSourceCountLabel(key: string) {
       </div>
 
       <!-- Unified step card -->
-      <div class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div class="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
         <!-- Card header -->
         <div class="px-6 pt-6 pb-5 border-b border-border">
           <div class="flex items-start justify-between gap-4">

@@ -352,7 +352,7 @@ watch(
       <img
         :src="lightboxSrc"
         alt="Cover preview"
-        class="max-h-[85vh] max-w-[85vw] rounded-xl shadow-2xl object-contain"
+        class="max-h-[85vh] max-w-[85vw] rounded-lg shadow-2xl object-contain"
         @click.stop
         @error="hideOnError"
       />

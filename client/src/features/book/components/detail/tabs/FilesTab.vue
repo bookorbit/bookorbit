@@ -233,7 +233,7 @@ async function toggleWriteLog() {
     <div
       v-for="file in sortedFiles"
       :key="file.id"
-      class="min-h-14 flex items-center gap-3 md:gap-4 px-4 py-3 md:py-2.5 rounded-xl md:rounded-lg bg-card/90 border border-border/80 hover:bg-muted/30 transition-colors"
+      class="min-h-14 flex items-center gap-3 md:gap-4 px-4 py-3 md:py-2.5 rounded-lg md:rounded-lg bg-card/90 border border-border/80 hover:bg-muted/30 transition-colors"
     >
       <div
         class="relative shrink-0 w-10 h-12 flex items-end justify-center pb-1.5"
@@ -341,7 +341,7 @@ async function toggleWriteLog() {
     </div>
 
     <div v-if="book.files.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
-      <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-muted mb-3">
+      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-muted mb-3">
         <Files class="size-5 text-muted-foreground/70" />
       </div>
       <p class="text-base md:text-sm font-semibold md:font-medium">No files attached</p>

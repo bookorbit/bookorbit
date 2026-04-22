@@ -113,7 +113,7 @@ watch(
 </script>
 
 <template>
-  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
     <button
       class="w-full flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card text-left"
       @click="cardOpen = !cardOpen"

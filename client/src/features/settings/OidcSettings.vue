@@ -357,7 +357,7 @@ async function deleteGroupMapping(id: number) {
             Add Provider
           </button>
         </div>
-        <div class="border border-border rounded-lg overflow-hidden shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden shadow-xs">
           <div v-if="providers.length > 0" class="divide-y divide-border">
             <button
               v-for="provider in providers"
@@ -429,7 +429,7 @@ async function deleteGroupMapping(id: number) {
       <!-- Status -->
       <div>
         <p class="settings-group-label">Status</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
             <div class="min-w-0">
               <p class="settings-label">Enable provider</p>
@@ -443,7 +443,7 @@ async function deleteGroupMapping(id: number) {
       <!-- Identity -->
       <div>
         <p class="settings-group-label">Provider Identity</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div
             v-if="viewMode === 'create'"
             class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4"
@@ -477,7 +477,7 @@ async function deleteGroupMapping(id: number) {
       <!-- Connection -->
       <div>
         <p class="settings-group-label">Connection</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-start md:justify-between md:gap-8 md:px-5 md:py-4">
             <div class="min-w-0 md:shrink-0 md:pt-0.5">
               <p class="settings-label">Issuer URI</p>
@@ -569,7 +569,7 @@ async function deleteGroupMapping(id: number) {
             JSON.stringify(previewClaims.raw, null, 2)
           }}</pre>
         </div>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
             <p class="settings-label md:shrink-0">Username claim</p>
             <input v-model="form.claimMapping.username" type="text" class="input-field w-full md:w-72" />
@@ -592,7 +592,7 @@ async function deleteGroupMapping(id: number) {
       <!-- Auto-provisioning -->
       <div>
         <p class="settings-group-label">Auto-Provisioning</p>
-        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
             <div class="min-w-0">
               <p class="settings-label">Auto-provision users</p>
@@ -631,7 +631,7 @@ async function deleteGroupMapping(id: number) {
       <div v-if="viewMode === 'edit'">
         <p class="settings-group-label">Group Mappings</p>
         <p class="mb-3 text-xs text-muted-foreground">Map OIDC group claims to BookOrbit permissions. Synced on every login.</p>
-        <div class="border border-border rounded-lg overflow-hidden bg-card shadow-sm">
+        <div class="border border-border rounded-lg overflow-hidden bg-card shadow-xs">
           <div v-if="groupMappings.length > 0" class="divide-y divide-border">
             <div v-for="mapping in groupMappings" :key="mapping.id" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
               <div class="min-w-0 flex-1">

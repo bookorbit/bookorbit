@@ -62,7 +62,7 @@ function onSheetChange(pref: FieldPreference) {
         @click="update({ enabled: !preference.enabled })"
       >
         <span
-          class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
+          class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-xs transition-transform"
           :class="preference.enabled ? 'translate-x-4' : 'translate-x-0.5'"
         />
       </div>

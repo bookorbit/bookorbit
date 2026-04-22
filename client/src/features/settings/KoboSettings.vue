@@ -173,7 +173,7 @@ async function saveSettings() {
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
   <template v-else>
     <!-- New device token display -->
-    <div v-if="newDeviceSyncUrl" class="mb-8 border-2 border-primary/30 rounded-xl p-4 bg-primary/5 shadow-sm">
+    <div v-if="newDeviceSyncUrl" class="mb-8 border-2 border-primary/30 rounded-lg p-4 bg-primary/5 shadow-xs">
       <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-2.5">
           <div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
@@ -228,7 +228,7 @@ async function saveSettings() {
       </div>
 
       <!-- Create form -->
-      <div v-if="showCreateForm" class="border border-border rounded-lg p-5 bg-card mb-4 space-y-4 shadow-sm">
+      <div v-if="showCreateForm" class="border border-border rounded-lg p-5 bg-card mb-4 space-y-4 shadow-xs">
         <div>
           <label class="settings-label block mb-1.5">Device name</label>
           <input v-model="newDeviceName" type="text" placeholder="e.g. My Kobo Libra" autofocus class="input-field w-full" />
@@ -242,7 +242,7 @@ async function saveSettings() {
         </div>
       </div>
 
-      <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-10 bg-card text-center shadow-sm">
+      <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-10 bg-card text-center shadow-xs">
         <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
           <Tablet :size="18" class="text-muted-foreground/70" />
         </div>
@@ -252,7 +252,7 @@ async function saveSettings() {
         </p>
       </div>
 
-      <div v-else-if="devices.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+      <div v-else-if="devices.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div v-for="device in devices" :key="device.id" class="px-5 py-4 bg-card transition-colors hover:bg-muted/30">
           <div v-if="renamingId === device.id" class="flex items-center gap-2">
             <input v-model="renameValue" type="text" class="flex-1 input-field" @keydown.enter="submitRename(device)" @keydown.esc="cancelRename()" />
@@ -293,7 +293,7 @@ async function saveSettings() {
     <!-- Sync settings -->
     <div class="mb-8">
       <p class="settings-group-label">Sync Preferences</p>
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-sm">
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div class="pr-8">
             <p class="settings-label">Convert to KEPUB</p>

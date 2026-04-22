@@ -6,7 +6,7 @@ const emit = defineEmits<{ save: [note: string]; cancel: []; 'update:modelValue'
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50" @click.self="emit('cancel')">
-      <div class="bg-card text-card-foreground rounded-xl shadow-2xl p-4 w-full max-w-sm flex flex-col gap-3">
+      <div class="bg-card text-card-foreground rounded-lg shadow-2xl p-4 w-full max-w-sm flex flex-col gap-3">
         <p class="text-sm font-medium">Add note</p>
         <p class="text-xs text-muted-foreground line-clamp-2 italic">"{{ selectedText }}"</p>
         <textarea

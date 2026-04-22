@@ -65,7 +65,7 @@ watch(
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="handleClose" />
-      <div class="relative z-10 w-full max-w-sm mx-4 bg-card border border-border rounded-xl shadow-2xl p-6">
+      <div class="relative z-10 w-full max-w-sm mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <h2 class="text-base font-semibold text-foreground mb-4">Edit tags - {{ bookCount }} book{{ bookCount === 1 ? '' : 's' }}</h2>
 
         <div class="space-y-4">

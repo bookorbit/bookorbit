@@ -54,7 +54,7 @@ async function submit() {
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="emit('close')" />
-      <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-xl shadow-2xl p-6">
+      <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-base font-semibold text-foreground">New Smart Scope</h2>
           <button @click="emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">

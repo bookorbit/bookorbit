@@ -170,7 +170,7 @@ function onSecretFieldFocus(event: FocusEvent) {
 </script>
 
 <template>
-  <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
+  <div class="border border-border rounded-lg bg-card overflow-hidden shadow-xs">
     <!-- Card Header -->
     <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex items-center justify-between bg-muted/30">
       <div class="flex items-center gap-2">
@@ -270,7 +270,7 @@ function onSecretFieldFocus(event: FocusEvent) {
               @click="draft[row.key].enabled = !draft[row.key].enabled"
             >
               <span
-                class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform"
+                class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-xs transition-transform"
                 :class="draft[row.key].enabled ? 'translate-x-4.5' : 'translate-x-0.5'"
               />
             </button>

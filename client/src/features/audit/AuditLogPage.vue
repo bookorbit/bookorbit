@@ -94,7 +94,7 @@ watch(
   </div>
 
   <div class="mt-5 md:mt-0 space-y-4">
-    <div class="border border-border rounded-lg bg-card overflow-hidden">
+    <div class="border border-border rounded-lg bg-card overflow-hidden shadow-xs">
       <button
         class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
         @click="filtersOpen = !filtersOpen"
@@ -187,7 +187,7 @@ watch(
 
     <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
 
-    <div class="hidden md:block rounded-lg border border-border overflow-hidden">
+    <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
       <table class="w-full text-sm">
         <thead class="bg-muted/50">
           <tr>
@@ -229,7 +229,7 @@ watch(
       </table>
     </div>
 
-    <div class="md:hidden border border-border rounded-lg bg-card overflow-hidden divide-y divide-border">
+    <div class="md:hidden border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
       <div v-if="loading" class="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
       <div v-else-if="entries.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No audit logs found</div>
       <div v-else v-for="entry in entries" :key="entry.id" class="px-4 py-3" :class="isFailedAuth(entry.action) ? 'bg-destructive/5' : 'bg-card'">

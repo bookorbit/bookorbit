@@ -147,7 +147,7 @@ async function onMetadataModeChange(event: Event) {
   <div v-else class="mt-5 md:mt-0 space-y-6">
     <p class="settings-group-label">Metadata</p>
 
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
         <div class="min-w-0">
           <p class="settings-label">Auto-fetch metadata from providers</p>
@@ -161,7 +161,7 @@ async function onMetadataModeChange(event: Event) {
 
     <div class="mt-6 space-y-4">
       <p class="settings-group-label">Auto-finalize</p>
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
             <p class="settings-label">Enable auto-finalize</p>

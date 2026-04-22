@@ -34,7 +34,7 @@ function handleCancel(): void {
 
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="handleCancel">
-    <div class="bg-card border border-border rounded-xl shadow-lg w-full max-w-lg mx-4 overflow-hidden flex flex-col h-150 max-h-[85vh]">
+    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-lg mx-4 overflow-hidden flex flex-col h-150 max-h-[85vh]">
       <div class="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
         <h3 class="text-base font-semibold flex items-center gap-2">
           <GitMerge class="h-5 w-5 text-primary" />

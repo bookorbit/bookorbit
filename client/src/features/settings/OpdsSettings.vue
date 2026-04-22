@@ -210,7 +210,7 @@ watch(
     <!-- Server Toggle -->
     <div v-if="canManageSettings" class="mb-6">
       <p class="settings-group-label">Server</p>
-      <div class="border border-border rounded-lg overflow-hidden">
+      <div class="border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
             <p class="settings-label">OPDS Catalog Server</p>
@@ -224,7 +224,7 @@ watch(
     <!-- Endpoint URL -->
     <div v-if="opdsEnabled" class="mb-6">
       <p class="settings-group-label">Endpoint</p>
-      <div class="border border-border rounded-lg overflow-hidden">
+      <div class="border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="flex flex-col md:flex-row md:items-center gap-2 px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <Rss :size="14" class="text-muted-foreground shrink-0" />
           <input :value="opdsUrl" readonly class="flex-1 text-sm bg-transparent text-foreground outline-none select-all min-w-0 truncate" />
@@ -269,7 +269,7 @@ watch(
       </div>
 
       <!-- Create form -->
-      <div v-if="showCreateForm" class="border border-border rounded-lg p-4 md:p-5 bg-card mb-4 space-y-4">
+      <div v-if="showCreateForm" class="border border-border rounded-lg p-4 md:p-5 bg-card mb-4 space-y-4 shadow-xs">
         <div>
           <label class="block text-xs font-medium text-muted-foreground mb-1.5">Username</label>
           <input v-model="createUsername" type="text" placeholder="e.g. koreader" class="input-field w-full" />
@@ -320,10 +320,10 @@ watch(
       </div>
 
       <!-- Users list -->
-      <div v-if="opdsUsers.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+      <div v-if="opdsUsers.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
         <p class="text-sm text-muted-foreground">No OPDS accounts yet. Create one to start using OPDS clients.</p>
       </div>
-      <div v-else-if="opdsUsers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div v-else-if="opdsUsers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div v-for="user in opdsUsers" :key="user.id" class="px-4 py-3.5 bg-card space-y-3 md:flex md:items-center md:gap-3 md:space-y-0 md:px-5">
           <div class="flex-1 min-w-0">
             <p class="settings-label truncate">{{ user.username }}</p>
@@ -366,7 +366,7 @@ watch(
       </div>
     </div>
 
-    <div v-if="opdsEnabled" class="border border-border rounded-lg bg-card/50">
+    <div v-if="opdsEnabled" class="border border-border rounded-lg bg-card/50 shadow-xs">
       <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="helpOpen = !helpOpen">
         <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">OPDS Notes</p>
         <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground" />
@@ -383,7 +383,7 @@ watch(
       @click.self="deleteConfirmUser = null"
     >
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
-      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+      <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">Delete OPDS account?</p>
         <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirmUser.username }}". This action cannot be undone.</p>
         <div class="mt-4 flex items-center justify-end gap-2">

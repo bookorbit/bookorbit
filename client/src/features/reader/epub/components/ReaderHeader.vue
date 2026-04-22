@@ -98,7 +98,7 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
         align="end"
         side="bottom"
         :side-offset="10"
-        class="w-[22rem] max-w-[calc(100vw-1rem)] max-h-[min(80vh,38rem)] rounded-xl border-border bg-card p-0 shadow-2xl overflow-hidden"
+        class="w-[22rem] max-w-[calc(100vw-1rem)] max-h-[min(80vh,38rem)] rounded-lg border-border bg-card p-0 shadow-2xl overflow-hidden"
       >
         <slot name="settingsPanel" />
       </DropdownMenuContent>

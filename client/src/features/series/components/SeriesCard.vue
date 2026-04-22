@@ -88,7 +88,7 @@ const coverStyles = computed(() => {
 <template>
   <div class="group flex h-full cursor-pointer flex-col" @click="handleClick">
     <div
-      class="flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:border-border hover:shadow-md"
+      class="flex h-full flex-col overflow-hidden rounded-lg border border-border/60 bg-card shadow-sm transition-all duration-200 hover:border-border hover:shadow-md"
     >
       <div
         class="relative isolate overflow-hidden border-b border-border/60 bg-linear-to-b from-white/[0.035] via-background/5 to-black/[0.07]"

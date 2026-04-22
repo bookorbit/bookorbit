@@ -59,7 +59,7 @@ const kpis = computed(() => [
 </script>
 
 <template>
-  <div class="relative overflow-hidden rounded-xl border bg-card">
+  <div class="relative overflow-hidden rounded-lg border bg-card">
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent" />
     <BarChart3 class="pointer-events-none absolute -right-0 -top-2 opacity-[0.04]" :size="100" aria-hidden="true" />
 

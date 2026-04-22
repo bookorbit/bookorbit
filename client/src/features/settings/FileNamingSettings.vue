@@ -245,7 +245,7 @@ onUnmounted(() => {
     <!-- Global Patterns -->
     <section class="space-y-4">
       <p class="settings-group-label">Global Defaults</p>
-      <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-sm">
+      <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
         <!-- Upload pattern -->
         <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -327,7 +327,7 @@ onUnmounted(() => {
     <!-- Library Overrides -->
     <section class="space-y-4">
       <p class="settings-group-label">Library Overrides</p>
-      <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-sm">
+      <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
         <div v-if="libraries.length === 0" class="px-4 py-8 md:px-6 md:py-10 text-center text-sm text-muted-foreground italic">
           No libraries configured. Create one in Library settings to set custom naming patterns.
         </div>
@@ -389,7 +389,7 @@ onUnmounted(() => {
       <p class="settings-group-label">Pattern Reference</p>
 
       <!-- Reference accordion -->
-      <div class="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+      <div class="border border-border rounded-lg bg-card shadow-xs overflow-hidden">
         <button
           class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
           @click="referenceOpen = !referenceOpen"
@@ -494,7 +494,7 @@ onUnmounted(() => {
     <!-- Examples -->
     <section class="space-y-4">
       <p class="settings-group-label">Examples</p>
-      <div class="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+      <div class="border border-border rounded-lg bg-card shadow-xs overflow-hidden">
         <div class="p-5 space-y-3">
           <button class="w-full flex items-center justify-between gap-2 text-left" @click="examplesOpen = !examplesOpen">
             <div>
@@ -505,7 +505,7 @@ onUnmounted(() => {
             <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
           </button>
           <div v-if="examplesOpen" class="space-y-3">
-            <div v-for="ex in EXAMPLES" :key="ex.pattern" class="rounded-xl border border-border bg-background overflow-hidden shadow-xs">
+            <div v-for="ex in EXAMPLES" :key="ex.pattern" class="rounded-lg border border-border bg-background overflow-hidden shadow-xs">
               <div class="flex items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border-b border-border">
                 <div class="min-w-0">
                   <p class="text-[13px] font-semibold text-foreground mb-0.5">{{ ex.label }}</p>

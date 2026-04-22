@@ -31,9 +31,9 @@ export function useOnboardingTour() {
       {
         element: '[data-tour="sidebar-smartScopes"]',
         popover: {
-          title: 'SmartScopes - smart filters',
+          title: 'Smart Scopes - Smart filters',
           description:
-            'SmartScopes are saved filter rules that always stay up to date. Define criteria once - like "unread sci-fi" - and browse that slice of your library instantly.',
+            'Smart Scopes are saved filter rules that always stay up to date. Define criteria once - like "unread sci-fi" - and browse that slice of your library instantly.',
           side: 'right',
           align: 'start',
         },

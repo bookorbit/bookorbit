@@ -18,7 +18,7 @@ const emit = defineEmits<{ click: [] }>()
 
 const buttonClass = [
   // layout & shape
-  'relative h-8.5 gap-1 rounded-xl pl-0.5 pr-2 group/item',
+  'relative h-8.5 gap-1 rounded-lg pl-0.5 pr-2 group/item',
   // transitions & hover
   'transition-[background-color,box-shadow] duration-200 hover:bg-primary/8',
   // active indicator pill (::before pseudo-element)

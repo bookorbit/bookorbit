@@ -253,7 +253,7 @@ function closeUnlinkDialog() {
   </div>
 
   <div class="mt-5 md:mt-0 space-y-4">
-    <section class="rounded-xl border border-border bg-card p-4 md:p-5 space-y-4 mb-4">
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 mb-4 shadow-xs">
       <button class="md:hidden w-full flex items-center justify-between gap-2 text-left" @click="profileCardOpen = !profileCardOpen">
         <div>
           <p class="text-sm font-semibold text-foreground">Profile & Security</p>
@@ -318,7 +318,7 @@ function closeUnlinkDialog() {
       </div>
     </section>
 
-    <section class="rounded-xl border border-border bg-card p-4 md:p-5 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">
       <button class="md:hidden w-full flex items-center justify-between gap-2 text-left" @click="avatarCardOpen = !avatarCardOpen">
         <div>
           <p class="text-sm font-semibold text-foreground">Profile Picture</p>
@@ -373,7 +373,7 @@ function closeUnlinkDialog() {
 
   <!-- OIDC Identity section -->
   <div v-if="!oidcIdentityLoading" class="mt-4">
-    <section class="rounded-xl border border-border bg-card p-4 md:p-5 space-y-3">
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-3 shadow-xs">
       <div class="flex items-center gap-2">
         <LinkIcon class="h-4 w-4 text-muted-foreground shrink-0" />
         <h2 class="text-sm font-semibold text-foreground">Connected Accounts</h2>
@@ -432,7 +432,7 @@ function closeUnlinkDialog() {
     @click.self="removeAvatarConfirmOpen = false"
   >
     <button class="absolute inset-0 bg-black/45" @click="removeAvatarConfirmOpen = false" />
-    <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+    <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
       <p class="text-base font-semibold text-foreground">Remove profile picture?</p>
       <p class="mt-1 text-sm text-muted-foreground">Your avatar will be removed and replaced with initials.</p>
       <div class="mt-4 flex items-center justify-end gap-2">
@@ -454,7 +454,7 @@ function closeUnlinkDialog() {
 
   <!-- Guided Tour (desktop only) -->
   <div class="hidden md:block mt-4">
-    <section class="rounded-xl border border-border bg-card p-4 md:p-5">
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 shadow-xs">
       <div class="flex items-center justify-between gap-4">
         <div class="flex items-center gap-2">
           <MapPin class="h-4 w-4 text-muted-foreground shrink-0" />
@@ -471,7 +471,7 @@ function closeUnlinkDialog() {
   <!-- Unlink OIDC identity confirmation dialog -->
   <div v-if="unlinkDialogOpen" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeUnlinkDialog">
     <button class="absolute inset-0 bg-black/45" @click="closeUnlinkDialog" />
-    <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+    <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
       <p class="text-base font-semibold text-foreground">Unlink {{ unlinkTarget?.providerName ?? 'OIDC' }} identity?</p>
       <p class="mt-1 text-sm text-muted-foreground">Enter your password to confirm. You will no longer be able to sign in with this provider.</p>
       <input

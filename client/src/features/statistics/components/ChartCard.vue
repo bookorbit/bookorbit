@@ -29,7 +29,7 @@ const iconStyle = computed(() => {
 <template>
   <div
     :class="[
-      'bg-card text-card-foreground flex h-full min-h-[320px] flex-col overflow-hidden rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md md:min-h-0',
+      'bg-card text-card-foreground flex h-full min-h-[320px] flex-col overflow-hidden rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md md:min-h-0',
     ]"
   >
     <div class="flex min-h-0 flex-1 flex-col p-4">

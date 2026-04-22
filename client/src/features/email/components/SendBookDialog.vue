@@ -109,7 +109,7 @@ function close() {
       <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]" @click="close()" />
 
-        <div class="relative w-full max-w-md bg-background border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div class="relative w-full max-w-md bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
           <!-- Header -->
           <div class="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>

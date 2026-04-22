@@ -171,7 +171,7 @@ async function save() {
         <!-- Scrollable body -->
         <div class="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-5">
           <!-- Identity card -->
-          <div class="rounded-xl border border-border bg-background p-5 flex flex-col gap-4">
+          <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Identity</h3>
             <div class="flex gap-3">
               <div class="flex-1 flex flex-col gap-1.5">
@@ -191,7 +191,7 @@ async function save() {
           </div>
 
           <!-- Filters card -->
-          <div class="rounded-xl border border-border bg-background p-5 flex flex-col gap-4">
+          <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Filters</h3>
 
             <!-- Empty state -->
@@ -234,7 +234,7 @@ async function save() {
           </div>
 
           <!-- Sort card -->
-          <div class="rounded-xl border border-border bg-background p-5 flex flex-col gap-4">
+          <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Default Sort</h3>
             <BookSortBuilder v-model="draftSort" />
           </div>

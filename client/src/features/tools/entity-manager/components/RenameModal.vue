@@ -29,7 +29,7 @@ function handleCancel(): void {
 
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="handleCancel">
-    <div class="bg-card border border-border rounded-xl shadow-lg w-full max-w-md mx-4 overflow-hidden">
+    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden">
       <div class="flex items-center justify-between px-5 py-4 border-b border-border">
         <h3 class="text-base font-semibold">Rename Entity</h3>
         <button class="text-muted-foreground hover:text-foreground transition-colors" @click="handleCancel">

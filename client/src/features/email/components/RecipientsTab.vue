@@ -145,7 +145,7 @@ function deviceLabel(type: string | null): string {
     </div>
 
     <!-- Form -->
-    <div v-if="showForm" class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-4">
+    <div v-if="showForm" class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-4 shadow-xs">
       <p class="text-sm font-semibold text-foreground">{{ editingId ? 'Edit Recipient' : 'New Recipient' }}</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
@@ -235,12 +235,12 @@ function deviceLabel(type: string | null): string {
     </div>
 
     <!-- Empty state -->
-    <div v-if="recipients.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+    <div v-if="recipients.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
       <p class="text-sm text-muted-foreground">No recipients yet.</p>
     </div>
 
     <!-- List -->
-    <div v-else-if="recipients.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div v-else-if="recipients.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <div v-for="r in recipients" :key="r.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -297,7 +297,7 @@ function deviceLabel(type: string | null): string {
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
-      <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-xl md:p-5">
+      <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">Delete recipient?</p>
         <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirm.name }}". This action cannot be undone.</p>
         <div class="mt-4 flex items-center justify-end gap-2">

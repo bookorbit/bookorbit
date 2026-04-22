@@ -986,13 +986,13 @@ onMounted(async () => {
               <button
                 v-for="mins in [15, 30, 45, 60]"
                 :key="mins"
-                class="text-sm text-left px-3 py-2 rounded-xl transition-colors hover:bg-white/10 text-white"
+                class="text-sm text-left px-3 py-2 rounded-lg transition-colors hover:bg-white/10 text-white"
                 @click="setSleepTimer(mins)"
               >
                 {{ mins }} minutes
               </button>
               <button
-                class="text-sm text-left px-3 py-2 rounded-xl transition-colors text-white"
+                class="text-sm text-left px-3 py-2 rounded-lg transition-colors text-white"
                 :class="detail?.audioMetadata?.chapters?.length ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'"
                 :disabled="!detail?.audioMetadata?.chapters?.length"
                 :title="!detail?.audioMetadata?.chapters?.length ? 'No chapters available' : undefined"
@@ -1004,13 +1004,13 @@ onMounted(async () => {
                 <div class="border-t border-white/10 my-1" />
                 <button
                   v-if="sleepTimerRemaining > 0"
-                  class="text-sm text-left px-3 py-2 rounded-xl transition-colors hover:bg-white/10 text-white/70 w-full"
+                  class="text-sm text-left px-3 py-2 rounded-lg transition-colors hover:bg-white/10 text-white/70 w-full"
                   @click="extendSleepTimer"
                 >
                   + 15 minutes
                 </button>
                 <button
-                  class="text-sm text-left px-3 py-2 rounded-xl transition-colors hover:bg-white/10 text-red-400 w-full"
+                  class="text-sm text-left px-3 py-2 rounded-lg transition-colors hover:bg-white/10 text-red-400 w-full"
                   @click="cancelSleepTimer"
                 >
                   Cancel
@@ -1051,7 +1051,7 @@ onMounted(async () => {
               <button
                 v-for="speed in SPEEDS"
                 :key="speed"
-                class="text-sm text-left px-3 py-2 rounded-xl transition-colors font-medium"
+                class="text-sm text-left px-3 py-2 rounded-lg transition-colors font-medium"
                 :class="settings.playbackSpeed.value === speed ? 'bg-primary/25 text-primary font-semibold' : 'hover:bg-white/10 text-white/70'"
                 @click="selectSpeed(speed)"
               >

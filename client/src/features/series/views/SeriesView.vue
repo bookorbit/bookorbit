@@ -477,7 +477,7 @@ watch(seriesGridGap, (value) => {
     }"
   >
     <template v-if="!initialLoadComplete">
-      <div v-for="n in INITIAL_SKELETON_COUNT" :key="n" class="overflow-hidden rounded-xl border border-border/60 bg-card">
+      <div v-for="n in INITIAL_SKELETON_COUNT" :key="n" class="overflow-hidden rounded-lg border border-border/60 bg-card">
         <div class="animate-pulse bg-muted/80" style="aspect-ratio: 11 / 8" />
         <div class="space-y-2 px-4 py-3">
           <div class="h-4 w-2/3 rounded bg-muted/80" />

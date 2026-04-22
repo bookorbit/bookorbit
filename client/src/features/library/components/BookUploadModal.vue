@@ -190,7 +190,7 @@ function formatPillClass(filename: string): string {
       <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="handleClose" />
 
       <div
-        class="relative flex flex-col w-full max-w-2xl bg-background rounded-xl shadow-2xl border border-border overflow-hidden"
+        class="relative flex flex-col w-full max-w-2xl bg-background rounded-lg shadow-2xl border border-border overflow-hidden"
         style="max-height: min(92vh, 760px)"
       >
         <!-- Header -->
@@ -249,7 +249,7 @@ function formatPillClass(filename: string): string {
             @drop="onDrop"
             @click="openFilePicker"
           >
-            <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-primary/10">
+            <div class="flex items-center justify-center w-11 h-11 rounded-lg bg-primary/10">
               <FileUp :size="20" class="text-primary" />
             </div>
             <div>

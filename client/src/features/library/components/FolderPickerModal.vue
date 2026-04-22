@@ -82,7 +82,7 @@ function selectCurrent() {
       <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="emit('close')" />
 
       <div
-        class="relative flex flex-col w-full max-w-lg bg-background rounded-xl shadow-2xl border border-border overflow-hidden"
+        class="relative flex flex-col w-full max-w-lg bg-background rounded-lg shadow-2xl border border-border overflow-hidden"
         style="height: min(80vh, 560px)"
       >
         <!-- Header -->

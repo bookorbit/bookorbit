@@ -26,7 +26,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-[70] flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="emit('cancel')" />
-      <div class="relative z-10 mx-4 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
+      <div class="relative z-10 mx-4 w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl">
         <div class="mb-5 flex items-start gap-4">
           <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" :class="destructive ? 'bg-destructive/10' : 'bg-primary/10'">
             <TriangleAlert :size="18" :class="destructive ? 'text-destructive' : 'text-primary'" />

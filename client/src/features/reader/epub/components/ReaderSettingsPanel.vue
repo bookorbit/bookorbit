@@ -89,7 +89,7 @@ onMounted(() => {
       class="sticky top-0 z-10 border-b border-border bg-card/95 px-3 py-3 backdrop-blur-sm transition-shadow"
       :class="hasTabBarShadow ? 'shadow-sm' : ''"
     >
-      <div class="grid grid-cols-3 gap-1 rounded-xl bg-muted/55 p-1">
+      <div class="grid grid-cols-3 gap-1 rounded-lg bg-muted/55 p-1">
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -112,7 +112,7 @@ onMounted(() => {
         <div class="space-y-6">
           <div>
             <p class="mb-2 text-[13px] font-medium text-foreground/90">Mode</p>
-            <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted/55 p-1">
+            <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
               <button
                 class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
                 :class="
@@ -225,7 +225,7 @@ onMounted(() => {
               <p class="text-sm font-medium leading-tight">Reading flow</p>
               <p class="text-xs leading-tight text-muted-foreground">Switch between paged and continuous scrolling.</p>
             </div>
-            <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted/55 p-1">
+            <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
               <button
                 class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
                 :class="

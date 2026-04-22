@@ -956,7 +956,7 @@ function formatSourceCountLabel(key: string) {
       <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="handleClose" />
 
       <div
-        class="relative flex flex-col w-full max-w-5xl bg-background rounded-xl shadow-2xl overflow-hidden border border-border"
+        class="relative flex flex-col w-full max-w-5xl bg-background rounded-lg shadow-2xl overflow-hidden border border-border"
         style="height: min(90vh, 700px)"
       >
         <!-- Mobile top bar -->
@@ -975,7 +975,7 @@ function formatSourceCountLabel(key: string) {
           <!-- Sidebar (desktop only) -->
           <nav class="hidden md:flex flex-col w-52 shrink-0 bg-muted/40 border-r border-border">
             <div class="px-4 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
-              <span class="text-sm font-semibold text-foreground font-serif truncate">Booklore Import</span>
+              <span class="font-semibold text-foreground font-serif truncate">Booklore Import</span>
               <button
                 class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 ml-1"
                 @click="handleClose"

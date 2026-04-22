@@ -71,7 +71,7 @@ function handleResetToDefault() {
 </script>
 
 <template>
-  <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
+  <div class="border border-border rounded-lg bg-card overflow-hidden shadow-xs">
     <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30">
       <div>
         <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Defaults</span>
@@ -149,7 +149,7 @@ function handleResetToDefault() {
                 @click.prevent="setGenreMerge(draft.options?.genres.mode !== 'merge')"
               >
                 <span
-                  class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
+                  class="inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform"
                   :class="draft.options?.genres.mode === 'merge' ? 'translate-x-4.5' : 'translate-x-0.5'"
                 />
               </div>
@@ -171,7 +171,7 @@ function handleResetToDefault() {
                 @click.prevent="toggleSaveProviderIds"
               >
                 <span
-                  class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
+                  class="inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform"
                   :class="draft.options?.saveProviderIds ? 'translate-x-4.5' : 'translate-x-0.5'"
                 />
               </div>

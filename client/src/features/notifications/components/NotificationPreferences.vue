@@ -86,7 +86,7 @@ async function handleSave() {
   </div>
 
   <div class="mt-5 md:mt-0 space-y-4">
-    <section class="rounded-xl border border-border bg-card p-4 md:p-5 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">
       <div
         v-for="category in Object.keys(NOTIFICATION_CATEGORIES) as NotificationCategory[]"
         :key="category"
@@ -102,7 +102,7 @@ async function handleSave() {
           @click="handleToggle(category)"
         >
           <span
-            class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform"
+            class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-xs ring-0 transition-transform"
             :class="preferences[category] !== false ? 'translate-x-4' : 'translate-x-0'"
           />
         </button>

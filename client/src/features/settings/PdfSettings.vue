@@ -59,14 +59,14 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.scrollMode === 'page' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.scrollMode === 'page' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ scrollMode: 'page' })"
             >
               Page
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.scrollMode === 'vertical' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.scrollMode === 'vertical' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ scrollMode: 'vertical' })"
             >
               Scrolled
@@ -85,21 +85,21 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.spread === 'none' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.spread === 'none' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ spread: 'none' })"
             >
               None
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.spread === 'odd' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.spread === 'odd' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ spread: 'odd' })"
             >
               Odd
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.spread === 'even' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.spread === 'even' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ spread: 'even' })"
             >
               Even

@@ -75,7 +75,7 @@ function onCopy() {
         }"
         @mousedown.stop
       >
-        <div class="bg-card text-card-foreground rounded-xl shadow-xl border border-border p-1.5 flex flex-col gap-1">
+        <div class="bg-card text-card-foreground rounded-lg shadow-xl border border-border p-1.5 flex flex-col gap-1">
           <div class="flex gap-1">
             <Tooltip>
               <TooltipTrigger as-child>

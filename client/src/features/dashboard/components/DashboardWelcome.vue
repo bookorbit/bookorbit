@@ -40,7 +40,7 @@ async function handleSaved(library: Library) {
 
       <div class="relative flex flex-col items-center px-10 py-12 text-center">
         <!-- Icon -->
-        <div class="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-border bg-background shadow-sm">
+        <div class="mb-6 flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-background shadow-sm">
           <component :is="canCreate ? BookOpen : Users" :size="26" class="text-foreground/70" />
         </div>
 

@@ -223,7 +223,7 @@ function formatBadgeClass(fmt: string): string {
 
 <template>
   <header
-    class="flex h-12 shrink-0 items-center gap-2 border border-sidebar-border/50 bg-background/90 backdrop-blur-xl px-3 shadow-lg shadow-black/5 relative mt-3 mx-4 z-30 rounded-xl transition-all duration-300 flex-none"
+    class="flex h-12 shrink-0 items-center gap-2 border border-sidebar-border/50 bg-background/90 backdrop-blur-xl px-3 shadow-lg shadow-black/5 relative mt-3 mx-4 z-30 rounded-lg transition-all duration-300 flex-none"
   >
     <!-- Mobile: search active overlay -->
     <template v-if="mobileSearchOpen">

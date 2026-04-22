@@ -90,7 +90,7 @@ async function handleSubmit() {
       <!-- Radius picker -->
       <div class="relative">
         <Transition name="popover">
-          <div v-if="radiusOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-xl">
+          <div v-if="radiusOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg">
             <div class="flex items-center gap-1.5">
               <Tooltip v-for="opt in RADIUS_OPTIONS" :key="opt.id">
                 <TooltipTrigger as-child>
@@ -124,7 +124,7 @@ async function handleSubmit() {
       <!-- Background picker -->
       <div class="relative">
         <Transition name="popover">
-          <div v-if="backgroundOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-xl w-64 max-h-72 overflow-y-auto">
+          <div v-if="backgroundOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg w-64 max-h-72 overflow-y-auto">
             <div class="grid grid-cols-5 gap-1.5">
               <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
                 <TooltipTrigger as-child>
@@ -156,7 +156,7 @@ async function handleSubmit() {
       <!-- Accent picker -->
       <div class="relative">
         <Transition name="popover">
-          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-xl space-y-2">
+          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-lg space-y-2">
             <div class="flex items-center gap-1.5">
               <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
                 <TooltipTrigger as-child>

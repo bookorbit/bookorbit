@@ -277,8 +277,8 @@ function coverRefreshLabel(libraryId: number): string {
   </SettingsPageHeader>
 
   <!-- Library cards -->
-  <div class="space-y-2 md:space-y-3">
-    <div v-for="lib in libraries" :key="lib.id" class="rounded-xl border border-border bg-card overflow-hidden">
+  <div class="space-y-2 md:space-y-4">
+    <div v-for="lib in libraries" :key="lib.id" class="rounded-lg border border-border bg-card overflow-hidden shadow-xs">
       <div class="px-4 py-3.5 md:px-5 md:py-4">
         <div class="flex items-center gap-3">
           <!-- Icon -->
@@ -404,8 +404,8 @@ function coverRefreshLabel(libraryId: number): string {
     </div>
 
     <!-- Empty state -->
-    <div v-if="libraries.length === 0" class="rounded-xl border border-dashed border-border bg-card/50 px-8 py-16 text-center">
-      <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mx-auto mb-4">
+    <div v-if="libraries.length === 0" class="rounded-lg border border-dashed border-border bg-card/50 px-8 py-16 text-center shadow-xs">
+      <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted mx-auto mb-4">
         <FolderOpen :size="22" class="text-muted-foreground/80" />
       </div>
       <p class="text-sm font-medium text-foreground mb-1">No libraries yet</p>
@@ -422,7 +422,7 @@ function coverRefreshLabel(libraryId: number): string {
 
   <!-- Delete confirmation dialog -->
   <div v-if="deletingLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div class="bg-card border border-border rounded-xl shadow-xl w-full max-w-sm p-6">
+    <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
       <h3 class="text-base font-semibold text-foreground mb-1">Delete "{{ deletingLibrary.name }}"?</h3>
       <p class="text-sm text-muted-foreground mb-4">
         This will permanently remove all books, metadata, reading progress, bookmarks, and annotations in this library. This cannot be undone.
@@ -456,7 +456,7 @@ function coverRefreshLabel(libraryId: number): string {
 
   <!-- Sync confirmation dialog -->
   <div v-if="confirmSyncLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div class="bg-card border border-border rounded-xl shadow-xl w-full max-w-sm p-6">
+    <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
       <h3 class="text-base font-semibold text-foreground mb-1">Sync metadata to files?</h3>
       <p class="text-sm text-muted-foreground mb-4">
         This will overwrite the metadata inside every supported file in

@@ -155,7 +155,7 @@ function handleResetClick() {
     </div>
   </div>
 
-  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
     <div v-for="group in groups" :key="group.group" class="px-5 py-4 bg-card">
       <div class="flex items-center justify-between mb-3">
         <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{{ group.label }}</p>

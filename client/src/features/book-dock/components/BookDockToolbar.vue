@@ -167,7 +167,7 @@ function clearSearch() {
 
         <div
           v-if="showUploadPopover"
-          class="absolute right-0 top-full mt-1.5 z-20 w-52 rounded-xl border border-border bg-card shadow-lg p-3 space-y-2.5"
+          class="absolute right-0 top-full mt-1.5 z-20 w-52 rounded-lg border border-border bg-card shadow-lg p-3 space-y-2.5"
         >
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-foreground">{{ isUploading ? 'Uploading...' : 'Done' }}</span>

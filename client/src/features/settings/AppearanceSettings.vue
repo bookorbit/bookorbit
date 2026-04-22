@@ -72,7 +72,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
   <!-- Theme & colors -->
   <div class="mb-6">
     <p class="settings-group-label">Theme</p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <!-- Light / dark -->
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>
@@ -82,14 +82,14 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
         <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="themeStore.theme === 'light' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :class="themeStore.theme === 'light' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
             @click="themeStore.theme === 'dark' && themeStore.toggleTheme()"
           >
             <Sun :size="12" /> Light
           </button>
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="themeStore.theme === 'dark' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :class="themeStore.theme === 'dark' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
             @click="themeStore.theme === 'light' && themeStore.toggleTheme()"
           >
             <Moon :size="12" /> Dark
@@ -202,7 +202,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
     <p class="settings-group-label">Library View</p>
 
     <!-- Background pattern -->
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4 shadow-xs">
       <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div class="mb-3">
           <div>
@@ -222,7 +222,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
                     type="button"
                     class="w-14 h-10 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
                     :class="
-                      themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
+                      themeStore.background === opt.id ? 'ring-primary shadow-xs shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
                     "
                     @click="themeStore.setBackground(opt.id)"
                   >
@@ -236,7 +236,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
         </div>
       </div>
     </div>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <!-- Cover size behavior -->
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>
@@ -247,14 +247,14 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
         <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="coverSizeScope === 'synced' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :class="coverSizeScope === 'synced' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
             @click="setCoverSizeScope('synced')"
           >
             Sync all views
           </button>
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="coverSizeScope === 'per-view' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :class="coverSizeScope === 'per-view' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
             @click="setCoverSizeScope('per-view')"
           >
             Per-view sizes
@@ -373,7 +373,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
 
     <!-- Card overlays -->
     <p class="settings-group-label mt-6">Author Grid</p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-6">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-6 shadow-xs">
       <!-- Author cover size -->
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>
@@ -406,14 +406,14 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
         <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="authorCoverShape === 'circle' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :class="authorCoverShape === 'circle' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
             @click="authorCoverShape = 'circle'"
           >
             <Circle :size="12" /> Circle
           </button>
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="authorCoverShape === 'square' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :class="authorCoverShape === 'square' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
             @click="authorCoverShape = 'square'"
           >
             <Square :size="12" /> Square
@@ -424,7 +424,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
 
     <!-- Card overlays -->
     <p class="settings-group-label">Card Overlays</p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <div v-for="opt in OVERLAY_OPTIONS" :key="opt.key" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
           <p class="settings-label">{{ opt.label }}</p>
@@ -438,7 +438,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
   <!-- SmartScopes -->
   <div class="mt-8">
     <p class="settings-group-label">Smart Scopes</p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
           <p class="settings-label">Show filter preview by default</p>
@@ -454,7 +454,7 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
   <!-- Series -->
   <div class="mt-8">
     <p class="settings-group-label">Series</p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
           <p class="settings-label">Collapse series by default</p>

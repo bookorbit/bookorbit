@@ -79,7 +79,7 @@ function handleSelectCandidate(candidate: MetadataCandidate) {
   <div class="flex flex-col h-full">
     <!-- Search form card -->
     <div v-if="!isFormCollapsed" class="px-4 pt-4 pb-3 shrink-0">
-      <div class="rounded-xl border border-border bg-card p-3 space-y-2 shadow-sm">
+      <div class="rounded-lg border border-border bg-card p-3 space-y-2 shadow-sm">
         <div class="flex gap-2">
           <div class="relative flex-1">
             <BookOpen class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
@@ -118,7 +118,7 @@ function handleSelectCandidate(candidate: MetadataCandidate) {
       </div>
     </div>
     <div v-else class="px-4 pt-4 pb-3 shrink-0">
-      <div class="rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm">
+      <div class="rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm">
         <div class="flex items-center gap-2">
           <Search class="size-3.5 text-muted-foreground shrink-0" />
           <div class="min-w-0 flex-1">
@@ -176,7 +176,7 @@ function handleSelectCandidate(candidate: MetadataCandidate) {
     <div class="flex-1 overflow-y-auto px-4 pb-4">
       <!-- Skeleton grid while loading with no results yet -->
       <div v-if="isStreaming && !filteredResults.length" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div v-for="n in 8" :key="n" class="rounded-xl border border-border/40 bg-card overflow-hidden animate-pulse flex gap-3 p-2.5">
+        <div v-for="n in 8" :key="n" class="rounded-lg border border-border/40 bg-card overflow-hidden animate-pulse flex gap-3 p-2.5">
           <div class="rounded-lg bg-muted shrink-0" :style="{ width: '88px', aspectRatio: coverAspectRatio }" />
           <div class="flex-1 flex flex-col justify-center gap-2 py-1">
             <div class="h-3 bg-muted rounded-md w-full" />

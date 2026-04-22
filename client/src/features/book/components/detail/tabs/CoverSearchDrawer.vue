@@ -81,7 +81,7 @@ onMounted(() => {
             <input
               ref="titleInput"
               v-model="searchTitle"
-              class="w-full h-9 md:h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              class="w-full h-9 md:h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               placeholder="Title"
               @keyup.enter="performSearch"
             />
@@ -90,7 +90,7 @@ onMounted(() => {
             <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Author</label>
             <input
               v-model="searchAuthor"
-              class="w-full h-9 md:h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              class="w-full h-9 md:h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               placeholder="Author"
               @keyup.enter="performSearch"
             />
@@ -100,7 +100,7 @@ onMounted(() => {
               <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Source</label>
               <select
                 v-model="searchProvider"
-                class="w-full h-9 md:h-10 rounded-xl border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                class="w-full h-9 md:h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               >
                 <option value="duckduckgo">DuckDuckGo</option>
                 <option value="itunes">iTunes</option>
@@ -109,7 +109,7 @@ onMounted(() => {
             </div>
             <!-- Icon-only search button on mobile, inline with Source -->
             <button
-              class="md:hidden flex items-center justify-center h-9 aspect-square rounded-xl bg-primary text-primary-foreground transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 shrink-0"
+              class="md:hidden flex items-center justify-center h-9 aspect-square rounded-lg bg-primary text-primary-foreground transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 shrink-0"
               :disabled="isSearching"
               @click="performSearch"
             >
@@ -120,7 +120,7 @@ onMounted(() => {
         </div>
         <!-- Full-width button on md+ -->
         <button
-          class="hidden md:flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm active:scale-[0.98]"
+          class="hidden md:flex items-center justify-center gap-2 w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm active:scale-[0.98]"
           :disabled="isSearching"
           @click="performSearch"
         >
@@ -133,14 +133,14 @@ onMounted(() => {
       <!-- Results Scroll Area -->
       <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
         <div v-if="isSearching" class="grid grid-cols-3 gap-4">
-          <div v-for="i in 9" :key="i" class="aspect-[2/3] rounded-xl bg-muted animate-pulse" />
+          <div v-for="i in 9" :key="i" class="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
         </div>
 
         <div v-else-if="searchResults.length > 0" class="grid grid-cols-3 gap-4">
           <div
             v-for="res in searchResults"
             :key="String(res.url)"
-            class="group relative aspect-[2/3] rounded-xl overflow-hidden bg-muted border border-border/50 hover:border-primary/50 hover:ring-4 hover:ring-primary/10 transition-all cursor-pointer"
+            class="group relative aspect-[2/3] rounded-lg overflow-hidden bg-muted border border-border/50 hover:border-primary/50 hover:ring-4 hover:ring-primary/10 transition-all cursor-pointer"
             @click="handleSelect(String(res.url))"
           >
             <img :src="res.previewUrl" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />

@@ -89,7 +89,7 @@ function formatDate(iso: string | null | undefined): string {
     <!-- Booklore Import -->
     <div>
       <p class="settings-group-label">Import</p>
-      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5">
+      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5 shadow-xs">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
           <div class="flex items-start gap-3">
             <div
@@ -167,7 +167,7 @@ function formatDate(iso: string | null | undefined): string {
     <!-- Recommendations -->
     <div>
       <p class="settings-group-label">Recommendations</p>
-      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5">
+      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5 shadow-xs">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
           <div class="flex items-start gap-3">
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">

@@ -51,7 +51,7 @@ async function setStorageMode(sync: boolean) {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <!-- This device only -->
         <div
-          class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-xl border-2 cursor-pointer transition-colors"
+          class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 cursor-pointer transition-colors"
           :class="!syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'"
           @click="setStorageMode(false)"
         >
@@ -76,7 +76,7 @@ async function setStorageMode(sync: boolean) {
 
         <!-- My account -->
         <div
-          class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-xl border-2 cursor-pointer transition-colors"
+          class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 cursor-pointer transition-colors"
           :class="syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'"
           @click="setStorageMode(true)"
         >

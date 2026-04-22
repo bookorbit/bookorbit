@@ -357,7 +357,7 @@ watch(authorName, () => {
         {{ authorError }}
       </div>
 
-      <div v-if="loadingAuthor && !author" class="mb-4 rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
+      <div v-if="loadingAuthor && !author" class="mb-4 rounded-lg border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
         Loading author...
       </div>
       <AuthorHeader
@@ -381,7 +381,7 @@ watch(authorName, () => {
         Could not load external author preview metadata right now.
       </div>
 
-      <section v-if="author && (editOpen || mergeOpen)" class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3 space-y-3">
+      <section v-if="author && (editOpen || mergeOpen)" class="mt-4 rounded-lg border border-border/70 bg-card/60 p-3 space-y-3">
         <div v-if="editOpen && canUpdate" class="space-y-2">
           <div class="grid gap-2 md:grid-cols-2">
             <label class="text-xs text-muted-foreground">
@@ -444,7 +444,7 @@ watch(authorName, () => {
         </div>
       </section>
 
-      <section class="mt-4 rounded-xl border border-border/70 bg-card/60 p-3">
+      <section class="mt-4 rounded-lg border border-border/70 bg-card/60 p-3">
         <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <h2 class="text-sm font-semibold text-foreground">Books</h2>
           <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

@@ -58,7 +58,7 @@ onMounted(load)
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="
-                effective.scrollMode === 'paginated' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                effective.scrollMode === 'paginated' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'
               "
               @click="update({ scrollMode: 'paginated' })"
             >
@@ -66,7 +66,7 @@ onMounted(load)
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.scrollMode === 'infinite' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.scrollMode === 'infinite' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ scrollMode: 'infinite' })"
             >
               Infinite
@@ -74,7 +74,7 @@ onMounted(load)
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="
-                effective.scrollMode === 'long-strip' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                effective.scrollMode === 'long-strip' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'
               "
               @click="update({ scrollMode: 'long-strip' })"
             >
@@ -94,14 +94,14 @@ onMounted(load)
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.viewMode === 'single' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.viewMode === 'single' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ viewMode: 'single' })"
             >
               Single
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.viewMode === 'two-page' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.viewMode === 'two-page' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ viewMode: 'two-page' })"
             >
               Two-page
@@ -150,14 +150,14 @@ onMounted(load)
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.direction === 'ltr' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.direction === 'ltr' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ direction: 'ltr' })"
             >
               L to R
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.direction === 'rtl' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.direction === 'rtl' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ direction: 'rtl' })"
             >
               R to L
@@ -177,7 +177,7 @@ onMounted(load)
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="
-                effective.spreadAlignment === 'normal' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                effective.spreadAlignment === 'normal' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'
               "
               @click="update({ spreadAlignment: 'normal' })"
             >
@@ -186,7 +186,7 @@ onMounted(load)
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="
-                effective.spreadAlignment === 'shifted' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                effective.spreadAlignment === 'shifted' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'
               "
               @click="update({ spreadAlignment: 'shifted' })"
             >
@@ -207,7 +207,7 @@ onMounted(load)
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="
-                effective.widePageSingletonMode === 'auto' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                effective.widePageSingletonMode === 'auto' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'
               "
               @click="update({ widePageSingletonMode: 'auto' })"
             >
@@ -217,7 +217,7 @@ onMounted(load)
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="
                 effective.widePageSingletonMode === 'disable'
-                  ? 'bg-background shadow-sm text-foreground'
+                  ? 'bg-background shadow-xs text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               "
               @click="update({ widePageSingletonMode: 'disable' })"
@@ -238,14 +238,14 @@ onMounted(load)
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="!effective.forceTwoPage ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="!effective.forceTwoPage ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ forceTwoPage: false })"
             >
               Off
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
-              :class="effective.forceTwoPage ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :class="effective.forceTwoPage ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ forceTwoPage: true })"
             >
               On
