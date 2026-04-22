@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, inArray, ne, and, isNotNull, sql } from 'drizzle-orm';
+import { eq, inArray, ne, and, isNotNull, sql, asc, desc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -8,6 +8,19 @@ import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, books, genres
 
 type Db = NodePgDatabase<typeof schema>;
 const ANN_CANDIDATE_FETCH_LIMIT = 100;
+const SERIES_BOOKS_LIMIT = 50;
+const AUTHOR_BOOKS_LIMIT = 25;
+
+export interface SeriesBookRow {
+  bookId: number;
+  title: string | null;
+  seriesIndex: number | null;
+}
+
+export interface AuthorBookRow {
+  bookId: number;
+  title: string | null;
+}
 
 export interface AnnCandidate {
   bookId: number;
@@ -58,6 +71,12 @@ export class RecommendationRepository {
     };
   }
 
+  async getSeriesName(bookId: number): Promise<string | null> {
+    const [row] = await this.db.select({ seriesName: bookMetadata.seriesName }).from(bookMetadata).where(eq(bookMetadata.bookId, bookId)).limit(1);
+
+    return row?.seriesName?.trim() || null;
+  }
+
   async findAnnCandidates(embedding: number[], targetBookId: number, libraryIds: number[]): Promise<AnnCandidate[]> {
     if (libraryIds.length === 0 || embedding.length === 0 || embedding.some((v) => !Number.isFinite(v))) return [];
 
@@ -106,6 +125,44 @@ export class RecommendationRepository {
       authorNames: authorsByBook.get(id) ?? [],
       genreTagNames: genreTagsByBook.get(id) ?? [],
     }));
+  }
+
+  async findSeriesBooks(seriesName: string, libraryIds: number[]): Promise<SeriesBookRow[]> {
+    if (libraryIds.length === 0 || !seriesName.trim()) return [];
+
+    const normalized = seriesName.trim().toLowerCase();
+
+    return this.db
+      .select({
+        bookId: books.id,
+        title: bookMetadata.title,
+        seriesIndex: bookMetadata.seriesIndex,
+      })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(and(inArray(books.libraryId, libraryIds), sql`lower(trim(${bookMetadata.seriesName})) = ${normalized}`))
+      .orderBy(sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, asc(bookMetadata.title), asc(books.id))
+      .limit(SERIES_BOOKS_LIMIT);
+  }
+
+  async findAuthorBooks(bookId: number, libraryIds: number[]): Promise<AuthorBookRow[]> {
+    if (libraryIds.length === 0) return [];
+
+    const authorIds = this.db.select({ authorId: bookAuthors.authorId }).from(bookAuthors).where(eq(bookAuthors.bookId, bookId));
+
+    return this.db
+      .select({
+        bookId: books.id,
+        title: bookMetadata.title,
+        sharedAuthors: sql<number>`count(*)::int`.as('shared_authors'),
+      })
+      .from(bookAuthors)
+      .innerJoin(books, eq(books.id, bookAuthors.bookId))
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(and(inArray(bookAuthors.authorId, authorIds), inArray(books.libraryId, libraryIds), ne(books.id, bookId)))
+      .groupBy(books.id, bookMetadata.title)
+      .orderBy(desc(sql`shared_authors`), asc(bookMetadata.title), asc(books.id))
+      .limit(AUTHOR_BOOKS_LIMIT);
   }
 
   private groupNamesByBook(rows: Array<{ bookId: number; name: string }>): Map<number, string[]> {

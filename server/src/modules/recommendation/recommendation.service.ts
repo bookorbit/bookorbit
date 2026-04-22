@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BookRecommendation } from '@bookorbit/types';
+import type { BookRecommendation, SeriesBookRecommendation } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookReadService } from '../book/book-read.service';
@@ -8,6 +8,8 @@ import { LibraryService } from '../library/library.service';
 import { AnnCandidate, CandidateMetadata, RecommendationRepository, TargetBookData } from './recommendation.repository';
 
 const RECOMMENDATION_EVENT = 'book.recommendations';
+const SERIES_BOOKS_EVENT = 'book.series_books';
+const AUTHOR_BOOKS_EVENT = 'book.author_books';
 const MAX_RECOMMENDATIONS = 25;
 const DEFAULT_RATING_PROXIMITY = 0.5;
 const RATING_PROXIMITY_RANGE = 4;
@@ -95,6 +97,66 @@ export class RecommendationService {
       const { errorClass, errorMessage } = this.parseError(err);
       this.logger.error(
         `[${RECOMMENDATION_EVENT}] [fail] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - recommendation lookup failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getSeriesBooks(bookId: number, user: RequestUser): Promise<SeriesBookRecommendation[]> {
+    const startedAt = Date.now();
+    this.logger.log(`[${SERIES_BOOKS_EVENT}] [start] bookId=${bookId} userId=${user.id} - series books lookup started`);
+
+    try {
+      const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
+      if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
+      await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+
+      const meta = await this.recRepo.getSeriesName(bookId);
+      if (!meta) {
+        this.logger.log(
+          `[${SERIES_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} reason=no_series - series books lookup completed`,
+        );
+        return [];
+      }
+
+      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const rows = await this.recRepo.findSeriesBooks(meta, libraryIds);
+
+      this.logger.log(
+        `[${SERIES_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} seriesName="${meta}" resultCount=${rows.length} - series books lookup completed`,
+      );
+
+      return rows.map((r) => ({ id: r.bookId, title: r.title, seriesIndex: r.seriesIndex }));
+    } catch (err) {
+      const { errorClass, errorMessage } = this.parseError(err);
+      this.logger.error(
+        `[${SERIES_BOOKS_EVENT}] [fail] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - series books lookup failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getAuthorBooks(bookId: number, user: RequestUser): Promise<BookRecommendation[]> {
+    const startedAt = Date.now();
+    this.logger.log(`[${AUTHOR_BOOKS_EVENT}] [start] bookId=${bookId} userId=${user.id} - author books lookup started`);
+
+    try {
+      const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
+      if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
+      await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+
+      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const rows = await this.recRepo.findAuthorBooks(bookId, libraryIds);
+
+      this.logger.log(
+        `[${AUTHOR_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} resultCount=${rows.length} - author books lookup completed`,
+      );
+
+      return rows.map((r) => ({ id: r.bookId, title: r.title }));
+    } catch (err) {
+      const { errorClass, errorMessage } = this.parseError(err);
+      this.logger.error(
+        `[${AUTHOR_BOOKS_EVENT}] [fail] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author books lookup failed`,
       );
       throw err;
     }

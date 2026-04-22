@@ -12,4 +12,14 @@ export class RecommendationController {
   getRecommendations(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.recommendationService.getRecommendations(id, user);
   }
+
+  @Get(':id/series-books')
+  getSeriesBooks(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.recommendationService.getSeriesBooks(id, user);
+  }
+
+  @Get(':id/author-books')
+  getAuthorBooks(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.recommendationService.getAuthorBooks(id, user);
+  }
 }

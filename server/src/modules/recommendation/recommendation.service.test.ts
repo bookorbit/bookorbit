@@ -25,6 +25,9 @@ function makeService() {
     getTargetBookData: vi.fn(),
     findAnnCandidates: vi.fn(),
     getCandidateMetadata: vi.fn(),
+    getSeriesName: vi.fn(),
+    findSeriesBooks: vi.fn(),
+    findAuthorBooks: vi.fn(),
   };
   const bookRepo = {
     findLibraryIdByBookId: vi.fn(),
@@ -33,6 +36,7 @@ function makeService() {
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
     findAll: vi.fn().mockResolvedValue([{ id: 7 }]),
+    findAccessibleLibraryIds: vi.fn().mockResolvedValue([7]),
   };
   const embedder = {
     embedBook: vi.fn(),
@@ -246,5 +250,127 @@ describe('RecommendationService', () => {
 
     expect(result).toHaveLength(25);
     expect(bookRepo.findRecommendationTitlesByBookIds).toHaveBeenCalledWith(Array.from({ length: 25 }, (_, i) => i + 1));
+  });
+
+  describe('getSeriesBooks', () => {
+    it('throws NotFoundException when the book does not exist', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(null);
+
+      await expect(service.getSeriesBooks(999, makeUser())).rejects.toThrow(NotFoundException);
+    });
+
+    it('verifies user access to the book library', async () => {
+      const { service, bookRepo, libraryService, recRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(21);
+      recRepo.getSeriesName.mockResolvedValue(null);
+
+      await service.getSeriesBooks(1, makeUser(true));
+
+      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(12, 21, true);
+    });
+
+    it('returns empty array when the book has no series', async () => {
+      const { service, bookRepo, recRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      recRepo.getSeriesName.mockResolvedValue(null);
+
+      await expect(service.getSeriesBooks(10, makeUser())).resolves.toEqual([]);
+      expect(recRepo.findSeriesBooks).not.toHaveBeenCalled();
+    });
+
+    it('returns series books ordered by index when book has a series', async () => {
+      const { service, bookRepo, recRepo, libraryService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      recRepo.getSeriesName.mockResolvedValue('Stormlight Archive');
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5, 6]);
+      recRepo.findSeriesBooks.mockResolvedValue([
+        { bookId: 1, title: 'The Way of Kings', seriesIndex: 1 },
+        { bookId: 2, title: 'Words of Radiance', seriesIndex: 2 },
+        { bookId: 3, title: 'Oathbringer', seriesIndex: 3 },
+      ]);
+
+      const result = await service.getSeriesBooks(2, makeUser());
+
+      expect(result).toEqual([
+        { id: 1, title: 'The Way of Kings', seriesIndex: 1 },
+        { id: 2, title: 'Words of Radiance', seriesIndex: 2 },
+        { id: 3, title: 'Oathbringer', seriesIndex: 3 },
+      ]);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Stormlight Archive', [5, 6]);
+    });
+
+    it('uses findAccessibleLibraryIds instead of findAll', async () => {
+      const { service, bookRepo, recRepo, libraryService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      recRepo.getSeriesName.mockResolvedValue('Test Series');
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findSeriesBooks.mockResolvedValue([]);
+
+      await service.getSeriesBooks(1, makeUser());
+
+      expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
+      expect(libraryService.findAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAuthorBooks', () => {
+    it('throws NotFoundException when the book does not exist', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(null);
+
+      await expect(service.getAuthorBooks(999, makeUser())).rejects.toThrow(NotFoundException);
+    });
+
+    it('verifies user access to the book library', async () => {
+      const { service, bookRepo, libraryService, recRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(21);
+      recRepo.findAuthorBooks.mockResolvedValue([]);
+
+      await service.getAuthorBooks(1, makeUser(true));
+
+      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(12, 21, true);
+    });
+
+    it('returns books by the same author excluding the current book', async () => {
+      const { service, bookRepo, recRepo, libraryService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findAuthorBooks.mockResolvedValue([
+        { bookId: 10, title: 'Other Book A' },
+        { bookId: 20, title: 'Other Book B' },
+      ]);
+
+      const result = await service.getAuthorBooks(1, makeUser());
+
+      expect(result).toEqual([
+        { id: 10, title: 'Other Book A' },
+        { id: 20, title: 'Other Book B' },
+      ]);
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5]);
+    });
+
+    it('returns empty array when author has no other books', async () => {
+      const { service, bookRepo, recRepo, libraryService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findAuthorBooks.mockResolvedValue([]);
+
+      const result = await service.getAuthorBooks(1, makeUser());
+
+      expect(result).toEqual([]);
+    });
+
+    it('uses findAccessibleLibraryIds instead of findAll', async () => {
+      const { service, bookRepo, recRepo, libraryService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findAuthorBooks.mockResolvedValue([]);
+
+      await service.getAuthorBooks(1, makeUser());
+
+      expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
+      expect(libraryService.findAll).not.toHaveBeenCalled();
+    });
   });
 });

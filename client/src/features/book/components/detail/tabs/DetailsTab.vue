@@ -12,7 +12,7 @@ import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import type { BookDetail, BookKoboState, ReadStatus } from '@bookorbit/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
-import RecommendedBooksRow from '@/features/book/components/detail/RecommendedBooksRow.vue'
+import DiscoverRow from '@/features/book/components/detail/DiscoverRow.vue'
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -1407,7 +1407,7 @@ watch(
     </div>
   </div>
 
-  <RecommendedBooksRow :book-id="book.id" />
+  <DiscoverRow :book-id="book.id" :series-name="book.seriesName" :author-count="book.authors.length" />
 
   <AddToCollectionSheet
     :open="addToCollectionOpen"

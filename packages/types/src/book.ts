@@ -144,6 +144,12 @@ export type BookRecommendation = {
   title: string | null;
 };
 
+export type SeriesBookRecommendation = {
+  id: number;
+  title: string | null;
+  seriesIndex: number | null;
+};
+
 export type CoverSearchResult = {
   url: number | string; // ID for proxy or direct URL
   previewUrl: string;
