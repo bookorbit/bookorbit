@@ -1,0 +1,66 @@
+<script setup lang="ts">
+import { Dna } from 'lucide-vue-next'
+
+import { useReadingDnaWidget } from '../../composables/useReadingDnaWidget'
+
+const { data, loading, error } = useReadingDnaWidget()
+
+const traitColors: Record<string, string> = {
+  length: 'bg-blue-500',
+  variety: 'bg-emerald-500',
+  rhythm: 'bg-amber-500',
+  time: 'bg-purple-500',
+}
+</script>
+
+<template>
+  <div class="flex h-full flex-col p-3">
+    <div class="mb-2 flex items-center gap-2 self-start">
+      <Dna :size="16" class="text-primary/90" />
+      <span class="text-[15px] font-semibold text-foreground">Reading DNA</span>
+    </div>
+
+    <!-- Loading -->
+    <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
+      <div class="h-4 w-32 animate-pulse rounded bg-muted" />
+      <div v-for="n in 4" :key="n" class="h-2 w-full animate-pulse rounded-full bg-muted" />
+    </div>
+
+    <!-- Error -->
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+
+    <!-- Not enough data -->
+    <div v-else-if="!data || data.booksAnalyzed < 5" class="flex flex-1 flex-col items-center justify-center gap-2">
+      <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+        <Dna :size="16" class="text-muted-foreground/60" />
+      </div>
+      <p class="text-center text-xs text-muted-foreground">Read at least 5 books to unlock your Reading DNA</p>
+    </div>
+
+    <!-- DNA Card -->
+    <div v-else class="flex flex-1 flex-col justify-center gap-2.5">
+      <p class="text-center text-sm font-bold text-foreground">"{{ data.archetype }}"</p>
+
+      <div class="space-y-1.5">
+        <div
+          v-for="trait in [
+            { key: 'length', label: 'Length', score: data.lengthScore, valueLabel: data.lengthLabel },
+            { key: 'variety', label: 'Variety', score: data.varietyScore, valueLabel: data.varietyLabel },
+            { key: 'rhythm', label: 'Rhythm', score: data.rhythmScore, valueLabel: data.rhythmLabel },
+            { key: 'time', label: 'Time', score: data.timeScore, valueLabel: data.timeLabel },
+          ]"
+          :key="trait.key"
+          class="flex items-center gap-2"
+        >
+          <span class="w-12 text-right text-[10px] text-muted-foreground">{{ trait.label }}</span>
+          <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div class="h-full rounded-full transition-all duration-500" :class="traitColors[trait.key]" :style="{ width: `${trait.score}%` }" />
+          </div>
+          <span class="w-14 text-[10px] text-muted-foreground">{{ trait.valueLabel }}</span>
+        </div>
+      </div>
+
+      <p class="text-center text-[10px] text-muted-foreground">Based on {{ data.booksAnalyzed }} books</p>
+    </div>
+  </div>
+</template>

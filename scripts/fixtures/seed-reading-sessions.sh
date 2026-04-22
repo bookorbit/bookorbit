@@ -20,7 +20,7 @@ TARGET_USER_ID="${1:-1}"
 
 echo "Seeding reading sessions for user_id=${TARGET_USER_ID}..."
 
-docker compose -f docker-compose.dev.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" << EOSQL
+docker compose -f docker-compose.dev.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" << EOSQL
 
 DO \$\$
 DECLARE
@@ -41,6 +41,9 @@ DECLARE
   v_file_ids   int[];
   v_total_sessions int := 0;
   v_total_completions int := 0;
+  v_inserted_sessions int := 0;
+  v_inserted int;
+  v_is_completion boolean;
 BEGIN
   -- Verify user exists
   IF NOT EXISTS (SELECT 1 FROM users WHERE id = v_user_id) THEN
@@ -103,18 +106,25 @@ BEGIN
       -- ~15% of sessions are completions (every 7th deterministically by loop)
       IF (v_total_sessions % 7) = 0 THEN
         v_end_pct := 100;
-        v_total_completions := v_total_completions + 1;
+        v_is_completion := true;
       ELSE
         v_end_pct := round((10 + random() * 80)::numeric, 2);
+        v_is_completion := false;
       END IF;
 
       v_session_id := md5(v_user_id::text || v_file_id::text || v_started::text || v_i::text);
+      v_total_sessions := v_total_sessions + 1;
 
       INSERT INTO reading_sessions
         (user_id, book_file_id, session_id, started_at, ended_at, duration_seconds, progress_delta, end_progress)
       VALUES
         (v_user_id, v_file_id, v_session_id, v_started, v_ended, v_duration, v_delta, v_end_pct)
-      ON CONFLICT (session_id) DO NOTHING;
+      ON CONFLICT (user_id, session_id) DO NOTHING;
+
+      GET DIAGNOSTICS v_inserted = ROW_COUNT;
+      IF v_inserted = 0 THEN
+        CONTINUE;
+      END IF;
 
       -- Real-time upsert of daily stats (mirrors what the server does on session save)
       INSERT INTO user_reading_daily_stats
@@ -127,11 +137,14 @@ BEGIN
         sessions_count  = user_reading_daily_stats.sessions_count  + 1,
         updated_at      = now();
 
-      v_total_sessions := v_total_sessions + 1;
+      v_inserted_sessions := v_inserted_sessions + 1;
+      IF v_is_completion THEN
+        v_total_completions := v_total_completions + 1;
+      END IF;
     END LOOP;
   END LOOP;
 
-  RAISE NOTICE 'Done: % sessions inserted (% completions)', v_total_sessions, v_total_completions;
+  RAISE NOTICE 'Done: % sessions generated, % inserted (% completions)', v_total_sessions, v_inserted_sessions, v_total_completions;
 END;
 \$\$;
 

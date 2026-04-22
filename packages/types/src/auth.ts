@@ -22,6 +22,7 @@ export interface UserSettings {
   };
   notificationPreferences?: import("./notification").NotificationPreferences;
   seriesCollapsePreferences?: import("./series-collapse").SeriesCollapsePreferences;
+  dashboardConfig?: import("./dashboard").DashboardConfig;
 }
 
 export interface AuthUser {

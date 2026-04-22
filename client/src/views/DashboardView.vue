@@ -8,6 +8,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
+import DashboardWidgetRow from '@/features/dashboard/components/DashboardWidgetRow.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 
@@ -58,6 +59,7 @@ onMounted(() => {
     <div class="space-y-5 pb-8 pt-4 sm:pr-2">
       <DashboardWelcome v-if="hasNoLibraries" :can-create="hasPermission('manage_libraries')" />
       <template v-else>
+        <DashboardWidgetRow class="animate-fade-up" />
         <DashboardScroller
           v-for="(scroller, index) in enabledScrollers"
           :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}`"
