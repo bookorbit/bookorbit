@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Readable } from 'stream';
 import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { createInflateRaw } from 'zlib';
-import { createExtractorFromData } from 'node-unrar-js';
+import { createExtractorFromData, UnrarError } from 'node-unrar-js';
 import { getSevenZip } from '../../../common/sevenzip';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
 
@@ -147,14 +147,27 @@ export class CbzService {
     if (!this.rarCache.has(fileId)) {
       const buf = await readFile(filePath);
       const ab = toArrayBuffer(buf);
+
       const extractor = await createExtractorFromData({ data: ab });
-
       const { fileHeaders } = extractor.getFileList();
-      const pages = [...fileHeaders]
-        .filter((h) => !h.flags.directory && isImage(h.name) && !isHidden(h.name))
-        .map((h) => h.name)
-        .sort(naturalSort);
 
+      const pages: string[] = [];
+      try {
+        for (const h of fileHeaders) {
+          if (!h.flags.directory && isImage(h.name) && !isHidden(h.name)) {
+            pages.push(h.name);
+          }
+        }
+      } catch (err) {
+        // Some RAR 1.5 archives throw ERAR_BAD_DATA at the end-of-archive
+        // marker instead of returning ERAR_END_ARCHIVE. If we already have
+        // pages, the archive is readable — accept the partial list.
+        if (!(err instanceof UnrarError) || pages.length === 0) {
+          throw err instanceof UnrarError ? new UnprocessableEntityException(`CBR archive is unreadable: ${err.message}`) : err;
+        }
+      }
+
+      pages.sort(naturalSort);
       this.rarCache.set(fileId, { buffer: ab, pages });
     }
     return this.rarCache.get(fileId)!;
@@ -162,12 +175,21 @@ export class CbzService {
 
   private async extractRarPage(buffer: ArrayBuffer, pageName: string): Promise<Uint8Array> {
     const extractor = await createExtractorFromData({ data: buffer });
-    const { files } = extractor.extract({ files: (h) => h.name === pageName });
+    // Pass an array so the extractor stops after the first match and never
+    // hits the malformed end-of-archive marker present in some RAR 1.5 files.
+    const { files } = extractor.extract({ files: [pageName] });
 
     // Generators MUST be fully drained to avoid WASM memory leak
     let result: Uint8Array | undefined;
-    for (const file of files) {
-      if (!file.fileHeader.flags.directory) result = file.extraction;
+    try {
+      for (const file of files) {
+        if (!file.fileHeader.flags.directory) result = file.extraction;
+      }
+    } catch (err) {
+      if (err instanceof UnrarError) {
+        throw new UnprocessableEntityException(`CBR page is unreadable: ${err.message}`);
+      }
+      throw err;
     }
     if (result === undefined) throw new NotFoundException(`Page not found in RAR archive`);
     return result;

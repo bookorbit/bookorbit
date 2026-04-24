@@ -14,19 +14,23 @@ const editing = ref(false)
 const goalInput = ref('')
 const saving = ref(false)
 
-const hasGoal = computed(() => data.value?.goalBooks != null && data.value.goalBooks > 0)
+const goalBooks = computed(() => data.value?.goalBooks ?? null)
+const hasGoal = computed(() => goalBooks.value != null && goalBooks.value > 0)
 const percentage = computed(() => {
-  if (!data.value || !hasGoal.value) return 0
-  return Math.min(100, Math.round((data.value.completedBooks / data.value.goalBooks!) * 100))
+  const goal = goalBooks.value
+  if (!data.value || goal == null || goal <= 0) return 0
+  return Math.min(100, Math.round((data.value.completedBooks / goal) * 100))
 })
 
 const option = shallowRef({})
 
 watchEffect(() => {
-  if (!data.value || !hasGoal.value) {
+  if (!data.value || !hasGoal.value || goalBooks.value == null) {
     option.value = {}
     return
   }
+
+  const goal = goalBooks.value
 
   option.value = {
     tooltip: { show: false },
@@ -43,9 +47,9 @@ watchEffect(() => {
         label: { show: false },
         labelLine: { show: false },
         data: [
-          { value: Math.min(data.value.completedBooks, data.value.goalBooks), name: 'Completed' },
+          { value: Math.min(data.value.completedBooks, goal), name: 'Completed' },
           {
-            value: Math.max(data.value.goalBooks - data.value.completedBooks, 0),
+            value: Math.max(goal - data.value.completedBooks, 0),
             name: 'Remaining',
             itemStyle: { color: readCssColor('--muted') },
           },

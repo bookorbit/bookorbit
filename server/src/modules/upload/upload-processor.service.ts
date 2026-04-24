@@ -1,6 +1,6 @@
 import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -53,6 +53,37 @@ export class UploadProcessorService {
     const [fileStat, hash] = await Promise.all([stat(absolutePath), fingerprintFile(absolutePath)]);
 
     const { bookId } = await this.db.transaction(async (tx) => {
+      const [existingBook] = await tx
+        .select({ id: books.id })
+        .from(books)
+        .where(and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath)))
+        .limit(1);
+
+      if (existingBook) {
+        const fileValues = {
+          bookId: existingBook.id,
+          libraryFolderId,
+          absolutePath,
+          relPath,
+          ino: fileStat.ino,
+          sizeBytes,
+          mtime: fileStat.mtime,
+          hash,
+          format,
+          role: 'content' as const,
+        };
+        const [file] = await tx
+          .insert(bookFiles)
+          .values(fileValues)
+          .onConflictDoUpdate({
+            target: bookFiles.absolutePath,
+            set: { bookId: existingBook.id, libraryFolderId, relPath, ino: fileStat.ino, sizeBytes, mtime: fileStat.mtime, hash, format },
+          })
+          .returning({ id: bookFiles.id });
+        if (!file) throw new InternalServerErrorException('Failed to create book file');
+        return { bookId: existingBook.id };
+      }
+
       const [book] = await tx.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning({ id: books.id });
       if (!book) throw new InternalServerErrorException('Failed to create book record');
 

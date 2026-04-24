@@ -228,13 +228,13 @@ Production uses the root compose file and env file:
 
 - Compose: `docker-compose.yml`
 - Env file: `.env` (from `.env.example`)
-- Image source: immutable images built in CI (`.github/workflows/container-image.yml`)
+- Image source: CI-published images (`latest`, sha tags, or digests)
 
 Quick start:
 
 ```bash
 cp .env.example .env
-# edit .env and set APP_IMAGE, secrets, APP_URL, and BOOKS_HOST_PATH
+# edit .env and set secrets, APP_URL, BOOKS_HOST_PATH, and optionally APP_IMAGE
 pnpm prod:up
 ```
 

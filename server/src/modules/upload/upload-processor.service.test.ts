@@ -23,10 +23,16 @@ describe('UploadProcessorService', () => {
   const insertBookMetadataValues = vi.fn();
   const insertBookFilesReturning = vi.fn();
   const insertBookFilesValues = vi.fn();
+  const insertBookFilesOnConflict = vi.fn();
   const updateBooksSet = vi.fn();
   const updateBooksWhere = vi.fn();
 
+  const selectFrom = vi.fn();
+  const selectWhere = vi.fn();
+  const selectLimit = vi.fn();
+
   const tx = {
+    select: vi.fn(() => ({ from: selectFrom })),
     insert: vi.fn((table: unknown) => {
       if (table === books) {
         return { values: insertBooksValues };
@@ -54,10 +60,15 @@ describe('UploadProcessorService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
+    selectFrom.mockReturnValue({ where: selectWhere });
+    selectWhere.mockReturnValue({ limit: selectLimit });
+    selectLimit.mockResolvedValue([]); // no existing book by default
+
     insertBooksValues.mockReturnValue({ returning: insertBooksReturning });
     insertBooksReturning.mockResolvedValue([{ id: 42 }]);
     insertBookMetadataValues.mockResolvedValue(undefined);
-    insertBookFilesValues.mockReturnValue({ returning: insertBookFilesReturning });
+    insertBookFilesOnConflict.mockReturnValue({ returning: insertBookFilesReturning });
+    insertBookFilesValues.mockReturnValue({ returning: insertBookFilesReturning, onConflictDoUpdate: insertBookFilesOnConflict });
     insertBookFilesReturning.mockResolvedValue([{ id: 420 }]);
     updateBooksSet.mockReturnValue({ where: updateBooksWhere });
     updateBooksWhere.mockResolvedValue(undefined);
@@ -94,6 +105,44 @@ describe('UploadProcessorService', () => {
     expect(orchestrator.scheduleIfEligible).toHaveBeenCalledWith(42, 1, 'event_import');
   });
 
+  it('adds a file to an existing book when the folder path already exists in the library', async () => {
+    selectLimit.mockResolvedValueOnce([{ id: 99 }]);
+
+    const result = await service.createBookRecord(1, 2, '/folder', '/folder/book2.epub', 'book/book2.epub', 'epub', 5000);
+
+    expect(result).toEqual({ bookId: 99 });
+    expect(insertBooksValues).not.toHaveBeenCalled();
+    expect(insertBookMetadataValues).not.toHaveBeenCalled();
+    expect(updateBooksSet).not.toHaveBeenCalled();
+    expect(insertBookFilesValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookId: 99,
+        libraryFolderId: 2,
+        absolutePath: '/folder/book2.epub',
+        relPath: 'book/book2.epub',
+        format: 'epub',
+        role: 'content',
+      }),
+    );
+    expect(insertBookFilesOnConflict).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: bookFiles.absolutePath,
+        set: expect.objectContaining({ bookId: 99, libraryFolderId: 2, format: 'epub' }),
+      }),
+    );
+    expect(orchestrator.scheduleIfEligible).toHaveBeenCalledWith(99, 1, 'event_import');
+  });
+
+  it('refreshes a stale book_files record when the absolute path already exists in the db', async () => {
+    selectLimit.mockResolvedValueOnce([{ id: 99 }]);
+    insertBookFilesOnConflict.mockReturnValueOnce({ returning: vi.fn().mockResolvedValue([{ id: 777 }]) });
+
+    const result = await service.createBookRecord(1, 2, '/folder', '/folder/stale.epub', 'book/stale.epub', 'epub', 1000);
+
+    expect(result).toEqual({ bookId: 99 });
+    expect(insertBookFilesOnConflict).toHaveBeenCalled();
+  });
+
   it('throws InternalServerErrorException when creating the book row fails', async () => {
     insertBooksReturning.mockResolvedValueOnce([]);
 
@@ -106,6 +155,15 @@ describe('UploadProcessorService', () => {
     insertBookFilesReturning.mockResolvedValueOnce([]);
 
     await expect(service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+
+  it('throws InternalServerErrorException when adding a file to an existing book fails', async () => {
+    selectLimit.mockResolvedValueOnce([{ id: 99 }]);
+    insertBookFilesReturning.mockResolvedValueOnce([]);
+
+    await expect(service.createBookRecord(1, 2, '/folder', '/folder/book2.epub', 'book/book2.epub', 'epub', 5000)).rejects.toBeInstanceOf(
       InternalServerErrorException,
     );
   });

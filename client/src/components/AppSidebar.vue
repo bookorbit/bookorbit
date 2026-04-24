@@ -187,7 +187,7 @@ onUnmounted(() => stopLibraryUploadListener())
       <!-- Dashboard / Book Dock / Authors -->
       <SidebarGroup>
         <SidebarGroupContent>
-          <SidebarMenu>
+          <SidebarMenu class="gap-0">
             <SidebarNavItem
               :is-active="isDashboardActive"
               tooltip="Dashboard"

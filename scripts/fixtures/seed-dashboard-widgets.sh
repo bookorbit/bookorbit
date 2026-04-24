@@ -106,8 +106,17 @@ BEGIN
     )
     ON CONFLICT (user_id, book_id) DO UPDATE
       SET status = 'read',
-          finished_at = COALESCE(user_book_status.finished_at,
-            date_trunc('year', current_date) + (i * 14 * interval '1 day')),
+          started_at = LEAST(
+            COALESCE(user_book_status.started_at, EXCLUDED.started_at),
+            COALESCE(user_book_status.finished_at, EXCLUDED.finished_at, EXCLUDED.started_at)
+          ),
+          finished_at = GREATEST(
+            COALESCE(user_book_status.finished_at, EXCLUDED.finished_at),
+            LEAST(
+              COALESCE(user_book_status.started_at, EXCLUDED.started_at),
+              COALESCE(user_book_status.finished_at, EXCLUDED.finished_at, EXCLUDED.started_at)
+            )
+          ),
           updated_at = EXCLUDED.updated_at;
   END LOOP;
   RAISE NOTICE 'Year Projection: marked % books as read this year', i;
