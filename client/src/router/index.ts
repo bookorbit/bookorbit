@@ -121,7 +121,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'admin/users',
             name: 'settings-admin-users',
             component: () => import('@/features/admin/UsersPage.vue'),
-            meta: { maxWidth: 'max-w-4xl', title: 'Users' },
+            meta: { maxWidth: 'max-w-6xl', title: 'Users' },
           },
           {
             path: 'admin/metadata',
@@ -163,6 +163,11 @@ export const routes: RouteRecordRaw[] = [
             name: 'settings-admin-audit-log',
             component: () => import('@/features/audit/AuditLogPage.vue'),
             meta: { maxWidth: 'max-w-7xl', title: 'Audit Log' },
+          },
+          {
+            path: 'admin/magic-links',
+            name: 'settings-admin-magic-links',
+            redirect: { name: 'settings-admin-users', query: { tab: 'magic-links' } },
           },
           { path: ':pathMatch(.*)*', redirect: { name: 'settings-libraries' } },
         ],
@@ -292,6 +297,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'oidc-callback',
     component: () => import('@/features/auth/OidcCallbackPage.vue'),
     meta: { public: true, title: 'Completing Sign In' },
+  },
+  {
+    path: '/magic',
+    name: 'magic-link-login',
+    component: () => import('@/features/auth/MagicLinkLoginView.vue'),
+    meta: { public: true, title: 'Magic Link Login' },
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

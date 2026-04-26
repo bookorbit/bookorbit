@@ -22,6 +22,23 @@ CREATE TABLE "app_settings" (
 	CONSTRAINT "app_settings_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
+CREATE TABLE "magic_access_tokens" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"created_by" integer,
+	"label" varchar(100) NOT NULL,
+	"token_hash" varchar(255) NOT NULL,
+	"raw_token" varchar(255) NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"expires_at" timestamp with time zone,
+	"last_used_at" timestamp with time zone,
+	"use_count" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"revoked_at" timestamp with time zone,
+	CONSTRAINT "magic_access_tokens_token_hash_unique" UNIQUE("token_hash"),
+	CONSTRAINT "magic_access_tokens_use_count_nonneg_chk" CHECK ("magic_access_tokens"."use_count" >= 0)
+);
+--> statement-breakpoint
 CREATE TABLE "password_reset_tokens" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
@@ -80,7 +97,7 @@ CREATE TABLE "users" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "users_username_unique" UNIQUE("username"),
 	CONSTRAINT "users_email_unique" UNIQUE("email"),
-	CONSTRAINT "users_provisioning_method_chk" CHECK ("users"."provisioning_method" in ('local', 'manual', 'oidc')),
+	CONSTRAINT "users_provisioning_method_chk" CHECK ("users"."provisioning_method" in ('local', 'manual', 'oidc', 'shared')),
 	CONSTRAINT "users_token_version_nonnegative_chk" CHECK ("users"."token_version" >= 0),
 	CONSTRAINT "users_failed_login_attempts_nonnegative_chk" CHECK ("users"."failed_login_attempts" >= 0),
 	CONSTRAINT "users_avatar_version_nonnegative_chk" CHECK ("users"."avatar_version" >= 0)
@@ -890,6 +907,8 @@ CREATE TABLE "dismissed_inline_duplicate_pairs" (
 );
 --> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "magic_access_tokens" ADD CONSTRAINT "magic_access_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "magic_access_tokens" ADD CONSTRAINT "magic_access_tokens_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_library_access" ADD CONSTRAINT "user_library_access_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -1004,6 +1023,7 @@ CREATE INDEX "idx_audit_resource" ON "audit_log" USING btree ("resource","resour
 CREATE INDEX "idx_audit_action" ON "audit_log" USING btree ("action");--> statement-breakpoint
 CREATE INDEX "idx_audit_ip" ON "audit_log" USING btree ("ip");--> statement-breakpoint
 CREATE INDEX "idx_audit_created_at" ON "audit_log" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "magic_access_tokens_user_id_idx" ON "magic_access_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "password_reset_tokens_expires_at_idx" ON "password_reset_tokens" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens" USING btree ("user_id");--> statement-breakpoint

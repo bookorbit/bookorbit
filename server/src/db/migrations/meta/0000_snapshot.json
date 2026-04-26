@@ -1,5 +1,5 @@
 {
-  "id": "c229dc64-65a0-42a3-907d-e5a2bd75e111",
+  "id": "2de4dd88-2590-4da4-b868-f9341ffe3e9f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -212,6 +212,140 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.magic_access_tokens": {
+      "name": "magic_access_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_token": {
+          "name": "raw_token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "use_count": {
+          "name": "use_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "magic_access_tokens_user_id_idx": {
+          "name": "magic_access_tokens_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "magic_access_tokens_user_id_users_id_fk": {
+          "name": "magic_access_tokens_user_id_users_id_fk",
+          "tableFrom": "magic_access_tokens",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "magic_access_tokens_created_by_users_id_fk": {
+          "name": "magic_access_tokens_created_by_users_id_fk",
+          "tableFrom": "magic_access_tokens",
+          "tableTo": "users",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "magic_access_tokens_token_hash_unique": {
+          "name": "magic_access_tokens_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "magic_access_tokens_use_count_nonneg_chk": {
+          "name": "magic_access_tokens_use_count_nonneg_chk",
+          "value": "\"magic_access_tokens\".\"use_count\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.password_reset_tokens": {
@@ -747,7 +881,7 @@
       "checkConstraints": {
         "users_provisioning_method_chk": {
           "name": "users_provisioning_method_chk",
-          "value": "\"users\".\"provisioning_method\" in ('local', 'manual', 'oidc')"
+          "value": "\"users\".\"provisioning_method\" in ('local', 'manual', 'oidc', 'shared')"
         },
         "users_token_version_nonnegative_chk": {
           "name": "users_token_version_nonnegative_chk",

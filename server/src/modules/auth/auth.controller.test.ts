@@ -27,8 +27,16 @@ function makeController() {
     unlinkIdentity: vi.fn(),
   };
 
-  const controller = new AuthController(authService as never, oidcService as never);
-  return { controller, authService, oidcService };
+  const magicLinkService = {
+    createToken: vi.fn(),
+    loginWithToken: vi.fn(),
+    listTokens: vi.fn(),
+    revokeToken: vi.fn(),
+    setActive: vi.fn(),
+  };
+
+  const controller = new AuthController(authService as never, oidcService as never, magicLinkService as never);
+  return { controller, authService, oidcService, magicLinkService };
 }
 
 describe('AuthController', () => {
@@ -92,6 +100,38 @@ describe('AuthController', () => {
     expect(oidcService.unlinkIdentity).toHaveBeenCalledWith(7, 3, 'Secret1!');
   });
 
+  it('delegates magic link endpoints to MagicLinkService', async () => {
+    const { controller, magicLinkService } = makeController();
+    const user = { id: 1, isSuperuser: true, username: 'admin' } as never;
+    const reply = { setCookie: vi.fn() } as never;
+    const req = { ip: '10.0.0.1' } as never;
+
+    magicLinkService.createToken.mockResolvedValue({ id: 1, token: 'raw', label: 'Demo', expiresAt: null });
+    magicLinkService.listTokens.mockResolvedValue([]);
+    magicLinkService.setActive.mockResolvedValue({ id: 1, isActive: false });
+    magicLinkService.revokeToken.mockResolvedValue(undefined);
+    magicLinkService.loginWithToken.mockResolvedValue({ accessToken: 'jwt' });
+
+    await controller.createMagicLink(user, { userId: 2, label: 'Demo' } as never);
+    await controller.listMagicLinks(user);
+    await controller.updateMagicLink(user, 1, { isActive: false } as never);
+    await controller.revokeMagicLink(user, 1);
+    await controller.loginWithMagicLink({ token: 'raw-token' } as never, reply, req);
+
+    expect(magicLinkService.createToken).toHaveBeenCalledWith(user, { userId: 2, label: 'Demo' });
+    expect(magicLinkService.listTokens).toHaveBeenCalled();
+    expect(magicLinkService.setActive).toHaveBeenCalledWith(user, 1, false);
+    expect(magicLinkService.revokeToken).toHaveBeenCalledWith(user, 1);
+    expect(magicLinkService.loginWithToken).toHaveBeenCalledWith('raw-token', reply, '10.0.0.1');
+  });
+
+  it('throws ForbiddenException from listMagicLinks for non-superuser', () => {
+    const { controller } = makeController();
+    const user = { id: 2, isSuperuser: false, username: 'viewer' } as never;
+
+    expect(() => controller.listMagicLinks(user)).toThrow();
+  });
+
   it('defines throttling metadata for sensitive public endpoints', () => {
     const limitKey = 'THROTTLER:LIMITdefault';
     const ttlKey = 'THROTTLER:TTLdefault';
@@ -127,5 +167,15 @@ describe('AuthController', () => {
     expect(oidcStateTtl).toBe(60_000);
     expect(oidcCallbackLimit).toBe(5);
     expect(oidcCallbackTtl).toBe(60_000);
+
+    const createMlLimit = Reflect.getMetadata(limitKey, AuthController.prototype.createMagicLink) as number;
+    const createMlTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.createMagicLink) as number;
+    const loginMlLimit = Reflect.getMetadata(limitKey, AuthController.prototype.loginWithMagicLink) as number;
+    const loginMlTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.loginWithMagicLink) as number;
+
+    expect(createMlLimit).toBe(5);
+    expect(createMlTtl).toBe(60_000);
+    expect(loginMlLimit).toBe(10);
+    expect(loginMlTtl).toBe(60_000);
   });
 });

@@ -9,6 +9,12 @@ export enum AuditAction {
   AuthPasswordAdminReset = "auth.password.admin_reset",
   AuthSessionRevoke = "auth.session.revoke",
 
+  MagicLinkCreate = "magic_link.create",
+  MagicLinkLogin = "magic_link.login",
+  MagicLinkRevoke = "magic_link.revoke",
+  MagicLinkActivate = "magic_link.activate",
+  MagicLinkDeactivate = "magic_link.deactivate",
+
   OidcLogin = "auth.oidc.login",
   OidcUserProvisioned = "auth.oidc.user_provisioned",
   OidcIdentityLinked = "auth.oidc.identity_linked",
@@ -121,6 +127,7 @@ export enum AuditResource {
   Language = "language",
   Series = "series",
   OidcIdentity = "oidc_identity",
+  MagicLinkToken = "magic_link_token",
 }
 
 export interface AuditLogEntry {

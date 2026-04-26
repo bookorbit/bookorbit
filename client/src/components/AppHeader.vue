@@ -51,6 +51,7 @@ const isBookDockActive = computed(() => route.name === 'book-dock')
 const isStatisticsActive = computed(() => route.name === 'statistics')
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
+const canChangePassword = computed(() => user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared')
 
 function navigateToBookDock() {
   router.push({ name: 'book-dock' })
@@ -675,8 +676,8 @@ function formatBadgeClass(fmt: string): string {
               <User :size="13" class="mr-2 text-muted-foreground" />
               Account
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem @click="openChangePassword()">
+            <DropdownMenuSeparator v-if="canChangePassword" />
+            <DropdownMenuItem v-if="canChangePassword" @click="openChangePassword()">
               <KeyRound :size="13" class="mr-2 text-muted-foreground" />
               Change Password
             </DropdownMenuItem>

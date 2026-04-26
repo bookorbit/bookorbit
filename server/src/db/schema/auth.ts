@@ -54,7 +54,7 @@ export const users = pgTable(
     uniqueIndex('users_oidc_subject_issuer_uidx')
       .on(t.oidcSubject, t.oidcIssuer)
       .where(sql`${t.oidcSubject} is not null and ${t.oidcIssuer} is not null`),
-    check('users_provisioning_method_chk', sql`${t.provisioningMethod} in ('local', 'manual', 'oidc')`),
+    check('users_provisioning_method_chk', sql`${t.provisioningMethod} in ('local', 'manual', 'oidc', 'shared')`),
     check('users_token_version_nonnegative_chk', sql`${t.tokenVersion} >= 0`),
     check('users_failed_login_attempts_nonnegative_chk', sql`${t.failedLoginAttempts} >= 0`),
     check('users_avatar_version_nonnegative_chk', sql`${t.avatarVersion} >= 0`),
@@ -141,3 +141,26 @@ export type NewUser = typeof users.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type AppSetting = typeof appSettings.$inferSelect;
+
+export const magicAccessTokens = pgTable(
+  'magic_access_tokens',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+    label: varchar('label', { length: 100 }).notNull(),
+    tokenHash: varchar('token_hash', { length: 255 }).notNull().unique(),
+    rawToken: varchar('raw_token', { length: 255 }).notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    useCount: integer('use_count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [index('magic_access_tokens_user_id_idx').on(t.userId), check('magic_access_tokens_use_count_nonneg_chk', sql`${t.useCount} >= 0`)],
+);
+
+export type MagicAccessToken = typeof magicAccessTokens.$inferSelect;

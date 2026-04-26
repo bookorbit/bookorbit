@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { UserPlus, Pencil, KeyRound, Trash2, ShieldCheck, MoreVertical } from 'lucide-vue-next'
+import { ref, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { UserPlus, Plus, Pencil, KeyRound, Trash2, ShieldCheck, MoreVertical } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { AuthUser } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -9,6 +10,9 @@ import ResetLinkModal from './ResetLinkModal.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import MagicLinksSettings from '@/features/settings/MagicLinksSettings.vue'
+
+type Tab = 'users' | 'magic-links'
 
 interface Library {
   id: number
@@ -19,6 +23,8 @@ interface UserRow extends AuthUser {
   id: number
 }
 
+const route = useRoute()
+const router = useRouter()
 const { isSuperuser } = usePermissions()
 
 const users = ref<UserRow[]>([])
@@ -33,6 +39,27 @@ const editingUser = ref<Partial<AuthUser> | null>(null)
 const resetUrl = ref<string | null>(null)
 const deleteConfirmUser = ref<UserRow | null>(null)
 const deleting = ref(false)
+
+const magicLinksRef = ref<InstanceType<typeof MagicLinksSettings> | null>(null)
+
+function normalizeTab(v: unknown): Tab {
+  if (v === 'magic-links' && isSuperuser.value) return 'magic-links'
+  return 'users'
+}
+
+const activeTab = ref<Tab>(normalizeTab(route.query.tab))
+
+watch(
+  () => route.query.tab,
+  (v) => {
+    activeTab.value = normalizeTab(v)
+  },
+)
+
+function selectTab(tab: Tab) {
+  activeTab.value = tab
+  router.replace({ name: 'settings-admin-users', query: { tab } })
+}
 
 async function loadData() {
   loading.value = true
@@ -100,199 +127,271 @@ function onSaved(newResetUrl?: string) {
   if (newResetUrl) resetUrl.value = newResetUrl
   loadData()
 }
+
+function openMagicLinkCreate() {
+  magicLinksRef.value?.openCreateForm()
+}
 </script>
 
 <template>
-  <SettingsPageHeader class="hidden md:flex" title="Users" subtitle="Manage user accounts and permission assignments.">
-    <button class="settings-btn-primary" @click="openCreate">
+  <!-- Desktop header -->
+  <SettingsPageHeader
+    class="hidden md:flex"
+    :title="activeTab === 'users' ? 'Users' : 'Magic Links'"
+    :subtitle="activeTab === 'users' ? 'Manage user accounts and permission assignments.' : 'Create shareable login links for shared accounts.'"
+  >
+    <button v-if="activeTab === 'users'" class="settings-btn-primary" @click="openCreate">
       <UserPlus :size="14" />
       Create user
     </button>
+    <button v-else class="settings-btn-primary" @click="openMagicLinkCreate">
+      <Plus :size="14" />
+      Create link
+    </button>
   </SettingsPageHeader>
+
+  <!-- Mobile title -->
   <div class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">Users</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ activeTab === 'users' ? 'Users' : 'Magic Links' }}</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      Manage user accounts and permission assignments.
+      {{ activeTab === 'users' ? 'Manage user accounts and permission assignments.' : 'Create shareable login links for shared accounts.' }}
     </p>
   </div>
-  <div class="md:hidden sticky top-[5.25rem] z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mt-4 mb-3">
+
+  <!-- Tab bar (superusers only) -->
+  <div
+    v-if="isSuperuser"
+    class="flex gap-1 mt-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-[5.25rem] z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x"
+  >
+    <button
+      class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
+      :class="
+        activeTab === 'users'
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+      "
+      @click="selectTab('users')"
+    >
+      Users
+    </button>
+    <button
+      class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
+      :class="
+        activeTab === 'magic-links'
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+      "
+      @click="selectTab('magic-links')"
+    >
+      Magic Links
+    </button>
+  </div>
+
+  <!-- Mobile CTA (when no tab bar is shown, keep the sticky button) -->
+  <div
+    v-if="!isSuperuser"
+    class="md:hidden sticky top-[5.25rem] z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mt-4 mb-3"
+  >
     <button class="settings-btn-primary w-full min-h-10 justify-center" @click="openCreate">
       <UserPlus :size="14" />
       Create user
     </button>
   </div>
 
-  <div v-if="error" class="mb-4 text-sm text-destructive">{{ error }}</div>
-  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <!-- Users tab content -->
+  <template v-if="activeTab === 'users'">
+    <div v-if="error" class="mb-4 text-sm text-destructive">{{ error }}</div>
+    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
 
-  <div v-else class="space-y-3">
-    <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
-      <table class="w-full text-sm">
-        <thead class="bg-muted/50">
-          <tr>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Username</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">Email</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Access</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-            <th class="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-for="user in users" :key="user.id" class="hover:bg-muted/30 transition-colors">
-            <td class="px-4 py-3 text-foreground font-medium">{{ user.name }}</td>
-            <td class="px-4 py-3 text-muted-foreground font-mono text-xs">{{ user.username }}</td>
-            <td class="px-4 py-3 text-muted-foreground hidden sm:table-cell">{{ user.email ?? '-' }}</td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-1.5 flex-wrap">
+    <div v-else class="space-y-3">
+      <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
+        <table class="w-full text-sm">
+          <thead class="bg-muted/50">
+            <tr>
+              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
+              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Username</th>
+              <th class="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">Email</th>
+              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Access</th>
+              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+              <th class="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            <tr v-for="user in users" :key="user.id" class="hover:bg-muted/30 transition-colors">
+              <td class="px-4 py-3 text-foreground font-medium">{{ user.name }}</td>
+              <td class="px-4 py-3 text-muted-foreground font-mono text-xs">{{ user.username }}</td>
+              <td class="px-4 py-3 text-muted-foreground hidden sm:table-cell">{{ user.email ?? '-' }}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span
+                    v-if="user.isSuperuser"
+                    class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
+                  >
+                    <ShieldCheck :size="11" />
+                    Admin
+                  </span>
+                  <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {{ user.permissions?.length ?? 0 }} permissions
+                  </span>
+                </div>
+              </td>
+              <td class="px-4 py-3">
                 <span
-                  v-if="user.isSuperuser"
-                  class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                  :class="user.active ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-destructive/15 text-destructive'"
                 >
-                  <ShieldCheck :size="11" />
-                  Admin
+                  {{ user.active ? 'Active' : 'Inactive' }}
                 </span>
-                <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  {{ user.permissions?.length ?? 0 }} permissions
-                </span>
-              </div>
-            </td>
-            <td class="px-4 py-3">
-              <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="user.active ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-destructive/15 text-destructive'"
-              >
-                {{ user.active ? 'Active' : 'Inactive' }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-2 justify-end">
-                <template v-if="isSuperuser || !user.isSuperuser">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <button
-                        @click="openEdit(user)"
-                        class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        <Pencil :size="14" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Edit</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <button
-                        @click="handleResetPassword(user.id)"
-                        :disabled="user.provisioningMethod === 'oidc'"
-                        class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                        :class="
-                          user.provisioningMethod === 'oidc' ? 'cursor-not-allowed opacity-50 hover:text-muted-foreground hover:bg-transparent' : ''
-                        "
-                      >
-                        <KeyRound :size="14" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {{ user.provisioningMethod === 'oidc' ? 'OIDC users reset passwords in their identity provider' : 'Reset password' }}
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <button
-                        @click="requestDeleteUser(user)"
-                        class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <Trash2 :size="14" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Delete</TooltipContent>
-                  </Tooltip>
-                </template>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2 justify-end">
+                  <template v-if="isSuperuser || !user.isSuperuser">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <button
+                          class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          @click="openEdit(user)"
+                        >
+                          <Pencil :size="14" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <button
+                          :disabled="user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared'"
+                          class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          :class="
+                            user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared'
+                              ? 'cursor-not-allowed opacity-50 hover:text-muted-foreground hover:bg-transparent'
+                              : ''
+                          "
+                          @click="handleResetPassword(user.id)"
+                        >
+                          <KeyRound :size="14" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {{
+                          user.provisioningMethod === 'oidc'
+                            ? 'OIDC users reset passwords in their identity provider'
+                            : user.provisioningMethod === 'shared'
+                              ? 'Shared accounts do not have passwords'
+                              : 'Reset password'
+                        }}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <button
+                          class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          @click="requestDeleteUser(user)"
+                        >
+                          <Trash2 :size="14" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete</TooltipContent>
+                    </Tooltip>
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="md:hidden space-y-3">
+        <div v-for="user in users" :key="user.id" class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
+          <div class="flex items-start justify-between gap-3">
+            <p class="text-sm font-medium text-foreground leading-5">{{ user.name }}</p>
+            <span
+              class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+              :class="user.active ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-destructive/15 text-destructive'"
+            >
+              {{ user.active ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <p class="text-xs font-mono text-muted-foreground truncate">@{{ user.username }}</p>
+            <span
+              v-if="user.isSuperuser"
+              class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
+            >
+              <ShieldCheck :size="11" />
+              Admin
+            </span>
+            <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              {{ user.permissions?.length ?? 0 }} permissions
+            </span>
+          </div>
+          <div v-if="isSuperuser || !user.isSuperuser" class="mt-3 flex items-center gap-2">
+            <button
+              class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+              @click="openEdit(user)"
+            >
+              Edit
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button class="rounded-md border border-border p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                  <MoreVertical :size="16" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-56">
+                <DropdownMenuItem
+                  :disabled="user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared'"
+                  @click="handleResetPassword(user.id)"
+                  >Reset password</DropdownMenuItem
+                >
+                <DropdownMenuItem class="text-destructive focus:text-destructive" @click="requestDeleteUser(user)">Delete user</DropdownMenuItem>
+                <DropdownMenuSeparator v-if="user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared'" />
+                <p v-if="user.provisioningMethod === 'oidc'" class="px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
+                  OIDC users reset passwords in their identity provider.
+                </p>
+                <p v-else-if="user.provisioningMethod === 'shared'" class="px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
+                  Shared accounts do not have passwords.
+                </p>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="md:hidden space-y-3">
-      <div v-for="user in users" :key="user.id" class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
-        <div class="flex items-start justify-between gap-3">
-          <p class="text-sm font-medium text-foreground leading-5">{{ user.name }}</p>
-          <span
-            class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-            :class="user.active ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-destructive/15 text-destructive'"
+    <UserFormDrawer v-if="drawerOpen" :user="editingUser" :libraries="libraries" @close="drawerOpen = false" @saved="onSaved" />
+    <ResetLinkModal v-if="resetUrl" :reset-url="resetUrl" @close="resetUrl = null" />
+
+    <div
+      v-if="deleteConfirmUser"
+      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
+      @click.self="deleteConfirmUser = null"
+    >
+      <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
+      <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
+        <p class="text-base font-semibold text-foreground">Delete user?</p>
+        <p class="mt-1 text-sm text-muted-foreground">Delete user "{{ deleteConfirmUser.username }}". This action cannot be undone.</p>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="deleteConfirmUser = null"
           >
-            {{ user.active ? 'Active' : 'Inactive' }}
-          </span>
-        </div>
-        <div class="mt-2 flex items-center justify-between gap-3">
-          <p class="text-xs font-mono text-muted-foreground truncate">@{{ user.username }}</p>
-          <span
-            v-if="user.isSuperuser"
-            class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
-          >
-            <ShieldCheck :size="11" />
-            Admin
-          </span>
-          <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-            {{ user.permissions?.length ?? 0 }} permissions
-          </span>
-        </div>
-        <div v-if="isSuperuser || !user.isSuperuser" class="mt-3 flex items-center gap-2">
-          <button class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors" @click="openEdit(user)">
-            Edit
+            Cancel
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button class="rounded-md border border-border p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                <MoreVertical :size="16" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="w-56">
-              <DropdownMenuItem :disabled="user.provisioningMethod === 'oidc'" @click="handleResetPassword(user.id)">Reset password</DropdownMenuItem>
-              <DropdownMenuItem class="text-destructive focus:text-destructive" @click="requestDeleteUser(user)">Delete user</DropdownMenuItem>
-              <DropdownMenuSeparator v-if="user.provisioningMethod === 'oidc'" />
-              <p v-if="user.provisioningMethod === 'oidc'" class="px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
-                OIDC users reset passwords in their identity provider.
-              </p>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+            :disabled="deleting"
+            @click="confirmDeleteUser"
+          >
+            {{ deleting ? 'Deleting...' : 'Delete' }}
+          </button>
         </div>
       </div>
     </div>
-  </div>
+  </template>
 
-  <UserFormDrawer v-if="drawerOpen" :user="editingUser" :libraries="libraries" @close="drawerOpen = false" @saved="onSaved" />
-
-  <ResetLinkModal v-if="resetUrl" :reset-url="resetUrl" @close="resetUrl = null" />
-
-  <div
-    v-if="deleteConfirmUser"
-    class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
-    @click.self="deleteConfirmUser = null"
-  >
-    <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
-    <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-      <p class="text-base font-semibold text-foreground">Delete user?</p>
-      <p class="mt-1 text-sm text-muted-foreground">Delete user "{{ deleteConfirmUser.username }}". This action cannot be undone.</p>
-      <div class="mt-4 flex items-center justify-end gap-2">
-        <button
-          class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-          @click="deleteConfirmUser = null"
-        >
-          Cancel
-        </button>
-        <button
-          class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
-          :disabled="deleting"
-          @click="confirmDeleteUser"
-        >
-          {{ deleting ? 'Deleting...' : 'Delete' }}
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Magic Links tab content -->
+  <MagicLinksSettings v-else ref="magicLinksRef" :with-header="false" />
 </template>

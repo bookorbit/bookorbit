@@ -154,5 +154,25 @@ export function useAuth() {
     router.push('/login')
   }
 
-  return { user, isLoading, init, login, logout, me, setup }
+  async function loginWithMagicLink(token: string): Promise<void> {
+    const res = await fetch('/api/v1/auth/magic-links/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ token }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message ?? 'Invalid or expired magic link')
+    }
+
+    const data: AuthResponse = await res.json()
+    setAccessToken(data.accessToken)
+    user.value = data.user
+    startSessionRefresh()
+    router.push('/')
+  }
+
+  return { user, isLoading, init, login, loginWithMagicLink, logout, me, setup }
 }

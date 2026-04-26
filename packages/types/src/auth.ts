@@ -10,6 +10,7 @@ export const ProvisioningMethod = {
   Local: "local",
   Manual: "manual",
   Oidc: "oidc",
+  Shared: "shared",
 } as const;
 
 export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof ProvisioningMethod];
@@ -141,4 +142,26 @@ export interface Session {
   id: number;
   createdAt: string;
   expiresAt: string;
+}
+
+export interface MagicLinkToken {
+  id: number;
+  userId: number;
+  username: string;
+  createdByUsername: string | null;
+  label: string;
+  rawToken: string;
+  isActive: boolean;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  useCount: number;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+export interface MagicLinkTokenCreateResponse {
+  id: number;
+  token: string;
+  label: string;
+  expiresAt: string | null;
 }

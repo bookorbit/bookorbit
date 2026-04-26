@@ -37,6 +37,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetupDto } from './dto/setup.dto';
 import { OidcDiscoveryService } from './oidc/oidc-discovery.service';
 import { OidcSessionRepository } from './oidc/oidc-session.repository';
+import { MagicLinkRepository } from './magic-link.repository';
 
 function parseDurationMs(duration: string): number {
   const match = duration.match(/^(\d+)([smhd])$/);
@@ -74,6 +75,7 @@ export class AuthService {
     private readonly oidcSessionRepo: OidcSessionRepository,
     private readonly oidcDiscovery: OidcDiscoveryService,
     private readonly auditEvents: AuditEventsService,
+    private readonly magicLinkRepo: MagicLinkRepository,
     @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
@@ -318,6 +320,20 @@ export class AuthService {
       throw new UnauthorizedException('Account disabled');
     }
 
+    if (userForToken.provisioningMethod === 'shared') {
+      const hasActive = await this.magicLinkRepo.hasActiveByUserId(row.userId);
+
+      if (!hasActive) {
+        this.logger.warn(
+          `[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="all magic links revoked" - refresh failed`,
+        );
+        await this.revokeAllUserSessions(row.userId);
+        this.clearRefreshCookie(reply);
+        this.clearAccessCookie(reply);
+        throw new UnauthorizedException();
+      }
+    }
+
     // Rotate: revoke old, issue new
     await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id));
 
@@ -401,7 +417,26 @@ export class AuthService {
     const user = await this.userService.findByIdWithPermissions(userId);
     if (!user || !user.active) throw new UnauthorizedException();
     if (user.tokenVersion !== tokenVersion) throw new UnauthorizedException();
+
+    if (user.provisioningMethod === 'shared') {
+      const hasActive = await this.magicLinkRepo.hasActiveByUserId(userId);
+      if (!hasActive) throw new UnauthorizedException();
+    }
+
     return user;
+  }
+
+  async revokeAllUserSessions(userId: number) {
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.users)
+        .set({ tokenVersion: sql`${schema.users.tokenVersion} + 1` })
+        .where(eq(schema.users.id, userId));
+      await tx
+        .update(schema.refreshTokens)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(schema.refreshTokens.userId, userId), isNull(schema.refreshTokens.revokedAt)));
+    });
   }
 
   async getSessions(userId: number) {
@@ -444,6 +479,11 @@ export class AuthService {
       return;
     }
 
+    if (user.provisioningMethod === 'shared') {
+      this.logger.log(`Password reset requested for shared account: ${maskEmail(email)}`);
+      return;
+    }
+
     const rawToken = await this.userService.generatePasswordResetToken(user.id);
     await this.systemMailService.sendPasswordReset(user.email, user.name, rawToken);
 
@@ -468,7 +508,7 @@ export class AuthService {
     }
 
     const user = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
-    if (!user || !user.active || user.provisioningMethod === 'oidc') {
+    if (!user || !user.active || user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared') {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
@@ -505,6 +545,10 @@ export class AuthService {
 
     if (user.provisioningMethod === 'oidc') {
       throw new BadRequestException('OIDC accounts cannot change their password here');
+    }
+
+    if (user.provisioningMethod === 'shared') {
+      throw new BadRequestException('Shared accounts cannot change their password');
     }
 
     const valid = await compare(dto.currentPassword, user.passwordHash);

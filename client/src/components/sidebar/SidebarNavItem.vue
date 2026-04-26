@@ -45,7 +45,7 @@ const buttonClass = [
         />
       </span>
       <span
-        class="text-[14px] tracking-tight text-sidebar-foreground/85 transition-colors group-hover/item:text-sidebar-foreground group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
+        class="text-[14px] tracking-tight text-sidebar-foreground/90 transition-colors group-hover/item:text-sidebar-foreground group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
       >
         {{ label }}
       </span>

@@ -29,6 +29,7 @@ import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CreateSharedUserDto } from './dto/create-shared-user.dto';
 import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
@@ -50,8 +51,9 @@ export class UserController {
   findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
+    @Query('provisioningMethod') provisioningMethod?: string,
   ) {
-    return this.userService.findAll(page, pageSize);
+    return this.userService.findAll(page, pageSize, provisioningMethod);
   }
 
   // Must be before :id routes to avoid named segments being parsed as ints
@@ -161,6 +163,21 @@ export class UserController {
   })
   createUser(@Body() dto: CreateUserDto) {
     return this.userService.createUser(dto);
+  }
+
+  @Post('shared')
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({
+    action: AuditAction.UserCreate,
+    resource: AuditResource.User,
+    getResourceId: (_, res: unknown) => (res as { id?: number })?.id,
+    description: (_, res: unknown) => `Created shared user '${(res as { username?: string })?.username ?? 'unknown'}'`,
+  })
+  createSharedUser(@Body() dto: CreateSharedUserDto, @CurrentUser() requestingUser: RequestUser) {
+    if (!requestingUser.isSuperuser) {
+      throw new BadRequestException('Only superusers can create shared accounts');
+    }
+    return this.userService.createSharedUser(dto);
   }
 
   @Patch(':id')

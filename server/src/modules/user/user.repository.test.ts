@@ -98,9 +98,11 @@ describe('UserRepository', () => {
     const idOffset = vi.fn().mockResolvedValue([]);
     const idLimit = vi.fn().mockReturnValue({ offset: idOffset });
     const idOrderBy = vi.fn().mockReturnValue({ limit: idLimit });
-    const idFrom = vi.fn().mockReturnValue({ orderBy: idOrderBy });
+    const idWhere = vi.fn().mockReturnValue({ orderBy: idOrderBy });
+    const idFrom = vi.fn().mockReturnValue({ where: idWhere });
 
-    const countFrom = vi.fn().mockResolvedValue([{ total: '7' }]);
+    const countWhere = vi.fn().mockResolvedValue([{ total: '7' }]);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
 
     select.mockReturnValueOnce({ from: idFrom }).mockReturnValueOnce({ from: countFrom });
 
@@ -114,9 +116,11 @@ describe('UserRepository', () => {
     const idOffset = vi.fn().mockResolvedValue([{ id: 20 }, { id: 10 }]);
     const idLimit = vi.fn().mockReturnValue({ offset: idOffset });
     const idOrderBy = vi.fn().mockReturnValue({ limit: idLimit });
-    const idFrom = vi.fn().mockReturnValue({ orderBy: idOrderBy });
+    const idWhere = vi.fn().mockReturnValue({ orderBy: idOrderBy });
+    const idFrom = vi.fn().mockReturnValue({ where: idWhere });
 
-    const countFrom = vi.fn().mockResolvedValue([{ total: 2 }]);
+    const countWhere = vi.fn().mockResolvedValue([{ total: 2 }]);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
 
     const rowsOrderBy = vi.fn().mockResolvedValue([
       {

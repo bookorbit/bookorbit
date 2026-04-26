@@ -29,7 +29,7 @@ export function registerAuthGuard(router: Router): void {
       return { path: '/login', query: { redirect: to.fullPath } }
     }
 
-    if (user.value.isDefaultPassword) {
+    if (user.value.isDefaultPassword && user.value.provisioningMethod !== 'shared') {
       useChangePasswordDialog().open(true)
       // Allow navigation to '/' but block everything else
       if (to.path !== '/') return { path: '/' }

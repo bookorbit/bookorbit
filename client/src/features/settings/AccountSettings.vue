@@ -300,19 +300,35 @@ function closeUnlinkDialog() {
             <Save :size="14" />
             {{ savingProfile ? 'Saving...' : 'Save profile' }}
           </button>
-          <button class="settings-btn-outline inline-flex items-center gap-2" :disabled="profileBusy" @click="openChangePassword()">
+          <button
+            v-if="user?.provisioningMethod !== 'oidc' && user?.provisioningMethod !== 'shared'"
+            class="settings-btn-outline inline-flex items-center gap-2"
+            :disabled="profileBusy"
+            @click="openChangePassword()"
+          >
             <KeyRound :size="14" />
             Change password
           </button>
-          <span class="text-xs text-muted-foreground">Account type: {{ user?.provisioningMethod === 'oidc' ? 'OIDC / SSO' : 'Local' }}</span>
+          <span class="text-xs text-muted-foreground">
+            Account type:
+            {{ user?.provisioningMethod === 'oidc' ? 'OIDC / SSO' : user?.provisioningMethod === 'shared' ? 'Shared' : 'Local' }}
+          </span>
         </div>
 
         <div class="md:hidden flex flex-wrap items-center gap-2">
-          <button class="settings-btn-outline inline-flex items-center gap-2" :disabled="profileBusy" @click="openChangePassword()">
+          <button
+            v-if="user?.provisioningMethod !== 'oidc' && user?.provisioningMethod !== 'shared'"
+            class="settings-btn-outline inline-flex items-center gap-2"
+            :disabled="profileBusy"
+            @click="openChangePassword()"
+          >
             <KeyRound :size="14" />
             Change password
           </button>
-          <span class="text-xs text-muted-foreground">Account type: {{ user?.provisioningMethod === 'oidc' ? 'OIDC / SSO' : 'Local' }}</span>
+          <span class="text-xs text-muted-foreground">
+            Account type:
+            {{ user?.provisioningMethod === 'oidc' ? 'OIDC / SSO' : user?.provisioningMethod === 'shared' ? 'Shared' : 'Local' }}
+          </span>
         </div>
         <p v-if="profileError" class="text-xs text-destructive">{{ profileError }}</p>
       </div>

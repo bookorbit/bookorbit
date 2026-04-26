@@ -79,6 +79,11 @@ export class OidcService {
     const provider = await this.providerService.findBySlugOrFail(providerSlug);
     if (!provider.enabled) throw new UnauthorizedException('OIDC provider is not enabled');
 
+    const user = await this.userService.findById(userId);
+    if (user?.provisioningMethod === 'shared') {
+      throw new BadRequestException('Shared accounts cannot link OIDC identities');
+    }
+
     const existing = await this.identityRepo.findByUserAndProvider(userId, provider.id);
     if (existing) throw new BadRequestException('You already have an identity linked to this provider');
 

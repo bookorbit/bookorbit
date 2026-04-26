@@ -12,6 +12,8 @@ import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { MagicLinkRepository } from './magic-link.repository';
+import { MagicLinkService } from './magic-link.service';
 import { BackchannelLogoutService } from './oidc/backchannel-logout.service';
 import { OidcClaimExtractorService } from './oidc/oidc-claim-extractor.service';
 import { OidcCleanupService } from './oidc/oidc-cleanup.service';
@@ -43,6 +45,8 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
   providers: [
     AuthService,
     JwtStrategy,
+    MagicLinkRepository,
+    MagicLinkService,
     OidcService,
     OidcStateService,
     OidcDiscoveryService,

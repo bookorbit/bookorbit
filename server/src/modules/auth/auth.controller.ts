@@ -1,4 +1,19 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -9,6 +24,7 @@ import { Auditable } from '../../common/decorators/auditable.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from './auth.service';
+import { MagicLinkService } from './magic-link.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -18,6 +34,9 @@ import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetupDto } from './dto/setup.dto';
 import { OidcService } from './oidc/oidc.service';
+import { CreateMagicLinkDto } from './dto/create-magic-link.dto';
+import { MagicLinkLoginDto } from './dto/magic-link-login.dto';
+import { UpdateMagicLinkDto } from './dto/update-magic-link.dto';
 
 const ONE_MINUTE_MS = 60_000;
 const ONE_HOUR_MS = 3_600_000;
@@ -27,6 +46,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly oidcService: OidcService,
+    private readonly magicLinkService: MagicLinkService,
   ) {}
 
   @Public()
@@ -171,5 +191,39 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   oidcUnlinkIdentity(@CurrentUser() user: RequestUser, @Param('providerId', ParseIntPipe) providerId: number, @Body() dto: OidcUnlinkDto) {
     return this.oidcService.unlinkIdentity(user.id, providerId, dto.password);
+  }
+
+  @Post('magic-links')
+  @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
+  createMagicLink(@CurrentUser() user: RequestUser, @Body() dto: CreateMagicLinkDto) {
+    return this.magicLinkService.createToken(user, dto);
+  }
+
+  @Get('magic-links')
+  listMagicLinks(@CurrentUser() user: RequestUser) {
+    if (!user.isSuperuser) {
+      throw new ForbiddenException('Only superusers can view magic links');
+    }
+    return this.magicLinkService.listTokens();
+  }
+
+  @Patch('magic-links/:id')
+  @HttpCode(HttpStatus.OK)
+  updateMagicLink(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMagicLinkDto) {
+    return this.magicLinkService.setActive(user, id, dto.isActive);
+  }
+
+  @Delete('magic-links/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  revokeMagicLink(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
+    return this.magicLinkService.revokeToken(user, id);
+  }
+
+  @Post('magic-links/login')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: ONE_MINUTE_MS } })
+  @HttpCode(HttpStatus.OK)
+  loginWithMagicLink(@Body() dto: MagicLinkLoginDto, @Res({ passthrough: true }) reply: FastifyReply, @Req() req: FastifyRequest) {
+    return this.magicLinkService.loginWithToken(dto.token, reply, req.ip);
   }
 }

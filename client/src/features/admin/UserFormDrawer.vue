@@ -44,6 +44,7 @@ const name = ref('')
 const username = ref('')
 const email = ref('')
 const active = ref(true)
+const isSharedAccount = ref(false)
 const selectedPermissionNames = ref<Set<string>>(new Set())
 const selectedLibraryIds = ref<Set<number>>(new Set())
 const error = ref<string | null>(null)
@@ -67,6 +68,7 @@ watch(
     username.value = u?.username ?? ''
     email.value = u?.email ?? ''
     active.value = u?.active ?? true
+    isSharedAccount.value = u?.provisioningMethod === 'shared'
     selectedPermissionNames.value = new Set(u?.permissions?.filter((p) => p !== '*') ?? [])
     selectedLibraryIds.value = new Set()
     error.value = null
@@ -150,8 +152,29 @@ async function handleSubmit() {
         return
       }
     } else {
-      if (!trimmedEmail) {
+      if (!isSharedAccount.value && !trimmedEmail) {
         error.value = 'Email is required'
+        return
+      }
+
+      if (isSharedAccount.value) {
+        const res = await api('/api/v1/users/shared', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.value,
+            username: username.value,
+            email: trimmedEmail || undefined,
+            permissionNames: [...selectedPermissionNames.value],
+            libraryIds: [...selectedLibraryIds.value],
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          error.value = err.message ?? 'Failed to create shared account'
+          return
+        }
+        emit('saved')
         return
       }
 
@@ -188,13 +211,29 @@ async function handleSubmit() {
     <div class="fixed inset-0 bg-black/40" @click="emit('close')" />
     <div class="relative ml-auto flex h-full w-full max-w-md flex-col bg-card shadow-xl">
       <div class="flex items-center justify-between border-b border-border px-6 py-4">
-        <h2 class="text-base font-semibold text-foreground">{{ isEdit ? 'Edit User' : 'Create User' }}</h2>
+        <h2 class="text-base font-semibold text-foreground">
+          {{ isEdit ? 'Edit User' : isSharedAccount ? 'Create Shared Account' : 'Create User' }}
+        </h2>
         <button @click="emit('close')" class="text-muted-foreground hover:text-foreground">
           <X :size="16" />
         </button>
       </div>
 
       <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto space-y-5 px-6 py-6">
+        <!-- Shared account toggle (create only) -->
+        <div v-if="!isEdit" class="rounded-md border border-border px-4 py-3">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input id="isShared" v-model="isSharedAccount" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input" />
+            <div>
+              <p class="text-sm font-medium text-foreground">Shared account</p>
+              <p class="text-xs text-muted-foreground mt-0.5">No password. Access is granted via magic links only.</p>
+            </div>
+          </label>
+        </div>
+        <div v-else-if="isSharedAccount" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">Shared account</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Manage login links from Settings - Magic Links.</p>
+        </div>
         <!-- Basic info -->
         <div v-if="!isEdit" class="space-y-1.5">
           <label class="settings-label">Username</label>
@@ -217,11 +256,14 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label class="settings-label">Email</label>
+          <label class="settings-label">
+            Email
+            <span v-if="isSharedAccount && !isEdit" class="text-muted-foreground font-normal">(optional)</span>
+          </label>
           <input
             v-model="email"
             type="email"
-            :required="!isEdit"
+            :required="!isEdit && !isSharedAccount"
             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>

@@ -15,12 +15,14 @@ type Db = NodePgDatabase<typeof schema>;
 export class UserRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async findAll(page: number, pageSize: number) {
+  async findAll(page: number, pageSize: number, provisioningMethod?: string) {
     const offset = page * pageSize;
 
+    const conditions = provisioningMethod ? eq(schema.users.provisioningMethod, provisioningMethod) : undefined;
+
     const [userPage, [{ total }]] = await Promise.all([
-      this.db.select({ id: schema.users.id }).from(schema.users).orderBy(schema.users.username).limit(pageSize).offset(offset),
-      this.db.select({ total: count() }).from(schema.users),
+      this.db.select({ id: schema.users.id }).from(schema.users).where(conditions).orderBy(schema.users.username).limit(pageSize).offset(offset),
+      this.db.select({ total: count() }).from(schema.users).where(conditions),
     ]);
     const normalizedTotal = Number(total);
 

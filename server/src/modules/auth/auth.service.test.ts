@@ -100,6 +100,11 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     getDiscoveryDoc: vi.fn(),
   };
 
+  const magicLinkRepo = {
+    hasActiveByUserId: vi.fn().mockResolvedValue(true),
+    countActiveByUserId: vi.fn().mockResolvedValue(0),
+  };
+
   const service = new AuthService(
     userService as never,
     jwtService as never,
@@ -108,10 +113,11 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     oidcSessionRepo as never,
     oidcDiscovery as never,
     { emit: vi.fn() } as never,
+    magicLinkRepo as never,
     db,
   );
 
-  return { service, db, userService, jwtService, config, systemMailService, appSettings, oidcSessionRepo, oidcDiscovery };
+  return { service, db, userService, jwtService, config, systemMailService, appSettings, oidcSessionRepo, oidcDiscovery, magicLinkRepo };
 }
 
 describe('AuthService', () => {
@@ -535,6 +541,24 @@ describe('AuthService', () => {
       const result = await service.validateUser(1, 2);
       expect(result).toEqual(user);
     });
+
+    it('throws UnauthorizedException for shared user with no active magic links', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ tokenVersion: 2, provisioningMethod: 'shared' }));
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(false);
+
+      await expect(service.validateUser(1, 2)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('returns shared user when active magic links exist', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      const user = makeFullUser({ tokenVersion: 2, provisioningMethod: 'shared' });
+      userService.findByIdWithPermissions.mockResolvedValue(user);
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(true);
+
+      const result = await service.validateUser(1, 2);
+      expect(result).toEqual(user);
+    });
   });
 
   describe('forgotPassword', () => {
@@ -597,6 +621,22 @@ describe('AuthService', () => {
       });
 
       await service.forgotPassword({ email: 'u@example.com' });
+      await new Promise((r) => setImmediate(r));
+      expect(systemMailService.sendPasswordReset).not.toHaveBeenCalled();
+    });
+
+    it('silently returns without sending email for shared user', async () => {
+      const { service, userService, systemMailService } = makeService();
+      userService.findByEmail.mockResolvedValue({
+        id: 1,
+        email: 'demo@example.com',
+        name: 'Demo',
+        active: true,
+        provisioningMethod: 'shared',
+        username: 'demo',
+      });
+
+      await service.forgotPassword({ email: 'demo@example.com' });
       await new Promise((r) => setImmediate(r));
       expect(systemMailService.sendPasswordReset).not.toHaveBeenCalled();
     });
@@ -670,6 +710,17 @@ describe('AuthService', () => {
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
         id: 1,
         provisioningMethod: 'oidc',
+        passwordHash: 'hash',
+      });
+
+      await expect(service.changePassword(1, { currentPassword: 'old', newPassword: 'New@1234' }, makeReply())).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException for shared-provisioned users', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        provisioningMethod: 'shared',
         passwordHash: 'hash',
       });
 
@@ -772,6 +823,24 @@ describe('AuthService', () => {
         username: 'jdoe',
         active: true,
         provisioningMethod: 'oidc',
+      });
+
+      await expect(service.resetPassword({ token: 'valid', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException for shared user', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 1,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 10_000),
+        usedAt: null,
+      });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        username: 'demo',
+        active: true,
+        provisioningMethod: 'shared',
       });
 
       await expect(service.resetPassword({ token: 'valid', newPassword: 'NewPassword1' })).rejects.toThrow(BadRequestException);
@@ -887,6 +956,18 @@ describe('AuthService', () => {
       const result = await service.logout(makeRequest({ refresh_token: 'some-token' }), makeReply());
       expect(result).toEqual({});
       expect(oidcSessionRepo.revokeByUserId).toHaveBeenCalledWith(8);
+    });
+  });
+
+  describe('revokeAllUserSessions', () => {
+    it('bumps tokenVersion and revokes all refresh tokens in a transaction', async () => {
+      const { service, db } = makeService();
+
+      await service.revokeAllUserSessions(5);
+
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.update).toHaveBeenCalled();
+      expect(db.set).toHaveBeenCalled();
     });
   });
 });

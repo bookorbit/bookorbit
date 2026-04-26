@@ -7,6 +7,7 @@ import type { UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CreateSharedUserDto } from './dto/create-shared-user.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -68,8 +69,8 @@ export class UserService {
     return this.userRepo.create(data);
   }
 
-  findAll(page = 0, pageSize = 50) {
-    return this.userRepo.findAll(page, pageSize);
+  findAll(page = 0, pageSize = 50, provisioningMethod?: string) {
+    return this.userRepo.findAll(page, pageSize, provisioningMethod);
   }
 
   findAssignable() {
@@ -113,6 +114,38 @@ export class UserService {
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
     return { id: user.id, username: user.username, name: user.name, resetUrl };
+  }
+
+  async createSharedUser(dto: CreateSharedUserDto) {
+    const existing = await this.userRepo.findByUsername(dto.username);
+    if (existing) throw new ConflictException('Username already taken');
+    if (dto.email) {
+      const existingEmail = await this.userRepo.findByEmail(dto.email);
+      if (existingEmail) throw new ConflictException('Email already in use');
+    }
+
+    const passwordHash = await hash(randomBytes(32).toString('hex'), 12);
+    const user = await this.userRepo.create({
+      username: dto.username,
+      name: dto.name,
+      email: dto.email ?? null,
+      passwordHash,
+      isDefaultPassword: false,
+      provisioningMethod: 'shared',
+    });
+
+    const permissionNames = this.uniquePermissions(dto.permissionNames ?? []);
+    if (permissionNames.length > 0) {
+      await this.userRepo.setPermissions(user.id, permissionNames);
+    }
+
+    const libraryIds = this.uniqueIds(dto.libraryIds ?? []);
+    if (libraryIds.length > 0) {
+      await this.assertKnownLibraryIds(libraryIds);
+      await this.userRepo.assignViewerLibraries(user.id, libraryIds);
+    }
+
+    return { id: user.id, username: user.username, name: user.name };
   }
 
   async updateUser(id: number, dto: UpdateUserDto, requestingUser: RequestUser) {
@@ -190,6 +223,9 @@ export class UserService {
     }
     const target = await this.userRepo.findByIdWithPermissions(targetUserId);
     if (!target) throw new NotFoundException('User not found');
+    if (target.provisioningMethod === 'shared') {
+      throw new BadRequestException('Shared accounts cannot be made superuser');
+    }
     if (!isSuperuser && target.isSuperuser) {
       const otherSuperusers = await this.userRepo.countOtherSuperusers(targetUserId);
       if (otherSuperusers === 0) {
@@ -225,6 +261,9 @@ export class UserService {
     }
     if (target.provisioningMethod === 'oidc') {
       throw new BadRequestException('OIDC accounts cannot reset their password here');
+    }
+    if (target.provisioningMethod === 'shared') {
+      throw new BadRequestException('Shared accounts do not have passwords');
     }
     const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
     const rawToken = await this.userRepo.generateResetToken(targetUserId);

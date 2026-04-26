@@ -93,7 +93,7 @@ describe('UserService', () => {
     expect(userRepo.incrementTokenVersion).toHaveBeenCalledWith(7);
     expect(userRepo.findByIdWithPermissions).toHaveBeenCalledWith(7);
     expect(userRepo.create).toHaveBeenCalledWith({ username: 'new' });
-    expect(userRepo.findAll).toHaveBeenCalledWith(1, 20);
+    expect(userRepo.findAll).toHaveBeenCalledWith(1, 20, undefined);
     expect(userRepo.findAssignable).toHaveBeenCalled();
     expect(userRepo.setPermissions).toHaveBeenCalledWith(7, [Permission.LibraryDownload]);
   });
