@@ -25,7 +25,7 @@ const router = useRouter()
 const route = useRoute()
 const { gridGap, viewMode, authorCoverSize, authorCoverShape } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
-const { hasPermission, isSuperuser } = usePermissions()
+const { hasPermission, isDemoRestrictedAccount, isSuperuser } = usePermissions()
 const { items, total, loading, error, hasMore, q, sort, order, libraryId, hasPhoto, minBookCount, load } = useAuthorsList()
 const { markRefreshing, clearRefreshing, isRefreshing } = useRefreshingAuthors()
 const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleAuthor, rangeSelectTo, selectAll, isSelected } =
@@ -52,7 +52,7 @@ const confirmingBulkDelete = ref(false)
 const pendingDeleteIds = ref<number[]>([])
 const deleteDialogOpen = ref(false)
 
-const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata'))
+const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata') && !isDemoRestrictedAccount.value)
 const canDeleteAuthors = computed(() => isSuperuser.value)
 
 const SORT_LABELS: Record<AuthorListSort, string> = {
@@ -256,7 +256,7 @@ async function clearFilters() {
 
 async function refreshSelectedAuthorsMetadata() {
   const ids = [...selectedIds.value]
-  if (ids.length === 0 || bulkRefreshing.value) return
+  if (ids.length === 0 || bulkRefreshing.value || !canRefreshMetadata.value) return
 
   bulkRefreshing.value = true
   markRefreshing(ids)
@@ -766,7 +766,7 @@ watch(
           <TooltipContent side="top">Select visible</TooltipContent>
         </Tooltip>
 
-        <Tooltip>
+        <Tooltip v-if="canRefreshMetadata">
           <TooltipTrigger as-child>
             <button
               :disabled="selectedCount === 0 || bulkRefreshing"

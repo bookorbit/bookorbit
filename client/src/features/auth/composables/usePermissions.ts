@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { Permission } from '@bookorbit/types'
 import { useAuth } from './useAuth'
 
 export function usePermissions() {
@@ -11,5 +12,11 @@ export function usePermissions() {
     return isSuperuser.value || userPermissions.value.includes(name)
   }
 
-  return { hasPermission, isSuperuser, userPermissions }
+  function hasExplicitPermission(name: string): boolean {
+    return userPermissions.value.includes(name)
+  }
+
+  const isDemoRestrictedAccount = computed(() => hasExplicitPermission(Permission.DemoRestricted))
+
+  return { hasPermission, hasExplicitPermission, isDemoRestrictedAccount, isSuperuser, userPermissions }
 }

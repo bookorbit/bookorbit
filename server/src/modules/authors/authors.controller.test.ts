@@ -3,8 +3,10 @@ import 'reflect-metadata';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { of } from 'rxjs';
+import { Permission } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
+import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthorsController } from './authors.controller';
 
@@ -176,6 +178,14 @@ describe('AuthorsController', () => {
     expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ authorId: 5, status: 'queued' })}\n\n`);
     expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, queued: 1, processed: 1, failed: 0 })}\n\n`);
     expect(raw.end).toHaveBeenCalled();
+  });
+
+  it('marks bulk metadata refresh endpoint as demo-restricted', () => {
+    expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, AuthorsController.prototype.bulkRefreshMetadata)).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot perform bulk edits',
+    });
+    expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, AuthorsController.prototype.refreshEnrichment)).toBeUndefined();
   });
 
   it('returns enrichment config values and updates them', async () => {

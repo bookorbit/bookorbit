@@ -2,6 +2,8 @@ import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded, typ
 import { EMAIL_TAB_LABELS, normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { METADATA_TAB_INFO, normalizeMetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { READER_TAB_TITLE_LABELS, normalizeReaderTab } from '@/features/settings/lib/reader-tabs'
+import { Permission } from '@bookorbit/types'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { registerAuthGuard } from './guards/auth.guard'
 import { registerRouteTitleHook } from './title-resolver'
 
@@ -38,6 +40,14 @@ function resolveMetadataTitle(to: RouteLocationNormalizedLoaded): string {
   return METADATA_TAB_INFO[tab].titleLabel
 }
 
+function blockDemoRestrictedNotificationsRoute() {
+  const { user } = useAuth()
+  if (user.value?.permissions?.includes(Permission.DemoRestricted)) {
+    return { name: 'settings-account' }
+  }
+  return true
+}
+
 export const routes: RouteRecordRaw[] = [
   {
     path: '/',
@@ -64,6 +74,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'notifications',
             name: 'settings-notifications',
             component: () => import('@/features/notifications/components/NotificationPreferences.vue'),
+            beforeEnter: blockDemoRestrictedNotificationsRoute,
             meta: { title: 'Notifications' },
           },
           {

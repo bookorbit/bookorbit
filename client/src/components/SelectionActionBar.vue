@@ -64,7 +64,7 @@ const emit = defineEmits<{
   exit: []
 }>()
 
-const { hasPermission } = usePermissions()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const confirmingDelete = ref(false)
 const deleteInput = ref('')
 const exportMenuOpen = ref(false)
@@ -72,6 +72,7 @@ const ratingMenuOpen = ref(false)
 const moreMenuOpen = ref(false)
 const slots = useSlots()
 const hasCustomContent = computed(() => Boolean(slots.content))
+const canBulkActions = computed(() => !isDemoRestrictedAccount.value)
 
 const canConfirmDelete = computed(() => props.count <= 50 || deleteInput.value === 'DELETE')
 
@@ -163,16 +164,26 @@ watch(
 
             <Tooltip v-if="hasPermission('email_send')">
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('send')">
+                <button
+                  data-testid="action-send-email"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                  @click="emit('send')"
+                >
                   <Mail :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Send via email</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_download')">
+            <Tooltip v-if="hasPermission('library_download') && canBulkActions">
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="exportMenuOpen = true">
+                <button
+                  data-testid="action-export"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                  @click="exportMenuOpen = true"
+                >
                   <Download :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
@@ -181,7 +192,12 @@ watch(
 
             <Tooltip>
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('add-to-collection')">
+                <button
+                  data-testid="action-add-to-collection"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                  @click="emit('add-to-collection')"
+                >
                   <FolderPlus :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
@@ -201,57 +217,84 @@ watch(
               <TooltipContent side="top">Remove from collection</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_edit_metadata')">
+            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('edit')">
+                <button
+                  data-testid="action-bulk-edit-metadata"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                  @click="emit('edit')"
+                >
                   <Pencil :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Edit metadata</TooltipContent>
             </Tooltip>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
+            <Tooltip v-if="canBulkActions">
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <button
+                        data-testid="action-bulk-set-status"
+                        :disabled="count === 0"
+                        :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                        aria-label="Set reading status"
+                      >
+                        <BookOpen :size="ICON_SIZE" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="top" align="center" class="w-48">
+                      <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="onSetStatus(opt.value)">
+                        <component :is="STATUS_ICONS[opt.value]" :size="14" />
+                        <span>{{ opt.label }}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">Set reading status</TooltipContent>
+            </Tooltip>
+
+            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
+              <TooltipTrigger as-child>
                 <button
+                  data-testid="action-bulk-set-rating"
                   :disabled="count === 0"
                   :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
-                  aria-label="Set reading status"
-                  title="Set reading status"
+                  @click="ratingMenuOpen = true"
                 >
-                  <BookOpen :size="ICON_SIZE" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="center" class="w-48">
-                <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="onSetStatus(opt.value)">
-                  <component :is="STATUS_ICONS[opt.value]" :size="14" />
-                  <span>{{ opt.label }}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Tooltip v-if="hasPermission('library_edit_metadata')">
-              <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="ratingMenuOpen = true">
                   <Star :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Set rating</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_edit_metadata')">
+            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]" @click="emit('edit-tags')">
+                <button
+                  data-testid="action-bulk-edit-tags"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                  @click="emit('edit-tags')"
+                >
                   <Tag :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Edit tags</TooltipContent>
             </Tooltip>
 
-            <div v-if="hasPermission('library_edit_metadata')" :class="DIVIDER" />
+            <div v-if="hasPermission('library_edit_metadata') && canBulkActions" :class="DIVIDER" />
 
-            <Tooltip v-if="hasPermission('library_edit_metadata')">
+            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="moreMenuOpen = true">
+                <button
+                  data-testid="action-bulk-more"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
+                  @click="moreMenuOpen = true"
+                >
                   <MoreHorizontal :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
@@ -262,7 +305,12 @@ watch(
 
             <Tooltip v-if="hasPermission('library_delete_books')">
               <TooltipTrigger as-child>
-                <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_DESTRUCTIVE : BTN_DISABLED]" @click="confirmingDelete = true">
+                <button
+                  data-testid="action-delete"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_DESTRUCTIVE : BTN_DISABLED]"
+                  @click="confirmingDelete = true"
+                >
                   <Trash2 :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
@@ -304,18 +352,58 @@ watch(
 
           <!-- More actions -->
           <template v-else-if="moreMenuOpen">
-            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('refresh-metadata')">
-              <RefreshCw :size="ICON_SIZE" />
-            </button>
-            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="emit('re-extract-cover')">
-              <ImageDown :size="ICON_SIZE" />
-            </button>
-            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="lockAll">
-              <Lock :size="ICON_SIZE" />
-            </button>
-            <button :disabled="count === 0" :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]" @click="unlockAll">
-              <Unlock :size="ICON_SIZE" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  data-testid="action-bulk-refresh-metadata"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
+                  @click="emit('refresh-metadata')"
+                >
+                  <RefreshCw :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Refresh metadata</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  data-testid="action-bulk-re-extract-cover"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
+                  @click="emit('re-extract-cover')"
+                >
+                  <ImageDown :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Re-extract cover</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  data-testid="action-bulk-lock-metadata"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
+                  @click="lockAll"
+                >
+                  <Lock :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Lock metadata</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  data-testid="action-bulk-unlock-metadata"
+                  :disabled="count === 0"
+                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
+                  @click="unlockAll"
+                >
+                  <Unlock :size="ICON_SIZE" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Unlock metadata</TooltipContent>
+            </Tooltip>
             <div :class="DIVIDER" />
             <button :class="BTN_TEXT_CANCEL" @click="moreMenuOpen = false">Back</button>
           </template>

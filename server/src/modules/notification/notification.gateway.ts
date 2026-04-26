@@ -85,6 +85,9 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
   }
 
   private assertHasAccess(user: RequestUser): void {
+    if (user.permissions.includes(Permission.DemoRestricted)) {
+      throw new Error('Demo-restricted account cannot access notifications');
+    }
     if (user.isSuperuser) return;
     if (user.permissions.includes(Permission.NotificationAccess)) return;
     throw new Error('Missing permission: notification_access');

@@ -17,10 +17,11 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { AuditAction, AuditResource } from '@bookorbit/types';
+import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 import { AllowDefaultPassword } from '../../common/decorators/allow-default-password.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from './auth.service';
@@ -134,6 +135,7 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   @AllowDefaultPassword()
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   changePassword(
     @CurrentUser() user: RequestUser,
     @Body() dto: ChangePasswordDto,
@@ -171,6 +173,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: ONE_MINUTE_MS } })
   @Post('oidc/:slug/link-state')
   @HttpCode(HttpStatus.OK)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   oidcGenerateLinkState(@CurrentUser() user: RequestUser, @Param('slug') slug: string) {
     return this.oidcService.generateLinkState(user.id, slug);
   }
@@ -189,6 +192,7 @@ export class AuthController {
 
   @Delete('oidc/identities/:providerId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   oidcUnlinkIdentity(@CurrentUser() user: RequestUser, @Param('providerId', ParseIntPipe) providerId: number, @Body() dto: OidcUnlinkDto) {
     return this.oidcService.unlinkIdentity(user.id, providerId, dto.password);
   }

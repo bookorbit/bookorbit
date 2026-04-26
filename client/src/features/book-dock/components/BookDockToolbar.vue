@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2 } from 'lucide-vue-next'
 import type { BookDockFileStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { SUPPORTED_FORMATS_ACCEPT, useBookDockUpload } from '../composables/useBookDockUpload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 }>()
 
 const { files: uploadFiles, isUploading, addFiles, clearCompleted } = useBookDockUpload()
+const { isDemoRestrictedAccount } = usePermissions()
 const fileInput = ref<HTMLInputElement | null>(null)
 const rescanning = ref(false)
 const searchQuery = ref('')
@@ -39,6 +41,7 @@ const uploadTotal = computed(() => uploadFiles.value.length)
 const uploadDone = computed(() => uploadFiles.value.filter((f) => f.status === 'done').length)
 const uploadError = computed(() => uploadFiles.value.filter((f) => f.status === 'error').length)
 const uploadProgress = computed(() => (uploadTotal.value > 0 ? Math.round((uploadDone.value / uploadTotal.value) * 100) : 0))
+const canBulkEdit = computed(() => !isDemoRestrictedAccount.value)
 
 let popoverTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -130,12 +133,13 @@ function clearSearch() {
           class="h-full w-32 sm:w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground/80"
           @input="onSearchInput"
         />
-        <button class="text-muted-foreground hover:text-foreground shrink-0" @click="clearSearch">
+        <button data-testid="book-dock-search-clear" class="text-muted-foreground hover:text-foreground shrink-0" @click="clearSearch">
           <X class="size-3" />
         </button>
       </div>
       <button
         v-else
+        data-testid="book-dock-search-toggle"
         class="flex items-center justify-center size-7 rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
         @click="showSearch = true"
       >
@@ -147,6 +151,7 @@ function clearSearch() {
       <input ref="fileInput" type="file" :accept="SUPPORTED_FORMATS_ACCEPT" multiple class="hidden" @change="onFilesSelected" />
 
       <button
+        data-testid="book-dock-rescan"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
         :disabled="rescanning"
         @click="rescan"
@@ -157,6 +162,7 @@ function clearSearch() {
 
       <div class="relative">
         <button
+          data-testid="book-dock-upload"
           class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95"
           @click="openFilePicker"
         >
@@ -195,6 +201,7 @@ function clearSearch() {
       <span class="text-xs font-medium text-foreground">{{ selectionCount }} selected</span>
       <div class="flex-1" />
       <button
+        data-testid="book-dock-finalize"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95"
         @click="$emit('finalize')"
       >
@@ -202,6 +209,7 @@ function clearSearch() {
         Finalize
       </button>
       <button
+        data-testid="book-dock-set-destination"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all active:scale-95"
         @click="$emit('setDestination')"
       >
@@ -211,6 +219,7 @@ function clearSearch() {
       <Tooltip v-if="fetchedCount > 0">
         <TooltipTrigger as-child>
           <button
+            data-testid="book-dock-apply-fetched"
             class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
             @click="$emit('applyFetched')"
           >
@@ -227,6 +236,7 @@ function clearSearch() {
       <Tooltip v-if="errorCount > 0">
         <TooltipTrigger as-child>
           <button
+            data-testid="book-dock-retry-errors"
             class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-sky-500/12 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 transition-all active:scale-95"
             @click="$emit('retryFetch')"
           >
@@ -241,6 +251,8 @@ function clearSearch() {
         <TooltipContent>Retry metadata fetch for {{ errorCount }} error file{{ errorCount !== 1 ? 's' : '' }}</TooltipContent>
       </Tooltip>
       <button
+        v-if="canBulkEdit"
+        data-testid="book-dock-bulk-edit"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-violet-500/12 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 transition-all active:scale-95"
         @click="$emit('bulkEdit')"
       >
@@ -248,6 +260,7 @@ function clearSearch() {
         Bulk Edit
       </button>
       <button
+        data-testid="book-dock-bulk-discard"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all active:scale-95"
         @click="$emit('bulkDiscard')"
       >

@@ -24,6 +24,7 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteService } from '../file-write/file-write.service';
@@ -146,6 +147,7 @@ export class BookController {
 
   @Post('bulk-refresh-metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   @Auditable({
     action: AuditAction.BookBulkMetadataRefresh,
     resource: AuditResource.Book,
@@ -175,6 +177,7 @@ export class BookController {
 
   @Post('bulk-re-extract-cover')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   @Auditable({
     action: AuditAction.BookBulkCoverReextract,
     resource: AuditResource.Book,
@@ -210,6 +213,7 @@ export class BookController {
 
   @Post('export')
   @RequirePermission(Permission.LibraryDownload)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
   async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const scope = dto.audioOnly ? 'audio' : dto.allFormats ? 'all' : 'primary';
     await this.streamBookExport(dto.bookIds, scope, user, reply);
@@ -217,6 +221,7 @@ export class BookController {
 
   @Get('export/download')
   @RequirePermission(Permission.LibraryDownload)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
   async exportBooksDownload(
     @Query('bookIds') bookIdsQuery: string | undefined,
     @Query('scope') scopeQuery: string | undefined,
@@ -501,6 +506,7 @@ export class BookController {
 
   @Post('bulk-set-status')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   @Auditable({
     action: AuditAction.BookBulkSetStatus,
     resource: AuditResource.Book,
@@ -517,6 +523,7 @@ export class BookController {
   @Post('bulk-set-rating')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   @Auditable({
     action: AuditAction.BookBulkSetRating,
     resource: AuditResource.Book,
@@ -533,6 +540,7 @@ export class BookController {
   @Post('bulk-update-tags')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   @Auditable({
     action: AuditAction.BookBulkUpdateTags,
     resource: AuditResource.Book,
@@ -549,6 +557,7 @@ export class BookController {
   @Post('bulk-set-metadata-lock')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   @Auditable({
     action: AuditAction.BookBulkSetMetadataLock,
     resource: AuditResource.Book,

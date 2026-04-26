@@ -4,6 +4,7 @@ import { PackageOpen, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 import type { BookDockFile } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatBytes } from '@/lib/formatting'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookDockFiles } from '@/features/book-dock/composables/useBookDockFiles'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import { useBookDockStatistics } from '@/features/book-dock/composables/useBookDockStatistics'
@@ -45,6 +46,7 @@ const {
 const { summary, fetchSummary, subscribe, onBookDockChange, socketConnected } = useBookDockSummary()
 const { statistics, fetchStatistics } = useBookDockStatistics()
 const { addFiles, isUploading } = useBookDockUpload()
+const { isDemoRestrictedAccount } = usePermissions()
 
 const selectedFile = ref<BookDockFile | null>(null)
 const showFinalizeDialog = ref(false)
@@ -231,6 +233,7 @@ function openFinalize() {
 }
 
 function openBulkEdit() {
+  if (isDemoRestrictedAccount.value) return
   showBulkEditDialog.value = true
 }
 

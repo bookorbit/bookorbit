@@ -28,7 +28,7 @@ function navigateToSection(section: ToolSection): void {
 </script>
 
 <template>
-  <div class="flex items-stretch h-11 px-6 border-b overflow-x-auto shrink-0 scrollbar-none snap-x snap-mandatory md:snap-none">
+  <div class="flex items-stretch h-11 px-4 border-b overflow-x-auto shrink-0 scrollbar-none snap-x snap-mandatory md:snap-none">
     <button
       v-for="section in sections"
       :key="section.routeName"

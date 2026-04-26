@@ -1,6 +1,8 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Readable } from 'stream';
+import { Permission } from '@bookorbit/types';
 
+import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { BookDockController } from './book-dock.controller';
 
 vi.mock('fs', () => ({
@@ -160,5 +162,13 @@ describe('BookDockController', () => {
     expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, MOCK_USER.isSuperuser);
     expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, [1], false, [], 2, 3, [], undefined, undefined);
     expect(watcherService.rescan).toHaveBeenCalled();
+  });
+
+  it('marks bulk edit endpoint as demo-restricted', () => {
+    expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, BookDockController.prototype.bulkEdit)).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot perform bulk edits',
+    });
+    expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, BookDockController.prototype.finalize)).toBeUndefined();
   });
 });

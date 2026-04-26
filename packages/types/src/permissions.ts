@@ -4,6 +4,7 @@ export enum Permission {
   LibraryUpload = "library_upload",
   LibraryEditMetadata = "library_edit_metadata",
   LibraryDeleteBooks = "library_delete_books",
+  DemoRestricted = "demo_restricted",
 
   // Devices & Access
   KoboSync = "kobo_sync",
@@ -30,6 +31,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.LibraryUpload]: "Upload books",
   [Permission.LibraryEditMetadata]: "Edit metadata",
   [Permission.LibraryDeleteBooks]: "Delete books",
+  [Permission.DemoRestricted]: "Demo restricted",
   [Permission.KoboSync]: "Kobo sync",
   [Permission.OpdsAccess]: "OPDS access",
   [Permission.BookDockAccess]: "Book Dock",

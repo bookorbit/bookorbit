@@ -25,6 +25,7 @@ import type { BookDockMetadata } from '@bookorbit/types';
 import { AuditAction, AuditResource } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { MultipartRequest } from '../../common/types/multipart-request';
@@ -163,6 +164,7 @@ export class BookDockController {
   }
 
   @Post('files/bulk-edit')
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   bulkEdit(@CurrentUser() user: RequestUser, @Body() dto: BulkEditBookDockDto) {
     return this.service.bulkEdit(
       dto.fileIds,

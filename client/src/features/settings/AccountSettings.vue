@@ -7,6 +7,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
 import { generatePkce } from '@/features/auth/composables/useOidc'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { MAX_PROFILE_AVATAR_BYTES, useProfileAvatar } from '@/features/auth/composables/useProfileAvatar'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -14,6 +15,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 
 const { user, me } = useAuth()
+const { isDemoRestrictedAccount } = usePermissions()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { uploading, removing, uploadAvatar, removeAvatar } = useProfileAvatar()
 const { resetTour } = useOnboardingTour()
@@ -26,6 +28,7 @@ const removeAvatarConfirmOpen = ref(false)
 const profileCardOpen = ref(true)
 const avatarCardOpen = ref(false)
 const isMobile = useMediaQuery('(max-width: 767px)')
+const DEMO_RESTRICTED_ACCOUNT_MESSAGE = 'Demo-restricted account cannot edit account settings'
 
 const formName = ref('')
 
@@ -51,12 +54,24 @@ const saveFeedback = computed(() => {
   if (profileState.value === 'saved') return 'All changes saved'
   return ''
 })
+const accountEditBlocked = computed(() => isDemoRestrictedAccount.value)
+const canChangePassword = computed(
+  () => !accountEditBlocked.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
+)
+
+function shouldBlockAccountEdit(): boolean {
+  if (!accountEditBlocked.value) return false
+  toast.error(DEMO_RESTRICTED_ACCOUNT_MESSAGE)
+  return true
+}
 
 function triggerFileDialog() {
+  if (shouldBlockAccountEdit()) return
   fileInput.value?.click()
 }
 
 async function onFileSelected(event: Event) {
+  if (shouldBlockAccountEdit()) return
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -72,6 +87,10 @@ async function onFileSelected(event: Event) {
 }
 
 async function onRemoveAvatar() {
+  if (shouldBlockAccountEdit()) {
+    removeAvatarConfirmOpen.value = false
+    return
+  }
   removeAvatarConfirmOpen.value = false
   try {
     await removeAvatar()
@@ -83,6 +102,7 @@ async function onRemoveAvatar() {
 }
 
 async function saveProfile() {
+  if (shouldBlockAccountEdit()) return
   if (!user.value) return
   profileError.value = null
   const trimmedName = formName.value.trim()
@@ -174,6 +194,7 @@ function availableForLinking(): OidcProviderPublic[] {
 }
 
 async function initiateOidcLink(provider: OidcProviderPublic) {
+  if (shouldBlockAccountEdit()) return
   linkingSlug.value = provider.slug
   try {
     const stateRes = await api(`/api/v1/auth/oidc/${provider.slug}/link-state`, { method: 'POST' })
@@ -204,6 +225,7 @@ async function initiateOidcLink(provider: OidcProviderPublic) {
 }
 
 async function confirmUnlink() {
+  if (shouldBlockAccountEdit()) return
   if (!unlinkPassword.value || !unlinkTarget.value) return
   unlinking.value = true
   try {
@@ -229,6 +251,7 @@ async function confirmUnlink() {
 }
 
 function openUnlinkDialog(identity: LinkedIdentity) {
+  if (shouldBlockAccountEdit()) return
   unlinkTarget.value = identity
   unlinkPassword.value = ''
   unlinkDialogOpen.value = true
@@ -264,6 +287,12 @@ function closeUnlinkDialog() {
       </button>
 
       <div v-show="profileCardOpen || !isMobile" class="space-y-4">
+        <p
+          v-if="accountEditBlocked"
+          class="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+        >
+          Demo-restricted account: editing profile, password, avatar, and linked identities is disabled.
+        </p>
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="space-y-1.5 sm:col-span-2">
             <label class="settings-label">Username</label>
@@ -280,7 +309,11 @@ function closeUnlinkDialog() {
               v-model="formName"
               type="text"
               autocomplete="name"
-              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              :readonly="accountEditBlocked"
+              :class="[
+                'w-full rounded-md border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50',
+                accountEditBlocked ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : 'bg-background text-foreground',
+              ]"
             />
           </div>
           <div class="space-y-1.5">
@@ -296,14 +329,14 @@ function closeUnlinkDialog() {
         </div>
 
         <div class="hidden md:flex flex-wrap items-center gap-2">
-          <button class="settings-btn-primary" :disabled="!profileChanged || profileBusy" @click="saveProfile">
+          <button class="settings-btn-primary" :disabled="!profileChanged || profileBusy || accountEditBlocked" @click="saveProfile">
             <Save :size="14" />
             {{ savingProfile ? 'Saving...' : 'Save profile' }}
           </button>
           <button
-            v-if="user?.provisioningMethod !== 'oidc' && user?.provisioningMethod !== 'shared'"
+            v-if="canChangePassword"
             class="settings-btn-outline inline-flex items-center gap-2"
-            :disabled="profileBusy"
+            :disabled="profileBusy || accountEditBlocked"
             @click="openChangePassword()"
           >
             <KeyRound :size="14" />
@@ -317,9 +350,9 @@ function closeUnlinkDialog() {
 
         <div class="md:hidden flex flex-wrap items-center gap-2">
           <button
-            v-if="user?.provisioningMethod !== 'oidc' && user?.provisioningMethod !== 'shared'"
+            v-if="canChangePassword"
             class="settings-btn-outline inline-flex items-center gap-2"
-            :disabled="profileBusy"
+            :disabled="profileBusy || accountEditBlocked"
             @click="openChangePassword()"
           >
             <KeyRound :size="14" />
@@ -355,16 +388,16 @@ function closeUnlinkDialog() {
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <input ref="fileInput" type="file" accept="image/*" class="hidden" :disabled="profileBusy" @change="onFileSelected" />
+          <input ref="fileInput" type="file" accept="image/*" class="hidden" :disabled="profileBusy || accountEditBlocked" @change="onFileSelected" />
 
-          <button class="settings-btn-primary" :disabled="profileBusy" @click="triggerFileDialog">
+          <button class="settings-btn-primary" :disabled="profileBusy || accountEditBlocked" @click="triggerFileDialog">
             <Upload :size="14" />
             {{ uploading ? 'Uploading...' : hasAvatar ? 'Replace picture' : 'Upload picture' }}
           </button>
 
           <button
             class="settings-btn-outline inline-flex items-center gap-2"
-            :disabled="profileBusy || !hasAvatar"
+            :disabled="profileBusy || !hasAvatar || accountEditBlocked"
             @click="removeAvatarConfirmOpen = true"
           >
             <Trash2 :size="14" />
@@ -376,7 +409,11 @@ function closeUnlinkDialog() {
 
     <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
       <div class="flex items-center gap-2">
-        <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="!profileChanged || profileBusy" @click="saveProfile">
+        <button
+          class="settings-btn-primary flex-1 min-h-10 justify-center"
+          :disabled="!profileChanged || profileBusy || accountEditBlocked"
+          @click="saveProfile"
+        >
           <Save :size="14" />
           {{ savingProfile ? 'Saving...' : 'Save profile' }}
         </button>
@@ -409,7 +446,8 @@ function closeUnlinkDialog() {
           </div>
           <button
             type="button"
-            class="shrink-0 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors"
+            :disabled="accountEditBlocked"
+            class="shrink-0 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             @click="openUnlinkDialog(identity)"
           >
             Unlink
@@ -425,7 +463,7 @@ function closeUnlinkDialog() {
             v-for="provider in availableForLinking()"
             :key="provider.slug"
             type="button"
-            :disabled="linkingSlug !== null"
+            :disabled="linkingSlug !== null || accountEditBlocked"
             class="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
             @click="initiateOidcLink(provider)"
           >
@@ -459,7 +497,8 @@ function closeUnlinkDialog() {
           Cancel
         </button>
         <button
-          class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+          :disabled="accountEditBlocked"
+          class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
           @click="onRemoveAvatar"
         >
           Remove
@@ -502,7 +541,7 @@ function closeUnlinkDialog() {
           Cancel
         </button>
         <button
-          :disabled="unlinking || !unlinkPassword"
+          :disabled="unlinking || !unlinkPassword || accountEditBlocked"
           class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
           @click="confirmUnlink"
         >

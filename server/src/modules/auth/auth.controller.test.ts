@@ -1,5 +1,7 @@
 import 'reflect-metadata';
+import { Permission } from '@bookorbit/types';
 
+import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { AuthController } from './auth.controller';
 
 function makeController() {
@@ -177,5 +179,33 @@ describe('AuthController', () => {
     expect(createMlTtl).toBe(60_000);
     expect(loginMlLimit).toBe(10);
     expect(loginMlTtl).toBe(60_000);
+  });
+
+  it('defines forbidden-permission metadata for account edit endpoints', () => {
+    const changePasswordForbidden = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, AuthController.prototype.changePassword) as {
+      permission: Permission;
+      message?: string;
+    };
+    const oidcLinkForbidden = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, AuthController.prototype.oidcGenerateLinkState) as {
+      permission: Permission;
+      message?: string;
+    };
+    const oidcUnlinkForbidden = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, AuthController.prototype.oidcUnlinkIdentity) as {
+      permission: Permission;
+      message?: string;
+    };
+
+    expect(changePasswordForbidden).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot edit account settings',
+    });
+    expect(oidcLinkForbidden).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot edit account settings',
+    });
+    expect(oidcUnlinkForbidden).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot edit account settings',
+    });
   });
 });

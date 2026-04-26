@@ -38,6 +38,10 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
     label: 'Administration',
     permissions: [Permission.ManageLibraries, Permission.ManageMetadataConfig, Permission.ManageAppSettings, Permission.ManageUsers],
   },
+  {
+    label: 'Restrictions',
+    permissions: [Permission.DemoRestricted],
+  },
 ]
 
 const name = ref('')

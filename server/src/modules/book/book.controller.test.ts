@@ -3,9 +3,11 @@ import type { MockedFunction } from 'vitest';
 import archiver from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
+import { Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
+import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { BookController } from './book.controller';
 
 vi.mock('archiver', () => ({
@@ -587,6 +589,39 @@ describe('BookController', () => {
     expect(updateLocksAudit.description({ params: { id: '44' } })).toBe('Updated metadata locks for book #44');
     expect(refreshAudit.getResourceId({ params: { id: '44' } })).toBe(44);
     expect(refreshAudit.description({ params: { id: '44' } })).toBe('Refreshed metadata for book #44');
+  });
+
+  it('marks bulk-edit endpoints as demo-restricted', () => {
+    const message = 'Demo-restricted account cannot perform bulk edits';
+    const bulkMethods = [
+      BookController.prototype.bulkRefreshMetadata,
+      BookController.prototype.bulkReExtractCover,
+      BookController.prototype.bulkSetStatus,
+      BookController.prototype.bulkSetRating,
+      BookController.prototype.bulkUpdateTags,
+      BookController.prototype.bulkSetMetadataLock,
+    ];
+
+    for (const method of bulkMethods) {
+      expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, method)).toEqual({
+        permission: Permission.DemoRestricted,
+        message,
+      });
+    }
+
+    expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, BookController.prototype.refreshMetadata)).toBeUndefined();
+  });
+
+  it('marks bulk-download endpoints as demo-restricted', () => {
+    const message = 'Demo-restricted account cannot perform bulk downloads';
+    const bulkDownloadMethods = [BookController.prototype.exportBooks, BookController.prototype.exportBooksDownload];
+
+    for (const method of bulkDownloadMethods) {
+      expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, method)).toEqual({
+        permission: Permission.DemoRestricted,
+        message,
+      });
+    }
   });
 
   it('preserves valid surrogate pairs while stripping lone surrogates in download filenames', async () => {

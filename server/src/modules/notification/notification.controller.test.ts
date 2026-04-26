@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Permission } from '@bookorbit/types';
 
+import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { NotificationController } from './notification.controller';
 
@@ -122,6 +123,13 @@ describe('NotificationController', () => {
       await controller.clearAll(mockUser);
 
       expect(service.clearAll).toHaveBeenCalledWith(42);
+    });
+  });
+
+  it('marks controller as demo-restricted', () => {
+    expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, NotificationController)).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot access notifications',
     });
   });
 });

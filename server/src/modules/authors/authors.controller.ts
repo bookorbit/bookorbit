@@ -25,6 +25,7 @@ import { map, Observable } from 'rxjs';
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
@@ -80,6 +81,7 @@ export class AuthorsController {
 
   @Post('bulk-refresh-metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   async bulkRefreshMetadata(@Body() dto: BulkAuthorIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',

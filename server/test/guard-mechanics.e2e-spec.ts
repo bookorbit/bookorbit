@@ -14,7 +14,9 @@ import {
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Permission } from '@bookorbit/types';
 
+import { ForbidPermission } from '../src/common/decorators/forbid-permission.decorator';
 import { IS_PUBLIC_KEY, Public } from '../src/common/decorators/public.decorator';
 import { RequirePermission } from '../src/common/decorators/require-permission.decorator';
 import { PermissionGuard } from '../src/common/guards/permission.guard';
@@ -35,7 +37,7 @@ const userRole = {
   permissions: [] as Array<{ id: number; name: string }>,
 };
 
-function makeUser(permissionNames: string[]): RequestUser {
+function makeUser(permissionNames: Permission[]): RequestUser {
   const permissions = permissionNames as RequestUser['permissions'];
   return {
     id: 1,
@@ -70,12 +72,17 @@ class TestJwtAuthGuard implements CanActivate {
     const auth = request.headers.authorization;
 
     if (auth === 'Bearer admin-token') {
-      request.user = makeUser(['manage_users']);
+      request.user = makeUser([Permission.ManageUsers]);
       return true;
     }
 
     if (auth === 'Bearer user-token') {
       request.user = makeUser([]);
+      return true;
+    }
+
+    if (auth === 'Bearer demo-admin-token') {
+      request.user = makeUser([Permission.ManageUsers, Permission.DemoRestricted]);
       return true;
     }
 
@@ -90,7 +97,7 @@ class SmokeAuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() body: LoginBody) {
     if (body.username === 'admin' && body.password === 'admin') {
-      return { accessToken: 'admin-token', user: makeUser(['manage_users']) };
+      return { accessToken: 'admin-token', user: makeUser([Permission.ManageUsers]) };
     }
     return { accessToken: 'user-token', user: makeUser([]) };
   }
@@ -104,8 +111,15 @@ class SmokeProtectedController {
   }
 
   @Get('admin')
-  @RequirePermission('manage_users')
+  @RequirePermission(Permission.ManageUsers)
   getAdmin() {
+    return { ok: true };
+  }
+
+  @Get('bulk-like')
+  @RequirePermission(Permission.ManageUsers)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
+  getBulkLike() {
     return { ok: true };
   }
 }
@@ -167,6 +181,26 @@ describe('Guard mechanics (e2e)', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/smoke/admin',
+      headers: { authorization: 'Bearer admin-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+  });
+
+  it('GET /api/v1/smoke/bulk-like denies users with demo restriction marker', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/smoke/bulk-like',
+      headers: { authorization: 'Bearer demo-admin-token' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().message).toBe('Demo-restricted account cannot perform bulk edits');
+  });
+
+  it('GET /api/v1/smoke/bulk-like allows users without demo restriction marker', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/smoke/bulk-like',
       headers: { authorization: 'Bearer admin-token' },
     });
     expect(res.statusCode).toBe(200);

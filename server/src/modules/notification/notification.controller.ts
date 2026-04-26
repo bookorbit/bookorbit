@@ -2,6 +2,7 @@ import { Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param
 import { Permission } from '@bookorbit/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { ListNotificationsDto } from './dto/list-notifications.dto';
@@ -9,6 +10,7 @@ import { NotificationService } from './notification.service';
 
 @Controller('notifications')
 @RequirePermission(Permission.NotificationAccess)
+@ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot access notifications')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 

@@ -28,6 +28,7 @@ describe('PermissionService', () => {
     const user = makeUser({ isSuperuser: true, permissions: [] });
 
     expect(service.userHas(user, Permission.ManageUsers)).toBe(true);
+    expect(service.userHasExplicit(user, Permission.ManageUsers)).toBe(false);
   });
 
   it('returns true when user has the specific permission', () => {
@@ -36,6 +37,7 @@ describe('PermissionService', () => {
     });
 
     expect(service.userHas(user, Permission.KoboSync)).toBe(true);
+    expect(service.userHasExplicit(user, Permission.KoboSync)).toBe(true);
   });
 
   it('returns false when permission does not exist', () => {
@@ -49,5 +51,7 @@ describe('PermissionService', () => {
 
     expect(() => service.userHas(malformedUser, Permission.LibraryDownload)).not.toThrow();
     expect(service.userHas(malformedUser, Permission.LibraryDownload)).toBe(false);
+    expect(() => service.userHasExplicit(malformedUser, Permission.LibraryDownload)).not.toThrow();
+    expect(service.userHasExplicit(malformedUser, Permission.LibraryDownload)).toBe(false);
   });
 });

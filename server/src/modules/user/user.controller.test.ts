@@ -12,6 +12,7 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
+import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { UserController } from './user.controller';
 import { MAX_USER_AVATAR_BYTES } from './user-avatar.service';
 
@@ -200,5 +201,33 @@ describe('UserController', () => {
     expect(superuserAudit.getResourceId({ params: { id: '17' } })).toBe(17);
     expect(superuserAudit.description({ params: { id: '17' }, body: { isSuperuser: true } }, null)).toBe('Enabled superuser for user #17');
     expect(superuserAudit.description({ params: { id: '17' }, body: { isSuperuser: false } }, null)).toBe('Disabled superuser for user #17');
+  });
+
+  it('defines forbidden-permission metadata for self account edit endpoints', () => {
+    const updateProfileForbidden = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, UserController.prototype.updateMe) as {
+      permission: Permission;
+      message?: string;
+    };
+    const uploadAvatarForbidden = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, UserController.prototype.uploadMyAvatar) as {
+      permission: Permission;
+      message?: string;
+    };
+    const deleteAvatarForbidden = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, UserController.prototype.deleteMyAvatar) as {
+      permission: Permission;
+      message?: string;
+    };
+
+    expect(updateProfileForbidden).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot edit account settings',
+    });
+    expect(uploadAvatarForbidden).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot edit account settings',
+    });
+    expect(deleteAvatarForbidden).toEqual({
+      permission: Permission.DemoRestricted,
+      message: 'Demo-restricted account cannot edit account settings',
+    });
   });
 });

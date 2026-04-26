@@ -26,6 +26,7 @@ import { stat } from 'fs/promises';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
+import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -64,6 +65,7 @@ export class UserController {
   }
 
   @Patch('me')
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   @Auditable({
     action: AuditAction.UserSelfUpdate,
     resource: AuditResource.User,
@@ -81,6 +83,7 @@ export class UserController {
   }
 
   @Post('me/avatar')
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   @Auditable({
     action: AuditAction.UserSelfUpdate,
     resource: AuditResource.User,
@@ -111,6 +114,7 @@ export class UserController {
   }
 
   @Delete('me/avatar')
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   @Auditable({
     action: AuditAction.UserSelfUpdate,
     resource: AuditResource.User,

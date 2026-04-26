@@ -5,7 +5,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
 const router = useRouter()
-const { isSuperuser, userPermissions } = usePermissions()
+const { isSuperuser, userPermissions, isDemoRestrictedAccount } = usePermissions()
 
 interface Section {
   label: string
@@ -55,7 +55,9 @@ const sections = computed<Section[]>(() => {
 
   result.push({ label: 'Account', routeName: 'settings-account' })
 
-  result.push({ label: 'Notifications', routeName: 'settings-notifications' })
+  if (!isDemoRestrictedAccount.value) {
+    result.push({ label: 'Notifications', routeName: 'settings-notifications' })
+  }
 
   if (su) {
     result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
@@ -66,7 +68,7 @@ const sections = computed<Section[]>(() => {
 </script>
 
 <template>
-  <div class="flex items-stretch h-11 px-6 border-b overflow-x-auto shrink-0 scrollbar-none snap-x snap-mandatory md:snap-none">
+  <div class="flex items-stretch h-11 px-4 border-b overflow-x-auto shrink-0 scrollbar-none snap-x snap-mandatory md:snap-none">
     <button
       v-for="section in sections"
       :key="section.routeName"

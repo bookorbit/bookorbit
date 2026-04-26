@@ -41,7 +41,7 @@ const router = useRouter()
 const route = useRoute()
 const { user, logout } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
-const { hasPermission } = usePermissions()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 const { summary: bookDockSummary, fetchSummary: fetchBookDockSummary, subscribe: subscribeBookDockSummary } = useBookDockSummary()
 const { subscribe: subscribeNotifications } = useNotifications()
@@ -51,7 +51,10 @@ const isBookDockActive = computed(() => route.name === 'book-dock')
 const isStatisticsActive = computed(() => route.name === 'statistics')
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
-const canChangePassword = computed(() => user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared')
+const canChangePassword = computed(
+  () => !isDemoRestrictedAccount.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
+)
+const canAccessNotifications = computed(() => hasPermission('notification_access') && !isDemoRestrictedAccount.value)
 
 function navigateToBookDock() {
   router.push({ name: 'book-dock' })
@@ -156,7 +159,7 @@ onMounted(() => {
     fetchBookDockSummary()
     subscribeBookDockSummary()
   }
-  if (hasPermission('notification_access')) {
+  if (canAccessNotifications.value) {
     subscribeNotifications()
   }
 })
@@ -442,7 +445,7 @@ function formatBadgeClass(fmt: string): string {
 
         <!-- Mobile: Notifications bell -->
         <div class="md:hidden">
-          <NotificationSheet v-if="hasPermission('notification_access')" :icon-radius-class="iconRadiusClass" />
+          <NotificationSheet v-if="canAccessNotifications" :icon-radius-class="iconRadiusClass" />
         </div>
 
         <!-- Mobile: Kebab Menu -->
@@ -546,7 +549,7 @@ function formatBadgeClass(fmt: string): string {
           </Tooltip>
 
           <!-- Notifications button -->
-          <NotificationSheet v-if="hasPermission('notification_access')" :icon-radius-class="iconRadiusClass" />
+          <NotificationSheet v-if="canAccessNotifications" :icon-radius-class="iconRadiusClass" />
 
           <!-- Statistics button -->
           <Tooltip>
