@@ -17,6 +17,7 @@ import {
   collectionBooks,
   collections,
   readingProgress,
+  userBookRatings,
   genres,
   libraries,
   narrators,
@@ -33,7 +34,6 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   updatedAt: books.updatedAt,
   publishedYear: bookMetadata.publishedYear,
   pageCount: bookMetadata.pageCount,
-  rating: bookMetadata.rating,
   publisher: bookMetadata.publisher,
 };
 
@@ -119,6 +119,11 @@ export class BookQueryBuilder {
         result.push(
           sql`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = books.id AND ubs.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
         );
+      } else if (field === 'rating') {
+        if (userId === undefined) throw new BadRequestException('rating sort requires an authenticated user');
+        result.push(
+          sql`(SELECT ubr.rating FROM user_book_ratings ubr WHERE ubr.book_id = books.id AND ubr.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
+        );
       } else if (field === 'random') {
         const daySeed = Math.floor(Date.now() / 86_400_000);
         const scopedSeed = daySeed + (userId ?? 0);
@@ -172,7 +177,8 @@ export class BookQueryBuilder {
       case 'pageCount':
         return this.numericRuleToSql(bookMetadata.pageCount, operator, value as number, valueTo as number | undefined);
       case 'rating':
-        return this.numericRuleToSql(bookMetadata.rating, operator, value as number, valueTo as number | undefined);
+        if (userId === undefined) throw new BadRequestException('rating filter requires an authenticated user');
+        return this.ratingRuleToSql(operator, value as number | undefined, valueTo as number | undefined, userId);
       case 'author':
         return this.authorRuleToSql(operator, value as string[]);
       case 'genre':
@@ -272,6 +278,40 @@ export class BookQueryBuilder {
         return isNull(col);
       case 'isNotEmpty':
         return isNotNull(col);
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
+    }
+  }
+
+  private ratingRuleToSql(operator: string, value: number | undefined, valueTo: number | undefined, userId: number): SQL {
+    const ratingExpr = sql<number>`(SELECT ${userBookRatings.rating} FROM ${userBookRatings} WHERE ${userBookRatings.bookId} = ${books.id} AND ${userBookRatings.userId} = ${userId})`;
+    switch (operator) {
+      case 'eq':
+        this.assertNumber(value, operator, 'value');
+        return sql`${ratingExpr} = ${value!}`;
+      case 'notEq':
+        this.assertNumber(value, operator, 'value');
+        return sql`${ratingExpr} <> ${value!}`;
+      case 'gt':
+        this.assertNumber(value, operator, 'value');
+        return sql`${ratingExpr} > ${value!}`;
+      case 'gte':
+        this.assertNumber(value, operator, 'value');
+        return sql`${ratingExpr} >= ${value!}`;
+      case 'lt':
+        this.assertNumber(value, operator, 'value');
+        return sql`${ratingExpr} < ${value!}`;
+      case 'lte':
+        this.assertNumber(value, operator, 'value');
+        return sql`${ratingExpr} <= ${value!}`;
+      case 'between':
+        this.assertNumber(value, operator, 'value');
+        this.assertNumber(valueTo, operator, 'valueTo');
+        return sql`${ratingExpr} >= ${value!} and ${ratingExpr} <= ${valueTo!}`;
+      case 'isEmpty':
+        return sql`${ratingExpr} is null`;
+      case 'isNotEmpty':
+        return sql`${ratingExpr} is not null`;
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
     }

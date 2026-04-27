@@ -99,7 +99,6 @@ export class FileWriteRepository {
       seriesIndex: meta.seriesIndex,
       isbn10: meta.isbn10,
       isbn13: meta.isbn13,
-      rating: meta.rating,
       googleBooksId: meta.googleBooksId,
       goodreadsId: meta.goodreadsId,
       amazonId: meta.amazonId,

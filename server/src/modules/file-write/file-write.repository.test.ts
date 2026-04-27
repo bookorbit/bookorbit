@@ -48,7 +48,6 @@ describe('FileWriteRepository', () => {
       seriesIndex: 1,
       isbn10: '123',
       isbn13: '978123',
-      rating: 8,
       googleBooksId: 'g',
       goodreadsId: 'gr',
       amazonId: 'a',

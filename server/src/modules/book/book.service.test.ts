@@ -85,6 +85,7 @@ function makeService() {
     findTagsByBookIds: vi.fn(),
     findPrimaryFile: vi.fn(),
     findById: vi.fn(),
+    findRatingByBookAndUser: vi.fn().mockResolvedValue(null),
     findCollectionsByBookId: vi.fn(),
     findKoboReadingState: vi.fn(),
     findKoboSnapshotState: vi.fn(),
@@ -847,11 +848,11 @@ describe('BookService', () => {
         5,
         expect.objectContaining({
           title: null,
-          rating: 4,
           updatedAt: expect.any(Date),
         }),
         expect.anything(),
       );
+      expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([5], 4, user.id);
       expect(metadataService.replaceAuthors).toHaveBeenCalledWith(
         5,
         [
@@ -1670,7 +1671,7 @@ describe('BookService', () => {
 
       await service.bulkSetRating([3, 5], 4, user);
 
-      expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3, 5], 4);
+      expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3, 5], 4, 42);
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(1, 3, 'auto', 42);
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(2, 5, 'auto', 42);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(1, 3);
@@ -1791,6 +1792,7 @@ describe('BookService', () => {
       userBookStatusService.findOne.mockResolvedValue({ status: 'reading' });
       comicMetadataService.findByBookId.mockResolvedValue({ issueNumber: '1', teams: ['House Atreides'] });
       bookRepo.findCollectionsByBookId.mockResolvedValue([{ id: 3, name: 'Favorites' }]);
+      bookRepo.findRatingByBookAndUser.mockResolvedValue(5);
 
       const result = await service.getDetail(9, user);
 

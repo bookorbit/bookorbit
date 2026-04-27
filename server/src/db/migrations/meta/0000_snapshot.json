@@ -1,5 +1,5 @@
 {
-  "id": "2de4dd88-2590-4da4-b868-f9341ffe3e9f",
+  "id": "e9ca331e-b35a-4d80-a54b-28759d1e1c61",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -5282,6 +5282,104 @@
         "reading_sessions_ended_after_started_chk": {
           "name": "reading_sessions_ended_after_started_chk",
           "value": "\"reading_sessions\".\"ended_at\" >= \"reading_sessions\".\"started_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.user_book_ratings": {
+      "name": "user_book_ratings",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating": {
+          "name": "rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ubr_user_id_idx": {
+          "name": "ubr_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ubr_book_id_idx": {
+          "name": "ubr_book_id_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_book_ratings_user_id_users_id_fk": {
+          "name": "user_book_ratings_user_id_users_id_fk",
+          "tableFrom": "user_book_ratings",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_book_ratings_book_id_books_id_fk": {
+          "name": "user_book_ratings_book_id_books_id_fk",
+          "tableFrom": "user_book_ratings",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_book_ratings_user_id_book_id_pk": {
+          "name": "user_book_ratings_user_id_book_id_pk",
+          "columns": ["user_id", "book_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "user_book_ratings_rating_range_chk": {
+          "name": "user_book_ratings_rating_range_chk",
+          "value": "\"user_book_ratings\".\"rating\" >= 1 and \"user_book_ratings\".\"rating\" <= 5"
         }
       },
       "isRLSEnabled": false

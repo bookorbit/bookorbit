@@ -42,6 +42,32 @@ export const userBookStatus = pgTable(
 export type UserBookStatusRow = typeof userBookStatus.$inferSelect;
 export type NewUserBookStatus = typeof userBookStatus.$inferInsert;
 
+export const userBookRatings = pgTable(
+  'user_book_ratings',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    rating: integer('rating').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookId] }),
+    index('ubr_user_id_idx').on(t.userId),
+    index('ubr_book_id_idx').on(t.bookId),
+    check('user_book_ratings_rating_range_chk', sql`${t.rating} >= 1 and ${t.rating} <= 5`),
+  ],
+);
+
+export type UserBookRatingRow = typeof userBookRatings.$inferSelect;
+export type NewUserBookRating = typeof userBookRatings.$inferInsert;
+
 export const readingProgress = pgTable(
   'reading_progress',
   {

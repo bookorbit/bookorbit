@@ -26,6 +26,7 @@ import {
   narrators,
   audiobookProgress,
   readingProgress,
+  userBookRatings,
   tags,
   userBookStatus,
 } from '../../db/schema';
@@ -93,12 +94,13 @@ export class BookRepository {
           seriesIndex: bookMetadata.seriesIndex,
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
-          rating: bookMetadata.rating,
+          rating: userBookRatings.rating,
           coverSource: bookMetadata.coverSource,
           lockedFields: bookMetadata.lockedFields,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, userId)))
         .where(where)
         .orderBy(...orderBy)
         .limit(limit)
@@ -268,7 +270,7 @@ export class BookRepository {
           book_metadata.series_index,
           book_metadata.published_year,
           book_metadata.language,
-          book_metadata.rating,
+          ubr.rating,
           book_metadata.cover_source,
           book_metadata.locked_fields,
           book_metadata.publisher,
@@ -280,6 +282,7 @@ export class BookRepository {
           sc.cover_book_ids
         FROM books
         LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+        LEFT JOIN user_book_ratings ubr ON ubr.book_id = books.id AND ubr.user_id = ${userId}
         LEFT JOIN series_agg sa
           ON sa.norm_series = NULLIF(lower(btrim(book_metadata.series_name)), '')
           AND sa.library_id = books.library_id
@@ -418,6 +421,15 @@ export class BookRepository {
     ]);
 
     return { book, authorRows, genreRows, tagRows, fileRows, narratorRows };
+  }
+
+  async findRatingByBookAndUser(bookId: number, userId: number): Promise<number | null> {
+    const [row] = await this.db
+      .select({ rating: userBookRatings.rating })
+      .from(userBookRatings)
+      .where(and(eq(userBookRatings.bookId, bookId), eq(userBookRatings.userId, userId)))
+      .limit(1);
+    return row?.rating ?? null;
   }
 
   async findCollectionsByBookId(bookId: number, userId: number): Promise<{ id: number; name: string }[]> {
@@ -704,9 +716,20 @@ export class BookRepository {
     await this.db.delete(books).where(inArray(books.id, bookIds));
   }
 
-  async bulkSetRating(bookIds: number[], rating: number | null): Promise<void> {
+  async bulkSetRating(bookIds: number[], rating: number | null, userId: number): Promise<void> {
     if (bookIds.length === 0) return;
-    await this.db.update(bookMetadata).set({ rating, updatedAt: new Date() }).where(inArray(bookMetadata.bookId, bookIds));
+    if (rating === null) {
+      await this.db.delete(userBookRatings).where(and(eq(userBookRatings.userId, userId), inArray(userBookRatings.bookId, bookIds)));
+      return;
+    }
+
+    await this.db
+      .insert(userBookRatings)
+      .values(bookIds.map((bookId) => ({ userId, bookId, rating })))
+      .onConflictDoUpdate({
+        target: [userBookRatings.userId, userBookRatings.bookId],
+        set: { rating, updatedAt: new Date() },
+      });
   }
 
   async findTagsByBookIds(bookIds: number[], executor: MetadataReadExecutor = this.db): Promise<Map<number, string[]>> {

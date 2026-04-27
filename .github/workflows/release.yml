@@ -81,9 +81,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: write
       issues: write
       pull-requests: write
+      packages: read
     outputs:
       published: ${{ steps.semantic.outputs.new_release_published }}
       version: ${{ steps.semantic.outputs.new_release_version }}
@@ -123,6 +125,30 @@ jobs:
           fi
           echo "CI verification passed: ${success_count} successful run(s) found."
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify SHA image exists in GHCR
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          IMAGE_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          SOURCE_TAG="ghcr.io/${IMAGE_NAME}:sha-${COMMIT_SHA}"
+          if ! docker buildx imagetools inspect "${SOURCE_TAG}" > /dev/null 2>&1; then
+            echo "::error::Multi-arch image sha-${COMMIT_SHA} not found in GHCR. Wait for the Container Image workflow to complete for this commit before releasing."
+            exit 1
+          fi
+          echo "Image sha-${COMMIT_SHA} verified in GHCR."
+
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
         with:
@@ -131,10 +157,23 @@ jobs:
 
       - name: Run semantic-release
         id: semantic
-        uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
+        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BEFORE_TAG=$(git tag --sort=-v:refname | head -1 || true)
+          pnpm exec semantic-release
+          git fetch --tags --quiet
+          AFTER_TAG=$(git tag --sort=-v:refname | head -1 || true)
+          if [[ -n "$AFTER_TAG" && "$AFTER_TAG" != "$BEFORE_TAG" ]]; then
+            VERSION="${AFTER_TAG#v}"
+            echo "new_release_published=true" >> "$GITHUB_OUTPUT"
+            echo "new_release_version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "new_release_git_tag=${AFTER_TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "new_release_published=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Release summary
         if: steps.semantic.outputs.new_release_published == 'true'
@@ -148,63 +187,21 @@ jobs:
           echo "- **Version:** ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Tag:** ${TAG}" >> "$GITHUB_STEP_SUMMARY"
 
-  docker-publish:
-    name: Publish Docker Image
+  docker-promote:
+    name: Promote Docker Image
     needs: [release]
     if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write
       packages: write
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ needs.release.outputs.tag }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-
-      - name: Resolve image tags
-        id: tags
-        shell: bash
-        env:
-          VERSION: ${{ needs.release.outputs.version }}
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE: ${{ env.IMAGE_NAME }}
-        run: |
-          FULL_IMAGE="${REGISTRY}/${IMAGE}"
-          echo "scan_tag=${FULL_IMAGE}:${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
-          echo "${FULL_IMAGE}:${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "${FULL_IMAGE}:latest" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Build image
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: ${{ steps.tags.outputs.tags }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ steps.tags.outputs.scan_tag }}
-          format: table
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
 
       - name: Log in to GHCR
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
@@ -213,21 +210,97 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image
+      - name: Verify SHA image and resolve digest
+        id: source
         shell: bash
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE_NAME }}
+          SHA: ${{ github.sha }}
         run: |
-          while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            docker push "$tag"
-          done <<'EOF'
-          ${{ steps.tags.outputs.tags }}
-          EOF
+          FULL_IMAGE="${REGISTRY}/${IMAGE}"
+          SOURCE_TAG="${FULL_IMAGE}:sha-${SHA}"
+          if ! docker buildx imagetools inspect "${SOURCE_TAG}" > /dev/null 2>&1; then
+            echo "::error::Multi-arch image sha-${SHA} not found in GHCR. Wait for the Container Image workflow to complete for this commit before releasing."
+            exit 1
+          fi
+          DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "${SOURCE_TAG}" | jq -r '.digest')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "image=${FULL_IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Promote to version and latest
+        shell: bash
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          DIGEST: ${{ steps.source.outputs.digest }}
+          IMAGE: ${{ steps.source.outputs.image }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            "${IMAGE}@${DIGEST}"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}@${DIGEST}"
+
+      - name: Inspect promoted manifests
+        shell: bash
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          IMAGE: ${{ steps.source.outputs.image }}
+        run: |
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+          docker buildx imagetools inspect "${IMAGE}:latest"
+
+      - name: Enrich release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+          VERSION: ${{ needs.release.outputs.version }}
+          SHA: ${{ github.sha }}
+          IMAGE: ${{ steps.source.outputs.image }}
+          DIGEST: ${{ steps.source.outputs.digest }}
+        run: |
+          set -euo pipefail
+          BODY_FILE="$(mktemp)"
+          gh release view "${TAG}" --repo "${GH_REPO}" --json body --jq '.body' > "${BODY_FILE}"
+
+          if grep -q "<!-- release-metadata -->" "${BODY_FILE}"; then
+            echo "Release metadata already present; skipping."
+            exit 0
+          fi
+
+          PREV_TAG=$(gh release list \
+            --repo "${GH_REPO}" \
+            --exclude-drafts \
+            --exclude-pre-releases \
+            --limit 100 \
+            --json tagName \
+            --jq '.[].tagName' \
+            | awk -v current="${TAG}" '$0 != current {print; exit}')
+
+          {
+            echo ""
+            echo "<!-- release-metadata -->"
+            echo ""
+            if [[ -n "${PREV_TAG}" ]]; then
+              echo "[Full diff](https://github.com/${GH_REPO}/compare/${PREV_TAG}...${TAG})"
+              echo ""
+            fi
+            echo "### Release Artifact"
+            echo "- Image tags: \`${IMAGE}:${VERSION}\`, \`${IMAGE}:latest\`"
+          } >> "${BODY_FILE}"
+
+          gh release edit "${TAG}" --repo "${GH_REPO}" --notes-file "${BODY_FILE}"
 
       - name: Docker publish summary
         shell: bash
         env:
           VERSION: ${{ needs.release.outputs.version }}
+          SHA: ${{ github.sha }}
         run: |
-          echo "## Docker Image Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Docker Image Promoted" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Tags:** \`${VERSION}\`, \`latest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Source:** \`sha-${SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tags:** \`${VERSION}\`, \`latest\` (linux/amd64, linux/arm64)" >> "$GITHUB_STEP_SUMMARY"

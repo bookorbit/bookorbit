@@ -7,6 +7,11 @@ on:
     branches: [main]
   # Break-glass: bypasses CI/E2E gate. Use only when CI is broken and a hotfix image is urgently needed.
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: Rebuild even if image for this SHA already exists in GHCR
+        type: boolean
+        default: false
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -25,63 +30,17 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  image:
-    name: ${{ github.event_name == 'pull_request' && 'Build and Scan Image' || 'Build and Push Image' }}
-    if: >
-      github.event_name == 'pull_request' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+  # PR path: amd64-only build and scan for fast feedback. No push.
+  scan:
+    name: Build and Scan Image
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
-      packages: write
     steps:
-      - name: Resolve source and image tags
-        id: vars
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GH_REF: ${{ github.ref }}
-          GH_REF_NAME: ${{ github.ref_name }}
-          GH_SHA: ${{ github.sha }}
-          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$GH_REF" != "refs/heads/main" ]]; then
-            echo "workflow_dispatch is only supported from main."
-            exit 1
-          fi
-
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            SHA="$WORKFLOW_RUN_HEAD_SHA"
-          else
-            SHA="$GH_SHA"
-          fi
-
-          SHORT_SHA="${SHA:0:12}"
-          IMAGE="$REGISTRY/$IMAGE_NAME"
-
-          echo "checkout_ref=${SHA}" >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "scan_tag=${IMAGE}:sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            echo "should_push=false" >> "$GITHUB_OUTPUT"
-            echo "tags<<EOF" >> "$GITHUB_OUTPUT"
-            echo "${IMAGE}:sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_push=true" >> "$GITHUB_OUTPUT"
-            echo "tags<<EOF" >> "$GITHUB_OUTPUT"
-            echo "${IMAGE}:${GH_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "${IMAGE}:sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ steps.vars.outputs.checkout_ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
@@ -93,36 +52,239 @@ jobs:
           file: ./Dockerfile
           push: false
           load: true
-          tags: ${{ steps.vars.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-scan
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=container-image-yml-pr
+          cache-to: type=gha,mode=max,scope=container-image-yml-pr
 
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ steps.vars.outputs.scan_tag }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-scan
           format: table
           vuln-type: os,library
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
 
+  # Main push path: resolve context once, then build multi-arch natively in parallel.
+  prepare:
+    name: Resolve Build Context
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      source_sha: ${{ steps.ctx.outputs.source_sha }}
+      update_main: ${{ steps.ctx.outputs.update_main }}
+      skip_build: ${{ steps.ctx.outputs.skip_build }}
+    steps:
+      - name: Resolve build context
+        id: ctx
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GH_REF: ${{ github.ref }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_NAME: ${{ github.repository }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$GH_REF" != "refs/heads/main" ]]; then
+            echo "::error::workflow_dispatch is only supported from main."
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            SOURCE_SHA="$WORKFLOW_RUN_HEAD_SHA"
+            echo "update_main=true" >> "$GITHUB_OUTPUT"
+          else
+            SOURCE_SHA="$GH_SHA"
+            echo "update_main=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          IMAGE_LOWER=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            "https://ghcr.io/v2/${IMAGE_LOWER}/manifests/sha-${SOURCE_SHA}")
+          if [[ "$HTTP_STATUS" == "200" && "${FORCE_REBUILD}" != "true" ]]; then
+            echo "Image sha-${SOURCE_SHA} already exists in GHCR, skipping rebuild."
+            echo "skip_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-amd64:
+    name: Build and Push amd64
+    needs: [prepare]
+    if: needs.prepare.outputs.skip_build != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
       - name: Log in to GHCR
-        if: steps.vars.outputs.should_push == 'true'
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image
-        if: steps.vars.outputs.should_push == 'true'
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: ./Dockerfile
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          platforms: linux/amd64
+          cache-from: type=gha,scope=container-image-yml-amd64
+          cache-to: type=gha,mode=max,scope=container-image-yml-amd64
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/amd64
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  build-arm64:
+    name: Build and Push arm64
+    needs: [prepare]
+    if: needs.prepare.outputs.skip_build != 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: ./Dockerfile
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          platforms: linux/arm64
+          cache-from: type=gha,scope=container-image-yml-arm64
+          cache-to: type=gha,mode=max,scope=container-image-yml-arm64
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  merge-manifest:
+    name: Merge and Push Multi-Arch Manifest
+    needs: [prepare, build-amd64, build-arm64]
+    if: needs.prepare.outputs.skip_build != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create SHA manifest
         shell: bash
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE_NAME }}
+          SHA: ${{ needs.prepare.outputs.source_sha }}
+          AMD64_DIGEST: ${{ needs.build-amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ needs.build-arm64.outputs.digest }}
         run: |
-          while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            docker push "$tag"
-          done <<'EOF'
-          ${{ steps.vars.outputs.tags }}
-          EOF
+          FULL_IMAGE="${REGISTRY}/${IMAGE}"
+          docker buildx imagetools create \
+            --tag "${FULL_IMAGE}:sha-${SHA}" \
+            "${FULL_IMAGE}@${AMD64_DIGEST}" \
+            "${FULL_IMAGE}@${ARM64_DIGEST}"
+
+      - name: Update main tag
+        if: needs.prepare.outputs.update_main == 'true'
+        shell: bash
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE_NAME }}
+          SHA: ${{ needs.prepare.outputs.source_sha }}
+          AMD64_DIGEST: ${{ needs.build-amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ needs.build-arm64.outputs.digest }}
+        run: |
+          FULL_IMAGE="${REGISTRY}/${IMAGE}"
+          docker buildx imagetools create \
+            --tag "${FULL_IMAGE}:main" \
+            "${FULL_IMAGE}@${AMD64_DIGEST}" \
+            "${FULL_IMAGE}@${ARM64_DIGEST}"
+
+      - name: Inspect SHA manifest
+        shell: bash
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE_NAME }}
+          SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: docker buildx imagetools inspect "${REGISTRY}/${IMAGE}:sha-${SHA}"

@@ -508,7 +508,6 @@ export class BookService {
       if (dto.seriesIndex !== undefined) scalarFields.seriesIndex = dto.seriesIndex ?? null;
       if (dto.isbn10 !== undefined) scalarFields.isbn10 = dto.isbn10 ?? null;
       if (dto.isbn13 !== undefined) scalarFields.isbn13 = dto.isbn13 ?? null;
-      if (dto.rating !== undefined) scalarFields.rating = dto.rating ?? null;
       if (dto.googleBooksId !== undefined) scalarFields.googleBooksId = dto.googleBooksId ?? null;
       if (dto.goodreadsId !== undefined) scalarFields.goodreadsId = dto.goodreadsId ?? null;
       if (dto.amazonId !== undefined) scalarFields.amazonId = dto.amazonId ?? null;
@@ -564,6 +563,10 @@ export class BookService {
       });
 
       this.metadataService.emitAuthorsReplaced(id, replacedAuthorIds);
+
+      if (dto.rating !== undefined) {
+        await this.bookRepo.bulkSetRating([id], dto.rating ?? null, user.id);
+      }
 
       this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
       this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
@@ -755,7 +758,7 @@ export class BookService {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} - bulk set rating started`);
     await this.verifyLibraryAccessForBookIds(bookIds, user);
-    await this.bookRepo.bulkSetRating(bookIds, rating);
+    await this.bookRepo.bulkSetRating(bookIds, rating, user.id);
     this.triggerPostMetadataUpdateEffects(bookIds, user.id);
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} durationMs=${Date.now() - startedAt} - bulk set rating completed`,
@@ -1226,8 +1229,9 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, readStatus, comicMeta, collectionRows] = await Promise.all([
+    const [result, personalRating, readStatus, comicMeta, collectionRows] = await Promise.all([
       this.bookRepo.findById(id),
+      this.bookRepo.findRatingByBookAndUser(id, user.id),
       this.userBookStatusService.findOne(user.id, id),
       this.comicMetadataService.findByBookId(id),
       this.bookRepo.findCollectionsByBookId(id, user.id),
@@ -1257,7 +1261,7 @@ export class BookService {
       pageCount: meta?.pageCount ?? null,
       seriesName: meta?.seriesName ?? null,
       seriesIndex: meta?.seriesIndex ?? null,
-      rating: meta?.rating ?? null,
+      rating: personalRating,
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
       lockedFields: this.bookMetadataLockService.normalizeLockedFields(meta?.lockedFields),
       providerIds: {
