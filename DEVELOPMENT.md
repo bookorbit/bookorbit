@@ -368,6 +368,19 @@ The same pipeline plus:
 
 - **Container image build** (`.github/workflows/container-image.yml`) - Builds a Docker image and pushes to GitHub Container Registry.
 
+### Releases
+
+Releases are created manually via `workflow_dispatch` on the `release.yml` workflow. The release workflow:
+
+1. Verifies CI has passed for the current `main` commit.
+2. Runs semantic-release to determine the next version from commit history.
+3. Creates a Git tag and GitHub Release with auto-generated release notes.
+4. Builds, scans, and publishes a Docker image with version and `latest` tags.
+
+PR titles are validated by commitlint to ensure they follow the [commit guidelines](COMMIT_GUIDELINES.md). Only releasable types (`feat`, `fix`, `perf`, `security`, `db`, `style`) trigger version bumps.
+
+For the full release runbook, see [`docs/release-process.md`](docs/release-process.md).
+
 ### E2E in CI
 
 E2E suites are dispatched automatically based on which files changed. On nightly builds and manual dispatches, all suites run. Each suite runs in its own job with a dedicated PostgreSQL service container.

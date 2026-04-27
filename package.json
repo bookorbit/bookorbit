@@ -4,10 +4,10 @@
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "setup": "bash ./scripts/bootstrap/local.sh",
-    "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @bookorbit/types dev\" \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:client": "cd client && npm run dev -- --host",
-    "dev:server": "cd server && npm run start:dev",
-    "verify:fast": "pnpm run lint:check && pnpm run typecheck && pnpm run test",
+    "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @bookorbit/types dev\" \"pnpm run dev:server\" \"pnpm run dev:client\"",
+    "dev:client": "cd client && pnpm dev -- --host",
+    "dev:server": "cd server && pnpm start:dev",
+    "verify:fast": "pnpm run lint:check && pnpm run typecheck",
     "verify": "pnpm run lint:check && pnpm run typecheck && pnpm run test",
     "verify:strict": "pnpm run format:check && pnpm run lint:check && pnpm run typecheck:full && pnpm run test",
     "build:client": "pnpm --filter client build",
@@ -44,10 +44,17 @@
     "pnpm": ">=9"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.3",
     "concurrently": "^9.2.1",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.3"
+    "prettier": "^3.8.3",
+    "semantic-release": "^24.2.5"
   },
   "lint-staged": {
     "*.{md,json,yml,yaml}": [

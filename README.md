@@ -1,6 +1,7 @@
 # BookOrbit
 
 [![CI](https://github.com/neonsolstice/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/neonsolstice/bookorbit/actions/workflows/ci.yml)
+[![Release](https://github.com/neonsolstice/bookorbit/actions/workflows/release.yml/badge.svg)](https://github.com/neonsolstice/bookorbit/actions/workflows/release.yml)
 
 A self-hostable book and library management app with Kobo device support. Organize your epub, pdf, and cbz collections, track reading progress, and sync with your Kobo.
 
@@ -92,14 +93,13 @@ All commands run from the **repo root** unless noted otherwise.
 
 ### Everyday workflow
 
-| Command              | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| `pnpm setup`         | One-time bootstrap                                 |
-| `pnpm dev`           | Daily development                                  |
-| `pnpm verify`        | Default local checks before push                   |
-| `pnpm quick`         | Faster local checks while coding                   |
-| `pnpm verify:strict` | Aspirational strict gate (format + full typecheck) |
-| `pnpm guide`         | Print command reference                            |
+| Command              | Description                                         |
+| -------------------- | --------------------------------------------------- |
+| `pnpm setup`         | One-time bootstrap                                  |
+| `pnpm dev`           | Daily development                                   |
+| `pnpm verify`        | Default local checks before push                    |
+| `pnpm verify:fast`   | Faster local checks while coding (lint + typecheck) |
+| `pnpm verify:strict` | Aspirational strict gate (format + full typecheck)  |
 
 ### Development
 
@@ -111,14 +111,14 @@ All commands run from the **repo root** unless noted otherwise.
 
 ### Testing
 
-| Command                         | Description                  |
-| ------------------------------- | ---------------------------- |
-| `pnpm test`                     | Server + client unit tests   |
-| `pnpm test:server`              | Server unit tests            |
-| `pnpm test:client`              | Client unit tests            |
-| `pnpm test:e2e:smoke`           | Server smoke e2e             |
-| `pnpm coverage`                 | Coverage for server + client |
-| `pnpm --filter server test:e2e` | Server e2e only              |
+| Command                               | Description                  |
+| ------------------------------------- | ---------------------------- |
+| `pnpm test`                           | Server + client unit tests   |
+| `pnpm test:server`                    | Server unit tests            |
+| `pnpm test:client`                    | Client unit tests            |
+| `pnpm run e2e:run -- guard-mechanics` | Server smoke e2e             |
+| `pnpm coverage`                       | Coverage for server + client |
+| `pnpm --filter server test:e2e`       | Server e2e only              |
 
 ### Database
 
@@ -133,25 +133,21 @@ All commands run from the **repo root** unless noted otherwise.
 
 ### Production operations
 
-| Command                                    | Description                                  |
-| ------------------------------------------ | -------------------------------------------- |
-| `pnpm prod:up`                             | Start/update production compose stack        |
-| `pnpm prod:down`                           | Stop production compose stack                |
-| `pnpm db:backup:prod`                      | Create Postgres backup (`local/backups/`)    |
-| `pnpm db:restore:prod -- <file.dump>`      | Restore backup into production database      |
-| `pnpm db:restore:test:prod -- <file.dump>` | Restore into temp DB to validate backup file |
+| Command          | Description                           |
+| ---------------- | ------------------------------------- |
+| `pnpm prod:up`   | Start/update production compose stack |
+| `pnpm prod:down` | Stop production compose stack         |
 
 ### Linting & formatting
 
-| Command                                 | Description                                |
-| --------------------------------------- | ------------------------------------------ |
-| `pnpm format:check`                     | Check formatting                           |
-| `pnpm format`                           | Auto-format source files                   |
-| `pnpm lint:check`                       | Non-mutating lint checks                   |
-| `pnpm lint:fix`                         | Auto-fix lint issues                       |
-| `pnpm typecheck`                        | Server typecheck + no-new client TS errors |
-| `pnpm typecheck:full`                   | Typecheck server + client (strict)         |
-| `pnpm typecheck:client:baseline:update` | Refresh accepted client TS baseline        |
+| Command               | Description                        |
+| --------------------- | ---------------------------------- |
+| `pnpm format:check`   | Check formatting                   |
+| `pnpm format`         | Auto-format source files           |
+| `pnpm lint:check`     | Non-mutating lint checks           |
+| `pnpm lint:fix`       | Auto-fix lint issues               |
+| `pnpm typecheck`      | Typecheck server + client          |
+| `pnpm typecheck:full` | Typecheck server + client (strict) |
 
 ---
 
@@ -375,9 +371,10 @@ Make sure you're accessing the client at `http://localhost:5173` (not port 3000)
 
 ## Further Reading
 
-| Doc                                        | What it covers                                               |
-| ------------------------------------------ | ------------------------------------------------------------ |
-| [`docs/production.md`](docs/production.md) | Production compose deployment, backups, restore testing      |
-| [`server/README.md`](server/README.md)     | Backend module map, DB commands, NestJS conventions          |
-| [`client/README.md`](client/README.md)     | Frontend project layout, IDE setup, Vue/Tailwind conventions |
-| [`packages/types/`](packages/types/)       | Shared type definitions between server and client            |
+| Doc                                                  | What it covers                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| [`docs/production.md`](docs/production.md)           | Production compose deployment, backups, restore testing      |
+| [`docs/release-process.md`](docs/release-process.md) | Release workflow, PR title format, Docker publish, rollback  |
+| [`server/README.md`](server/README.md)               | Backend module map, DB commands, NestJS conventions          |
+| [`client/README.md`](client/README.md)               | Frontend project layout, IDE setup, Vue/Tailwind conventions |
+| [`packages/types/`](packages/types/)                 | Shared type definitions between server and client            |
