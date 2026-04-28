@@ -47,6 +47,8 @@ export function useReaderState() {
   const themeName = ref(defaults.themeName)
   const flow = ref<'paginated' | 'scrolled'>(defaults.flow)
 
+  const fontFaceCSS = ref('')
+
   const state = computed<ReaderState>(() => ({
     fontSize: fontSize.value,
     lineHeight: lineHeight.value,
@@ -87,7 +89,10 @@ export function useReaderState() {
         }`
       : ''
 
+    const fontFaceBlock = fontFaceCSS.value
+
     return `
+      ${fontFaceBlock}
       @namespace epub "http://www.idpf.org/2007/ops";
       @media print {
           html {
@@ -261,6 +266,10 @@ export function useReaderState() {
     flow.value = v
   }
 
+  function setFontFaceCSS(css: string) {
+    fontFaceCSS.value = css
+  }
+
   return {
     state,
     fontSize,
@@ -292,5 +301,6 @@ export function useReaderState() {
     setIsDark,
     setThemeName,
     setFlow,
+    setFontFaceCSS,
   }
 }

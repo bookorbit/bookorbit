@@ -915,6 +915,23 @@ CREATE TABLE "dismissed_inline_duplicate_pairs" (
 	CONSTRAINT "dismissed_inline_duplicate_pairs_unique" UNIQUE("entity_type","value_a","value_b")
 );
 --> statement-breakpoint
+CREATE TABLE "user_fonts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"family_name" varchar(200) NOT NULL,
+	"original_file_name" varchar(500) NOT NULL,
+	"stored_file_name" varchar(500) NOT NULL,
+	"format" varchar(10) NOT NULL,
+	"weight" integer DEFAULT 400 NOT NULL,
+	"style" varchar(10) DEFAULT 'normal' NOT NULL,
+	"file_size" integer NOT NULL,
+	"file_hash" varchar(64) NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "user_fonts_format_chk" CHECK ("user_fonts"."format" in ('ttf', 'otf', 'woff', 'woff2')),
+	CONSTRAINT "user_fonts_weight_chk" CHECK ("user_fonts"."weight" >= 100 and "user_fonts"."weight" <= 900 and "user_fonts"."weight" % 100 = 0),
+	CONSTRAINT "user_fonts_style_chk" CHECK ("user_fonts"."style" in ('normal', 'italic'))
+);
+--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "magic_access_tokens" ADD CONSTRAINT "magic_access_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "magic_access_tokens" ADD CONSTRAINT "magic_access_tokens_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -1029,6 +1046,7 @@ ALTER TABLE "email_send_log" ADD CONSTRAINT "email_send_log_template_id_email_te
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dismissed_duplicate_pairs" ADD CONSTRAINT "dismissed_duplicate_pairs_dismissed_by_users_id_fk" FOREIGN KEY ("dismissed_by") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dismissed_inline_duplicate_pairs" ADD CONSTRAINT "dismissed_inline_duplicate_pairs_dismissed_by_users_id_fk" FOREIGN KEY ("dismissed_by") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_fonts" ADD CONSTRAINT "user_fonts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_audit_user_id" ON "audit_log" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_resource" ON "audit_log" USING btree ("resource","resource_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_action" ON "audit_log" USING btree ("action");--> statement-breakpoint
@@ -1153,4 +1171,6 @@ CREATE INDEX "notifications_created_at_idx" ON "notifications" USING btree ("cre
 CREATE INDEX "dismissed_duplicate_pairs_entity_a_idx" ON "dismissed_duplicate_pairs" USING btree ("entity_type","entity_id_a");--> statement-breakpoint
 CREATE INDEX "dismissed_duplicate_pairs_entity_b_idx" ON "dismissed_duplicate_pairs" USING btree ("entity_type","entity_id_b");--> statement-breakpoint
 CREATE INDEX "dismissed_inline_pairs_entity_a_idx" ON "dismissed_inline_duplicate_pairs" USING btree ("entity_type","value_a");--> statement-breakpoint
-CREATE INDEX "dismissed_inline_pairs_entity_b_idx" ON "dismissed_inline_duplicate_pairs" USING btree ("entity_type","value_b");
+CREATE INDEX "dismissed_inline_pairs_entity_b_idx" ON "dismissed_inline_duplicate_pairs" USING btree ("entity_type","value_b");--> statement-breakpoint
+CREATE UNIQUE INDEX "uf_user_hash_uidx" ON "user_fonts" USING btree ("user_id","file_hash");--> statement-breakpoint
+CREATE UNIQUE INDEX "uf_user_family_weight_style_uidx" ON "user_fonts" USING btree ("user_id","family_name","weight","style");

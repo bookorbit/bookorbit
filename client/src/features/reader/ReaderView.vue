@@ -6,6 +6,7 @@ import { useReaderProgress } from './shared/composables/useReaderProgress'
 import { useReadingSession } from './shared/composables/useReadingSession'
 import { useReaderState } from './epub/composables/useReaderState'
 import { useReaderSettings } from './shared/composables/useReaderSettings'
+import { useCustomFonts } from './epub/composables/useCustomFonts'
 import { useVisibility } from './shared/composables/useVisibility'
 import { useBookmarks } from './epub/composables/useBookmarks'
 import { useAnnotations } from './epub/composables/useAnnotations'
@@ -67,7 +68,10 @@ const {
   setIsDark,
   setThemeName,
   setFlow,
+  setFontFaceCSS,
 } = readerState
+
+const customFonts = useCustomFonts()
 
 const progress = useReaderProgress(bookId, fileId)
 const { cfi, chapterTitle, sectionIndex, totalSections, fraction, updateHeadsFeet } = progress
@@ -142,6 +146,9 @@ onMounted(async () => {
   // Specialized readers own their own progress/settings/loading lifecycle.
   if (isAudioFormat || isPdfFormat || isComicFormat) return
 
+  await customFonts.fetchFonts()
+  setFontFaceCSS(customFonts.generateFontFaceCSS())
+
   await progress.load()
 
   await bookSettings.load()
@@ -215,6 +222,15 @@ function setSettingsOpen(open: boolean) {
 watch(showSettings, (open) => {
   setVisibilityLock(open)
 })
+
+watch(
+  () => customFonts.fonts.value,
+  () => {
+    setFontFaceCSS(customFonts.generateFontFaceCSS())
+    const renderer = getRenderer()
+    if (renderer && shouldApplyStyles.value) applyToRenderer(renderer)
+  },
+)
 
 async function handleHighlight(color: string, style: string, note?: string) {
   const annotationCfi = selection.cfi.value
@@ -311,7 +327,7 @@ function closeSearch() {
       @toggleFullscreen="toggleFullscreen"
     >
       <template #settingsPanel>
-        <ReaderSettingsPanel :state="state" @update="applyUpdate" />
+        <ReaderSettingsPanel :state="state" :customFonts="customFonts" @update="applyUpdate" />
       </template>
     </ReaderHeader>
 

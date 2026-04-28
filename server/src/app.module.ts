@@ -55,6 +55,7 @@ import { MigrationModule } from './modules/migration/migration.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SeriesModule } from './modules/series/series.module';
 import { EntityManagerModule } from './modules/entity-manager/entity-manager.module';
+import { FontModule } from './modules/font/font.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { EntityManagerModule } from './modules/entity-manager/entity-manager.mod
     NotificationModule,
     SeriesModule,
     EntityManagerModule,
+    FontModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

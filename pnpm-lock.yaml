@@ -321,6 +321,9 @@ importers:
       nodemailer:
         specifier: ^8.0.7
         version: 8.0.7
+      opentype.js:
+        specifier: ^1.3.5
+        version: 1.3.5
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -388,6 +391,9 @@ importers:
       "@types/nodemailer":
         specifier: ^8.0.0
         version: 8.0.0
+      "@types/opentype.js":
+        specifier: ^1.3.9
+        version: 1.3.9
       "@types/passport-jwt":
         specifier: ^4.0.1
         version: 4.0.1
@@ -4035,6 +4041,12 @@ packages:
     resolution:
       {
         integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==,
+      }
+
+  "@types/opentype.js@1.3.9":
+    resolution:
+      {
+        integrity: sha512-KOGywvDPncA4/tTWV5xKNhjpsoSSAHIx3mHOhL5l3XX+c6Xu2dQnHvGs7mRNQsQRte1EqmQ0cPQQ8Z14lkv+yw==,
       }
 
   "@types/passport-jwt@4.0.1":
@@ -9102,6 +9114,13 @@ packages:
       }
     engines: { node: ">=18" }
 
+  opentype.js@1.3.5:
+    resolution:
+      {
+        integrity: sha512-thKDiELidAApOvXlncrpwDZKJCa9fXLEKM4+FoEWI+qTLDeNb+h7EkN+8a7KQODsB1GZ+Exz9KknkoPrEdXZDw==,
+      }
+    hasBin: true
+
   optionator@0.9.4:
     resolution:
       {
@@ -13798,6 +13817,8 @@ snapshots:
 
   "@types/normalize-package-data@2.4.4": {}
 
+  "@types/opentype.js@1.3.9": {}
+
   "@types/passport-jwt@4.0.1":
     dependencies:
       "@types/jsonwebtoken": 9.0.10
@@ -16832,6 +16853,8 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
+
+  opentype.js@1.3.5: {}
 
   optionator@0.9.4:
     dependencies:

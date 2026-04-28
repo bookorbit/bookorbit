@@ -83,7 +83,12 @@ export function useFoliate(
       view.addEventListener('load', (e: Event) => {
         const detail = (e as CustomEvent).detail
         loading.value = false
-        if (onApplyStyles) onApplyStyles(view.renderer)
+        // The paginator's internal #view reference is updated in a microtask after the
+        // 'load' event fires. Deferring to a macrotask ensures setStyles targets the
+        // new chapter document, not the previous one.
+        setTimeout(() => {
+          if (onApplyStyles) onApplyStyles(view.renderer)
+        }, 0)
         annotations.reAddAll(view)
         if (detail?.doc) input.attachIframeClicks(detail.doc)
       })

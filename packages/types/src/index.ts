@@ -30,3 +30,4 @@ export * from "./notification";
 export * from "./series";
 export * from "./series-collapse";
 export * from "./entity-manager";
+export * from "./font";

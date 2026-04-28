@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { BookOpen, LayoutGrid, Moon, Palette, ScrollText, Sun, Type } from 'lucide-vue-next'
 import type { ReaderState } from '../composables/useReaderState'
+import type { useCustomFonts } from '../composables/useCustomFonts'
 import { themes } from '../constants/themes'
+import { BUILTIN_READER_FONT_OPTIONS } from '@/features/reader/shared/constants/font-options'
+import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
 
 const props = defineProps<{
   state: ReaderState
+  customFonts?: ReturnType<typeof useCustomFonts>
 }>()
 
 const emit = defineEmits<{
@@ -27,14 +31,6 @@ const tabs: { id: Tab; icon: typeof Palette; label: string }[] = [
   { id: 'appearance', icon: Palette, label: 'Appearance' },
   { id: 'text', icon: Type, label: 'Text' },
   { id: 'layout', icon: LayoutGrid, label: 'Layout' },
-]
-
-const fontFamilies = [
-  { name: "Publisher's", value: null },
-  { name: 'Serif', value: 'serif' },
-  { name: 'Sans-Serif', value: 'sans-serif' },
-  { name: 'Monospace', value: 'monospace' },
-  { name: 'Cursive', value: 'cursive' },
 ]
 
 const stepperButtonClass = 'size-8 rounded-lg border border-border text-lg font-light text-foreground transition-colors hover:bg-muted'
@@ -79,6 +75,46 @@ onMounted(() => {
   contentRef.value.scrollTop = scrollMemory.value[activeTab.value] ?? 0
   hasTabBarShadow.value = contentRef.value.scrollTop > 0
 })
+
+onUnmounted(removePreviewStyles)
+
+const previewStyleEl = ref<HTMLStyleElement | null>(null)
+
+function injectPreviewStyles(css: string) {
+  removePreviewStyles()
+  if (!css) return
+  const el = document.createElement('style')
+  el.setAttribute('data-reader-font-preview', '')
+  el.textContent = css
+  document.head.appendChild(el)
+  previewStyleEl.value = el
+}
+
+function removePreviewStyles() {
+  if (previewStyleEl.value) {
+    previewStyleEl.value.remove()
+    previewStyleEl.value = null
+  }
+}
+
+watch(
+  () => props.customFonts?.fonts.value,
+  () => {
+    injectPreviewStyles(props.customFonts?.generateFontFaceCSS() ?? '')
+  },
+  { immediate: true },
+)
+
+function selectCustomFont(familyName: string) {
+  if (!props.customFonts) return
+  const cssFamilyName = props.customFonts.getCssFamilyForDisplay(familyName)
+  if (cssFamilyName) emit('update', { fontFamily: cssFamilyName })
+}
+
+function isCustomFontSelected(familyName: string): boolean {
+  if (!props.customFonts) return false
+  return props.customFonts.isFontFamilySelected(familyName, props.state.fontFamily)
+}
 </script>
 
 <template>
@@ -196,24 +232,50 @@ onMounted(() => {
           <div class="space-y-3">
             <div class="space-y-1">
               <p class="text-sm font-medium leading-tight">Font family</p>
-              <p class="text-xs leading-tight text-muted-foreground">Switch between publisher default and common reader fonts.</p>
+              <p class="text-xs leading-tight text-muted-foreground">Choose built-in or uploaded fonts for body text.</p>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="font in fontFamilies"
-                :key="String(font.value)"
-                class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
-                :class="
-                  state.fontFamily === font.value
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted'
-                "
-                :style="font.value ? { fontFamily: font.value } : {}"
-                @click="emit('update', { fontFamily: font.value })"
-              >
-                {{ font.name }}
-              </button>
+            <div class="space-y-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Built-in</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="font in BUILTIN_READER_FONT_OPTIONS"
+                  :key="String(font.value)"
+                  class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  :class="
+                    state.fontFamily === font.value
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border hover:border-muted-foreground/40 hover:bg-muted'
+                  "
+                  :style="font.value ? { fontFamily: font.value } : {}"
+                  @click="emit('update', { fontFamily: font.value })"
+                >
+                  {{ font.label }}
+                </button>
+              </div>
             </div>
+
+            <template v-if="customFonts && customFonts.families.value.length > 0">
+              <div class="h-px bg-border/70" />
+              <div class="space-y-2">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Your fonts</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="family in customFonts.families.value"
+                    :key="family.name"
+                    class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                    :class="
+                      isCustomFontSelected(family.name)
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border hover:border-muted-foreground/40 hover:bg-muted'
+                    "
+                    :style="{ fontFamily: `'${family.cssFamilyName}', sans-serif` }"
+                    @click="selectCustomFont(family.name)"
+                  >
+                    {{ formatFontFamilyLabel(family.name) }}
+                  </button>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </template>

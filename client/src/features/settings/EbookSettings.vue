@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { EpubReaderSettings } from '@bookorbit/types'
+import { fontCssFamilyGroupName } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
+import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { themes } from '@/features/reader/epub/constants/themes'
+import { BUILTIN_READER_FONT_OPTIONS } from '@/features/reader/shared/constants/font-options'
+import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
 import { Check } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -18,16 +22,54 @@ const props = withDefaults(
 
 const { effective, load, update, reset } = useReaderDefaultSettings<EpubReaderSettings>('epub')
 
-onMounted(load)
+const customFonts = useCustomFonts()
 
-const fontFamilies: { id: string | null; label: string }[] = [
-  { id: null, label: "Book's font" },
-  { id: 'serif', label: 'Serif' },
-  { id: 'sans-serif', label: 'Sans-serif' },
-  { id: 'monospace', label: 'Monospace' },
-  { id: 'Georgia, serif', label: 'Georgia' },
-  { id: 'Palatino Linotype, Palatino, Book Antiqua, serif', label: 'Palatino' },
-]
+const customFontOptions = computed(() =>
+  customFonts.families.value.map((f) => ({
+    id: fontCssFamilyGroupName(f.name),
+    label: formatFontFamilyLabel(f.name),
+  })),
+)
+
+const previewStyleEl = ref<HTMLStyleElement | null>(null)
+
+function injectPreviewStyles(css: string) {
+  if (previewStyleEl.value) {
+    previewStyleEl.value.textContent = css
+    return
+  }
+  if (!css) return
+  const el = document.createElement('style')
+  el.setAttribute('data-ebook-settings-font-preview', '')
+  el.textContent = css
+  document.head.appendChild(el)
+  previewStyleEl.value = el
+}
+
+watch(
+  () => customFonts.fonts.value,
+  () => {
+    injectPreviewStyles(customFonts.generateFontFaceCSS())
+
+    // If the saved font family is a custom font that no longer exists, reset it.
+    const saved = effective.value.fontFamily
+    if (saved?.startsWith('__userfont_')) {
+      const stillExists = customFonts.families.value.some((f) => fontCssFamilyGroupName(f.name) === saved)
+      if (!stillExists) update({ fontFamily: null })
+    }
+  },
+  { immediate: true },
+)
+
+onMounted(async () => {
+  await load()
+  await customFonts.fetchFonts()
+})
+
+onUnmounted(() => {
+  previewStyleEl.value?.remove()
+  previewStyleEl.value = null
+})
 </script>
 
 <template>
@@ -210,7 +252,12 @@ const fontFamilies: { id: string | null; label: string }[] = [
             :value="effective.fontFamily ?? ''"
             @change="update({ fontFamily: ($event.target as HTMLSelectElement).value || null })"
           >
-            <option v-for="f in fontFamilies" :key="String(f.id)" :value="f.id ?? ''">{{ f.label }}</option>
+            <optgroup label="Built-in fonts">
+              <option v-for="f in BUILTIN_READER_FONT_OPTIONS" :key="String(f.value)" :value="f.value ?? ''">{{ f.label }}</option>
+            </optgroup>
+            <optgroup v-if="customFontOptions.length > 0" label="Your Fonts">
+              <option v-for="f in customFontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
+            </optgroup>
           </select>
         </div>
 
