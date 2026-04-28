@@ -33,6 +33,7 @@ import { computeLongestStreak, computeStreakData, formatDay } from './dashboard-
 type Db = NodePgDatabase<typeof schema>;
 
 const CURRENTLY_READING_LIMIT = 3;
+const DEFAULT_VIRTUAL_PAGE_COUNT = 300;
 
 @Injectable()
 export class DashboardWidgetRepository {
@@ -290,7 +291,9 @@ export class DashboardWidgetRepository {
       [shortRow],
       [newGenreRow],
       [newAuthorRow],
-      [sessionPagesRow],
+      [sessionPagesKnownRow],
+      [sessionUnknownProgressRow],
+      [dailyProgressRow],
       [finishedThisMonthRow],
       thisMonthReadDays,
     ] = await Promise.all([
@@ -403,8 +406,39 @@ export class DashboardWidgetRepository {
             eq(readingSessions.userId, userId),
             gte(readingSessions.startedAt, monthStart),
             gt(readingSessions.progressDelta, 0),
+            isNotNull(bookMetadata.pageCount),
             libFilter,
             presentFilter,
+          ),
+        ),
+      this.db
+        .select({
+          totalProgress: sql<number>`coalesce(sum(least(greatest(coalesce(${readingSessions.progressDelta}, 0), 0), 100)), 0)::float`,
+        })
+        .from(readingSessions)
+        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(
+          and(
+            eq(readingSessions.userId, userId),
+            gte(readingSessions.startedAt, monthStart),
+            gt(readingSessions.progressDelta, 0),
+            isNull(bookMetadata.pageCount),
+            libFilter,
+            presentFilter,
+          ),
+        ),
+      this.db
+        .select({
+          totalProgress: sql<number>`coalesce(sum(${userReadingDailyStats.progressDelta}), 0)::float`,
+        })
+        .from(userReadingDailyStats)
+        .where(
+          and(
+            eq(userReadingDailyStats.userId, userId),
+            inArray(userReadingDailyStats.libraryId, accessibleLibraryIds),
+            gte(userReadingDailyStats.day, formatDay(monthStart)),
           ),
         ),
       // Any book finished this month — approximates whether the oldest in-progress book was cleared
@@ -437,11 +471,17 @@ export class DashboardWidgetRepository {
     ]);
 
     const streakData = await this.getReadingStreak(userId, accessibleLibraryIds);
-    const pagesReadThisMonth = Math.max(sessionPagesRow?.total ?? 0, pagesRow?.total ?? 0);
+    const avgPageCount = avgRow?.avg ?? 0;
+    const inferredPageCount = avgPageCount > 0 ? avgPageCount : DEFAULT_VIRTUAL_PAGE_COUNT;
+    const pagesFromUnknownPageCountSessions = Math.floor(((sessionUnknownProgressRow?.totalProgress ?? 0) * inferredPageCount) / 100);
+    const pagesFromSessions = (sessionPagesKnownRow?.total ?? 0) + pagesFromUnknownPageCountSessions;
+    const pagesFromFinishedBooks = pagesRow?.total ?? 0;
+    const pagesFromDailyProgress = Math.floor(((dailyProgressRow?.totalProgress ?? 0) * avgPageCount) / 100);
+    const pagesReadThisMonth = Math.max(pagesFromSessions, pagesFromFinishedBooks, pagesFromDailyProgress, 0);
     const maxStreakThisMonth = computeLongestStreak(new Set(thisMonthReadDays.map((r) => r.day)));
 
     return {
-      avgPageCount: avgRow?.avg ?? 0,
+      avgPageCount,
       uniqueGenresLast6Months: genreRow?.count ?? 0,
       staleInProgressCount: staleRow?.count ?? 0,
       currentStreak: streakData.currentStreak,
