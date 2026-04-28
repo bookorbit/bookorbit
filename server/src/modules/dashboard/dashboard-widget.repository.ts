@@ -25,6 +25,7 @@ import {
   genres,
   readingProgress,
   readingSessions,
+  userBookRatings,
   userBookStatus,
   userReadingDailyStats,
 } from '../../db/schema';
@@ -586,7 +587,7 @@ export class DashboardWidgetRepository {
         bookId: books.id,
         title: bookMetadata.title,
         coverSource: bookMetadata.coverSource,
-        rating: bookMetadata.rating,
+        rating: userBookRatings.rating,
         addedAt: books.addedAt,
         genre: sql<
           string | null
@@ -594,12 +595,13 @@ export class DashboardWidgetRepository {
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, userId)))
       .leftJoin(booksAlreadyRead, eq(booksAlreadyRead.bookId, books.id))
       .where(
         and(
           inArray(books.libraryId, accessibleLibraryIds),
           eq(books.status, 'present'),
-          gte(bookMetadata.rating, 8),
+          gte(userBookRatings.rating, 4),
           isNull(booksAlreadyRead.bookId),
         ),
       )

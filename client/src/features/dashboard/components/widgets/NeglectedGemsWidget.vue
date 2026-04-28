@@ -74,7 +74,7 @@ async function addToQueue() {
       </button>
       <div class="flex items-center gap-1 text-[11px] text-muted-foreground">
         <Star :size="12" class="fill-amber-400 text-amber-400" />
-        <span>{{ (currentGem.rating / 2).toFixed(1) }}</span>
+        <span>{{ currentGem.rating }}/5</span>
         <span>&middot;</span>
         <span>{{ currentGem.waitingDays }}d waiting</span>
       </div>

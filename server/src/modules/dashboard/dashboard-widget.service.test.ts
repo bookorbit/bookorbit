@@ -260,7 +260,7 @@ describe('DashboardWidgetService', () => {
     it('delegates to repo and returns result', async () => {
       const { service, widgetRepo, libraryService } = makeService();
       const mockData: NeglectedGemsWidgetData = {
-        gems: [{ bookId: 1, title: 'Gem', hasCover: true, rating: 9, waitingDays: 100, genre: 'Fantasy' }],
+        gems: [{ bookId: 1, title: 'Gem', hasCover: true, rating: 5, waitingDays: 100, genre: 'Fantasy' }],
       };
       libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
       widgetRepo.getNeglectedGems.mockResolvedValue(mockData);
