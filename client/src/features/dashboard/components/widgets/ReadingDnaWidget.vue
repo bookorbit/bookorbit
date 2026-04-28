@@ -10,6 +10,7 @@ const traitColors: Record<string, string> = {
   variety: 'bg-emerald-500',
   rhythm: 'bg-amber-500',
   time: 'bg-purple-500',
+  speed: 'bg-rose-500',
 }
 </script>
 
@@ -23,7 +24,7 @@ const traitColors: Record<string, string> = {
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
       <div class="h-4 w-32 animate-pulse rounded bg-muted" />
-      <div v-for="n in 4" :key="n" class="h-2 w-full animate-pulse rounded-full bg-muted" />
+      <div v-for="n in 5" :key="n" class="h-2 w-full animate-pulse rounded-full bg-muted" />
     </div>
 
     <!-- Error -->
@@ -48,6 +49,7 @@ const traitColors: Record<string, string> = {
             { key: 'variety', label: 'Variety', score: data.varietyScore, valueLabel: data.varietyLabel },
             { key: 'rhythm', label: 'Rhythm', score: data.rhythmScore, valueLabel: data.rhythmLabel },
             { key: 'time', label: 'Time', score: data.timeScore, valueLabel: data.timeLabel },
+            { key: 'speed', label: 'Speed', score: data.speedScore, valueLabel: data.speedLabel },
           ]"
           :key="trait.key"
           class="flex items-center gap-2"
@@ -56,7 +58,7 @@ const traitColors: Record<string, string> = {
           <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div class="h-full rounded-full transition-all duration-500" :class="traitColors[trait.key]" :style="{ width: `${trait.score}%` }" />
           </div>
-          <span class="w-14 text-[10px] text-muted-foreground">{{ trait.valueLabel }}</span>
+          <span class="w-18 text-[10px] text-muted-foreground">{{ trait.valueLabel }}</span>
         </div>
       </div>
 

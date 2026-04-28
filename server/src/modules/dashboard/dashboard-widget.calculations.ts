@@ -237,6 +237,10 @@ export function computeTimeScore(peakHour: number): number {
   return Math.min(100, Math.round((peakHour / 23) * 100));
 }
 
+export function computeSpeedScore(avgPagesPerHour: number): number {
+  return Math.max(0, Math.min(100, Math.round((avgPagesPerHour / 80) * 100)));
+}
+
 function getLengthLabel(score: number): string {
   if (score <= 30) return 'Short';
   if (score <= 60) return 'Medium';
@@ -262,11 +266,18 @@ function getTimeLabel(peakHour: number): string {
   return 'Evening';
 }
 
+function getSpeedLabel(score: number): string {
+  if (score <= 30) return 'Slow Savorer';
+  if (score <= 60) return 'Steady Pacer';
+  return 'Speed Demon';
+}
+
 interface DnaTraits {
   lengthScore: number;
   varietyScore: number;
   rhythmScore: number;
   timeLabel: string;
+  speedScore: number | null;
 }
 
 const ARCHETYPES: [predicate: (traits: DnaTraits) => boolean, label: string][] = [
@@ -274,6 +285,10 @@ const ARCHETYPES: [predicate: (traits: DnaTraits) => boolean, label: string][] =
   [({ lengthScore, varietyScore, rhythmScore }) => lengthScore > 60 && varietyScore > 60 && rhythmScore > 60, 'Steady Eclectic Explorer'],
   [({ varietyScore, rhythmScore }) => varietyScore > 60 && rhythmScore > 60, 'Disciplined Genre Hopper'],
   [({ lengthScore, timeLabel }) => lengthScore > 60 && timeLabel === 'Early Bird', 'Early Bird Marathon Reader'],
+  [({ speedScore, lengthScore }) => speedScore !== null && speedScore <= 30 && lengthScore > 60, 'Slow Savorer'],
+  [({ speedScore, varietyScore }) => speedScore !== null && speedScore > 60 && varietyScore > 60, 'Rapid Explorer'],
+  [({ speedScore, rhythmScore }) => speedScore !== null && speedScore > 60 && rhythmScore <= 30, 'Speed Demon'],
+  [({ speedScore, varietyScore }) => speedScore !== null && speedScore <= 30 && varietyScore <= 30, 'Patient Specialist'],
   [({ varietyScore }) => varietyScore <= 30, 'Deep Specialist'],
   [({ rhythmScore }) => rhythmScore <= 30, 'Weekend Binge Reader'],
   [({ varietyScore }) => varietyScore > 60, 'Curious Explorer'],
@@ -286,16 +301,18 @@ export function computeReadingDna(
   totalBooks: number,
   readingDaysRatio: number,
   peakHour: number,
+  avgPagesPerHour: number | null,
 ): ReadingDnaWidgetData {
   const lengthScore = computeLengthScore(avgPageCount);
   const varietyScore = computeVarietyScore(uniqueGenres, totalBooks);
   const rhythmScore = computeRhythmScore(readingDaysRatio);
   const timeScore = computeTimeScore(peakHour);
   const timeLabel = getTimeLabel(peakHour);
+  const speedScore = avgPagesPerHour !== null ? computeSpeedScore(avgPagesPerHour) : null;
 
   let archetype = 'Avid Reader';
   for (const [predicate, label] of ARCHETYPES) {
-    if (predicate({ lengthScore, varietyScore, rhythmScore, timeLabel })) {
+    if (predicate({ lengthScore, varietyScore, rhythmScore, timeLabel, speedScore })) {
       archetype = label;
       break;
     }
@@ -307,10 +324,12 @@ export function computeReadingDna(
     varietyScore,
     rhythmScore,
     timeScore,
+    speedScore: speedScore ?? 0,
     lengthLabel: getLengthLabel(lengthScore),
     varietyLabel: getVarietyLabel(varietyScore),
     rhythmLabel: getRhythmLabel(rhythmScore),
     timeLabel,
+    speedLabel: speedScore !== null ? getSpeedLabel(speedScore) : 'N/A',
     booksAnalyzed: totalBooks,
   };
 }

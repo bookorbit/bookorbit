@@ -280,12 +280,32 @@ describe('DashboardWidgetService', () => {
         totalBooks: 25,
         readingDaysRatio: 0.7,
         peakHour: 21,
+        avgPagesPerHour: 45,
       });
 
       const result = await service.getReadingDna(makeUser());
       expect(result.archetype).toBeTruthy();
       expect(result.booksAnalyzed).toBe(25);
       expect(result.timeLabel).toBe('Evening');
+      expect(result.speedLabel).toBe('Steady Pacer');
+      expect(result.speedScore).toBe(56);
+    });
+
+    it('returns speedLabel N/A when no speed data is available', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingDnaData.mockResolvedValue({
+        avgPageCount: 350,
+        uniqueGenres: 8,
+        totalBooks: 25,
+        readingDaysRatio: 0.7,
+        peakHour: 21,
+        avgPagesPerHour: null,
+      });
+
+      const result = await service.getReadingDna(makeUser());
+      expect(result.speedLabel).toBe('N/A');
+      expect(result.speedScore).toBe(0);
     });
   });
 

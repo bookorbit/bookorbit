@@ -12,6 +12,7 @@ import {
   computeReadingDna,
   computeRhythm,
   computeRhythmScore,
+  computeSpeedScore,
   computeTimeScore,
   computeVarietyScore,
   findEligibleChallenges,
@@ -310,9 +311,36 @@ describe('Reading DNA calculations', () => {
     });
   });
 
+  describe('computeSpeedScore', () => {
+    it('returns 0 for 0 pages/hour', () => {
+      expect(computeSpeedScore(0)).toBe(0);
+    });
+
+    it('caps at 100 for very fast readers', () => {
+      expect(computeSpeedScore(80)).toBe(100);
+      expect(computeSpeedScore(200)).toBe(100);
+    });
+
+    it('scores ~50 at 40 pages/hour (mid-range)', () => {
+      expect(computeSpeedScore(40)).toBe(50);
+    });
+
+    it('returns Slow Savorer threshold boundary: score 30 at 24 pages/hour', () => {
+      expect(computeSpeedScore(24)).toBe(30);
+    });
+
+    it('returns Steady Pacer threshold boundary: score 60 at 48 pages/hour', () => {
+      expect(computeSpeedScore(48)).toBe(60);
+    });
+
+    it('clamps to 0 for negative input', () => {
+      expect(computeSpeedScore(-10)).toBe(0);
+    });
+  });
+
   describe('computeReadingDna', () => {
     it('returns valid archetype and scores', () => {
-      const dna = computeReadingDna(300, 5, 20, 0.8, 21);
+      const dna = computeReadingDna(300, 5, 20, 0.8, 21, null);
       expect(dna.archetype).toBeTruthy();
       expect(dna.lengthScore).toBeGreaterThanOrEqual(0);
       expect(dna.lengthScore).toBeLessThanOrEqual(100);
@@ -321,15 +349,67 @@ describe('Reading DNA calculations', () => {
       expect(dna.varietyLabel).toBeTruthy();
       expect(dna.rhythmLabel).toBeTruthy();
       expect(dna.timeLabel).toBeTruthy();
+      expect(dna.speedLabel).toBeTruthy();
     });
 
     it('identifies Deep Specialist for low variety', () => {
-      const dna = computeReadingDna(200, 1, 20, 0.5, 12);
+      const dna = computeReadingDna(200, 1, 20, 0.5, 12, null);
       expect(dna.archetype).toBe('Deep Specialist');
     });
 
     it('identifies Steady Eclectic Explorer', () => {
-      const dna = computeReadingDna(400, 15, 20, 0.9, 14);
+      const dna = computeReadingDna(400, 15, 20, 0.9, 14, null);
+      expect(dna.archetype).toBe('Steady Eclectic Explorer');
+    });
+
+    it('returns speedScore=0 and speedLabel="N/A" when no speed data', () => {
+      const dna = computeReadingDna(300, 5, 20, 0.5, 14, null);
+      expect(dna.speedScore).toBe(0);
+      expect(dna.speedLabel).toBe('N/A');
+    });
+
+    it('returns speedLabel for valid speed data', () => {
+      const dna = computeReadingDna(300, 5, 20, 0.5, 14, 30);
+      expect(dna.speedScore).toBeGreaterThan(0);
+      expect(dna.speedLabel).not.toBe('N/A');
+    });
+
+    it('identifies Slow Savorer for slow speed and long books', () => {
+      // avgPageCount=600 -> lengthScore=100 (>60), speed=10 pages/hr -> speedScore=12 (<=30)
+      const dna = computeReadingDna(600, 5, 20, 0.5, 14, 10);
+      expect(dna.archetype).toBe('Slow Savorer');
+    });
+
+    it('identifies Rapid Explorer for fast speed and eclectic variety', () => {
+      // uniqueGenres=20, totalBooks=20 -> varietyScore=100 (>60), speed=80 pages/hr -> speedScore=100 (>60)
+      const dna = computeReadingDna(300, 20, 20, 0.5, 14, 80);
+      expect(dna.archetype).toBe('Rapid Explorer');
+    });
+
+    it('identifies Speed Demon for fast speed and bursty rhythm', () => {
+      // readingDaysRatio=0.1 -> rhythmScore=10 (<=30), speed=80 pages/hr -> speedScore=100 (>60)
+      // variety must be <= 60 so Rapid Explorer does not trigger first
+      const dna = computeReadingDna(300, 3, 10, 0.1, 14, 80);
+      expect(dna.archetype).toBe('Speed Demon');
+    });
+
+    it('identifies Patient Specialist for slow speed and focused variety', () => {
+      // uniqueGenres=1, totalBooks=20 -> varietyScore=10 (<=30), speed=10 pages/hr -> speedScore=12 (<=30)
+      // rhythmScore must be > 30 so Weekend Binge Reader does not win
+      const dna = computeReadingDna(300, 1, 20, 0.5, 14, 10);
+      expect(dna.archetype).toBe('Patient Specialist');
+    });
+
+    it('skips speed archetypes when speed data is null even if scores would otherwise match', () => {
+      // Same conditions as Patient Specialist but no speed data -> falls to Deep Specialist
+      const dna = computeReadingDna(300, 1, 20, 0.5, 14, null);
+      expect(dna.archetype).toBe('Deep Specialist');
+    });
+
+    it('speed archetypes do not override higher-priority 3-condition archetypes', () => {
+      // long + eclectic + steady -> Steady Eclectic Explorer (priority 2)
+      // also has fast speed + eclectic -> would be Rapid Explorer (priority 6)
+      const dna = computeReadingDna(600, 20, 20, 0.9, 14, 80);
       expect(dna.archetype).toBe('Steady Eclectic Explorer');
     });
   });

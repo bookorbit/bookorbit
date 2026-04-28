@@ -142,7 +142,7 @@ export class DashboardWidgetService {
 
     const data = await this.widgetRepo.getReadingDnaData(user.id, accessibleLibraryIds, since);
 
-    return computeReadingDna(data.avgPageCount, data.uniqueGenres, data.totalBooks, data.readingDaysRatio, data.peakHour);
+    return computeReadingDna(data.avgPageCount, data.uniqueGenres, data.totalBooks, data.readingDaysRatio, data.peakHour, data.avgPagesPerHour);
   }
 
   async getLongWait(user: RequestUser): Promise<LongWaitWidgetData | null> {

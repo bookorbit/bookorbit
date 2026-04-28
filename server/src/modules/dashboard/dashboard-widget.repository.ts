@@ -630,15 +630,16 @@ export class DashboardWidgetRepository {
     totalBooks: number;
     readingDaysRatio: number;
     peakHour: number;
+    avgPagesPerHour: number | null;
   }> {
     if (accessibleLibraryIds.length === 0) {
-      return { avgPageCount: 0, uniqueGenres: 0, totalBooks: 0, readingDaysRatio: 0, peakHour: 12 };
+      return { avgPageCount: 0, uniqueGenres: 0, totalBooks: 0, readingDaysRatio: 0, peakHour: 12, avgPagesPerHour: null };
     }
 
     const libFilter = inArray(books.libraryId, accessibleLibraryIds);
     const presentFilter = eq(books.status, 'present');
 
-    const [[statsRow], [genreRow], dailyRows, [peakRow]] = await Promise.all([
+    const [[statsRow], [genreRow], dailyRows, [peakRow], [knownSpeedRow], [unknownSpeedRow]] = await Promise.all([
       this.db
         .select({
           avg: sql<number>`coalesce(avg(${bookMetadata.pageCount}), 0)::int`,
@@ -680,10 +681,60 @@ export class DashboardWidgetRepository {
         .groupBy(sql`extract(hour from ${readingSessions.startedAt})`)
         .orderBy(desc(sql`sum(${readingSessions.durationSeconds})`))
         .limit(1),
+      this.db
+        .select({
+          totalPages: sql<number>`coalesce(sum(${bookMetadata.pageCount} * ${readingSessions.progressDelta} / 100.0), 0)::float`,
+          totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::float`,
+        })
+        .from(readingSessions)
+        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(
+          and(
+            eq(readingSessions.userId, userId),
+            libFilter,
+            presentFilter,
+            gte(readingSessions.startedAt, since),
+            isNotNull(readingSessions.progressDelta),
+            gt(readingSessions.progressDelta, 0),
+            sql`${readingSessions.progressDelta} <= 100`,
+            gt(readingSessions.durationSeconds, 0),
+            isNotNull(bookMetadata.pageCount),
+            gt(bookMetadata.pageCount, 0),
+          ),
+        ),
+      this.db
+        .select({
+          totalProgress: sql<number>`coalesce(sum(${readingSessions.progressDelta}), 0)::float`,
+          totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::float`,
+        })
+        .from(readingSessions)
+        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(
+          and(
+            eq(readingSessions.userId, userId),
+            libFilter,
+            presentFilter,
+            gte(readingSessions.startedAt, since),
+            isNotNull(readingSessions.progressDelta),
+            gt(readingSessions.progressDelta, 0),
+            sql`${readingSessions.progressDelta} <= 100`,
+            gt(readingSessions.durationSeconds, 0),
+            isNull(bookMetadata.pageCount),
+          ),
+        ),
     ]);
 
     const daysSinceLookback = Math.max(1, Math.ceil((Date.now() - since.getTime()) / (1000 * 60 * 60 * 24)));
     const activeDays = dailyRows.filter((r) => r.seconds > 0).length;
+    const inferredPageCount = (statsRow?.avg ?? 0) > 0 ? (statsRow?.avg ?? 0) : DEFAULT_VIRTUAL_PAGE_COUNT;
+    const pagesFromKnownSpeed = knownSpeedRow?.totalPages ?? 0;
+    const pagesFromUnknownSpeed = ((unknownSpeedRow?.totalProgress ?? 0) * inferredPageCount) / 100;
+    const speedSeconds = (knownSpeedRow?.totalSeconds ?? 0) + (unknownSpeedRow?.totalSeconds ?? 0);
+    const avgPagesPerHour = speedSeconds > 0 ? (pagesFromKnownSpeed + pagesFromUnknownSpeed) / (speedSeconds / 3600) : null;
 
     return {
       avgPageCount: statsRow?.avg ?? 0,
@@ -691,6 +742,7 @@ export class DashboardWidgetRepository {
       totalBooks: statsRow?.total ?? 0,
       readingDaysRatio: activeDays / daysSinceLookback,
       peakHour: peakRow?.hour ?? 12,
+      avgPagesPerHour,
     };
   }
 

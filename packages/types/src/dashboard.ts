@@ -92,13 +92,7 @@ export interface HighlightOfTheDayWidgetData {
   createdAt: string;
 }
 
-export type ChallengeType =
-  | "short-read"
-  | "genre-explorer"
-  | "finish-oldest"
-  | "streak-builder"
-  | "new-author"
-  | "page-milestone";
+export type ChallengeType = "short-read" | "genre-explorer" | "finish-oldest" | "streak-builder" | "new-author" | "page-milestone";
 
 export interface MonthlyChallengeWidgetData {
   challengeType: ChallengeType;
@@ -139,10 +133,12 @@ export interface ReadingDnaWidgetData {
   varietyScore: number;
   rhythmScore: number;
   timeScore: number;
+  speedScore: number;
   lengthLabel: string;
   varietyLabel: string;
   rhythmLabel: string;
   timeLabel: string;
+  speedLabel: string;
   booksAnalyzed: number;
 }
 
