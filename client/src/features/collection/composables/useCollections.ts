@@ -3,20 +3,30 @@ import { api } from '@/lib/api'
 import type { Collection } from '@bookorbit/types'
 
 const collections = ref<Collection[]>([])
-let loaded = false
+const loaded = ref(false)
+const loading = ref(false)
+const error = ref<string | null>(null)
 let fetchPromise: Promise<void> | null = null
 
 export function useCollections() {
   async function fetchCollections(): Promise<void> {
-    if (loaded) return
+    if (loaded.value) return
     if (fetchPromise) return fetchPromise
+    loading.value = true
+    error.value = null
     fetchPromise = api('/api/v1/collections')
       .then(async (res) => {
-        if (!res.ok) return
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`)
+        }
         collections.value = await res.json()
-        loaded = true
+        loaded.value = true
+      })
+      .catch((e: unknown) => {
+        error.value = e instanceof Error ? e.message : 'Failed to load collections'
       })
       .finally(() => {
+        loading.value = false
         fetchPromise = null
       })
     return fetchPromise
@@ -95,6 +105,9 @@ export function useCollections() {
 
   return {
     collections,
+    loaded,
+    loading,
+    error,
     fetchCollections,
     fetchCollectionsWithMembership,
     createCollection,

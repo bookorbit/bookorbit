@@ -1,12 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BooksPage } from '@bookorbit/types';
+import type { BookQuery, BooksPage, GroupRule, SortSpec } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import type { SmartScope } from '../../db/schema/smart-scopes';
+import { BookService } from '../book/book.service';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { BookReadService } from '../book/book-read.service';
 import { validateGroupRule } from '../book/utils/group-rule.validator';
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { LibraryService } from '../library/library.service';
 import { CreateSmartScopeDto } from './dto/create-smart-scope.dto';
 import { ReorderSmartScopesDto } from './dto/reorder-smart-scopes.dto';
@@ -19,13 +19,32 @@ function normalizeIcon(value: unknown): string | null {
   return icon.length > 0 ? icon : null;
 }
 
+/**
+ * SmartScopes: server-backed, rule-based dynamic datasets.
+ *
+ * A SmartScope is a saved filter rule (GroupRule) stored in the database.
+ * When queried it executes the rule against the book catalog and returns a
+ * live, always-up-to-date subset of books. It is the server-side equivalent
+ * of a smart playlist.
+ *
+ * Concept boundaries:
+ *   - SmartScope    → server-backed, rule-based data filtering (what books appear)
+ *   - Saved view    → client-only snapshot of presentation state (layout + sort + filter UI)
+ *   - Column preset → client-only column layout template (visibility / order / widths)
+ *
+ * SmartScopes own data scoping. Saved views and presets own presentation state.
+ * They are independent: a saved view may be applied on top of any scope.
+ */
 @Injectable()
 export class SmartScopeService {
+  private readonly logger = new Logger(SmartScopeService.name);
+
   constructor(
     private readonly smartScopeRepo: SmartScopeRepository,
     private readonly bookReadService: BookReadService,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly libraryService: LibraryService,
+    private readonly bookService: BookService,
   ) {}
 
   private async getSmartScopeOrThrow(id: number): Promise<SmartScope> {
@@ -126,25 +145,71 @@ export class SmartScopeService {
   }
 
   async executeSmartScope(id: number, user: RequestUser, page: number, size: number, q?: string): Promise<BooksPage> {
+    return this.queryBooks(id, user, {
+      sort: [],
+      pagination: { page, size },
+      ...(q?.trim() ? { q: q.trim() } : {}),
+    });
+  }
+
+  async queryBooks(id: number, user: RequestUser, query: BookQuery): Promise<BooksPage> {
+    const start = Date.now();
+    this.logger.debug(
+      `[smart_scope.query_books] [start] scopeId=${id} userId=${user.id} page=${query.pagination.page} size=${query.pagination.size} - query started`,
+    );
+
     const smartScope = await this.getSmartScopeOrThrow(id);
     this.assertReadAccess(smartScope, user);
 
     if (!smartScope.filter) {
-      return { items: [], total: 0, page, size };
+      return { items: [], total: 0, page: query.pagination.page, size: query.pagination.size };
     }
 
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-
-    const where = this.queryBuilder.buildWhere(smartScope.filter, { accessibleLibraryIds, userId: user.id, q });
-    const orderBy = this.queryBuilder.buildOrderBy(smartScope.defaultSort ?? [], user.id);
-    const { rows, authorRows, fileRows, genreRows, progressRows, total } = await this.bookReadService.findCards({
-      where,
-      orderBy,
-      limit: size,
-      offset: page * size,
+    const filter = this.combineFilters(smartScope.filter, query.filter);
+    const effectiveQuery: BookQuery = {
+      ...query,
+      filter,
+      sort: this.resolveSort(query.sort, smartScope),
+    };
+    const where = this.queryBuilder.buildWhere(filter, {
+      accessibleLibraryIds,
       userId: user.id,
+      q: query.q,
     });
 
-    return { items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows), total, page, size };
+    try {
+      const result = await this.bookService.executeBooksQuery(user.id, where, effectiveQuery);
+      const durationMs = Date.now() - start;
+      if (durationMs >= 500) {
+        this.logger.warn(
+          `[smart_scope.query_books] [end] scopeId=${id} userId=${user.id} resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
+        );
+      }
+      return result;
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      this.logger.error(
+        `[smart_scope.query_books] [fail] scopeId=${id} userId=${user.id} durationMs=${durationMs} errorClass=${(err as Error).constructor?.name} error="${(err as Error).message}" - query failed`,
+      );
+      throw err;
+    }
+  }
+
+  private combineFilters(scopeFilter: GroupRule | null, queryFilter?: GroupRule): GroupRule | undefined {
+    if (!scopeFilter) return undefined;
+    if (!queryFilter) return scopeFilter;
+    return {
+      type: 'group',
+      join: 'AND',
+      rules: [scopeFilter, queryFilter],
+    };
+  }
+
+  private resolveSort(querySort: SortSpec[] | undefined, smartScope: SmartScope): SortSpec[] {
+    if (querySort && querySort.length > 0) {
+      return querySort;
+    }
+    return smartScope.defaultSort ?? [];
   }
 }

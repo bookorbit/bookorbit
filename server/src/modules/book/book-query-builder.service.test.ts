@@ -30,6 +30,7 @@ import { ilike, sql } from 'drizzle-orm';
 import { FIELD_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
 
 import { BookQueryBuilder } from './book-query-builder.service';
+import { BookSortBuilder } from './book-sort-builder.service';
 
 function makeBuilder() {
   const sqWhere = vi.fn((whereClause?: unknown) => ({ type: 'subquery', whereClause }));
@@ -38,7 +39,7 @@ function makeBuilder() {
   const db = {
     select: vi.fn().mockReturnValue({ from: sqFrom }),
   };
-  return { builder: new BookQueryBuilder(db as never), db };
+  return { builder: new BookQueryBuilder(db as never, new BookSortBuilder()), db };
 }
 
 function wrapRule(rule: Record<string, unknown>) {
@@ -279,6 +280,36 @@ describe('BookQueryBuilder', () => {
     expect(raw).not.toHaveBeenCalledWith(expect.stringContaining('DROP TABLE'));
   });
 
+  it('builds order clauses for language and metadataScore', () => {
+    const { builder } = makeBuilder();
+    const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+    const result = builder.buildOrderBy([
+      { field: 'language', dir: 'asc' },
+      { field: 'metadataScore', dir: 'desc' },
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(raw).toHaveBeenNthCalledWith(1, 'ASC');
+    expect(raw).toHaveBeenNthCalledWith(2, 'DESC');
+  });
+
+  it('builds readStatus sort with subquery', () => {
+    const { builder } = makeBuilder();
+
+    const result = builder.buildOrderBy([{ field: 'readStatus', dir: 'asc' }], 1);
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('builds format sort with subquery', () => {
+    const { builder } = makeBuilder();
+
+    const result = builder.buildOrderBy([{ field: 'format', dir: 'desc' }]);
+
+    expect(result).toHaveLength(1);
+  });
+
   it('builds one author subquery per includesAll value and uses ilike patterns', () => {
     const { builder, db } = makeBuilder();
 
@@ -301,6 +332,87 @@ describe('BookQueryBuilder', () => {
     }) as any;
 
     expect(where.clauses[1].clauses[0]).toMatchObject({ type: 'sql', text: '1 = 0' });
+  });
+});
+
+describe('readStatus filter field', () => {
+  it('includesAny generates exists with inArray', () => {
+    const { builder, db } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'readStatus', operator: 'includesAny', value: ['reading', 'read'] }) as never,
+      USER_CTX,
+    ) as any;
+
+    const ruleSql = getRuleSql(where);
+    expect(ruleSql).toMatchObject({ type: 'sql' });
+    expect(db.select).toHaveBeenCalled();
+  });
+
+  it('excludesAll generates not(exists) with inArray', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'readStatus', operator: 'excludesAll', value: ['abandoned'] }) as never,
+      USER_CTX,
+    ) as any;
+
+    const ruleSql = getRuleSql(where);
+    expect(ruleSql).toMatchObject({ type: 'not' });
+  });
+
+  it('isEmpty generates not(exists)', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readStatus', operator: 'isEmpty' }) as never, USER_CTX) as any;
+
+    const ruleSql = getRuleSql(where);
+    expect(ruleSql).toMatchObject({ type: 'not' });
+  });
+
+  it('isNotEmpty generates exists', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readStatus', operator: 'isNotEmpty' }) as never, USER_CTX) as any;
+
+    const ruleSql = getRuleSql(where);
+    expect(ruleSql).toMatchObject({ type: 'sql' });
+  });
+
+  it('includesAny with empty array returns always-false', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readStatus', operator: 'includesAny', value: [] }) as never, USER_CTX) as any;
+
+    const ruleSql = getRuleSql(where);
+    expect(ruleSql).toMatchObject({ type: 'sql', text: '1 = 0' });
+  });
+
+  it('excludesAll with empty array returns always-true', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'readStatus', operator: 'excludesAll', value: [] }) as never, USER_CTX) as any;
+
+    const ruleSql = getRuleSql(where);
+    expect(ruleSql).toMatchObject({ type: 'sql', text: '1 = 1' });
+  });
+
+  it('throws when userId is undefined', () => {
+    const { builder } = makeBuilder();
+
+    expect(() =>
+      builder.buildWhere(wrapRule({ type: 'rule', field: 'readStatus', operator: 'includesAny', value: ['read'] }) as never, {
+        accessibleLibraryIds: [1],
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('throws for invalid operator', () => {
+    const { builder } = makeBuilder();
+
+    expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'readStatus', operator: 'contains', value: 'read' }) as never, USER_CTX)).toThrow(
+      BadRequestException,
+    );
   });
 });
 
@@ -412,11 +524,11 @@ describe('buildWhere with q', () => {
 describe('textRuleToSql (via title)', () => {
   it.each([
     ['contains', 'Dune', { type: 'ilike', pattern: '%Dune%' }],
-    ['notContains', 'Dune', { type: 'not' }],
+    ['notContains', 'Dune', { type: 'or' }],
     ['startsWith', 'Dune', { type: 'ilike', pattern: 'Dune%' }],
     ['endsWith', 'Dune', { type: 'ilike', pattern: '%Dune' }],
     ['eq', 'Dune', { type: 'ilike', pattern: 'Dune' }],
-    ['notEq', 'Dune', { type: 'not' }],
+    ['notEq', 'Dune', { type: 'or' }],
     ['isEmpty', undefined, { type: 'or' }],
     ['isNotEmpty', undefined, { type: 'and' }],
   ] as const)('operator %s produces the correct SQL shape', (operator, value, expected) => {
@@ -428,18 +540,22 @@ describe('textRuleToSql (via title)', () => {
     expect(getRuleSql(where)).toMatchObject(expected);
   });
 
-  it('notContains wraps an ilike in not()', () => {
+  it('notContains wraps an ilike in or(isNull, not())', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'notContains', value: 'Dune' }) as never, BASE_CTX) as any;
     const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'not', value: { type: 'ilike', pattern: '%Dune%' } });
+    expect(clause).toMatchObject({ type: 'or' });
+    expect(clause.clauses[0]).toMatchObject({ type: 'isNull' });
+    expect(clause.clauses[1]).toMatchObject({ type: 'not', value: { type: 'ilike', pattern: '%Dune%' } });
   });
 
-  it('notEq wraps an exact ilike in not()', () => {
+  it('notEq wraps an exact ilike in or(isNull, not())', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'notEq', value: 'Dune' }) as never, BASE_CTX) as any;
     const clause = getRuleSql(where);
-    expect(clause).toMatchObject({ type: 'not', value: { type: 'ilike', pattern: 'Dune' } });
+    expect(clause).toMatchObject({ type: 'or' });
+    expect(clause.clauses[0]).toMatchObject({ type: 'isNull' });
+    expect(clause.clauses[1]).toMatchObject({ type: 'not', value: { type: 'ilike', pattern: 'Dune' } });
   });
 });
 
@@ -1047,5 +1163,23 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
   it('skips unrecognised sort fields silently', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'unknownField' as never, dir: 'asc' }], 1);
     expect(result).toBe('sort_title ASC NULLS LAST');
+  });
+
+  it('generates readStatus sort using subquery', () => {
+    const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'readStatus', dir: 'asc' }], 1);
+    expect(result).toContain('user_book_status');
+    expect(result).toContain('ASC NULLS LAST');
+  });
+
+  it('generates format sort using subquery', () => {
+    const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'format', dir: 'desc' }], 1);
+    expect(result).toContain('book_files');
+    expect(result).toContain('DESC NULLS LAST');
+  });
+
+  it('throws for non-integer userId', () => {
+    expect(() => BookQueryBuilder.buildCollapseOrderBy([{ field: 'readProgress', dir: 'asc' }], 1.5)).toThrow('Invalid userId');
+    expect(() => BookQueryBuilder.buildCollapseOrderBy([{ field: 'readProgress', dir: 'asc' }], NaN)).toThrow('Invalid userId');
+    expect(() => BookQueryBuilder.buildCollapseOrderBy([{ field: 'readProgress', dir: 'asc' }], Infinity)).toThrow('Invalid userId');
   });
 });

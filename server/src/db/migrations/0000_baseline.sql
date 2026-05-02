@@ -1095,6 +1095,7 @@ CREATE INDEX "author_enrichment_queue_next_attempt_idx" ON "author_enrichment_qu
 CREATE UNIQUE INDEX "author_enrichment_queue_single_processing_idx" ON "author_enrichment_queue" USING btree ("status") WHERE "author_enrichment_queue"."status" = 'processing';--> statement-breakpoint
 CREATE INDEX "authors_name_trgm_idx" ON "authors" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "book_authors_author_id_idx" ON "book_authors" USING btree ("author_id");--> statement-breakpoint
+CREATE INDEX "book_authors_book_display_idx" ON "book_authors" USING btree ("book_id","display_order");--> statement-breakpoint
 CREATE INDEX "book_genres_genre_id_idx" ON "book_genres" USING btree ("genre_id");--> statement-breakpoint
 CREATE INDEX "bm_title_trgm_idx" ON "book_metadata" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "bm_title_lower_idx" ON "book_metadata" USING btree (lower("title"));--> statement-breakpoint
@@ -1134,8 +1135,10 @@ CREATE INDEX "rs_book_file_started_at_idx" ON "reading_sessions" USING btree ("b
 CREATE INDEX "rs_user_book_file_idx" ON "reading_sessions" USING btree ("user_id","book_file_id");--> statement-breakpoint
 CREATE INDEX "ubr_user_id_idx" ON "user_book_ratings" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "ubr_book_id_idx" ON "user_book_ratings" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "ubr_book_user_rating_idx" ON "user_book_ratings" USING btree ("book_id","user_id");--> statement-breakpoint
 CREATE INDEX "ubs_user_id_idx" ON "user_book_status" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "ubs_user_status_idx" ON "user_book_status" USING btree ("user_id","status");--> statement-breakpoint
+CREATE INDEX "ubs_book_user_idx" ON "user_book_status" USING btree ("book_id","user_id");--> statement-breakpoint
 CREATE INDEX "urds_user_day_idx" ON "user_reading_daily_stats" USING btree ("user_id","day");--> statement-breakpoint
 CREATE UNIQUE INDEX "oidc_group_mappings_provider_claim_uidx" ON "oidc_group_mappings" USING btree ("provider_id","oidc_group_claim");--> statement-breakpoint
 CREATE UNIQUE INDEX "oidc_identities_provider_subject_uidx" ON "oidc_identities" USING btree ("provider_id","oidc_subject");--> statement-breakpoint

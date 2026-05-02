@@ -7,7 +7,7 @@ import BookCoverCard from './BookCoverCard.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 
-type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
 
 const props = withDefaults(
   defineProps<{

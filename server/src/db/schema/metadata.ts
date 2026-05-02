@@ -118,7 +118,11 @@ export const bookAuthors = pgTable(
       .references(() => authors.id),
     displayOrder: integer('display_order').notNull().default(0),
   },
-  (t) => [primaryKey({ columns: [t.bookId, t.authorId] }), index('book_authors_author_id_idx').on(t.authorId)],
+  (t) => [
+    primaryKey({ columns: [t.bookId, t.authorId] }),
+    index('book_authors_author_id_idx').on(t.authorId),
+    index('book_authors_book_display_idx').on(t.bookId, t.displayOrder),
+  ],
 );
 
 export const authorEnrichmentQueue = pgTable(

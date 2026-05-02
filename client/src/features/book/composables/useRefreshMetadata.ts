@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { api } from '@/lib/api'
 import type { BookDetail, ComicMetadataFields } from '@bookorbit/types'
 import { useCoverVersions } from './useCoverVersions'
+import { useRefreshingBooks } from './useRefreshingBooks'
 import { toast } from 'vue-sonner'
 
 export interface MetadataRefreshPreview {
@@ -37,9 +38,11 @@ export interface MetadataRefreshPreview {
 export function useRefreshMetadata() {
   const refreshing = ref(false)
   const { bumpVersion } = useCoverVersions()
+  const { markRefreshing, clearRefreshing } = useRefreshingBooks()
 
   async function callRefresh<T>(bookId: number, preview: boolean): Promise<T | null> {
     refreshing.value = true
+    if (!preview) markRefreshing([bookId])
     try {
       const url = `/api/v1/books/${bookId}/refresh-metadata${preview ? '?preview=true' : ''}`
       const res = await api(url, { method: 'POST' })
@@ -48,6 +51,7 @@ export function useRefreshMetadata() {
     } catch {
       return null
     } finally {
+      if (!preview) clearRefreshing([bookId])
       refreshing.value = false
     }
   }
@@ -60,13 +64,15 @@ export function useRefreshMetadata() {
     return callRefresh<MetadataRefreshPreview>(bookId, true)
   }
 
-  async function refreshWithFeedback(bookId: number): Promise<void> {
+  async function refreshWithFeedback(bookId: number): Promise<BookDetail | null> {
     const updated = await refreshAndSave(bookId)
     if (updated) {
       bumpVersion(bookId)
       toast.success('Metadata refreshed')
+      return updated
     } else {
       toast.error('Metadata refresh failed')
+      return null
     }
   }
 

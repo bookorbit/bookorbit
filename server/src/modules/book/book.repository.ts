@@ -42,14 +42,20 @@ type CollapsedRawRow = {
   primary_file_id: number | null;
   folder_path: string;
   added_at: string;
+  updated_at: string;
   title: string | null;
   series_name: string | null;
   series_index: number | null;
   published_year: number | null;
   language: string | null;
   rating: number | null;
+  metadata_score: number | null;
   cover_source: string | null;
   locked_fields: string[] | null;
+  subtitle: string | null;
+  isbn13: string | null;
+  publisher: string | null;
+  page_count: number | null;
   sort_title: string | null;
   sort_added_at: string | null;
   book_count: string | null;
@@ -81,83 +87,113 @@ export class BookRepository {
   async findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }) {
     const { where, orderBy, limit, offset, userId } = opts;
 
-    const [rows, [{ total }]] = await Promise.all([
-      this.db
-        .select({
-          id: books.id,
-          status: books.status,
-          primaryFileId: books.primaryFileId,
-          folderPath: books.folderPath,
-          addedAt: books.addedAt,
-          title: bookMetadata.title,
-          seriesName: bookMetadata.seriesName,
-          seriesIndex: bookMetadata.seriesIndex,
-          publishedYear: bookMetadata.publishedYear,
-          language: bookMetadata.language,
-          rating: userBookRatings.rating,
-          coverSource: bookMetadata.coverSource,
-          lockedFields: bookMetadata.lockedFields,
-        })
-        .from(books)
-        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, userId)))
-        .where(where)
-        .orderBy(...orderBy)
-        .limit(limit)
-        .offset(offset),
-      this.db.select({ total: count() }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where),
-    ]);
+    const rows = await this.db
+      .select({
+        id: books.id,
+        status: books.status,
+        primaryFileId: books.primaryFileId,
+        folderPath: books.folderPath,
+        addedAt: books.addedAt,
+        updatedAt: books.updatedAt,
+        title: bookMetadata.title,
+        seriesName: bookMetadata.seriesName,
+        seriesIndex: bookMetadata.seriesIndex,
+        publishedYear: bookMetadata.publishedYear,
+        language: bookMetadata.language,
+        rating: userBookRatings.rating,
+        coverSource: bookMetadata.coverSource,
+        lockedFields: bookMetadata.lockedFields,
+        subtitle: bookMetadata.subtitle,
+        publisher: bookMetadata.publisher,
+        pageCount: bookMetadata.pageCount,
+        isbn13: bookMetadata.isbn13,
+        metadataScore: bookMetadata.metadataScore,
+        _total: sql<number>`count(*) over()`.as('_total'),
+      })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, userId)))
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(limit)
+      .offset(offset);
+
+    const total = rows.length > 0 ? rows[0]._total : await this.countWhere(where);
 
     const bookIds = rows.map((r) => r.id);
-
-    const [authorRows, fileRows, genreRows] = await Promise.all([
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookAuthors.bookId, name: authors.name })
-            .from(bookAuthors)
-            .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-            .where(inArray(bookAuthors.bookId, bookIds))
-            .orderBy(bookAuthors.displayOrder)
-        : [],
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
-            .from(bookFiles)
-            .where(inArray(bookFiles.bookId, bookIds))
-        : ([] as { bookId: number; id: number; format: string | null; role: string }[]),
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookGenres.bookId, name: genres.name })
-            .from(bookGenres)
-            .innerJoin(genres, eq(genres.id, bookGenres.genreId))
-            .where(inArray(bookGenres.bookId, bookIds))
-        : [],
-    ]);
-
     const primaryFileIds = rows.map((r) => r.primaryFileId).filter((id): id is number => id != null);
-    const [progressRows, statusRows] = await Promise.all([
+    const enrichment = await this.enrichBookIds(bookIds, primaryFileIds, userId);
+
+    return { rows, ...enrichment, total: Number(total) };
+  }
+
+  private async enrichBookIds(bookIds: number[], primaryFileIds: number[], userId: number) {
+    if (bookIds.length === 0) {
+      return {
+        authorRows: [] as { bookId: number; name: string }[],
+        fileRows: [] as { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null }[],
+        genreRows: [] as { bookId: number; name: string }[],
+        tagRows: [] as { bookId: number; name: string }[],
+        progressRows: [] as { bookFileId: number; percentage: number }[],
+        statusRows: [] as {
+          bookId: number;
+          status: string;
+          source: string;
+          startedAt: Date | null;
+          finishedAt: Date | null;
+          updatedAt: Date;
+        }[],
+        narratorRows: [] as { bookId: number; name: string }[],
+      };
+    }
+
+    const [authorRows, fileRows, genreRows, tagRows, narratorRows, statusRows, progressRows] = await Promise.all([
+      this.db
+        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, bookIds))
+        .orderBy(bookAuthors.displayOrder),
+      this.db
+        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role, sizeBytes: bookFiles.sizeBytes })
+        .from(bookFiles)
+        .where(inArray(bookFiles.bookId, bookIds)),
+      this.db
+        .select({ bookId: bookGenres.bookId, name: genres.name })
+        .from(bookGenres)
+        .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+        .where(inArray(bookGenres.bookId, bookIds)),
+      this.db
+        .select({ bookId: bookTags.bookId, name: tags.name })
+        .from(bookTags)
+        .innerJoin(tags, eq(tags.id, bookTags.tagId))
+        .where(inArray(bookTags.bookId, bookIds)),
+      this.db
+        .select({ bookId: bookNarrators.bookId, name: narrators.name })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+        .where(inArray(bookNarrators.bookId, bookIds))
+        .orderBy(bookNarrators.displayOrder),
+      this.db
+        .select({
+          bookId: userBookStatus.bookId,
+          status: userBookStatus.status,
+          source: userBookStatus.source,
+          startedAt: userBookStatus.startedAt,
+          finishedAt: userBookStatus.finishedAt,
+          updatedAt: userBookStatus.updatedAt,
+        })
+        .from(userBookStatus)
+        .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds))),
       primaryFileIds.length > 0
         ? this.db
             .select({ bookFileId: readingProgress.bookFileId, percentage: readingProgress.percentage })
             .from(readingProgress)
             .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
-        : Promise.resolve([]),
-      bookIds.length > 0
-        ? this.db
-            .select({
-              bookId: userBookStatus.bookId,
-              status: userBookStatus.status,
-              source: userBookStatus.source,
-              startedAt: userBookStatus.startedAt,
-              finishedAt: userBookStatus.finishedAt,
-              updatedAt: userBookStatus.updatedAt,
-            })
-            .from(userBookStatus)
-            .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds)))
-        : Promise.resolve([]),
+        : Promise.resolve([] as { bookFileId: number; percentage: number }[]),
     ]);
 
-    return { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total: Number(total) };
+    return { authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows };
   }
 
   async findCardsByBookIds(bookIds: number[], userId: number) {
@@ -167,8 +203,10 @@ export class BookRepository {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
+        narratorRows: [],
         total: 0,
       };
     }
@@ -189,22 +227,29 @@ export class BookRepository {
       primaryFileId: number | null;
       folderPath: string;
       addedAt: Date;
+      updatedAt: Date;
       title: string | null;
       seriesName: string | null;
       seriesIndex: number | null;
       publishedYear: number | null;
       language: string | null;
       rating: number | null;
+      metadataScore: number | null;
       coverSource: string | null;
       lockedFields: string[] | null;
+      subtitle: string | null;
+      publisher: string | null;
+      pageCount: number | null;
+      isbn13: string | null;
       bookCount: number | null;
       readCount: number | null;
       coverBookIds: number[] | null;
       seriesLatestAddedAt: Date | null;
     }>;
     authorRows: { bookId: number; name: string }[];
-    fileRows: { bookId: number; id: number; format: string | null; role: string }[];
+    fileRows: { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null }[];
     genreRows: { bookId: number; name: string }[];
+    tagRows: { bookId: number; name: string }[];
     progressRows: { bookFileId: number; percentage: number | null }[];
     statusRows: {
       bookId: number;
@@ -214,6 +259,7 @@ export class BookRepository {
       finishedAt: Date | null;
       updatedAt: Date;
     }[];
+    narratorRows: { bookId: number; name: string }[];
     total: number;
   }> {
     const { where, sort, limit, offset, userId } = opts;
@@ -275,6 +321,10 @@ export class BookRepository {
           book_metadata.locked_fields,
           book_metadata.publisher,
           book_metadata.page_count,
+          book_metadata.subtitle,
+          book_metadata.isbn13,
+          book_metadata.metadata_score,
+          books.updated_at,
           COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), lower(book_metadata.title)) AS sort_title,
           COALESCE(sa.latest_added_at, books.added_at) AS sort_added_at,
           sa.book_count,
@@ -313,14 +363,20 @@ export class BookRepository {
       primaryFileId: r.primary_file_id,
       folderPath: r.folder_path,
       addedAt: new Date(r.added_at),
+      updatedAt: new Date(r.updated_at),
       title: r.title,
       seriesName: r.series_name,
       seriesIndex: r.series_index,
       publishedYear: r.published_year,
       language: r.language,
       rating: r.rating,
+      metadataScore: r.metadata_score !== null ? Number(r.metadata_score) : null,
       coverSource: r.cover_source,
       lockedFields: r.locked_fields,
+      subtitle: r.subtitle,
+      publisher: r.publisher,
+      pageCount: r.page_count !== null ? Number(r.page_count) : null,
+      isbn13: r.isbn13,
       bookCount: r.book_count !== null ? Number(r.book_count) : null,
       readCount: r.read_count !== null ? Number(r.read_count) : null,
       coverBookIds: r.cover_book_ids,
@@ -328,55 +384,10 @@ export class BookRepository {
     }));
 
     const bookIds = mappedRows.map((r) => r.id);
-
-    const [authorRows, fileRows, genreRows] = await Promise.all([
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookAuthors.bookId, name: authors.name })
-            .from(bookAuthors)
-            .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-            .where(inArray(bookAuthors.bookId, bookIds))
-            .orderBy(bookAuthors.displayOrder)
-        : [],
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
-            .from(bookFiles)
-            .where(inArray(bookFiles.bookId, bookIds))
-        : ([] as { bookId: number; id: number; format: string | null; role: string }[]),
-      bookIds.length > 0
-        ? this.db
-            .select({ bookId: bookGenres.bookId, name: genres.name })
-            .from(bookGenres)
-            .innerJoin(genres, eq(genres.id, bookGenres.genreId))
-            .where(inArray(bookGenres.bookId, bookIds))
-        : [],
-    ]);
-
     const primaryFileIds = mappedRows.map((r) => r.primaryFileId).filter((id): id is number => id != null);
-    const [progressRows, statusRows] = await Promise.all([
-      primaryFileIds.length > 0
-        ? this.db
-            .select({ bookFileId: readingProgress.bookFileId, percentage: readingProgress.percentage })
-            .from(readingProgress)
-            .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
-        : Promise.resolve([]),
-      bookIds.length > 0
-        ? this.db
-            .select({
-              bookId: userBookStatus.bookId,
-              status: userBookStatus.status,
-              source: userBookStatus.source,
-              startedAt: userBookStatus.startedAt,
-              finishedAt: userBookStatus.finishedAt,
-              updatedAt: userBookStatus.updatedAt,
-            })
-            .from(userBookStatus)
-            .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds)))
-        : Promise.resolve([]),
-    ]);
+    const enrichment = await this.enrichBookIds(bookIds, primaryFileIds, userId);
 
-    return { rows: mappedRows, authorRows, fileRows, genreRows, progressRows, statusRows, total };
+    return { rows: mappedRows, ...enrichment, total };
   }
 
   async findById(id: number) {
@@ -673,6 +684,11 @@ export class BookRepository {
     return rows.map((r) => r.id);
   }
 
+  async findIdsByWhere(where: SQL | undefined): Promise<number[]> {
+    const rows = await this.db.select({ id: books.id }).from(books).where(where);
+    return rows.map((r) => r.id);
+  }
+
   async findPrimaryFile(bookId: number): Promise<{ absolutePath: string; format: string | null } | null> {
     const [row] = await this.db
       .select({ absolutePath: bookFiles.absolutePath, format: bookFiles.format })
@@ -754,6 +770,15 @@ export class BookRepository {
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
     await executor.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
+  }
+
+  async bulkUpdateMetadataFields(
+    bookIds: number[],
+    fields: Partial<typeof bookMetadata.$inferInsert>,
+    executor: MetadataUpdateExecutor = this.db,
+  ): Promise<void> {
+    if (bookIds.length === 0) return;
+    await executor.update(bookMetadata).set(fields).where(inArray(bookMetadata.bookId, bookIds));
   }
 
   async upsertProgress(

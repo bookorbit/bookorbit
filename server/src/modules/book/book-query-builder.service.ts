@@ -2,9 +2,10 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { GroupRule, Rule, SortField, SortSpec } from '@bookorbit/types';
+import type { GroupRule, ReadStatus, Rule, SortSpec } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { BookSortBuilder } from './book-sort-builder.service';
 import {
   authors,
   bookAuthors,
@@ -18,6 +19,7 @@ import {
   collections,
   readingProgress,
   userBookRatings,
+  userBookStatus,
   genres,
   libraries,
   narrators,
@@ -26,20 +28,12 @@ import {
 
 type Db = NodePgDatabase<typeof schema>;
 
-const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
-  title: bookMetadata.title,
-  series: bookMetadata.seriesName,
-  seriesIndex: bookMetadata.seriesIndex,
-  addedAt: books.addedAt,
-  updatedAt: books.updatedAt,
-  publishedYear: bookMetadata.publishedYear,
-  pageCount: bookMetadata.pageCount,
-  publisher: bookMetadata.publisher,
-};
-
 @Injectable()
 export class BookQueryBuilder {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly sortBuilder: BookSortBuilder,
+  ) {}
 
   buildWhere(
     filter: GroupRule | null | undefined,
@@ -91,60 +85,7 @@ export class BookQueryBuilder {
   }
 
   buildOrderBy(sort: SortSpec[], userId?: number): SQL[] {
-    if (sort.length === 0) return [sql`${bookMetadata.title} ASC NULLS LAST`];
-    const result: SQL[] = [];
-    for (const { field, dir } of sort) {
-      const D = this.normalizeSortDirection(dir);
-      if (!D) continue;
-      if (field === 'author') {
-        result.push(
-          sql.raw(
-            `(SELECT a.sort_name FROM book_authors ba INNER JOIN authors a ON ba.author_id = a.id WHERE ba.book_id = books.id ORDER BY ba.display_order LIMIT 1) ${D} NULLS LAST`,
-          ),
-        );
-      } else if (field === 'fileSize') {
-        result.push(sql.raw(`(SELECT bf.size_bytes FROM book_files bf WHERE bf.id = books.primary_file_id) ${D} NULLS LAST`));
-      } else if (field === 'readProgress') {
-        if (userId === undefined) throw new BadRequestException('readProgress sort requires an authenticated user');
-        result.push(
-          sql`(SELECT max(rp.percentage) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
-        );
-      } else if (field === 'lastReadAt') {
-        if (userId === undefined) throw new BadRequestException('lastReadAt sort requires an authenticated user');
-        result.push(
-          sql`(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
-        );
-      } else if (field === 'finishedAt') {
-        if (userId === undefined) throw new BadRequestException('finishedAt sort requires an authenticated user');
-        result.push(
-          sql`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = books.id AND ubs.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
-        );
-      } else if (field === 'rating') {
-        if (userId === undefined) throw new BadRequestException('rating sort requires an authenticated user');
-        result.push(
-          sql`(SELECT ubr.rating FROM user_book_ratings ubr WHERE ubr.book_id = books.id AND ubr.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
-        );
-      } else if (field === 'random') {
-        const daySeed = Math.floor(Date.now() / 86_400_000);
-        const scopedSeed = daySeed + (userId ?? 0);
-        result.push(sql`md5(${books.id}::text || ':' || ${scopedSeed}::text) ${sql.raw(D)}`);
-        result.push(sql`${books.id} ${sql.raw(D)}`);
-      } else {
-        const col = SORT_FIELD_MAP[field];
-        if (!col) continue;
-        result.push(sql`${col} ${sql.raw(D)} NULLS LAST`);
-        if (field === 'seriesIndex' && !sort.some((s) => s.field === 'series')) {
-          result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
-        }
-      }
-    }
-    return result.length > 0 ? result : [sql`${bookMetadata.title} ASC NULLS LAST`];
-  }
-
-  private normalizeSortDirection(dir: string): 'ASC' | 'DESC' | null {
-    const direction = dir.toUpperCase();
-    if (direction === 'ASC' || direction === 'DESC') return direction;
-    return null;
+    return this.sortBuilder.build(sort, userId);
   }
 
   private groupToSql(node: GroupRule, depth: number, userId?: number): SQL {
@@ -197,6 +138,8 @@ export class BookQueryBuilder {
         return this.statusRuleToSql(operator);
       case 'readProgress':
         return this.readProgressRuleToSql(operator, userId);
+      case 'readStatus':
+        return this.readStatusRuleToSql(operator, value as string[] | undefined, userId);
       case 'description':
         return this.textRuleToSql(bookMetadata.description, operator, value as string);
       case 'isbn':
@@ -219,7 +162,7 @@ export class BookQueryBuilder {
       case 'contains':
         return ilike(col, `%${escapeLikePattern(value!)}%`);
       case 'notContains':
-        return not(ilike(col, `%${escapeLikePattern(value!)}%`));
+        return or(isNull(col), not(ilike(col, `%${escapeLikePattern(value!)}%`)))!;
       case 'startsWith':
         return ilike(col, `${escapeLikePattern(value!)}%`);
       case 'endsWith':
@@ -227,7 +170,7 @@ export class BookQueryBuilder {
       case 'eq':
         return ilike(col, escapeLikePattern(value!));
       case 'notEq':
-        return not(ilike(col, escapeLikePattern(value!)));
+        return or(isNull(col), not(ilike(col, escapeLikePattern(value!))))!;
       case 'isEmpty':
         return or(isNull(col), eq(col, ''))!;
       case 'isNotEmpty':
@@ -485,6 +428,34 @@ export class BookQueryBuilder {
     }
   }
 
+  private readStatusRuleToSql(operator: string, values: string[] | undefined, userId?: number): SQL {
+    if (userId === undefined) throw new BadRequestException('Read status filter requires an authenticated user');
+    const existsStatus = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(userBookStatus)
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
+
+    switch (operator) {
+      case 'includesAny':
+        if (!values?.length) return sql`1 = 0`;
+        return existsStatus(inArray(userBookStatus.status, values as ReadStatus[]));
+      case 'excludesAll':
+        if (!values?.length) return sql`1 = 1`;
+        return not(existsStatus(inArray(userBookStatus.status, values as ReadStatus[])));
+      case 'isEmpty':
+        return not(existsStatus());
+      case 'isNotEmpty':
+        return existsStatus();
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for readStatus field`);
+    }
+  }
+
   private tagRuleToSql(operator: string, values?: string[]): SQL {
     const existsTag = (whereClause?: SQL) => {
       const predicates: SQL[] = [eq(bookTags.bookId, books.id)];
@@ -590,6 +561,10 @@ export class BookQueryBuilder {
 
   static buildCollapseOrderBy(sort: SortSpec[], userId: number): string {
     if (sort.length === 0) return 'sort_title ASC NULLS LAST';
+
+    if (!Number.isSafeInteger(userId)) throw new BadRequestException('Invalid userId for collapse order');
+    const safeUserId = String(Math.trunc(userId));
+
     const parts: string[] = [];
     for (const { field, dir } of sort) {
       const D = dir.toUpperCase();
@@ -633,16 +608,16 @@ export class BookQueryBuilder {
           break;
         case 'readProgress':
           parts.push(
-            `(SELECT max(rp.percentage) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${userId}) ${D} NULLS LAST`,
+            `(SELECT max(rp.percentage) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${safeUserId}) ${D} NULLS LAST`,
           );
           break;
         case 'lastReadAt':
           parts.push(
-            `(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${userId}) ${D} NULLS LAST`,
+            `(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${safeUserId}) ${D} NULLS LAST`,
           );
           break;
         case 'finishedAt':
-          parts.push(`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${userId}) ${D} NULLS LAST`);
+          parts.push(`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);
           break;
         case 'random': {
           const daySeed = Math.floor(Date.now() / 86_400_000);
@@ -651,6 +626,12 @@ export class BookQueryBuilder {
           parts.push(`r.id ${D}`);
           break;
         }
+        case 'readStatus':
+          parts.push(`(SELECT ubs.status FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);
+          break;
+        case 'format':
+          parts.push(`(SELECT bf.format FROM book_files bf WHERE bf.id = r.primary_file_id) ${D} NULLS LAST`);
+          break;
       }
     }
     return parts.length > 0 ? parts.join(', ') : 'sort_title ASC NULLS LAST';

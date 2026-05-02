@@ -17,16 +17,22 @@ watchEffect(() => {
   option.value = {
     tooltip: { trigger: 'item' },
     legend: {
+      type: 'scroll',
       orient: md.value ? 'vertical' : 'horizontal',
-      right: md.value ? '2%' : 'auto',
-      bottom: md.value ? 'auto' : 0,
-      top: md.value ? 'middle' : 'auto',
+      left: md.value ? '56%' : 'center',
+      right: md.value ? 0 : 'auto',
+      top: md.value ? 8 : 'auto',
+      bottom: md.value ? 8 : 0,
+      itemWidth: 12,
+      itemHeight: 8,
+      pageIconSize: 10,
+      pageButtonGap: 4,
     },
     series: [
       {
         type: 'pie',
-        radius: ['40%', '70%'],
-        center: md.value ? ['38%', '50%'] : ['50%', '44%'],
+        radius: ['42%', '68%'],
+        center: md.value ? ['27%', '50%'] : ['50%', '38%'],
         data: data.value.items.map((item) => ({ name: item.language.toUpperCase(), value: item.count })),
         label: { show: false },
       },

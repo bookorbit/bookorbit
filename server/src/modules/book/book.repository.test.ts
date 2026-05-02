@@ -50,24 +50,26 @@ describe('BookRepository', () => {
   });
 
   it('findCards loads card rows and related collections for the current user', async () => {
-    const rows = [{ id: 10, primaryFileId: 1001 }];
-    const totals = [{ total: '1' }];
+    const rows = [{ id: 10, primaryFileId: 1001, _total: 1 }];
     const authorRows = [{ bookId: 10, name: 'Frank Herbert' }];
     const fileRows = [{ bookId: 10, id: 1001, format: 'epub', role: 'primary' }];
     const genreRows = [{ bookId: 10, name: 'Sci-Fi' }];
+    const tagRows = [{ bookId: 10, name: 'dune' }];
     const progressRows = [{ bookFileId: 1001, percentage: 45 }];
     const statusRows = [{ bookId: 10, status: 'reading', source: 'manual', startedAt: null, finishedAt: null, updatedAt: null }];
+    const narratorRows = [{ bookId: 10, name: 'Scott Brick' }];
 
     const db = {
       select: vi
         .fn()
         .mockReturnValueOnce(makeSelectChain('offset', rows))
-        .mockReturnValueOnce(makeSelectChain('where', totals))
         .mockReturnValueOnce(makeSelectChain('orderBy', authorRows))
         .mockReturnValueOnce(makeSelectChain('where', fileRows))
         .mockReturnValueOnce(makeSelectChain('where', genreRows))
-        .mockReturnValueOnce(makeSelectChain('where', progressRows))
-        .mockReturnValueOnce(makeSelectChain('where', statusRows)),
+        .mockReturnValueOnce(makeSelectChain('where', tagRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows))
+        .mockReturnValueOnce(makeSelectChain('where', statusRows))
+        .mockReturnValueOnce(makeSelectChain('where', progressRows)),
     };
     const repo = new BookRepository(db as never);
 
@@ -78,8 +80,10 @@ describe('BookRepository', () => {
       authorRows,
       fileRows,
       genreRows,
+      tagRows,
       progressRows,
       statusRows,
+      narratorRows,
       total: 1,
     });
   });
@@ -93,8 +97,10 @@ describe('BookRepository', () => {
       authorRows: [],
       fileRows: [],
       genreRows: [],
+      tagRows: [],
       progressRows: [],
       statusRows: [],
+      narratorRows: [],
       total: 0,
     });
     expect(db.select).not.toHaveBeenCalled();

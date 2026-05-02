@@ -20,6 +20,7 @@ import { useAuthorSelection } from '../composables/useAuthorSelection'
 import { useAuthorsList } from '../composables/useAuthorsList'
 import { useRefreshingAuthors } from '../composables/useRefreshingAuthors'
 import type { AuthorListSort, SortDirection } from '../types/author'
+import type { BookViewMode } from '@/composables/useDisplaySettings'
 
 const router = useRouter()
 const route = useRoute()
@@ -54,6 +55,12 @@ const deleteDialogOpen = ref(false)
 
 const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata') && !isDemoRestrictedAccount.value)
 const canDeleteAuthors = computed(() => isSuperuser.value)
+const authorViewMode = computed<BookViewMode>({
+  get: () => (viewMode.value === 'table' ? 'grid' : viewMode.value),
+  set: (next) => {
+    viewMode.value = next === 'table' ? 'grid' : next
+  },
+})
 
 const SORT_LABELS: Record<AuthorListSort, string> = {
   name: 'Name',
@@ -446,8 +453,9 @@ watch(
     :total="total"
     v-model:coverSize="authorCoverSize"
     v-model:gridGap="gridGap"
-    v-model:viewMode="viewMode"
+    v-model:viewMode="authorViewMode"
     v-model:coverShape="authorCoverShape"
+    :allowed-view-modes="['grid', 'list']"
     :selection-mode="selectionMode"
     @toggle-selection="toggleSelectionMode"
   >
@@ -698,7 +706,7 @@ watch(
     </div>
 
     <div
-      v-show="viewMode === 'grid' && items.length > 0"
+      v-show="authorViewMode === 'grid' && items.length > 0"
       class="grid"
       :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${authorCoverSize}px, 1fr))`, gap: `${gridGap}px` }"
     >
@@ -720,7 +728,7 @@ watch(
       />
     </div>
 
-    <div v-show="viewMode === 'list' && items.length > 0" class="flex flex-col divide-y divide-border">
+    <div v-show="authorViewMode === 'list' && items.length > 0" class="flex flex-col divide-y divide-border">
       <AuthorListRow
         v-for="author in items"
         :key="author.id"

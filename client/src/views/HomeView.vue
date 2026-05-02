@@ -1,9 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, Bookmark, BookmarkCheck, BookOpen, CheckSquare, Filter, Layers, SlidersHorizontal, Square, Telescope, X } from 'lucide-vue-next'
+import {
+  ArrowUpDown,
+  Bookmark,
+  BookmarkCheck,
+  BookOpen,
+  CheckSquare,
+  FileSpreadsheet,
+  Filter,
+  Layers,
+  SlidersHorizontal,
+  Square,
+  Telescope,
+  X,
+} from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
+import TableColumnPanel from '@/features/book/components/TableColumnPanel.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
@@ -13,36 +28,42 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
+import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsSmartScopeDialog from '@/features/smart-scope/components/SaveAsSmartScopeDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
-import { useBookQuery, type BookCard } from '@/features/book/composables/useBookQuery'
+import { useLibraryBooks, type BookCard } from '@/features/book/composables/useLibraryBooks'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
-import { useBookSelection } from '@/features/book/composables/useBookSelection'
-import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
-import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLiveScanBooks } from '@/features/scanner/composables/useLiveScanBooks'
 import ScanProgressBar from '@/features/scanner/components/ScanProgressBar.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
-import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { useViewSort } from '@/features/book/composables/useViewSort'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
-import type { GroupRule, SortSpec } from '@bookorbit/types'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useBookViewContext } from '@/features/book/composables/useBookViewContext'
+import { useBookTableShell } from '@/features/book/composables/useBookTableShell'
+import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfiniteScrollSentinel'
+import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
+import type { GroupRule, Rule, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+import { type QuerySelectionState } from '@/features/book/composables/useBookBulkActions'
 
 const route = useRoute()
 const router = useRouter()
-const { viewMode } = useDisplaySettings()
+const { viewMode, effectiveViewMode } = useEffectiveViewMode()
 const { libraries, loaded: librariesLoaded } = useLibraries()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 
 const libraryId = shallowRef<number | null>(route.params.id ? Number(route.params.id) : null)
 const currentLibrary = computed(() => libraries.value.find((l) => l.id === libraryId.value))
@@ -84,42 +105,127 @@ const {
   hasMore,
   load,
   clear,
-} = useBookQuery(libraryId, collapseEnabledRef, debouncedQuery)
+} = useLibraryBooks(libraryId, collapseEnabledRef, debouncedQuery)
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
-
-const { setBookContext, registerLoadMore } = useBookNavigation()
-watch(
-  [books, total],
-  ([newBooks, newTotal]) => {
-    setBookContext(
-      newBooks.map((b) => b.id),
-      newTotal,
-    )
-  },
-  { immediate: true },
-)
-onMounted(() => {
-  registerLoadMore(async () => {
-    await load()
-  })
-})
-onUnmounted(() => {
-  registerLoadMore(null)
-})
+const { setBookContext } = useBookNavigation()
+useBookViewContext(books, total, () => load())
 
 const FILTER_STORAGE_PREFIX = 'bookorbit:filter:library:'
 function getFilterKey(id: number) {
   return `${FILTER_STORAGE_PREFIX}${id}`
 }
 
-const SORT_STORAGE_PREFIX = 'bookorbit:sort:library:'
-function getSortKey(id: number) {
-  return `${SORT_STORAGE_PREFIX}${id}`
-}
-
 const savedFilter = ref<GroupRule | undefined>(undefined)
 const hasSavedFilter = computed(() => savedFilter.value !== undefined)
 const isFilterSaved = computed(() => JSON.stringify(filter.value) === JSON.stringify(savedFilter.value))
+
+const { sortModel, isDefaultSort, sortSummary, resetSort } = useViewSort(sort, 'library', libraryId)
+const { tableDensity } = useDisplaySettings()
+const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('library', libraryId)
+
+function handleSaveCurrentView(name: string) {
+  if (!tableRef.value) return
+  saveView({
+    name,
+    layout: tableRef.value.currentLayout,
+    sort: sort.value,
+    filter: filter.value,
+  })
+}
+
+function handleApplySavedView(view: SavedView) {
+  tableRef.value?.applyPreset(view.layout, view.sort)
+  filter.value = view.filter ? JSON.parse(JSON.stringify(view.filter)) : undefined
+}
+
+function handleRenameSavedView(id: string, name: string) {
+  renameView(id, name)
+}
+
+function handleDeleteSavedView(id: string) {
+  deleteView(id)
+}
+
+function handleDuplicateSavedView(id: string) {
+  duplicateView(id)
+}
+
+function handleToggleSavedViewFavorite(id: string) {
+  toggleFavorite(id)
+}
+
+function downloadBackup(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function handleExportTableBackup() {
+  downloadBackup(`library-table-backup-${libraryId.value ?? 'shared'}.json`, {
+    version: 1,
+    presets: tableRef.value?.allPresets.filter((preset) => !preset.isBuiltIn) ?? [],
+    savedViews: allSavedViews.value,
+  })
+}
+
+async function handleImportTableBackup(file: File) {
+  const raw = await file.text()
+  const parsed = JSON.parse(raw) as { presets?: unknown[]; savedViews?: unknown[] }
+  const importedPresets = handleImportPresetBackup((parsed.presets ?? []) as never)
+  const importedViews = importViews((parsed.savedViews ?? []) as SavedView[])
+  if (importedPresets === 0 && importedViews === 0) return
+}
+
+function handleQuickFilter(rule: Rule) {
+  filter.value = filter.value
+    ? {
+        type: 'group',
+        join: 'AND',
+        rules: [...filter.value.rules, rule],
+      }
+    : {
+        type: 'group',
+        join: 'AND',
+        rules: [rule],
+      }
+}
+
+function handleTableDensityChange(value: 'compact' | 'comfortable' | 'roomy') {
+  tableDensity.value = value
+}
+
+function handleSelectAllLoaded(checked: boolean) {
+  const ids = books.value.map((book) => book.id)
+  if (checked) {
+    selectAll(ids)
+    if (total.value > books.value.length) {
+      showQuerySelectionBanner.value = true
+    }
+  } else {
+    deselectAll(ids)
+    querySelection.value = null
+    showQuerySelectionBanner.value = false
+  }
+}
+
+function activateQuerySelection() {
+  querySelection.value = {
+    libraryId: libraryId.value ?? undefined,
+    filter: filter.value,
+    q: debouncedQuery.value || undefined,
+    sort: sort.value,
+    total: total.value,
+  }
+  showQuerySelectionBanner.value = false
+}
+
+function dismissQuerySelectionBanner() {
+  showQuerySelectionBanner.value = false
+}
 
 watch(
   libraryId,
@@ -132,15 +238,11 @@ watch(
         filter.value = saved
       } catch {
         savedFilter.value = undefined
-      }
-      try {
-        const rawSort = localStorage.getItem(getSortKey(id))
-        sort.value = rawSort ? JSON.parse(rawSort) : [{ field: 'title', dir: 'asc' }]
-      } catch {
-        sort.value = [{ field: 'title', dir: 'asc' }]
+        filter.value = undefined
       }
     } else {
       savedFilter.value = undefined
+      filter.value = undefined
     }
   },
   { immediate: true },
@@ -199,29 +301,16 @@ onBookMoved((bookIds) => {
 const filterOpen = ref(false)
 const mobileControlsExpanded = ref(false)
 
-function saveSort() {
-  if (libraryId.value === null) return
-  localStorage.setItem(getSortKey(libraryId.value), JSON.stringify(sort.value))
-}
-
-const isDefaultSort = computed(() => sort.value.length === 1 && sort.value[0]?.field === 'title' && sort.value[0]?.dir === 'asc')
-
-const sortSummary = computed(() => sort.value.map((s) => `${SORT_FIELD_LABELS[s.field]} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', '))
-
-const sortModel = computed({
-  get: () => sort.value,
+const localSortModel = computed({
+  get: () => sortModel.value,
   set: (v: SortSpec[]) => {
-    sort.value = v.length > 0 ? v : [{ field: 'title', dir: 'asc' }]
-    saveSort()
-    load(true)
+    sortModel.value = v
     collapseMobileControlsIfNeeded()
   },
 })
 
-function resetSort() {
-  sort.value = [{ field: 'title', dir: 'asc' }]
-  if (libraryId.value !== null) localStorage.removeItem(getSortKey(libraryId.value))
-  load(true)
+function handleResetSort() {
+  resetSort()
   collapseMobileControlsIfNeeded()
 }
 
@@ -257,31 +346,14 @@ function closeFilterPanel() {
   filterOpen.value = false
 }
 
-const sentinel = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
-function checkSentinel() {
-  if (!hasMore.value || loading.value) return
-  const el = sentinel.value
-  if (!el) return
-  if (el.getBoundingClientRect().top < window.innerHeight + 300) load()
-}
+const { sentinel } = useInfiniteScrollSentinel({
+  hasMore,
+  loading,
+  loadMore: () => load(),
+})
 
 onMounted(() => {
   load(true)
-
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0]?.isIntersecting && !loading.value && hasMore.value) load()
-    },
-    { rootMargin: '300px' },
-  )
-  if (sentinel.value) observer.observe(sentinel.value)
-  window.addEventListener('resize', checkSentinel, { passive: true })
-})
-
-onUnmounted(() => {
-  observer?.disconnect()
-  window.removeEventListener('resize', checkSentinel)
 })
 
 const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
@@ -301,67 +373,89 @@ watch(libraryId, (newId) => {
 watch(debouncedQuery, () => load(true))
 
 watch(filter, () => load(true), { deep: true })
-watch(
-  loading,
-  (isLoading) => {
-    if (!isLoading) checkSentinel()
-  },
-  { flush: 'post' },
-)
 
-const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
+const saveAsSmartScopeOpen = ref(false)
+const querySelection = ref<QuerySelectionState | null>(null)
+const showQuerySelectionBanner = ref(false)
+
 const {
-  pendingId: deleteBookId,
-  deleting: deletingBook,
-  promptDelete,
+  tableRef,
+  handleResetColumns,
+  handleToggleColumn,
+  handleColumnPanelReorder,
+  handleApplyTablePreset,
+  handleSaveTablePreset,
+  handleDeleteTablePreset,
+  handleRenameTablePreset,
+  handleDuplicateTablePreset,
+  handleTogglePresetFavorite,
+  handleImportPresetBackup,
+  selectionMode,
+  selectedIds,
+  selectedCount,
+  enterSelectionMode,
+  exitSelectionMode,
+  selectAll,
+  deselectAll,
+  isSelected,
+  handleSelect,
+  toggleSelectionMode,
+  deleteBookId,
+  deletingBook,
   cancelDelete,
   confirmDelete,
-} = useDeleteBook((id) => {
-  books.value = books.value.filter((b) => b.id !== id)
-})
-const {
   inFlight,
   handleBulkRefreshMetadata,
   handleBulkReExtractCover,
-  handleExport,
+  handleDownloadFiles,
   handleBulkSetStatus,
   handleBulkSetRating,
   handleBulkUpdateTags,
+  handleBulkSetField,
   handleBulkSetMetadataLock,
   handleDeleteSelected,
-} = useBookBulkActions(
-  selectedIds,
-  (ids) => {
-    const deleted = new Set(ids)
-    books.value = books.value.filter((b) => !deleted.has(b.id))
-    exitSelectionMode()
-  },
+  addToCollectionOpen,
+  bulkTagsOpen,
+  sendBookOpen,
+  quickViewBookId,
+  quickViewOpen,
+  handleBookAction,
+  handleTableBookUpdate,
+} = useBookTableShell({
   books,
-)
+  loadFn: () => load(true),
+  querySelection,
+})
 
-function handleSelect(id: number, event: MouseEvent) {
-  if (event.shiftKey)
-    rangeSelectTo(
-      id,
-      books.value.map((b) => b.id),
-    )
-  else toggleBook(id)
+const metadataExportOpen = ref(false)
+const metadataExportDefaultScope = ref<'selected' | 'all-matching'>('all-matching')
+
+const metadataExportQuery = computed(() => {
+  if (libraryId.value === null) return undefined
+  return {
+    libraryId: libraryId.value,
+    filter: filter.value,
+    q: debouncedQuery.value || undefined,
+    sort: sort.value,
+  }
+})
+
+const visibleExportColumns = computed(() => {
+  if (!tableRef.value) return []
+  return tableRef.value.allColumns.filter((column) => column.visible).map((column) => column.id)
+})
+
+function openMetadataExport(scope: 'selected' | 'all-matching') {
+  metadataExportDefaultScope.value = scope
+  metadataExportOpen.value = true
 }
 
-function toggleSelectionMode() {
-  if (selectionMode.value) exitSelectionMode()
-  else enterSelectionMode()
-}
-
-const addToCollectionOpen = ref(false)
-const bulkTagsOpen = ref(false)
-const sendBookOpen = ref(false)
-const saveAsSmartScopeOpen = ref(false)
-
-type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
-
-const quickViewBookId = ref<number | null>(null)
-const quickViewOpen = ref(false)
+watch(selectionMode, (active) => {
+  if (!active) {
+    querySelection.value = null
+    showQuerySelectionBanner.value = false
+  }
+})
 
 function handleEditSelected() {
   const ids = [...selectedIds.value]
@@ -369,25 +463,6 @@ function handleEditSelected() {
   setBookContext(ids, ids.length)
   router.push({ name: 'book-detail', params: { bookId: ids[0] }, query: { tab: 'edit' } })
   exitSelectionMode()
-}
-
-function handleBookAction(book: BookCard, action: BookActionType) {
-  if (action === 'quick-view') {
-    quickViewBookId.value = book.id
-    quickViewOpen.value = true
-    return
-  }
-  if (action === 'add-to-collection') {
-    if (!selectionMode.value) {
-      enterSelectionMode()
-      toggleBook(book.id)
-    }
-    addToCollectionOpen.value = true
-    return
-  }
-  if (action === 'delete') {
-    promptDelete(book.id)
-  }
 }
 
 async function handleToggleCollapse() {
@@ -400,7 +475,7 @@ async function handleToggleCollapse() {
 </script>
 
 <template>
-  <section class="flex min-h-full flex-col">
+  <section class="flex h-full flex-col">
     <ViewHeader
       :title="title"
       :icon="libraryIcon"
@@ -414,7 +489,7 @@ async function handleToggleCollapse() {
       @toggle-selection="toggleSelectionMode"
     >
       <template #toolbar>
-        <div class="hidden sm:flex items-center gap-1">
+        <div v-if="effectiveViewMode !== 'table'" class="hidden sm:flex items-center gap-1">
           <Popover>
             <PopoverTrigger as-child>
               <button
@@ -433,14 +508,14 @@ async function handleToggleCollapse() {
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" class="w-80 p-3">
-              <BookSortBuilder v-model="sortModel" />
+              <BookSortBuilder v-model="localSortModel" />
             </PopoverContent>
           </Popover>
           <Tooltip>
             <TooltipTrigger as-child>
               <button
                 v-if="!isDefaultSort"
-                @click="resetSort"
+                @click="handleResetSort"
                 class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <X :size="13" />
@@ -465,6 +540,18 @@ async function handleToggleCollapse() {
             </button>
           </TooltipTrigger>
           <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+              class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
+              @click="openMetadataExport('all-matching')"
+            >
+              <FileSpreadsheet :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Export metadata</TooltipContent>
         </Tooltip>
         <button
           @click="toggleFilterPanel"
@@ -518,6 +605,33 @@ async function handleToggleCollapse() {
           Collapse series
         </DropdownMenuItem>
       </template>
+      <template v-if="effectiveViewMode === 'table'" #columns>
+        <TableColumnPanel
+          v-if="tableRef"
+          :all-columns="tableRef.allColumns"
+          :all-presets="tableRef.allPresets"
+          :saved-views="allSavedViews"
+          :table-density="tableDensity"
+          @toggle-column="handleToggleColumn"
+          @reorder-columns="handleColumnPanelReorder"
+          @apply-preset="handleApplyTablePreset"
+          @save-preset="handleSaveTablePreset"
+          @delete-preset="handleDeleteTablePreset"
+          @rename-preset="handleRenameTablePreset"
+          @duplicate-preset="handleDuplicateTablePreset"
+          @favorite-preset="handleTogglePresetFavorite"
+          @apply-view="handleApplySavedView"
+          @save-view="handleSaveCurrentView"
+          @delete-view="handleDeleteSavedView"
+          @rename-view="handleRenameSavedView"
+          @duplicate-view="handleDuplicateSavedView"
+          @favorite-view="handleToggleSavedViewFavorite"
+          @update:density="handleTableDensityChange"
+          @export-backup="handleExportTableBackup"
+          @import-backup="handleImportTableBackup"
+          @reset="handleResetColumns"
+        />
+      </template>
     </ViewHeader>
 
     <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
@@ -538,14 +652,14 @@ async function handleToggleCollapse() {
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" class="w-80 p-3">
-            <BookSortBuilder v-model="sortModel" />
+            <BookSortBuilder v-model="localSortModel" />
           </PopoverContent>
         </Popover>
 
         <button
           v-if="!isDefaultSort"
           class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:text-destructive hover:bg-destructive/10"
-          @click="resetSort"
+          @click="handleResetSort"
         >
           <X :size="13" />
         </button>
@@ -567,6 +681,15 @@ async function handleToggleCollapse() {
         </button>
 
         <button
+          v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="openMetadataExport('all-matching')"
+        >
+          <FileSpreadsheet :size="13" />
+          <span>Export</span>
+        </button>
+
+        <button
           v-if="activeFilterCount > 0"
           @click="clearFilters"
           class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
@@ -576,7 +699,7 @@ async function handleToggleCollapse() {
       </div>
     </section>
 
-    <main class="flex-1 min-h-0">
+    <main :class="effectiveViewMode === 'table' ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto'">
       <EntityNotFound v-if="libraryNotFound" entity="Library" />
 
       <template v-else>
@@ -671,7 +794,7 @@ async function handleToggleCollapse() {
 
         <!-- Grid view -->
         <VirtualBookGrid
-          v-if="viewMode === 'grid' && books.length > 0"
+          v-if="effectiveViewMode === 'grid' && books.length > 0"
           :books="books"
           :cover-size="coverSize"
           :grid-gap="gridGap"
@@ -683,7 +806,7 @@ async function handleToggleCollapse() {
         />
 
         <!-- List view -->
-        <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <div v-if="effectiveViewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
           <BookListRow
             v-for="book in books"
             :key="book.id"
@@ -695,7 +818,33 @@ async function handleToggleCollapse() {
           />
         </div>
 
-        <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+        <!-- Table view -->
+        <VirtualBookTable
+          v-if="effectiveViewMode === 'table'"
+          ref="tableRef"
+          :books="books"
+          :in-flight="inFlight"
+          :sort="sort"
+          :has-more="hasMore"
+          :loading="loading"
+          :total="total"
+          view-type="library"
+          :selection-mode="selectionMode"
+          :is-selected="isSelected"
+          :selected-count="selectedCount"
+          :filter-active="activeFilterCount > 0"
+          :initialized="booksInitialized"
+          @update:sort="localSortModel = $event"
+          @action="handleBookAction"
+          @select="handleSelect"
+          @update:book="handleTableBookUpdate"
+          @load-more="load"
+          @select-all="handleSelectAllLoaded"
+          @enter-selection="enterSelectionMode"
+          @quick-filter="handleQuickFilter"
+        />
+
+        <div v-if="effectiveViewMode !== 'table'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
           <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
           <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
         </div>
@@ -710,12 +859,33 @@ async function handleToggleCollapse() {
     @action="quickViewBookId !== null && handleBookAction({ id: quickViewBookId } as BookCard, $event)"
   />
 
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    leave-active-class="transition-all duration-150 ease-in"
+    enter-from-class="opacity-0 -translate-y-2"
+    leave-to-class="opacity-0 -translate-y-2"
+  >
+    <div
+      v-if="showQuerySelectionBanner && !querySelection"
+      class="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-lg border border-primary/30 bg-background px-4 py-2.5 text-sm shadow-lg"
+    >
+      <span class="text-muted-foreground"> {{ selectedCount.toLocaleString() }} of {{ total.toLocaleString() }} loaded books selected. </span>
+      <button class="font-medium text-primary underline-offset-2 hover:underline" @click="activateQuerySelection">
+        Select all {{ total.toLocaleString() }} matching books
+      </button>
+      <button class="text-muted-foreground hover:text-foreground" @click="dismissQuerySelectionBanner">
+        <X :size="14" />
+      </button>
+    </div>
+  </Transition>
+
   <SelectionActionBar
     :visible="selectionMode"
-    :count="selectedCount"
+    :count="querySelection ? querySelection.total : selectedCount"
     :in-flight="inFlight"
     @send="sendBookOpen = true"
-    @export="handleExport"
+    @download="handleDownloadFiles"
+    @export-metadata="openMetadataExport(querySelection ? 'all-matching' : 'selected')"
     @add-to-collection="addToCollectionOpen = true"
     @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
@@ -723,9 +893,23 @@ async function handleToggleCollapse() {
     @set-status="handleBulkSetStatus"
     @set-rating="handleBulkSetRating"
     @edit-tags="bulkTagsOpen = true"
+    @set-field="handleBulkSetField"
     @lock-metadata="handleBulkSetMetadataLock"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
+  />
+
+  <MetadataExportDialog
+    :open="metadataExportOpen"
+    view-type="library"
+    :selected-book-ids="[...selectedIds]"
+    :selected-count="selectedCount"
+    :total-count="total"
+    :all-matching-query="metadataExportQuery"
+    :sort="sort"
+    :visible-columns="visibleExportColumns"
+    :default-scope="metadataExportDefaultScope"
+    @update:open="metadataExportOpen = $event"
   />
 
   <AddToCollectionSheet

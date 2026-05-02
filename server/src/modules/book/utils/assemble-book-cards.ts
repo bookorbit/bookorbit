@@ -1,6 +1,14 @@
 import { basename } from 'path';
 
-import type { BookCard, CollapsedSeriesInfo, UserBookStatus } from '@bookorbit/types';
+import type { BookCard, BookMetadataLockField, CollapsedSeriesInfo, UserBookStatus } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS } from '@bookorbit/types';
+
+const LOCK_FIELD_SET = new Set<string>(BOOK_METADATA_LOCK_FIELDS);
+
+function normalizeLockedFields(raw: string[] | null | undefined): BookMetadataLockField[] {
+  if (!raw?.length) return [];
+  return raw.filter((f) => LOCK_FIELD_SET.has(f)) as BookMetadataLockField[];
+}
 
 type BookRow = {
   id: number;
@@ -8,14 +16,20 @@ type BookRow = {
   primaryFileId?: number | null;
   folderPath: string;
   addedAt: Date;
+  updatedAt?: Date;
   title: string | null;
   seriesName: string | null;
   seriesIndex: number | null;
   publishedYear: number | null;
   language: string | null;
   rating: number | null;
+  metadataScore?: number | null;
   coverSource: string | null;
   lockedFields: string[] | null;
+  subtitle: string | null;
+  publisher: string | null;
+  pageCount: number | null;
+  isbn13: string | null;
 };
 
 type CollapsedBookRow = BookRow & {
@@ -26,7 +40,8 @@ type CollapsedBookRow = BookRow & {
 };
 
 type NameRow = { bookId: number; name: string };
-type FileRow = { bookId: number; id: number; format: string | null; role: string };
+type NarratorRow = { bookId: number; name: string };
+type FileRow = { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null };
 type ProgressRow = { bookFileId: number; percentage: number | null };
 type StatusRow = {
   bookId: number;
@@ -44,6 +59,8 @@ export function assembleBookCards(
   genreRows: NameRow[],
   progressRows: ProgressRow[],
   statusRows: StatusRow[] = [],
+  narratorRows: NarratorRow[] = [],
+  tagRows: NameRow[] = [],
 ): BookCard[] {
   const authorsByBook = new Map<number, string[]>();
   for (const row of authorRows) {
@@ -52,10 +69,10 @@ export function assembleBookCards(
     authorsByBook.set(row.bookId, list);
   }
 
-  const filesByBook = new Map<number, { id: number; format: string | null; role: string }[]>();
+  const filesByBook = new Map<number, { id: number; format: string | null; role: string; sizeBytes: number | null }[]>();
   for (const row of fileRows) {
     const list = filesByBook.get(row.bookId) ?? [];
-    list.push({ id: row.id, format: row.format, role: row.role });
+    list.push({ id: row.id, format: row.format, role: row.role, sizeBytes: row.sizeBytes });
     filesByBook.set(row.bookId, list);
   }
 
@@ -82,6 +99,20 @@ export function assembleBookCards(
     });
   }
 
+  const narratorsByBook = new Map<number, string[]>();
+  for (const row of narratorRows) {
+    const list = narratorsByBook.get(row.bookId) ?? [];
+    list.push(row.name);
+    narratorsByBook.set(row.bookId, list);
+  }
+
+  const tagsByBook = new Map<number, string[]>();
+  for (const row of tagRows) {
+    const list = tagsByBook.get(row.bookId) ?? [];
+    list.push(row.name);
+    tagsByBook.set(row.bookId, list);
+  }
+
   return rows.map((row) => {
     const rawFiles = filesByBook.get(row.id) ?? [];
     const primaryFile =
@@ -90,7 +121,12 @@ export function assembleBookCards(
       rawFiles.find((f) => f.role === 'content') ??
       rawFiles[0] ??
       null;
-    const files = rawFiles.map((f) => ({ ...f, role: primaryFile && f.id === primaryFile.id ? 'primary' : f.role }));
+    const files = rawFiles.map((f) => ({
+      id: f.id,
+      format: f.format,
+      role: primaryFile && f.id === primaryFile.id ? 'primary' : f.role,
+      sizeBytes: f.sizeBytes,
+    }));
     const readingProgress = primaryFile != null ? (progressByFileId.get(primaryFile.id) ?? null) : null;
 
     return {
@@ -108,8 +144,17 @@ export function assembleBookCards(
       readingProgress,
       readStatus: statusByBookId.get(row.id) ?? null,
       addedAt: row.addedAt.toISOString(),
+      updatedAt: row.updatedAt?.toISOString() ?? null,
+      metadataScore: row.metadataScore ?? null,
       hasCover: row.coverSource != null,
       hasMetadataLocks: (row.lockedFields?.length ?? 0) > 0,
+      lockedFields: normalizeLockedFields(row.lockedFields),
+      subtitle: row.subtitle ?? null,
+      publisher: row.publisher ?? null,
+      pageCount: row.pageCount ?? null,
+      isbn13: row.isbn13 ?? null,
+      narrators: narratorsByBook.get(row.id) ?? [],
+      tags: tagsByBook.get(row.id) ?? [],
     };
   });
 }
@@ -121,8 +166,10 @@ export function assembleCollapsedBookCards(
   genreRows: NameRow[],
   progressRows: ProgressRow[],
   statusRows: StatusRow[] = [],
+  narratorRows: NarratorRow[] = [],
+  tagRows: NameRow[] = [],
 ): BookCard[] {
-  const base = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows);
+  const base = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows);
 
   for (let i = 0; i < base.length; i++) {
     const row = rows[i];

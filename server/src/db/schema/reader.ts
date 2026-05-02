@@ -30,6 +30,7 @@ export const userBookStatus = pgTable(
     primaryKey({ columns: [t.userId, t.bookId] }),
     index('ubs_user_id_idx').on(t.userId),
     index('ubs_user_status_idx').on(t.userId, t.status),
+    index('ubs_book_user_idx').on(t.bookId, t.userId),
     check(
       'user_book_status_status_chk',
       sql`${t.status} in ('unread', 'want_to_read', 'reading', 'on_hold', 'rereading', 'read', 'skimmed', 'abandoned')`,
@@ -61,6 +62,7 @@ export const userBookRatings = pgTable(
     primaryKey({ columns: [t.userId, t.bookId] }),
     index('ubr_user_id_idx').on(t.userId),
     index('ubr_book_id_idx').on(t.bookId),
+    index('ubr_book_user_rating_idx').on(t.bookId, t.userId),
     check('user_book_ratings_rating_range_chk', sql`${t.rating} >= 1 and ${t.rating} <= 5`),
   ],
 );

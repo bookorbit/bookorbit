@@ -1,8 +1,3 @@
-import { ArrayNotEmpty, IsArray, IsInt } from 'class-validator';
+import { BulkSelectionDto } from './bulk-selection.dto';
 
-export class BulkBookIdsDto {
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsInt({ each: true })
-  bookIds: number[];
-}
+export class BulkBookIdsDto extends BulkSelectionDto {}

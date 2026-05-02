@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -10,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, readdir, rm, stat } from 'fs/promises';
-import type { SQL } from 'drizzle-orm';
+import { inArray, type SQL } from 'drizzle-orm';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
@@ -19,7 +20,7 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
-import { basename, extname, join } from 'path';
+import { basename, dirname, extname, join } from 'path';
 
 import {
   BOOK_METADATA_LOCK_FIELDS,
@@ -37,6 +38,7 @@ import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { LibraryService } from '../library/library.service';
+import { books } from '../../db/schema';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { FileWriteService } from '../file-write/file-write.service';
@@ -47,6 +49,10 @@ import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
+import type { BulkMetadataField } from './dto/bulk-set-metadata.dto';
+import type { BulkSelectionDto } from './dto/bulk-selection.dto';
+import type { MetadataExportDto, MetadataExportFormat, MetadataExportViewType } from './dto/metadata-export.dto';
+import type { MetadataExportColumnMode } from './dto/metadata-export-options.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
@@ -63,6 +69,16 @@ const METADATA_UPDATE_FAILPOINTS = [
 
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
 export type ExportScope = 'primary' | 'all' | 'audio';
+const BULK_METADATA_LOCK_FIELD_BY_FIELD: Record<BulkMetadataField, BookMetadataLockField> = {
+  seriesName: 'seriesName',
+  publisher: 'publisher',
+  language: 'language',
+  publishedYear: 'publishedYear',
+  authors: 'authors',
+  genres: 'genres',
+  tags: 'tags',
+  narrators: 'narrators',
+};
 
 const EXPORT_LIMITS = {
   MAX_BOOKS: 250,
@@ -84,6 +100,59 @@ export type ExportPlan = {
   projectedBytes: number;
   bookCount: number;
   scope: ExportScope;
+};
+
+const METADATA_EXPORT_SCHEMA_VERSION = 1 as const;
+
+const METADATA_EXPORT_LIMITS = {
+  MAX_ROWS: 100_000,
+  MAX_ESTIMATED_BYTES: 120 * 1024 * 1024,
+} as const;
+
+type MetadataExportSizeCategory = 'small' | 'medium' | 'large';
+
+type MetadataExportResolvedOptions = {
+  includePersonalData: boolean;
+  includeFilePaths: boolean;
+  includeContextMeta: boolean;
+  columnsMode: MetadataExportColumnMode;
+  visibleColumns: string[];
+  viewType: MetadataExportViewType;
+};
+
+type MetadataExportSelectionScope = 'selected' | 'all-matching';
+
+type MetadataExportPreflight = {
+  schemaVersion: number;
+  rowCount: number;
+  estimatedBytes: number;
+  sizeCategory: MetadataExportSizeCategory;
+  fileName: string;
+  scope: MetadataExportSelectionScope;
+  format: MetadataExportFormat;
+};
+
+type MetadataExportContextMeta = {
+  exportedAt: string;
+  exportedByUserId: number;
+  viewType: MetadataExportViewType;
+  scope: MetadataExportSelectionScope;
+  format: MetadataExportFormat;
+  rowCount: number;
+  options: MetadataExportResolvedOptions;
+  query?: {
+    libraryId?: number;
+    q?: string;
+    sort?: { field: string; dir: string }[];
+    filterApplied: boolean;
+  };
+};
+
+type MetadataExportBuildResult = {
+  preflight: MetadataExportPreflight;
+  content: string;
+  contentType: string;
+  fileName: string;
 };
 
 @Injectable()
@@ -186,6 +255,34 @@ export class BookService {
     return file;
   }
 
+  async resolveSelectionToIds(dto: BulkSelectionDto, user: RequestUser): Promise<number[]> {
+    if (dto.bookIds && dto.query) {
+      throw new BadRequestException('bookIds and query are mutually exclusive');
+    }
+    if (dto.bookIds) {
+      await this.verifyLibraryAccessForBookIds(dto.bookIds, user);
+      return dto.bookIds;
+    }
+    if (dto.query) {
+      const libs = await this.libraryService.findAll(user);
+      let accessibleLibraryIds = libs.map((l) => l.id);
+      if (dto.query.libraryId !== undefined) {
+        if (!accessibleLibraryIds.includes(dto.query.libraryId)) {
+          throw new ForbiddenException(`Library ${dto.query.libraryId} is not accessible`);
+        }
+        accessibleLibraryIds = [dto.query.libraryId];
+      }
+      const where = this.queryBuilder.buildWhere(dto.query.filter, {
+        accessibleLibraryIds,
+        implicitLibraryId: dto.query.libraryId,
+        userId: user.id,
+        q: dto.query.q,
+      });
+      return this.bookRepo.findIdsByWhere(where);
+    }
+    throw new BadRequestException('Either bookIds or query must be provided');
+  }
+
   acquireExportSlot(userId: number): () => void {
     const current = this.activeExportCounts.get(userId) ?? 0;
     if (current >= EXPORT_LIMITS.MAX_CONCURRENT_PER_USER) {
@@ -207,6 +304,445 @@ export class BookService {
       } else {
         this.activeExportCounts.set(userId, next);
       }
+    };
+  }
+
+  private resolveMetadataExportOptions(dto: MetadataExportDto): MetadataExportResolvedOptions {
+    return {
+      includePersonalData: dto.options?.includePersonalData ?? false,
+      includeFilePaths: dto.options?.includeFilePaths ?? false,
+      includeContextMeta: dto.options?.includeContextMeta ?? true,
+      columnsMode: dto.options?.columnsMode ?? 'canonical',
+      visibleColumns: dto.options?.visibleColumns ?? [],
+      viewType: dto.viewType ?? 'library',
+    };
+  }
+
+  private resolveMetadataExportScope(dto: BulkSelectionDto): MetadataExportSelectionScope {
+    return dto.query ? 'all-matching' : 'selected';
+  }
+
+  private resolveMetadataExportFileName(viewType: MetadataExportViewType, scope: MetadataExportSelectionScope, format: MetadataExportFormat): string {
+    const date = new Date().toISOString().slice(0, 10);
+    return `bookorbit-${viewType}-${scope}-${date}.${format}`;
+  }
+
+  private estimateMetadataExportBytes(rowCount: number, format: MetadataExportFormat, options: MetadataExportResolvedOptions): number {
+    const basePerRow = format === 'json' ? 1150 : 520;
+    const personalExtra = options.includePersonalData ? 160 : 0;
+    const pathExtra = options.includeFilePaths ? 260 : 0;
+    const contextExtra = options.includeContextMeta ? 2200 : 0;
+    return Math.max(0, rowCount * (basePerRow + personalExtra + pathExtra) + contextExtra);
+  }
+
+  private resolveMetadataExportSizeCategory(estimatedBytes: number): MetadataExportSizeCategory {
+    if (estimatedBytes < 5 * 1024 * 1024) return 'small';
+    if (estimatedBytes < 25 * 1024 * 1024) return 'medium';
+    return 'large';
+  }
+
+  private normalizeExportSort(sort: unknown): BookQuery['sort'] {
+    if (!Array.isArray(sort)) return [];
+    return sort
+      .map((entry) => {
+        const field =
+          typeof (entry as { field?: unknown })?.field === 'string'
+            ? ((entry as { field: string }).field as BookQuery['sort'][number]['field'])
+            : null;
+        const dir =
+          typeof (entry as { dir?: unknown })?.dir === 'string' ? ((entry as { dir: string }).dir as BookQuery['sort'][number]['dir']) : null;
+        if (!field || !dir) return null;
+        if (dir !== 'asc' && dir !== 'desc') return null;
+        return { field, dir };
+      })
+      .filter((entry): entry is BookQuery['sort'][number] => entry !== null);
+  }
+
+  private async resolveMetadataExportRows(
+    dto: MetadataExportDto,
+    user: RequestUser,
+  ): Promise<{
+    rows: BooksPage['items'];
+    rowCount: number;
+    scope: MetadataExportSelectionScope;
+    queryMeta?: MetadataExportContextMeta['query'];
+  }> {
+    if (dto.query) {
+      const libraries = await this.libraryService.findAll(user);
+      let accessibleLibraryIds = libraries.map((library) => library.id);
+      if (dto.query.libraryId !== undefined) {
+        if (!accessibleLibraryIds.includes(dto.query.libraryId)) {
+          throw new ForbiddenException(`Library ${dto.query.libraryId} is not accessible`);
+        }
+        accessibleLibraryIds = [dto.query.libraryId];
+      }
+      const where = this.queryBuilder.buildWhere(dto.query.filter, {
+        accessibleLibraryIds,
+        implicitLibraryId: dto.query.libraryId,
+        userId: user.id,
+        q: dto.query.q,
+      });
+      const rowCount = await this.bookRepo.countWhere(where);
+      if (rowCount === 0) throw new BadRequestException('No books matched export selection');
+      if (rowCount > METADATA_EXPORT_LIMITS.MAX_ROWS) {
+        throw new BadRequestException(`Too many rows selected for metadata export. Limit is ${METADATA_EXPORT_LIMITS.MAX_ROWS}.`);
+      }
+      const sort = this.normalizeExportSort(dto.query.sort);
+      const page = await this.executeBooksQuery(user.id, where, {
+        filter: dto.query.filter,
+        sort,
+        pagination: { page: 0, size: rowCount },
+        q: dto.query.q,
+      });
+      return {
+        rows: page.items,
+        rowCount,
+        scope: 'all-matching',
+        queryMeta: {
+          libraryId: dto.query.libraryId,
+          q: dto.query.q,
+          sort: sort.map((spec) => ({ field: spec.field, dir: spec.dir })),
+          filterApplied: !!dto.query.filter,
+        },
+      };
+    }
+
+    const uniqueIds = [...new Set(dto.bookIds ?? [])];
+    if (uniqueIds.length === 0) throw new BadRequestException('No books selected for metadata export');
+    if (uniqueIds.length > METADATA_EXPORT_LIMITS.MAX_ROWS) {
+      throw new BadRequestException(`Too many rows selected for metadata export. Limit is ${METADATA_EXPORT_LIMITS.MAX_ROWS}.`);
+    }
+    const rows = await this.verifyLibraryAccessForBookIds(uniqueIds, user);
+    const foundIds = new Set(rows.map((row) => row.id));
+    const missingIds = uniqueIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      throw new BadRequestException(`Some selected books were not found: ${missingIds.join(', ')}`);
+    }
+
+    const sort = this.normalizeExportSort(dto.sort);
+    const page = await this.executeBooksQuery(user.id, inArray(books.id, uniqueIds), {
+      filter: undefined,
+      sort,
+      pagination: { page: 0, size: uniqueIds.length },
+    });
+    return {
+      rows: page.items,
+      rowCount: page.items.length,
+      scope: 'selected',
+    };
+  }
+
+  private async resolveMetadataExportSelectionCount(
+    dto: MetadataExportDto,
+    user: RequestUser,
+  ): Promise<{
+    rowCount: number;
+    scope: MetadataExportSelectionScope;
+  }> {
+    if (dto.query) {
+      const libraries = await this.libraryService.findAll(user);
+      let accessibleLibraryIds = libraries.map((library) => library.id);
+      if (dto.query.libraryId !== undefined) {
+        if (!accessibleLibraryIds.includes(dto.query.libraryId)) {
+          throw new ForbiddenException(`Library ${dto.query.libraryId} is not accessible`);
+        }
+        accessibleLibraryIds = [dto.query.libraryId];
+      }
+      const where = this.queryBuilder.buildWhere(dto.query.filter, {
+        accessibleLibraryIds,
+        implicitLibraryId: dto.query.libraryId,
+        userId: user.id,
+        q: dto.query.q,
+      });
+      const rowCount = await this.bookRepo.countWhere(where);
+      if (rowCount === 0) throw new BadRequestException('No books matched export selection');
+      return { rowCount, scope: 'all-matching' };
+    }
+
+    const uniqueIds = [...new Set(dto.bookIds ?? [])];
+    if (uniqueIds.length === 0) throw new BadRequestException('No books selected for metadata export');
+    await this.verifyLibraryAccessForBookIds(uniqueIds, user);
+    const rows = await this.bookRepo.findLibraryIdsByBookIds(uniqueIds);
+    const foundIds = new Set(rows.map((row) => row.id));
+    const missingIds = uniqueIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      throw new BadRequestException(`Some selected books were not found: ${missingIds.join(', ')}`);
+    }
+    return { rowCount: uniqueIds.length, scope: 'selected' };
+  }
+
+  private resolveVisibleExportKeys(visibleColumns: string[], options: MetadataExportResolvedOptions): string[] {
+    const keyMap: Record<string, string[]> = {
+      title: ['title'],
+      subtitle: ['subtitle'],
+      authors: ['authors'],
+      seriesName: ['seriesName'],
+      seriesIndex: ['seriesIndex'],
+      publishedYear: ['publishedYear'],
+      language: ['language'],
+      genres: ['genres'],
+      tags: ['tags'],
+      narrators: ['narrators'],
+      publisher: ['publisher'],
+      pageCount: ['pageCount'],
+      isbn13: ['isbn13'],
+      metadataScore: ['metadataScore'],
+      addedAt: ['addedAt'],
+      updatedAt: ['updatedAt'],
+      format: ['primaryFormat', 'formats'],
+      fileSize: ['totalFileSizeBytes'],
+      rating: ['rating'],
+      readingProgress: ['readProgress'],
+      finishedAt: ['readFinishedAt'],
+      readStatus: ['readStatus'],
+    };
+    const required = ['bookId', 'libraryId', 'libraryName'];
+    const resolved = new Set<string>(required);
+    for (const columnId of visibleColumns) {
+      for (const key of keyMap[columnId] ?? []) {
+        resolved.add(key);
+      }
+    }
+    if (options.includeFilePaths) {
+      resolved.add('folderPath');
+      resolved.add('filePaths');
+    }
+    return [...resolved];
+  }
+
+  private resolveCanonicalExportKeys(options: MetadataExportResolvedOptions): string[] {
+    const keys = [
+      'bookId',
+      'libraryId',
+      'libraryName',
+      'status',
+      'title',
+      'subtitle',
+      'authors',
+      'seriesName',
+      'seriesIndex',
+      'publishedYear',
+      'language',
+      'publisher',
+      'pageCount',
+      'isbn13',
+      'genres',
+      'tags',
+      'narrators',
+      'metadataScore',
+      'hasCover',
+      'hasMetadataLocks',
+      'lockedFields',
+      'addedAt',
+      'updatedAt',
+      'fileCount',
+      'primaryFormat',
+      'formats',
+      'totalFileSizeBytes',
+      'rating',
+      'readProgress',
+      'readStatus',
+      'readStartedAt',
+      'readFinishedAt',
+      'readUpdatedAt',
+    ];
+    if (!options.includePersonalData) {
+      // Keep schema stable by retaining personal-data fields but emitting null values.
+    }
+    if (options.includeFilePaths) {
+      keys.push('folderPath', 'filePaths');
+    }
+    return keys;
+  }
+
+  private csvCell(value: string | number | boolean | null | undefined): string {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    if (!/[",\n]/.test(text)) return text;
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  private projectExportRow(record: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+    const projected: Record<string, unknown> = {};
+    for (const key of keys) projected[key] = record[key];
+    return projected;
+  }
+
+  private serializeCsvRows(rows: Record<string, unknown>[], keys: string[], meta: MetadataExportContextMeta, includeContextMeta: boolean): string {
+    const lines: string[] = ['\uFEFF'];
+    if (includeContextMeta) {
+      lines.push(`# schemaVersion=${METADATA_EXPORT_SCHEMA_VERSION}`);
+      lines.push(`# exportedAt=${meta.exportedAt}`);
+      lines.push(`# viewType=${meta.viewType}`);
+      lines.push(`# scope=${meta.scope}`);
+      lines.push(`# rowCount=${meta.rowCount}`);
+    }
+    lines.push(keys.join(','));
+    for (const row of rows) {
+      const values = keys.map((key) => {
+        const value = row[key];
+        if (Array.isArray(value)) return this.csvCell(value.join('; '));
+        if (value !== null && typeof value === 'object') return this.csvCell(JSON.stringify(value));
+        return this.csvCell(value as string | number | boolean | null | undefined);
+      });
+      lines.push(values.join(','));
+    }
+    return lines.join('\n');
+  }
+
+  async getMetadataExportPreflight(dto: MetadataExportDto, user: RequestUser): Promise<MetadataExportPreflight> {
+    const options = this.resolveMetadataExportOptions(dto);
+    const { rowCount, scope } = await this.resolveMetadataExportSelectionCount(dto, user);
+    if (rowCount > METADATA_EXPORT_LIMITS.MAX_ROWS) {
+      throw new BadRequestException(`Too many rows selected for metadata export. Limit is ${METADATA_EXPORT_LIMITS.MAX_ROWS}.`);
+    }
+    const estimatedBytes = this.estimateMetadataExportBytes(rowCount, dto.format, options);
+    if (estimatedBytes > METADATA_EXPORT_LIMITS.MAX_ESTIMATED_BYTES) {
+      throw new BadRequestException(
+        `Metadata export is too large. Estimated size exceeds ${METADATA_EXPORT_LIMITS.MAX_ESTIMATED_BYTES} bytes. Refine your filters.`,
+      );
+    }
+    return {
+      schemaVersion: METADATA_EXPORT_SCHEMA_VERSION,
+      rowCount,
+      estimatedBytes,
+      sizeCategory: this.resolveMetadataExportSizeCategory(estimatedBytes),
+      fileName: this.resolveMetadataExportFileName(options.viewType, scope, dto.format),
+      scope,
+      format: dto.format,
+    };
+  }
+
+  async buildMetadataExport(dto: MetadataExportDto, user: RequestUser): Promise<MetadataExportBuildResult> {
+    const options = this.resolveMetadataExportOptions(dto);
+    const { rows, rowCount, scope, queryMeta } = await this.resolveMetadataExportRows(dto, user);
+    const estimatedBytes = this.estimateMetadataExportBytes(rowCount, dto.format, options);
+    if (estimatedBytes > METADATA_EXPORT_LIMITS.MAX_ESTIMATED_BYTES) {
+      throw new BadRequestException(
+        `Metadata export is too large. Estimated size exceeds ${METADATA_EXPORT_LIMITS.MAX_ESTIMATED_BYTES} bytes. Refine your filters.`,
+      );
+    }
+    const preflight: MetadataExportPreflight = {
+      schemaVersion: METADATA_EXPORT_SCHEMA_VERSION,
+      rowCount,
+      estimatedBytes,
+      sizeCategory: this.resolveMetadataExportSizeCategory(estimatedBytes),
+      fileName: this.resolveMetadataExportFileName(options.viewType, scope, dto.format),
+      scope,
+      format: dto.format,
+    };
+    const bookIds = rows.map((row) => row.id);
+    const [libraryRows, libraries, filePathRows] = await Promise.all([
+      this.bookRepo.findLibraryIdsByBookIds(bookIds),
+      this.libraryService.findAll(user),
+      options.includeFilePaths ? this.bookRepo.findAllFilesByBookIds(bookIds) : Promise.resolve([]),
+    ]);
+
+    const libraryIdByBookId = new Map(libraryRows.map((row) => [row.id, row.libraryId]));
+    const libraryNameById = new Map(libraries.map((library) => [library.id, library.name]));
+    const filePathsByBookId = new Map<number, string[]>();
+    for (const file of filePathRows) {
+      const byBook = filePathsByBookId.get(file.bookId) ?? [];
+      byBook.push(file.absolutePath);
+      filePathsByBookId.set(file.bookId, byBook);
+    }
+
+    const records = rows.map((row) => {
+      const libraryId = libraryIdByBookId.get(row.id) ?? null;
+      const primaryFile = row.files.find((file) => file.role === 'primary') ?? row.files[0] ?? null;
+      const formats = [...new Set(row.files.map((file) => file.format).filter((format): format is string => !!format))];
+      const totalFileSizeBytes = row.files.reduce((sum, file) => sum + (file.sizeBytes ?? 0), 0);
+      const readStatus = options.includePersonalData ? (row.readStatus?.status ?? null) : null;
+      const readStartedAt = options.includePersonalData ? (row.readStatus?.startedAt ?? null) : null;
+      const readFinishedAt = options.includePersonalData ? (row.readStatus?.finishedAt ?? null) : null;
+      const readUpdatedAt = options.includePersonalData ? (row.readStatus?.updatedAt ?? null) : null;
+      const rating = options.includePersonalData ? (row.rating ?? null) : null;
+      const readProgress = options.includePersonalData ? (row.readingProgress ?? null) : null;
+      const filePaths = options.includeFilePaths ? (filePathsByBookId.get(row.id) ?? []) : [];
+      const folderPath = options.includeFilePaths && filePaths.length > 0 ? dirname(filePaths[0]!) : null;
+
+      return {
+        bookId: row.id,
+        libraryId,
+        libraryName: libraryId !== null ? (libraryNameById.get(libraryId) ?? null) : null,
+        status: row.status,
+        title: row.title,
+        subtitle: row.subtitle,
+        authors: row.authors,
+        seriesName: row.seriesName,
+        seriesIndex: row.seriesIndex,
+        publishedYear: row.publishedYear,
+        language: row.language,
+        publisher: row.publisher,
+        pageCount: row.pageCount,
+        isbn13: row.isbn13,
+        genres: row.genres,
+        tags: row.tags,
+        narrators: row.narrators,
+        metadataScore: row.metadataScore,
+        hasCover: row.hasCover,
+        hasMetadataLocks: row.hasMetadataLocks,
+        lockedFields: row.lockedFields,
+        addedAt: row.addedAt,
+        updatedAt: row.updatedAt,
+        fileCount: row.files.length,
+        primaryFormat: primaryFile?.format ?? null,
+        formats,
+        totalFileSizeBytes,
+        rating,
+        readProgress,
+        readStatus,
+        readStartedAt,
+        readFinishedAt,
+        readUpdatedAt,
+        folderPath,
+        filePaths,
+        files: row.files.map((file) => ({
+          id: file.id,
+          format: file.format,
+          role: file.role,
+          sizeBytes: file.sizeBytes,
+        })),
+      } as Record<string, unknown>;
+    });
+
+    const exportKeys =
+      options.columnsMode === 'visible' ? this.resolveVisibleExportKeys(options.visibleColumns, options) : this.resolveCanonicalExportKeys(options);
+    const projected = records.map((record) => this.projectExportRow(record, exportKeys));
+    const contextMeta: MetadataExportContextMeta = {
+      exportedAt: new Date().toISOString(),
+      exportedByUserId: user.id,
+      viewType: options.viewType,
+      scope,
+      format: dto.format,
+      rowCount,
+      options,
+      query: queryMeta,
+    };
+
+    if (dto.format === 'json') {
+      const payload: { schemaVersion: number; items: Record<string, unknown>[]; meta?: MetadataExportContextMeta } = {
+        schemaVersion: METADATA_EXPORT_SCHEMA_VERSION,
+        items: projected,
+      };
+      if (options.includeContextMeta) {
+        payload.meta = contextMeta;
+      }
+      const content = JSON.stringify(payload, null, 2);
+      return {
+        preflight,
+        content,
+        contentType: 'application/json; charset=utf-8',
+        fileName: preflight.fileName,
+      };
+    }
+
+    const content = this.serializeCsvRows(projected, exportKeys, contextMeta, options.includeContextMeta);
+    return {
+      preflight,
+      content,
+      contentType: 'text/csv; charset=utf-8',
+      fileName: preflight.fileName,
     };
   }
 
@@ -236,40 +772,56 @@ export class BookService {
     return this.executeBooksQuery(user.id, where, query);
   }
 
-  private async executeBooksQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<BooksPage> {
+  async executeBooksQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<BooksPage> {
+    const start = Date.now();
     const { page, size } = query.pagination;
     const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesFilter(query.filter);
 
     if (shouldCollapse) {
-      const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCardsCollapsed({
-        where,
-        sort: query.sort,
-        limit: size,
-        offset: page * size,
-        userId,
-      });
-      return {
-        items: assembleCollapsedBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
+      const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, total } =
+        await this.bookRepo.findCardsCollapsed({
+          where,
+          sort: query.sort,
+          limit: size,
+          offset: page * size,
+          userId,
+        });
+      const result = {
+        items: assembleCollapsedBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows),
         total,
         page,
         size,
       };
+      const durationMs = Date.now() - start;
+      if (durationMs >= 500) {
+        this.logger.warn(
+          `[book.list_query] [end] userId=${userId} page=${page} size=${size} filterCount=${query.filter?.rules?.length ?? 0} sortFields=${query.sort?.length ?? 0} collapseSeries=true resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
+        );
+      }
+      return result;
     }
 
     const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId);
-    const { rows, authorRows, fileRows, genreRows, progressRows, statusRows, total } = await this.bookRepo.findCards({
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, total } = await this.bookRepo.findCards({
       where,
       orderBy,
       limit: size,
       offset: page * size,
       userId,
     });
-    return {
-      items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows),
+    const result = {
+      items: assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows),
       total,
       page,
       size,
     };
+    const durationMs = Date.now() - start;
+    if (durationMs >= 500) {
+      this.logger.warn(
+        `[book.list_query] [end] userId=${userId} page=${page} size=${size} filterCount=${query.filter?.rules?.length ?? 0} sortFields=${query.sort?.length ?? 0} collapseSeries=false resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
+      );
+    }
+    return result;
   }
 
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
@@ -758,10 +1310,71 @@ export class BookService {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} - bulk set rating started`);
     await this.verifyLibraryAccessForBookIds(bookIds, user);
-    await this.bookRepo.bulkSetRating(bookIds, rating, user.id);
-    this.triggerPostMetadataUpdateEffects(bookIds, user.id);
+    const lockedIds = await this.bookMetadataLockService.getBookIdsWithLockedField(bookIds, 'rating');
+    const updatableIds = bookIds.filter((bookId) => !lockedIds.has(bookId));
+    if (updatableIds.length > 0) {
+      await this.bookRepo.bulkSetRating(updatableIds, rating, user.id);
+      this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
+    }
     this.logger.log(
-      `[${event}] [end] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} durationMs=${Date.now() - startedAt} - bulk set rating completed`,
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} updated=${updatableIds.length} skippedLocked=${lockedIds.size} durationMs=${Date.now() - startedAt} - bulk set rating completed`,
+    );
+  }
+
+  async bulkSetMetadata(bookIds: number[], field: BulkMetadataField, value: string | number | string[] | null, user: RequestUser): Promise<void> {
+    const event = 'book.bulk.set_metadata';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} field=${field} - bulk set metadata started`);
+    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    const lockField = BULK_METADATA_LOCK_FIELD_BY_FIELD[field];
+    const lockedIds = await this.bookMetadataLockService.getBookIdsWithLockedField(bookIds, lockField);
+    const updatableIds = bookIds.filter((bookId) => !lockedIds.has(bookId));
+    if (updatableIds.length > 0) {
+      const normalizeListValue = (raw: string | number | string[] | null): string[] => {
+        if (Array.isArray(raw)) return [...new Set(raw.map((entry) => entry.trim()).filter((entry) => entry.length > 0))];
+        if (raw === null) return [];
+        const normalized = String(raw).trim();
+        return normalized.length > 0 ? [normalized] : [];
+      };
+      if (field === 'seriesName' || field === 'publisher' || field === 'language' || field === 'publishedYear') {
+        if (field === 'publishedYear') {
+          const year = value === null ? null : typeof value === 'number' ? value : Number(value);
+          if (year !== null && (!Number.isFinite(year) || !Number.isInteger(year))) {
+            throw new BadRequestException('Invalid publishedYear value');
+          }
+          await this.bookRepo.bulkUpdateMetadataFields(updatableIds, { publishedYear: year, updatedAt: new Date() });
+        } else {
+          const textValue = value === null ? null : String(value).trim();
+          await this.bookRepo.bulkUpdateMetadataFields(updatableIds, { [field]: textValue?.length ? textValue : null, updatedAt: new Date() });
+        }
+      } else {
+        const names = normalizeListValue(value);
+        await this.bookRepo.withTransaction(async (tx) => {
+          for (const bookId of updatableIds) {
+            if (field === 'authors') {
+              await this.metadataService.replaceAuthors(
+                bookId,
+                names.map((name) => ({ name, sortName: null })),
+                { executor: tx },
+              );
+              continue;
+            }
+            if (field === 'genres') {
+              await this.metadataService.replaceGenres(bookId, names, { executor: tx });
+              continue;
+            }
+            if (field === 'tags') {
+              await this.metadataService.replaceTags(bookId, names, { executor: tx });
+              continue;
+            }
+            await this.narratorService.replaceForBook(bookId, names, { executor: tx });
+          }
+        });
+      }
+      this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
+    }
+    this.logger.log(
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} field=${field} updated=${updatableIds.length} skippedLocked=${lockedIds.size} durationMs=${Date.now() - startedAt} - bulk set metadata completed`,
     );
   }
 
@@ -1005,7 +1618,7 @@ export class BookService {
   async bulkRefreshMetadata(
     bookIds: number[],
     user: RequestUser,
-    onProgress?: (bookId: number) => void,
+    onProgress?: (event: { bookId: number; success: boolean; detail?: BookDetailDto; error?: string }) => void,
     options?: { isCancelled?: () => boolean },
   ): Promise<{ processed: number; failed: number }> {
     const event = 'book.bulk_refresh_metadata';
@@ -1027,19 +1640,25 @@ export class BookService {
           cancelled = true;
           break;
         }
+        let success = false;
+        let detail: BookDetailDto | undefined;
+        let errorMessage: string | undefined;
         try {
-          await this.refreshMetadata(id, false, user);
+          const refreshed = await this.refreshMetadata(id, false, user);
+          detail = refreshed as BookDetailDto;
           processed++;
+          success = true;
         } catch (err) {
           const itemErrorClass = err instanceof Error ? err.name : 'Error';
           const itemError = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+          errorMessage = err instanceof Error ? err.message : String(err);
           this.logger.warn(
             `[${event}] [fail] bookId=${id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${itemErrorClass} error="${itemError}" - bulk refresh metadata item failed`,
           );
           failed++;
         }
         try {
-          onProgress?.(id);
+          onProgress?.({ bookId: id, success, detail, error: errorMessage });
         } catch {
           callbackInterrupted = true;
           break;

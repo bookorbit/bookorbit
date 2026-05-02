@@ -50,6 +50,7 @@ function makeService() {
     removeBooks: vi.fn(),
     findBookIdsPage: vi.fn(),
     findAllBookIds: vi.fn(),
+    buildMembershipWhere: vi.fn(),
   };
 
   const bookReadService = {
@@ -63,11 +64,21 @@ function makeService() {
   };
 
   const queryBuilder = {
-    buildQuickSearch: vi.fn().mockReturnValue({ type: 'quick-search' }),
+    buildWhere: vi.fn().mockReturnValue({ type: 'where' }),
   };
 
-  const service = new CollectionService(collectionRepo as never, bookReadService as never, libraryService as never, queryBuilder as never);
-  return { service, collectionRepo, bookReadService, libraryService, queryBuilder };
+  const bookService = {
+    executeBooksQuery: vi.fn(),
+  };
+
+  const service = new CollectionService(
+    collectionRepo as never,
+    bookReadService as never,
+    libraryService as never,
+    queryBuilder as never,
+    bookService as never,
+  );
+  return { service, collectionRepo, bookReadService, libraryService, queryBuilder, bookService };
 }
 
 describe('CollectionService', () => {
@@ -277,82 +288,62 @@ describe('CollectionService', () => {
 
   describe('getBooks', () => {
     it('returns an empty page when no collection books are visible to the user', async () => {
-      const { service, collectionRepo, libraryService, bookReadService } = makeService();
+      const { service, collectionRepo, libraryService, queryBuilder, bookService } = makeService();
       collectionRepo.findById.mockResolvedValue([makeCollection()]);
       libraryService.findAccessibleLibraryIds.mockResolvedValue([100]);
-      collectionRepo.findBookIdsPage.mockResolvedValue({ bookIds: [], total: 0, page: 0, size: 50 });
+      collectionRepo.buildMembershipWhere.mockReturnValue('membership-where');
+      bookService.executeBooksQuery.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
 
       const result = await service.getBooks(10, makeUser(), 0, 50);
 
       expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
-      expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(undefined, {
+        accessibleLibraryIds: [100],
+        userId: 1,
+        q: undefined,
+      });
+      expect(collectionRepo.buildMembershipWhere).toHaveBeenCalledWith(10);
+      expect(bookService.executeBooksQuery).toHaveBeenCalledWith(1, expect.anything(), {
+        sort: [],
+        pagination: { page: 0, size: 50 },
+      });
     });
 
-    it('loads page ids via repository and returns ordered cards with read status', async () => {
-      const { service, collectionRepo, libraryService, bookReadService } = makeService();
+    it('passes collapse, search, and query filters into the shared book query pipeline', async () => {
+      const { service, collectionRepo, libraryService, queryBuilder, bookService } = makeService();
       collectionRepo.findById.mockResolvedValue([makeCollection()]);
       libraryService.findAccessibleLibraryIds.mockResolvedValue([100, 101]);
-      collectionRepo.findBookIdsPage.mockResolvedValue({ bookIds: [2, 1], total: 2, page: 0, size: 50 });
-      bookReadService.findCardsByBookIds.mockResolvedValue({
-        rows: [
-          {
-            id: 1,
-            status: 'present',
-            primaryFileId: 11,
-            folderPath: '/books/one',
-            addedAt: new Date('2026-01-01T00:00:00Z'),
-            title: 'One',
-            seriesName: null,
-            seriesIndex: null,
-            publishedYear: null,
-            language: null,
-            rating: null,
-          },
-          {
-            id: 2,
-            status: 'present',
-            primaryFileId: 22,
-            folderPath: '/books/two',
-            addedAt: new Date('2026-01-02T00:00:00Z'),
-            title: 'Two',
-            seriesName: null,
-            seriesIndex: null,
-            publishedYear: null,
-            language: null,
-            rating: null,
-          },
-        ],
-        authorRows: [],
-        fileRows: [
-          { bookId: 1, id: 11, format: 'epub', role: 'primary' },
-          { bookId: 2, id: 22, format: 'epub', role: 'primary' },
-        ],
-        genreRows: [],
-        progressRows: [
-          { bookFileId: 11, percentage: 35 },
-          { bookFileId: 22, percentage: 95 },
-        ],
-        statusRows: [
-          {
-            bookId: 1,
-            status: 'reading',
-            source: 'manual',
-            startedAt: new Date('2026-01-03T00:00:00Z'),
-            finishedAt: null,
-            updatedAt: new Date('2026-01-03T00:00:00Z'),
-          },
-        ],
-        total: 2,
+      collectionRepo.buildMembershipWhere.mockReturnValue('membership-where');
+      queryBuilder.buildWhere.mockReturnValue('filter-where');
+      bookService.executeBooksQuery.mockResolvedValue({ items: [{ id: 2 }, { id: 1 }], total: 2, page: 0, size: 50 });
+
+      const result = await service.queryBooks(10, makeUser(), {
+        filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Two' }] },
+        sort: [{ field: 'title', dir: 'desc' }],
+        pagination: { page: 0, size: 50 },
+        collapseSeries: true,
+        q: 'science',
       });
 
-      const result = await service.getBooks(10, makeUser(), 0, 50);
-
-      expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
-      expect(collectionRepo.findBookIdsPage).toHaveBeenCalledWith(10, [100, 101], 0, 50, undefined);
-      expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([2, 1], 1);
-      expect(result.total).toBe(2);
-      expect(result.items.map((item) => item.id)).toEqual([2, 1]);
-      expect(result.items[1]?.readStatus).toEqual(expect.objectContaining({ status: 'reading' }));
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(
+        { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Two' }] },
+        {
+          accessibleLibraryIds: [100, 101],
+          userId: 1,
+          q: 'science',
+        },
+      );
+      expect(bookService.executeBooksQuery).toHaveBeenCalledWith(
+        1,
+        expect.anything(),
+        expect.objectContaining({
+          sort: [{ field: 'title', dir: 'desc' }],
+          pagination: { page: 0, size: 50 },
+          collapseSeries: true,
+          q: 'science',
+        }),
+      );
+      expect(result).toEqual({ items: [{ id: 2 }, { id: 1 }], total: 2, page: 0, size: 50 });
     });
 
     it('propagates ownership errors before loading collection books', async () => {

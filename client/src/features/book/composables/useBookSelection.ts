@@ -55,6 +55,16 @@ export function useBookSelection() {
     selectedIds.value = new Set(ids)
   }
 
+  function deselectAll(ids: number[]) {
+    if (ids.length === 0) return
+    const remove = new Set(ids)
+    selectedIds.value = new Set([...selectedIds.value].filter((id) => !remove.has(id)))
+    if (anchorId.value !== null && remove.has(anchorId.value)) {
+      anchorId.value = null
+      anchorSelected.value = false
+    }
+  }
+
   function isSelected(id: number) {
     return selectedIds.value.has(id)
   }
@@ -68,6 +78,7 @@ export function useBookSelection() {
     toggleBook,
     rangeSelectTo,
     selectAll,
+    deselectAll,
     isSelected,
   }
 }

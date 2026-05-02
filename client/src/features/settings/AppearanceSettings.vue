@@ -19,6 +19,7 @@ const {
   smartScopeFilterExpanded,
   authorCoverSize,
   authorCoverShape,
+  tableZebraStriping,
 } = useDisplaySettings()
 
 const { prefs, setPreference } = useSeriesCollapsePreference()
@@ -431,6 +432,22 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">{{ opt.hint }}</p>
         </div>
         <ToggleSwitch :model-value="cardOverlays.includes(opt.key)" @update:model-value="toggleOverlay(opt.key)" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Table View -->
+  <div class="mt-8">
+    <p class="settings-group-label">Table View</p>
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
+        <div class="min-w-0">
+          <p class="settings-label">Zebra striping</p>
+          <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
+            Alternate row background colors for easier scanning
+          </p>
+        </div>
+        <ToggleSwitch v-model="tableZebraStriping" />
       </div>
     </div>
   </div>

@@ -3,6 +3,7 @@ import { computed, ref, useSlots, watch } from 'vue'
 import {
   BookOpen,
   Download,
+  FileSpreadsheet,
   FolderMinus,
   FolderPlus,
   ImageDown,
@@ -18,12 +19,14 @@ import {
   Unlock,
   X,
 } from 'lucide-vue-next'
+import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
+import { usePublisherSearch, useSeriesNameSearch, useLanguageSearch } from '@/features/book/composables/useMetadataFieldSearch'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { STATUS_ICONS, STATUS_OPTIONS } from '@/features/book/composables/useBookStatus'
 import type { ReadStatus } from '@bookorbit/types'
-import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
+import type { BulkEditableField, BulkEditableValue, InFlightOp } from '@/features/book/composables/useBookBulkActions'
 
 export type ExportScope = 'primary' | 'all' | 'audio'
 
@@ -53,31 +56,55 @@ const emit = defineEmits<{
   'remove-from-collection': []
   edit: []
   send: []
-  export: [scope: ExportScope]
+  download: [scope: ExportScope]
+  'export-metadata': []
   'refresh-metadata': []
   're-extract-cover': []
   'set-status': [status: ReadStatus]
   'set-rating': [rating: number | null]
   'edit-tags': []
+  'set-field': [field: BulkEditableField, value: BulkEditableValue]
   'lock-metadata': [locked: boolean]
   delete: []
   exit: []
 }>()
 
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
+const { search: searchPublisher } = usePublisherSearch()
+const { search: searchSeriesName } = useSeriesNameSearch()
+const { search: searchLanguage } = useLanguageSearch()
 const confirmingDelete = ref(false)
 const deleteInput = ref('')
 const exportMenuOpen = ref(false)
 const ratingMenuOpen = ref(false)
-const moreMenuOpen = ref(false)
+const fieldMenuOpen = ref(false)
+const bulkField = ref<BulkEditableField>('publisher')
+const fieldValue = ref('')
 const slots = useSlots()
 const hasCustomContent = computed(() => Boolean(slots.content))
 const canBulkActions = computed(() => !isDemoRestrictedAccount.value)
+const canDownload = computed(() => hasPermission('library_download') && canBulkActions.value)
+const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
+const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value)
+const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
+const arrayFieldSelected = computed(() => ['authors', 'genres', 'tags', 'narrators'].includes(bulkField.value))
+const fieldValuePlaceholder = computed(() => (arrayFieldSelected.value ? 'Comma-separated (leave blank to clear)' : 'Leave blank to clear'))
+const typeaheadSearchFn = computed<((q: string) => Promise<string[]>) | null>(() => {
+  if (bulkField.value === 'seriesName') return searchSeriesName
+  if (bulkField.value === 'publisher') return searchPublisher
+  if (bulkField.value === 'language') return searchLanguage
+  return null
+})
 
 const canConfirmDelete = computed(() => props.count <= 50 || deleteInput.value === 'DELETE')
+const canApplyFieldValue = computed(() => {
+  if (!numericFieldSelected.value) return true
+  const trimmed = fieldValue.value.trim()
+  return trimmed.length === 0 || !Number.isNaN(Number(trimmed))
+})
 
 function onExport(scope: ExportScope) {
-  emit('export', scope)
+  emit('download', scope)
   exportMenuOpen.value = false
 }
 
@@ -114,6 +141,56 @@ function unlockAll() {
   emit('lock-metadata', false)
 }
 
+function openFieldEditor() {
+  if (props.count === 0) return
+  fieldMenuOpen.value = true
+}
+
+function onEditTags() {
+  if (props.count === 0) return
+  emit('edit-tags')
+}
+
+function onRefreshMetadata() {
+  if (props.count === 0) return
+  emit('refresh-metadata')
+}
+
+function onReExtractCover() {
+  if (props.count === 0) return
+  emit('re-extract-cover')
+}
+
+function resetFieldEditor() {
+  fieldMenuOpen.value = false
+  bulkField.value = 'publisher'
+  fieldValue.value = ''
+}
+
+function applyFieldEdit() {
+  if (!canApplyFieldValue.value) return
+  const trimmed = fieldValue.value.trim()
+  let value: BulkEditableValue
+  if (numericFieldSelected.value) {
+    value = trimmed ? Number(trimmed) : null
+  } else if (arrayFieldSelected.value) {
+    value = trimmed
+      ? [
+          ...new Set(
+            trimmed
+              .split(',')
+              .map((entry) => entry.trim())
+              .filter((entry) => entry.length > 0),
+          ),
+        ]
+      : []
+  } else {
+    value = trimmed || null
+  }
+  emit('set-field', bulkField.value, value)
+  resetFieldEditor()
+}
+
 watch(
   () => props.visible,
   (v) => {
@@ -121,8 +198,8 @@ watch(
       confirmingDelete.value = false
       exportMenuOpen.value = false
       ratingMenuOpen.value = false
-      moreMenuOpen.value = false
       deleteInput.value = ''
+      resetFieldEditor()
     }
   },
 )
@@ -155,7 +232,7 @@ watch(
             <slot name="content" :count="count" />
           </template>
 
-          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !moreMenuOpen">
+          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !fieldMenuOpen">
             <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{
               count
             }}</span>
@@ -176,10 +253,10 @@ watch(
               <TooltipContent side="top">Send via email</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_download') && canBulkActions">
+            <Tooltip v-if="canDownload">
               <TooltipTrigger as-child>
                 <button
-                  data-testid="action-export"
+                  data-testid="action-download-files"
                   :disabled="count === 0"
                   :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
                   @click="exportMenuOpen = true"
@@ -187,7 +264,7 @@ watch(
                   <Download :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Export as ZIP</TooltipContent>
+              <TooltipContent side="top">Download files as ZIP</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -217,7 +294,7 @@ watch(
               <TooltipContent side="top">Remove from collection</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
+            <Tooltip v-if="canEditMetadata">
               <TooltipTrigger as-child>
                 <button
                   data-testid="action-bulk-edit-metadata"
@@ -228,7 +305,7 @@ watch(
                   <Pencil :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Edit metadata</TooltipContent>
+              <TooltipContent side="top">Open metadata editor</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="canBulkActions">
@@ -257,7 +334,7 @@ watch(
               <TooltipContent side="top">Set reading status</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
+            <Tooltip v-if="canEditMetadata">
               <TooltipTrigger as-child>
                 <button
                   data-testid="action-bulk-set-rating"
@@ -271,32 +348,56 @@ watch(
               <TooltipContent side="top">Set rating</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
-              <TooltipTrigger as-child>
-                <button
-                  data-testid="action-bulk-edit-tags"
-                  :disabled="count === 0"
-                  :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
-                  @click="emit('edit-tags')"
-                >
-                  <Tag :size="ICON_SIZE" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Edit tags</TooltipContent>
-            </Tooltip>
+            <div v-if="canShowMoreMenu" :class="DIVIDER" />
 
-            <div v-if="hasPermission('library_edit_metadata') && canBulkActions" :class="DIVIDER" />
-
-            <Tooltip v-if="hasPermission('library_edit_metadata') && canBulkActions">
+            <Tooltip v-if="canShowMoreMenu">
               <TooltipTrigger as-child>
-                <button
-                  data-testid="action-bulk-more"
-                  :disabled="count === 0"
-                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
-                  @click="moreMenuOpen = true"
-                >
-                  <MoreHorizontal :size="ICON_SIZE" />
-                </button>
+                <span class="inline-flex">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <button
+                        data-testid="action-bulk-metadata-menu"
+                        :disabled="count === 0"
+                        :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
+                        aria-label="More actions"
+                      >
+                        <MoreHorizontal :size="ICON_SIZE" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="top" align="center" class="w-56">
+                      <DropdownMenuItem v-if="canDownload" data-testid="action-export-metadata" @click="emit('export-metadata')">
+                        <FileSpreadsheet :size="14" />
+                        <span>Export metadata</span>
+                      </DropdownMenuItem>
+                      <template v-if="canEditMetadata">
+                        <DropdownMenuItem data-testid="action-bulk-set-field" @click="openFieldEditor">
+                          <Pencil :size="14" />
+                          <span>Set field</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem data-testid="action-bulk-edit-tags" @click="onEditTags">
+                          <Tag :size="14" />
+                          <span>Edit tags</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem data-testid="action-bulk-refresh-metadata" @click="onRefreshMetadata">
+                          <RefreshCw :size="14" />
+                          <span>Refresh metadata</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem data-testid="action-bulk-re-extract-cover" @click="onReExtractCover">
+                          <ImageDown :size="14" />
+                          <span>Re-extract cover</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem data-testid="action-bulk-lock-metadata" @click="lockAll">
+                          <Lock :size="14" />
+                          <span>Lock metadata</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem data-testid="action-bulk-unlock-metadata" @click="unlockAll">
+                          <Unlock :size="14" />
+                          <span>Unlock metadata</span>
+                        </DropdownMenuItem>
+                      </template>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
               </TooltipTrigger>
               <TooltipContent side="top">More actions</TooltipContent>
             </Tooltip>
@@ -331,7 +432,7 @@ watch(
 
           <!-- Export scope picker -->
           <template v-else-if="exportMenuOpen">
-            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Export as ZIP:</span>
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Download files as ZIP:</span>
             <div :class="DIVIDER" />
             <button :class="BTN_TEXT_PRIMARY" @click="onExport('primary')">Primary only</button>
             <button :class="BTN_TEXT_PRIMARY" @click="onExport('all')">All formats</button>
@@ -350,62 +451,45 @@ watch(
             <button :class="BTN_TEXT_CANCEL" @click="ratingMenuOpen = false">Cancel</button>
           </template>
 
-          <!-- More actions -->
-          <template v-else-if="moreMenuOpen">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  data-testid="action-bulk-refresh-metadata"
-                  :disabled="count === 0"
-                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
-                  @click="emit('refresh-metadata')"
-                >
-                  <RefreshCw :size="ICON_SIZE" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Refresh metadata</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  data-testid="action-bulk-re-extract-cover"
-                  :disabled="count === 0"
-                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
-                  @click="emit('re-extract-cover')"
-                >
-                  <ImageDown :size="ICON_SIZE" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Re-extract cover</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  data-testid="action-bulk-lock-metadata"
-                  :disabled="count === 0"
-                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
-                  @click="lockAll"
-                >
-                  <Lock :size="ICON_SIZE" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Lock metadata</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  data-testid="action-bulk-unlock-metadata"
-                  :disabled="count === 0"
-                  :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
-                  @click="unlockAll"
-                >
-                  <Unlock :size="ICON_SIZE" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Unlock metadata</TooltipContent>
-            </Tooltip>
+          <!-- Field editor -->
+          <template v-else-if="fieldMenuOpen">
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Set field:</span>
             <div :class="DIVIDER" />
-            <button :class="BTN_TEXT_CANCEL" @click="moreMenuOpen = false">Back</button>
+            <select
+              v-model="bulkField"
+              class="h-8 rounded-full border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="seriesName">Series Name</option>
+              <option value="publisher">Publisher</option>
+              <option value="language">Language</option>
+              <option value="publishedYear">Published Year</option>
+              <option value="authors">Authors</option>
+              <option value="genres">Genres</option>
+              <option value="tags">Tags</option>
+              <option value="narrators">Narrators</option>
+            </select>
+            <InputWithSuggestions
+              v-if="typeaheadSearchFn"
+              v-model="fieldValue"
+              :search-fn="typeaheadSearchFn"
+              :placeholder="fieldValuePlaceholder"
+              :class="'h-8 min-w-28 rounded-full border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary'"
+            />
+            <input
+              v-else
+              v-model="fieldValue"
+              :type="numericFieldSelected ? 'number' : 'text'"
+              class="h-8 min-w-28 rounded-full border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              :placeholder="fieldValuePlaceholder"
+            />
+            <button
+              :disabled="!canApplyFieldValue"
+              :class="[BTN_TEXT_PRIMARY, !canApplyFieldValue && 'cursor-not-allowed opacity-40']"
+              @click="applyFieldEdit"
+            >
+              Apply
+            </button>
+            <button :class="BTN_TEXT_CANCEL" @click="resetFieldEditor">Cancel</button>
           </template>
 
           <!-- Delete confirmation -->

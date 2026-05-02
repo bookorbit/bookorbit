@@ -1,93 +1,17 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
-import type { GroupRule, Rule } from '@bookorbit/types';
-
-// Constants inlined to avoid a runtime require() of the @bookorbit/types TS source.
-// Keep in sync with packages/types/src/query.ts.
-const RULE_FIELDS = [
-  'title',
-  'publisher',
-  'language',
-  'series',
-  'seriesIndex',
-  'publishedYear',
-  'pageCount',
-  'author',
-  'genre',
-  'tag',
-  'collection',
-  'library',
-  'format',
-  'addedAt',
-  'fileAvailability',
-  'rating',
-  'readProgress',
-  'description',
-  'isbn',
-  'metadataScore',
-  'cover',
-] as const;
-const RULE_OPERATORS = [
-  'contains',
-  'notContains',
-  'startsWith',
-  'endsWith',
-  'eq',
-  'notEq',
-  'isEmpty',
-  'isNotEmpty',
-  'gt',
-  'gte',
-  'lt',
-  'lte',
-  'between',
-  'includesAny',
-  'includesAll',
-  'excludesAll',
-  'before',
-  'after',
-  'withinLast',
-  'isMissing',
-  'isPresent',
-  'isUnread',
-  'isInProgress',
-  'isFinished',
-] as const;
-
-const VALID_OPERATORS_BY_FIELD: Record<string, string[]> = {
-  title: ['contains', 'notContains', 'startsWith', 'endsWith', 'eq', 'notEq', 'isEmpty', 'isNotEmpty'],
-  publisher: ['contains', 'notContains', 'eq', 'notEq', 'includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  language: ['eq', 'notEq', 'includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  series: ['contains', 'notContains', 'eq', 'notEq', 'includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  author: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  genre: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  tag: ['includesAny', 'includesAll', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  collection: ['includesAny', 'excludesAll', 'isEmpty', 'isNotEmpty'],
-  library: ['includesAny', 'excludesAll'],
-  format: ['includesAny', 'excludesAll'],
-  publishedYear: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
-  seriesIndex: ['eq', 'notEq', 'gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
-  pageCount: ['gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
-  addedAt: ['before', 'after', 'between', 'withinLast'],
-  fileAvailability: ['isMissing', 'isPresent'],
-  rating: ['eq', 'gt', 'gte', 'lt', 'lte', 'isEmpty', 'isNotEmpty'],
-  readProgress: ['isUnread', 'isInProgress', 'isFinished'],
-  description: ['isEmpty', 'isNotEmpty'],
-  isbn: ['isEmpty', 'isNotEmpty', 'eq'],
-  metadataScore: ['gt', 'gte', 'lt', 'lte', 'between', 'isEmpty', 'isNotEmpty'],
-  cover: ['isMissing', 'isPresent'],
-};
+import { FIELD_OPERATORS, RULE_FIELDS, RULE_OPERATORS, type GroupRule, type Rule } from '@bookorbit/types';
 
 const ruleSchema: z.ZodType<Rule> = z
   .object({
     type: z.literal('rule'),
-    field: z.enum(RULE_FIELDS),
-    operator: z.enum(RULE_OPERATORS),
+    field: z.enum(RULE_FIELDS as unknown as [string, ...string[]]),
+    operator: z.enum(RULE_OPERATORS as unknown as [string, ...string[]]),
     value: z.union([z.string(), z.number(), z.array(z.string().min(1)).min(1).max(20), z.array(z.number()).min(1).max(20)]).optional(),
     valueTo: z.union([z.string(), z.number()]).optional(),
   })
-  .refine((rule) => !!VALID_OPERATORS_BY_FIELD[rule.field]?.includes(rule.operator), {
+  .refine((rule) => !!FIELD_OPERATORS[rule.field as keyof typeof FIELD_OPERATORS]?.includes(rule.operator as never), {
     message: 'Operator is not valid for this field',
   }) as z.ZodType<Rule>;
 

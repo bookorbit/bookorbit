@@ -11,7 +11,8 @@ export function isAudioFormat(format: string): boolean {
   return AUDIO_FORMATS.has(format.toLowerCase());
 }
 
-export type ReadStatus = "unread" | "want_to_read" | "reading" | "on_hold" | "rereading" | "read" | "skimmed" | "abandoned";
+export const READ_STATUSES = ["unread", "want_to_read", "reading", "on_hold", "rereading", "read", "skimmed", "abandoned"] as const;
+export type ReadStatus = (typeof READ_STATUSES)[number];
 export type ReadStatusSource = "auto" | "manual";
 
 export type UserBookStatus = {
@@ -26,6 +27,7 @@ export type BookFileRef = {
   id: number;
   format: string | null;
   role: string;
+  sizeBytes: number | null;
 };
 
 export type BookCard = {
@@ -43,8 +45,17 @@ export type BookCard = {
   readingProgress: number | null;
   readStatus: UserBookStatus | null;
   addedAt: string;
+  updatedAt: string | null;
+  metadataScore: number | null;
   hasCover: boolean;
   hasMetadataLocks: boolean;
+  lockedFields: BookMetadataLockField[];
+  subtitle: string | null;
+  publisher: string | null;
+  pageCount: number | null;
+  isbn13: string | null;
+  narrators: string[];
+  tags: string[];
   collapsedSeries?: import("./series-collapse").CollapsedSeriesInfo;
 };
 

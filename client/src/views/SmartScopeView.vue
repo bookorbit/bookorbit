@@ -1,66 +1,80 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Settings2, Trash2, ChevronDown, ChevronUp, ArrowUpDown, Aperture, SlidersHorizontal, X } from 'lucide-vue-next'
+import {
+  AlertTriangle,
+  Settings2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpDown,
+  Aperture,
+  FileSpreadsheet,
+  SlidersHorizontal,
+  X,
+} from 'lucide-vue-next'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
+import TableColumnPanel from '@/features/book/components/TableColumnPanel.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SmartScopeEditorPanel from '@/features/smart-scope/components/SmartScopeEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
+import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { toast } from 'vue-sonner'
 import { useSmartScope } from '@/features/smart-scope/composables/useSmartScope'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
-import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
-import { useBookSelection } from '@/features/book/composables/useBookSelection'
-import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
-import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { usePageTitle } from '@/composables/usePageTitle'
-import type { BookCard, GroupRule, SortField } from '@bookorbit/types'
+import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
+import { useBookViewContext } from '@/features/book/composables/useBookViewContext'
+import { useBookTableShell } from '@/features/book/composables/useBookTableShell'
+import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfiniteScrollSentinel'
+import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import type { BookCard, GroupRule, SortField, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { viewMode, smartScopeFilterExpanded } = useDisplaySettings()
+const { viewMode, effectiveViewMode } = useEffectiveViewMode()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
+const { smartScopeFilterExpanded } = useDisplaySettings()
 
 const smartScopeId = computed(() => Number(route.params.id))
+const tableSort = ref<SortSpec[]>([{ field: 'title', dir: 'asc' }])
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
 const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId, coverAspectRatio)
+const { tableDensity } = useDisplaySettings()
+const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('smartScope', smartScopeId)
 
 const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
-const { items: books, total, loading, initialized: booksInitialized, hasMore, load } = useSmartScope(smartScopeId, debouncedQuery)
-const { setBookContext, registerLoadMore } = useBookNavigation()
-watch(
-  [books, total],
-  ([newBooks, newTotal]) => {
-    setBookContext(
-      newBooks.map((b) => b.id),
-      newTotal,
-    )
-  },
-  { immediate: true },
-)
-
-onMounted(() => {
-  registerLoadMore(async () => {
-    await load()
-  })
-})
-onUnmounted(() => {
-  registerLoadMore(null)
-})
-const { smartScopes, fetchSmartScopes, deleteSmartScope } = useSmartScopes()
+const {
+  items: books,
+  total,
+  loading,
+  initialized: booksInitialized,
+  error: booksError,
+  hasMore,
+  load,
+  clear,
+} = useSmartScope(smartScopeId, debouncedQuery, tableSort)
+const { setBookContext } = useBookNavigation()
+useBookViewContext(books, total, () => load())
+const { smartScopes, loaded: smartScopesLoaded, error: smartScopesError, fetchSmartScopes, deleteSmartScope } = useSmartScopes()
 const smartScopeNotFound = ref(false)
+const smartScopeLoadError = computed(() => smartScopesError.value ?? booksError.value)
 
 const smartScope = computed(() => smartScopes.value.find((l) => l.id === smartScopeId.value))
 const pageTitle = computed(() => {
@@ -78,58 +92,112 @@ const sortChip = computed(() => {
 const filterExpanded = smartScopeFilterExpanded
 const mobileControlsExpanded = ref(false)
 
-const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
-
-function handleSelect(id: number, event: MouseEvent) {
-  if (event.shiftKey)
-    rangeSelectTo(
-      id,
-      books.value.map((b) => b.id),
-    )
-  else toggleBook(id)
+function handleSaveCurrentView(name: string) {
+  if (!tableRef.value) return
+  saveView({
+    name,
+    layout: tableRef.value.currentLayout,
+    sort: tableSort.value,
+  })
 }
 
-function toggleSelectionMode() {
-  if (selectionMode.value) exitSelectionMode()
-  else enterSelectionMode()
+function handleApplySavedView(view: SavedView) {
+  tableRef.value?.applyPreset(view.layout, view.sort)
 }
 
-const addToCollectionOpen = ref(false)
-const bulkTagsOpen = ref(false)
-const sendBookOpen = ref(false)
+function handleExportTableBackup() {
+  const blob = new Blob(
+    [
+      JSON.stringify(
+        {
+          version: 1,
+          presets: tableRef.value?.allPresets.filter((preset) => !preset.isBuiltIn) ?? [],
+          savedViews: allSavedViews.value,
+        },
+        null,
+        2,
+      ),
+    ],
+    { type: 'application/json' },
+  )
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `smart-scope-table-backup-${smartScopeId.value ?? 'shared'}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+async function handleImportTableBackup(file: File) {
+  const raw = await file.text()
+  const parsed = JSON.parse(raw) as { presets?: unknown[]; savedViews?: unknown[] }
+  handleImportPresetBackup((parsed.presets ?? []) as never)
+  importViews((parsed.savedViews ?? []) as SavedView[])
+}
+
+function handleTableDensityChange(value: 'compact' | 'comfortable' | 'roomy') {
+  tableDensity.value = value
+}
+
+function handleSelectAllLoaded(checked: boolean) {
+  const ids = books.value.map((book) => book.id)
+  if (checked) selectAll(ids)
+  else deselectAll(ids)
+}
+
 const {
-  pendingId: deleteBookId,
-  deleting: deletingBook,
-  promptDelete,
+  tableRef,
+  handleResetColumns,
+  handleToggleColumn,
+  handleColumnPanelReorder,
+  handleApplyTablePreset,
+  handleSaveTablePreset,
+  handleDeleteTablePreset,
+  handleRenameTablePreset,
+  handleDuplicateTablePreset,
+  handleTogglePresetFavorite,
+  handleImportPresetBackup,
+  selectionMode,
+  selectedIds,
+  selectedCount,
+  enterSelectionMode,
+  exitSelectionMode,
+  selectAll,
+  deselectAll,
+  isSelected,
+  handleSelect,
+  toggleSelectionMode,
+  deleteBookId,
+  deletingBook,
   cancelDelete,
   confirmDelete,
-} = useDeleteBook((id) => {
-  books.value = books.value.filter((b) => b.id !== id)
-})
-const {
   inFlight,
   handleBulkRefreshMetadata,
   handleBulkReExtractCover,
-  handleExport,
+  handleDownloadFiles,
   handleBulkSetStatus,
   handleBulkSetRating,
   handleBulkUpdateTags,
+  handleBulkSetField,
   handleBulkSetMetadataLock,
   handleDeleteSelected,
-} = useBookBulkActions(
-  selectedIds,
-  (ids) => {
-    const deleted = new Set(ids)
-    books.value = books.value.filter((b) => !deleted.has(b.id))
-    exitSelectionMode()
-  },
+  addToCollectionOpen,
+  bulkTagsOpen,
+  sendBookOpen,
+  quickViewBookId,
+  quickViewOpen,
+  handleBookAction,
+  handleTableBookUpdate,
+} = useBookTableShell({
   books,
-)
+  loadFn: () => load(true),
+})
 
-type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
-
-const quickViewBookId = ref<number | null>(null)
-const quickViewOpen = ref(false)
+const metadataExportOpen = ref(false)
+const visibleExportColumns = computed(() => {
+  if (!tableRef.value) return []
+  return tableRef.value.allColumns.filter((column) => column.visible).map((column) => column.id)
+})
 
 function handleEditSelected() {
   const ids = [...selectedIds.value]
@@ -139,24 +207,13 @@ function handleEditSelected() {
   exitSelectionMode()
 }
 
-function handleBookAction(book: BookCard, action: BookActionType) {
-  if (action === 'quick-view') {
-    quickViewBookId.value = book.id
-    quickViewOpen.value = true
-    return
-  }
-  if (action === 'add-to-collection') {
-    if (!selectionMode.value) {
-      enterSelectionMode()
-      toggleBook(book.id)
-    }
-    addToCollectionOpen.value = true
-    return
-  }
-  if (action === 'delete') {
-    promptDelete(book.id)
-  }
-}
+watch(
+  smartScope,
+  (scope) => {
+    tableSort.value = scope?.defaultSort?.length ? [...scope.defaultSort] : [{ field: 'title', dir: 'asc' }]
+  },
+  { immediate: true },
+)
 
 const editorOpen = ref(false)
 const confirmSmartScopeDelete = ref(false)
@@ -211,53 +268,46 @@ function openEditor() {
   collapseMobileControlsIfNeeded()
 }
 
+function openMetadataExport() {
+  metadataExportOpen.value = true
+  collapseMobileControlsIfNeeded()
+}
+
 function onSaved() {
   load(true)
 }
 
-const sentinel = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
-
-function checkSentinel() {
-  if (!hasMore.value || loading.value) return
-  const el = sentinel.value
-  if (!el) return
-  if (el.getBoundingClientRect().top < window.innerHeight + 300) load()
-}
+const { sentinel } = useInfiniteScrollSentinel({
+  hasMore,
+  loading,
+  loadMore: () => load(),
+})
 
 onMounted(async () => {
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0]?.isIntersecting && !loading.value && hasMore.value) load()
-    },
-    { rootMargin: '300px' },
-  )
-  if (sentinel.value) observer.observe(sentinel.value)
-  window.addEventListener('resize', checkSentinel, { passive: true })
+  await retrySmartScopeLoad()
+})
 
+async function retrySmartScopeLoad() {
+  smartScopeNotFound.value = false
+  clear()
   await fetchSmartScopes()
-  if (!smartScope.value) {
+  if (smartScopesError.value) return
+  if (!smartScope.value && smartScopesLoaded.value) {
     smartScopeNotFound.value = true
     return
   }
-  load(true)
+  if (smartScope.value) {
+    await load(true)
+  }
+}
+
+watch(smartScopeId, async () => {
+  clearSearch()
+  await retrySmartScopeLoad()
 })
-
-onUnmounted(() => {
-  observer?.disconnect()
-  window.removeEventListener('resize', checkSentinel)
+watch(debouncedQuery, () => {
+  if (smartScope.value) void load(true)
 })
-
-watch(smartScopeId, () => clearSearch())
-watch(debouncedQuery, () => load(true))
-
-watch(
-  loading,
-  (isLoading) => {
-    if (!isLoading) checkSentinel()
-  },
-  { flush: 'post' },
-)
 </script>
 
 <template>
@@ -275,7 +325,8 @@ watch(
     :count="selectedCount"
     :in-flight="inFlight"
     @send="sendBookOpen = true"
-    @export="handleExport"
+    @download="handleDownloadFiles"
+    @export-metadata="openMetadataExport"
     @add-to-collection="addToCollectionOpen = true"
     @edit="handleEditSelected"
     @refresh-metadata="handleBulkRefreshMetadata"
@@ -283,9 +334,22 @@ watch(
     @set-status="handleBulkSetStatus"
     @set-rating="handleBulkSetRating"
     @edit-tags="bulkTagsOpen = true"
+    @set-field="handleBulkSetField"
     @lock-metadata="handleBulkSetMetadataLock"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
+  />
+
+  <MetadataExportDialog
+    :open="metadataExportOpen"
+    view-type="smartScope"
+    :selected-book-ids="[...selectedIds]"
+    :selected-count="selectedCount"
+    :total-count="total"
+    :sort="tableSort"
+    :visible-columns="visibleExportColumns"
+    default-scope="selected"
+    @update:open="metadataExportOpen = $event"
   />
 
   <AddToCollectionSheet
@@ -299,7 +363,7 @@ watch(
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 
-  <section class="flex min-h-full flex-col">
+  <section class="flex h-full flex-col">
     <ViewHeader
       :title="smartScope?.name ?? 'SmartScope'"
       :icon="smartScope?.icon ?? undefined"
@@ -330,6 +394,14 @@ watch(
           <span>Filter</span>
         </button>
         <button
+          v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+          @click="openMetadataExport"
+          class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <FileSpreadsheet :size="13" />
+          <span>Export</span>
+        </button>
+        <button
           @click="openEditor"
           class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
@@ -350,6 +422,33 @@ watch(
           <span>{{ confirmSmartScopeDelete ? 'Confirm?' : 'Delete' }}</span>
         </button>
       </template>
+      <template v-if="effectiveViewMode === 'table'" #columns>
+        <TableColumnPanel
+          v-if="tableRef"
+          :all-columns="tableRef.allColumns"
+          :all-presets="tableRef.allPresets"
+          :saved-views="allSavedViews"
+          :table-density="tableDensity"
+          @toggle-column="handleToggleColumn"
+          @reorder-columns="handleColumnPanelReorder"
+          @apply-preset="handleApplyTablePreset"
+          @save-preset="handleSaveTablePreset"
+          @delete-preset="handleDeleteTablePreset"
+          @rename-preset="handleRenameTablePreset"
+          @duplicate-preset="handleDuplicateTablePreset"
+          @favorite-preset="handleTogglePresetFavorite"
+          @apply-view="handleApplySavedView"
+          @save-view="handleSaveCurrentView"
+          @delete-view="deleteView"
+          @rename-view="renameView"
+          @duplicate-view="duplicateView"
+          @favorite-view="toggleFavorite"
+          @update:density="handleTableDensityChange"
+          @export-backup="handleExportTableBackup"
+          @import-backup="handleImportTableBackup"
+          @reset="handleResetColumns"
+        />
+      </template>
     </ViewHeader>
 
     <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
@@ -361,6 +460,14 @@ watch(
         >
           <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
           <span>{{ filterExpanded ? 'Hide Filter' : 'Show Filter' }}</span>
+        </button>
+        <button
+          v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+          @click="openMetadataExport"
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <FileSpreadsheet :size="13" />
+          <span>Export</span>
         </button>
         <button
           @click="openEditor"
@@ -392,8 +499,22 @@ watch(
       </div>
     </section>
 
-    <main class="flex-1 min-h-0">
-      <EntityNotFound v-if="smartScopeNotFound" entity="SmartScope" />
+    <main :class="effectiveViewMode === 'table' ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto'">
+      <div v-if="smartScopeLoadError" class="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertTriangle :size="28" />
+        </div>
+        <p class="text-sm font-medium text-foreground">Could not load this SmartScope</p>
+        <p class="max-w-md text-xs text-muted-foreground">{{ smartScopeLoadError }}</p>
+        <button
+          class="rounded-md border border-input px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+          @click="retrySmartScopeLoad"
+        >
+          Retry
+        </button>
+      </div>
+
+      <EntityNotFound v-else-if="smartScopeNotFound" entity="SmartScope" />
 
       <template v-else>
         <!-- Filter summary -->
@@ -449,7 +570,7 @@ watch(
 
         <!-- Grid view -->
         <VirtualBookGrid
-          v-if="viewMode === 'grid' && books.length > 0"
+          v-if="effectiveViewMode === 'grid' && books.length > 0"
           :books="books"
           :cover-size="coverSize"
           :grid-gap="gridGap"
@@ -460,7 +581,7 @@ watch(
         />
 
         <!-- List view -->
-        <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <div v-if="effectiveViewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
           <BookListRow
             v-for="book in books"
             :key="book.id"
@@ -472,7 +593,31 @@ watch(
           />
         </div>
 
-        <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+        <!-- Table view -->
+        <VirtualBookTable
+          v-if="effectiveViewMode === 'table'"
+          ref="tableRef"
+          :books="books"
+          :in-flight="inFlight"
+          :sort="tableSort"
+          :has-more="hasMore"
+          :loading="loading"
+          :total="total"
+          view-type="smartScope"
+          :selection-mode="selectionMode"
+          :is-selected="isSelected"
+          :selected-count="selectedCount"
+          :initialized="booksInitialized"
+          @update:sort="tableSort = $event"
+          @action="handleBookAction"
+          @select="handleSelect"
+          @update:book="handleTableBookUpdate"
+          @load-more="load"
+          @select-all="handleSelectAllLoaded"
+          @enter-selection="enterSelectionMode"
+        />
+
+        <div v-if="effectiveViewMode !== 'table'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
           <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
           <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground"> All {{ total.toLocaleString() }} books loaded </span>
         </div>

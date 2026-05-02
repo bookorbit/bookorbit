@@ -33,10 +33,12 @@ import { BookQueryPipe } from './pipes/book-query.pipe';
 import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
 import { BulkSetStatusDto } from './dto/bulk-set-status.dto';
 import { BulkSetRatingDto } from './dto/bulk-set-rating.dto';
+import { BulkSetMetadataDto } from './dto/bulk-set-metadata.dto';
 import { BulkUpdateTagsDto } from './dto/bulk-update-tags.dto';
 import { BulkSetMetadataLockDto } from './dto/bulk-set-metadata-lock.dto';
 import { DeleteBooksDto } from './dto/delete-books.dto';
 import { ExportBooksDto } from './dto/export-books.dto';
+import { MetadataExportDto } from './dto/metadata-export.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
@@ -130,8 +132,9 @@ export class BookController {
       return `Deleted ${count} book${count !== 1 ? 's' : ''}`;
     },
   })
-  deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.deleteBooks(dto.bookIds, user);
+  async deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.deleteBooks(ids, user);
   }
 
   // Must be before @Get(':id') so NestJS does not treat 'search' as an :id param
@@ -157,13 +160,14 @@ export class BookController {
     },
   })
   async bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
     const stream = this.createSseStream(reply);
     try {
       const result = await this.bookService.bulkRefreshMetadata(
-        dto.bookIds,
+        ids,
         user,
-        (bookId) => {
-          stream.send({ bookId });
+        (event) => {
+          stream.send(event);
         },
         { isCancelled: stream.isClosed },
       );
@@ -187,10 +191,11 @@ export class BookController {
     },
   })
   async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
     const stream = this.createSseStream(reply);
     try {
       const result = await this.bookService.bulkReExtractCover(
-        dto.bookIds,
+        ids,
         user,
         (bookId) => {
           stream.send({ bookId });
@@ -231,6 +236,46 @@ export class BookController {
     const bookIds = this.parseBookIdsQuery(bookIdsQuery);
     const scope = this.parseExportScopeQuery(scopeQuery);
     await this.streamBookExport(bookIds, scope, user, reply);
+  }
+
+  @Post('metadata-export/preflight')
+  @RequirePermission(Permission.LibraryDownload)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
+  metadataExportPreflight(@Body() dto: MetadataExportDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.getMetadataExportPreflight(dto, user);
+  }
+
+  @Post('metadata-export/download')
+  @RequirePermission(Permission.LibraryDownload)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
+  async downloadMetadataExport(@Body() dto: MetadataExportDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const event = 'book.export_metadata';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] userId=${user.id} format=${dto.format} scope=${dto.query ? 'all-matching' : 'selected'} - export started`);
+    const releaseExportSlot = this.bookService.acquireExportSlot(user.id);
+    try {
+      const exported = await this.bookService.buildMetadataExport(dto, user);
+      const asciiFilename = exported.fileName.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'book-metadata-export';
+      const encodedFilename = encodeFilenameStar(exported.fileName);
+      const disposition = `attachment; filename="${asciiFilename}"`;
+
+      reply.raw.setHeader('Content-Type', exported.contentType);
+      reply.raw.setHeader('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
+      reply.send(exported.content);
+
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} format=${dto.format} scope=${exported.preflight.scope} rows=${exported.preflight.rowCount} durationMs=${Date.now() - startedAt} - export completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} format=${dto.format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - export failed`,
+      );
+      throw err;
+    } finally {
+      releaseExportSlot();
+    }
   }
 
   private async streamBookExport(bookIds: number[], scope: 'primary' | 'all' | 'audio', user: RequestUser, reply: FastifyReply) {
@@ -297,6 +342,7 @@ export class BookController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
+    @Query('t') t?: string,
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     const coverPath = await this.bookService.getCoverPath(id, user);
@@ -304,13 +350,15 @@ export class BookController {
 
     const { mtimeMs } = await stat(coverPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
+    const cacheControl = t ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+
     if (ifNoneMatch === etag) {
-      reply.status(304).header('Cache-Control', 'no-cache').header('ETag', etag).send();
+      reply.status(304).header('Cache-Control', cacheControl).header('ETag', etag).send();
       return;
     }
 
     const contentType = imageContentTypeFromPath(coverPath);
-    reply.header('Cache-Control', 'no-cache');
+    reply.header('Cache-Control', cacheControl);
     reply.header('ETag', etag);
     reply.type(contentType);
     reply.send(createReadStream(coverPath));
@@ -322,6 +370,7 @@ export class BookController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
+    @Query('t') t?: string,
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
     const thumbnailPath = await this.bookService.getThumbnailPath(id, user);
@@ -329,12 +378,14 @@ export class BookController {
 
     const { mtimeMs } = await stat(thumbnailPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
+    const cacheControl = t ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+
     if (ifNoneMatch === etag) {
-      reply.status(304).header('Cache-Control', 'no-cache').header('ETag', etag).send();
+      reply.status(304).header('Cache-Control', cacheControl).header('ETag', etag).send();
       return;
     }
 
-    reply.header('Cache-Control', 'no-cache');
+    reply.header('Cache-Control', cacheControl);
     reply.header('ETag', etag);
     reply.type('image/jpeg');
     reply.send(createReadStream(thumbnailPath));
@@ -516,8 +567,9 @@ export class BookController {
       return `Bulk set status to ${body?.status ?? 'unknown'} for ${count} book${count !== 1 ? 's' : ''}`;
     },
   })
-  bulkSetStatus(@Body() dto: BulkSetStatusDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkSetStatus(dto.bookIds, dto.status, user);
+  async bulkSetStatus(@Body() dto: BulkSetStatusDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.bulkSetStatus(ids, dto.status, user);
   }
 
   @Post('bulk-set-rating')
@@ -533,8 +585,27 @@ export class BookController {
       return `Bulk set rating to ${body?.rating ?? 'null'} for ${count} book${count !== 1 ? 's' : ''}`;
     },
   })
-  bulkSetRating(@Body() dto: BulkSetRatingDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkSetRating(dto.bookIds, dto.rating ?? null, user);
+  async bulkSetRating(@Body() dto: BulkSetRatingDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.bulkSetRating(ids, dto.rating ?? null, user);
+  }
+
+  @Post('bulk-set-metadata')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
+  @Auditable({
+    action: AuditAction.BookBulkSetMetadata,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; field?: string };
+      const count = body?.bookIds?.length ?? 0;
+      return `Bulk set ${body?.field ?? 'metadata'} for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
+  async bulkSetMetadata(@Body() dto: BulkSetMetadataDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.bulkSetMetadata(ids, dto.field, dto.value ?? null, user);
   }
 
   @Post('bulk-update-tags')
@@ -550,8 +621,9 @@ export class BookController {
       return `Bulk ${body?.mode ?? 'update'} tags for ${count} book${count !== 1 ? 's' : ''}`;
     },
   })
-  bulkUpdateTags(@Body() dto: BulkUpdateTagsDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkUpdateTags(dto.bookIds, dto.mode, dto.tags, user);
+  async bulkUpdateTags(@Body() dto: BulkUpdateTagsDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.bulkUpdateTags(ids, dto.mode, dto.tags, user);
   }
 
   @Post('bulk-set-metadata-lock')
@@ -567,8 +639,9 @@ export class BookController {
       return `Bulk ${body?.locked ? 'locked' : 'unlocked'} metadata for ${count} book${count !== 1 ? 's' : ''}`;
     },
   })
-  bulkSetMetadataLock(@Body() dto: BulkSetMetadataLockDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkSetMetadataLock(dto.bookIds, dto.locked, user);
+  async bulkSetMetadataLock(@Body() dto: BulkSetMetadataLockDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.bulkSetMetadataLock(ids, dto.locked, user);
   }
 
   @Get(':id')

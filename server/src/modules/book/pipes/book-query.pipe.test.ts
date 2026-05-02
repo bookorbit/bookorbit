@@ -58,6 +58,16 @@ describe('BookQueryPipe', () => {
     expect(() => pipe.transform({ sort: [{ field: 'title', dir: 'sideways' }] })).toThrow(BadRequestException);
   });
 
+  it('accepts readStatus as a valid sort field', () => {
+    const result = pipe.transform({ sort: [{ field: 'readStatus', dir: 'asc' }] });
+    expect(result.sort).toEqual([{ field: 'readStatus', dir: 'asc' }]);
+  });
+
+  it('accepts format as a valid sort field', () => {
+    const result = pipe.transform({ sort: [{ field: 'format', dir: 'desc' }] });
+    expect(result.sort).toEqual([{ field: 'format', dir: 'desc' }]);
+  });
+
   it('throws BadRequestException for more than 5 sort entries', () => {
     const sort = ['title', 'author', 'series', 'addedAt', 'publishedYear', 'pageCount'].map((field) => ({ field, dir: 'asc' }));
     expect(() => pipe.transform({ sort })).toThrow(BadRequestException);
@@ -103,9 +113,35 @@ describe('BookQueryPipe', () => {
   });
 
   it('accepts all valid sort fields', () => {
-    const validFields = ['author', 'title', 'series', 'seriesIndex', 'addedAt', 'updatedAt', 'publishedYear', 'pageCount', 'rating'];
+    const validFields = [
+      'author',
+      'title',
+      'series',
+      'seriesIndex',
+      'addedAt',
+      'updatedAt',
+      'publishedYear',
+      'pageCount',
+      'rating',
+      'language',
+      'metadataScore',
+    ];
     for (const field of validFields) {
       expect(() => pipe.transform({ sort: [{ field, dir: 'desc' }] })).not.toThrow();
     }
+  });
+
+  it('accepts metadataScore and language sort entries together', () => {
+    const result = pipe.transform({
+      sort: [
+        { field: 'metadataScore', dir: 'desc' },
+        { field: 'language', dir: 'asc' },
+      ],
+    });
+
+    expect(result.sort).toEqual([
+      { field: 'metadataScore', dir: 'desc' },
+      { field: 'language', dir: 'asc' },
+    ]);
   });
 });

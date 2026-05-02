@@ -93,6 +93,15 @@ export class CollectionRepository {
       .returning();
   }
 
+  buildMembershipWhere(collectionId: number): SQL {
+    const membership = this.db
+      .select({ one: sql`1` })
+      .from(collectionBooks)
+      .where(and(eq(collectionBooks.collectionId, collectionId), eq(collectionBooks.bookId, books.id)))
+      .limit(1);
+    return sql`exists (${membership})`;
+  }
+
   async findBookIdsPage(collectionId: number, libraryIds: number[], page: number, size: number, extraWhere?: SQL) {
     if (libraryIds.length === 0) {
       return {

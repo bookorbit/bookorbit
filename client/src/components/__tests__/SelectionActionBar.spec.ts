@@ -19,6 +19,12 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   }),
 }))
 
+vi.mock('@/features/book/composables/useMetadataFieldSearch', () => ({
+  usePublisherSearch: () => ({ search: vi.fn<(query: string) => Promise<string[]>>().mockResolvedValue([]) }),
+  useSeriesNameSearch: () => ({ search: vi.fn<(query: string) => Promise<string[]>>().mockResolvedValue([]) }),
+  useLanguageSearch: () => ({ search: vi.fn<(query: string) => Promise<string[]>>().mockResolvedValue([]) }),
+}))
+
 const globalStubs = {
   stubs: {
     DropdownMenu: { template: '<div><slot /></div>' },
@@ -53,15 +59,12 @@ describe('SelectionActionBar demo restriction', () => {
   it('shows bulk-edit controls for non-restricted accounts', async () => {
     const wrapper = mountBar()
 
-    expect(wrapper.find('[data-testid="action-export"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="action-download-files"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="action-export-metadata"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-edit-metadata"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-set-status"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-set-rating"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="action-bulk-edit-tags"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="action-bulk-more"]').exists()).toBe(true)
-
-    await wrapper.find('[data-testid="action-bulk-more"]').trigger('click')
-    await nextTick()
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(true)
 
     expect(wrapper.find('[data-testid="action-bulk-refresh-metadata"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-re-extract-cover"]').exists()).toBe(true)
@@ -69,33 +72,48 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.find('[data-testid="action-bulk-unlock-metadata"]').exists()).toBe(true)
   })
 
+  it('keeps metadata export available in the more menu with download-only permission', () => {
+    permissionState.allowed = new Set(['library_download'])
+    const wrapper = mountBar()
+
+    expect(wrapper.find('[data-testid="action-download-files"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="action-export-metadata"]').exists()).toBe(true)
+
+    expect(wrapper.find('[data-testid="action-bulk-edit-metadata"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-refresh-metadata"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-re-extract-cover"]').exists()).toBe(false)
+  })
+
   it('hides bulk-edit controls for demo-restricted accounts', () => {
     permissionState.demoRestricted = true
     const wrapper = mountBar()
 
-    expect(wrapper.find('[data-testid="action-export"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-download-files"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-export-metadata"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="action-bulk-edit-metadata"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="action-bulk-set-status"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="action-bulk-set-rating"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="action-bulk-edit-tags"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="action-bulk-more"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="action-add-to-collection"]').exists()).toBe(true)
   })
 
-  it('emits add/send/export/status/rating/tag actions from default controls', async () => {
+  it('emits add/send/download/metadata-export/status/rating/tag actions from default controls', async () => {
     const wrapper = mountBar()
 
     await wrapper.find('[data-testid="action-add-to-collection"]').trigger('click')
     expect(wrapper.emitted('add-to-collection')).toHaveLength(1)
 
     await wrapper.find('[data-testid="action-send-email"]').trigger('click')
-    await wrapper.find('[data-testid="action-export"]').trigger('click')
+    await wrapper.find('[data-testid="action-export-metadata"]').trigger('click')
+    await wrapper.find('[data-testid="action-download-files"]').trigger('click')
     await wrapper
       .findAll('button')
       .find((btn) => btn.text() === 'Primary only')
       ?.trigger('click')
     expect(wrapper.emitted('send')).toHaveLength(1)
-    expect(wrapper.emitted('export')?.[0]).toEqual(['primary'])
+    expect(wrapper.emitted('export-metadata')).toHaveLength(1)
+    expect(wrapper.emitted('download')?.[0]).toEqual(['primary'])
 
     await wrapper.find('[data-testid="action-bulk-set-status"]').trigger('click')
     await wrapper
@@ -116,10 +134,8 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.emitted('edit-tags')).toHaveLength(1)
   })
 
-  it('emits bulk metadata actions from More menu', async () => {
+  it('emits bulk metadata actions from Metadata menu', async () => {
     const wrapper = mountBar()
-    await wrapper.find('[data-testid="action-bulk-more"]').trigger('click')
-    await nextTick()
 
     await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
     await wrapper.find('[data-testid="action-bulk-re-extract-cover"]').trigger('click')
@@ -129,6 +145,56 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.emitted('refresh-metadata')).toHaveLength(1)
     expect(wrapper.emitted('re-extract-cover')).toHaveLength(1)
     expect(wrapper.emitted('lock-metadata')?.map((args) => args[0])).toEqual([true, false])
+  })
+
+  it('emits set-field from the field editor flow', async () => {
+    const wrapper = mountBar()
+    await wrapper.find('[data-testid="action-bulk-set-field"]').trigger('click')
+    await nextTick()
+
+    const select = wrapper.find('select')
+    const input = wrapper.find('input')
+    await select.setValue('language')
+    await input.setValue('fr')
+    await wrapper
+      .findAll('button')
+      .find((btn) => btn.text() === 'Apply')
+      ?.trigger('click')
+
+    expect(wrapper.emitted('set-field')?.[0]).toEqual(['language', 'fr'])
+  })
+
+  it('clears numeric fields when the field editor input is blank', async () => {
+    const wrapper = mountBar()
+    await wrapper.find('[data-testid="action-bulk-set-field"]').trigger('click')
+    await nextTick()
+
+    const select = wrapper.find('select')
+    await select.setValue('publishedYear')
+    await nextTick()
+    await wrapper
+      .findAll('button')
+      .find((btn) => btn.text() === 'Apply')
+      ?.trigger('click')
+
+    expect(wrapper.emitted('set-field')?.[0]).toEqual(['publishedYear', null])
+  })
+
+  it('emits list fields as deduplicated comma-separated values', async () => {
+    const wrapper = mountBar()
+    await wrapper.find('[data-testid="action-bulk-set-field"]').trigger('click')
+    await nextTick()
+
+    const select = wrapper.find('select')
+    await select.setValue('authors')
+    await nextTick()
+    await wrapper.find('input').setValue(' Author A, Author B , Author A ')
+    await wrapper
+      .findAll('button')
+      .find((btn) => btn.text() === 'Apply')
+      ?.trigger('click')
+
+    expect(wrapper.emitted('set-field')?.[0]).toEqual(['authors', ['Author A', 'Author B']])
   })
 
   it('requires DELETE confirmation text when count exceeds 50', async () => {
@@ -156,16 +222,16 @@ describe('SelectionActionBar demo restriction', () => {
 
   it('resets transient menu state when visibility is turned off', async () => {
     const wrapper = mountBar()
-    await wrapper.find('[data-testid="action-bulk-more"]').trigger('click')
+    await wrapper.find('[data-testid="action-bulk-set-field"]').trigger('click')
     await nextTick()
-    expect(wrapper.find('[data-testid="action-bulk-refresh-metadata"]').exists()).toBe(true)
+    expect(wrapper.find('select').exists()).toBe(true)
 
     await wrapper.setProps({ visible: false })
     await nextTick()
     await wrapper.setProps({ visible: true })
     await nextTick()
 
-    expect(wrapper.find('[data-testid="action-bulk-more"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="action-bulk-refresh-metadata"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(true)
+    expect(wrapper.find('select').exists()).toBe(false)
   })
 })

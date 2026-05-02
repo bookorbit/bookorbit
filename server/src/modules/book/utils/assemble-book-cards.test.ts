@@ -14,6 +14,10 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
     rating: null,
     coverSource: null,
     lockedFields: null,
+    subtitle: null,
+    publisher: null,
+    pageCount: null,
+    isbn13: null,
     ...overrides,
   };
 }
@@ -22,14 +26,25 @@ describe('assembleBookCards', () => {
   it('assembles a simple book card with authors and files', () => {
     const rows = [makeBookRow(1)];
     const authorRows = [{ bookId: 1, name: 'Author A' }];
-    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary' }];
+    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null }];
 
     const [card] = assembleBookCards(rows, authorRows, fileRows, [], []);
 
     expect(card.id).toBe(1);
     expect(card.title).toBe('Book 1');
     expect(card.authors).toEqual(['Author A']);
-    expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary' }]);
+    expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }]);
+  });
+
+  it('includes updatedAt, metadataScore, and file size when present', () => {
+    const rows = [makeBookRow(1, { updatedAt: new Date('2024-02-01T00:00:00.000Z'), metadataScore: 88 })];
+    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: 4096 }];
+
+    const [card] = assembleBookCards(rows, [], fileRows, [], []);
+
+    expect(card.updatedAt).toBe('2024-02-01T00:00:00.000Z');
+    expect(card.metadataScore).toBe(88);
+    expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary', sizeBytes: 4096 }]);
   });
 
   it('falls back to basename of folderPath when title is null', () => {
@@ -43,8 +58,8 @@ describe('assembleBookCards', () => {
   it('returns reading progress from primary file', () => {
     const rows = [makeBookRow(1)];
     const fileRows = [
-      { bookId: 1, id: 10, format: 'epub', role: 'primary' },
-      { bookId: 1, id: 11, format: 'pdf', role: 'supplemental' },
+      { bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null },
+      { bookId: 1, id: 11, format: 'pdf', role: 'supplemental', sizeBytes: null },
     ];
     const progressRows = [
       { bookFileId: 10, percentage: 45 },
@@ -58,7 +73,7 @@ describe('assembleBookCards', () => {
 
   it('falls back to first file for progress when no primary file exists', () => {
     const rows = [makeBookRow(1)];
-    const fileRows = [{ bookId: 1, id: 11, format: 'pdf', role: 'supplemental' }];
+    const fileRows = [{ bookId: 1, id: 11, format: 'pdf', role: 'supplemental', sizeBytes: null }];
     const progressRows = [{ bookFileId: 11, percentage: 30 }];
 
     const [card] = assembleBookCards(rows, [], fileRows, [], progressRows);
@@ -74,7 +89,7 @@ describe('assembleBookCards', () => {
 
   it('returns null readingProgress when progress is not recorded for the file', () => {
     const rows = [makeBookRow(1)];
-    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary' }];
+    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null }];
 
     const [card] = assembleBookCards(rows, [], fileRows, [], []);
 
@@ -147,6 +162,7 @@ describe('assembleBookCards', () => {
     const [card] = assembleBookCards(rows, [], [], [], []);
 
     expect(card.hasMetadataLocks).toBe(true);
+    expect(card.lockedFields).toEqual(['title']);
   });
 
   it('marks cards without metadata locks as unlocked', () => {
@@ -155,6 +171,34 @@ describe('assembleBookCards', () => {
     const [card] = assembleBookCards(rows, [], [], [], []);
 
     expect(card.hasMetadataLocks).toBe(false);
+    expect(card.lockedFields).toEqual([]);
+  });
+
+  it('returns empty lockedFields when lockedFields row is null', () => {
+    const rows = [makeBookRow(1, { lockedFields: null })];
+
+    const [card] = assembleBookCards(rows, [], [], [], []);
+
+    expect(card.hasMetadataLocks).toBe(false);
+    expect(card.lockedFields).toEqual([]);
+  });
+
+  it('normalizes lockedFields by filtering out unknown field names', () => {
+    const rows = [makeBookRow(1, { lockedFields: ['title', 'unknownField', 'authors'] })];
+
+    const [card] = assembleBookCards(rows, [], [], [], []);
+
+    expect(card.lockedFields).toEqual(['title', 'authors']);
+    expect(card.hasMetadataLocks).toBe(true);
+  });
+
+  it('returns lockedFields with multiple known fields', () => {
+    const rows = [makeBookRow(1, { lockedFields: ['title', 'authors', 'seriesName', 'cover'] })];
+
+    const [card] = assembleBookCards(rows, [], [], [], []);
+
+    expect(card.lockedFields).toEqual(['title', 'authors', 'seriesName', 'cover']);
+    expect(card.hasMetadataLocks).toBe(true);
   });
 
   it('includes all optional metadata fields', () => {
@@ -182,13 +226,75 @@ describe('assembleBookCards', () => {
 
   it('handles a book with progress percentage of 0', () => {
     const rows = [makeBookRow(1)];
-    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary' }];
+    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null }];
     const progressRows = [{ bookFileId: 10, percentage: 0 }];
 
     const [card] = assembleBookCards(rows, [], fileRows, [], progressRows);
 
     // 0 is a valid progress value, not null
     expect(card.readingProgress).toBe(0);
+  });
+
+  it('populates narrators from narratorRows', () => {
+    const rows = [makeBookRow(1)];
+    const narratorRows = [
+      { bookId: 1, name: 'Narrator A' },
+      { bookId: 1, name: 'Narrator B' },
+    ];
+    const [card] = assembleBookCards(rows, [], [], [], [], [], narratorRows);
+    expect(card.narrators).toEqual(['Narrator A', 'Narrator B']);
+  });
+
+  it('returns empty narrators array when no narratorRows for book', () => {
+    const rows = [makeBookRow(1)];
+    const [card] = assembleBookCards(rows, [], [], [], []);
+    expect(card.narrators).toEqual([]);
+  });
+
+  it('maps subtitle, publisher, pageCount, isbn13 from row', () => {
+    const rows = [makeBookRow(1, { subtitle: 'A Subtitle', publisher: 'Pub', pageCount: 300, isbn13: '9780000000000' })];
+    const [card] = assembleBookCards(rows, [], [], [], []);
+    expect(card.subtitle).toBe('A Subtitle');
+    expect(card.publisher).toBe('Pub');
+    expect(card.pageCount).toBe(300);
+    expect(card.isbn13).toBe('9780000000000');
+  });
+
+  it('returns null for subtitle, publisher, pageCount, isbn13 when absent', () => {
+    const rows = [makeBookRow(1)];
+    const [card] = assembleBookCards(rows, [], [], [], []);
+    expect(card.subtitle).toBeNull();
+    expect(card.publisher).toBeNull();
+    expect(card.pageCount).toBeNull();
+    expect(card.isbn13).toBeNull();
+  });
+
+  it('populates tags from tagRows', () => {
+    const rows = [makeBookRow(1)];
+    const tagRows = [
+      { bookId: 1, name: 'sci-fi' },
+      { bookId: 1, name: 'classic' },
+    ];
+    const [card] = assembleBookCards(rows, [], [], [], [], [], [], tagRows);
+    expect(card.tags).toEqual(['sci-fi', 'classic']);
+  });
+
+  it('returns empty tags array when no tagRows for book', () => {
+    const rows = [makeBookRow(1)];
+    const [card] = assembleBookCards(rows, [], [], [], []);
+    expect(card.tags).toEqual([]);
+  });
+
+  it('assigns tags to correct books in multi-book assembly', () => {
+    const rows = [makeBookRow(1), makeBookRow(2)];
+    const tagRows = [
+      { bookId: 1, name: 'fiction' },
+      { bookId: 2, name: 'non-fiction' },
+      { bookId: 2, name: 'history' },
+    ];
+    const cards = assembleBookCards(rows, [], [], [], [], [], [], tagRows);
+    expect(cards[0].tags).toEqual(['fiction']);
+    expect(cards[1].tags).toEqual(['non-fiction', 'history']);
   });
 });
 
@@ -207,6 +313,10 @@ function makeCollapsedRow(id: number, overrides?: Record<string, unknown>) {
     rating: null,
     coverSource: null,
     lockedFields: null,
+    subtitle: null,
+    publisher: null,
+    pageCount: null,
+    isbn13: null,
     bookCount: 3,
     readCount: 1,
     coverBookIds: [id],
@@ -233,6 +343,12 @@ function makeBookCard(id: number, overrides?: Record<string, unknown>) {
     addedAt: '2024-01-01T00:00:00.000Z',
     hasCover: false,
     hasMetadataLocks: false,
+    lockedFields: [] as string[],
+    subtitle: null as string | null,
+    publisher: null as string | null,
+    pageCount: null as number | null,
+    isbn13: null as string | null,
+    narrators: [] as string[],
     ...overrides,
   };
 }

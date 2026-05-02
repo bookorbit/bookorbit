@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and } from 'drizzle-orm';
 
-import type { BooksPage } from '@bookorbit/types';
-import { assembleBookCards, collapseBookCards } from '../book/utils/assemble-book-cards';
+import type { BookQuery, BooksPage } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { BookService } from '../book/book.service';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
@@ -42,6 +43,7 @@ export class CollectionService {
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
     private readonly queryBuilder: BookQueryBuilder,
+    private readonly bookService: BookService,
   ) {}
 
   private assertAccess(ownerId: number, user: RequestUser): void {
@@ -204,87 +206,39 @@ export class CollectionService {
   }
 
   async getBooks(id: number, user: RequestUser, page: number, size: number, collapseSeries?: boolean, q?: string): Promise<BooksPage> {
-    const event = 'collection.get_books';
+    return this.queryBooks(id, user, {
+      sort: [],
+      pagination: { page, size },
+      ...(collapseSeries ? { collapseSeries: true } : {}),
+      ...(q?.trim() ? { q: q.trim() } : {}),
+    });
+  }
+
+  async queryBooks(id: number, user: RequestUser, query: BookQuery): Promise<BooksPage> {
+    const event = 'collection.query_books';
     const startedAt = Date.now();
     this.logger.log(
-      `[${event}] [start] collectionId=${id} userId=${user.id} page=${page} size=${size} collapseSeries=${collapseSeries ?? false} hasSearch=${!!q?.trim()} - get collection books started`,
+      `[${event}] [start] collectionId=${id} userId=${user.id} page=${query.pagination.page} size=${query.pagination.size} collapseSeries=${query.collapseSeries ?? false} hasSearch=${!!query.q?.trim()} - query collection books started`,
     );
     try {
       await this.findCollectionForUserOrThrow(id, user);
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-      const qWhere = q?.trim() ? this.queryBuilder.buildQuickSearch(q.trim()) : undefined;
-
-      if (collapseSeries) {
-        const MAX_COLLAPSE_BOOKS = 5000;
-        const allBookIds = await this.collectionRepo.findAllBookIds(id, libraryIds, qWhere);
-        if (allBookIds.length === 0) {
-          this.logger.log(
-            `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=0 itemCount=0 - get collection books completed`,
-          );
-          return { items: [], total: 0, page, size };
-        }
-
-        if (allBookIds.length > MAX_COLLAPSE_BOOKS) {
-          this.logger.warn(
-            `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} bookCount=${allBookIds.length} cap=${MAX_COLLAPSE_BOOKS} - falling back to non-collapsed pagination`,
-          );
-          const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size, qWhere);
-          if (bookPage.bookIds.length === 0) {
-            return { items: [], total: bookPage.total, page, size };
-          }
-          const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(
-            bookPage.bookIds,
-            user.id,
-          );
-          const orderMap = new Map(bookPage.bookIds.map((bookId, index) => [bookId, index]));
-          const items = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows).sort(
-            (left, right) => (orderMap.get(left.id) ?? 0) - (orderMap.get(right.id) ?? 0),
-          );
-          return { items, total: bookPage.total, page, size };
-        }
-
-        const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(
-          allBookIds,
-          user.id,
-        );
-        const orderMap = new Map(allBookIds.map((bookId, index) => [bookId, index]));
-        const allItems = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows).sort(
-          (left, right) => (orderMap.get(left.id) ?? 0) - (orderMap.get(right.id) ?? 0),
-        );
-        const collapsed = collapseBookCards(allItems);
-        const pageItems = collapsed.slice(page * size, page * size + size);
-
-        this.logger.log(
-          `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${collapsed.length} itemCount=${pageItems.length} - get collection books completed`,
-        );
-        return { items: pageItems, total: collapsed.length, page, size };
-      }
-
-      const bookPage = await this.collectionRepo.findBookIdsPage(id, libraryIds, page, size, qWhere);
-      if (bookPage.bookIds.length === 0) {
-        this.logger.log(
-          `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${bookPage.total} itemCount=0 - get collection books completed`,
-        );
-        return { items: [], total: bookPage.total, page, size };
-      }
-
-      const { rows, authorRows, fileRows, genreRows, progressRows, statusRows } = await this.bookReadService.findCardsByBookIds(
-        bookPage.bookIds,
-        user.id,
-      );
-      const orderMap = new Map(bookPage.bookIds.map((bookId, index) => [bookId, index]));
-      const items = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows).sort(
-        (left, right) => (orderMap.get(left.id) ?? 0) - (orderMap.get(right.id) ?? 0),
-      );
+      const filterWhere = this.queryBuilder.buildWhere(query.filter, {
+        accessibleLibraryIds: libraryIds,
+        userId: user.id,
+        q: query.q,
+      });
+      const where = and(filterWhere, this.collectionRepo.buildMembershipWhere(id));
+      const page = await this.bookService.executeBooksQuery(user.id, where, query);
 
       this.logger.log(
-        `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${bookPage.total} itemCount=${items.length} - get collection books completed`,
+        `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${page.total} itemCount=${page.items.length} - query collection books completed`,
       );
-      return { items, total: bookPage.total, page, size };
+      return page;
     } catch (error) {
       const { errorClass, errorMessage } = this.buildErrorLogFields(error);
       this.logger.warn(
-        `[${event}] [fail] collectionId=${id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - get collection books failed`,
+        `[${event}] [fail] collectionId=${id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - query collection books failed`,
       );
       throw error;
     }

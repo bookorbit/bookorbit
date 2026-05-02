@@ -1,3 +1,18 @@
+/**
+ * Semantic filter field names used in rules.
+ *
+ * Most fields map directly to a DB column. The exceptions:
+ * - `fileAvailability` - derived from `books.status` ('present' | 'missing')
+ * - `readProgress` - aggregated from `reading_progress.percentage` (per-user, per-book-file)
+ * - `readStatus` - stored in `user_book_status.status` (per-user)
+ * - `author` - resolved via `book_authors` join to `authors.name`
+ * - `genre` - resolved via `book_genres` join to `genres.name`
+ * - `tag` - resolved via `book_tags` join to `tags.name`
+ * - `collection` - resolved via `collection_books` join to `collections.name`
+ * - `library` - resolved via `books.library_id` join to `libraries.name`
+ * - `format` - resolved via `book_files.format` (primary file)
+ * - `isbn` - matches both `isbn10` and `isbn13` in `book_metadata`
+ */
 export type RuleField =
   | "title"
   | "publisher"
@@ -16,6 +31,7 @@ export type RuleField =
   | "fileAvailability"
   | "rating"
   | "readProgress"
+  | "readStatus"
   | "description"
   | "isbn"
   | "metadataScore"
@@ -65,6 +81,7 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   fileAvailability: ["isMissing", "isPresent"],
   rating: ["eq", "gt", "gte", "lt", "lte", "isEmpty", "isNotEmpty"],
   readProgress: ["isUnread", "isInProgress", "isFinished"],
+  readStatus: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   description: ["isEmpty", "isNotEmpty"],
   isbn: ["isEmpty", "isNotEmpty", "eq"],
   metadataScore: ["gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
@@ -114,6 +131,23 @@ export type GroupRule = {
   rules: (Rule | GroupRule)[];
 };
 
+/**
+ * Semantic sort field names used in sort specs.
+ *
+ * Most fields map directly to `book_metadata` columns. The exceptions:
+ * - `author` - sorts by first author's `sort_name` via `book_authors` → `authors` join
+ * - `fileSize` - fetched from `book_files.size_bytes` for the primary file (correlated subquery)
+ * - `readProgress` - aggregated from `reading_progress.percentage` (per-user, correlated subquery)
+ * - `readStatus` - from `user_book_status.status` (per-user, correlated subquery)
+ * - `lastReadAt` - max `reading_progress.updated_at` across all files (per-user, correlated subquery)
+ * - `finishedAt` - from `user_book_status.finished_at` (per-user, correlated subquery)
+ * - `rating` - from `user_book_ratings.rating` (per-user, correlated subquery)
+ * - `format` - from `book_files.format` for the primary file (correlated subquery)
+ * - `random` - day-seeded pseudorandom based on book id and user id
+ *
+ * Fields marked "per-user, correlated subquery" require an authenticated userId and
+ * execute a subquery per result row; they are slower on large result sets.
+ */
 export type SortField =
   | "author"
   | "title"
@@ -127,9 +161,13 @@ export type SortField =
   | "publisher"
   | "fileSize"
   | "readProgress"
+  | "readStatus"
+  | "format"
   | "lastReadAt"
   | "finishedAt"
-  | "random";
+  | "random"
+  | "language"
+  | "metadataScore";
 
 export const SORT_FIELDS: SortField[] = [
   "author",
@@ -144,9 +182,13 @@ export const SORT_FIELDS: SortField[] = [
   "publisher",
   "fileSize",
   "readProgress",
+  "readStatus",
+  "format",
   "lastReadAt",
   "finishedAt",
   "random",
+  "language",
+  "metadataScore",
 ];
 
 export type SortSpec = {

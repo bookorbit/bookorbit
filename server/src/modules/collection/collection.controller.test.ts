@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { BadRequestException } from '@nestjs/common';
 
+import type { BookQuery } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { CollectionController } from './collection.controller';
@@ -32,6 +33,7 @@ function makeController() {
     addBooks: vi.fn(),
     removeBooks: vi.fn(),
     getBooks: vi.fn(),
+    queryBooks: vi.fn(),
   };
   const controller = new CollectionController(service as never);
   return { controller, service };
@@ -100,6 +102,21 @@ describe('CollectionController', () => {
       await expectBadRequest(() => controller.getBooks(10, USER, 2_000_000, 100));
       expect(service.getBooks).not.toHaveBeenCalled();
     });
+  });
+
+  it('forwards validated POST table queries to the collection service', async () => {
+    const { controller, service } = makeController();
+    const query: BookQuery = {
+      filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'hobbit' }] },
+      sort: [{ field: 'title', dir: 'asc' }],
+      pagination: { page: 0, size: 50 },
+      collapseSeries: true,
+      q: 'tolkien',
+    };
+
+    await controller.queryBooks(10, query, USER);
+
+    expect(service.queryBooks).toHaveBeenCalledWith(10, USER, query);
   });
 
   describe('mutation endpoints', () => {

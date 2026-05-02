@@ -4,8 +4,16 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { BulkBookIdsDto } from './bulk-book-ids.dto';
+import { BulkQuerySelectionDto } from './bulk-query-selection.dto';
+import { BulkSelectionDto } from './bulk-selection.dto';
+import { BulkSetMetadataDto } from './bulk-set-metadata.dto';
+import { BulkSetMetadataLockDto } from './bulk-set-metadata-lock.dto';
+import { BulkSetRatingDto } from './bulk-set-rating.dto';
+import { BulkSetStatusDto } from './bulk-set-status.dto';
+import { BulkUpdateTagsDto } from './bulk-update-tags.dto';
 import { DeleteBooksDto } from './delete-books.dto';
 import { ExportBooksDto } from './export-books.dto';
+import { MetadataExportDto } from './metadata-export.dto';
 import { GetBooksDto } from './get-books.dto';
 import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
@@ -24,11 +32,43 @@ async function strictErrorsFor<T extends object>(cls: new () => T, value: Record
 }
 
 describe('Book DTO validation', () => {
-  it('validates book id array DTOs require non-empty integer arrays', async () => {
+  it('validates bulk selection DTOs for explicit ids and query payloads', async () => {
+    expect((await errorsFor(BulkQuerySelectionDto, { libraryId: 5 })).length).toBe(0);
+    expect((await errorsFor(BulkQuerySelectionDto, { filter: { type: 'group', join: 'AND', rules: [] } })).length).toBe(0);
+    expect((await errorsFor(BulkSelectionDto, { bookIds: [1, 2] })).length).toBe(0);
+    expect((await errorsFor(BulkSelectionDto, { query: { libraryId: 5 } })).length).toBe(0);
+    expect((await errorsFor(BulkSelectionDto, { query: { filter: { type: 'group', join: 'AND', rules: [] } } })).length).toBe(0);
+    expect((await errorsFor(BulkSelectionDto, { query: { sort: [{ field: 'title', dir: 'asc' }] } })).length).toBe(0);
+    expect((await errorsFor(BulkSelectionDto, { query: {} })).length).toBe(0);
+    expect((await errorsFor(BulkSelectionDto, {})).length).toBeGreaterThan(0);
+    expect((await errorsFor(BulkSelectionDto, { bookIds: [] })).length).toBeGreaterThan(0);
+    expect((await errorsFor(BulkSelectionDto, { bookIds: ['x'] })).length).toBeGreaterThan(0);
+  });
+
+  it('validates bulk book id DTOs in explicit and query modes', async () => {
     expect((await errorsFor(BulkBookIdsDto, { bookIds: [1, 2] })).length).toBe(0);
+    expect((await errorsFor(BulkBookIdsDto, { query: { libraryId: 5 } })).length).toBe(0);
     expect((await errorsFor(DeleteBooksDto, { bookIds: [3] })).length).toBe(0);
+    expect((await errorsFor(DeleteBooksDto, { query: { filter: { type: 'group', join: 'AND', rules: [] } } })).length).toBe(0);
+    expect((await errorsFor(BulkBookIdsDto, {})).length).toBeGreaterThan(0);
     expect((await errorsFor(BulkBookIdsDto, { bookIds: [] })).length).toBeGreaterThan(0);
     expect((await errorsFor(DeleteBooksDto, { bookIds: ['x'] })).length).toBeGreaterThan(0);
+  });
+
+  it('validates bulk action DTOs with bookIds and query selection', async () => {
+    expect((await errorsFor(BulkSetStatusDto, { bookIds: [1], status: 'read' })).length).toBe(0);
+    expect((await errorsFor(BulkSetStatusDto, { query: { libraryId: 5 }, status: 'read' })).length).toBe(0);
+    expect((await errorsFor(BulkSetRatingDto, { bookIds: [1], rating: 4 })).length).toBe(0);
+    expect((await errorsFor(BulkSetRatingDto, { query: {}, rating: 4 })).length).toBe(0);
+    expect((await errorsFor(BulkSetMetadataDto, { bookIds: [1], field: 'language', value: 'fr' })).length).toBe(0);
+    expect((await errorsFor(BulkSetMetadataDto, { query: { libraryId: 5 }, field: 'language', value: 'fr' })).length).toBe(0);
+    expect((await errorsFor(BulkUpdateTagsDto, { bookIds: [1], mode: 'add', tags: ['favorite'] })).length).toBe(0);
+    expect(
+      (await errorsFor(BulkUpdateTagsDto, { query: { filter: { type: 'group', join: 'AND', rules: [] } }, mode: 'replace', tags: ['favorite'] }))
+        .length,
+    ).toBe(0);
+    expect((await errorsFor(BulkSetMetadataLockDto, { bookIds: [1], locked: true })).length).toBe(0);
+    expect((await errorsFor(BulkSetMetadataLockDto, { query: {}, locked: false })).length).toBe(0);
   });
 
   it('validates export options and boolean allFormats flag', async () => {
@@ -36,6 +76,33 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(ExportBooksDto, { bookIds: [1], audioOnly: true })).length).toBe(0);
     expect((await errorsFor(ExportBooksDto, { bookIds: [1], allFormats: 'true' })).length).toBeGreaterThan(0);
     expect((await errorsFor(ExportBooksDto, { bookIds: [1], audioOnly: 'true' })).length).toBeGreaterThan(0);
+  });
+
+  it('validates metadata export dto options and scopes', async () => {
+    expect(
+      (
+        await errorsFor(MetadataExportDto, {
+          bookIds: [1],
+          format: 'csv',
+          viewType: 'library',
+          sort: [{ field: 'title', dir: 'asc' }],
+          options: { includePersonalData: true, includeFilePaths: false, columnsMode: 'canonical' },
+        })
+      ).length,
+    ).toBe(0);
+    expect(
+      (
+        await errorsFor(MetadataExportDto, {
+          query: { libraryId: 3, q: 'dune', sort: [{ field: 'addedAt', dir: 'desc' }] },
+          format: 'json',
+          viewType: 'smartScope',
+          options: { columnsMode: 'visible', visibleColumns: ['title', 'authors'] },
+        })
+      ).length,
+    ).toBe(0);
+    expect((await errorsFor(MetadataExportDto, { bookIds: [1], format: 'xml' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(MetadataExportDto, { bookIds: [1], format: 'csv', options: { columnsMode: 'bad-mode' } })).length).toBeGreaterThan(0);
+    expect((await errorsFor(MetadataExportDto, { bookIds: [1], format: 'csv', viewType: 'series' })).length).toBeGreaterThan(0);
   });
 
   it('coerces GetBooksDto numeric query values and enforces bounds', async () => {
@@ -95,6 +162,33 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'english-too-long' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { isbn10: '12345678901' })).length).toBeGreaterThan(0);
+  });
+
+  it('validates inline-edit single-field patches for table view use cases', async () => {
+    // Single title patch
+    expect((await errorsFor(UpdateBookMetadataDto, { title: 'New Title' })).length).toBe(0);
+    // Single series patch
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesName: 'My Series', seriesIndex: 1.5 })).length).toBe(0);
+    // Series cleared to null
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesName: null, seriesIndex: null })).length).toBe(0);
+    // Language valid 2-letter code
+    expect((await errorsFor(UpdateBookMetadataDto, { language: 'en' })).length).toBe(0);
+    // Language cleared to null
+    expect((await errorsFor(UpdateBookMetadataDto, { language: null })).length).toBe(0);
+    // Rating null (clear rating)
+    expect((await errorsFor(UpdateBookMetadataDto, { rating: null })).length).toBe(0);
+    // Rating valid range
+    expect((await errorsFor(UpdateBookMetadataDto, { rating: 1 })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { rating: 5 })).length).toBe(0);
+    // Authors array single-field patch
+    expect((await errorsFor(UpdateBookMetadataDto, { authors: ['Author One'] })).length).toBe(0);
+    // Genres/tags single-field patch
+    expect((await errorsFor(UpdateBookMetadataDto, { genres: ['Fantasy'] })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { tags: ['to-read'] })).length).toBe(0);
+    // Empty payload (all fields optional)
+    expect((await errorsFor(UpdateBookMetadataDto, {})).length).toBe(0);
+    // seriesIndex must be a number
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: 'not-a-number' })).length).toBeGreaterThan(0);
   });
 
   it('rejects legacy top-level audiobook fields and accepts nested audioMetadata', async () => {

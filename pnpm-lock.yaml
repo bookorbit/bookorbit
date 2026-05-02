@@ -59,6 +59,12 @@ importers:
       "@tailwindcss/vite":
         specifier: ^4.2.4
         version: 4.2.4(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      "@tanstack/vue-table":
+        specifier: ^8.21.3
+        version: 8.21.3(vue@3.5.33(typescript@5.9.3))
+      "@tanstack/vue-virtual":
+        specifier: ^3.13.24
+        version: 3.13.24(vue@3.5.33(typescript@5.9.3))
       "@types/howler":
         specifier: ^2.2.12
         version: 2.2.12
@@ -3811,11 +3817,27 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
+  "@tanstack/table-core@8.21.3":
+    resolution:
+      {
+        integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==,
+      }
+    engines: { node: ">=12" }
+
   "@tanstack/virtual-core@3.14.0":
     resolution:
       {
         integrity: sha512-JLANqGy/D6k4Ujmh8Tr25lGimuOXNiaVyXaCAZS0W+1390sADdGnyUdSWNIfd49gebtIxGMij4IktRVzrdr12Q==,
       }
+
+  "@tanstack/vue-table@8.21.3":
+    resolution:
+      {
+        integrity: sha512-rusRyd77c5tDPloPskctMyPLFEQUeBzxdQ+2Eow4F7gDPlPOB1UnnhzfpdvqZ8ZyX2rRNGmqNnQWm87OI2OQPw==,
+      }
+    engines: { node: ">=12" }
+    peerDependencies:
+      vue: ">=3.2"
 
   "@tanstack/vue-virtual@3.13.24":
     resolution:
@@ -13685,7 +13707,14 @@ snapshots:
       tailwindcss: 4.2.4
       vite: 8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  "@tanstack/table-core@8.21.3": {}
+
   "@tanstack/virtual-core@3.14.0": {}
+
+  "@tanstack/vue-table@8.21.3(vue@3.5.33(typescript@5.9.3))":
+    dependencies:
+      "@tanstack/table-core": 8.21.3
+      vue: 3.5.33(typescript@5.9.3)
 
   "@tanstack/vue-virtual@3.13.24(vue@3.5.33(typescript@5.9.3))":
     dependencies:

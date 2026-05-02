@@ -1,5 +1,5 @@
-export type FontFormat = 'ttf' | 'otf' | 'woff' | 'woff2';
-export type FontStyle = 'normal' | 'italic';
+export type FontFormat = "ttf" | "otf" | "woff" | "woff2";
+export type FontStyle = "normal" | "italic";
 
 export interface UserFont {
   id: number;
@@ -19,27 +19,27 @@ export interface FontUploadResult {
   suggestedStyle: FontStyle;
 }
 
-export const FONT_FORMATS: readonly FontFormat[] = ['ttf', 'otf', 'woff', 'woff2'];
+export const FONT_FORMATS: readonly FontFormat[] = ["ttf", "otf", "woff", "woff2"];
 
 export const FONT_FORMAT_EXTENSIONS: Record<FontFormat, string> = {
-  ttf: '.ttf',
-  otf: '.otf',
-  woff: '.woff',
-  woff2: '.woff2',
+  ttf: ".ttf",
+  otf: ".otf",
+  woff: ".woff",
+  woff2: ".woff2",
 };
 
 export const FONT_FORMAT_MIME_TYPES: Record<FontFormat, string> = {
-  ttf: 'font/ttf',
-  otf: 'font/otf',
-  woff: 'font/woff',
-  woff2: 'font/woff2',
+  ttf: "font/ttf",
+  otf: "font/otf",
+  woff: "font/woff",
+  woff2: "font/woff2",
 };
 
 export const FONT_FORMAT_CSS_FORMAT: Record<FontFormat, string> = {
-  ttf: 'truetype',
-  otf: 'opentype',
-  woff: 'woff',
-  woff2: 'woff2',
+  ttf: "truetype",
+  otf: "opentype",
+  woff: "woff",
+  woff2: "woff2",
 };
 
 export const MAX_FONT_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -57,6 +57,10 @@ export function fontCssFamilyName(fontId: number): string {
  * browser pick bold/italic variants automatically.
  */
 export function fontCssFamilyGroupName(familyName: string): string {
-  const safe = familyName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'font';
+  const safe =
+    familyName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "font";
   return `__userfont_${safe}`;
 }

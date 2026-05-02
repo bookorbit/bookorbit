@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, Pencil } from 'lucide-vue-next'
+import { ChevronLeft, Pencil, RotateCcw, SlidersHorizontal } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
-import type { BookCard, BookDetail } from '@bookorbit/types'
+import type { BookCard, BookDetail, SortSpec } from '@bookorbit/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -22,6 +24,8 @@ import SeriesGapBanner from '../components/SeriesGapBanner.vue'
 import { fetchSeriesBooks } from '../api/series'
 import { useSeriesDetail } from '../composables/useSeriesDetail'
 import { useCoverStack, MAX_VISIBLE as MAX_STACK_VISIBLE } from '../composables/useCoverStack'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import type { ColumnId } from '@/features/book/composables/useTableColumns'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,7 +33,8 @@ const { hasPermission } = usePermissions()
 const { setBookContext } = useBookNavigation()
 const { coverUrl } = useCoverVersions()
 
-const { portraitCoverSize, gridGap, viewMode } = useDisplaySettings()
+const { portraitCoverSize, gridGap } = useDisplaySettings()
+const { effectiveViewMode } = useEffectiveViewMode()
 const { libraries, fetchLibraries } = useLibraries()
 
 const seriesName = computed(() => {
@@ -112,6 +117,22 @@ function handleBookAction(book: BookCard, action: string) {
   if (action === 'quick-view') {
     void router.push({ name: 'book-detail', params: { bookId: book.id } })
   }
+}
+
+function handleTableBookUpdate(updated: BookCard) {
+  const idx = books.value.findIndex((b) => b.id === updated.id)
+  if (idx !== -1) books.value = books.value.map((b, i) => (i === idx ? updated : b))
+}
+
+const tableSort = ref<SortSpec[]>([{ field: 'seriesIndex', dir: 'asc' }])
+const tableRef = ref<InstanceType<typeof VirtualBookTable> | null>(null)
+
+function handleResetColumns() {
+  tableRef.value?.resetLayout()
+}
+
+function handleToggleColumn(id: ColumnId) {
+  tableRef.value?.toggleColumn(id)
 }
 
 function goBack() {
@@ -492,6 +513,37 @@ watch(
                 <option value="">All Libraries</option>
                 <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
               </select>
+
+              <Popover v-if="effectiveViewMode === 'table'">
+                <PopoverTrigger as-child>
+                  <button
+                    class="flex h-8 w-full items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-auto"
+                  >
+                    <SlidersHorizontal :size="13" />
+                    Columns
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" class="w-52 p-3">
+                  <template v-if="tableRef">
+                    <div class="mb-2 flex items-center justify-between">
+                      <span class="text-xs font-semibold uppercase tracking-wide text-foreground">Columns</span>
+                      <button class="text-xs text-muted-foreground hover:text-foreground" @click="handleResetColumns">
+                        <RotateCcw :size="11" class="mr-0.5 inline" />Reset
+                      </button>
+                    </div>
+                    <div class="space-y-1">
+                      <label
+                        v-for="col in tableRef.allColumns.filter((c) => c.pinned === null)"
+                        :key="col.id"
+                        class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-accent"
+                      >
+                        <input type="checkbox" :checked="col.visible" class="accent-primary" @change="handleToggleColumn(col.id)" />
+                        {{ col.header || col.id }}
+                      </label>
+                    </div>
+                  </template>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
@@ -502,16 +554,28 @@ watch(
         </div>
 
         <VirtualBookGrid
-          v-if="viewMode === 'grid' && books.length > 0"
+          v-if="effectiveViewMode === 'grid' && books.length > 0"
           :books="books"
           :cover-size="seriesBooksCoverSize"
           :grid-gap="gridGap"
           @action="handleBookAction"
         />
 
-        <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <div v-if="effectiveViewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
           <BookListRow v-for="book in books" :key="book.id" :book="book" @action="handleBookAction(book, $event)" />
         </div>
+
+        <!-- Table view -->
+        <VirtualBookTable
+          v-if="effectiveViewMode === 'table'"
+          ref="tableRef"
+          :books="books"
+          :sort="tableSort"
+          view-type="series"
+          @update:sort="tableSort = $event"
+          @action="handleBookAction"
+          @update:book="handleTableBookUpdate"
+        />
 
         <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
           <span v-if="loadingBooks" class="text-xs text-muted-foreground">Loading...</span>

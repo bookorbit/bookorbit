@@ -55,7 +55,7 @@ const props = defineProps<{
   selected?: boolean
 }>()
 
-type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
 const emit = defineEmits<{
   action: [type: BookActionType]
   select: [event: MouseEvent]

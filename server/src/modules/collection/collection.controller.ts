@@ -16,10 +16,12 @@ import {
 } from '@nestjs/common';
 
 import { AuditAction, AuditResource } from '@bookorbit/types';
+import type { BookQuery } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { BookQueryPipe } from '../book/pipes/book-query.pipe';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
@@ -158,5 +160,10 @@ export class CollectionController {
     this.validateSizeQuery(size);
     this.validatePageQuery(page, size);
     return this.collectionService.getBooks(id, user, page, size, collapseSeries, q);
+  }
+
+  @Post(':id/books/query')
+  queryBooks(@Param('id', ParseIntPipe) id: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+    return this.collectionService.queryBooks(id, user, query);
   }
 }

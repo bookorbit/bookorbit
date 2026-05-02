@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Plus, Trash2, X } from 'lucide-vue-next'
 import { FIELD_OPERATORS, RULE_FIELDS, type GroupRule, type Rule, type RuleField, type RuleOperator } from '@bookorbit/types'
+import { READ_STATUSES } from '@bookorbit/types'
 import { FIELD_LABELS, OPERATOR_LABELS } from '@/features/book/lib/filter-labels'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import FilterChipTypeahead from './FilterChipTypeahead.vue'
@@ -33,6 +34,17 @@ const SCORE_PRESETS = [
 
 const CHIP_TYPEAHEAD_FIELDS: RuleField[] = ['author', 'genre', 'tag', 'collection']
 const TEXT_TYPEAHEAD_FIELDS: RuleField[] = ['publisher', 'series', 'language']
+
+const READ_STATUS_LABELS: Record<string, string> = {
+  unread: 'Unread',
+  want_to_read: 'Want to Read',
+  reading: 'Reading',
+  on_hold: 'On Hold',
+  rereading: 'Rereading',
+  read: 'Read',
+  skimmed: 'Skimmed',
+  abandoned: 'Abandoned',
+}
 
 const ENDPOINT_BY_FIELD: Partial<Record<RuleField, string>> = {
   author: '/api/v1/metadata/authors',
@@ -256,6 +268,26 @@ function removeLibraryChip(index: number, name: string) {
   emitUpdate()
 }
 
+function addStatusChip(index: number, event: Event) {
+  const select = event.target as HTMLSelectElement
+  const status = select.value
+  select.value = ''
+  if (!status) return
+
+  const node = nodes.value[index]
+  if (node?.kind !== 'rule') return
+  if (node.rule.valueChips.includes(status)) return
+  node.rule.valueChips = [...node.rule.valueChips, status]
+  emitUpdate()
+}
+
+function removeStatusChip(index: number, status: string) {
+  const node = nodes.value[index]
+  if (node?.kind !== 'rule') return
+  node.rule.valueChips = node.rule.valueChips.filter((value) => value !== status)
+  emitUpdate()
+}
+
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
   if (DATE_FIELDS.includes(field)) return operator === 'withinLast' ? 'number' : 'date'
@@ -351,6 +383,31 @@ function showValueToInput(operator: RuleOperator): boolean {
                 :disabled="node.rule.valueChips.includes(libraryName)"
               >
                 {{ libraryName }}
+              </option>
+            </select>
+          </div>
+        </template>
+        <!-- Read status dropdown -->
+        <template v-else-if="node.rule.field === 'readStatus' && COLLECTION_OPERATORS.includes(node.rule.operator)">
+          <div class="flex flex-wrap items-center gap-1 min-w-48 flex-1 rounded-md border border-input bg-background px-2 py-1.5">
+            <span
+              v-for="status in node.rule.valueChips"
+              :key="status"
+              class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+            >
+              {{ READ_STATUS_LABELS[status] ?? status }}
+              <button type="button" class="text-primary/60 hover:text-primary leading-none" @click="removeStatusChip(index, status)">
+                <X :size="10" />
+              </button>
+            </span>
+            <select
+              :value="''"
+              class="h-7 flex-1 min-w-32 bg-transparent text-foreground text-sm outline-none"
+              @change="addStatusChip(index, $event)"
+            >
+              <option value="" disabled>Select status...</option>
+              <option v-for="status in READ_STATUSES" :key="status" :value="status" :disabled="node.rule.valueChips.includes(status)">
+                {{ READ_STATUS_LABELS[status] ?? status }}
               </option>
             </select>
           </div>

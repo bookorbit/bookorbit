@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
-import { CheckSquare, Circle, LayoutGrid, List, MoreHorizontal, Search, SlidersHorizontal, Square, X } from 'lucide-vue-next'
+import { CheckSquare, Circle, LayoutGrid, List, MoreHorizontal, Search, SlidersHorizontal, Square, Table2, X } from 'lucide-vue-next'
 import * as LucideIcons from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { BookViewMode } from '@/composables/useDisplaySettings'
 
 withDefaults(
   defineProps<{
@@ -22,7 +23,7 @@ withDefaults(
     total: number
     coverSize: number
     gridGap: number
-    viewMode: 'grid' | 'list'
+    viewMode: BookViewMode
     selectionMode?: boolean
     showSelection?: boolean
     showViewModeToggle?: boolean
@@ -35,6 +36,7 @@ withDefaults(
     gridGapStep?: number
     searchable?: boolean
     searchQuery?: string
+    allowedViewModes?: BookViewMode[]
   }>(),
   {
     coverSizeMin: 100,
@@ -45,13 +47,14 @@ withDefaults(
     gridGapStep: 4,
     showSelection: true,
     showViewModeToggle: true,
+    allowedViewModes: () => ['grid', 'list', 'table'] as BookViewMode[],
   },
 )
 
 const emit = defineEmits<{
   'update:coverSize': [value: number]
   'update:gridGap': [value: number]
-  'update:viewMode': [value: 'grid' | 'list']
+  'update:viewMode': [value: BookViewMode]
   'toggle-selection': []
   'update:coverShape': [value: 'square' | 'circle']
   'update:searchQuery': [value: string]
@@ -167,8 +170,9 @@ function handleSearchInput(event: Event) {
       <div v-if="showSelection" class="hidden md:block w-px h-3.5 bg-border/40 mx-1.5" />
 
       <!-- Desktop: view mode toggle -->
-      <div v-if="showViewModeToggle" class="hidden md:flex items-center gap-0.5">
+      <div v-if="showViewModeToggle && allowedViewModes.length > 0" class="hidden md:flex items-center gap-0.5">
         <Button
+          v-if="allowedViewModes.includes('grid')"
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
@@ -178,6 +182,7 @@ function handleSearchInput(event: Event) {
           <LayoutGrid :size="14" />
         </Button>
         <Button
+          v-if="allowedViewModes.includes('list')"
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
@@ -185,6 +190,16 @@ function handleSearchInput(event: Event) {
           @click="emit('update:viewMode', 'list')"
         >
           <List :size="14" />
+        </Button>
+        <Button
+          v-if="allowedViewModes.includes('table')"
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8 rounded-lg"
+          :class="viewMode === 'table' ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 hover:text-foreground hover:bg-primary/5'"
+          @click="emit('update:viewMode', 'table')"
+        >
+          <Table2 :size="14" />
         </Button>
       </div>
 
@@ -199,40 +214,47 @@ function handleSearchInput(event: Event) {
             <SlidersHorizontal :size="14" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-56 p-4" align="end">
+        <PopoverContent :class="viewMode === 'table' ? 'w-80 max-w-[90vw] max-h-[80vh] overflow-y-auto p-4' : 'w-56 p-4'" align="end">
           <div class="space-y-4">
             <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Display</p>
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-muted-foreground">Cover size</span>
-                <span class="text-xs font-medium tabular-nums text-foreground">{{ coverSize }}px</span>
+            <template v-if="viewMode !== 'table'">
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-muted-foreground">Cover size</span>
+                  <span class="text-xs font-medium tabular-nums text-foreground">{{ coverSize }}px</span>
+                </div>
+                <input
+                  :value="coverSize"
+                  @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
+                  type="range"
+                  :min="coverSizeMin"
+                  :max="coverSizeMax"
+                  :step="coverSizeStep"
+                  class="w-full accent-primary cursor-pointer"
+                />
               </div>
-              <input
-                :value="coverSize"
-                @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
-                type="range"
-                :min="coverSizeMin"
-                :max="coverSizeMax"
-                :step="coverSizeStep"
-                class="w-full accent-primary cursor-pointer"
-              />
-            </div>
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-muted-foreground">Grid gap</span>
-                <span class="text-xs font-medium tabular-nums text-foreground">{{ gridGap }}px</span>
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-muted-foreground">Grid gap</span>
+                  <span class="text-xs font-medium tabular-nums text-foreground">{{ gridGap }}px</span>
+                </div>
+                <input
+                  :value="gridGap"
+                  @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
+                  type="range"
+                  :min="gridGapMin"
+                  :max="gridGapMax"
+                  :step="gridGapStep"
+                  class="w-full accent-primary cursor-pointer"
+                />
               </div>
-              <input
-                :value="gridGap"
-                @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
-                type="range"
-                :min="gridGapMin"
-                :max="gridGapMax"
-                :step="gridGapStep"
-                class="w-full accent-primary cursor-pointer"
-              />
-            </div>
-            <div v-if="coverShape !== undefined" class="space-y-1.5">
+            </template>
+            <template v-else>
+              <slot name="columns">
+                <p class="text-xs text-muted-foreground">Use the column visibility panel in the table header to show or hide columns.</p>
+              </slot>
+            </template>
+            <div v-if="coverShape !== undefined && viewMode !== 'table'" class="space-y-1.5">
               <span class="text-xs text-muted-foreground">Cover shape</span>
               <div class="flex items-center gap-1 mt-1.5">
                 <button
@@ -271,9 +293,10 @@ function handleSearchInput(event: Event) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-44">
-          <DropdownMenuRadioGroup :model-value="viewMode" @update:model-value="emit('update:viewMode', $event as 'grid' | 'list')">
-            <DropdownMenuRadioItem value="grid">Grid</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="list">List</DropdownMenuRadioItem>
+          <DropdownMenuRadioGroup :model-value="viewMode" @update:model-value="emit('update:viewMode', $event as BookViewMode)">
+            <DropdownMenuRadioItem v-if="allowedViewModes.includes('grid')" value="grid">Grid</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem v-if="allowedViewModes.includes('list')" value="list">List</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem v-if="allowedViewModes.includes('table')" value="table">Table</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="mobileDisplayOpen = true">
@@ -311,37 +334,44 @@ function handleSearchInput(event: Event) {
         <SheetTitle>Display</SheetTitle>
       </SheetHeader>
       <div class="space-y-4 px-4 pb-6">
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-muted-foreground">Cover size</span>
-            <span class="text-xs font-medium tabular-nums text-foreground">{{ coverSize }}px</span>
+        <template v-if="viewMode !== 'table'">
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-muted-foreground">Cover size</span>
+              <span class="text-xs font-medium tabular-nums text-foreground">{{ coverSize }}px</span>
+            </div>
+            <input
+              :value="coverSize"
+              @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
+              type="range"
+              :min="coverSizeMin"
+              :max="coverSizeMax"
+              :step="coverSizeStep"
+              class="w-full accent-primary cursor-pointer"
+            />
           </div>
-          <input
-            :value="coverSize"
-            @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
-            type="range"
-            :min="coverSizeMin"
-            :max="coverSizeMax"
-            :step="coverSizeStep"
-            class="w-full accent-primary cursor-pointer"
-          />
-        </div>
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-muted-foreground">Grid gap</span>
-            <span class="text-xs font-medium tabular-nums text-foreground">{{ gridGap }}px</span>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-muted-foreground">Grid gap</span>
+              <span class="text-xs font-medium tabular-nums text-foreground">{{ gridGap }}px</span>
+            </div>
+            <input
+              :value="gridGap"
+              @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
+              type="range"
+              :min="gridGapMin"
+              :max="gridGapMax"
+              :step="gridGapStep"
+              class="w-full accent-primary cursor-pointer"
+            />
           </div>
-          <input
-            :value="gridGap"
-            @input="emit('update:gridGap', Number(($event.target as HTMLInputElement).value))"
-            type="range"
-            :min="gridGapMin"
-            :max="gridGapMax"
-            :step="gridGapStep"
-            class="w-full accent-primary cursor-pointer"
-          />
-        </div>
-        <div v-if="coverShape !== undefined" class="space-y-1.5">
+        </template>
+        <template v-else>
+          <slot name="columns">
+            <p class="text-xs text-muted-foreground">Column visibility can be managed from the table header.</p>
+          </slot>
+        </template>
+        <div v-if="coverShape !== undefined && viewMode !== 'table'" class="space-y-1.5">
           <span class="text-xs text-muted-foreground">Cover shape</span>
           <div class="flex items-center gap-1 mt-1.5">
             <button

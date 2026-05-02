@@ -183,16 +183,14 @@ onUnmounted(() => clearTimeout(debounceTimer))
       </button>
 
       <!-- Cover Search Drawer -->
-      <Teleport to="body">
-        <CoverSearchDrawer
-          v-if="isSearchOpen"
-          :initial-title="book.title ?? ''"
-          :initial-author="book.authors?.[0]?.name ?? ''"
-          :is-audiobook="isPrimaryAudio"
-          @close="isSearchOpen = false"
-          @select="handleSearchSelect"
-        />
-      </Teleport>
+      <CoverSearchDrawer
+        :open="isSearchOpen"
+        :initial-title="book.title ?? ''"
+        :initial-author="book.authors?.[0]?.name ?? ''"
+        :is-audiobook="isPrimaryAudio"
+        @update:open="isSearchOpen = $event"
+        @select="handleSearchSelect"
+      />
 
       <!-- Error -->
       <p v-if="error" class="text-xs text-destructive">{{ error }}</p>

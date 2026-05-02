@@ -1,11 +1,7 @@
-import { ArrayNotEmpty, IsArray, IsBoolean, IsInt } from 'class-validator';
+import { IsBoolean } from 'class-validator';
+import { BulkSelectionDto } from './bulk-selection.dto';
 
-export class BulkSetMetadataLockDto {
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsInt({ each: true })
-  bookIds: number[];
-
+export class BulkSetMetadataLockDto extends BulkSelectionDto {
   @IsBoolean()
   locked!: boolean;
 }

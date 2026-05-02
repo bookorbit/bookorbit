@@ -28,6 +28,7 @@ export * from "./user-statistics";
 export * from "./migration";
 export * from "./notification";
 export * from "./series";
+export * from "./table-layout";
 export * from "./series-collapse";
 export * from "./entity-manager";
 export * from "./font";

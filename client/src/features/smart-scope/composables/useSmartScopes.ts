@@ -4,21 +4,49 @@ import type { CreateSmartScopePayload, SmartScope } from '@bookorbit/types'
 
 const smartScopes = ref<SmartScope[]>([])
 const loaded = ref(false)
+const loading = ref(false)
+const error = ref<string | null>(null)
+let fetchPromise: Promise<void> | null = null
 
 export function useSmartScopes() {
   async function fetchSmartScopes() {
     if (loaded.value) return
-    const res = await api('/api/v1/smart-scopes')
-    if (!res.ok) return
-    smartScopes.value = await res.json()
-    loaded.value = true
+    if (fetchPromise) return fetchPromise
+    loading.value = true
+    error.value = null
+    fetchPromise = api('/api/v1/smart-scopes')
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`)
+        }
+        smartScopes.value = await res.json()
+        loaded.value = true
+      })
+      .catch((e: unknown) => {
+        error.value = e instanceof Error ? e.message : 'Failed to load smart scopes'
+      })
+      .finally(() => {
+        loading.value = false
+        fetchPromise = null
+      })
+    return fetchPromise
   }
 
   async function refreshSmartScopes() {
-    const res = await api('/api/v1/smart-scopes')
-    if (!res.ok) return
-    smartScopes.value = await res.json()
-    loaded.value = true
+    loading.value = true
+    error.value = null
+    try {
+      const res = await api('/api/v1/smart-scopes')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      smartScopes.value = await res.json()
+      loaded.value = true
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : 'Failed to load smart scopes'
+    } finally {
+      loading.value = false
+    }
   }
 
   async function createSmartScope(payload: CreateSmartScopePayload): Promise<SmartScope> {
@@ -60,5 +88,16 @@ export function useSmartScopes() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
   }
 
-  return { smartScopes, fetchSmartScopes, refreshSmartScopes, createSmartScope, updateSmartScope, deleteSmartScope, reorderSmartScopes }
+  return {
+    smartScopes,
+    loaded,
+    loading,
+    error,
+    fetchSmartScopes,
+    refreshSmartScopes,
+    createSmartScope,
+    updateSmartScope,
+    deleteSmartScope,
+    reorderSmartScopes,
+  }
 }

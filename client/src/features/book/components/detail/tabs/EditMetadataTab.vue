@@ -17,6 +17,8 @@ import { useMetadataLocks } from '../../../composables/useMetadataLocks'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
 import { useNarratorSearch } from '../../../composables/useNarratorSearch'
 import { useGenreSearch, useTagSearch } from '../../../composables/useTagSearch'
+import { usePublisherSearch, useSeriesNameSearch, useLanguageSearch } from '../../../composables/useMetadataFieldSearch'
+import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{
@@ -85,6 +87,9 @@ const { search: searchAuthors } = useAuthorSearch()
 const { search: searchNarrators } = useNarratorSearch()
 const { search: searchGenres } = useGenreSearch()
 const { search: searchTags } = useTagSearch()
+const { search: searchPublisher } = usePublisherSearch()
+const { search: searchSeriesName } = useSeriesNameSearch()
+const { search: searchLanguage } = useLanguageSearch()
 const searchComicMetadata = async (q: string): Promise<string[]> => (q.trim() ? [] : [])
 
 const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
@@ -616,10 +621,11 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           :is-updating="isUpdatingLock"
           @toggle="handleLockToggle"
         >
-          <input
+          <InputWithSuggestions
             v-model="form.seriesName"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :search-fn="searchSeriesName"
             :disabled="isLocked('seriesName')"
+            :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
@@ -648,10 +654,11 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           :is-updating="isUpdatingLock"
           @toggle="handleLockToggle"
         >
-          <input
+          <InputWithSuggestions
             v-model="form.publisher"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :search-fn="searchPublisher"
             :disabled="isLocked('publisher')"
+            :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
           />
         </MetadataFieldLabel>
       </div>
@@ -666,11 +673,12 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           :is-updating="isUpdatingLock"
           @toggle="handleLockToggle"
         >
-          <input
+          <InputWithSuggestions
             v-model="form.language"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-            maxlength="10"
+            :search-fn="searchLanguage"
             :disabled="isLocked('language')"
+            :maxlength="10"
+            :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel

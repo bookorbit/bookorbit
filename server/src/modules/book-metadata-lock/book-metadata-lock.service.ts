@@ -83,6 +83,15 @@ export class BookMetadataLockService {
     return locked;
   }
 
+  async getBookIdsWithLockedField(bookIds: number[], field: BookMetadataLockField): Promise<Set<number>> {
+    const fieldsMap = await this.lockRepo.findLockedFieldsByBookIds(bookIds);
+    const locked = new Set<number>();
+    for (const [bookId, fields] of fieldsMap) {
+      if (fields.includes(field)) locked.add(bookId);
+    }
+    return locked;
+  }
+
   async assertFieldsUnlocked(bookId: number, fields: readonly BookMetadataLockField[]): Promise<void> {
     const lockedFields = await this.getLockedFields(bookId);
     const lockedSet = new Set(lockedFields);

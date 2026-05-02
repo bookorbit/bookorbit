@@ -1,3 +1,6 @@
+import { BadRequestException } from '@nestjs/common';
+
+import type { BookQuery } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { SmartScopeController } from './smart-scope.controller';
 
@@ -20,6 +23,10 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
 }
 
 describe('SmartScopeController', () => {
+  async function expectBadRequest(fn: () => unknown | Promise<unknown>) {
+    await expect(Promise.resolve().then(fn)).rejects.toBeInstanceOf(BadRequestException);
+  }
+
   it('forwards each route handler to SmartScopeService with parsed args', async () => {
     const smartScopeService = {
       findAll: vi.fn().mockResolvedValue([]),
@@ -29,6 +36,7 @@ describe('SmartScopeController', () => {
       update: vi.fn().mockResolvedValue({ id: 1, name: 'Updated' }),
       remove: vi.fn().mockResolvedValue(undefined),
       executeSmartScope: vi.fn().mockResolvedValue({ items: [], total: 0, page: 0, size: 50 }),
+      queryBooks: vi.fn().mockResolvedValue({ items: [], total: 0, page: 0, size: 50 }),
     };
     const controller = new SmartScopeController(smartScopeService as never);
     const user = makeUser();
@@ -40,6 +48,8 @@ describe('SmartScopeController', () => {
     await controller.update(1, { name: 'Updated' } as never, user);
     await controller.remove(1, user);
     await controller.executeSmartScope(1, user, 2, 25);
+    const query: BookQuery = { sort: [{ field: 'title', dir: 'asc' }], pagination: { page: 0, size: 50 } };
+    await controller.queryBooks(1, query, user);
 
     expect(smartScopeService.findAll).toHaveBeenCalledWith(user);
     expect(smartScopeService.findOne).toHaveBeenCalledWith(1, user);
@@ -48,5 +58,27 @@ describe('SmartScopeController', () => {
     expect(smartScopeService.update).toHaveBeenCalledWith(1, { name: 'Updated' }, user);
     expect(smartScopeService.remove).toHaveBeenCalledWith(1, user);
     expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(1, user, 2, 25, undefined);
+    expect(smartScopeService.queryBooks).toHaveBeenCalledWith(1, user, query);
+  });
+
+  it('rejects invalid page and size boundaries for legacy GET queries', async () => {
+    const smartScopeService = {
+      findAll: vi.fn(),
+      findOne: vi.fn(),
+      create: vi.fn(),
+      reorder: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      executeSmartScope: vi.fn(),
+      queryBooks: vi.fn(),
+    };
+    const controller = new SmartScopeController(smartScopeService as never);
+    const user = makeUser();
+
+    await expectBadRequest(() => controller.executeSmartScope(1, user, -1, 50));
+    await expectBadRequest(() => controller.executeSmartScope(1, user, 0, 0));
+    await expectBadRequest(() => controller.executeSmartScope(1, user, 0, 101));
+    await expectBadRequest(() => controller.executeSmartScope(1, user, 2_000_000, 100));
+    expect(smartScopeService.executeSmartScope).not.toHaveBeenCalled();
   });
 });

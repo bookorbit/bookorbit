@@ -12,6 +12,7 @@ import { NarratorModule } from '../narrator/narrator.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { BookReadService } from './book-read.service';
 import { BookQueryBuilder } from './book-query-builder.service';
+import { BookSortBuilder } from './book-sort-builder.service';
 import { BookController } from './book.controller';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
@@ -30,7 +31,7 @@ import { BookService } from './book.service';
     UserBookStatusModule,
   ],
   controllers: [BookController],
-  providers: [BookService, BookRepository, BookReadService, BookQueryBuilder],
+  providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder],
   exports: [BookService, BookReadService, BookQueryBuilder],
 })
 export class BookModule {}

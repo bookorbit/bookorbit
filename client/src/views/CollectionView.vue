@@ -1,43 +1,55 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CheckSquare, FolderOpen, Layers, Pencil, SlidersHorizontal, Square, X } from 'lucide-vue-next'
+import { AlertTriangle, CheckSquare, FileSpreadsheet, FolderOpen, Layers, Pencil, SlidersHorizontal, Square, X } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
+import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
+import TableColumnPanel from '@/features/book/components/TableColumnPanel.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
+import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { useCollectionBooks } from '@/features/collection/composables/useCollectionBooks'
-import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
-import { useBookSelection } from '@/features/book/composables/useBookSelection'
-import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
-import { useBookBulkActions } from '@/features/book/composables/useBookBulkActions'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
-import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
-import type { BookCard } from '@bookorbit/types'
+import { useViewSort } from '@/features/book/composables/useViewSort'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
+import { useBookViewContext } from '@/features/book/composables/useBookViewContext'
+import { useBookTableShell } from '@/features/book/composables/useBookTableShell'
+import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfiniteScrollSentinel'
+import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
+import type { BookCard, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { viewMode } = useDisplaySettings()
+const { viewMode, effectiveViewMode } = useEffectiveViewMode()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 
 const collectionId = computed(() => Number(route.params.id))
+const tableSort = ref<SortSpec[]>([{ field: 'title', dir: 'asc' }])
+const { sortModel: tableSortModel } = useViewSort(tableSort, 'collection', collectionId)
+const { tableDensity } = useDisplaySettings()
+const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('collection', collectionId)
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
 const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId, coverAspectRatio)
-const { collections, fetchCollections, removeBooksFromCollection } = useCollections()
+const { collections, loaded: collectionsLoaded, error: collectionsError, fetchCollections, removeBooksFromCollection } = useCollections()
 const collectionNotFound = ref(false)
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
 const pageTitle = computed(() => {
@@ -64,83 +76,125 @@ const {
   total,
   loading,
   initialized: booksInitialized,
+  error: booksError,
   hasMore,
   load,
-} = useCollectionBooks(collectionId, collapseEnabledRef, debouncedQuery)
-const { setBookContext, registerLoadMore } = useBookNavigation()
-watch(
-  [books, total],
-  ([newBooks, newTotal]) => {
-    setBookContext(
-      newBooks.map((b) => b.id),
-      newTotal,
-    )
-  },
-  { immediate: true },
-)
+  clear,
+} = useCollectionBooks(collectionId, collapseEnabledRef, debouncedQuery, tableSort)
+const collectionLoadError = computed(() => collectionsError.value ?? booksError.value)
+const { setBookContext } = useBookNavigation()
+useBookViewContext(books, total, () => load())
 
-onMounted(() => {
-  registerLoadMore(async () => {
-    await load()
+function handleSaveCurrentView(name: string) {
+  if (!tableRef.value) return
+  saveView({
+    name,
+    layout: tableRef.value.currentLayout,
+    sort: tableSort.value,
   })
-})
-onUnmounted(() => {
-  registerLoadMore(null)
-})
-
-const { selectionMode, selectedIds, selectedCount, enterSelectionMode, exitSelectionMode, toggleBook, rangeSelectTo, isSelected } = useBookSelection()
-
-function handleSelect(id: number, event: MouseEvent) {
-  if (event.shiftKey)
-    rangeSelectTo(
-      id,
-      books.value.map((b) => b.id),
-    )
-  else toggleBook(id)
 }
 
-function toggleSelectionMode() {
-  if (selectionMode.value) exitSelectionMode()
-  else enterSelectionMode()
+function handleApplySavedView(view: SavedView) {
+  tableRef.value?.applyPreset(view.layout, view.sort)
 }
 
-const addToCollectionOpen = ref(false)
-const bulkTagsOpen = ref(false)
-const sendBookOpen = ref(false)
-const editCollectionOpen = ref(false)
-const mobileControlsExpanded = ref(false)
-let removingInProgress = false
+function handleExportTableBackup() {
+  const blob = new Blob(
+    [
+      JSON.stringify(
+        {
+          version: 1,
+          presets: tableRef.value?.allPresets.filter((preset) => !preset.isBuiltIn) ?? [],
+          savedViews: allSavedViews.value,
+        },
+        null,
+        2,
+      ),
+    ],
+    { type: 'application/json' },
+  )
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `collection-table-backup-${collectionId.value ?? 'shared'}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+async function handleImportTableBackup(file: File) {
+  const raw = await file.text()
+  const parsed = JSON.parse(raw) as { presets?: unknown[]; savedViews?: unknown[] }
+  handleImportPresetBackup((parsed.presets ?? []) as never)
+  importViews((parsed.savedViews ?? []) as SavedView[])
+}
+
+function handleTableDensityChange(value: 'compact' | 'comfortable' | 'roomy') {
+  tableDensity.value = value
+}
+
+function handleSelectAllLoaded(checked: boolean) {
+  const ids = books.value.map((book) => book.id)
+  if (checked) selectAll(ids)
+  else deselectAll(ids)
+}
+
 const {
-  pendingId: deleteBookId,
-  deleting: deletingBook,
-  promptDelete,
+  tableRef,
+  handleResetColumns,
+  handleToggleColumn,
+  handleColumnPanelReorder,
+  handleApplyTablePreset,
+  handleSaveTablePreset,
+  handleDeleteTablePreset,
+  handleRenameTablePreset,
+  handleDuplicateTablePreset,
+  handleTogglePresetFavorite,
+  handleImportPresetBackup,
+  selectionMode,
+  selectedIds,
+  selectedCount,
+  enterSelectionMode,
+  exitSelectionMode,
+  selectAll,
+  deselectAll,
+  isSelected,
+  handleSelect,
+  toggleSelectionMode,
+  deleteBookId,
+  deletingBook,
   cancelDelete,
   confirmDelete,
-} = useDeleteBook((id) => {
-  books.value = books.value.filter((b) => b.id !== id)
-})
-const {
   inFlight,
   handleBulkRefreshMetadata,
   handleBulkReExtractCover,
-  handleExport,
+  handleDownloadFiles,
   handleBulkSetStatus,
   handleBulkSetRating,
   handleBulkUpdateTags,
+  handleBulkSetField,
   handleBulkSetMetadataLock,
   handleDeleteSelected,
-} = useBookBulkActions(
-  selectedIds,
-  (ids) => {
-    const deleted = new Set(ids)
-    books.value = books.value.filter((b) => !deleted.has(b.id))
-    exitSelectionMode()
-  },
+  addToCollectionOpen,
+  bulkTagsOpen,
+  sendBookOpen,
+  quickViewBookId,
+  quickViewOpen,
+  handleBookAction,
+  handleTableBookUpdate,
+} = useBookTableShell({
   books,
-)
+  loadFn: () => load(true),
+})
 
-const quickViewBookId = ref<number | null>(null)
-const quickViewOpen = ref(false)
+const metadataExportOpen = ref(false)
+const visibleExportColumns = computed(() => {
+  if (!tableRef.value) return []
+  return tableRef.value.allColumns.filter((column) => column.visible).map((column) => column.id)
+})
+
+const editCollectionOpen = ref(false)
+const mobileControlsExpanded = ref(false)
+let removingInProgress = false
 
 async function handleRemoveFromCollection() {
   if (removingInProgress || !collectionId.value || selectedIds.value.size === 0) return
@@ -185,23 +239,17 @@ function openCollectionEditor() {
   collapseMobileControlsIfNeeded()
 }
 
+function openMetadataExport() {
+  metadataExportOpen.value = true
+  collapseMobileControlsIfNeeded()
+}
+
 function handleEditSelected() {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
   setBookContext(ids, ids.length)
   router.push({ name: 'book-detail', params: { bookId: ids[0] }, query: { tab: 'edit' } })
   exitSelectionMode()
-}
-
-function handleBookAction(book: BookCard, action: 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete') {
-  if (action === 'quick-view') {
-    quickViewBookId.value = book.id
-    quickViewOpen.value = true
-    return
-  }
-  if (action === 'delete') {
-    promptDelete(book.id)
-  }
 }
 
 async function handleToggleCollapse() {
@@ -211,49 +259,37 @@ async function handleToggleCollapse() {
   await setPreference({ collectionId: collectionId.value }, next)
 }
 
-const sentinel = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
-function checkSentinel() {
-  if (!hasMore.value || loading.value) return
-  const el = sentinel.value
-  if (!el) return
-  if (el.getBoundingClientRect().top < window.innerHeight + 300) load()
-}
+const { sentinel } = useInfiniteScrollSentinel({
+  hasMore,
+  loading,
+  loadMore: () => load(),
+})
 
 onMounted(async () => {
+  await retryCollectionLoad()
+})
+
+async function retryCollectionLoad() {
+  collectionNotFound.value = false
+  clear()
   await fetchCollections()
-  if (!collection.value) {
+  if (collectionsError.value) return
+  if (!collection.value && collectionsLoaded.value) {
     collectionNotFound.value = true
     return
   }
-  load(true)
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0]?.isIntersecting && !loading.value && hasMore.value) load()
-    },
-    { rootMargin: '300px' },
-  )
-  if (sentinel.value) observer.observe(sentinel.value)
-  window.addEventListener('resize', checkSentinel, { passive: true })
-})
+  if (collection.value) {
+    await load(true)
+  }
+}
 
-onUnmounted(() => {
-  observer?.disconnect()
-  window.removeEventListener('resize', checkSentinel)
-})
-
-watch(collectionId, () => {
+watch(collectionId, async () => {
   clearSearch()
-  load(true)
+  await retryCollectionLoad()
 })
-watch(debouncedQuery, () => load(true))
-watch(
-  loading,
-  (isLoading) => {
-    if (!isLoading) checkSentinel()
-  },
-  { flush: 'post' },
-)
+watch(debouncedQuery, () => {
+  if (collection.value) void load(true)
+})
 </script>
 
 <template>
@@ -270,7 +306,8 @@ watch(
     :in-collection="true"
     :in-flight="inFlight"
     @send="sendBookOpen = true"
-    @export="handleExport"
+    @download="handleDownloadFiles"
+    @export-metadata="openMetadataExport"
     @add-to-collection="addToCollectionOpen = true"
     @remove-from-collection="handleRemoveFromCollection"
     @edit="handleEditSelected"
@@ -279,9 +316,22 @@ watch(
     @set-status="handleBulkSetStatus"
     @set-rating="handleBulkSetRating"
     @edit-tags="bulkTagsOpen = true"
+    @set-field="handleBulkSetField"
     @lock-metadata="handleBulkSetMetadataLock"
     @delete="handleDeleteSelected"
     @exit="exitSelectionMode"
+  />
+
+  <MetadataExportDialog
+    :open="metadataExportOpen"
+    view-type="collection"
+    :selected-book-ids="[...selectedIds]"
+    :selected-count="selectedCount"
+    :total-count="total"
+    :sort="tableSort"
+    :visible-columns="visibleExportColumns"
+    default-scope="selected"
+    @update:open="metadataExportOpen = $event"
   />
 
   <AddToCollectionSheet
@@ -302,7 +352,7 @@ watch(
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
 
-  <section class="flex min-h-full flex-col">
+  <section class="flex h-full flex-col">
     <ViewHeader
       :title="collection?.name ?? 'Collection'"
       :icon="collection?.icon || 'FolderOpen'"
@@ -336,6 +386,19 @@ watch(
         <Tooltip>
           <TooltipTrigger as-child>
             <button
+              v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+              class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
+              @click="openMetadataExport"
+            >
+              <FileSpreadsheet :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Export metadata</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
               v-if="collection"
               class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               @click="openCollectionEditor"
@@ -360,6 +423,33 @@ watch(
           Collapse series
         </DropdownMenuItem>
       </template>
+      <template v-if="effectiveViewMode === 'table'" #columns>
+        <TableColumnPanel
+          v-if="tableRef"
+          :all-columns="tableRef.allColumns"
+          :all-presets="tableRef.allPresets"
+          :saved-views="allSavedViews"
+          :table-density="tableDensity"
+          @toggle-column="handleToggleColumn"
+          @reorder-columns="handleColumnPanelReorder"
+          @apply-preset="handleApplyTablePreset"
+          @save-preset="handleSaveTablePreset"
+          @delete-preset="handleDeleteTablePreset"
+          @rename-preset="handleRenameTablePreset"
+          @duplicate-preset="handleDuplicateTablePreset"
+          @favorite-preset="handleTogglePresetFavorite"
+          @apply-view="handleApplySavedView"
+          @save-view="handleSaveCurrentView"
+          @delete-view="deleteView"
+          @rename-view="renameView"
+          @duplicate-view="duplicateView"
+          @favorite-view="toggleFavorite"
+          @update:density="handleTableDensityChange"
+          @export-backup="handleExportTableBackup"
+          @import-backup="handleImportTableBackup"
+          @reset="handleResetColumns"
+        />
+      </template>
     </ViewHeader>
 
     <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
@@ -375,6 +465,14 @@ watch(
         >
           <Layers :size="13" />
           <span>{{ collapseEnabledRef ? 'Expanded' : 'Collapse series' }}</span>
+        </button>
+        <button
+          v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+          class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="openMetadataExport"
+        >
+          <FileSpreadsheet :size="13" />
+          <span>Export</span>
         </button>
         <button
           v-if="collection"
@@ -394,19 +492,35 @@ watch(
       </div>
     </section>
 
-    <main class="flex-1 min-h-0">
-      <EntityNotFound v-if="collectionNotFound" entity="Collection" />
+    <main :class="effectiveViewMode === 'table' ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto'">
+      <div v-if="collectionLoadError" class="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertTriangle :size="28" />
+        </div>
+        <p class="text-sm font-medium text-foreground">Could not load this collection</p>
+        <p class="max-w-md text-xs text-muted-foreground">{{ collectionLoadError }}</p>
+        <button
+          class="rounded-md border border-input px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+          @click="retryCollectionLoad"
+        >
+          Retry
+        </button>
+      </div>
 
-      <div v-else-if="booksInitialized && !loading && books.length === 0" class="flex flex-col items-center justify-center py-24 gap-3 text-center">
+      <EntityNotFound v-else-if="collectionNotFound" entity="Collection" />
+
+      <div v-else-if="booksInitialized && !loading && books.length === 0" class="flex flex-col items-center justify-center gap-3 py-24 text-center">
         <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
           <FolderOpen :size="28" class="text-muted-foreground/70" />
         </div>
-        <p class="text-sm font-medium text-foreground">No books in this collection</p>
-        <p class="text-xs text-muted-foreground">Select books from your library and add them here.</p>
+        <p class="text-sm font-medium text-foreground">{{ debouncedQuery ? 'No books match this search' : 'No books in this collection' }}</p>
+        <p class="text-xs text-muted-foreground">
+          {{ debouncedQuery ? 'Try a different search term or clear the search.' : 'Select books from your library and add them here.' }}
+        </p>
       </div>
 
       <VirtualBookGrid
-        v-if="viewMode === 'grid' && books.length > 0"
+        v-if="effectiveViewMode === 'grid' && books.length > 0"
         :books="books"
         :cover-size="coverSize"
         :grid-gap="gridGap"
@@ -416,7 +530,7 @@ watch(
         @select="handleSelect"
       />
 
-      <div v-if="viewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+      <div v-if="effectiveViewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
         <BookListRow
           v-for="book in books"
           :key="book.id"
@@ -428,7 +542,31 @@ watch(
         />
       </div>
 
-      <div ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+      <!-- Table view -->
+      <VirtualBookTable
+        v-if="effectiveViewMode === 'table'"
+        ref="tableRef"
+        :books="books"
+        :in-flight="inFlight"
+        :sort="tableSort"
+        :has-more="hasMore"
+        :loading="loading"
+        :total="total"
+        view-type="collection"
+        :selection-mode="selectionMode"
+        :is-selected="isSelected"
+        :selected-count="selectedCount"
+        :initialized="booksInitialized"
+        @update:sort="tableSortModel = $event"
+        @action="handleBookAction"
+        @select="handleSelect"
+        @update:book="handleTableBookUpdate"
+        @load-more="load"
+        @select-all="handleSelectAllLoaded"
+        @enter-selection="enterSelectionMode"
+      />
+
+      <div v-if="effectiveViewMode !== 'table'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
         <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
         <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
       </div>

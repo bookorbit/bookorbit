@@ -22,7 +22,7 @@ const props = defineProps<{ bookId: number | null; open: boolean }>()
 const { hasPermission } = usePermissions()
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  action: [type: 'edit-metadata' | 'add-to-collection' | 'delete']
+  action: [type: 'add-to-collection' | 'delete']
 }>()
 
 type ProviderLink = {
@@ -429,7 +429,7 @@ function toggleGenres() {
                   <Pencil class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Edit metadata</TooltipContent>
+              <TooltipContent>Open metadata editor</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger as-child>

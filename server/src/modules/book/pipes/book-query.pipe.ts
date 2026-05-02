@@ -1,28 +1,10 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { z } from 'zod';
 
-import type { BookQuery } from '@bookorbit/types';
+import { SORT_FIELDS, type BookQuery } from '@bookorbit/types';
 
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../../common/constants/pagination.constants';
 import { groupRuleSchema } from '../utils/group-rule.validator';
-
-const SORT_FIELDS = [
-  'author',
-  'title',
-  'series',
-  'seriesIndex',
-  'addedAt',
-  'updatedAt',
-  'publishedYear',
-  'pageCount',
-  'rating',
-  'publisher',
-  'fileSize',
-  'readProgress',
-  'lastReadAt',
-  'finishedAt',
-  'random',
-] as const;
 
 const bookQuerySchema = z.object({
   collapseSeries: z.boolean().optional(),
@@ -31,7 +13,7 @@ const bookQuerySchema = z.object({
   sort: z
     .array(
       z.object({
-        field: z.enum(SORT_FIELDS),
+        field: z.enum(SORT_FIELDS as unknown as [string, ...string[]]),
         dir: z.enum(['asc', 'desc']),
       }),
     )

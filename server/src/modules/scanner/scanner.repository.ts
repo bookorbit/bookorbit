@@ -359,6 +359,10 @@ export class ScannerRepository {
           rating: bookMetadata.rating,
           coverSource: bookMetadata.coverSource,
           lockedFields: bookMetadata.lockedFields,
+          subtitle: bookMetadata.subtitle,
+          publisher: bookMetadata.publisher,
+          pageCount: bookMetadata.pageCount,
+          isbn13: bookMetadata.isbn13,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -370,7 +374,7 @@ export class ScannerRepository {
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
       this.db
-        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role, sizeBytes: bookFiles.sizeBytes })
         .from(bookFiles)
         .where(inArray(bookFiles.bookId, bookIds)),
       this.db
