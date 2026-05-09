@@ -149,7 +149,7 @@ export function useTableColumns(viewType: TableViewType) {
   }
 
   function pinColumn(id: ColumnId, side: 'left' | 'right'): void {
-    const currentPins = { ...(layout.value.pinnedColumns ?? {}) }
+    const currentPins = { ...layout.value.pinnedColumns }
     if (currentPins[id] === side) return
     const MAX_PINNED = 3
     const pinnedOnSide = Object.values(currentPins).filter((s) => s === side).length
@@ -159,7 +159,7 @@ export function useTableColumns(viewType: TableViewType) {
   }
 
   function unpinColumn(id: ColumnId): void {
-    const currentPins = { ...(layout.value.pinnedColumns ?? {}) }
+    const currentPins = { ...layout.value.pinnedColumns }
     currentPins[id] = null
     layout.value = { ...layout.value, pinnedColumns: currentPins }
   }
