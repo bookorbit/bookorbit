@@ -74,7 +74,7 @@ describe('LibraryService', () => {
   });
 
   it('findAll uses scoped folder query for non-superusers', async () => {
-    libraryRepo.findAllForUser.mockResolvedValue([{ id: 10, name: 'A' }]);
+    libraryRepo.findAllForUser.mockResolvedValue([{ id: 10, name: 'A', coverAspectRatio: '1/1' }]);
     libraryRepo.findFoldersByLibraryIds.mockResolvedValue([{ id: 1, libraryId: 10, path: '/a', createdAt: new Date() }]);
 
     const result = await service.findAll({ id: 7, isSuperuser: false } as any);
@@ -83,6 +83,7 @@ describe('LibraryService', () => {
     expect(libraryRepo.findFoldersByLibraryIds).toHaveBeenCalledWith([10]);
     expect(libraryRepo.findAllFolders).not.toHaveBeenCalled();
     expect(result[0].folders).toEqual([{ id: 1, path: '/a', createdAt: expect.any(Date) }]);
+    expect(result[0].coverAspectRatio).toBe('1/1');
   });
 
   it('verifyUserAccess bypasses lookup for superusers', async () => {

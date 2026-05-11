@@ -33,6 +33,7 @@ export class LibraryRepository {
         name: libraries.name,
         icon: libraries.icon,
         displayOrder: libraries.displayOrder,
+        coverAspectRatio: libraries.coverAspectRatio,
         scanMode: libraries.scanMode,
         createdAt: libraries.createdAt,
         updatedAt: libraries.updatedAt,
