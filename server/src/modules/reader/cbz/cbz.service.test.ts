@@ -6,6 +6,9 @@ vi.mock('zlib', async () => {
 });
 vi.mock('node-unrar-js', () => ({ createExtractorFromData: vi.fn() }));
 vi.mock('../../../common/sevenzip', () => ({ getSevenZip: vi.fn() }));
+vi.mock('../../../common/comic-format-detect', () => ({
+  detectComicContainerFormat: vi.fn().mockImplementation((_path: string, fmt: string) => Promise.resolve(fmt)),
+}));
 
 import { NotFoundException } from '@nestjs/common';
 import { createReadStream } from 'fs';
@@ -14,6 +17,7 @@ import { createExtractorFromData } from 'node-unrar-js';
 import { createInflateRaw, deflateRawSync } from 'zlib';
 
 import { getSevenZip } from '../../../common/sevenzip';
+import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 import { CbzService } from './cbz.service';
 
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
@@ -21,6 +25,7 @@ const mockCreateReadStream = createReadStream as unknown as MockedFunction<typeo
 const mockCreateInflateRaw = createInflateRaw as unknown as MockedFunction<typeof createInflateRaw>;
 const mockCreateExtractorFromData = createExtractorFromData as MockedFunction<typeof createExtractorFromData>;
 const mockGetSevenZip = getSevenZip as MockedFunction<typeof getSevenZip>;
+const mockDetectComicContainerFormat = detectComicContainerFormat as MockedFunction<typeof detectComicContainerFormat>;
 
 interface ZipEntrySpec {
   name: string;
@@ -80,6 +85,7 @@ describe('CbzService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     service = new CbzService(bookService as any);
+    mockDetectComicContainerFormat.mockImplementation((_path, fmt) => Promise.resolve(fmt));
   });
 
   it('counts visible CBZ images and caches the parsed index', async () => {
@@ -256,5 +262,49 @@ describe('CbzService', () => {
     await expect(service.getPageCount(9, user)).rejects.toThrow(NotFoundException);
     await expect(service.streamPage(9, 0, user)).rejects.toThrow(NotFoundException);
     await expect(service.streamPage(9, 1, user)).rejects.toThrow(NotFoundException);
+  });
+
+  it('reads a CBZ-stored-as-RAR using the CBR reader when magic bytes detect RAR', async () => {
+    mockDetectComicContainerFormat.mockResolvedValue('cbr');
+    const rarBytes = Buffer.from('fake-rar');
+    bookService.verifyFileAccess.mockResolvedValue({ format: 'cbz', absolutePath: '/books/mislabelled.cbz' });
+    mockReadFile.mockResolvedValue(rarBytes as unknown as Awaited<ReturnType<typeof readFile>>);
+    mockCreateExtractorFromData
+      .mockResolvedValueOnce({
+        getFileList: () => ({ fileHeaders: [{ name: '1.jpg', flags: { directory: false } }] }),
+      } as any)
+      .mockResolvedValueOnce({
+        extract: () => ({ files: [{ fileHeader: { flags: { directory: false } }, extraction: Uint8Array.from([1, 2, 3]) }] }),
+      } as any);
+
+    await expect(service.getPageCount(10, user)).resolves.toBe(1);
+    const result = await service.streamPage(10, 0, user);
+    await expect(readStream(result.stream)).resolves.toEqual(Buffer.from([1, 2, 3]));
+    expect(mockDetectComicContainerFormat).toHaveBeenCalledWith('/books/mislabelled.cbz', 'cbz');
+  });
+
+  it('reads a CBR-stored-as-ZIP using the CBZ reader when magic bytes detect ZIP', async () => {
+    mockDetectComicContainerFormat.mockResolvedValue('cbz');
+    const rawStream = { kind: 'raw-stream' };
+    bookService.verifyFileAccess.mockResolvedValue({ format: 'cbr', absolutePath: '/books/mislabelled.cbr' });
+    mockReadFile.mockResolvedValue(
+      buildCbzBuffer([{ name: 'cover.jpg', data: Buffer.from([0xff, 0xd8]) }]) as unknown as Awaited<ReturnType<typeof readFile>>,
+    );
+    mockCreateReadStream.mockReturnValue(rawStream as unknown as ReturnType<typeof createReadStream>);
+
+    await expect(service.getPageCount(11, user)).resolves.toBe(1);
+    const result = await service.streamPage(11, 0, user);
+    expect(result.stream).toBe(rawStream);
+    expect(mockDetectComicContainerFormat).toHaveBeenCalledWith('/books/mislabelled.cbr', 'cbr');
+  });
+
+  it('caches resolved format and calls detectComicContainerFormat only once per fileId', async () => {
+    bookService.verifyFileAccess.mockResolvedValue({ format: 'cbz', absolutePath: '/books/cached.cbz' });
+    mockReadFile.mockResolvedValue(buildCbzBuffer([{ name: '1.jpg', data: Buffer.from([1]) }]) as unknown as Awaited<ReturnType<typeof readFile>>);
+
+    await service.getPageCount(12, user);
+    await service.getPageCount(12, user);
+
+    expect(mockDetectComicContainerFormat).toHaveBeenCalledTimes(1);
   });
 });

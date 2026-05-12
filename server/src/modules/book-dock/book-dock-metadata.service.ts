@@ -9,6 +9,8 @@ import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParsed, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { extractCover, generateThumbnail, imageExt } from '../metadata/lib/cover';
+import { detectComicContainerFormat } from '../../common/comic-format-detect';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookDockRepository } from './book-dock.repository';
 
 @Injectable()
@@ -44,7 +46,7 @@ export class BookDockMetadataService {
       });
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = (err instanceof Error ? err.message : String(err)).replace(/"/g, '\\"');
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
         `[book_dock.extract_metadata] [fail] fileId=${fileId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata extraction failed`,
       );
@@ -118,7 +120,8 @@ export class BookDockMetadataService {
   }
 
   private async fromCbx(absolutePath: string, format: 'cbz' | 'cbr' | 'cb7'): Promise<BookDockMetadata> {
-    const extractor = format === 'cbz' ? extractCbzMetadata : format === 'cbr' ? extractCbrMetadata : extractCb7Metadata;
+    const actualFormat = await detectComicContainerFormat(absolutePath, format);
+    const extractor = actualFormat === 'cbz' ? extractCbzMetadata : actualFormat === 'cbr' ? extractCbrMetadata : extractCb7Metadata;
     const parsed = await extractor(absolutePath);
     if (!parsed) return {};
     return {

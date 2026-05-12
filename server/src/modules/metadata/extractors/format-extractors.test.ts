@@ -51,6 +51,10 @@ vi.mock('./audio.extractor', () => ({
   extractAudioMetadata: vi.fn(),
 }));
 
+vi.mock('../../../common/comic-format-detect', () => ({
+  detectComicContainerFormat: vi.fn().mockImplementation((_path: string, fmt: string) => Promise.resolve(fmt)),
+}));
+
 import { extractEpubCover } from '../lib/cover-epub';
 import { extractFb2Cover } from '../lib/cover-fb2';
 import { extractCbrCover } from '../lib/cover-cbr';
@@ -68,6 +72,7 @@ import { EpubFormatExtractor } from './epub-format.extractor';
 import { Fb2FormatExtractor } from './fb2-format.extractor';
 import { MobiFormatExtractor } from './mobi-format.extractor';
 import { PdfFormatExtractor } from './pdf-format.extractor';
+import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 
 const mockExtractEpubMetadata = extractEpubMetadata as MockedFunction<typeof extractEpubMetadata>;
 const mockExtractEpubCover = extractEpubCover as MockedFunction<typeof extractEpubCover>;
@@ -82,6 +87,7 @@ const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockExtractMobiCover = extractMobiCover as MockedFunction<typeof extractMobiCover>;
 const mockParsePdfFile = parsePdfFile as MockedFunction<typeof parsePdfFile>;
 const mockExtractAudioMetadata = extractAudioMetadata as MockedFunction<typeof extractAudioMetadata>;
+const mockDetectComicContainerFormat = detectComicContainerFormat as MockedFunction<typeof detectComicContainerFormat>;
 
 describe('metadata format extractors', () => {
   beforeEach(() => {
@@ -234,6 +240,30 @@ describe('metadata format extractors', () => {
         comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
       }),
     );
+  });
+
+  it('comic extractor uses CBR reader when a CBZ file is actually a RAR archive', async () => {
+    mockDetectComicContainerFormat.mockResolvedValue('cbr');
+    mockExtractCbrMetadata.mockResolvedValue({
+      title: 'Mislabelled Issue',
+      description: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      genres: [],
+      tags: [],
+    } as any);
+    mockExtractCbrCover.mockResolvedValue(Buffer.from('cover'));
+
+    const result = await new ComicFormatExtractor('cbz').extract('/books/mislabelled.cbz');
+
+    expect(mockDetectComicContainerFormat).toHaveBeenCalledWith('/books/mislabelled.cbz', 'cbz');
+    expect(mockExtractCbrMetadata).toHaveBeenCalledWith('/books/mislabelled.cbz');
+    expect(mockExtractCbzMetadata).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({ title: 'Mislabelled Issue' }));
   });
 
   it('mobi extractor parses year from publishedDate and tolerates missing cover', async () => {

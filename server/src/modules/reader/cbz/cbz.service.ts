@@ -6,6 +6,7 @@ import { createInflateRaw } from 'zlib';
 import { createExtractorFromData, UnrarError } from 'node-unrar-js';
 import { getSevenZip } from '../../../common/sevenzip';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
+import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 
 import type { RequestUser } from '../../../common/types/request-user';
 import { BookService } from '../../book/book.service';
@@ -124,11 +125,26 @@ export class CbzService {
   private readonly rarCache = new Map<number, RarCache>();
   // CB7: sorted page names per fileId (extracted files live in WASM VFS)
   private readonly sevenZPages = new Map<number, string[]>();
+  // Resolved actual format per fileId (magic bytes override stored extension)
+  private readonly resolvedFormat = new Map<number, string>();
 
   constructor(private readonly bookService: BookService) {}
 
   private async getFile(fileId: number, user: RequestUser) {
     return this.bookService.verifyFileAccess(fileId, user);
+  }
+
+  private async resolveFormat(fileId: number, absolutePath: string, storedFmt: string | null): Promise<string> {
+    if (!this.resolvedFormat.has(fileId)) {
+      let resolved: string;
+      if (storedFmt === 'cbz' || storedFmt === 'cbr' || storedFmt === 'cb7') {
+        resolved = await detectComicContainerFormat(absolutePath, storedFmt);
+      } else {
+        resolved = storedFmt ?? '';
+      }
+      this.resolvedFormat.set(fileId, resolved);
+    }
+    return this.resolvedFormat.get(fileId)!;
   }
 
   // ── CBZ ──────────────────────────────────────────────────────────────────────
@@ -230,7 +246,7 @@ export class CbzService {
 
   async getPageCount(fileId: number, user: RequestUser): Promise<number> {
     const file = await this.getFile(fileId, user);
-    const fmt = file.format ?? '';
+    const fmt = await this.resolveFormat(fileId, file.absolutePath, file.format);
 
     if (fmt === 'cbz') return (await this.getCbzIndex(fileId, file.absolutePath)).length;
     if (fmt === 'cbr') return (await this.getRarCache(fileId, file.absolutePath)).pages.length;
@@ -241,7 +257,7 @@ export class CbzService {
 
   async streamPage(fileId: number, pageIndex: number, user: RequestUser): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
     const file = await this.getFile(fileId, user);
-    const fmt = file.format ?? '';
+    const fmt = await this.resolveFormat(fileId, file.absolutePath, file.format);
 
     if (fmt === 'cbz') {
       const entries = await this.getCbzIndex(fileId, file.absolutePath);

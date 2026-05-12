@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 
 import { bookCoverDirPath } from '../../../common/book-cover-storage';
+import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 import { extractCb7Cover } from './cover-cb7';
 import { extractCbrCover } from './cover-cbr';
 import { extractCbzCover } from './cover-cbz';
@@ -51,9 +52,10 @@ export async function extractCover(absolutePath: string, format: string): Promis
     case 'azw':
       return extractMobiCover(absolutePath);
     case 'cbz':
-      return extractCbzCover(absolutePath);
-    case 'cbr':
-      return extractCbrCover(absolutePath);
+    case 'cbr': {
+      const actual = await detectComicContainerFormat(absolutePath, format.toLowerCase() as 'cbz' | 'cbr');
+      return actual === 'cbr' ? extractCbrCover(absolutePath) : extractCbzCover(absolutePath);
+    }
     case 'cb7':
       return extractCb7Cover(absolutePath);
     case 'fb2':

@@ -5,6 +5,9 @@ vi.mock('./cover-cb7', () => ({ extractCb7Cover: vi.fn() }));
 vi.mock('./cover-fb2', () => ({ extractFb2Cover: vi.fn() }));
 vi.mock('./mobi-parser', () => ({ extractMobiCover: vi.fn() }));
 vi.mock('./pdf-cover', () => ({ extractPdfCover: vi.fn() }));
+vi.mock('../../../common/comic-format-detect', () => ({
+  detectComicContainerFormat: vi.fn().mockImplementation((_: string, fmt: string) => Promise.resolve(fmt)),
+}));
 vi.mock('sharp', () => {
   const chain = {
     resize: vi.fn(),
@@ -27,6 +30,7 @@ import { extractFb2Cover } from './cover-fb2';
 import { extractMobiCover } from './mobi-parser';
 import { extractPdfCover } from './pdf-cover';
 import { coverDirPath, extractCover, generateThumbnail, imageExt } from './cover';
+import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 const mockEpub = extractEpubCover as MockedFunction<typeof extractEpubCover>;
 const mockMobi = extractMobiCover as MockedFunction<typeof extractMobiCover>;
 const mockCbz = extractCbzCover as MockedFunction<typeof extractCbzCover>;
@@ -34,6 +38,7 @@ const mockCbr = extractCbrCover as MockedFunction<typeof extractCbrCover>;
 const mockCb7 = extractCb7Cover as MockedFunction<typeof extractCb7Cover>;
 const mockFb2 = extractFb2Cover as MockedFunction<typeof extractFb2Cover>;
 const mockPdf = extractPdfCover as MockedFunction<typeof extractPdfCover>;
+const mockDetect = detectComicContainerFormat as MockedFunction<typeof detectComicContainerFormat>;
 
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
 
@@ -47,6 +52,8 @@ beforeEach(() => {
   mockCb7.mockResolvedValue(null);
   mockFb2.mockResolvedValue(null);
   mockPdf.mockResolvedValue(null);
+  // Default: detection confirms the stored format (no mislabelling)
+  mockDetect.mockImplementation((_path, fmt) => Promise.resolve(fmt));
 });
 
 // ── imageExt ──────────────────────────────────────────────────────────────────
@@ -180,5 +187,25 @@ describe('extractCover', () => {
     mockEpub.mockResolvedValue(JPEG_BYTES);
     await extractCover('/book.epub', 'EPUB');
     expect(mockEpub).toHaveBeenCalled();
+  });
+
+  it('routes cbz-stored-as-rar to extractCbrCover', async () => {
+    mockDetect.mockResolvedValue('cbr');
+    mockCbr.mockResolvedValue(JPEG_BYTES);
+    const result = await extractCover('/mislabelled.cbz', 'cbz');
+    expect(mockDetect).toHaveBeenCalledWith('/mislabelled.cbz', 'cbz');
+    expect(mockCbr).toHaveBeenCalledWith('/mislabelled.cbz');
+    expect(mockCbz).not.toHaveBeenCalled();
+    expect(result).toBe(JPEG_BYTES);
+  });
+
+  it('routes cbr-stored-as-zip to extractCbzCover', async () => {
+    mockDetect.mockResolvedValue('cbz');
+    mockCbz.mockResolvedValue(JPEG_BYTES);
+    const result = await extractCover('/mislabelled.cbr', 'cbr');
+    expect(mockDetect).toHaveBeenCalledWith('/mislabelled.cbr', 'cbr');
+    expect(mockCbz).toHaveBeenCalledWith('/mislabelled.cbr');
+    expect(mockCbr).not.toHaveBeenCalled();
+    expect(result).toBe(JPEG_BYTES);
   });
 });
