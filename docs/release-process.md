@@ -88,8 +88,8 @@ If all commits since the last release are non-releasable types (`chore`, `docs`,
 
 The `release.yml` workflow publishes Docker images after a successful release:
 
-- `ghcr.io/neonsolstice/bookorbit:<X.Y.Z>` - version-specific tag
-- `ghcr.io/neonsolstice/bookorbit:latest` - latest stable release
+- `ghcr.io/bookorbit/bookorbit:<X.Y.Z>` - version-specific tag
+- `ghcr.io/bookorbit/bookorbit:latest` - latest stable release
 
 Images are scanned with Trivy before push. If critical or high vulnerabilities are found, the push is blocked.
 
@@ -107,7 +107,7 @@ To deploy a previous version:
 
 ```bash
 # In your production docker-compose.yml or .env, set:
-APP_IMAGE=ghcr.io/neonsolstice/bookorbit:X.Y.Z
+APP_IMAGE=ghcr.io/bookorbit/bookorbit:X.Y.Z
 ```
 
 Replace `X.Y.Z` with the version you want to roll back to, then redeploy:

@@ -1,381 +1,95 @@
+<div align="center">
+
+<!-- Replace this with your logo once available -->
+<img src="docs/logo.png" alt="BookOrbit" width="120" height="120" />
+
 # BookOrbit
 
-[![CI](https://github.com/neonsolstice/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/neonsolstice/bookorbit/actions/workflows/ci.yml)
-[![Release](https://github.com/neonsolstice/bookorbit/actions/workflows/release.yml/badge.svg)](https://github.com/neonsolstice/bookorbit/actions/workflows/release.yml)
+A self-hosted library management and reading platform for epub, pdf, audiobooks, and comics.
 
-A self-hostable book and library management app with Kobo device support. Organize your epub, pdf, and cbz collections, track reading progress, and sync with your Kobo.
+[![CI](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml)
+[![Release](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/bookorbit/bookorbit?label=latest)](https://github.com/bookorbit/bookorbit/releases)
+[![Commits/month](https://img.shields.io/github/commit-activity/m/bookorbit/bookorbit?label=commits%2Fmonth)](https://github.com/bookorbit/bookorbit/commits/main)
+[![Stars](https://img.shields.io/github/stars/bookorbit/bookorbit?style=flat)](https://github.com/bookorbit/bookorbit/stargazers)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Container image](https://img.shields.io/badge/ghcr.io-bookorbit%2Fbookorbit-informational?logo=docker&logoColor=white)](https://github.com/bookorbit/bookorbit/pkgs/container/bookorbit)
 
----
+**[Documentation](https://bookorbit.app) · [Live Demo](https://demo.bookorbit.app) · [Report a Bug](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml) · [Request a Feature](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml)**
 
-## Quick Start
-
-### Prerequisites
-
-| Tool    | Version | Install                                                      |
-| ------- | ------- | ------------------------------------------------------------ |
-| Node.js | >= 24   | [nodejs.org](https://nodejs.org)                             |
-| pnpm    | >= 9    | `corepack enable && corepack prepare pnpm@latest --activate` |
-| Docker  | latest  | [docker.com](https://www.docker.com/products/docker-desktop) |
-
-### Setup
-
-```bash
-git clone <repo-url> bookorbit
-cd bookorbit
-pnpm setup
-```
-
-Docker is only used for PostgreSQL. The server and client run directly on your machine.
-
-### Start developing
-
-```bash
-pnpm dev
-```
-
-This starts the NestJS server and Vue client concurrently:
-
-- **Client:** http://localhost:5173
-- **API:** http://localhost:3000/api
-
-If you prefer separate terminals (cleaner logs):
-
-```bash
-# Terminal 1
-cd server && pnpm start:dev
-
-# Terminal 2
-cd client && pnpm dev
-```
-
-Both must be running. The client proxies all `/api` and `/socket.io` requests to the server, so API calls will fail if only the client is running.
-
-### First steps after setup
-
-1. **Complete initial setup** - you'll be redirected to `/setup` to create the first administrator account (username, password, name, and email).
-2. **Create a library** - open Settings (gear icon) > Libraries > Create Library. Add a folder path pointing to some books on your machine, e.g. any directory containing `.epub`, `.pdf`, or `.cbz` files.
-3. **Scan** - the library scans automatically after creation. You should see books appear on the home page once the scan completes.
-
-> **Where does data go?** `APP_DATA_PATH` in `server/.env` defaults to `../local/data` (resolves to `<project-root>/local/data`). This is the app's data directory where extracted cover images and thumbnails are stored (`local/data/covers/`). It is **not** where your book files live - those paths are configured per-library in the UI. The `local/` folder is gitignored.
+</div>
 
 ---
 
-## Project Structure
-
-```
-bookorbit/
-├── client/             Vue 3 frontend (Vite + Tailwind CSS v4)
-├── server/             NestJS 11 backend (Fastify + Drizzle ORM)
-├── packages/
-│   └── types/          Shared TypeScript types (@bookorbit/types)
-├── docker/
-│   └── postgres/       Postgres init scripts (extensions)
-├── local/              Local dev data (covers, docs) - gitignored
-├── docker-compose.dev.yml  Dev: runs Postgres only (app runs natively)
-├── docker-compose.yml      Prod: app + Postgres
-├── .env.example            Template env file for production compose
-└── Dockerfile              Production multi-stage build
-```
-
-### Monorepo layout
-
-This is a **pnpm workspace**. The three packages are:
-
-- **`server/`** - NestJS API. Modules live in `src/modules/`, one folder per feature. Database schema is in `src/db/schema/`.
-- **`client/`** - Vue 3 SPA. Feature code lives in `src/features/`, shared components in `src/components/ui/`.
-- **`packages/types/`** - Shared types imported as `@bookorbit/types` by both server and client. Add any type that crosses the API boundary here.
+![BookOrbit dashboard showing reading stats, widgets, and book shelves](https://bookorbit.app/images/home/dashboard-overview.webp)
 
 ---
 
-## Common Commands
+## About
 
-All commands run from the **repo root** unless noted otherwise.
+BookOrbit is a self-hosted book and library manager. Deploy it once on your own server and get a full reading platform: built-in readers, rich metadata, reading statistics, device sync, and multi-user support - all running on your hardware.
 
-### Everyday workflow
-
-| Command              | Description                                         |
-| -------------------- | --------------------------------------------------- |
-| `pnpm setup`         | One-time bootstrap                                  |
-| `pnpm dev`           | Daily development                                   |
-| `pnpm verify`        | Default local checks before push                    |
-| `pnpm verify:fast`   | Faster local checks while coding (lint + typecheck) |
-| `pnpm verify:strict` | Aspirational strict gate (format + full typecheck)  |
-
-### Development
-
-| Command                       | Description                          |
-| ----------------------------- | ------------------------------------ |
-| `pnpm dev`                    | Start server + client (concurrently) |
-| `cd server && pnpm start:dev` | Server only (watch mode)             |
-| `cd client && pnpm dev`       | Client only (Vite dev server)        |
-
-### Testing
-
-| Command                               | Description                  |
-| ------------------------------------- | ---------------------------- |
-| `pnpm test`                           | Server + client unit tests   |
-| `pnpm test:server`                    | Server unit tests            |
-| `pnpm test:client`                    | Client unit tests            |
-| `pnpm run e2e:run -- guard-mechanics` | Server smoke e2e             |
-| `pnpm coverage`                       | Coverage for server + client |
-| `pnpm --filter server test:e2e`       | Server e2e only              |
-
-### Database
-
-| Command                                   | Description                              |
-| ----------------------------------------- | ---------------------------------------- |
-| `pnpm db:up`                              | Start local Postgres                     |
-| `pnpm db:migrate`                         | Apply pending migrations                 |
-| `pnpm db:seed`                            | Seed baseline app data                   |
-| `pnpm db:reset`                           | Reset schema, migrate, and seed          |
-| `pnpm --filter server db:generate <name>` | Generate a migration from schema changes |
-| `pnpm --filter server db:studio`          | Open Drizzle Studio (DB browser)         |
-
-### Production operations
-
-| Command          | Description                           |
-| ---------------- | ------------------------------------- |
-| `pnpm prod:up`   | Start/update production compose stack |
-| `pnpm prod:down` | Stop production compose stack         |
-
-### Linting & formatting
-
-| Command               | Description                        |
-| --------------------- | ---------------------------------- |
-| `pnpm format:check`   | Check formatting                   |
-| `pnpm format`         | Auto-format source files           |
-| `pnpm lint:check`     | Non-mutating lint checks           |
-| `pnpm lint:fix`       | Auto-fix lint issues               |
-| `pnpm typecheck`      | Typecheck server + client          |
-| `pnpm typecheck:full` | Typecheck server + client (strict) |
+No subscription. No third-party account. No data leaving your server.
 
 ---
 
-## Development Workflow
+## Live Demo
 
-Once `pnpm dev` is running, here's how the feedback loop works for each type of change:
+Try BookOrbit without installing anything. The demo is pre-loaded with a sample library and resets automatically.
 
-### Frontend (`client/`)
-
-Save a file → Vite HMR hot-swaps the module → browser updates instantly. No restart needed.
-
-### Backend (`server/`)
-
-Save a file → NestJS watch mode (SWC) recompiles and restarts the server automatically. Takes about a second.
-
-### Shared types (`packages/types/`)
-
-The types package points directly at `.ts` source files. Edit a type → both client and server pick it up on their next rebuild cycle. No build step needed.
-
-### Database schema
-
-Schema changes are the one thing that isn't automatic. See [Database Workflow](#database-workflow) for the generate + migrate steps.
-
-### Environment variables
-
-The `start:dev` script reads `server/.env` once at startup. If you change a value in `.env`, you must restart `pnpm dev` for it to take effect.
-
-### After `git pull`
-
-If other people have pushed changes, you may need to sync dependencies and migrations:
-
-```bash
-pnpm install                      # pick up lockfile changes
-pnpm db:migrate                   # apply any new migrations
-```
-
-### Adding a dependency
-
-Always install into the correct workspace, not the root:
-
-```bash
-cd server && pnpm add <pkg>       # backend dependency
-cd client && pnpm add <pkg>       # frontend dependency
-```
-
-### Adding a new feature
-
-The fastest way to learn the patterns is to follow an existing module:
-
-- **Backend:** Look at `server/src/modules/bookmark/` for a minimal example (controller, service, repository, DTO, module). Copy it, rename, and adapt.
-- **Frontend:** Look at `client/src/features/collection/` for a full feature (composables for state/API, components for UI).
-- **Shared types:** If the feature adds API request/response shapes, add them in `packages/types/src/` and import via `@bookorbit/types`.
+**[Open demo](https://demo.bookorbit.app/magic?token=2d92cb900e184cf0eb8b11f72cffc6011673d1016e1b300d750eb3d76abc1572)** - no account needed, click the link to log in automatically.
 
 ---
 
-## Environment Variables
+## Features
 
-Server environment is configured in `server/.env` for local development. Production compose uses the repo-root `.env` created from `.env.example`.
-
-| Variable                        | Default                                                   | Description                                                       |
-| ------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
-| `DATABASE_URL`                  | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` | PostgreSQL connection string                                      |
-| `PORT`                          | `3000`                                                    | Server port                                                       |
-| `NODE_ENV`                      | `development`                                             | Environment mode                                                  |
-| `JWT_SECRET`                    | `change-me-in-production`                                 | JWT signing secret                                                |
-| `SETUP_BOOTSTRAP_TOKEN`         | (empty)                                                   | Required in production for initial `/api/v1/auth/setup`           |
-| `APP_DATA_PATH`                 | `../local/data`                                           | App data directory for cover images (not where books live)        |
-| `APP_URL`                       | `http://localhost:5173`                                   | Client URL (used in emails)                                       |
-| `CSP_ALLOW_CLOUDFLARE_INSIGHTS` | `false`                                                   | Allow Cloudflare Web Analytics beacon script/connect hosts in CSP |
-| `NODE_MAX_OLD_SPACE_SIZE`       | `2048`                                                    | Docker Node.js heap limit in MB                                   |
-
-## Production Deploy
-
-Production uses the root compose file and env file:
-
-- Compose: `docker-compose.yml`
-- Env file: `.env` (from `.env.example`)
-- Image source: CI-published images (`latest`, sha tags, or digests)
-
-Quick start:
-
-```bash
-cp .env.example .env
-# edit .env and set secrets, APP_URL, BOOKS_HOST_PATH, and optionally APP_IMAGE
-pnpm prod:up
-```
-
-For production compose, `BOOKS_HOST_PATH` is the only host folder most users need to choose. It is mounted as `/books` in the container, and library paths created in the UI should point under `/books`.
-
-Generated app data and PostgreSQL live in explicit folders beside the compose file:
-
-```text
-./data/app       generated covers, author images, staging files, and Book Dock uploads
-./data/postgres  PostgreSQL data
-```
-
-The container starts as root only long enough to create/chown app-managed data paths, then runs the Node process as `PUID:PGID`.
-
-On NAS installs, set `PUID` and `PGID` to the user/group that should own app-generated files:
-
-```bash
-id your-media-user
-```
-
-Do not add a compose `user:` override unless your platform requires it; that bypasses the startup permission repair.
-
-The app container defaults Node's JavaScript heap limit to 2048 MB. Set `NODE_MAX_OLD_SPACE_SIZE` in `.env` if the host needs a lower or higher limit.
+- **4 built-in readers** - eBook (EPUB, KEPUB, MOBI, AZW3, FB2), PDF, Comics (CBZ, CBR, CB7), Audiobook (M4B, MP3, FLAC, and more)
+- **Multiple libraries** with independent scan rules, format priorities, and metadata configuration
+- **Collections and Smart Scopes** - curated lists and saved filters that live in your sidebar
+- **Metadata from 9 providers** - Google Books, Goodreads, Hardcover, Amazon, Audible, ComicVine, and more; with field-level rules and confidence scoring
+- **Reading statistics** - daily time, heatmap, streaks, pace, goal tracking, and library health
+- **Kobo sync** - sideload books and sync reading position over the local network
+- **OPDS, email delivery, and Book Dock** for getting books in from anywhere
+- **Multi-user** with per-user permissions, isolated reading data, and OIDC/SSO support
 
 ---
 
-## Database Workflow
+## Setup
 
-The database schema is defined in `server/src/db/schema/` using Drizzle ORM. Each domain has its own schema file (e.g. `books.ts`, `libraries.ts`, `auth.ts`).
-
-**Making schema changes:**
-
-1. Edit the relevant file in `server/src/db/schema/`
-2. Generate a migration: `pnpm --filter server db:generate describe_your_change`
-3. Apply it: `pnpm db:migrate`
-
-Never hand-write migration SQL. Always generate from schema diffs.
-
-### Resetting the database from scratch
-
-```bash
-pnpm db:reset
-```
+See the **[Installation guide](https://bookorbit.app/installation.html)** for Docker setup, NAS installs, environment variables, and upgrade instructions.
 
 ---
 
-## Architecture Overview
+## Documentation
 
-```
-┌──────────────┐       ┌──────────────────────┐       ┌────────────┐
-│  Vue 3 SPA   │──────>│  NestJS API (/api)   │──────>│ PostgreSQL │
-│  port 5173   │<──────│  port 3000           │<──────│ port 5432  │
-└──────────────┘       └──────────────────────┘       └────────────┘
-       │                        │
-       │  WebSocket             │  Drizzle ORM
-       │  (socket.io)           │  (schema in src/db/schema/)
-       └────────────────────────┘
-```
+Full documentation is at **[bookorbit.app](https://bookorbit.app)**.
 
-- **Backend:** NestJS 11 on Fastify. Global prefix `/api`. Auth via JWT (access + refresh tokens in httpOnly cookies). RBAC with permissions system.
-- **Frontend:** Vue 3 Composition API (`<script setup>`). Tailwind CSS v4 for styling. Feature-local state in composables, not global stores.
-- **Database:** PostgreSQL 16 via Drizzle ORM. Migrations generated by Drizzle Kit.
-- **Shared types:** `@bookorbit/types` package ensures API contracts stay in sync.
+> [What is BookOrbit?](https://bookorbit.app/what-is-bookorbit.html) &nbsp;·&nbsp; [Installation](https://bookorbit.app/installation.html) &nbsp;·&nbsp; [Creating a Library](https://bookorbit.app/creating-a-library.html) &nbsp;·&nbsp; [Metadata](https://bookorbit.app/metadata.html) &nbsp;·&nbsp; [Kobo Sync](https://bookorbit.app/kobo.html) &nbsp;·&nbsp; [Users & Permissions](https://bookorbit.app/users.html)
 
 ---
 
-## Troubleshooting
+## Developing
 
-### Port 5432 already in use
-
-Another PostgreSQL instance is running. Either stop it or change the port mapping in `docker-compose.yml`:
-
-```yaml
-ports:
-  - "5433:5432" # use 5433 on host
-```
-
-Then update `DATABASE_URL` in `server/.env` to use port `5433`.
-
-### Port 3000 or 5173 already in use
-
-Kill the process occupying the port:
-
-```bash
-lsof -ti:3000 | xargs kill -9   # server port
-lsof -ti:5173 | xargs kill -9   # client port
-```
-
-### `pnpm db:migrate` does nothing after a schema change
-
-You need to generate a migration first:
-
-```bash
-cd server && pnpm db:generate describe_your_change
-cd server && pnpm db:migrate
-```
-
-### `pnpm db:generate` fails with a connection error
-
-Drizzle Kit auto-loads `server/.env` for the `DATABASE_URL`. If the file is missing or the URL is wrong, generation fails. Verify `server/.env` exists and that PostgreSQL is running (`docker compose ps`).
-
-The fallback URL in `drizzle.config.ts` uses `postgres:5432` (the Docker service hostname), which only works inside Docker, not from the host machine.
-
-### Docker container won't start
-
-```bash
-docker compose down
-docker compose up -d --wait
-```
-
-If the volume is corrupted, wipe it (destroys all data):
-
-```bash
-docker compose down -v
-docker compose up -d --wait
-cd server && pnpm db:migrate
-```
-
-### `EACCES: permission denied, mkdir '/data/covers'`
-
-The default compose uses `./data/app` for generated app data. The container repairs `/data` ownership during startup, then runs as `PUID:PGID`.
-
-If this still happens, make sure the folder mounted at `/data` is writable by `PUID:PGID`. Avoid adding `user:` to the app service, because startup cannot repair ownership when it is forced to start as a non-root user.
-
-### `Cannot find module '@bookorbit/types'`
-
-The shared types package needs to be built or the workspace link is broken:
-
-```bash
-pnpm install
-```
-
-### CORS errors in the browser
-
-Make sure you're accessing the client at `http://localhost:5173` (not port 3000). The Vite dev server proxies API requests to the backend automatically.
+See **[DEVELOPMENT.md](DEVELOPMENT.md)** for local setup, architecture, project structure, database workflow, and commands. See **[TESTING.md](TESTING.md)** for test suites, coverage, and E2E details.
 
 ---
 
-## Further Reading
+## Contributing
 
-| Doc                                                  | What it covers                                               |
-| ---------------------------------------------------- | ------------------------------------------------------------ |
-| [`docs/production.md`](docs/production.md)           | Production compose deployment, backups, restore testing      |
-| [`docs/release-process.md`](docs/release-process.md) | Release workflow, PR title format, Docker publish, rollback  |
-| [`server/README.md`](server/README.md)               | Backend module map, DB commands, NestJS conventions          |
-| [`client/README.md`](client/README.md)               | Frontend project layout, IDE setup, Vue/Tailwind conventions |
-| [`packages/types/`](packages/types/)                 | Shared type definitions between server and client            |
+Contributions are welcome. For the full contribution workflow (branch naming, test expectations, PR checklist, commit format), see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+To report a security vulnerability, use [GitHub's private vulnerability reporting](https://github.com/bookorbit/bookorbit/security/advisories/new) - do not open a public issue.
+
+---
+
+## Support
+
+- **Questions and discussion:** [GitHub Discussions](https://github.com/bookorbit/bookorbit/discussions)
+- **Bug reports:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml)
+- **Feature requests:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml)
+
+---
+
+## License
+
+BookOrbit is licensed under the **[GNU Affero General Public License v3.0](LICENSE)**.

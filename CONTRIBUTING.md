@@ -65,7 +65,7 @@ This step prevents wasted effort on changes that conflict with the project direc
 ```bash
 git clone https://github.com/<your-username>/bookorbit.git
 cd bookorbit
-git remote add upstream https://github.com/neonsolstice/bookorbit.git
+git remote add upstream https://github.com/bookorbit/bookorbit.git
 ```
 
 > **Trusted contributors** with direct push access can skip the fork and work on branches in the main repository. The rest of this guide assumes the fork workflow.
