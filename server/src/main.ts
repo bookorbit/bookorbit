@@ -107,7 +107,7 @@ async function bootstrap() {
         fontSrc: ["'self'", 'data:', 'blob:'],
         objectSrc: ["'none'"],
         frameSrc: ["'self'", 'blob:'],
-        frameAncestors: ["'none'"],
+        frameAncestors: ["'self'"],
         upgradeInsecureRequests: null,
       },
     },

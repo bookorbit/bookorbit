@@ -7,6 +7,7 @@ import { StartLiveRunDto } from './dto/start-live-run.dto';
 import { buildPathMappingsHash, buildPlanHash, buildProfileHash, buildSourceSnapshotHash } from './core/plan-hash';
 import { asInteger, asRecord, asString } from './core/coerce';
 import {
+  type ApiMigrationPlanArtifact,
   type ApiMigrationRun,
   sanitizeSourceForApi,
   sanitizeProfileForApi,
@@ -97,7 +98,7 @@ export class MigrationService {
       summary,
       createdByUserId: userId,
     });
-    return sanitizePlanArtifactForApi(artifact);
+    return sanitizePlanArtifactWithDuplicateCandidates(artifact);
   }
 
   async resolveDuplicateMatches(artifactId: number, dto: ResolveDuplicateMatchesDto) {
@@ -186,7 +187,7 @@ export class MigrationService {
     });
 
     this.logger.log(`[plan.resolve_duplicates] [end] artifactId=${artifactId} resolved=${resolved.size} - duplicates resolved`);
-    return sanitizePlanArtifactForApi(updated);
+    return sanitizePlanArtifactWithDuplicateCandidates(updated);
   }
 
   async startLiveRun(dto: StartLiveRunDto, userId: number) {
@@ -342,7 +343,7 @@ export class MigrationService {
         ? {
             source: sanitizeSourceForApi(this.withDecryptedConfig(activeBundle.source)),
             profile: activeBundle.profile ? sanitizeProfileForApi(activeBundle.profile) : null,
-            plan: activeBundle.plan ? sanitizePlanArtifactForApi(activeBundle.plan) : null,
+            plan: activeBundle.plan ? sanitizePlanArtifactWithDuplicateCandidates(activeBundle.plan) : null,
             run: activeBundle.run ? sanitizeRunForApi(activeBundle.run) : null,
           }
         : null,
@@ -392,6 +393,74 @@ function normalizeDuplicateMatches(duplicate: {
     targetBookId: duplicate.targetBookId,
     strategy: duplicate.strategies[index] ?? duplicate.strategies[0] ?? 'title_author',
   }));
+}
+
+function sanitizePlanArtifactWithDuplicateCandidates(artifact: MigrationPlanArtifact): ApiMigrationPlanArtifact {
+  const sourceData = artifact.sourceData as SourceExportData | null;
+  const hydratedPlan = hydrateDuplicateSourceCandidates(artifact.plan, sourceData);
+  return sanitizePlanArtifactForApi({ ...artifact, plan: hydratedPlan });
+}
+
+function hydrateDuplicateSourceCandidates(planRaw: unknown, sourceData: SourceExportData | null): unknown {
+  const plan = asRecord(planRaw);
+  const duplicateBookMatches = Array.isArray(plan.duplicateBookMatches) ? plan.duplicateBookMatches : [];
+  if (duplicateBookMatches.length === 0) return planRaw;
+
+  const sourceBooksById = new Map(sourceData?.books.map((book) => [book.sourceBookId, book]) ?? []);
+  if (sourceBooksById.size === 0) return planRaw;
+
+  let changed = false;
+  const hydratedDuplicates = duplicateBookMatches.map((item) => {
+    const row = asRecord(item);
+    const sourceBookIds = Array.isArray(row.sourceBookIds) ? row.sourceBookIds.filter((id): id is string => typeof id === 'string') : [];
+    if (sourceBookIds.length === 0) return item;
+
+    const existingCandidates = Array.isArray(row.sourceCandidates) ? row.sourceCandidates : [];
+    if (existingCandidates.length > 0) {
+      const hasMetadata = existingCandidates.some((candidate) => {
+        const value = asRecord(candidate);
+        return typeof value.title === 'string' || typeof value.author === 'string' || typeof value.filePath === 'string';
+      });
+      if (hasMetadata) return item;
+    }
+
+    const duplicateMatches = Array.isArray(row.matches) ? row.matches : [];
+    const strategyBySourceBookId = new Map<string, MatchStrategy>();
+    for (const duplicateMatch of duplicateMatches) {
+      const match = asRecord(duplicateMatch);
+      const sourceBookId = asString(match.sourceBookId);
+      const strategy = asString(match.strategy);
+      if (sourceBookId && (strategy === 'isbn' || strategy === 'file_hash' || strategy === 'path_mapping' || strategy === 'title_author')) {
+        strategyBySourceBookId.set(sourceBookId, strategy);
+      }
+    }
+
+    const strategies = Array.isArray(row.strategies) ? row.strategies.map((value) => asString(value)) : [];
+    const sourceCandidates = sourceBookIds.map((sourceBookId, index) => {
+      const sourceBook = sourceBooksById.get(sourceBookId);
+      const strategyFromMatch = strategyBySourceBookId.get(sourceBookId);
+      const strategyFromList = strategies[index] ?? strategies[0] ?? null;
+      const strategy = strategyFromMatch ?? toMatchStrategy(strategyFromList) ?? 'title_author';
+      return {
+        sourceBookId,
+        title: sourceBook?.title ?? null,
+        author: sourceBook?.author ?? null,
+        filePath: sourceBook?.filePath ?? null,
+        strategy,
+      };
+    });
+
+    changed = true;
+    return { ...row, sourceCandidates };
+  });
+
+  if (!changed) return planRaw;
+  return { ...plan, duplicateBookMatches: hydratedDuplicates };
+}
+
+function toMatchStrategy(value: string | null): MatchStrategy | null {
+  if (value === 'isbn' || value === 'file_hash' || value === 'path_mapping' || value === 'title_author') return value;
+  return null;
 }
 
 function parsePlanUserMappings(raw: unknown): Map<string, number> {

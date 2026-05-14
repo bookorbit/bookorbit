@@ -2,7 +2,7 @@ import { parseBookloreConnectionConfig } from '../adapters/booklore/booklore-con
 import { asRecord } from './coerce';
 
 export function parseConnectionConfig(type: string, raw: unknown): unknown {
-  if (type === 'booklore') {
+  if (type === 'booklore' || type === 'grimmory') {
     return parseBookloreConnectionConfig(raw);
   }
   return asRecord(raw);

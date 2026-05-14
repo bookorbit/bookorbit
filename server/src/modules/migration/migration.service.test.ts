@@ -908,5 +908,1020 @@ describe('MigrationService', () => {
         hasActiveRun: false,
       });
     });
+
+    it('resolves active bundle using source fallback when no matching profile exists', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source 1',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 5,
+              sourceId: 1,
+              profileId: null,
+              sourceSnapshotHash: 'a',
+              profileHash: 'b',
+              planHash: 'c',
+              plan: {},
+              sourceData: null,
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+
+      expect(state.active?.source.id).toBe(1);
+      expect(state.active?.profile).toBeNull();
+      expect(state.active?.plan?.id).toBe(5);
+      expect(state.active?.run).toBeNull();
+      expect(state.hasActiveRun).toBe(false);
+    });
+
+    it('prefers active run source over first source in list', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 10,
+              type: 'booklore',
+              name: 'Source A',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: 20,
+              type: 'booklore',
+              name: 'Source B',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() => Promise.resolve([])),
+        listRuns: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 99,
+              sourceId: 20,
+              profileId: null,
+              planArtifactId: null,
+              targetKey: 'bookorbit',
+              state: 'running',
+              currentStage: 'init',
+              triggeredByUserId: 1,
+              startedAt: now,
+              endedAt: null,
+              errorMessage: null,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+      });
+
+      const state = await service.getWorkflowState();
+
+      expect(state.active?.source.id).toBe(20);
+      expect(state.hasActiveRun).toBe(true);
+    });
+
+    it('returns first source as active bundle when no run is active', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 7,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 11,
+              sourceId: 7,
+              name: 'Profile',
+              version: 1,
+              userMappings: [],
+              pathMappings: [],
+              scope: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 22,
+              sourceId: 7,
+              profileId: 11,
+              sourceSnapshotHash: 'x',
+              profileHash: 'y',
+              planHash: 'z',
+              plan: {},
+              sourceData: null,
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 33,
+              sourceId: 7,
+              profileId: 11,
+              planArtifactId: 22,
+              targetKey: 'bookorbit',
+              state: 'completed',
+              currentStage: 'completed',
+              triggeredByUserId: 1,
+              startedAt: now,
+              endedAt: now,
+              errorMessage: null,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+      });
+
+      const state = await service.getWorkflowState();
+
+      expect(state.active?.source.id).toBe(7);
+      expect(state.active?.profile?.id).toBe(11);
+      expect(state.active?.plan?.id).toBe(22);
+      expect(state.active?.run?.id).toBe(33);
+      expect(state.hasActiveRun).toBe(false);
+    });
+
+    it('resolves plan by sourceId fallback when profile has no matching plan but source does', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 2,
+              sourceId: 1,
+              name: 'Profile',
+              version: 1,
+              userMappings: [],
+              pathMappings: [],
+              scope: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 55,
+              sourceId: 1,
+              profileId: 999,
+              sourceSnapshotHash: 'x',
+              profileHash: 'y',
+              planHash: 'z',
+              plan: {},
+              sourceData: null,
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+
+      expect(state.active?.plan?.id).toBe(55);
+    });
+  });
+
+  describe('startLiveRun additional branches', () => {
+    it('throws BadRequestException when source capabilities.ok is false', async () => {
+      const service = createService({
+        findSourceById: vi.fn(() =>
+          Promise.resolve({
+            id: 1,
+            type: 'booklore',
+            name: 'Booklore',
+            connectionConfig: {},
+            capabilities: { ok: false, missingTables: ['book'] },
+            lastValidatedAt: new Date(),
+            createdByUserId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 2,
+            plan: {},
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100, targetKey: 'bookorbit' }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException when capabilities.ok is false and missingTables is missing', async () => {
+      const service = createService({
+        findSourceById: vi.fn(() =>
+          Promise.resolve({
+            id: 1,
+            type: 'booklore',
+            name: 'Booklore',
+            connectionConfig: {},
+            capabilities: { ok: false },
+            lastValidatedAt: new Date(),
+            createdByUserId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 2,
+            plan: {},
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException when profile.sourceId does not match source.id', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 99,
+            plan: {},
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+        findProfileById: vi.fn(() =>
+          Promise.resolve({
+            id: 99,
+            sourceId: 999,
+            name: 'Wrong Profile',
+            version: 1,
+            userMappings: [{ sourceUserId: 'u1', targetUserId: 10 }],
+            pathMappings: [],
+            scope: {},
+            createdByUserId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException when userMappings is empty', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 2,
+            plan: {},
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+        findProfileById: vi.fn(() =>
+          Promise.resolve({
+            id: 2,
+            sourceId: 1,
+            name: 'Profile',
+            version: 1,
+            userMappings: [],
+            pathMappings: [],
+            scope: {},
+            createdByUserId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws NotFoundException when plan artifact is missing', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 9999 }, 1)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when source is missing after artifact found', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 2,
+            plan: {},
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+        findSourceById: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100 }, 1)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when profile is not found during startLiveRun', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 2,
+            plan: {},
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+        findProfileById: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100 }, 1)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws InternalServerErrorException when createRunWithLock returns no run and no conflict', async () => {
+      const service = createService({
+        findProfileById: vi.fn(() =>
+          Promise.resolve({
+            id: 2,
+            sourceId: 1,
+            name: 'Profile',
+            version: 1,
+            userMappings: [{ sourceUserId: 'src-user', targetUserId: 10 }],
+            pathMappings: [],
+            scope: {},
+            createdByUserId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        createRunWithLock: vi.fn(() => Promise.resolve({ run: null, activeRun: null })),
+      });
+
+      await expect(service.startLiveRun({ planArtifactId: 100 }, 1)).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+
+    it('uses default targetKey "bookorbit" when no targetKey provided', async () => {
+      const run = {
+        id: 55,
+        sourceId: 1,
+        profileId: 2,
+        planArtifactId: 100,
+        targetKey: 'bookorbit',
+        state: 'running',
+        currentStage: 'init',
+        triggeredByUserId: 1,
+        startedAt: new Date(),
+        endedAt: null,
+        errorMessage: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const createRunWithLock = vi.fn(() => Promise.resolve({ run, activeRun: null }));
+      const service = createService({
+        findProfileById: vi.fn(() =>
+          Promise.resolve({
+            id: 2,
+            sourceId: 1,
+            name: 'Profile',
+            version: 1,
+            userMappings: [{ sourceUserId: 'src-user', targetUserId: 10 }],
+            pathMappings: [],
+            scope: {},
+            createdByUserId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        createRunWithLock,
+      });
+
+      await service.startLiveRun({ planArtifactId: 100 }, 1);
+
+      expect(createRunWithLock).toHaveBeenCalledWith(expect.objectContaining({ targetKey: 'bookorbit' }));
+    });
+  });
+
+  describe('retryFailedRun additional branches', () => {
+    it('throws BadRequestException when run has no planArtifactId', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'failed',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: null,
+            targetKey: 'bookorbit',
+            currentStage: 'user_state',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: 'error',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(service.retryFailedRun(77)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws NotFoundException when source is not found during retry', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'failed',
+            sourceId: 999,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'bookorbit',
+            currentStage: 'user_state',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: 'error',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        findSourceById: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.retryFailedRun(77)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when artifact is not found during retry', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'failed',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'bookorbit',
+            currentStage: 'user_state',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: 'error',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        findPlanArtifactById: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.retryFailedRun(77)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws InternalServerErrorException when updateRunState returns null during retry', async () => {
+      const service = createService({
+        findRunById: vi.fn(() =>
+          Promise.resolve({
+            id: 77,
+            state: 'failed',
+            sourceId: 1,
+            profileId: 2,
+            planArtifactId: 100,
+            targetKey: 'bookorbit',
+            currentStage: 'user_state',
+            triggeredByUserId: 1,
+            startedAt: new Date(),
+            endedAt: new Date(),
+            errorMessage: 'error',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+        updateRunState: vi.fn(() => Promise.resolve(null)),
+      });
+
+      await expect(service.retryFailedRun(77)).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+  });
+
+  describe('hydrateDuplicateSourceCandidates via getWorkflowState', () => {
+    it('hydrates sourceCandidates from sourceData when no existing metadata', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 5,
+              sourceId: 1,
+              profileId: null,
+              sourceSnapshotHash: 'a',
+              profileHash: 'b',
+              planHash: 'c',
+              plan: {
+                duplicateBookMatches: [
+                  {
+                    targetBookId: 10,
+                    sourceBookIds: ['sb1', 'sb2'],
+                    strategies: ['isbn', 'title_author'],
+                    matches: [
+                      { sourceBookId: 'sb1', targetBookId: 10, strategy: 'isbn' },
+                      { sourceBookId: 'sb2', targetBookId: 10, strategy: 'title_author' },
+                    ],
+                    reason: 'duplicate_target_match',
+                  },
+                ],
+              },
+              sourceData: {
+                books: [
+                  { sourceBookId: 'sb1', title: 'Book One', author: 'Author A', filePath: '/books/one.epub' },
+                  { sourceBookId: 'sb2', title: 'Book Two', author: 'Author B', filePath: '/books/two.epub' },
+                ],
+              },
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+      const plan = state.active?.plan?.plan as Record<string, unknown>;
+      const dupes = plan?.duplicateBookMatches as Array<Record<string, unknown>>;
+
+      expect(dupes).toHaveLength(1);
+      const candidates = dupes[0]?.sourceCandidates as Array<Record<string, unknown>>;
+      expect(candidates).toHaveLength(2);
+      expect(candidates[0]).toMatchObject({ sourceBookId: 'sb1', title: 'Book One', author: 'Author A', strategy: 'isbn' });
+      expect(candidates[1]).toMatchObject({ sourceBookId: 'sb2', title: 'Book Two', author: 'Author B', strategy: 'title_author' });
+    });
+
+    it('skips hydration when existing sourceCandidates already have metadata', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 5,
+              sourceId: 1,
+              profileId: null,
+              sourceSnapshotHash: 'a',
+              profileHash: 'b',
+              planHash: 'c',
+              plan: {
+                duplicateBookMatches: [
+                  {
+                    targetBookId: 10,
+                    sourceBookIds: ['sb1'],
+                    strategies: ['isbn'],
+                    sourceCandidates: [{ sourceBookId: 'sb1', title: 'Already Hydrated', author: 'Author', filePath: null, strategy: 'isbn' }],
+                    reason: 'duplicate_target_match',
+                  },
+                ],
+              },
+              sourceData: { books: [{ sourceBookId: 'sb1', title: 'From Source', author: 'Source Author', filePath: null }] },
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+      const plan = state.active?.plan?.plan as Record<string, unknown>;
+      const dupes = plan?.duplicateBookMatches as Array<Record<string, unknown>>;
+      const candidates = dupes[0]?.sourceCandidates as Array<Record<string, unknown>>;
+
+      expect(candidates[0]?.title).toBe('Already Hydrated');
+    });
+
+    it('returns plan unchanged when no duplicate book matches exist', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 5,
+              sourceId: 1,
+              profileId: null,
+              sourceSnapshotHash: 'a',
+              profileHash: 'b',
+              planHash: 'c',
+              plan: { duplicateBookMatches: [], matchedBooks: [{ sourceBookId: 'sb1', targetBookId: 1, strategy: 'isbn' }] },
+              sourceData: { books: [] },
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+      const plan = state.active?.plan?.plan as Record<string, unknown>;
+      const dupes = plan?.duplicateBookMatches as unknown[];
+
+      expect(dupes).toHaveLength(0);
+    });
+
+    it('returns plan unchanged when sourceData is empty (no books)', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 5,
+              sourceId: 1,
+              profileId: null,
+              sourceSnapshotHash: 'a',
+              profileHash: 'b',
+              planHash: 'c',
+              plan: {
+                duplicateBookMatches: [{ targetBookId: 10, sourceBookIds: ['sb1'], strategies: ['isbn'], reason: 'duplicate_target_match' }],
+              },
+              sourceData: null,
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+      const plan = state.active?.plan?.plan as Record<string, unknown>;
+      const dupes = plan?.duplicateBookMatches as Array<Record<string, unknown>>;
+
+      expect(dupes[0]).not.toHaveProperty('sourceCandidates');
+    });
+
+    it('falls back to strategies list when matches array is empty', async () => {
+      const now = new Date();
+      const service = createService({
+        listSources: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              type: 'booklore',
+              name: 'Source',
+              connectionConfig: {},
+              capabilities: null,
+              lastValidatedAt: now,
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listProfiles: vi.fn(() => Promise.resolve([])),
+        listPlanArtifacts: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 5,
+              sourceId: 1,
+              profileId: null,
+              sourceSnapshotHash: 'a',
+              profileHash: 'b',
+              planHash: 'c',
+              plan: {
+                duplicateBookMatches: [
+                  {
+                    targetBookId: 10,
+                    sourceBookIds: ['sb1', 'sb2'],
+                    strategies: ['isbn', 'file_hash'],
+                    reason: 'duplicate_target_match',
+                  },
+                ],
+              },
+              sourceData: {
+                books: [
+                  { sourceBookId: 'sb1', title: 'Book 1', author: 'A1', filePath: null },
+                  { sourceBookId: 'sb2', title: 'Book 2', author: 'A2', filePath: null },
+                ],
+              },
+              summary: {},
+              createdByUserId: 1,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
+        ),
+        listRuns: vi.fn(() => Promise.resolve([])),
+      });
+
+      const state = await service.getWorkflowState();
+      const plan = state.active?.plan?.plan as Record<string, unknown>;
+      const dupes = plan?.duplicateBookMatches as Array<Record<string, unknown>>;
+      const candidates = dupes[0]?.sourceCandidates as Array<Record<string, unknown>>;
+
+      expect(candidates[0]?.strategy).toBe('isbn');
+      expect(candidates[1]?.strategy).toBe('file_hash');
+    });
+  });
+
+  describe('resolveDuplicateMatches with sourceData', () => {
+    it('uses sourceData book titles when populating unresolved books', async () => {
+      const artifact = {
+        id: 100,
+        sourceId: 1,
+        profileId: 2,
+        sourceSnapshotHash: 'a',
+        profileHash: 'b',
+        planHash: 'c',
+        plan: {
+          matchedBooks: [],
+          unresolvedBooks: [],
+          duplicateBookMatches: [
+            { targetBookId: 5, sourceBookIds: ['sb10', 'sb11'], strategies: ['isbn', 'title_author'], reason: 'duplicate_target_match' },
+          ],
+        },
+        sourceData: {
+          books: [
+            { sourceBookId: 'sb10', title: 'The Chosen Book', author: 'Author A', filePath: null },
+            { sourceBookId: 'sb11', title: 'The Loser Book', author: 'Author B', filePath: null },
+          ],
+          users: [],
+          userBookStatuses: [],
+          userFileProgress: [],
+          bookmarks: [],
+          annotations: [],
+          shelves: [],
+          shelfBooks: [],
+          availableDomains: {},
+        },
+        summary: { status: 'blocked', duplicateBookMatches: 1 },
+        createdByUserId: 1,
+        createdAt: new Date(Date.now() + 1000),
+        updatedAt: new Date(),
+      };
+
+      const updateFn = vi.fn((id: number, vals: { plan: unknown; summary: unknown }) => Promise.resolve({ ...artifact, id, ...vals }));
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve(artifact)),
+        updatePlanArtifact: updateFn,
+      });
+
+      const result = await service.resolveDuplicateMatches(100, {
+        resolutions: [{ targetBookId: 5, selectedSourceBookId: 'sb10' }],
+      });
+
+      const updatedPlan = (updateFn.mock.calls as unknown[][])[0][1] as { plan: Record<string, unknown> };
+      const unresolvedBooks = updatedPlan.plan.unresolvedBooks as Array<{ sourceBookId: string; title: string | null }>;
+
+      expect(unresolvedBooks.find((u) => u.sourceBookId === 'sb11')?.title).toBe('The Loser Book');
+      expect(result.summary?.status).toBe('ready_for_live_run');
+    });
+
+    it('builds userPreview from sourceData when available', async () => {
+      const artifact = {
+        id: 100,
+        sourceId: 1,
+        profileId: 2,
+        sourceSnapshotHash: 'a',
+        profileHash: 'b',
+        planHash: 'c',
+        plan: {
+          matchedBooks: [{ sourceBookId: 'sb1', targetBookId: 1, strategy: 'isbn' }],
+          unresolvedBooks: [],
+          userMappings: [{ sourceUserId: 'u1', targetUserId: 10 }],
+          duplicateBookMatches: [
+            { targetBookId: 5, sourceBookIds: ['sb10', 'sb11'], strategies: ['isbn', 'title_author'], reason: 'duplicate_target_match' },
+          ],
+        },
+        sourceData: {
+          books: [{ sourceBookId: 'sb10', title: 'T', author: 'A', filePath: null }],
+          users: [{ sourceUserId: 'u1', username: 'alice', email: null, name: null }],
+          userBookStatuses: [{ sourceUserId: 'u1', sourceBookId: 'sb1', status: 'read' }],
+          userFileProgress: [],
+          bookmarks: [],
+          annotations: [],
+          shelves: [],
+          shelfBooks: [],
+          availableDomains: {},
+        },
+        summary: { status: 'blocked', duplicateBookMatches: 1 },
+        createdByUserId: 1,
+        createdAt: new Date(Date.now() + 1000),
+        updatedAt: new Date(),
+      };
+
+      const updateFn = vi.fn((id: number, vals: { plan: unknown; summary: unknown }) => Promise.resolve({ ...artifact, id, ...vals }));
+      const service = createService({
+        findPlanArtifactById: vi.fn(() => Promise.resolve(artifact)),
+        updatePlanArtifact: updateFn,
+      });
+
+      await service.resolveDuplicateMatches(100, {
+        resolutions: [{ targetBookId: 5, selectedSourceBookId: 'sb10' }],
+      });
+
+      const updatedPlan = (updateFn.mock.calls as unknown[][])[0][1] as { summary: Record<string, unknown> };
+      expect(updatedPlan.summary.mappedUsers).toBe(1);
+    });
+
+    it('throws BadRequestException when targetBookId is not in duplicates map', async () => {
+      const service = createService({
+        findPlanArtifactById: vi.fn(() =>
+          Promise.resolve({
+            id: 100,
+            sourceId: 1,
+            profileId: 2,
+            sourceSnapshotHash: 'a',
+            profileHash: 'b',
+            planHash: 'c',
+            plan: {
+              matchedBooks: [],
+              unresolvedBooks: [],
+              duplicateBookMatches: [{ targetBookId: 5, sourceBookIds: ['sb10', 'sb11'], strategies: ['isbn', 'title_author'], reason: 'dup' }],
+            },
+            sourceData: null,
+            summary: {},
+            createdByUserId: 1,
+            createdAt: new Date(Date.now() + 1000),
+            updatedAt: new Date(),
+          }),
+        ),
+      });
+
+      await expect(
+        service.resolveDuplicateMatches(100, {
+          resolutions: [
+            { targetBookId: 999, selectedSourceBookId: 'sb10' },
+            { targetBookId: 5, selectedSourceBookId: 'sb10' },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

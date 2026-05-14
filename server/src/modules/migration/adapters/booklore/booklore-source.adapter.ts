@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { constants as fsConstants } from 'fs';
+import { access, stat } from 'fs/promises';
 import type mysql from 'mysql2/promise';
+import { join } from 'path';
 
 import type {
   SourceAdapter,
@@ -85,7 +88,7 @@ interface TableResolution {
 
 @Injectable()
 export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionConfig> {
-  readonly type = 'booklore';
+  readonly type: string = 'booklore';
 
   constructor(private readonly connector: BookloreConnector) {}
 
@@ -101,7 +104,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
       if (!resolved.bookFile) missingTables.push('book_file');
 
       const counts = await this.collectCounts(conn, resolved);
-      const warnings = this.buildWarnings(resolved, config);
+      const warnings = await this.buildWarnings(resolved, config);
 
       return {
         ok: missingTables.length === 0,
@@ -208,7 +211,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     return out;
   }
 
-  private buildWarnings(resolved: TableResolution, config: BookloreConnectionConfig): string[] {
+  private async buildWarnings(resolved: TableResolution, config: BookloreConnectionConfig): Promise<string[]> {
     const warnings: string[] = [];
 
     if (!resolved.bookMetadata) warnings.push('book_metadata table not found; metadata overlays will be limited');
@@ -233,10 +236,70 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     ) {
       warnings.push('Booklore viewer preference tables detected; reader preference migration is deferred');
     }
-    if (!config.mediaRootPath) warnings.push('mediaRootPath not configured; book cover/thumbnail import disabled');
+    if (!config.mediaRootPath) {
+      warnings.push('mediaRootPath not configured; book cover/thumbnail import disabled');
+    } else {
+      warnings.push(...(await this.validateMediaRootPath(config.mediaRootPath)));
+    }
     if (!config.password) warnings.push('No password set; connection may fail if the database requires authentication');
 
     return warnings;
+  }
+
+  private async validateMediaRootPath(mediaRootPath: string): Promise<string[]> {
+    const warnings: string[] = [];
+
+    const rootState = await this.inspectDirectory(mediaRootPath);
+    if (rootState === 'missing') {
+      warnings.push(`mediaRootPath "${mediaRootPath}" does not exist on this server; book cover/thumbnail import will be skipped`);
+      return warnings;
+    }
+    if (rootState === 'not_directory') {
+      warnings.push(`mediaRootPath "${mediaRootPath}" is not a directory; book cover/thumbnail import will be skipped`);
+      return warnings;
+    }
+    if (rootState === 'not_readable') {
+      warnings.push(`mediaRootPath "${mediaRootPath}" is not readable by the BookOrbit process; book cover/thumbnail import may fail`);
+      return warnings;
+    }
+    if (rootState === 'unknown') {
+      warnings.push(`mediaRootPath "${mediaRootPath}" could not be verified; book cover/thumbnail import may fail`);
+      return warnings;
+    }
+
+    const imagesPath = join(mediaRootPath, 'images');
+    const imagesState = await this.inspectDirectory(imagesPath);
+    if (imagesState === 'missing') {
+      warnings.push(`mediaRootPath "${mediaRootPath}" is missing the "images" subdirectory expected by Booklore covers`);
+    } else if (imagesState === 'not_directory') {
+      warnings.push(`mediaRootPath "${imagesPath}" is not a directory; book cover/thumbnail import will be skipped`);
+    } else if (imagesState === 'not_readable') {
+      warnings.push(`mediaRootPath "${imagesPath}" is not readable by the BookOrbit process; book cover/thumbnail import may fail`);
+    } else if (imagesState === 'unknown') {
+      warnings.push(`mediaRootPath "${imagesPath}" could not be verified; book cover/thumbnail import may fail`);
+    }
+
+    return warnings;
+  }
+
+  private async inspectDirectory(path: string): Promise<'ok' | 'missing' | 'not_directory' | 'not_readable' | 'unknown'> {
+    try {
+      const info = await stat(path);
+      if (!info.isDirectory()) return 'not_directory';
+    } catch (error) {
+      if (isFsErrorCode(error, 'ENOENT')) return 'missing';
+      if (isFsErrorCode(error, 'EACCES') || isFsErrorCode(error, 'EPERM')) return 'not_readable';
+      return 'unknown';
+    }
+
+    try {
+      await access(path, fsConstants.R_OK);
+      return 'ok';
+    } catch (error) {
+      if (isFsErrorCode(error, 'ENOENT')) return 'missing';
+      if (isFsErrorCode(error, 'EACCES') || isFsErrorCode(error, 'EPERM')) return 'not_readable';
+      return 'unknown';
+    }
   }
 
   private async fetchUsers(conn: mysql.Connection, usersTable: string | null): Promise<SourceUser[]> {
@@ -1126,4 +1189,8 @@ function toIso(value: unknown): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
   return null;
+}
+
+function isFsErrorCode(error: unknown, code: string): boolean {
+  return !!error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === code;
 }

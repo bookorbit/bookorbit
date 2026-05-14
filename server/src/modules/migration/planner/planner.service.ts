@@ -10,6 +10,7 @@ import type {
   PathMapping,
   PlannedBookMatch,
   PlannedDuplicateBookMatch,
+  PlannedDuplicateSourceCandidate,
   PlannerResult,
   PlannedMigration,
   PlannedUserPreview,
@@ -39,7 +40,8 @@ export class MigrationPlannerService {
     const scope = { ...asRecord(profile.scope), ...(scopeOverride ?? {}) };
 
     const { matches, unresolved } = await this.matchingService.matchBooks(sourceData.books, pathMappings);
-    const { executableMatches, duplicateBookMatches } = splitDuplicateMatches(matches);
+    const sourceBooksById = new Map(sourceData.books.map((book) => [book.sourceBookId, book]));
+    const { executableMatches, duplicateBookMatches } = splitDuplicateMatches(matches, sourceBooksById);
 
     const matchedBookIds = new Set(executableMatches.map((entry) => entry.sourceBookId));
     const mappedUsers = new Map(userMappings.map((entry) => [entry.sourceUserId, entry.targetUserId]));
@@ -71,7 +73,10 @@ export class MigrationPlannerService {
   }
 }
 
-function splitDuplicateMatches(matches: PlannedBookMatch[]): {
+function splitDuplicateMatches(
+  matches: PlannedBookMatch[],
+  sourceBooksById: Map<string, { title: string | null; author: string | null; filePath: string | null }>,
+): {
   executableMatches: PlannedBookMatch[];
   duplicateBookMatches: PlannedDuplicateBookMatch[];
 } {
@@ -87,11 +92,22 @@ function splitDuplicateMatches(matches: PlannedBookMatch[]): {
   for (const [targetBookId, rows] of byTarget) {
     if (rows.length < 2) continue;
     duplicateTargetIds.add(targetBookId);
+    const sourceCandidates: PlannedDuplicateSourceCandidate[] = rows.map((row) => {
+      const sourceBook = sourceBooksById.get(row.sourceBookId);
+      return {
+        sourceBookId: row.sourceBookId,
+        title: sourceBook?.title ?? null,
+        author: sourceBook?.author ?? null,
+        filePath: sourceBook?.filePath ?? null,
+        strategy: row.strategy,
+      };
+    });
     duplicateBookMatches.push({
       targetBookId,
       matches: rows,
       sourceBookIds: rows.map((row) => row.sourceBookId),
       strategies: rows.map((row) => row.strategy),
+      sourceCandidates,
       reason: 'duplicate_target_match',
     });
   }

@@ -30,11 +30,20 @@ export interface PlannedBookMatch {
   strategy: MatchStrategy;
 }
 
+export interface PlannedDuplicateSourceCandidate {
+  sourceBookId: string;
+  title: string | null;
+  author: string | null;
+  filePath: string | null;
+  strategy: MatchStrategy;
+}
+
 export interface PlannedDuplicateBookMatch {
   targetBookId: number;
   matches: PlannedBookMatch[];
   sourceBookIds: string[];
   strategies: MatchStrategy[];
+  sourceCandidates?: PlannedDuplicateSourceCandidate[];
   reason: 'duplicate_target_match';
 }
 

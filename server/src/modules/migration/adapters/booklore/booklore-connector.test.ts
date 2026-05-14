@@ -7,6 +7,7 @@ vi.mock('mysql2/promise', () => {
   };
 });
 
+import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import mysql from 'mysql2/promise';
 
@@ -89,5 +90,24 @@ describe('BookloreConnector', () => {
     await expect(connector.countRows(conn as never, 'book_file')).resolves.toBe(7);
     await expect(connector.countRows(conn as never, 'book_file')).resolves.toBe(0);
     await expect(connector.queryRows(conn as never, 'SELECT * FROM book WHERE id = ?', [1])).resolves.toEqual([{ id: 1 }]);
+  });
+
+  it('maps access denied connection failures to a user-facing BadRequestException', async () => {
+    const connector = new BookloreConnector();
+    const createConnection = mysql.createConnection as unknown as ReturnType<typeof vi.fn>;
+    createConnection.mockRejectedValue(Object.assign(new Error("Access denied for user 'booklore'"), { code: 'ER_ACCESS_DENIED_ERROR' }));
+
+    let thrown: unknown;
+    try {
+      await connector.withConnection({ host: 'localhost', user: 'booklore', password: 'pw', database: 'booklore', ssl: false } as never, () =>
+        Promise.resolve('ok'),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const payload = (thrown as BadRequestException).getResponse() as { message?: string };
+    expect(payload.message).toBe('Authentication failed. Check the username and password.');
   });
 });

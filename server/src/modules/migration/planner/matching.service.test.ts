@@ -186,4 +186,200 @@ describe('MatchingService private lookups', () => {
 
     await expect((service as never).lookupByTitleAuthor('Dune', ['Frank Herbert'])).resolves.toEqual({ kind: 'found', bookId: 777 });
   });
+
+  it('batchLookupFileHashes returns found, ambiguous, and none results', async () => {
+    const where = vi.fn().mockResolvedValue([
+      { bookId: 10, hash: 'hash-unique' },
+      { bookId: 20, hash: 'hash-dup' },
+      { bookId: 21, hash: 'hash-dup' },
+    ]);
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = new MatchingService({ select } as never);
+
+    const lookup = await (service as never).batchLookupFileHashes([
+      sourceBook({ sourceBookId: 'a', fileHash: 'hash-unique' }),
+      sourceBook({ sourceBookId: 'b', fileHash: 'hash-dup' }),
+      sourceBook({ sourceBookId: 'c', fileHash: 'hash-missing' }),
+    ]);
+
+    expect(lookup.get('hash-unique')).toEqual({ kind: 'found', bookId: 10 });
+    expect(lookup.get('hash-dup')).toEqual({ kind: 'ambiguous' });
+    expect(lookup.get('hash-missing')).toBeUndefined();
+  });
+
+  it('batchLookupFileHashes returns empty map for books without hashes', async () => {
+    const service = new MatchingService({} as never);
+
+    const lookup = await (service as never).batchLookupFileHashes([sourceBook({ sourceBookId: 'a' })]);
+
+    expect(lookup.size).toBe(0);
+  });
+
+  it('lookupByFilePath returns found when exactly one book matches', async () => {
+    const limit = vi.fn().mockResolvedValue([{ bookId: 55 }]);
+    const where = vi.fn().mockReturnValue({ limit });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = new MatchingService({ select } as never);
+
+    const result = await (service as never).lookupByFilePath('/books/dune.epub');
+    expect(result).toEqual({ kind: 'found', bookId: 55 });
+  });
+
+  it('lookupByFilePath returns ambiguous when multiple books match', async () => {
+    const limit = vi.fn().mockResolvedValue([{ bookId: 55 }, { bookId: 56 }]);
+    const where = vi.fn().mockReturnValue({ limit });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = new MatchingService({ select } as never);
+
+    const result = await (service as never).lookupByFilePath('/books/dune.epub');
+    expect(result).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('lookupByFilePath returns none when no books match', async () => {
+    const limit = vi.fn().mockResolvedValue([]);
+    const where = vi.fn().mockReturnValue({ limit });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = new MatchingService({ select } as never);
+
+    const result = await (service as never).lookupByFilePath('/books/missing.epub');
+    expect(result).toEqual({ kind: 'none' });
+  });
+
+  it('lookupByTitleAuthor returns none when title is empty', async () => {
+    const service = new MatchingService({} as never);
+    const result = await (service as never).lookupByTitleAuthor('', ['Author']);
+    expect(result).toEqual({ kind: 'none' });
+  });
+
+  it('lookupByTitleAuthor returns none when no valid authors provided', async () => {
+    const service = new MatchingService({} as never);
+    const result = await (service as never).lookupByTitleAuthor('Dune', ['', '   ']);
+    expect(result).toEqual({ kind: 'none' });
+  });
+
+  it('lookupByTitleAuthor returns exact ambiguous result without calling approx', async () => {
+    const exactLimit = vi.fn().mockResolvedValue([{ bookId: 1 }, { bookId: 2 }]);
+    const exactWhere = vi.fn().mockReturnValue({ limit: exactLimit });
+    const exactInnerJoin2 = vi.fn().mockReturnValue({ where: exactWhere });
+    const exactInnerJoin1 = vi.fn().mockReturnValue({ innerJoin: exactInnerJoin2 });
+    const exactFrom = vi.fn().mockReturnValue({ innerJoin: exactInnerJoin1 });
+    const selectDistinct = vi.fn().mockReturnValueOnce({ from: exactFrom });
+    const service = new MatchingService({ selectDistinct } as never);
+
+    const result = await (service as never).lookupByTitleAuthor('Dune', ['Frank Herbert']);
+    expect(result).toEqual({ kind: 'ambiguous' });
+    expect(selectDistinct).toHaveBeenCalledTimes(1);
+  });
+
+  it('lookupByTitleAuthor returns none when both exact and approx return empty', async () => {
+    const makeChain = () => {
+      const limit = vi.fn().mockResolvedValue([]);
+      const where = vi.fn().mockReturnValue({ limit });
+      const innerJoin2 = vi.fn().mockReturnValue({ where });
+      const innerJoin1 = vi.fn().mockReturnValue({ innerJoin: innerJoin2 });
+      const from = vi.fn().mockReturnValue({ innerJoin: innerJoin1 });
+      return { from };
+    };
+    const chain1 = makeChain();
+    const chain2 = makeChain();
+    const selectDistinct = vi.fn().mockReturnValueOnce({ from: chain1.from }).mockReturnValueOnce({ from: chain2.from });
+    const service = new MatchingService({ selectDistinct } as never);
+
+    const result = await (service as never).lookupByTitleAuthor('Unknown Title', ['Unknown Author']);
+    expect(result).toEqual({ kind: 'none' });
+  });
+
+  it('matchBooks handles books with multiple file paths via files array', async () => {
+    const service = new MatchingService({} as never);
+
+    vi.spyOn(service as never, 'batchLookupIsbns').mockResolvedValue(new Map());
+    vi.spyOn(service as never, 'batchLookupFileHashes').mockResolvedValue(new Map());
+
+    const lookupByFilePath = vi.spyOn(service as never, 'lookupByFilePath').mockImplementation((path: string) => {
+      if (path === '/target/file.epub') return Promise.resolve({ kind: 'found', bookId: 900 });
+      return Promise.resolve({ kind: 'none' });
+    });
+
+    const result = await service.matchBooks(
+      [
+        {
+          sourceBookId: 'multi-file',
+          title: null,
+          author: null,
+          subtitle: null,
+          isbn10: null,
+          isbn13: null,
+          description: null,
+          publisher: null,
+          publishedYear: null,
+          language: null,
+          filePath: null,
+          fileHash: null,
+          genres: [],
+          tags: [],
+          files: [
+            { filePath: '/source/file.epub', fileHash: null },
+            { filePath: '/source/other.epub', fileHash: null },
+          ],
+        },
+      ],
+      [{ sourcePrefix: '/source', targetPrefix: '/target' }],
+    );
+
+    expect(result.matches).toEqual([{ sourceBookId: 'multi-file', targetBookId: 900, strategy: 'path_mapping' }]);
+    expect(lookupByFilePath).toHaveBeenCalledWith('/target/file.epub');
+  });
+
+  it('matchBooks deduplicates mapped paths using Set (cache reuse)', async () => {
+    const service = new MatchingService({} as never);
+    vi.spyOn(service as never, 'batchLookupIsbns').mockResolvedValue(new Map());
+    vi.spyOn(service as never, 'batchLookupFileHashes').mockResolvedValue(new Map());
+    const lookupByFilePath = vi.spyOn(service as never, 'lookupByFilePath').mockResolvedValue({ kind: 'found', bookId: 10 });
+
+    await service.matchBooks(
+      [
+        sourceBook({ sourceBookId: 'dup-path', filePath: '/source/same.epub' }),
+        sourceBook({ sourceBookId: 'dup-path-2', filePath: '/source/same.epub' }),
+      ],
+      [{ sourcePrefix: '/source', targetPrefix: '/target' }],
+    );
+
+    expect(lookupByFilePath).toHaveBeenCalledTimes(1);
+  });
+
+  it('matchBooks uses authors array when available for title_author strategy', async () => {
+    const service = new MatchingService({} as never);
+    vi.spyOn(service as never, 'batchLookupIsbns').mockResolvedValue(new Map());
+    vi.spyOn(service as never, 'batchLookupFileHashes').mockResolvedValue(new Map());
+    const lookupByTitleAuthor = vi.spyOn(service as never, 'lookupByTitleAuthor').mockResolvedValue({ kind: 'found', bookId: 42 });
+
+    await service.matchBooks(
+      [
+        {
+          sourceBookId: 'auth-arr',
+          title: 'Structured Title',
+          author: 'Legacy Author',
+          subtitle: null,
+          isbn10: null,
+          isbn13: null,
+          description: null,
+          publisher: null,
+          publishedYear: null,
+          language: null,
+          filePath: null,
+          fileHash: null,
+          genres: [],
+          tags: [],
+          authors: [{ name: 'Structured Author 1' }, { name: 'Structured Author 2' }],
+        },
+      ],
+      [],
+    );
+
+    expect(lookupByTitleAuthor).toHaveBeenCalledWith('Structured Title', ['Structured Author 1', 'Structured Author 2']);
+  });
 });

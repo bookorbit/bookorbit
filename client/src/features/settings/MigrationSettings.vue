@@ -6,6 +6,7 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 import MigrationStepper from '@/features/migration/components/MigrationStepper.vue'
 import SearchableUserSelect from '@/features/migration/components/SearchableUserSelect.vue'
 import type { StepDefinition } from '@/features/migration/components/MigrationStepper.vue'
+import { api } from '@/lib/api'
 import {
   cancelRun,
   createDryRunPlan,
@@ -71,6 +72,8 @@ const supportedTypes = ref<string[]>([])
 const targetUsers = ref<TargetUser[]>([])
 const targetLibraryFolders = ref<Array<{ libraryName: string; path: string }>>([])
 const sourcePathPrefixes = ref<string[]>([])
+const mediaPathTestState = ref<'idle' | 'pass' | 'fail'>('idle')
+const mediaPathTestMessage = ref<string | null>(null)
 
 const workflowState = ref<MigrationWorkflowState | null>(null)
 const runProgress = ref<MigrationRunProgress | null>(null)
@@ -95,8 +98,10 @@ const sourceDraft = reactive({
 
 const busy = reactive({
   testingSource: false,
+  testingMediaPath: false,
   savingSource: false,
   loadingSuggestions: false,
+  loadingTargetUsers: false,
   savingProfile: false,
   dryRun: false,
   startingRun: false,
@@ -119,6 +124,25 @@ const hasActiveRun = computed(() => workflowState.value?.hasActiveRun === true)
 const sourceCapabilities = computed<MigrationSourceCapabilities | null>(() => source.value?.capabilities ?? null)
 const sourceValidationWarnings = computed(() => sourceCapabilities.value?.warnings ?? [])
 const sourceRowCounts = computed(() => Object.entries(sourceCapabilities.value?.counts ?? {}).sort(([left], [right]) => left.localeCompare(right)))
+const mediaRootPathHint = computed(() => {
+  const path = sourceDraft.mediaRootPath.trim()
+  if (!path) {
+    return {
+      className: 'text-amber-600',
+      text: 'Required for migrating book covers.',
+    }
+  }
+  if (!path.startsWith('/')) {
+    return {
+      className: 'text-amber-600',
+      text: 'Use an absolute path (for example: /books). Relative paths are not supported.',
+    }
+  }
+  return {
+    className: 'text-muted-foreground',
+    text: 'Cover import path configured. Use Test Connection to verify access and Booklore images folder structure.',
+  }
+})
 
 const preflight = computed(() => {
   const issues: string[] = []
@@ -189,10 +213,30 @@ const activeStepIndex = computed(() => {
 const currentStep = ref(0)
 
 watch(activeStepIndex, (newVal) => {
+  const shouldHoldSourceStep = busy.savingSource && currentStep.value === 0 && newVal === 1
+  const shouldHoldMappingsStep = busy.savingProfile && currentStep.value === 1 && newVal === 2
+  const shouldHoldDryRunStep = busy.dryRun && currentStep.value === 2 && newVal === 3
+  if (shouldHoldSourceStep || shouldHoldMappingsStep || shouldHoldDryRunStep) return
   if (newVal > currentStep.value) {
     currentStep.value = newVal
   }
 })
+
+watch(
+  () => [
+    sourceDraft.mediaRootPath,
+    sourceDraft.host,
+    sourceDraft.port,
+    sourceDraft.user,
+    sourceDraft.password,
+    sourceDraft.database,
+    sourceDraft.ssl,
+  ],
+  () => {
+    mediaPathTestState.value = 'idle'
+    mediaPathTestMessage.value = null
+  },
+)
 
 function onStepClick(index: number) {
   currentStep.value = index
@@ -247,6 +291,13 @@ interface DuplicateBookMatch {
   targetBookId: number
   sourceBookIds: string[]
   strategies: string[]
+  sourceCandidates?: Array<{
+    sourceBookId: string
+    title: string | null
+    author: string | null
+    filePath: string | null
+    strategy: string
+  }>
   reason: string
 }
 
@@ -258,6 +309,131 @@ const duplicateMatches = computed<DuplicateBookMatch[]>(() => {
 })
 
 const duplicateResolutions = ref<Map<number, string>>(new Map())
+const duplicateTargetBookLabels = ref<Map<number, string>>(new Map())
+const duplicateGroupsRemaining = computed(() => duplicateMatches.value.filter((dup) => !duplicateResolutions.value.has(dup.targetBookId)).length)
+
+const STRATEGY_PRIORITY: Record<string, number> = {
+  isbn: 40,
+  file_hash: 30,
+  path_mapping: 20,
+  title_author: 10,
+}
+
+function strategyForSource(dup: DuplicateBookMatch, sourceId: string): string | null {
+  const candidateStrategy = dup.sourceCandidates?.find((candidate) => candidate.sourceBookId === sourceId)?.strategy
+  if (typeof candidateStrategy === 'string' && candidateStrategy.length > 0) return candidateStrategy
+  const index = dup.sourceBookIds.indexOf(sourceId)
+  if (index < 0) return null
+  const strategy = dup.strategies[index]
+  return typeof strategy === 'string' ? strategy : null
+}
+
+function sourceBookLabel(dup: DuplicateBookMatch, sourceId: string): string {
+  const candidate = dup.sourceCandidates?.find((row) => row.sourceBookId === sourceId)
+  const title = candidate?.title?.trim()
+  if (title) return title
+  return `Source record ID #${sourceId}`
+}
+
+function sourceBookSecondary(dup: DuplicateBookMatch, sourceId: string): string | null {
+  const candidate = dup.sourceCandidates?.find((row) => row.sourceBookId === sourceId)
+  const author = candidate?.author?.trim()
+  if (author) return `by ${author} (ID: ${sourceId})`
+  const filePath = candidate?.filePath?.trim()
+  if (filePath) return `${filePath} (ID: ${sourceId})`
+  return `Booklore source ID: ${sourceId}`
+}
+
+function recommendedSourceBookId(dup: DuplicateBookMatch): string | null {
+  let bestScore = Number.NEGATIVE_INFINITY
+  let bestSourceId: string | null = null
+  let tie = false
+
+  for (const sourceId of dup.sourceBookIds) {
+    const strategy = strategyForSource(dup, sourceId)
+    const score = strategy ? (STRATEGY_PRIORITY[strategy] ?? 0) : 0
+
+    if (score > bestScore) {
+      bestScore = score
+      bestSourceId = sourceId
+      tie = false
+      continue
+    }
+    if (score === bestScore) tie = true
+  }
+
+  if (!bestSourceId || tie) return null
+  return bestSourceId
+}
+
+function isRecommendedSourceBook(dup: DuplicateBookMatch, sourceId: string): boolean {
+  return recommendedSourceBookId(dup) === sourceId
+}
+
+function targetBookLabel(targetBookId: number): string {
+  return duplicateTargetBookLabels.value.get(targetBookId) ?? `Library book #${targetBookId}`
+}
+
+function pruneDuplicateResolutions() {
+  const activeTargetIds = new Set(duplicateMatches.value.map((dup) => dup.targetBookId))
+  const keptResolutions = new Map<number, string>()
+  const keptLabels = new Map<number, string>()
+
+  for (const [targetBookId, sourceBookId] of duplicateResolutions.value) {
+    if (activeTargetIds.has(targetBookId)) keptResolutions.set(targetBookId, sourceBookId)
+  }
+  for (const [targetBookId, label] of duplicateTargetBookLabels.value) {
+    if (activeTargetIds.has(targetBookId)) keptLabels.set(targetBookId, label)
+  }
+
+  duplicateResolutions.value = keptResolutions
+  duplicateTargetBookLabels.value = keptLabels
+}
+
+function applyRecommendedDuplicateSelections() {
+  const next = new Map(duplicateResolutions.value)
+  for (const dup of duplicateMatches.value) {
+    if (next.has(dup.targetBookId)) continue
+    const recommendedSource = recommendedSourceBookId(dup)
+    if (!recommendedSource) continue
+    next.set(dup.targetBookId, recommendedSource)
+  }
+  duplicateResolutions.value = next
+}
+
+async function loadDuplicateTargetBookLabels() {
+  const missingTargetIds = [...new Set(duplicateMatches.value.map((dup) => dup.targetBookId))].filter(
+    (targetBookId) => !duplicateTargetBookLabels.value.has(targetBookId),
+  )
+  if (missingTargetIds.length === 0) return
+
+  const rows = await Promise.all(
+    missingTargetIds.map(async (targetBookId) => {
+      try {
+        const response = await api(`/api/v1/books/${targetBookId}`)
+        if (!response.ok) return [targetBookId, `Library book #${targetBookId}`] as const
+        const payload = asRecord(await response.json())
+        return [targetBookId, asString(payload.title) ?? `Library book #${targetBookId}`] as const
+      } catch {
+        return [targetBookId, `Library book #${targetBookId}`] as const
+      }
+    }),
+  )
+
+  const next = new Map(duplicateTargetBookLabels.value)
+  for (const [targetBookId, label] of rows) next.set(targetBookId, label)
+  duplicateTargetBookLabels.value = next
+}
+
+watch(
+  duplicateMatches,
+  () => {
+    pruneDuplicateResolutions()
+    applyRecommendedDuplicateSelections()
+    void loadDuplicateTargetBookLabels()
+  },
+  { immediate: true },
+)
 
 const reportData = computed(() => {
   const metrics = runReport.value?.metrics ?? runProgress.value?.metrics ?? []
@@ -370,15 +546,42 @@ onMounted(async () => {
 async function initialize() {
   loading.value = true
   try {
-    const [typesRes, usersRes, foldersRes] = await Promise.all([listSupportedSourceTypes(), listTargetUsers(), listTargetLibraryFolders()])
-    supportedTypes.value = typesRes
-    targetUsers.value = usersRes
-    targetLibraryFolders.value = foldersRes
+    await Promise.all([loadSupportedTypes(), loadTargetUsers(), loadTargetLibraryFolders()])
     await refreshWorkflowState()
   } catch (error) {
     toast.error(getErrorMessage(error, 'Failed to initialize migration settings'))
   } finally {
     loading.value = false
+  }
+}
+
+async function loadSupportedTypes() {
+  try {
+    supportedTypes.value = await listSupportedSourceTypes()
+  } catch (error) {
+    supportedTypes.value = []
+    toast.error(getErrorMessage(error, 'Failed to load supported migration source types'))
+  }
+}
+
+async function loadTargetUsers() {
+  busy.loadingTargetUsers = true
+  try {
+    targetUsers.value = await listTargetUsers()
+  } catch (error) {
+    targetUsers.value = []
+    toast.error(getErrorMessage(error, 'Failed to load target users'))
+  } finally {
+    busy.loadingTargetUsers = false
+  }
+}
+
+async function loadTargetLibraryFolders() {
+  try {
+    targetLibraryFolders.value = await listTargetLibraryFolders()
+  } catch (error) {
+    targetLibraryFolders.value = []
+    toast.error(getErrorMessage(error, 'Failed to load target library folders'))
   }
 }
 
@@ -388,6 +591,7 @@ async function refreshWorkflowState() {
   hydratePathMappings()
   hydrateUserMappingsFromProfile()
   if (source.value?.lastValidatedAt) {
+    if (targetUsers.value.length === 0) await loadTargetUsers()
     await hydrateUserMappingsFromSuggestions(false)
     await autoLoadPathPrefixes()
   }
@@ -439,11 +643,12 @@ async function hydrateUserMappingsFromSuggestions(showSuccessToast: boolean) {
     const response = await suggestUserMappings(currentSource.id)
     suggestionsLoadedAt.value = response.generatedAt
     const savedMappings = new Map((profile.value?.userMappings ?? []).map((row) => [row.sourceUserId, row.targetUserId]))
+    const fallbackSingleTargetUserId = targetUsers.value.length === 1 ? (targetUsers.value[0]?.id ?? null) : null
 
     userMappings.value = response.suggestions.map((row) => ({
       sourceUserId: row.sourceUserId,
       username: row.username,
-      targetUserId: savedMappings.get(row.sourceUserId) ?? row.suggestedTargetUserId,
+      targetUserId: savedMappings.get(row.sourceUserId) ?? row.suggestedTargetUserId ?? fallbackSingleTargetUserId,
     }))
 
     if (showSuccessToast) {
@@ -478,6 +683,14 @@ function hasValidSourceDraft() {
   return !!sourceDraft.name.trim() && !!sourceDraft.host.trim() && !!sourceDraft.user.trim() && !!sourceDraft.database.trim()
 }
 
+function extractWarningStrings(result: Record<string, unknown>): string[] {
+  return Array.isArray(result.warnings) ? (result.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : []
+}
+
+function extractMediaPathWarnings(result: Record<string, unknown>): string[] {
+  return extractWarningStrings(result).filter((warning) => /mediarootpath/i.test(warning))
+}
+
 async function onTestSource() {
   if (!hasValidSourceDraft()) {
     toast.error('Host, user, database, and source name are required')
@@ -488,8 +701,17 @@ async function onTestSource() {
   try {
     const result = await testSource({ type: sourceDraft.type, connectionConfig: buildSourceConnectionConfig() })
     const missing = Array.isArray(result.missingTables) ? result.missingTables.length : 0
+    const warnings = extractWarningStrings(result)
     if (result.ok === true) {
-      toast.success('Connection test passed')
+      if (warnings.length > 0) {
+        const mediaPathWarning = warnings.find((warning) => /mediarootpath/i.test(warning))
+        const highlightedWarning = mediaPathWarning ?? warnings[0] ?? 'Connection test passed with warnings'
+        toast.warning(
+          warnings.length === 1 ? highlightedWarning : `Connection test passed with ${warnings.length} warning(s). First: ${highlightedWarning}`,
+        )
+      } else {
+        toast.success('Connection test passed')
+      }
     } else {
       toast.warning(`Connection ok, but ${missing} required table(s) are missing`)
     }
@@ -497,6 +719,60 @@ async function onTestSource() {
     toast.error(friendlyConnectionError(error))
   } finally {
     busy.testingSource = false
+  }
+}
+
+async function onTestMediaPath() {
+  if (hasActiveRun.value) {
+    toast.error('Cannot test media path while a run is active')
+    return
+  }
+  if (!hasValidSourceDraft()) {
+    toast.error('Host, user, database, and source name are required')
+    return
+  }
+  const mediaRootPath = sourceDraft.mediaRootPath.trim()
+  if (!mediaRootPath) {
+    mediaPathTestState.value = 'fail'
+    const message = 'Media Root Path is required for cover import.'
+    mediaPathTestMessage.value = message
+    toast.error(message)
+    return
+  }
+  if (!mediaRootPath.startsWith('/')) {
+    mediaPathTestState.value = 'fail'
+    const message = 'Use an absolute path (for example: /books).'
+    mediaPathTestMessage.value = message
+    toast.error(message)
+    return
+  }
+
+  busy.testingMediaPath = true
+  try {
+    const result = await testSource({ type: sourceDraft.type, connectionConfig: buildSourceConnectionConfig() })
+    const mediaWarnings = extractMediaPathWarnings(result)
+    if (result.ok === true && mediaWarnings.length === 0) {
+      mediaPathTestState.value = 'pass'
+      mediaPathTestMessage.value = 'Media path verified.'
+      toast.success('Media path is valid and readable')
+    } else if (mediaWarnings.length > 0) {
+      mediaPathTestState.value = 'fail'
+      const message = mediaWarnings[0] ?? 'Media path validation failed.'
+      mediaPathTestMessage.value = message
+      toast.warning(message)
+    } else {
+      mediaPathTestState.value = 'fail'
+      const message = 'Connection test failed before media path validation could complete.'
+      mediaPathTestMessage.value = message
+      toast.warning(message)
+    }
+  } catch (error) {
+    mediaPathTestState.value = 'fail'
+    const message = friendlyConnectionError(error)
+    mediaPathTestMessage.value = message
+    toast.error(message)
+  } finally {
+    busy.testingMediaPath = false
   }
 }
 
@@ -546,6 +822,7 @@ async function autoLoadPathPrefixes() {
 }
 
 async function onReloadSuggestions() {
+  await loadTargetUsers()
   await hydrateUserMappingsFromSuggestions(true)
 }
 
@@ -1014,8 +1291,8 @@ function formatSourceCountLabel(key: string) {
         <!-- Card body -->
         <div class="px-6 py-6">
           <!-- Step 0: Source Connection -->
-          <div v-if="currentStep === 0" class="space-y-5">
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div v-if="currentStep === 0" class="space-y-3">
+            <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <label class="block">
                 <span class="settings-hint">Source Type</span>
                 <select v-model="sourceDraft.type" class="select-field mt-1 w-full" :disabled="hasActiveRun">
@@ -1065,23 +1342,34 @@ function formatSourceCountLabel(key: string) {
               </label>
               <label class="block md:col-span-2 xl:col-span-2">
                 <span class="settings-hint">Media Root Path</span>
-                <input
-                  v-model="sourceDraft.mediaRootPath"
-                  class="input-field mt-1 w-full"
-                  placeholder="/data/booklore/media"
-                  :disabled="hasActiveRun"
-                />
-                <p class="mt-1 text-xs" :class="sourceDraft.mediaRootPath.trim() ? 'text-muted-foreground' : 'text-amber-600'">
-                  {{
-                    sourceDraft.mediaRootPath.trim()
-                      ? 'Book cover images will be imported from this directory.'
-                      : 'Required for cover import. Without this, book covers will not be migrated.'
-                  }}
+                <div class="mt-1 flex items-center gap-2">
+                  <input v-model="sourceDraft.mediaRootPath" class="input-field w-full" placeholder="/data/booklore/media" :disabled="hasActiveRun" />
+                  <button
+                    type="button"
+                    :disabled="busy.testingMediaPath || hasActiveRun"
+                    class="inline-flex h-9 items-center rounded-md border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                    :class="
+                      mediaPathTestState === 'pass'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20'
+                        : mediaPathTestState === 'fail'
+                          ? 'border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20'
+                          : 'border-border bg-background text-foreground hover:bg-muted'
+                    "
+                    @click="onTestMediaPath"
+                  >
+                    <Loader2 v-if="busy.testingMediaPath" class="size-3.5 animate-spin" />
+                    <span v-else>
+                      {{ mediaPathTestState === 'pass' ? 'Path OK' : mediaPathTestState === 'fail' ? 'Path Issue' : 'Test Path' }}
+                    </span>
+                  </button>
+                </div>
+                <p class="mt-1 text-xs" :class="mediaRootPathHint.className">{{ mediaRootPathHint.text }}</p>
+                <p v-if="mediaPathTestMessage" class="mt-1 text-xs" :class="mediaPathTestState === 'pass' ? 'text-emerald-700' : 'text-amber-700'">
+                  {{ mediaPathTestMessage }}
                 </p>
               </label>
-              <div class="block">
-                <span class="settings-hint opacity-0 select-none">_</span>
-                <label class="mt-1 flex h-9 cursor-pointer items-center gap-2">
+              <div class="flex items-center">
+                <label class="flex h-9 cursor-pointer items-center gap-2">
                   <input v-model="sourceDraft.ssl" type="checkbox" class="size-4 rounded border-border" :disabled="hasActiveRun" />
                   <span class="settings-hint">Use TLS/SSL</span>
                 </label>
@@ -1126,10 +1414,10 @@ function formatSourceCountLabel(key: string) {
               <button
                 v-if="source"
                 class="text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
-                :disabled="busy.loadingSuggestions || hasActiveRun"
+                :disabled="busy.loadingSuggestions || busy.loadingTargetUsers || hasActiveRun"
                 @click="onReloadSuggestions"
               >
-                <Loader2 v-if="busy.loadingSuggestions" class="size-3 animate-spin inline" />
+                <Loader2 v-if="busy.loadingSuggestions || busy.loadingTargetUsers" class="size-3 animate-spin inline" />
                 Refresh
               </button>
             </div>
@@ -1158,6 +1446,9 @@ function formatSourceCountLabel(key: string) {
                 </tbody>
               </table>
             </div>
+            <p v-if="!busy.loadingTargetUsers && targetUsers.length === 0" class="text-xs text-amber-600">
+              No active target users found. Create or re-enable a BookOrbit user before mapping.
+            </p>
 
             <div class="space-y-2">
               <div class="flex items-center justify-between">
@@ -1172,15 +1463,15 @@ function formatSourceCountLabel(key: string) {
                 included in the migration.
               </p>
 
-              <div v-for="(row, index) in pathMappings" :key="index" class="grid gap-2 md:grid-cols-[1fr_1fr_auto] items-center">
-                <select v-model="row.sourcePrefix" class="select-field" :disabled="hasActiveRun">
+              <div v-for="(row, index) in pathMappings" :key="index" class="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center">
+                <select v-model="row.sourcePrefix" class="select-field w-full min-w-0" :disabled="hasActiveRun">
                   <option value="">
                     {{ sourcePathPrefixes.length === 0 ? 'No prefixes found - validate source first' : 'Select source prefix...' }}
                   </option>
                   <option v-for="prefix in sourcePathPrefixes" :key="prefix" :value="prefix">{{ prefix }}</option>
                 </select>
 
-                <select v-model="row.targetPrefix" class="select-field" :disabled="hasActiveRun">
+                <select v-model="row.targetPrefix" class="select-field w-full min-w-0" :disabled="hasActiveRun">
                   <option value="">Select target folder...</option>
                   <option v-for="folder in targetLibraryFolders" :key="folder.path" :value="folder.path">
                     {{ folder.libraryName }} - {{ folder.path }}
@@ -1231,31 +1522,52 @@ function formatSourceCountLabel(key: string) {
               </div>
 
               <div v-if="duplicateMatches.length > 0" class="space-y-3 border-t border-border pt-3">
-                <div>
-                  <p class="font-medium text-red-600">Duplicate target matches</p>
+                <div class="space-y-1">
+                  <p class="font-medium text-red-600">Resolve duplicate target matches</p>
                   <p class="text-xs text-muted-foreground">
-                    Multiple source books matched the same target book. Select which source book to use for each target.
+                    For each target book, choose one source book to keep. Recommended choices are preselected when there is a single strongest match.
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Remaining groups:
+                    <span class="font-medium text-foreground">{{ duplicateGroupsRemaining }}</span>
+                    of {{ duplicateMatches.length }}
                   </p>
                 </div>
                 <div class="space-y-3">
                   <div v-for="dup in duplicateMatches" :key="dup.targetBookId" class="rounded border border-border bg-background p-3 space-y-2">
-                    <p class="text-xs font-medium">Target book #{{ dup.targetBookId }}</p>
+                    <p class="text-xs font-medium text-foreground">{{ targetBookLabel(dup.targetBookId) }}</p>
+                    <p class="text-[11px] text-muted-foreground">Target book #{{ dup.targetBookId }}</p>
                     <div class="space-y-1">
                       <label
                         v-for="sourceId in dup.sourceBookIds"
                         :key="sourceId"
-                        class="flex items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
+                        class="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
                       >
-                        <input
-                          type="radio"
-                          :name="`dup-${dup.targetBookId}`"
-                          :value="sourceId"
-                          :checked="duplicateResolutions.get(dup.targetBookId) === sourceId"
-                          class="accent-primary"
-                          @change="() => handleDuplicateSelection(dup.targetBookId, sourceId)"
-                        />
-                        <span>{{ sourceId }}</span>
-                        <span class="text-muted-foreground"> ({{ dup.strategies[dup.sourceBookIds.indexOf(sourceId)] ?? 'unknown' }}) </span>
+                        <div class="flex min-w-0 items-center gap-2">
+                          <input
+                            type="radio"
+                            :name="`dup-${dup.targetBookId}`"
+                            :value="sourceId"
+                            :checked="duplicateResolutions.get(dup.targetBookId) === sourceId"
+                            class="accent-primary"
+                            @change="() => handleDuplicateSelection(dup.targetBookId, sourceId)"
+                          />
+                          <div class="min-w-0">
+                            <p class="truncate">{{ sourceBookLabel(dup, sourceId) }}</p>
+                            <p v-if="sourceBookSecondary(dup, sourceId)" class="truncate text-[11px] text-muted-foreground">
+                              {{ sourceBookSecondary(dup, sourceId) }}
+                            </p>
+                          </div>
+                          <span
+                            v-if="isRecommendedSourceBook(dup, sourceId)"
+                            class="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
+                          >
+                            Recommended
+                          </span>
+                        </div>
+                        <span class="text-muted-foreground text-[11px] whitespace-nowrap">{{
+                          friendlyMatchStrategy(strategyForSource(dup, sourceId))
+                        }}</span>
                       </label>
                     </div>
                   </div>

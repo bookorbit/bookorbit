@@ -16,6 +16,7 @@ import { MigrationEncryptionService } from './core/migration-encryption.service'
 import { SourceAdapterRegistry } from './adapters/source-adapter.registry';
 import { BookloreSourceAdapter } from './adapters/booklore/booklore-source.adapter';
 import { BookloreConnector } from './adapters/booklore/booklore-connector';
+import { GrimmorySourceAdapter } from './adapters/grimmory/grimmory-source.adapter';
 import { MatchingService } from './planner/matching.service';
 import { MigrationPlannerService } from './planner/planner.service';
 import { PathMappingValidationService } from './planner/path-mapping-validation.service';
@@ -46,6 +47,7 @@ import { MigrationReportingService } from './reporting/migration-reporting.servi
     MigrationEncryptionService,
     BookloreConnector,
     BookloreSourceAdapter,
+    GrimmorySourceAdapter,
     SourceAdapterRegistry,
     MatchingService,
     MigrationPlannerService,
