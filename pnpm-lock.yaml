@@ -331,8 +331,8 @@ importers:
         specifier: ^8.0.7
         version: 8.0.7
       opentype.js:
-        specifier: ^1.3.4
-        version: 1.3.5
+        specifier: ^2.0.0
+        version: 2.0.0
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -7221,9 +7221,8 @@ packages:
     resolution: {integrity: sha512-YgBpdJHPyQ2UE5x+hlSXcnejzAvD0b22U2OuAP+8OnlJT+PjWPxtgmGqKKc+RgTM63U9gN0YzrYc71R2WT/hTA==}
     engines: {node: '>=18'}
 
-  opentype.js@1.3.5:
-    resolution: {integrity: sha512-thKDiELidAApOvXlncrpwDZKJCa9fXLEKM4+FoEWI+qTLDeNb+h7EkN+8a7KQODsB1GZ+Exz9KknkoPrEdXZDw==}
-    deprecated: This version should be ignored, it was meant to be published as 2.0.0 but got published as 1.3.5 by mistake. As of May 6th 2026 the latest v1 release is v1.3.4
+  opentype.js@2.0.0:
+    resolution: {integrity: sha512-kCyjv6xdDY1W/jLWZ/L3QhhTlKUqDZMQ5+Jdlw12b3dXkKNpYBqqlMMj0YDQPShWFTMwgZI1hG14kN3XUDSg/A==}
     hasBin: true
 
   optionator@0.9.4:
@@ -15805,7 +15804,7 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  opentype.js@1.3.5: {}
+  opentype.js@2.0.0: {}
 
   optionator@0.9.4:
     dependencies:
