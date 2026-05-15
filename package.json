@@ -56,14 +56,14 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
+    "@commitlint/config-conventional": "^21.0.1",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/github": "^11.0.1",
     "@semantic-release/release-notes-generator": "^14.1.1",
     "concurrently": "^9.2.1",
     "conventional-changelog-conventionalcommits": "^8.0.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.4",
     "prettier": "^3.8.3",
     "semantic-release": "^24.2.5"
   },
