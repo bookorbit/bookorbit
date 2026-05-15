@@ -12,6 +12,8 @@ export type FileEventResult =
   | { type: 'book-moved'; libraryId: number; bookIds: number[] }
   | { type: 'noop' };
 
+type FsStat = NonNullable<Awaited<ReturnType<typeof stat>>>;
+
 @Injectable()
 export class FileEventProcessorService {
   private readonly logger = new Logger(FileEventProcessorService.name);
@@ -231,7 +233,7 @@ export class FileEventProcessorService {
     const files = (await this.scannerRepo.findBookFilesByBookId(book.id))
       .filter((f) => f.role === 'content')
       .map((f) => ({ id: f.id, absolutePath: f.absolutePath, format: f.format, sizeBytes: f.sizeBytes }));
-    const existingContent: ((typeof files)[number] & { stat: Awaited<ReturnType<typeof stat>> })[] = [];
+    const existingContent: ((typeof files)[number] & { stat: FsStat })[] = [];
 
     for (const file of files) {
       const s = await stat(file.absolutePath).catch(() => null);
@@ -258,11 +260,7 @@ export class FileEventProcessorService {
     return { type: 'book-restored', libraryId: book.libraryId, bookIds: [book.id] };
   }
 
-  private async detectMovedFile(
-    newAbsolutePath: string,
-    fileStat: Awaited<ReturnType<typeof stat>>,
-    scopeLibraryId?: number,
-  ): Promise<FileEventResult> {
+  private async detectMovedFile(newAbsolutePath: string, fileStat: FsStat, scopeLibraryId?: number): Promise<FileEventResult> {
     const ino = Number(fileStat.ino);
     if (ino === 0) return { type: 'noop' };
 
@@ -314,7 +312,7 @@ export class FileEventProcessorService {
     return { type: 'book-moved', libraryId: rowLibraryId, bookIds: [file.bookId] };
   }
 
-  private statToFileInfo(s: Awaited<ReturnType<typeof stat>>): { ino: number; sizeBytes: number; mtime: Date } {
+  private statToFileInfo(s: FsStat): { ino: number; sizeBytes: number; mtime: Date } {
     return { ino: Number(s.ino), sizeBytes: Number(s.size), mtime: s.mtime };
   }
 
