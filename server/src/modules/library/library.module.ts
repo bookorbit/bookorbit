@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { AchievementModule } from '../achievement/achievement.module';
 import { BookModule } from '../book/book.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { ScannerModule } from '../scanner/scanner.module';
@@ -8,7 +9,7 @@ import { LibraryRepository } from './library.repository';
 import { LibraryService } from './library.service';
 
 @Module({
-  imports: [ScannerModule, forwardRef(() => BookModule), FileWriteModule],
+  imports: [ScannerModule, AchievementModule, forwardRef(() => BookModule), FileWriteModule],
   controllers: [LibraryController],
   providers: [LibraryService, LibraryRepository],
   exports: [LibraryService, LibraryRepository],

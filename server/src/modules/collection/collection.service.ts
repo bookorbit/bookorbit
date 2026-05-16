@@ -8,6 +8,7 @@ import { BookService } from '../book/book.service';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_COLLECTION_CREATED } from '../achievement/achievement-events.service';
 import { CollectionBooksDto } from './dto/collection-books.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
@@ -45,6 +46,7 @@ export class CollectionService {
     private readonly libraryService: LibraryService,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly bookService: BookService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {}
 
   private assertAccess(ownerId: number, user: RequestUser): void {
@@ -106,6 +108,10 @@ export class CollectionService {
         syncToKobo: dto.syncToKobo ?? false,
       });
       const [collection] = await this.collectionRepo.findById(inserted.id);
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_COLLECTION_CREATED, {
+        userId: user.id,
+        collectionId: inserted.id,
+      });
       return collection;
     } catch (error) {
       if (isUniqueViolation(error)) {

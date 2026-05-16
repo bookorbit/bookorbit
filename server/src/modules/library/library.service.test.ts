@@ -11,6 +11,7 @@ vi.mock('../scanner/lib/classify', () => ({
 import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { readdir, rm, stat } from 'fs/promises';
 
+import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { LibraryService } from './library.service';
 
@@ -32,6 +33,8 @@ describe('LibraryService', () => {
     hasUserAccess: vi.fn(),
     findAll: vi.fn(),
     findAllForUser: vi.fn(),
+    findAllIds: vi.fn(),
+    findAccessibleIdsForUser: vi.fn(),
     findAllFolders: vi.fn(),
     findFoldersByLibraryIds: vi.fn(),
     findById: vi.fn(),
@@ -59,13 +62,23 @@ describe('LibraryService', () => {
     findNonMissingPrimaryFilesByLibrary: vi.fn(),
     writeToFile: vi.fn(),
   };
+  const achievementEvents = {
+    emit: vi.fn(),
+  };
 
   let service: LibraryService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('/books');
-    service = new LibraryService(libraryRepo as any, config as any, scannerService as any, fileWatcherService as any, fileWriteService as any);
+    service = new LibraryService(
+      libraryRepo as any,
+      config as any,
+      scannerService as any,
+      fileWatcherService as any,
+      fileWriteService as any,
+      achievementEvents as any,
+    );
 
     mockStat.mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
     mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
@@ -84,6 +97,31 @@ describe('LibraryService', () => {
     expect(libraryRepo.findAllFolders).not.toHaveBeenCalled();
     expect(result[0].folders).toEqual([{ id: 1, path: '/a', createdAt: expect.any(Date) }]);
     expect(result[0].coverAspectRatio).toBe('1/1');
+  });
+
+  it('findAccessibleLibraryIds reads all IDs for superusers and scoped IDs for normal users', async () => {
+    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 3 }, { id: 4 }]);
+
+    await expect(service.findAccessibleLibraryIds({ id: 99, isSuperuser: true } as any)).resolves.toEqual([1, 2]);
+    await expect(service.findAccessibleLibraryIds({ id: 42, isSuperuser: false } as any)).resolves.toEqual([3, 4]);
+  });
+
+  it('findOne returns library details and normalizes organization mode', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Main', organizationMode: null }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 50, path: '/books/main' }]);
+
+    await expect(service.findOne(10)).resolves.toEqual({
+      id: 10,
+      name: 'Main',
+      organizationMode: 'book_per_folder',
+      folders: [{ id: 50, path: '/books/main' }],
+    });
+  });
+
+  it('findOne throws when library is missing', async () => {
+    libraryRepo.findById.mockResolvedValue([]);
+    await expect(service.findOne(111)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('verifyUserAccess bypasses lookup for superusers', async () => {
@@ -246,6 +284,48 @@ describe('LibraryService', () => {
     expect(libraryRepo.update).not.toHaveBeenCalled();
   });
 
+  it('grantAccess emits library catalog changed event for the granted user', async () => {
+    libraryRepo.grantAccess.mockResolvedValue({ libraryId: 4, userId: 21, accessLevel: 'read' });
+
+    await service.grantAccess(4, { userId: 21, accessLevel: 'read' } as any);
+
+    expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId: 21, libraryId: 4 });
+  });
+
+  it('revokeAccess emits library catalog changed event for the revoked user', async () => {
+    libraryRepo.revokeAccess.mockResolvedValue(undefined);
+
+    await service.revokeAccess(4, 21);
+
+    expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId: 21, libraryId: 4 });
+  });
+
+  it('getAccess proxies to repository', async () => {
+    libraryRepo.getAccessWithUsers.mockResolvedValue([{ userId: 1, accessLevel: 'read' }]);
+
+    const result = await service.getAccess(9);
+
+    expect(libraryRepo.getAccessWithUsers).toHaveBeenCalledWith(9);
+    expect(result).toEqual([{ userId: 1, accessLevel: 'read' }]);
+  });
+
+  it('updateAccess proxies to repository', async () => {
+    libraryRepo.updateAccess.mockResolvedValue({ libraryId: 9, userId: 1, accessLevel: 'write' });
+
+    const result = await service.updateAccess(9, 1, 'write');
+
+    expect(libraryRepo.updateAccess).toHaveBeenCalledWith(9, 1, 'write');
+    expect(result).toEqual({ libraryId: 9, userId: 1, accessLevel: 'write' });
+  });
+
+  it('reorder proxies library order updates', async () => {
+    libraryRepo.updateDisplayOrders.mockResolvedValue(undefined);
+
+    await service.reorder({ order: [3, 1, 2] } as any);
+
+    expect(libraryRepo.updateDisplayOrders).toHaveBeenCalledWith([3, 1, 2]);
+  });
+
   it('remove deletes library and cleans related cover directories', async () => {
     libraryRepo.findById.mockResolvedValue([{ id: 4, name: 'L' }]);
     libraryRepo.findBookIdsByLibrary.mockResolvedValue([{ id: 101 }, { id: 102 }]);
@@ -339,6 +419,16 @@ describe('LibraryService', () => {
     expect(onProgress).toHaveBeenNthCalledWith(1, { bookId: 1, status: 'success', reason: undefined });
     expect(onProgress).toHaveBeenNthCalledWith(2, { bookId: 2, status: 'failed', reason: 'write failed' });
     expect(onProgress).toHaveBeenNthCalledWith(3, { bookId: 3, status: 'skipped', reason: 'no changes' });
+  });
+
+  it('writeMetadataToFiles converts thrown write errors into failed results', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 1, name: 'L', fileWriteEnabled: true }]);
+    fileWriteService.findNonMissingPrimaryFilesByLibrary.mockResolvedValue([{ bookId: 1 }]);
+    fileWriteService.writeToFile.mockRejectedValue('disk offline');
+
+    const summary = await service.writeMetadataToFiles(1, 7, false);
+
+    expect(summary).toEqual({ processed: 1, succeeded: 0, failed: 1, skipped: 0, cancelled: false });
   });
 
   it('writeMetadataToFiles stops when cancellation is requested', async () => {

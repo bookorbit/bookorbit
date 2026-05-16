@@ -58,6 +58,7 @@ import { EntityManagerModule } from './modules/entity-manager/entity-manager.mod
 import { FontModule } from './modules/font/font.module';
 import { KoreaderModule } from './modules/koreader/koreader.module';
 import { AppInfoModule } from './modules/app-info/app-info.module';
+import { AchievementModule } from './modules/achievement/achievement.module';
 
 @Module({
   imports: [
@@ -124,6 +125,7 @@ import { AppInfoModule } from './modules/app-info/app-info.module';
     FontModule,
     KoreaderModule,
     AppInfoModule,
+    AchievementModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

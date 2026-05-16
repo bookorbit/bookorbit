@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import type { OidcProviderPublic } from '@bookorbit/types'
-import { ChevronDown, ChevronUp, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Upload } from 'lucide-vue-next'
+import type { OidcProviderPublic, UserSettings } from '@bookorbit/types'
+import { ChevronDown, ChevronUp, Clock, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Upload } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
@@ -31,11 +31,23 @@ const isMobile = useMediaQuery('(max-width: 767px)')
 const DEMO_RESTRICTED_ACCOUNT_MESSAGE = 'Demo-restricted account cannot edit account settings'
 
 const formName = ref('')
+const formTimezone = ref('UTC')
+const savingTimezone = ref(false)
+const timezoneChanged = computed(() => formTimezone.value !== ((user.value?.settings as UserSettings | undefined)?.timezone ?? 'UTC'))
+
+const timezones = (() => {
+  try {
+    return (Intl as typeof Intl & { supportedValuesOf: (key: string) => string[] }).supportedValuesOf('timeZone')
+  } catch {
+    return ['UTC']
+  }
+})()
 
 watch(
   () => user.value,
   (current) => {
     formName.value = current?.name ?? ''
+    formTimezone.value = (current?.settings as UserSettings | undefined)?.timezone ?? 'UTC'
   },
   { immediate: true },
 )
@@ -137,6 +149,30 @@ async function saveProfile() {
     toast.success('Profile updated')
   } finally {
     savingProfile.value = false
+  }
+}
+
+async function saveTimezone() {
+  if (!user.value) return
+  savingTimezone.value = true
+  try {
+    const res = await api('/api/v1/users/me/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { timezone: formTimezone.value } }),
+    })
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
+      const message = Array.isArray(payload?.message)
+        ? (payload.message[0] ?? 'Failed to save preferences')
+        : (payload?.message ?? 'Failed to save preferences')
+      toast.error(message)
+      return
+    }
+    await me()
+    toast.success('Preferences saved')
+  } finally {
+    savingTimezone.value = false
   }
 }
 
@@ -365,6 +401,31 @@ function closeUnlinkDialog() {
         </div>
         <p v-if="profileError" class="text-xs text-destructive">{{ profileError }}</p>
       </div>
+    </section>
+
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">
+      <div class="flex items-center gap-2">
+        <Clock class="h-4 w-4 text-muted-foreground shrink-0" />
+        <div>
+          <p class="text-sm font-semibold text-foreground">Reading Preferences</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Timezone is used for time-sensitive achievements like Early Bird and All-nighter.</p>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="space-y-1.5">
+          <label class="settings-label">Timezone</label>
+          <select
+            v-model="formTimezone"
+            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
+          </select>
+        </div>
+      </div>
+      <button class="settings-btn-primary" :disabled="!timezoneChanged || savingTimezone" @click="saveTimezone">
+        <Save :size="14" />
+        {{ savingTimezone ? 'Saving...' : 'Save preferences' }}
+      </button>
     </section>
 
     <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">

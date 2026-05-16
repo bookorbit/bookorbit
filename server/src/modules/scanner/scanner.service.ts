@@ -4,6 +4,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import type { BookMissingEvent, CoverRefreshedEvent, CoverRefreshProgressEvent, ScanBooksAddedEvent, ScanProgressEvent } from '@bookorbit/types';
 import { NotificationType } from '@bookorbit/types';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { NotificationService } from '../notification/notification.service';
@@ -96,6 +97,7 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly scanGateway: ScanGateway,
     private readonly notificationService: NotificationService,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
+    @Optional() private readonly achievementEvents?: AchievementEventsService,
   ) {}
 
   // ── Live book emission buffer ──────────────────────────────────────────────
@@ -276,6 +278,8 @@ export class ScannerService implements OnApplicationBootstrap {
         meta: { libraryId, count },
       })
       .catch(() => {});
+
+    this.emitLibraryCatalogChangedForLibrary(libraryId);
   }
 
   bufferBooksRestoredNotification(libraryId: number, bookIds: number[]): void {
@@ -312,6 +316,8 @@ export class ScannerService implements OnApplicationBootstrap {
         meta: { libraryId, count },
       })
       .catch(() => {});
+
+    this.emitLibraryCatalogChangedForLibrary(libraryId);
   }
 
   private flushWatcherNotification(libraryId: number): void {
@@ -336,6 +342,28 @@ export class ScannerService implements OnApplicationBootstrap {
         });
       })
       .catch(() => {});
+
+    this.emitLibraryCatalogChangedForLibrary(libraryId);
+  }
+
+  private emitLibraryCatalogChangedForUsers(libraryId: number, userIds: number[]): void {
+    if (!this.achievementEvents || userIds.length === 0) return;
+    for (const userId of userIds) {
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId, libraryId });
+    }
+  }
+
+  private emitLibraryCatalogChangedForLibrary(libraryId: number): void {
+    if (!this.achievementEvents) return;
+
+    this.scannerRepo
+      .findLibraryAccessibleUserIds(libraryId)
+      .then((userIds) => this.emitLibraryCatalogChangedForUsers(libraryId, userIds))
+      .catch((err) => {
+        this.logger.warn(
+          `[scanner.achievement_emit] [fail] libraryId=${libraryId} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - failed to emit library catalog achievement event`,
+        );
+      });
   }
 
   async onApplicationBootstrap(): Promise<void> {
@@ -1010,6 +1038,10 @@ export class ScannerService implements OnApplicationBootstrap {
           meta: { libraryId, jobId, ...totals },
         })
         .catch(() => {});
+
+      if (totals.addedCount > 0 || totals.updatedCount > 0 || totals.missingCount > 0) {
+        this.emitLibraryCatalogChangedForLibrary(libraryId);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await this.scannerRepo.failScanJob(jobId, message).catch(() => {

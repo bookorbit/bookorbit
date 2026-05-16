@@ -16,6 +16,7 @@ import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';
 
+import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { ScannerService } from './scanner.service';
 import { ScanJobStore } from './scan-job-store.service';
 import { DEFAULT_FORMAT_PRIORITY } from './lib/classify';
@@ -78,6 +79,7 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
       excludePatterns: [],
       organizationMode: 'book_per_folder',
     }),
+    findLibraryAccessibleUserIds: vi.fn().mockResolvedValue([]),
     createScanJob: vi.fn().mockResolvedValue({ id: 100 }),
     completeScanJob: vi.fn().mockResolvedValue(undefined),
     failScanJob: vi.fn().mockResolvedValue(undefined),
@@ -109,6 +111,7 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     findBookFilesByBookId: vi.fn().mockResolvedValue([]),
     findBookFilesByBookIds: vi.fn().mockResolvedValue([]),
     findBookById: vi.fn().mockResolvedValue(null),
+    findBookCardData: vi.fn().mockResolvedValue({ rows: [], authorRows: [], fileRows: [], genreRows: [] }),
     deleteBookFile: vi.fn().mockResolvedValue(undefined),
     updateBookFolderPath: vi.fn().mockResolvedValue(undefined),
     findDirScanState: vi.fn().mockResolvedValue(new Map()),
@@ -140,8 +143,17 @@ const mockMetadata = {
 function makeService(repo: ReturnType<typeof makeRepo>) {
   const jobStore = new ScanJobStore();
   const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
-  const service = new ScannerService(repo as any, mockMetadata as any, jobStore, mockGateway as any, notificationService as any);
-  return { service, jobStore, notificationService };
+  const achievementEvents = { emit: vi.fn() };
+  const service = new ScannerService(
+    repo as any,
+    mockMetadata as any,
+    jobStore,
+    mockGateway as any,
+    notificationService as any,
+    undefined,
+    achievementEvents as any,
+  );
+  return { service, jobStore, notificationService, achievementEvents };
 }
 
 /**
@@ -313,6 +325,47 @@ describe('books unavailable notifications', () => {
         meta: { libraryId: 4, count: 1 },
       }),
     );
+  });
+});
+
+describe('achievement event emission', () => {
+  it('emits library catalog changed for accessible users when unavailable notification flushes', async () => {
+    const repo = makeRepo({
+      findLibraryAccessibleUserIds: vi.fn().mockResolvedValue([7, 11]),
+    });
+    const { service, achievementEvents } = makeService(repo);
+
+    service.bufferBooksUnavailableNotification(9, [1, 2]);
+    (service as any).flushBooksUnavailableNotification(9);
+
+    await vi.waitFor(() => {
+      expect(achievementEvents.emit).toHaveBeenCalledTimes(2);
+    });
+    expect(repo.findLibraryAccessibleUserIds).toHaveBeenCalledWith(9);
+    expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId: 7, libraryId: 9 });
+    expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId: 11, libraryId: 9 });
+  });
+
+  it('emits library catalog changed when a scan changes library contents', async () => {
+    const repo = makeRepo({
+      findLibraryAccessibleUserIds: vi.fn().mockResolvedValue([3]),
+      findBookCardData: vi.fn().mockResolvedValue({ rows: [], authorRows: [], fileRows: [], genreRows: [] }),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/New Book', [makeFileStat({ absolutePath: '/library/Author/New Book/book.epub' })])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service, achievementEvents } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    await vi.waitFor(() => {
+      expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId: 3, libraryId: 1 });
+    });
   });
 });
 

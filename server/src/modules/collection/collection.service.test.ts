@@ -71,14 +71,19 @@ function makeService() {
     executeBooksQuery: vi.fn(),
   };
 
+  const achievementEvents = {
+    emit: vi.fn(),
+  };
+
   const service = new CollectionService(
     collectionRepo as never,
     bookReadService as never,
     libraryService as never,
     queryBuilder as never,
     bookService as never,
+    achievementEvents as never,
   );
-  return { service, collectionRepo, bookReadService, libraryService, queryBuilder, bookService };
+  return { service, collectionRepo, bookReadService, libraryService, queryBuilder, bookService, achievementEvents };
 }
 
 describe('CollectionService', () => {

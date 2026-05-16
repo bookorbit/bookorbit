@@ -4,7 +4,9 @@ vi.mock('../auth/auth.module', () => ({ AuthModule: class AuthModule {} }));
 vi.mock('../book-metadata-fetch/book-metadata-fetch.module', () => ({ BookMetadataFetchModule: class BookMetadataFetchModule {} }));
 vi.mock('../metadata/metadata.module', () => ({ MetadataModule: class MetadataModule {} }));
 vi.mock('../notification/notification.module', () => ({ NotificationModule: class NotificationModule {} }));
+vi.mock('../achievement/achievement.module', () => ({ AchievementModule: class AchievementModule {} }));
 
+import { AchievementModule } from '../achievement/achievement.module';
 import { AuthModule } from '../auth/auth.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
 import { MetadataModule } from '../metadata/metadata.module';
@@ -23,9 +25,10 @@ describe('ScannerModule', () => {
     const imports = Reflect.getMetadata('imports', ScannerModule) as unknown[];
     expect(imports[0]).toBe(MetadataModule);
     expect(imports[1]).toBe(AuthModule);
-    expect(imports[2]).toEqual(expect.objectContaining({ forwardRef: expect.any(Function) }));
+    expect(imports[2]).toBe(AchievementModule);
     expect(imports[3]).toEqual(expect.objectContaining({ forwardRef: expect.any(Function) }));
-    expect(imports[4]).toEqual(expect.objectContaining({ module: expect.any(Function) }));
+    expect(imports[4]).toEqual(expect.objectContaining({ forwardRef: expect.any(Function) }));
+    expect(imports[5]).toEqual(expect.objectContaining({ module: expect.any(Function) }));
 
     expect(Reflect.getMetadata('controllers', ScannerModule)).toEqual([ScannerController]);
     expect(Reflect.getMetadata('providers', ScannerModule)).toEqual([

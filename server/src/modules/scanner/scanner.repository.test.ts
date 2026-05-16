@@ -99,6 +99,23 @@ describe('ScannerRepository', () => {
     await expect(repo.findLibraryFolderPath(2)).resolves.toBeNull();
   });
 
+  it('reads library name and returns null when missing', async () => {
+    const { repo, queues } = makeRepo();
+    queues.select.push([{ name: 'Shelf One' }]);
+    queues.select.push([]);
+
+    await expect(repo.findLibraryName(1)).resolves.toBe('Shelf One');
+    await expect(repo.findLibraryName(2)).resolves.toBeNull();
+  });
+
+  it('returns unique accessible user ids including explicit library access and superusers', async () => {
+    const { repo, queues } = makeRepo();
+    queues.select.push([{ userId: 2 }, { userId: 3 }]);
+    queues.select.push([{ userId: 1 }, { userId: 3 }]);
+
+    await expect(repo.findLibraryAccessibleUserIds(9)).resolves.toEqual([2, 3, 1]);
+  });
+
   it('creates and updates books, including primary file reassignment and missing state', async () => {
     const { repo, queues, db, chains } = makeRepo();
     queues.insert.push([{ id: 11, libraryId: 9, folderPath: '/books/Book', status: 'present' }]);
@@ -115,6 +132,15 @@ describe('ScannerRepository', () => {
     expect(chains.insert[0].mocks.onConflictDoUpdate).toHaveBeenCalledTimes(1);
     expect(chains.insert[1].mocks.onConflictDoNothing).toHaveBeenCalledTimes(1);
     expect(db.update).toHaveBeenCalledTimes(4);
+  });
+
+  it('promotes processing books to present and reports whether a row changed', async () => {
+    const { repo, queues } = makeRepo();
+    queues.update.push([{ id: 10 }]);
+    queues.update.push([]);
+
+    await expect(repo.promoteProcessingBookToPresent(10)).resolves.toBe(true);
+    await expect(repo.promoteProcessingBookToPresent(99)).resolves.toBe(false);
   });
 
   it('queries book/file lookups with optional scope variants', async () => {
@@ -231,6 +257,15 @@ describe('ScannerRepository', () => {
     expect(db.update).toHaveBeenCalledTimes(1);
   });
 
+  it('finds books by id and returns null when absent', async () => {
+    const { repo, queues } = makeRepo();
+    queues.select.push([{ id: 44, folderPath: '/books/Found' }]);
+    queues.select.push([]);
+
+    await expect(repo.findBookById(44)).resolves.toEqual({ id: 44, folderPath: '/books/Found' });
+    await expect(repo.findBookById(45)).resolves.toBeNull();
+  });
+
   it('returns empty card data for empty input and aggregates card data for requested books', async () => {
     const { repo, queues } = makeRepo();
     await expect(repo.findBookCardData([])).resolves.toEqual({ rows: [], authorRows: [], fileRows: [], genreRows: [] });
@@ -246,5 +281,50 @@ describe('ScannerRepository', () => {
       fileRows: [{ bookId: 1, id: 10, format: 'epub', role: 'content' }],
       genreRows: [{ bookId: 1, name: 'Fiction' }],
     });
+  });
+
+  it('handles directory scan state lookups and upserts', async () => {
+    const { repo, queues, db } = makeRepo();
+    queues.select.push([
+      { dirPath: '/books/a', lastSeenMtimeMs: 100 },
+      { dirPath: '/books/b', lastSeenMtimeMs: 200 },
+    ]);
+    queues.insert.push([]);
+    queues.insert.push([]);
+
+    const map = await repo.findDirScanState(7);
+    expect(map.get('/books/a')).toBe(100);
+    expect(map.get('/books/b')).toBe(200);
+
+    await repo.upsertDirScanState(7, []);
+    expect(db.insert).toHaveBeenCalledTimes(0);
+
+    const entries = Array.from({ length: 501 }, (_, i) => ({ dirPath: `/books/${i}`, mtimeMs: i + 0.4 }));
+    await repo.upsertDirScanState(7, entries);
+    expect(db.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes stale directory scan state across all branch paths', async () => {
+    const { repo, queues, db } = makeRepo();
+
+    await repo.deleteStaleDirScanState(7, new Set());
+    expect(db.delete).toHaveBeenCalledTimes(1);
+
+    queues.select.push([
+      { id: 1, dirPath: '/keep' },
+      { id: 2, dirPath: '/drop' },
+    ]);
+    await repo.deleteStaleDirScanState(7, new Set(['/keep']));
+    expect(db.delete).toHaveBeenCalledTimes(2);
+
+    queues.select.push([{ id: 3, dirPath: '/keep-only' }]);
+    await repo.deleteStaleDirScanState(7, new Set(['/keep-only']));
+    expect(db.delete).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears directory scan state for a library folder', async () => {
+    const { repo, db } = makeRepo();
+    await repo.clearDirScanState(21);
+    expect(db.delete).toHaveBeenCalledTimes(1);
   });
 });

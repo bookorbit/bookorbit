@@ -1,9 +1,12 @@
 import { computed, ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
 import { api, getAccessToken } from '@/lib/api'
-import type { NotificationItem, NotificationPage } from '@bookorbit/types'
+import type { AchievementRarity, NotificationItem, NotificationPage } from '@bookorbit/types'
+import { NotificationType } from '@bookorbit/types'
+import { showAchievementToast } from '@/features/achievements/utils/achievementToast'
 
 const PAGE_SIZE = 20
+const ACHIEVEMENT_RARITIES: readonly AchievementRarity[] = ['common', 'rare', 'epic', 'legendary']
 
 const notifications = ref<NotificationItem[]>([])
 const unreadCount = ref(0)
@@ -16,6 +19,25 @@ let loaded = false
 let offset = 0
 
 const hasMore = computed(() => notifications.value.length < total.value)
+
+function isAchievementRarity(value: unknown): value is AchievementRarity {
+  return typeof value === 'string' && ACHIEVEMENT_RARITIES.includes(value as AchievementRarity)
+}
+
+function resolveAchievementToastPayload(item: NotificationItem): { name: string; rarity: AchievementRarity } {
+  const meta = item.meta
+  const metaRarity = meta?.['rarity']
+  const metaName = meta?.['achievementName']
+
+  const rarity = isAchievementRarity(metaRarity) ? metaRarity : 'common'
+  const messageName = item.message?.trim() ?? ''
+  const fallbackName = typeof metaName === 'string' ? metaName.trim() : ''
+
+  return {
+    name: messageName || fallbackName || 'New achievement',
+    rarity,
+  }
+}
 
 function requestNotifications(reset: boolean, markLoading: boolean): Promise<void> {
   if (fetchPromise) return fetchPromise
@@ -69,6 +91,11 @@ function getSocket(): Socket {
       notifications.value = [item, ...notifications.value]
       total.value++
       unreadCount.value++
+
+      if (item.type === NotificationType.AchievementUnlocked) {
+        const { name, rarity } = resolveAchievementToastPayload(item)
+        showAchievementToast(name, rarity)
+      }
     })
 
     socket.on('notification:unread-count', (data: { count: number }) => {

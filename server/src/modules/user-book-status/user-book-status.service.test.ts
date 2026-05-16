@@ -32,7 +32,7 @@ beforeEach(() => {
   mockRepo.findOne.mockResolvedValue(null);
   mockRepo.findByBookIds.mockResolvedValue([]);
   mockRepo.upsert.mockResolvedValue(undefined);
-  service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository);
+  service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository, { emit: vi.fn() } as never);
 });
 
 describe('setManual', () => {

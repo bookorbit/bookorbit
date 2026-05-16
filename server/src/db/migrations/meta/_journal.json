@@ -22,6 +22,13 @@
       "when": 1778543840852,
       "tag": "0002_koreader-sync",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778890017858,
+      "tag": "0003_add-achievements-tables",
+      "breakpoints": true
     }
   ]
 }

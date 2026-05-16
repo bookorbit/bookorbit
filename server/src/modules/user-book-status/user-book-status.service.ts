@@ -3,6 +3,7 @@ import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import type { UserBookStatusRow } from '../../db/schema';
 import { isReadStatus, isReadStatusSource } from './user-book-status.constants';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from '../achievement/achievement-events.service';
 
 const DEFAULT_FINISH_THRESHOLD = 98;
 const READING_THRESHOLD = 0.25;
@@ -11,10 +12,23 @@ const MAX_PERCENTAGE = 100;
 
 @Injectable()
 export class UserBookStatusService {
-  constructor(private readonly repo: UserBookStatusRepository) {}
+  constructor(
+    private readonly repo: UserBookStatusRepository,
+    private readonly achievementEvents: AchievementEventsService,
+  ) {}
 
   async setManual(userId: number, bookId: number, status: ReadStatus): Promise<void> {
+    const existing = await this.repo.findOne(userId, bookId);
+    const previousStatus = existing?.status ?? null;
     await this.repo.upsert(userId, bookId, status, 'manual', new Date());
+    if (status !== previousStatus) {
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
+        userId,
+        bookId,
+        newStatus: status,
+        previousStatus,
+      });
+    }
   }
 
   async bulkSetManual(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
@@ -23,6 +37,17 @@ export class UserBookStatusService {
     const existing = await this.repo.findByBookIds(userId, bookIds);
     const existingMap = new Map(existing.map((row) => [row.bookId, row]));
     await Promise.all(bookIds.map((bookId) => this.repo.upsert(userId, bookId, status, 'manual', now, existingMap.get(bookId))));
+    for (const bookId of bookIds) {
+      const previousStatus = existingMap.get(bookId)?.status ?? null;
+      if (status !== previousStatus) {
+        this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
+          userId,
+          bookId,
+          newStatus: status,
+          previousStatus,
+        });
+      }
+    }
   }
 
   async autoUpdate(
@@ -44,7 +69,14 @@ export class UserBookStatusService {
     if (!existing && derived === 'unread') return;
     if (existing?.status === derived) return;
 
+    const previousStatus = existing?.status ?? null;
     await this.repo.upsert(userId, bookId, derived, 'auto', new Date(), existing);
+    this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
+      userId,
+      bookId,
+      newStatus: derived,
+      previousStatus,
+    });
   }
 
   async findOne(userId: number, bookId: number): Promise<UserBookStatus | null> {

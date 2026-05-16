@@ -13,6 +13,7 @@ import { STATISTICS_CHART_META } from '../statistics-chart-meta'
 import { useStatisticsConfig } from '../composables/useStatisticsConfig'
 import StatisticsGrid from './StatisticsGrid.vue'
 import StatisticsSummaryCard from './StatisticsSummaryCard.vue'
+import AchievementsTab from '@/features/achievements/components/AchievementsTab.vue'
 
 const {
   orderedLibraryCharts,
@@ -36,9 +37,11 @@ const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
 const configOpen = ref(false)
 
-const initialTab = route.query.tab === 'user' ? 'user' : 'library'
-const activeTab = ref<'library' | 'user'>(initialTab)
-const loaded = ref<Set<'library' | 'user'>>(new Set([initialTab]))
+const initialTab = (['library', 'user', 'achievements'] as const).includes(route.query.tab as 'library' | 'user' | 'achievements')
+  ? (route.query.tab as 'library' | 'user' | 'achievements')
+  : 'library'
+const activeTab = ref<'library' | 'user' | 'achievements'>(initialTab)
+const loaded = ref<Set<'library' | 'user' | 'achievements'>>(new Set([initialTab]))
 
 // Called in setup (not onMounted) so filters are populated before chart children mount.
 init()
@@ -112,7 +115,7 @@ function chartMeta(id: StatisticsChartId) {
   return STATISTICS_CHART_META[id]
 }
 
-function setTab(tab: 'library' | 'user') {
+function setTab(tab: 'library' | 'user' | 'achievements') {
   activeTab.value = tab
   loaded.value.add(tab)
   void router.replace({ query: { ...route.query, tab } })
@@ -141,9 +144,18 @@ function setTab(tab: 'library' | 'user') {
         >
           My Reading
         </button>
+        <button
+          :class="[
+            'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
+            activeTab === 'achievements' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="setTab('achievements')"
+        >
+          Achievements
+        </button>
       </div>
 
-      <div class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end">
+      <div v-if="activeTab !== 'achievements'" class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end">
         <Popover v-if="libraries.length > 1">
           <PopoverTrigger as-child>
             <button
@@ -196,7 +208,7 @@ function setTab(tab: 'library' | 'user') {
       </div>
     </div>
 
-    <StatisticsSummaryCard />
+    <StatisticsSummaryCard v-if="activeTab !== 'achievements'" />
 
     <Sheet v-model:open="configOpen">
       <SheetContent side="right" class="w-[90dvw] max-w-[90dvw] sm:w-[420px] sm:max-w-[420px]">
@@ -252,6 +264,9 @@ function setTab(tab: 'library' | 'user') {
     </div>
     <div v-if="loaded.has('user')" v-show="activeTab === 'user'">
       <StatisticsGrid :charts="visibleUserCharts" />
+    </div>
+    <div v-if="loaded.has('achievements')" v-show="activeTab === 'achievements'">
+      <AchievementsTab />
     </div>
   </div>
 </template>

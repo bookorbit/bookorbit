@@ -16,6 +16,8 @@ import {
   libraries,
   libraryFolders,
   scanJobs,
+  userLibraryAccess,
+  users,
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -73,6 +75,18 @@ export class ScannerRepository {
   async findLibraryName(libraryId: number): Promise<string | null> {
     const [row] = await this.db.select({ name: libraries.name }).from(libraries).where(eq(libraries.id, libraryId)).limit(1);
     return row?.name ?? null;
+  }
+
+  async findLibraryAccessibleUserIds(libraryId: number): Promise<number[]> {
+    const [accessRows, superuserRows] = await Promise.all([
+      this.db.select({ userId: userLibraryAccess.userId }).from(userLibraryAccess).where(eq(userLibraryAccess.libraryId, libraryId)),
+      this.db.select({ userId: users.id }).from(users).where(eq(users.isSuperuser, true)),
+    ]);
+
+    const userIds = new Set<number>();
+    for (const row of accessRows) userIds.add(row.userId);
+    for (const row of superuserRows) userIds.add(row.userId);
+    return [...userIds];
   }
 
   // ── Books ──────────────────────────────────────────────────────────────────

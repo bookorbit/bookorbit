@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_ANNOTATION_CREATED } from '../achievement/achievement-events.service';
 import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_STYLE } from './annotation.constants';
 import { AnnotationRepository } from './annotation.repository';
 import { AnnotationResponseDto } from './dto/annotation-response.dto';
@@ -13,6 +14,7 @@ export class AnnotationService {
   constructor(
     private readonly annotationRepo: AnnotationRepository,
     private readonly bookService: BookService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {}
 
   async getAnnotations(bookId: number, user: RequestUser): Promise<AnnotationResponseDto[]> {
@@ -32,6 +34,11 @@ export class AnnotationService {
       style: dto.style ?? DEFAULT_ANNOTATION_STYLE,
       note: dto.note ?? null,
       chapterTitle: dto.chapterTitle ?? null,
+    });
+    this.achievementEvents.emit(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+      userId: user.id,
+      bookId,
+      annotationId: row.id,
     });
     return AnnotationResponseDto.from(row);
   }

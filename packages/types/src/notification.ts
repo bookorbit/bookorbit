@@ -16,6 +16,7 @@ export const NotificationType = {
   MigrationFailed: "migration_failed",
   FileWriteBackCompleted: "file_write_back_completed",
   FileWriteBackFailed: "file_write_back_failed",
+  AchievementUnlocked: "achievement_unlocked",
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -29,6 +30,7 @@ export const NOTIFICATION_CATEGORIES = {
   koboSync: [NotificationType.KoboSyncCompleted],
   migration: [NotificationType.MigrationCompleted, NotificationType.MigrationFailed],
   fileWriteBack: [NotificationType.FileWriteBackCompleted, NotificationType.FileWriteBackFailed],
+  achievements: [NotificationType.AchievementUnlocked],
 } as const;
 
 export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
@@ -42,6 +44,7 @@ export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> 
   koboSync: "Kobo Sync",
   migration: "Data Migration",
   fileWriteBack: "File Write-back",
+  achievements: "Achievements",
 };
 
 export type NotificationPreferences = {

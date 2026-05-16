@@ -43,6 +43,7 @@
     "@tanstack/vue-virtual": "^3.13.24",
     "@types/howler": "^2.2.12",
     "@vueuse/core": "^14.3.0",
+    "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dompurify": "^3.4.3",
@@ -65,6 +66,7 @@
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/dompurify": "^3.2.0",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^25.8.0",

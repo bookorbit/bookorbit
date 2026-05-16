@@ -52,7 +52,10 @@ function makeService() {
   const bookService = {
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
   };
-  const service = new AnnotationService(annotationRepo as never, bookService as never);
+  const achievementEvents = {
+    emit: vi.fn(),
+  };
+  const service = new AnnotationService(annotationRepo as never, bookService as never, achievementEvents as never);
   return { service, annotationRepo, bookService };
 }
 

@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
+import type { UserSettings } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } from '../achievement/achievement-events.service';
 import type { SaveReadingSessionDto } from './dto/save-reading-session.dto';
 import { ReadingSessionRepository } from './reading-session.repository';
 
@@ -12,6 +14,7 @@ export class ReadingSessionService {
   constructor(
     private readonly repo: ReadingSessionRepository,
     private readonly bookService: BookService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {}
 
   async save(fileId: number, dto: SaveReadingSessionDto, user: RequestUser): Promise<void> {
@@ -53,6 +56,19 @@ export class ReadingSessionService {
       this.logger.log(
         `[${event}] [end] fileId=${fileId} userId=${user.id} sessionId=${dto.sessionId} durationMs=${Date.now() - startedAtMs} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - reading session save completed`,
       );
+
+      if (result.kind === 'saved') {
+        this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
+          userId: user.id,
+          bookFileId: fileId,
+          durationSeconds,
+          startedAt,
+          endedAt,
+          progressDelta: dto.progressDelta ?? null,
+          endProgress: dto.endProgress ?? null,
+          timezone: (user.settings as unknown as UserSettings)?.timezone ?? 'UTC',
+        });
+      }
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
       const errorMessage = (error instanceof Error ? error.message : 'unknown error').replaceAll('"', "'");

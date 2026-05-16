@@ -24,6 +24,7 @@ export interface UserSettings {
   notificationPreferences?: import("./notification").NotificationPreferences;
   seriesCollapsePreferences?: import("./series-collapse").SeriesCollapsePreferences;
   dashboardConfig?: import("./dashboard").DashboardConfig;
+  timezone?: string;
 }
 
 export interface AuthUser {

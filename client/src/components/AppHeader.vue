@@ -1,6 +1,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowLeft, Search, Palette, Upload, X, KeyRound, Settings, LogOut, PackageOpen, BarChart3, User, MoreVertical } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  Search,
+  Palette,
+  Upload,
+  X,
+  KeyRound,
+  Settings,
+  LogOut,
+  PackageOpen,
+  BarChart3,
+  Trophy,
+  User,
+  MoreVertical,
+} from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -48,7 +62,14 @@ const { subscribe: subscribeNotifications } = useNotifications()
 const themeStore = useThemeStore()
 
 const isBookDockActive = computed(() => route.name === 'book-dock')
-const isStatisticsActive = computed(() => route.name === 'statistics')
+const statisticsTab = computed<string | null>(() => {
+  const tab = route.query.tab
+  if (typeof tab === 'string') return tab
+  if (Array.isArray(tab)) return tab[0] ?? null
+  return null
+})
+const isAchievementsActive = computed(() => route.name === 'statistics' && statisticsTab.value === 'achievements')
+const isStatisticsActive = computed(() => route.name === 'statistics' && !isAchievementsActive.value)
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 const canChangePassword = computed(
@@ -62,6 +83,10 @@ function navigateToBookDock() {
 
 function navigateToStatistics() {
   router.push({ name: 'statistics', query: { tab: 'library' } })
+}
+
+function navigateToAchievements() {
+  router.push({ name: 'statistics', query: { tab: 'achievements' } })
 }
 
 function navigateToAccount() {
@@ -477,6 +502,10 @@ function formatBadgeClass(fmt: string): string {
               <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
               Statistics
             </DropdownMenuItem>
+            <DropdownMenuItem @click="navigateToAchievements">
+              <Trophy :size="15" class="mr-2 text-muted-foreground" />
+              Achievements
+            </DropdownMenuItem>
             <DropdownMenuItem v-if="hasPermission('library_upload')" @click="uploadOpen = true">
               <Upload :size="15" class="mr-2 text-muted-foreground" />
               Upload books
@@ -571,6 +600,27 @@ function formatBadgeClass(fmt: string): string {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Statistics</TooltipContent>
+          </Tooltip>
+
+          <!-- Achievements button -->
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 border transition-colors"
+                :class="[
+                  isAchievementsActive
+                    ? 'border-primary/80 bg-primary/8 text-primary'
+                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
+                  iconRadiusClass,
+                ]"
+                @click="navigateToAchievements"
+              >
+                <Trophy :size="15" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Achievements</TooltipContent>
           </Tooltip>
 
           <!-- Upload button -->

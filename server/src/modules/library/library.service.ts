@@ -15,6 +15,7 @@ import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../common/types/request-user';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { FileWatcherService } from '../scanner/file-watcher.service';
@@ -57,6 +58,7 @@ export class LibraryService {
     private readonly scannerService: ScannerService,
     private readonly fileWatcherService: FileWatcherService,
     private readonly fileWriteService: FileWriteService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -288,16 +290,20 @@ export class LibraryService {
     return this.libraryRepo.getAccessWithUsers(libraryId);
   }
 
-  grantAccess(libraryId: number, dto: GrantLibraryAccessDto) {
-    return this.libraryRepo.grantAccess(libraryId, dto.userId, dto.accessLevel);
+  async grantAccess(libraryId: number, dto: GrantLibraryAccessDto) {
+    const result = await this.libraryRepo.grantAccess(libraryId, dto.userId, dto.accessLevel);
+    this.achievementEvents.emit(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId: dto.userId, libraryId });
+    return result;
   }
 
   updateAccess(libraryId: number, userId: number, accessLevel: AccessLevel) {
     return this.libraryRepo.updateAccess(libraryId, userId, accessLevel);
   }
 
-  revokeAccess(libraryId: number, userId: number) {
-    return this.libraryRepo.revokeAccess(libraryId, userId);
+  async revokeAccess(libraryId: number, userId: number) {
+    const result = await this.libraryRepo.revokeAccess(libraryId, userId);
+    this.achievementEvents.emit(ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED, { userId, libraryId });
+    return result;
   }
 
   async writeMetadataToFiles(

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Check, RefreshCw, Sparkles, ArrowUpFromLine, CheckCircle2, AlertCircle, Loader2, Bell } from 'lucide-vue-next'
+import { Check, RefreshCw, Sparkles, ArrowUpFromLine, CheckCircle2, AlertCircle, Loader2, Bell, Award } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import MigrationModal from '@/features/migration/components/MigrationModal.vue'
 import { api } from '@/lib/api'
 import { getWorkflowState, type MigrationWorkflowState } from '@/features/migration/lib/migration-api'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const showMigrationModal = ref(false)
 
@@ -19,6 +20,11 @@ const migrationLoading = ref(true)
 
 const updateCheckEnabled = ref(true)
 const updateCheckLoading = ref(false)
+const achievementBackfillRunning = ref(false)
+const achievementBackfillError = ref<string | null>(null)
+const achievementBackfillResult = ref<{ usersProcessed: number; awardsGranted: number } | null>(null)
+
+const { isSuperuser } = usePermissions()
 
 const migrationSource = computed(() => migrationState.value?.active?.source ?? null)
 const migrationRun = computed(() => migrationState.value?.active?.run ?? null)
@@ -100,6 +106,32 @@ async function rebuildEmbeddings() {
     toast.error(`Failed to rebuild embeddings: ${embeddingError.value ?? 'Unknown error'}`)
   } finally {
     running.value = false
+  }
+}
+
+async function runAchievementBackfill() {
+  if (!isSuperuser.value || achievementBackfillRunning.value) return
+
+  if (!confirm('Run achievement backfill for all achievements across all users? This may take a while.')) return
+
+  achievementBackfillRunning.value = true
+  achievementBackfillError.value = null
+  achievementBackfillResult.value = null
+
+  try {
+    const res = await api('/api/v1/achievements/admin/backfill', {
+      method: 'POST',
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+    const result: { usersProcessed: number; awardsGranted: number } = await res.json()
+    achievementBackfillResult.value = result
+    toast.success(`Achievement backfill complete: ${result.awardsGranted} awards granted`)
+  } catch (e) {
+    achievementBackfillError.value = e instanceof Error ? e.message : 'Failed to run backfill'
+    toast.error(`Failed to run achievement backfill: ${achievementBackfillError.value}`)
+  } finally {
+    achievementBackfillRunning.value = false
   }
 }
 
@@ -226,6 +258,43 @@ function formatDate(iso: string | null | undefined): string {
           <button class="settings-btn-outline self-start md:w-auto md:shrink-0" :disabled="running" @click="rebuildEmbeddings">
             <RefreshCw :size="13" :class="running ? 'animate-spin' : ''" />
             {{ running ? 'Running...' : 'Run' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    <div v-if="isSuperuser">
+      <p class="settings-group-label">Achievements</p>
+      <div class="border border-border rounded-lg bg-card px-4 py-4 md:px-5 md:py-5 shadow-xs">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Award :size="16" class="text-primary" />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <p class="settings-label">Backfill achievements</p>
+              <p
+                class="settings-hint leading-relaxed max-w-sm md:[display:block] overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+              >
+                Re-evaluate achievements across all users.
+              </p>
+
+              <p v-if="achievementBackfillResult" class="mt-2 text-xs text-green-600 dark:text-green-400">
+                Processed {{ achievementBackfillResult.usersProcessed }} users; granted {{ achievementBackfillResult.awardsGranted }} awards.
+              </p>
+              <p v-if="achievementBackfillError" class="mt-2 text-xs text-destructive">{{ achievementBackfillError }}</p>
+            </div>
+          </div>
+
+          <button
+            class="settings-btn-outline self-start md:w-auto md:shrink-0"
+            :disabled="achievementBackfillRunning"
+            @click="runAchievementBackfill"
+          >
+            <RefreshCw :size="13" :class="achievementBackfillRunning ? 'animate-spin' : ''" />
+            {{ achievementBackfillRunning ? 'Running...' : 'Run Backfill' }}
           </button>
         </div>
       </div>

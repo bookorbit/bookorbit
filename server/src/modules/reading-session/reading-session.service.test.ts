@@ -41,7 +41,11 @@ describe('ReadingSessionService', () => {
     mockBookService.verifyFileAccess.mockResolvedValue(undefined);
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    service = new ReadingSessionService(mockRepo as unknown as ReadingSessionRepository, mockBookService as unknown as BookService);
+    service = new ReadingSessionService(
+      mockRepo as unknown as ReadingSessionRepository,
+      mockBookService as unknown as BookService,
+      { emit: vi.fn() } as never,
+    );
   });
 
   it('verifies access and persists a session with wall-clock clamped duration', async () => {
