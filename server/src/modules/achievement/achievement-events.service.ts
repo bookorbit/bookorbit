@@ -8,6 +8,7 @@ export const ACHIEVEMENT_EVENT_COLLECTION_CREATED = 'collection.created';
 export const ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED = 'library.catalog-changed';
 export const ACHIEVEMENT_EVENT_BACKFILL = 'achievement.backfill';
 export const ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED = 'achievement.awarded';
+export const ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED = 'book.rating-changed';
 
 export interface ReadingSessionSavedPayload {
   userId: number;
@@ -43,12 +44,19 @@ export interface LibraryCatalogChangedPayload {
   libraryId: number;
 }
 
+export interface BookRatingChangedPayload {
+  userId: number;
+  bookIds: number[];
+  rating: number | null;
+}
+
 export type AchievementEventPayload =
   | ReadingSessionSavedPayload
   | BookStatusChangedPayload
   | AnnotationCreatedPayload
   | CollectionCreatedPayload
-  | LibraryCatalogChangedPayload;
+  | LibraryCatalogChangedPayload
+  | BookRatingChangedPayload;
 
 @Injectable()
 export class AchievementEventsService extends EventEmitter {}

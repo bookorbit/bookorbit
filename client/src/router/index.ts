@@ -108,6 +108,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { maxWidth: 'max-w-3xl', title: 'KOReader Sync' },
           },
           {
+            path: 'hardcover',
+            name: 'settings-hardcover',
+            component: () => import('@/features/hardcover/components/HardcoverSettings.vue'),
+            meta: { maxWidth: 'max-w-3xl', title: 'Hardcover' },
+          },
+          {
             path: 'email',
             name: 'settings-email',
             component: () => import('@/features/email/components/EmailSettings.vue'),

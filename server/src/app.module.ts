@@ -59,6 +59,7 @@ import { FontModule } from './modules/font/font.module';
 import { KoreaderModule } from './modules/koreader/koreader.module';
 import { AppInfoModule } from './modules/app-info/app-info.module';
 import { AchievementModule } from './modules/achievement/achievement.module';
+import { HardcoverModule } from './modules/hardcover/hardcover.module';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { AchievementModule } from './modules/achievement/achievement.module';
     KoreaderModule,
     AppInfoModule,
     AchievementModule,
+    HardcoverModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

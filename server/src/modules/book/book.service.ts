@@ -45,6 +45,7 @@ import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-
 import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
@@ -180,6 +181,7 @@ export class BookService {
     private readonly bookMetadataLockService: BookMetadataLockService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
+    @Optional() private readonly achievementEvents: AchievementEventsService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -1120,7 +1122,13 @@ export class BookService {
       this.metadataService.emitAuthorsReplaced(id, replacedAuthorIds);
 
       if (dto.rating !== undefined) {
-        await this.bookRepo.bulkSetRating([id], dto.rating ?? null, user.id);
+        const rating = dto.rating ?? null;
+        await this.bookRepo.bulkSetRating([id], rating, user.id);
+        this.achievementEvents?.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, {
+          userId: user.id,
+          bookIds: [id],
+          rating,
+        });
       }
 
       this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
@@ -1318,6 +1326,11 @@ export class BookService {
     if (updatableIds.length > 0) {
       await this.bookRepo.bulkSetRating(updatableIds, rating, user.id);
       this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
+      this.achievementEvents?.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, {
+        userId: user.id,
+        bookIds: updatableIds,
+        rating,
+      });
     }
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} rating=${rating ?? 'null'} updated=${updatableIds.length} skippedLocked=${lockedIds.size} durationMs=${Date.now() - startedAt} - bulk set rating completed`,
