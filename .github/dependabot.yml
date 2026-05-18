@@ -14,6 +14,10 @@ updates:
       - "npm"
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # archiver v8 is ESM-only with a completely different API; pin to v7 until we migrate
+      - dependency-name: "archiver"
+        update-types: ["version-update:semver-major"]
     groups:
       production-dependencies:
         dependency-type: "production"

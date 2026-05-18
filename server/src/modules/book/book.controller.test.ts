@@ -559,6 +559,98 @@ describe('BookController', () => {
     expect(archive.abort).toHaveBeenCalled();
   });
 
+  it('aborts archive on raw "aborted" event', async () => {
+    const { controller, bookService } = makeController();
+    const { reply, emitRawEvent } = makeReply();
+    bookService.getExportFiles.mockResolvedValue({
+      files: [{ absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 }],
+      projectedBytes: 10,
+      bookCount: 1,
+      scope: 'primary',
+    });
+    const archive = {
+      pipe: vi.fn(),
+      file: vi.fn(),
+      on: vi.fn().mockReturnThis(),
+      abort: vi.fn(),
+      finalize: vi.fn().mockImplementation(() => {
+        emitRawEvent('aborted');
+        return Promise.reject(new Error('stream aborted'));
+      }),
+    };
+    (archiver as unknown as vi.Mock).mockReturnValueOnce(archive);
+
+    await expect(controller.exportBooks({ bookIds: [1], allFormats: false }, makeUser(), reply)).resolves.toBeUndefined();
+    expect(archive.abort).toHaveBeenCalled();
+  });
+
+  it('releases export slot when zip archive export fails', async () => {
+    const { controller, bookService } = makeController();
+    const { reply } = makeReply();
+    const release = vi.fn();
+    bookService.acquireExportSlot.mockReturnValueOnce(release);
+    bookService.getExportFiles.mockResolvedValue({
+      files: [{ absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 }],
+      projectedBytes: 10,
+      bookCount: 1,
+      scope: 'primary',
+    });
+    const archive = {
+      pipe: vi.fn(),
+      file: vi.fn(),
+      on: vi.fn().mockReturnThis(),
+      abort: vi.fn(),
+      finalize: vi.fn().mockRejectedValue(new Error('zip failure')),
+    };
+    (archiver as unknown as vi.Mock).mockReturnValueOnce(archive);
+
+    await expect(controller.exportBooks({ bookIds: [1], allFormats: false }, makeUser(), reply)).rejects.toThrow('zip failure');
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('archive warning event rejects the zip export', async () => {
+    const { controller, bookService } = makeController();
+    const { reply } = makeReply();
+    bookService.getExportFiles.mockResolvedValue({
+      files: [{ absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 }],
+      projectedBytes: 10,
+      bookCount: 1,
+      scope: 'primary',
+    });
+    const listeners: Record<string, (err: Error) => void> = {};
+    const archive = {
+      pipe: vi.fn(),
+      file: vi.fn(),
+      on: vi.fn().mockImplementation((event: string, cb: (err: Error) => void) => {
+        listeners[event] = cb;
+        return archive;
+      }),
+      abort: vi.fn(),
+      finalize: vi.fn().mockImplementation(() => {
+        void Promise.resolve().then(() => listeners['warning']?.(new Error('archive warning')));
+        return new Promise<void>(() => {});
+      }),
+    };
+    (archiver as unknown as vi.Mock).mockReturnValueOnce(archive);
+
+    await expect(controller.exportBooks({ bookIds: [1], allFormats: false }, makeUser(), reply)).rejects.toThrow('archive warning');
+  });
+
+  it('exportBooksDownload with scope=all passes through correctly', async () => {
+    const { controller, bookService } = makeController();
+    const { reply } = makeReply();
+    bookService.getExportFiles.mockResolvedValue({
+      files: [{ absolutePath: '/books/a.epub', zipPath: 'A.epub', sizeBytes: 10 }],
+      projectedBytes: 10,
+      bookCount: 1,
+      scope: 'all',
+    });
+
+    await controller.exportBooksDownload('5,6', 'all', makeUser(), reply);
+
+    expect(bookService.getExportFiles).toHaveBeenCalledWith([5, 6], expect.any(Object), 'all');
+  });
+
   it('delegates book-level progress endpoint to service with current user id', async () => {
     const { controller, bookService } = makeController();
     const user = makeUser();
