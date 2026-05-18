@@ -54,6 +54,7 @@ jobs:
         run: pnpm exec commitlint --config commitlint.config.cjs --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
 
       - name: Validate referenced issues exist
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
