@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   AuthorAutoEnrichmentWriteMode,
   DEFAULT_DOWNLOAD_PATTERN,
-  DEFAULT_UPLOAD_PATTERN,
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
   DEFAULT_METADATA_SCORE_WEIGHTS,
   type MetadataScoreWeights,
   type BookDockAutoFinalizeMetadataMode,
@@ -81,11 +82,20 @@ export class AppSettingsService {
 
   async getUploadPattern(): Promise<string> {
     const row = await this.repo.findByKey(APP_SETTING_KEYS.UPLOAD_FILE_PATTERN);
-    return row?.value ?? DEFAULT_UPLOAD_PATTERN;
+    return row?.value ?? DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE;
   }
 
   async setUploadPattern(pattern: string): Promise<void> {
     await this.repo.upsert(APP_SETTING_KEYS.UPLOAD_FILE_PATTERN, pattern);
+  }
+
+  async getUploadPatternBookPerFolder(): Promise<string> {
+    const row = await this.repo.findByKey(APP_SETTING_KEYS.UPLOAD_FILE_PATTERN_BOOK_PER_FOLDER);
+    return row?.value ?? DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER;
+  }
+
+  async setUploadPatternBookPerFolder(pattern: string): Promise<void> {
+    await this.repo.upsert(APP_SETTING_KEYS.UPLOAD_FILE_PATTERN_BOOK_PER_FOLDER, pattern);
   }
 
   async getDownloadPattern(): Promise<string> {

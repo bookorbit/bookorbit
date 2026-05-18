@@ -35,6 +35,7 @@ function makeService() {
   const appSettings = {
     getAutoFinalizeSettings: vi.fn(),
     getUploadPattern: vi.fn().mockResolvedValue(null),
+    getUploadPatternBookPerFolder: vi.fn().mockResolvedValue(null),
   };
   const metadataService = {
     downloadAndSaveCover: vi.fn().mockResolvedValue(false),
@@ -489,6 +490,48 @@ describe('BookDockFinalizeService', () => {
     ]);
   });
 
+  it('previewNames uses folder-mode global pattern for book_per_folder library', async () => {
+    const { service, repo, appSettings, db } = makeService();
+    repo.findByIds.mockResolvedValue([makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata })]);
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{title}/');
+    db.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: 10, fileNamingPattern: null, organizationMode: 'book_per_folder' }]),
+      }),
+    });
+
+    const result = await service.previewNames([1], false, [], undefined);
+    expect(result[0].newName).toBe('Dune/book.epub');
+  });
+
+  it('previewNames uses file-mode global pattern for book_per_file library', async () => {
+    const { service, repo, appSettings, db } = makeService();
+    repo.findByIds.mockResolvedValue([makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata })]);
+    appSettings.getUploadPattern.mockResolvedValue('{title}.{extension}');
+    db.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: 10, fileNamingPattern: null, organizationMode: 'book_per_file' }]),
+      }),
+    });
+
+    const result = await service.previewNames([1], false, [], undefined);
+    expect(result[0].newName).toBe('Dune.epub');
+  });
+
+  it('previewNames library-specific pattern wins over mode-specific global pattern', async () => {
+    const { service, repo, appSettings, db } = makeService();
+    repo.findByIds.mockResolvedValue([makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata })]);
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{authors:first}/{title}/');
+    db.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: 10, fileNamingPattern: '{title}.{extension}', organizationMode: 'book_per_folder' }]),
+      }),
+    });
+
+    const result = await service.previewNames([1], false, [], undefined);
+    expect(result[0].newName).toBe('Dune.epub');
+  });
+
   it('applyMetadata updates scalar metadata fields and related author/genre rows', async () => {
     const { service, db, metadataService } = makeService();
     const updateChain = {
@@ -674,6 +717,42 @@ describe('BookDockFinalizeService', () => {
     await expect((service as any).resolveDestination({ fileNamingPattern: null }, '/library', rowWithMeta, 'epub')).resolves.toBe(
       '/library/original.epub',
     );
+  });
+
+  it('resolveDestination uses folder-mode global pattern for book_per_folder libraries', async () => {
+    const { service, appSettings } = makeService();
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{title}/');
+    const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'Foundation' } as BookDockMetadata });
+
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: null, organizationMode: 'book_per_folder' }, '/library', row, 'epub'),
+    ).resolves.toBe('/library/Foundation/book.epub');
+    expect(appSettings.getUploadPatternBookPerFolder).toHaveBeenCalled();
+    expect(appSettings.getUploadPattern).not.toHaveBeenCalled();
+  });
+
+  it('resolveDestination uses file-mode global pattern for book_per_file libraries', async () => {
+    const { service, appSettings } = makeService();
+    appSettings.getUploadPattern.mockResolvedValue('{title}.{extension}');
+    const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'Foundation' } as BookDockMetadata });
+
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: null, organizationMode: 'book_per_file' }, '/library', row, 'epub'),
+    ).resolves.toBe('/library/Foundation.epub');
+    expect(appSettings.getUploadPattern).toHaveBeenCalled();
+    expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
+  });
+
+  it('resolveDestination library pattern wins over mode-specific global pattern', async () => {
+    const { service, appSettings } = makeService();
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{authors:first}/{title}/');
+    const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'Dune' } as BookDockMetadata });
+
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: '{title}.{extension}', organizationMode: 'book_per_folder' }, '/library', row, 'epub'),
+    ).resolves.toBe('/library/Dune.epub');
+    expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
+    expect(appSettings.getUploadPattern).not.toHaveBeenCalled();
   });
 
   it('findDuplicate resolves from prebuilt lookup before querying database', async () => {

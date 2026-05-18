@@ -1,7 +1,7 @@
 import {
   applyModifier,
   DEFAULT_DOWNLOAD_PATTERN,
-  DEFAULT_UPLOAD_PATTERN,
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
   EXAMPLE_PATTERN_METADATA,
   replacePlaceholders,
   resolveDownloadFilename,
@@ -368,7 +368,7 @@ describe('validatePattern', () => {
   });
 
   it('accepts a complex realistic pattern', () => {
-    expect(validatePattern(DEFAULT_UPLOAD_PATTERN)).toBe(true);
+    expect(validatePattern(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE)).toBe(true);
   });
 
   it('accepts path separators and common punctuation', () => {
@@ -400,10 +400,10 @@ describe('validatePattern', () => {
   });
 });
 
-// ── DEFAULT_UPLOAD_PATTERN integration ───────────────────────────────────────
+// ── DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE integration ─────────────────────────
 
-describe('DEFAULT_UPLOAD_PATTERN', () => {
-  const P = DEFAULT_UPLOAD_PATTERN;
+describe('DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE', () => {
+  const P = DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE;
 
   it('full metadata: author / series / index. title (year)', () => {
     expect(resolveUploadPath(P, FULL, 'epub')).toBe('William Gibson/Sprawl/01. Neuromancer (1984).epub');

@@ -96,7 +96,11 @@ export class UploadService {
     filename: string,
     format: string,
   ): Promise<{ absolutePath: string; bookFolderPath: string; relPath: string }> {
-    const pattern = library.fileNamingPattern ?? (await this.appSettings.getUploadPattern());
+    const pattern =
+      library.fileNamingPattern ??
+      (library.organizationMode === 'book_per_folder'
+        ? await this.appSettings.getUploadPatternBookPerFolder()
+        : await this.appSettings.getUploadPattern());
 
     if (pattern) {
       const stem = basename(filename, extname(filename));

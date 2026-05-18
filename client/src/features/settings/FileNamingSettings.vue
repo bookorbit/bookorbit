@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Check, ChevronDown, ChevronUp, ClipboardCopy, FileText, Info, Loader2, RotateCcw, Save } from 'lucide-vue-next'
-import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN, PATTERN_TOKENS } from '@bookorbit/types'
+import { Check, ChevronDown, ChevronUp, ClipboardCopy, FolderOpen, Info, Loader2, RotateCcw, Save } from 'lucide-vue-next'
+import * as LucideIcons from 'lucide-vue-next'
+import {
+  DEFAULT_DOWNLOAD_PATTERN,
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
+  PATTERN_TOKENS,
+} from '@bookorbit/types'
 import { toast } from 'vue-sonner'
 import { useMediaQuery } from '@vueuse/core'
 import { useFileNamingPattern } from './composables/useFileNamingPattern'
@@ -12,20 +18,27 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 const {
   globalPattern,
   globalError,
+  folderPattern,
+  folderError,
   downloadPattern,
   downloadError,
   libraries,
   loadingGlobal,
   savingGlobal,
+  loadingFolder,
+  savingFolder,
   loadingDownload,
   savingDownload,
   savingLibraryId,
   fetchGlobalPattern,
+  fetchFolderPattern,
   fetchDownloadPattern,
   fetchLibraries,
   onGlobalPatternInput,
+  onFolderPatternInput,
   onDownloadPatternInput,
   saveGlobalPattern,
+  saveFolderPattern,
   saveDownloadPattern,
   saveLibraryPattern,
   clearLibraryPattern,
@@ -42,8 +55,10 @@ const conditionalHelpOpen = ref(false)
 const examplesOpen = ref(false)
 
 const previewGlobalPattern = ref('')
+const previewFolderPattern = ref('')
 const previewDownloadPattern = ref('')
 let globalPreviewTimer: ReturnType<typeof setTimeout> | null = null
+let folderPreviewTimer: ReturnType<typeof setTimeout> | null = null
 let downloadPreviewTimer: ReturnType<typeof setTimeout> | null = null
 
 const MODIFIERS = [
@@ -138,6 +153,11 @@ const EXAMPLES = [
   },
 ]
 
+function getLibraryIconComponent(name: string | null | undefined) {
+  if (!name) return FolderOpen
+  return (LucideIcons as Record<string, unknown>)[name] ?? FolderOpen
+}
+
 async function copyToken(token: string) {
   await navigator.clipboard.writeText(`{${token}}`)
   toast.success(`{${token}} copied to clipboard`)
@@ -164,6 +184,17 @@ function syncPreviewGlobal(value: string) {
   }, 250)
 }
 
+function syncPreviewFolder(value: string) {
+  if (folderPreviewTimer) clearTimeout(folderPreviewTimer)
+  if (!isMobile.value) {
+    previewFolderPattern.value = value
+    return
+  }
+  folderPreviewTimer = setTimeout(() => {
+    previewFolderPattern.value = value
+  }, 250)
+}
+
 function syncPreviewDownload(value: string) {
   if (downloadPreviewTimer) clearTimeout(downloadPreviewTimer)
   if (!isMobile.value) {
@@ -180,12 +211,14 @@ onMounted(async () => {
   modifierHelpOpen.value = !isMobile.value
   conditionalHelpOpen.value = !isMobile.value
   examplesOpen.value = !isMobile.value
-  await Promise.all([fetchGlobalPattern(), fetchDownloadPattern(), fetchLibraries()])
+  await Promise.all([fetchGlobalPattern(), fetchFolderPattern(), fetchDownloadPattern(), fetchLibraries()])
   previewGlobalPattern.value = globalPattern.value
+  previewFolderPattern.value = folderPattern.value
   previewDownloadPattern.value = downloadPattern.value
 })
 
 watch(globalPattern, (value) => syncPreviewGlobal(value), { immediate: true })
+watch(folderPattern, (value) => syncPreviewFolder(value), { immediate: true })
 watch(downloadPattern, (value) => syncPreviewDownload(value), { immediate: true })
 watch(isMobile, (mobile) => {
   tokenHelpOpen.value = !mobile
@@ -193,14 +226,17 @@ watch(isMobile, (mobile) => {
   conditionalHelpOpen.value = !mobile
   examplesOpen.value = !mobile
   previewGlobalPattern.value = globalPattern.value
+  previewFolderPattern.value = folderPattern.value
   previewDownloadPattern.value = downloadPattern.value
 })
 
 const uploadPreviewValue = computed(() => previewPath(previewGlobalPattern.value))
+const folderPreviewValue = computed(() => previewPath(previewFolderPattern.value))
 const downloadPreviewValue = computed(() => previewDownloadName(previewDownloadPattern.value))
 
 onUnmounted(() => {
   if (globalPreviewTimer) clearTimeout(globalPreviewTimer)
+  if (folderPreviewTimer) clearTimeout(folderPreviewTimer)
   if (downloadPreviewTimer) clearTimeout(downloadPreviewTimer)
 })
 </script>
@@ -224,11 +260,20 @@ onUnmounted(() => {
     <div class="md:hidden sticky top-0 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg p-3 space-y-3">
       <div class="space-y-1.5 pt-1 pb-4 border-border/60">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Upload preview</p>
-          <button class="text-xs text-primary hover:underline" @click="copyText(uploadPreviewValue, 'Upload preview')">Copy</button>
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">File as Book preview</p>
+          <button class="text-xs text-primary hover:underline" @click="copyText(uploadPreviewValue, 'File as Book preview')">Copy</button>
         </div>
         <div class="rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs overflow-x-auto whitespace-nowrap">
           {{ uploadPreviewValue }}
+        </div>
+      </div>
+      <div class="space-y-1.5 pt-1 pb-4 border-border/60">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Folder as Book preview</p>
+          <button class="text-xs text-primary hover:underline" @click="copyText(folderPreviewValue, 'Folder as Book preview')">Copy</button>
+        </div>
+        <div class="rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs overflow-x-auto whitespace-nowrap">
+          {{ folderPreviewValue }}
         </div>
       </div>
       <div class="space-y-1.5">
@@ -246,19 +291,19 @@ onUnmounted(() => {
     <section class="space-y-4">
       <p class="settings-group-label">Global Defaults</p>
       <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
-        <!-- Upload pattern -->
+        <!-- File as Book upload pattern -->
         <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
-          <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div class="max-w-md">
-              <p class="settings-label">Upload Pattern</p>
-              <p class="settings-hint">Controls the folder structure and filename for new uploads. Applied to all libraries unless overridden.</p>
+          <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+            <div class="w-full lg:max-w-md">
+              <p class="settings-label">File as Book default</p>
+              <p class="settings-hint">Upload pattern for libraries using File as Book mode. Each file is one book.</p>
             </div>
-            <div class="flex flex-col gap-4 w-full md:flex-row md:items-center md:w-auto">
-              <div class="relative flex-1 md:w-120">
+            <div class="flex flex-col gap-4 w-full lg:flex-row lg:items-center lg:w-auto">
+              <div class="relative flex-1 lg:w-120 xl:w-140">
                 <input
                   :value="globalPattern"
                   type="text"
-                  :placeholder="DEFAULT_UPLOAD_PATTERN"
+                  :placeholder="DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE"
                   class="input-field w-full"
                   :class="globalError ? 'border-destructive focus:ring-destructive/20' : ''"
                   :disabled="loadingGlobal"
@@ -267,7 +312,7 @@ onUnmounted(() => {
                 <p v-if="globalError" class="absolute -bottom-5 left-0 text-[11px] text-destructive font-medium">{{ globalError }}</p>
               </div>
               <button
-                class="flex items-center justify-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 md:h-8"
+                class="flex items-center justify-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 lg:h-8"
                 :disabled="savingGlobal || !!globalError || loadingGlobal"
                 @click="saveGlobalPattern"
               >
@@ -284,15 +329,53 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Folder as Book upload pattern -->
+        <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+            <div class="w-full lg:max-w-md">
+              <p class="settings-label">Folder as Book default</p>
+              <p class="settings-hint">Upload pattern for libraries using Folder as Book mode. Each book must be in its own folder.</p>
+            </div>
+            <div class="flex flex-col gap-4 w-full lg:flex-row lg:items-center lg:w-auto">
+              <div class="relative flex-1 lg:w-120 xl:w-140">
+                <input
+                  :value="folderPattern"
+                  type="text"
+                  :placeholder="DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER"
+                  class="input-field w-full"
+                  :class="folderError ? 'border-destructive focus:ring-destructive/20' : ''"
+                  :disabled="loadingFolder"
+                  @input="onFolderPatternInput(($event.target as HTMLInputElement).value)"
+                />
+                <p v-if="folderError" class="absolute -bottom-5 left-0 text-[11px] text-destructive font-medium">{{ folderError }}</p>
+              </div>
+              <button
+                class="flex items-center justify-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 lg:h-8"
+                :disabled="savingFolder || !!folderError || loadingFolder"
+                @click="saveFolderPattern"
+              >
+                <Loader2 v-if="savingFolder" :size="14" class="animate-spin" />
+                <Save v-else :size="14" />
+                <span>Save</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
+            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+            <span class="text-foreground truncate">{{ folderPreviewValue }}</span>
+          </div>
+        </div>
+
         <!-- Download pattern -->
         <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
-          <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div class="max-w-md">
+          <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+            <div class="w-full lg:max-w-md">
               <p class="settings-label">Download Pattern</p>
               <p class="settings-hint">Suggested filenames for single-file downloads and files inside export ZIPs.</p>
             </div>
-            <div class="flex flex-col gap-4 w-full md:flex-row md:items-center md:w-auto">
-              <div class="relative flex-1 md:w-120">
+            <div class="flex flex-col gap-4 w-full lg:flex-row lg:items-center lg:w-auto">
+              <div class="relative flex-1 lg:w-120 xl:w-140">
                 <input
                   :value="downloadPattern"
                   type="text"
@@ -305,7 +388,7 @@ onUnmounted(() => {
                 <p v-if="downloadError" class="absolute -bottom-5 left-0 text-[11px] text-destructive font-medium">{{ downloadError }}</p>
               </div>
               <button
-                class="flex items-center justify-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 md:h-8"
+                class="flex items-center justify-center gap-2 h-9 px-3 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 lg:h-8"
                 :disabled="savingDownload || !!downloadError || loadingDownload"
                 @click="saveDownloadPattern"
               >
@@ -332,32 +415,42 @@ onUnmounted(() => {
           No libraries configured. Create one in Library settings to set custom naming patterns.
         </div>
 
-        <div v-for="lib in libraries" :key="lib.id" class="px-4 py-4 md:px-6 md:py-5 space-y-4">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
+        <div v-for="lib in libraries" :key="lib.id" class="px-4 py-4 md:px-6 md:py-5 space-y-3">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
               <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-muted shrink-0 text-muted-foreground">
-                <FileText :size="16" />
+                <component :is="getLibraryIconComponent(lib.icon)" :size="16" />
               </div>
               <div class="min-w-0">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="settings-label truncate">{{ lib.name }}</span>
                   <Badge v-if="lib.fileNamingPattern" variant="secondary" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight">
                     Custom
                   </Badge>
                   <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight opacity-60"> Default </Badge>
+                  <Badge
+                    variant="outline"
+                    class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight"
+                    :class="
+                      lib.organizationMode === 'book_per_folder' ? 'text-blue-500 border-blue-500/40' : 'text-emerald-500 border-emerald-500/40'
+                    "
+                  >
+                    {{ lib.organizationMode === 'book_per_folder' ? 'Folder as Book' : 'File as Book' }}
+                  </Badge>
                 </div>
-                <p class="text-xs text-muted-foreground font-mono truncate max-w-[300px]">
-                  {{ getEffectivePreview(lib) }}
-                </p>
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 w-full lg:w-auto">
               <input
                 v-model="lib.fileNamingPattern"
                 type="text"
-                :placeholder="globalPattern || DEFAULT_UPLOAD_PATTERN"
-                class="input-field w-full md:w-120 h-9 md:h-8 text-xs px-2.5"
+                :placeholder="
+                  lib.organizationMode === 'book_per_folder'
+                    ? folderPattern || DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER
+                    : globalPattern || DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE
+                "
+                class="input-field w-full lg:w-120 h-9 lg:h-8 text-xs px-2.5"
               />
               <button
                 class="shrink-0 flex items-center justify-center h-8 w-8 rounded-md border border-border bg-background text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/30 transition-all disabled:opacity-50"
@@ -378,6 +471,13 @@ onUnmounted(() => {
                 </TooltipTrigger>
                 <TooltipContent>Reset to default</TooltipContent>
               </Tooltip>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 text-xs">
+            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+            <div class="overflow-x-auto min-w-0 font-mono">
+              <span class="text-foreground whitespace-nowrap">{{ getEffectivePreview(lib) }}</span>
             </div>
           </div>
         </div>

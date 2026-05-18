@@ -1,4 +1,6 @@
-export const DEFAULT_UPLOAD_PATTERN = "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. >{title}< ({year})>";
+export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE = "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. >{title}< ({year})>";
+export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER =
+  "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. >{title}< ({year})>/<{seriesIndex}. >{title}< ({year})>";
 export const DEFAULT_DOWNLOAD_PATTERN = "{originalFilename}";
 
 export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {

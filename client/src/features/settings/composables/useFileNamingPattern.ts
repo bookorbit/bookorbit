@@ -24,6 +24,10 @@ export function useFileNamingPattern() {
   const globalError = ref('')
   const loadingGlobal = ref(false)
   const savingGlobal = ref(false)
+  const folderPattern = ref('')
+  const folderError = ref('')
+  const loadingFolder = ref(false)
+  const savingFolder = ref(false)
   const downloadPattern = ref('')
   const downloadError = ref('')
   const loadingDownload = ref(false)
@@ -45,6 +49,19 @@ export function useFileNamingPattern() {
     }
   }
 
+  async function fetchFolderPattern() {
+    loadingFolder.value = true
+    try {
+      const res = await api('/api/v1/app-settings/upload-pattern-folder')
+      if (res.ok) {
+        const data: { pattern: string } = await res.json()
+        folderPattern.value = data.pattern
+      }
+    } finally {
+      loadingFolder.value = false
+    }
+  }
+
   async function fetchDownloadPattern() {
     loadingDownload.value = true
     try {
@@ -61,6 +78,11 @@ export function useFileNamingPattern() {
   function onGlobalPatternInput(value: string) {
     globalPattern.value = value
     globalError.value = value && !validatePattern(value) ? 'Pattern contains invalid characters' : ''
+  }
+
+  function onFolderPatternInput(value: string) {
+    folderPattern.value = value
+    folderError.value = value && !validatePattern(value) ? 'Pattern contains invalid characters' : ''
   }
 
   function onDownloadPatternInput(value: string) {
@@ -84,6 +106,25 @@ export function useFileNamingPattern() {
       }
     } finally {
       savingGlobal.value = false
+    }
+  }
+
+  async function saveFolderPattern() {
+    if (folderError.value) return
+    savingFolder.value = true
+    try {
+      const res = await api('/api/v1/app-settings/upload-pattern-folder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pattern: folderPattern.value }),
+      })
+      if (res.ok) {
+        toast.success('Default pattern saved')
+      } else {
+        toast.error('Failed to save pattern')
+      }
+    } finally {
+      savingFolder.value = false
     }
   }
 
@@ -130,26 +171,34 @@ export function useFileNamingPattern() {
   }
 
   function getEffectivePreview(library: Library): string {
-    return previewPath(library.fileNamingPattern ?? globalPattern.value)
+    const base = library.organizationMode === 'book_per_folder' ? folderPattern.value : globalPattern.value
+    return previewPath(library.fileNamingPattern ?? base)
   }
 
   return {
     globalPattern,
     globalError,
+    folderPattern,
+    folderError,
     downloadPattern,
     downloadError,
     libraries,
     loadingGlobal,
     savingGlobal,
+    loadingFolder,
+    savingFolder,
     loadingDownload,
     savingDownload,
     savingLibraryId,
     fetchGlobalPattern,
+    fetchFolderPattern,
     fetchDownloadPattern,
     fetchLibraries,
     onGlobalPatternInput,
+    onFolderPatternInput,
     onDownloadPatternInput,
     saveGlobalPattern,
+    saveFolderPattern,
     saveDownloadPattern,
     saveLibraryPattern,
     clearLibraryPattern,

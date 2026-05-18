@@ -15,6 +15,8 @@ function makeService(): jest.Mocked<AppSettingsService> {
     isAuthorsProviderAudnexusEnabled: vi.fn(),
     getUploadPattern: vi.fn(),
     setUploadPattern: vi.fn(),
+    getUploadPatternBookPerFolder: vi.fn(),
+    setUploadPatternBookPerFolder: vi.fn(),
     getDownloadPattern: vi.fn(),
     setDownloadPattern: vi.fn(),
     getAutoFinalizeSettings: vi.fn(),
@@ -89,6 +91,20 @@ describe('AppSettingsController', () => {
       const result = await controller.setUploadPattern({ pattern: '{title}' });
       expect(service.setUploadPattern).toHaveBeenCalledWith('{title}');
       expect(result).toEqual({ pattern: '{title}' });
+    });
+  });
+
+  describe('getUploadPatternBookPerFolder / setUploadPatternBookPerFolder', () => {
+    it('getUploadPatternBookPerFolder returns pattern from service', async () => {
+      service.getUploadPatternBookPerFolder.mockResolvedValue('{title}/');
+      expect(await controller.getUploadPatternBookPerFolder()).toEqual({ pattern: '{title}/' });
+    });
+
+    it('setUploadPatternBookPerFolder calls service and returns pattern', async () => {
+      service.setUploadPatternBookPerFolder.mockResolvedValue(undefined);
+      const result = await controller.setUploadPatternBookPerFolder({ pattern: '{title}/' });
+      expect(service.setUploadPatternBookPerFolder).toHaveBeenCalledWith('{title}/');
+      expect(result).toEqual({ pattern: '{title}/' });
     });
   });
 

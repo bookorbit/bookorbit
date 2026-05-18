@@ -161,7 +161,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'admin/file-naming',
             name: 'settings-admin-file-naming',
             component: () => import('@/features/settings/FileNamingSettings.vue'),
-            meta: { maxWidth: 'max-w-6xl', title: 'File Naming' },
+            meta: { maxWidth: 'max-w-7xl', title: 'File Naming' },
           },
           {
             path: 'admin/book-dock',

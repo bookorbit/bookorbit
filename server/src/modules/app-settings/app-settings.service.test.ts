@@ -1,7 +1,7 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN } from '@bookorbit/types';
+import { DEFAULT_DOWNLOAD_PATTERN, DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE, DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER } from '@bookorbit/types';
 
 vi.mock('../../common/utils/ssrf.utils', () => ({
   ensureSafeUrl: vi.fn().mockImplementation((url: string) => Promise.resolve(new URL(url.replace(/\/$/, '')))),
@@ -354,10 +354,10 @@ describe('AppSettingsService', () => {
     });
   });
 
-  describe('getUploadPattern / getDownloadPattern', () => {
-    it('returns DEFAULT_UPLOAD_PATTERN when not set', async () => {
+  describe('getUploadPattern / getDownloadPattern / getUploadPatternBookPerFolder', () => {
+    it('returns DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE when not set', async () => {
       repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.getUploadPattern()).toBe(DEFAULT_UPLOAD_PATTERN);
+      expect(await service.getUploadPattern()).toBe(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE);
     });
 
     it('returns stored upload pattern', async () => {
@@ -383,6 +383,21 @@ describe('AppSettingsService', () => {
     it('upserts download pattern on setDownloadPattern', async () => {
       await service.setDownloadPattern('{title}');
       expect(repo.upsert).toHaveBeenCalledWith('download_file_pattern', '{title}');
+    });
+
+    it('returns DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER when book_per_folder pattern is not set', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.getUploadPatternBookPerFolder()).toBe(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER);
+    });
+
+    it('returns stored book_per_folder upload pattern', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'upload_file_pattern_book_per_folder', value: '{title}/' } as never);
+      expect(await service.getUploadPatternBookPerFolder()).toBe('{title}/');
+    });
+
+    it('upserts book_per_folder upload pattern on setUploadPatternBookPerFolder', async () => {
+      await service.setUploadPatternBookPerFolder('{title}/');
+      expect(repo.upsert).toHaveBeenCalledWith('upload_file_pattern_book_per_folder', '{title}/');
     });
   });
 

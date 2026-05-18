@@ -16,6 +16,7 @@ export const APP_SETTING_KEYS = {
   AUTHORS_ENRICHMENT_PAUSED: 'authors_enrichment_paused',
   OIDC_CONFIG: 'oidc_config',
   UPLOAD_FILE_PATTERN: 'upload_file_pattern',
+  UPLOAD_FILE_PATTERN_BOOK_PER_FOLDER: 'upload_file_pattern_book_per_folder',
   DOWNLOAD_FILE_PATTERN: 'download_file_pattern',
   METADATA_SCORE_WEIGHTS: 'metadata_score_weights',
   AUDIT_RETENTION_DAYS: 'audit_retention_days',

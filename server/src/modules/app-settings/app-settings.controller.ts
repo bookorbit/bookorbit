@@ -50,6 +50,23 @@ export class AppSettingsController {
     return { pattern: dto.pattern };
   }
 
+  @Get('upload-pattern-folder')
+  async getUploadPatternBookPerFolder() {
+    return { pattern: await this.appSettingsService.getUploadPatternBookPerFolder() };
+  }
+
+  @Put('upload-pattern-folder')
+  @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: 'Updated upload file pattern for folder-as-book libraries',
+  })
+  async setUploadPatternBookPerFolder(@Body() dto: UpdateFilePatternDto) {
+    await this.appSettingsService.setUploadPatternBookPerFolder(dto.pattern);
+    return { pattern: dto.pattern };
+  }
+
   @Get('download-pattern')
   async getDownloadPattern() {
     return { pattern: await this.appSettingsService.getDownloadPattern() };

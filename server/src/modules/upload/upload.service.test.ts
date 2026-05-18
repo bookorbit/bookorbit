@@ -41,7 +41,7 @@ describe('UploadService', () => {
     select: vi.fn(),
   };
 
-  const appSettings = { getUploadPattern: vi.fn() };
+  const appSettings = { getUploadPattern: vi.fn(), getUploadPatternBookPerFolder: vi.fn() };
   const libraryService = { verifyUserAccess: vi.fn() };
   const validator = {
     sanitizeFilename: vi.fn(),
@@ -77,6 +77,7 @@ describe('UploadService', () => {
     processor.createBookRecord.mockResolvedValue({ bookId: 99 });
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     appSettings.getUploadPattern.mockResolvedValue(null);
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
     mockFsAccess.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
     mockExtractEpubMetadata.mockResolvedValue(null);
   });
@@ -516,11 +517,12 @@ describe('UploadService', () => {
     expect(result).toEqual({ bookId: 99, filename: 'MyBook.epub', format: 'epub', sizeBytes: 456 });
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/MyBook.epub');
     expect(appSettings.getUploadPattern).not.toHaveBeenCalled();
+    expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
   });
 
-  it('global pattern used when library pattern is null', async () => {
+  it('book_per_file global pattern used when library pattern is null', async () => {
     db.select
-      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null, organizationMode: 'book_per_file' }]))
       .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
 
     appSettings.getUploadPattern.mockResolvedValue('{title}.{extension}');
@@ -545,6 +547,67 @@ describe('UploadService', () => {
     expect(result).toEqual({ bookId: 99, filename: 'GlobalBook.epub', format: 'epub', sizeBytes: 456 });
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/GlobalBook.epub');
     expect(appSettings.getUploadPattern).toHaveBeenCalled();
+    expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
+  });
+
+  it('book_per_folder global pattern used when library pattern is null', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null, organizationMode: 'book_per_folder' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{title}/');
+
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'FolderBook',
+      subtitle: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      isbn13: null,
+      authors: [],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/FolderBook/book.epub');
+    expect(appSettings.getUploadPatternBookPerFolder).toHaveBeenCalled();
+    expect(appSettings.getUploadPattern).not.toHaveBeenCalled();
+  });
+
+  it('book_per_folder library pattern still wins over folder-mode global pattern', async () => {
+    db.select
+      .mockReturnValueOnce(
+        selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{title}/{title}.{extension}', organizationMode: 'book_per_folder' }]),
+      )
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{series}/{title}/');
+
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: 'Dune Chronicles',
+      seriesIndex: 1,
+      isbn13: null,
+      authors: [{ name: 'Frank Herbert' }],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Dune/Dune.epub');
+    expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
+    expect(appSettings.getUploadPattern).not.toHaveBeenCalled();
   });
 
   it('pattern resolves to null falls back to stem-folder layout', async () => {

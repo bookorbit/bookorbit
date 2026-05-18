@@ -283,7 +283,8 @@ export class BookDockFinalizeService implements OnModuleInit {
     if (!ids.length) return [];
 
     const rows = await this.repo.findByIds(ids);
-    const appPattern = await this.appSettings.getUploadPattern();
+    const appPatternFile = await this.appSettings.getUploadPattern();
+    const appPatternFolder = await this.appSettings.getUploadPatternBookPerFolder();
     const libraryIds = [...new Set(rows.map((row) => row.targetLibraryId ?? defaultLibraryId).filter((id): id is number => id != null))];
     const libraryMap = libraryIds.length
       ? new Map((await this.db.select().from(libraries).where(inArray(libraries.id, libraryIds))).map((lib) => [lib.id, lib]))
@@ -294,7 +295,9 @@ export class BookDockFinalizeService implements OnModuleInit {
       const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
       let newName = row.fileName;
       const effectiveLibraryId = row.targetLibraryId ?? defaultLibraryId ?? null;
-      const libraryPattern = effectiveLibraryId !== null ? (libraryMap.get(effectiveLibraryId)?.fileNamingPattern ?? null) : null;
+      const lib = effectiveLibraryId !== null ? libraryMap.get(effectiveLibraryId) : undefined;
+      const libraryPattern = lib?.fileNamingPattern ?? null;
+      const appPattern = lib?.organizationMode === 'book_per_folder' ? appPatternFolder : appPatternFile;
       const pattern = libraryPattern ?? appPattern;
 
       if (pattern) {
@@ -441,12 +444,16 @@ export class BookDockFinalizeService implements OnModuleInit {
   }
 
   private async resolveDestination(
-    library: { fileNamingPattern?: string | null },
+    library: { fileNamingPattern?: string | null; organizationMode?: string | null },
     folderPath: string,
     row: BookDockFileRow,
     format: string,
   ): Promise<string> {
-    const pattern = library.fileNamingPattern ?? (await this.appSettings.getUploadPattern());
+    const pattern =
+      library.fileNamingPattern ??
+      (library.organizationMode === 'book_per_folder'
+        ? await this.appSettings.getUploadPatternBookPerFolder()
+        : await this.appSettings.getUploadPattern());
     const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
 
     if (pattern) {
