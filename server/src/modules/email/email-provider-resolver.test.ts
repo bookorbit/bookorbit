@@ -36,6 +36,7 @@ describe('EmailProviderResolver', () => {
     auth: true,
     ssl: false,
     startTls: true,
+    tlsRejectUnauthorized: true,
   };
 
   beforeEach(async () => {
@@ -74,6 +75,15 @@ describe('EmailProviderResolver', () => {
       expect(result.config.host).toBe('smtp.test.com');
       expect(result.config.fromName).toBe('BookOrbit Bot');
       expect(result.config.fromAddress).toBe('bot@example.com');
+      expect(result.config.tlsRejectUnauthorized).toBe(true);
+    });
+
+    it('should include tlsRejectUnauthorized=false in resolved config when provider has it disabled', async () => {
+      (providerService.getProviderWithDecryptedPassword as vi.Mock).mockResolvedValue({ ...mockProvider, tlsRejectUnauthorized: false });
+
+      const result = await resolver.resolve(mockUser, 10);
+
+      expect(result.config.tlsRejectUnauthorized).toBe(false);
     });
 
     it('should resolve from default provider if no ID requested', async () => {

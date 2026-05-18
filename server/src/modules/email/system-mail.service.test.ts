@@ -24,6 +24,7 @@ describe('SystemMailService', () => {
     auth: true,
     ssl: false,
     startTls: true,
+    tlsRejectUnauthorized: true,
     fromName: 'BookOrbit',
     fromAddress: 'no-reply@example.com',
   };
@@ -82,6 +83,7 @@ describe('SystemMailService', () => {
       auth: true,
       ssl: false,
       startTls: true,
+      tlsRejectUnauthorized: true,
     });
     expect(transporter.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({

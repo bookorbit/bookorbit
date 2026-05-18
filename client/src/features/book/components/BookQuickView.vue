@@ -40,6 +40,9 @@ const { detail, loading, fetch } = useBookDetail()
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
 const providerIconErrors = ref<Record<string, boolean>>({})
+const descriptionExpanded = ref(false)
+const genresExpanded = ref(false)
+const coverLightboxOpen = ref(false)
 
 watch(
   () => props.bookId,
@@ -133,9 +136,6 @@ const providerLinks = computed<ProviderLink[]>(() => {
   return out
 })
 
-const descriptionExpanded = ref(false)
-const genresExpanded = ref(false)
-const coverLightboxOpen = ref(false)
 const safeDescription = useSafeHtml(() => detail.value?.description)
 
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
@@ -187,6 +187,16 @@ function openDetails() {
 
 function toggleGenres() {
   genresExpanded.value = !genresExpanded.value
+}
+
+function handleAddToCollection() {
+  emit('update:open', false)
+  emit('action', 'add-to-collection')
+}
+
+function handleDelete() {
+  emit('update:open', false)
+  emit('action', 'delete')
 }
 </script>
 
@@ -435,8 +445,9 @@ function toggleGenres() {
             <Tooltip>
               <TooltipTrigger as-child>
                 <button
+                  data-testid="quick-view-action-add-to-collection"
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
-                  @click="emit('action', 'add-to-collection')"
+                  @click="handleAddToCollection"
                 >
                   <FolderPlus class="size-3.5" />
                 </button>
@@ -446,8 +457,9 @@ function toggleGenres() {
             <Tooltip v-if="hasPermission('library_delete_books')">
               <TooltipTrigger as-child>
                 <button
+                  data-testid="quick-view-action-delete"
                   class="flex items-center justify-center h-9 px-3 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                  @click="emit('action', 'delete')"
+                  @click="handleDelete"
                 >
                   <Trash2 class="size-3.5" />
                 </button>

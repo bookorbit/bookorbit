@@ -3,6 +3,21 @@ import { basename, dirname, join, relative } from 'path';
 
 import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
+const PG_BIGINT_MAX = 9223372036854775807n; // 2^63 - 1: upper bound of PostgreSQL bigint
+
+/**
+ * Convert a raw filesystem inode (bigint from stat with { bigint: true }) to a number
+ * safe to store in PostgreSQL's signed bigint column.
+ *
+ * MergerFS and other synthetic filesystems produce unsigned 64-bit inodes that exceed
+ * PostgreSQL's bigint range (2^63 - 1). Those are clamped to 0, which is the existing
+ * sentinel value meaning "rename detection disabled for this file".
+ */
+export function clampIno(ino: bigint): number {
+  if (ino > PG_BIGINT_MAX) return 0;
+  return Number(ino);
+}
+
 export interface FileStat {
   absolutePath: string;
   relPath: string; // relative to library folder root
@@ -85,7 +100,7 @@ async function statFilesIntoAcc(
 ): Promise<void> {
   const statResults = await Promise.all(
     filePaths.map(async (full) => {
-      const s = await stat(full).catch((err: NodeJS.ErrnoException) => {
+      const s = await stat(full, { bigint: true }).catch((err: NodeJS.ErrnoException) => {
         if (err.code === 'ENOENT') return null;
         throw err;
       });
@@ -95,9 +110,11 @@ async function statFilesIntoAcc(
   for (const entry of statResults) {
     if (!entry) continue;
     const { full, s } = entry;
-    const ino = Number(s.ino);
-    if (ino === 0) {
+    const ino = clampIno(s.ino);
+    if (s.ino === 0n) {
       logger?.(`File has inode 0 (likely network mount), rename detection disabled: ${full}`);
+    } else if (ino === 0) {
+      logger?.(`File inode out of range for storage (MergerFS/synthetic inode ${s.ino}), rename detection disabled: ${full}`);
     }
     if (!acc.has(dir)) acc.set(dir, []);
     const { format, role } = classifyFile(full);
@@ -105,7 +122,7 @@ async function statFilesIntoAcc(
       absolutePath: full,
       relPath: relative(libraryRoot, full),
       ino,
-      sizeBytes: s.size,
+      sizeBytes: Number(s.size),
       mtime: s.mtime,
       format,
       role,
@@ -423,14 +440,18 @@ export async function buildSingleBookCandidate(
 
   const stats = await Promise.all(
     filePaths.map(async (full) => {
-      const s = await stat(full).catch(() => null);
+      const s = await stat(full, { bigint: true }).catch(() => null);
       if (!s) return null;
       const { format, role } = classifyFile(full);
+      const ino = clampIno(s.ino);
+      if (s.ino > PG_BIGINT_MAX) {
+        logger?.(`File inode out of range for storage (MergerFS/synthetic inode ${s.ino}), rename detection disabled: ${full}`);
+      }
       return {
         absolutePath: full,
         relPath: relative(libraryFolderPath, full),
-        ino: Number(s.ino),
-        sizeBytes: s.size,
+        ino,
+        sizeBytes: Number(s.size),
         mtime: s.mtime,
         format,
         role,

@@ -40,6 +40,9 @@ const globalStubs = {
     DropdownMenuSub: { template: '<div><slot /></div>' },
     DropdownMenuSubTrigger: { template: '<div><slot /></div>' },
     DropdownMenuSubContent: { template: '<div><slot /></div>' },
+    Tooltip: { template: '<div><slot /></div>' },
+    TooltipTrigger: { template: '<div><slot /></div>' },
+    TooltipContent: { template: '<div data-testid="tooltip-content"><slot /></div>' },
   },
 }
 
@@ -241,5 +244,71 @@ describe('BookCoverCard — placeholder state', () => {
     const wrapper = mountCard(presentBookWithCover)
     const imgs = wrapper.findAll('img')
     expect(imgs.length).toBeGreaterThan(0)
+  })
+})
+
+describe('BookCoverCard — series position overlay', () => {
+  const bookWithSeries: BookCard = {
+    ...presentBook,
+    seriesName: 'The Expanse',
+    seriesIndex: 3,
+  }
+
+  afterEach(() => {
+    cardOverlays.value = ['progress-bar', 'format', 'rating', 'read-status']
+  })
+
+  it('renders the series badge when overlay is enabled and seriesIndex is set', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard(bookWithSeries)
+    expect(wrapper.text()).toContain('#3')
+  })
+
+  it('does not render the badge when series-position is not in overlays', () => {
+    cardOverlays.value = []
+    const wrapper = mountCard(bookWithSeries)
+    expect(wrapper.text()).not.toContain('#3')
+  })
+
+  it('does not render badge when seriesIndex is null', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard({ ...presentBook, seriesIndex: null, seriesName: 'Dune' })
+    expect(wrapper.text()).not.toContain('#')
+  })
+
+  it('formats whole-number float 3.0 as #3 (no trailing decimal)', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard({ ...presentBook, seriesIndex: 3.0, seriesName: 'Dune' })
+    expect(wrapper.text()).toContain('#3')
+    expect(wrapper.text()).not.toContain('#3.0')
+  })
+
+  it('formats fractional index 1.5 as #1.5', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard({ ...presentBook, seriesIndex: 1.5, seriesName: 'Dune' })
+    expect(wrapper.text()).toContain('#1.5')
+  })
+
+  it('tooltip content shows series name combined with number', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard(bookWithSeries)
+    const tooltip = wrapper.find('[data-testid="tooltip-content"]')
+    expect(tooltip.exists()).toBe(true)
+    expect(tooltip.text()).toContain('The Expanse #3')
+  })
+
+  it('tooltip shows only number when seriesName is null', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard({ ...presentBook, seriesIndex: 5, seriesName: null })
+    const tooltip = wrapper.find('[data-testid="tooltip-content"]')
+    expect(tooltip.exists()).toBe(true)
+    expect(tooltip.text()).toBe('#5')
+  })
+
+  it('lock and series badges coexist in the top-right container', () => {
+    cardOverlays.value = ['series-position', 'lock-status']
+    const wrapper = mountCard({ ...presentBook, seriesIndex: 2, seriesName: 'Dune', hasMetadataLocks: true })
+    expect(wrapper.text()).toContain('#2')
+    expect(wrapper.find('.text-amber-400').exists()).toBe(true)
   })
 })

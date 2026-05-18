@@ -16,7 +16,15 @@ import { readdir, stat } from 'fs/promises';
 import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole, isAudioFormat } from './lib/classify';
 import { computeFileHash } from './lib/hash';
 import { waitForStability } from './lib/stability';
-import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate, type WalkResult } from './lib/walk';
+import {
+  BookCandidate,
+  FileStat,
+  findBookCandidates,
+  findLooseFileCandidates,
+  buildSingleBookCandidate,
+  clampIno,
+  type WalkResult,
+} from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 
@@ -751,7 +759,7 @@ export class ScannerService implements OnApplicationBootstrap {
       return;
     }
 
-    const fileStat = await stat(filePath).catch(() => null);
+    const fileStat = await stat(filePath, { bigint: true }).catch(() => null);
     if (!fileStat || !fileStat.isFile()) {
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} candidateFound=false scanScope=file - targeted book scan completed`,
@@ -765,7 +773,7 @@ export class ScannerService implements OnApplicationBootstrap {
         {
           absolutePath: filePath,
           relPath: relative(libraryFolder.path, filePath),
-          ino: Number(fileStat.ino),
+          ino: clampIno(fileStat.ino),
           sizeBytes: Number(fileStat.size),
           mtime: fileStat.mtime,
           format,
@@ -794,7 +802,7 @@ export class ScannerService implements OnApplicationBootstrap {
     event: string,
     startedAt: number,
   ): Promise<void> {
-    const fileStat = await stat(filePath).catch(() => null);
+    const fileStat = await stat(filePath, { bigint: true }).catch(() => null);
     if (!fileStat || !fileStat.isFile()) {
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} candidateFound=false scanScope=root_file - targeted book scan completed`,
@@ -824,7 +832,7 @@ export class ScannerService implements OnApplicationBootstrap {
         {
           absolutePath: filePath,
           relPath: relative(libraryFolder.path, filePath),
-          ino: Number(fileStat.ino),
+          ino: clampIno(fileStat.ino),
           sizeBytes: Number(fileStat.size),
           mtime: fileStat.mtime,
           format,

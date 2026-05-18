@@ -21,6 +21,7 @@ export const emailProviders = pgTable(
     isDefault: boolean('is_default').notNull().default(false),
     isShared: boolean('is_shared').notNull().default(false),
     isSystemProvider: boolean('is_system_provider').notNull().default(false),
+    tlsRejectUnauthorized: boolean('tls_reject_unauthorized').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

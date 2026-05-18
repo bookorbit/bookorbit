@@ -62,6 +62,7 @@ describe('EmailProviderController', () => {
         auth: true,
         ssl: false,
         startTls: true,
+        tlsRejectUnauthorized: true,
       };
 
       await controller.create(dto, user);

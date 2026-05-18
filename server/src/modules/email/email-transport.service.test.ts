@@ -22,6 +22,7 @@ describe('EmailTransportService', () => {
       auth: true,
       ssl: false,
       startTls: true,
+      tlsRejectUnauthorized: true,
     });
 
     expect(nodemailer.createTransport).toHaveBeenCalledWith(
@@ -44,6 +45,7 @@ describe('EmailTransportService', () => {
       auth: false,
       ssl: false,
       startTls: false,
+      tlsRejectUnauthorized: true,
     });
 
     expect(nodemailer.createTransport).toHaveBeenCalledWith(
@@ -71,6 +73,7 @@ describe('EmailTransportService', () => {
       auth: true,
       ssl: false,
       startTls: true,
+      tlsRejectUnauthorized: true,
     });
 
     expect(nodemailer.createTransport).toHaveBeenCalledWith(
@@ -80,7 +83,7 @@ describe('EmailTransportService', () => {
     );
   });
 
-  it('should not disable TLS certificate verification by default', () => {
+  it('should not set tls option when tlsRejectUnauthorized is true', () => {
     (nodemailer.createTransport as vi.Mock).mockReturnValue({});
 
     service.buildTransporter({
@@ -91,10 +94,32 @@ describe('EmailTransportService', () => {
       auth: true,
       ssl: false,
       startTls: true,
+      tlsRejectUnauthorized: true,
     });
 
     const calls = (nodemailer.createTransport as vi.Mock).mock.calls;
     const callArg = calls[calls.length - 1][0] as Record<string, unknown>;
     expect(callArg).not.toHaveProperty('tls');
+  });
+
+  it('should set tls.rejectUnauthorized=false when tlsRejectUnauthorized is false', () => {
+    (nodemailer.createTransport as vi.Mock).mockReturnValue({});
+
+    service.buildTransporter({
+      host: 'smtp.selfhosted.com',
+      port: 465,
+      auth: true,
+      username: 'user',
+      password: 'pass',
+      ssl: true,
+      startTls: false,
+      tlsRejectUnauthorized: false,
+    });
+
+    expect(nodemailer.createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tls: { rejectUnauthorized: false },
+      }),
+    );
   });
 });

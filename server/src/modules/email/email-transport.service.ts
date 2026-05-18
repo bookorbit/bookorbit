@@ -13,6 +13,7 @@ export interface SmtpConfig {
   auth: boolean;
   ssl: boolean;
   startTls: boolean;
+  tlsRejectUnauthorized: boolean;
 }
 
 @Injectable()
@@ -29,6 +30,7 @@ export class EmailTransportService {
       secure,
       requireTLS: requireTls,
       ...(auth ? { auth } : {}),
+      ...(!config.tlsRejectUnauthorized ? { tls: { rejectUnauthorized: false } } : {}),
     };
 
     return nodemailer.createTransport(options);

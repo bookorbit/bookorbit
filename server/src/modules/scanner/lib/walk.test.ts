@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile, chmod } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { findBookCandidates, buildSingleBookCandidate, findLooseFileCandidates, BookCandidate } from './walk';
+import { findBookCandidates, buildSingleBookCandidate, findLooseFileCandidates, clampIno, BookCandidate } from './walk';
 
 let suiteRoot: string;
 let root: string;
@@ -923,5 +923,48 @@ describe('incremental scan — findLooseFileCandidates', () => {
     // Author/ dir is unchanged - no candidates
     expect(second.candidates).toHaveLength(0);
     expect(second.unchangedDirs.size).toBeGreaterThan(0);
+  });
+});
+
+// ── clampIno ─────────────────────────────────────────────────────────────────
+
+describe('clampIno', () => {
+  it('passes through zero unchanged', () => {
+    expect(clampIno(0n)).toBe(0);
+  });
+
+  it('passes through typical small filesystem inodes', () => {
+    expect(clampIno(1n)).toBe(1);
+    expect(clampIno(12345n)).toBe(12345);
+    expect(clampIno(1000000n)).toBe(1000000);
+  });
+
+  it('passes through the maximum safe JS integer', () => {
+    expect(clampIno(BigInt(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it('does not clamp values at the PostgreSQL bigint maximum', () => {
+    // 2^63 - 1: largest value PostgreSQL bigint can store
+    const pgMax = 9223372036854775807n;
+    expect(clampIno(pgMax)).not.toBe(0);
+    expect(clampIno(pgMax)).toBeGreaterThan(0);
+  });
+
+  it('clamps values one above the PostgreSQL bigint maximum to 0', () => {
+    expect(clampIno(9223372036854775808n)).toBe(0);
+  });
+
+  it('clamps the exact MergerFS inode from the bug report to 0', () => {
+    // 17237992710316634000 is the unsigned 64-bit inode reported in the MergerFS issue
+    expect(clampIno(17237992710316634000n)).toBe(0);
+  });
+
+  it('clamps the maximum unsigned 64-bit inode (2^64 - 1) to 0', () => {
+    expect(clampIno(18446744073709551615n)).toBe(0);
+  });
+
+  it('returns a number type', () => {
+    expect(typeof clampIno(1n)).toBe('number');
+    expect(typeof clampIno(17237992710316634000n)).toBe('number');
   });
 });

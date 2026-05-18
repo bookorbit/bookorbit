@@ -13,6 +13,7 @@ export interface EmailProvider {
   auth: boolean
   ssl: boolean
   startTls: boolean
+  tlsRejectUnauthorized: boolean
   isDefault: boolean
   isShared: boolean
   isSystemProvider: boolean
@@ -31,6 +32,7 @@ export interface EmailProviderForm {
   auth: boolean
   ssl: boolean
   startTls: boolean
+  tlsRejectUnauthorized: boolean
 }
 
 const providers = ref<EmailProvider[]>([])
@@ -82,7 +84,10 @@ export function useEmailProviders() {
 
   async function deleteProvider(id: number): Promise<void> {
     const res = await api(`/api/v1/email/providers/${id}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('Failed to delete provider')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as { message?: string }).message ?? 'Failed to delete provider')
+    }
     providers.value = providers.value.filter((p) => p.id !== id)
   }
 

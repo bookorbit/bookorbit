@@ -149,33 +149,39 @@ describe('useBookTableShell', () => {
     it('enters selection mode and toggles the book for add-to-collection when not in selection mode', () => {
       mockSelectionMode.value = false
       const books = ref([makeBook({ id: 3 })])
-      const { handleBookAction, addToCollectionOpen } = useBookTableShell({ books })
+      const { handleBookAction, addToCollectionOpen, quickViewOpen } = useBookTableShell({ books })
+      quickViewOpen.value = true
 
       handleBookAction(makeBook({ id: 3 }), 'add-to-collection')
 
       expect(mocks.enterSelectionMode).toHaveBeenCalledOnce()
       expect(mocks.toggleBook).toHaveBeenCalledWith(3)
+      expect(quickViewOpen.value).toBe(false)
       expect(addToCollectionOpen.value).toBe(true)
     })
 
     it('skips enterSelectionMode for add-to-collection when already in selection mode', () => {
       mockSelectionMode.value = true
       const books = ref([makeBook({ id: 3 })])
-      const { handleBookAction, addToCollectionOpen } = useBookTableShell({ books })
+      const { handleBookAction, addToCollectionOpen, quickViewOpen } = useBookTableShell({ books })
+      quickViewOpen.value = true
 
       handleBookAction(makeBook({ id: 3 }), 'add-to-collection')
 
       expect(mocks.enterSelectionMode).not.toHaveBeenCalled()
       expect(mocks.toggleBook).not.toHaveBeenCalled()
+      expect(quickViewOpen.value).toBe(false)
       expect(addToCollectionOpen.value).toBe(true)
     })
 
     it('calls promptDelete for the delete action', () => {
       const books = ref([makeBook({ id: 5 })])
-      const { handleBookAction } = useBookTableShell({ books })
+      const { handleBookAction, quickViewOpen } = useBookTableShell({ books })
+      quickViewOpen.value = true
 
       handleBookAction(makeBook({ id: 5 }), 'delete')
 
+      expect(quickViewOpen.value).toBe(false)
       expect(mocks.promptDelete).toHaveBeenCalledWith(5)
     })
   })

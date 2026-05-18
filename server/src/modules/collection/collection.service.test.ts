@@ -114,6 +114,17 @@ describe('CollectionService', () => {
       expect(collectionRepo.findAllForUserWithMembership).toHaveBeenCalledWith(user.id, [4, 5]);
       expect(result[0]).toEqual(expect.objectContaining({ memberCount: 2 }));
     });
+
+    it('falls back to the non-membership query when book ids are empty', async () => {
+      const { service, collectionRepo } = makeService();
+      const user = makeUser();
+      collectionRepo.findAllForUser.mockResolvedValue([makeCollection()]);
+
+      await service.findAll(user, []);
+
+      expect(collectionRepo.findAllForUser).toHaveBeenCalledWith(user.id);
+      expect(collectionRepo.findAllForUserWithMembership).not.toHaveBeenCalled();
+    });
   });
 
   describe('findOne', () => {
@@ -181,6 +192,22 @@ describe('CollectionService', () => {
       await expect(service.update(10, { name: 'Favorites' }, makeUser())).rejects.toThrow('A collection with this name already exists');
     });
 
+    it('maps wrapped unique constraint errors to ConflictException semantics', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      collectionRepo.update.mockRejectedValue(new Error('duplicate key', { cause: { code: '23505' } }));
+
+      await expect(service.update(10, { name: 'Favorites' }, makeUser())).rejects.toThrow('A collection with this name already exists');
+    });
+
+    it('rethrows non-unique update errors', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      collectionRepo.update.mockRejectedValue(new Error('db write failed'));
+
+      await expect(service.update(10, { name: 'Favorites' }, makeUser())).rejects.toThrow('db write failed');
+    });
+
     it('rejects changes that would leave a collection without an icon', async () => {
       const { service, collectionRepo } = makeService();
       collectionRepo.findById.mockResolvedValue([makeCollection({ icon: null })]);
@@ -207,6 +234,29 @@ describe('CollectionService', () => {
         }),
       );
       expect(result).toEqual(expect.objectContaining({ id: 25, name: 'New Collection' }));
+    });
+
+    it('rejects create when icon is empty after trimming', async () => {
+      const { service, collectionRepo } = makeService();
+
+      await expect(service.create({ name: 'No Icon', icon: '   ' } as any, makeUser({ id: 9 }))).rejects.toThrow(BadRequestException);
+      expect(collectionRepo.insert).not.toHaveBeenCalled();
+    });
+
+    it('maps unique violations from wrapped database errors during create', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.insert.mockRejectedValue(new Error('constraint fail', { cause: { code: '23505' } }));
+
+      await expect(service.create({ name: 'Favorites', icon: '⭐' } as any, makeUser({ id: 9 }))).rejects.toThrow(
+        'A collection with this name already exists',
+      );
+    });
+
+    it('rethrows non-unique create errors', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.insert.mockRejectedValue(new Error('insert timeout'));
+
+      await expect(service.create({ name: 'Favorites', icon: '⭐' } as any, makeUser({ id: 9 }))).rejects.toThrow('insert timeout');
     });
 
     it('propagates ownership checks on remove and deletes using owner id', async () => {
@@ -400,6 +450,14 @@ describe('CollectionService', () => {
 
       expect(collectionRepo.removeBooks).toHaveBeenCalledWith(10, [7]);
       expect(result).toEqual(expect.objectContaining({ bookCount: 1 }));
+    });
+
+    it('rethrows repository errors while removing books', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      collectionRepo.removeBooks.mockRejectedValue(new Error('remove failed'));
+
+      await expect(service.removeBooks(10, { bookIds: [7] }, makeUser())).rejects.toThrow('remove failed');
     });
   });
 });
