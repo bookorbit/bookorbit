@@ -74,6 +74,7 @@ describe('CollectionController', () => {
       await expectBadRequest(() => controller.findAll(USER, '1,two'));
       await expectBadRequest(() => controller.findAll(USER, '-1,2'));
       await expectBadRequest(() => controller.findAll(USER, '0,2'));
+      await expectBadRequest(() => controller.findAll(USER, '   '));
     });
   });
 
@@ -101,6 +102,24 @@ describe('CollectionController', () => {
 
       await expectBadRequest(() => controller.getBooks(10, USER, 2_000_000, 100));
       expect(service.getBooks).not.toHaveBeenCalled();
+    });
+
+    it('accepts pagination at the maximum offset boundary', async () => {
+      const { controller, service } = makeController();
+      service.getBooks.mockResolvedValue({ items: [], total: 0, page: 500, size: 100 });
+
+      await controller.getBooks(10, USER, 500, 100);
+
+      expect(service.getBooks).toHaveBeenCalledWith(10, USER, 500, 100, undefined, undefined);
+    });
+
+    it('forwards collapseSeries and search query when present', async () => {
+      const { controller, service } = makeController();
+      service.getBooks.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+
+      await controller.getBooks(10, USER, 0, 50, true, 'dune');
+
+      expect(service.getBooks).toHaveBeenCalledWith(10, USER, 0, 50, true, 'dune');
     });
   });
 
