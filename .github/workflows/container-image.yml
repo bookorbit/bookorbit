@@ -1,10 +1,8 @@
 name: Container Image
 run-name: >-
-  ${{ github.event_name == 'workflow_run' && format('Image - {0} ({1})', github.event.workflow_run.head_commit.message, github.event.workflow_run.head_branch) || github.event_name == 'pull_request' && format('Image check - PR #{0}', github.event.pull_request.number) || format('Image - {0}', github.ref_name) }}
+  ${{ github.event_name == 'workflow_run' && format('Image - {0} ({1})', github.event.workflow_run.head_commit.message, github.event.workflow_run.head_branch) || format('Image - {0}', github.ref_name) }}
 
 on:
-  pull_request:
-    branches: [main]
   # Break-glass: bypasses CI/E2E gate. Use only when CI is broken and a hotfix image is urgently needed.
   workflow_dispatch:
     inputs:
@@ -18,7 +16,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -30,43 +28,6 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # PR path: amd64-only build and scan for fast feedback. No push.
-  scan:
-    name: Build and Scan Image
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-
-      - name: Build image
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-scan
-          platforms: linux/amd64
-          cache-from: type=gha,scope=container-image-yml-pr
-          cache-to: type=gha,mode=max,scope=container-image-yml-pr
-
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-scan
-          format: table
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
-
   # Main push path: resolve context once, then build multi-arch natively in parallel.
   prepare:
     name: Resolve Build Context
