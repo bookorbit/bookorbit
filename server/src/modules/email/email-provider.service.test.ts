@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EmailProviderService } from './email-provider.service';
 import { EmailProviderRepository } from './email-provider.repository';
 import { EmailEncryptionService } from './email-encryption.service';
@@ -40,9 +40,11 @@ describe('EmailProviderService', () => {
     username: 'testuser',
     passwordEnc: 'encrypted',
     isShared: false,
+    isSystemProvider: false,
     auth: true,
     ssl: false,
     startTls: true,
+    tlsRejectUnauthorized: true,
   };
 
   beforeEach(() => {
@@ -81,15 +83,39 @@ describe('EmailProviderService', () => {
 
   describe('create', () => {
     it('should encrypt password and insert provider', async () => {
-      const dto = { name: 'New SMTP', host: 'new.test.com', port: 465, password: 'new-password', auth: true, ssl: true, startTls: false };
+      const dto = {
+        name: 'New SMTP',
+        host: 'new.test.com',
+        port: 465,
+        password: 'new-password',
+        auth: true,
+        ssl: true,
+        startTls: false,
+        tlsRejectUnauthorized: true,
+      };
       await service.create(dto, mockUser);
       expect(encryption.encrypt).toHaveBeenCalledWith('new-password');
       expect(repo.insert).toHaveBeenCalled();
     });
 
+    it('should persist tlsRejectUnauthorized=false when provided', async () => {
+      const dto = { name: 'Self-Hosted', host: 'smtp.home.lan', port: 465, auth: true, ssl: true, startTls: false, tlsRejectUnauthorized: false };
+      await service.create(dto, mockUser);
+      expect(repo.insert).toHaveBeenCalledWith(expect.objectContaining({ tlsRejectUnauthorized: false }));
+    });
+
     it('should map duplicate provider names to ConflictException', async () => {
       (repo.insert as vi.Mock).mockRejectedValue({ code: '23505' });
-      const dto = { name: 'New SMTP', host: 'new.test.com', port: 465, password: 'new-password', auth: true, ssl: true, startTls: false };
+      const dto = {
+        name: 'New SMTP',
+        host: 'new.test.com',
+        port: 465,
+        password: 'new-password',
+        auth: true,
+        ssl: true,
+        startTls: false,
+        tlsRejectUnauthorized: true,
+      };
       await expect(service.create(dto, mockUser)).rejects.toThrow(ConflictException);
     });
   });
@@ -111,6 +137,11 @@ describe('EmailProviderService', () => {
       expect(result.id).toBe(10);
     });
 
+    it('should patch tlsRejectUnauthorized when provided', async () => {
+      await service.update(10, { tlsRejectUnauthorized: false }, mockUser);
+      expect(repo.update).toHaveBeenCalledWith(10, 1, expect.objectContaining({ tlsRejectUnauthorized: false }));
+    });
+
     it('should throw NotFoundException if update fails', async () => {
       (repo.update as vi.Mock).mockResolvedValue([]);
       await expect(service.update(10, {}, mockUser)).rejects.toThrow(NotFoundException);
@@ -126,6 +157,11 @@ describe('EmailProviderService', () => {
     it('should remove a provider', async () => {
       await service.remove(10, mockUser);
       expect(repo.delete).toHaveBeenCalledWith(10, 1);
+    });
+
+    it('should throw BadRequestException when provider is the system provider', async () => {
+      (repo.findById as vi.Mock).mockResolvedValue([{ ...mockProvider, isSystemProvider: true }]);
+      await expect(service.remove(10, mockUser)).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -168,6 +204,13 @@ describe('EmailProviderService', () => {
       const result = await service.testConnection(10, mockUser);
       expect(result.success).toBe(false);
       expect(result.error).toBe('Connection failed');
+    });
+
+    it('should pass tlsRejectUnauthorized to the transporter builder', async () => {
+      (repo.findById as vi.Mock).mockResolvedValue([{ ...mockProvider, tlsRejectUnauthorized: false }]);
+      (transport.verifyTransporter as vi.Mock).mockResolvedValue(undefined);
+      await service.testConnection(10, mockUser);
+      expect(transport.buildTransporter).toHaveBeenCalledWith(expect.objectContaining({ tlsRejectUnauthorized: false }));
     });
   });
 

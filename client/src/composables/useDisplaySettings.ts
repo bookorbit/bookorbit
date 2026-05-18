@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import { storage } from '@/services/storage'
 
-export type CardOverlayKey = 'progress-bar' | 'format' | 'rating' | 'read-status' | 'lock-status'
+export type CardOverlayKey = 'progress-bar' | 'format' | 'rating' | 'read-status' | 'lock-status' | 'series-position'
 export type AuthorCoverShape = 'square' | 'circle'
 export type CoverSizeScope = 'per-view' | 'synced'
 export type TableDensity = 'compact' | 'comfortable' | 'roomy'
@@ -9,8 +9,8 @@ export type TableDensity = 'compact' | 'comfortable' | 'roomy'
 const DEFAULT_PORTRAIT_COVER_SIZE = 130
 const DEFAULT_SQUARE_COVER_SIZE = 150
 const DEFAULT_GRID_GAP = 28
-const CARD_OVERLAY_KEYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'lock-status']
-const DEFAULT_CARD_OVERLAYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status']
+const CARD_OVERLAY_KEYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'lock-status', 'series-position']
+const DEFAULT_CARD_OVERLAYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'series-position']
 
 function normalizeCardOverlays(value: unknown): CardOverlayKey[] {
   if (!Array.isArray(value)) return [...DEFAULT_CARD_OVERLAYS]

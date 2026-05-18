@@ -43,6 +43,7 @@ export class EmailProviderService {
         auth: dto.auth,
         ssl: dto.ssl,
         startTls: dto.startTls,
+        tlsRejectUnauthorized: dto.tlsRejectUnauthorized,
       });
       return this.sanitize(created);
     } catch (error) {
@@ -66,6 +67,7 @@ export class EmailProviderService {
     if (dto.auth !== undefined) patch.auth = dto.auth;
     if (dto.ssl !== undefined) patch.ssl = dto.ssl;
     if (dto.startTls !== undefined) patch.startTls = dto.startTls;
+    if (dto.tlsRejectUnauthorized !== undefined) patch.tlsRejectUnauthorized = dto.tlsRejectUnauthorized;
     if (dto.password !== undefined) {
       patch.passwordEnc = dto.password ? this.encryption.encrypt(dto.password) : null;
     }
@@ -130,6 +132,7 @@ export class EmailProviderService {
       auth: provider.auth,
       ssl: provider.ssl,
       startTls: provider.startTls,
+      tlsRejectUnauthorized: provider.tlsRejectUnauthorized,
     });
 
     try {

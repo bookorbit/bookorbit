@@ -8,12 +8,16 @@ updates:
       day: "friday"
       time: "03:00"
       timezone: "UTC"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "npm"
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # archiver v8 is ESM-only with a completely different API; pin to v7 until we migrate
+      - dependency-name: "archiver"
+        update-types: ["version-update:semver-major"]
     groups:
       production-dependencies:
         dependency-type: "production"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { ChevronDown, ChevronUp, Plus, Pencil, Trash2, Star, Share2, Wifi, Server } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Plus, Pencil, Trash2, Star, Share2, Wifi, Server, AlertTriangle } from 'lucide-vue-next'
 import { Permission } from '@bookorbit/types'
 import { useEmailProviders, type EmailProvider, type EmailProviderForm } from '../composables/useEmailProviders'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -43,6 +43,7 @@ const emptyForm = (): EmailProviderForm => ({
   auth: true,
   ssl: false,
   startTls: true,
+  tlsRejectUnauthorized: true,
 })
 
 const form = reactive<EmailProviderForm>(emptyForm())
@@ -67,6 +68,7 @@ function openEdit(p: EmailProvider) {
     auth: p.auth,
     ssl: p.ssl,
     startTls: p.startTls,
+    tlsRejectUnauthorized: p.tlsRejectUnauthorized,
   })
   editingId.value = p.id
   formError.value = null
@@ -293,6 +295,17 @@ watch(
           <input v-model="form.startTls" type="checkbox" class="rounded border-border" />
           <span class="text-xs text-foreground">STARTTLS</span>
         </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input v-model="form.tlsRejectUnauthorized" type="checkbox" class="rounded border-border" />
+          <span class="text-xs text-foreground">Verify TLS certificate</span>
+        </label>
+      </div>
+
+      <div v-if="!form.tlsRejectUnauthorized" class="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+        <AlertTriangle :size="14" class="mt-0.5 shrink-0 text-amber-500" />
+        <p class="text-xs text-amber-700 dark:text-amber-400">
+          TLS verification is disabled. The server's certificate will not be validated - use only for trusted internal servers.
+        </p>
       </div>
 
       <div v-if="formError" class="text-xs text-destructive">{{ formError }}</div>
@@ -418,13 +431,21 @@ watch(
           <Tooltip v-if="canManageEmail && p.userId !== null">
             <TooltipTrigger as-child>
               <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+                :class="
+                  p.isSystemProvider
+                    ? 'cursor-not-allowed text-muted-foreground/40'
+                    : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                "
+                :disabled="p.isSystemProvider"
                 @click="requestRemove(p)"
               >
                 <Trash2 :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
+            <TooltipContent>
+              {{ p.isSystemProvider ? 'Remove the system designation before deleting' : 'Delete' }}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>

@@ -56,6 +56,8 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
       return
     }
 
+    quickViewOpen.value = false
+
     if (action === 'add-to-collection') {
       if (!selection.selectionMode.value) {
         selection.enterSelectionMode()

@@ -42,6 +42,7 @@ describe('Email DTO validation', () => {
           auth: true,
           ssl: false,
           startTls: true,
+          tlsRejectUnauthorized: true,
         })
       ).length,
     ).toBe(0);
@@ -55,12 +56,29 @@ describe('Email DTO validation', () => {
           auth: true,
           ssl: false,
           startTls: true,
+          tlsRejectUnauthorized: true,
         })
       ).length,
     ).toBeGreaterThan(0);
 
+    expect(
+      (
+        await errorsFor(CreateEmailProviderDto, {
+          name: 'SMTP',
+          host: 'smtp.example.com',
+          port: 465,
+          auth: true,
+          ssl: true,
+          startTls: false,
+        })
+      ).length,
+      'tlsRejectUnauthorized is required on create',
+    ).toBeGreaterThan(0);
+
     expect((await errorsFor(UpdateEmailProviderDto, { port: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateEmailProviderDto, { port: 2525, auth: false })).length).toBe(0);
+    expect((await errorsFor(UpdateEmailProviderDto, { tlsRejectUnauthorized: false })).length).toBe(0);
+    expect((await errorsFor(UpdateEmailProviderDto, { tlsRejectUnauthorized: 'yes' })).length).toBeGreaterThan(0);
   });
 
   it('enforces recipient enums and allows null resets on update', async () => {

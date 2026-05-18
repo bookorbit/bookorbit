@@ -49,6 +49,7 @@ export class SystemMailService {
       auth: provider.auth,
       ssl: provider.ssl,
       startTls: provider.startTls,
+      tlsRejectUnauthorized: provider.tlsRejectUnauthorized,
     });
 
     const from = provider.fromAddress ? (provider.fromName ? `${provider.fromName} <${provider.fromAddress}>` : provider.fromAddress) : undefined;

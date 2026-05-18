@@ -48,4 +48,8 @@ export class UpdateEmailProviderDto {
   @IsOptional()
   @IsBoolean()
   startTls?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  tlsRejectUnauthorized?: boolean;
 }
