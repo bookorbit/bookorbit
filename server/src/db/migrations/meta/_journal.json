@@ -29,6 +29,13 @@
       "when": 1778890017858,
       "tag": "0003_add-achievements-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779128487353,
+      "tag": "0004_add_tls_reject_unauthorized_to_email_providers",
+      "breakpoints": true
     }
   ]
 }

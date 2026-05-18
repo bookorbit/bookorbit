@@ -50,6 +50,7 @@ export class EmailProviderResolver {
         auth: provider.auth,
         ssl: provider.ssl,
         startTls: provider.startTls,
+        tlsRejectUnauthorized: provider.tlsRejectUnauthorized,
       },
       providerId: provider.id,
     };

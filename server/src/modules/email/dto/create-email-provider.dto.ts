@@ -42,4 +42,7 @@ export class CreateEmailProviderDto {
 
   @IsBoolean()
   startTls: boolean;
+
+  @IsBoolean()
+  tlsRejectUnauthorized: boolean;
 }
