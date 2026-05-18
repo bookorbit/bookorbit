@@ -45,6 +45,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 
@@ -120,6 +121,20 @@ const showFormatOverlay = computed(() => cardOverlays.value.includes('format') &
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
+
+const showSeriesPositionBadge = computed(
+  () => cardOverlays.value.includes('series-position') && props.book.seriesIndex != null && !props.selectionMode && !isMissing.value,
+)
+const seriesPositionLabel = computed(() => {
+  const index = props.book.seriesIndex
+  if (index == null) return ''
+  const display = index % 1 === 0 ? String(Math.trunc(index)) : String(index)
+  return `#${display}`
+})
+const seriesPositionTooltip = computed(() => {
+  const label = seriesPositionLabel.value
+  return props.book.seriesName ? `${props.book.seriesName} ${label}` : label
+})
 
 const ratingColor = computed(() => {
   const r = Math.round(props.book.rating ?? 0)
@@ -283,12 +298,27 @@ async function handleSetStatus(status: ReadStatus) {
         <component :is="STATUS_ICONS[localReadStatus!]" :size="12" :class="STATUS_COLORS[localReadStatus!]" />
       </div>
 
-      <!-- Top-right overlay: lock status -->
-      <div
-        v-if="showLockStatusPill"
-        class="absolute top-1.5 right-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
-      >
-        <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
+      <!-- Top-right overlay container: lock status (above) + series position (below) -->
+      <div class="absolute top-1.5 right-1.5 z-10 flex flex-col items-end gap-1 pointer-events-none">
+        <div
+          v-if="showLockStatusPill"
+          class="flex items-center justify-center rounded-full bg-black/60 p-1 group-hover:opacity-0 transition-opacity duration-150"
+        >
+          <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
+        </div>
+
+        <Tooltip v-if="showSeriesPositionBadge">
+          <TooltipTrigger as-child>
+            <div
+              class="pointer-events-auto flex items-center bg-black/60 rounded-full px-1.5 py-0.5 group-hover:opacity-0 transition-opacity duration-150 cursor-default"
+            >
+              <span class="text-[9px] font-bold text-white leading-none">{{ seriesPositionLabel }}</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{{ seriesPositionTooltip }}</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <!-- Bottom-left overlay: rating -->

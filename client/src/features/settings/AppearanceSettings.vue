@@ -34,6 +34,7 @@ const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = 
   { key: 'format', label: 'File format', hint: 'Color-coded EPUB, PDF, CBZ badge at bottom-right' },
   { key: 'rating', label: 'Rating', hint: 'Star rating indicator at bottom-left' },
   { key: 'read-status', label: 'Read status', hint: 'Color icon showing the current reading status at top-left' },
+  { key: 'series-position', label: 'Series number', hint: 'Badge showing the book position in its series at top-right (e.g. #3, #1.5)' },
   { key: 'lock-status', label: 'Lock status', hint: 'Metadata lock icon at top-right - orange when locked, green when unlocked' },
 ]
 
