@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { readdir, stat } from 'fs/promises';
+import type { BigIntStats } from 'fs';
 import { dirname, join, relative } from 'path';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import { classifyFile, DEFAULT_FORMAT_PRIORITY } from './lib/classify';
+import { clampIno } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 
 export type FileEventResult =
@@ -12,7 +14,7 @@ export type FileEventResult =
   | { type: 'book-moved'; libraryId: number; bookIds: number[] }
   | { type: 'noop' };
 
-type FsStat = NonNullable<Awaited<ReturnType<typeof stat>>>;
+type FsStat = BigIntStats;
 
 @Injectable()
 export class FileEventProcessorService {
@@ -84,7 +86,7 @@ export class FileEventProcessorService {
   }
 
   async handleCreate(absolutePath: string, scopeLibraryId?: number): Promise<FileEventResult> {
-    const fileStat = await stat(absolutePath).catch(() => null);
+    const fileStat = await stat(absolutePath, { bigint: true }).catch(() => null);
     if (!fileStat) return { type: 'noop' };
 
     if (fileStat.isDirectory()) return this.handleCreateDir(absolutePath, scopeLibraryId);
@@ -149,7 +151,7 @@ export class FileEventProcessorService {
     // for the wrong book), check if the inode belongs to a file already tracked by a
     // book at this folder path. This handles atomic-save patterns where an editor writes
     // a new inode for the same logical file.
-    const ino = Number(fileStat.ino);
+    const ino = clampIno(fileStat.ino);
     if (ino !== 0) {
       const folderPath = dirname(absolutePath);
       const ownBook =
@@ -236,7 +238,7 @@ export class FileEventProcessorService {
     const existingContent: ((typeof files)[number] & { stat: FsStat })[] = [];
 
     for (const file of files) {
-      const s = await stat(file.absolutePath).catch(() => null);
+      const s = await stat(file.absolutePath, { bigint: true }).catch(() => null);
       if (!s || !s.isFile()) continue;
       existingContent.push({ ...file, stat: s });
     }
@@ -261,7 +263,7 @@ export class FileEventProcessorService {
   }
 
   private async detectMovedFile(newAbsolutePath: string, fileStat: FsStat, scopeLibraryId?: number): Promise<FileEventResult> {
-    const ino = Number(fileStat.ino);
+    const ino = clampIno(fileStat.ino);
     if (ino === 0) return { type: 'noop' };
 
     const match = await this.scannerRepo.findBookFileWithContextByIno(ino, scopeLibraryId);
@@ -313,7 +315,7 @@ export class FileEventProcessorService {
   }
 
   private statToFileInfo(s: FsStat): { ino: number; sizeBytes: number; mtime: Date } {
-    return { ino: Number(s.ino), sizeBytes: Number(s.size), mtime: s.mtime };
+    return { ino: clampIno(s.ino), sizeBytes: Number(s.size), mtime: s.mtime };
   }
 
   private async detectMovedBooksInDir(dirPath: string, scopeLibraryId?: number): Promise<FileEventResult> {
@@ -327,7 +329,7 @@ export class FileEventProcessorService {
       const { role } = classifyFile(fullPath);
       if (role !== 'content') continue;
 
-      const s = await stat(fullPath).catch(() => null);
+      const s = await stat(fullPath, { bigint: true }).catch(() => null);
       if (!s) continue;
 
       const result = await this.detectMovedFile(fullPath, s, scopeLibraryId);

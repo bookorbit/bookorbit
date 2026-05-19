@@ -60,10 +60,10 @@ function makeService() {
   return new FileEventProcessorService(mockRepo as unknown as ScannerRepository);
 }
 
-function makeFileStat(overrides: Partial<{ ino: number; size: number; mtime: Date; isDirectory: boolean; isFile: boolean }> = {}) {
+function makeFileStat(overrides: Partial<{ ino: number | bigint; size: number | bigint; mtime: Date; isDirectory: boolean; isFile: boolean }> = {}) {
   return {
-    ino: overrides.ino ?? 1001,
-    size: overrides.size ?? 12345,
+    ino: overrides.ino ?? 1001n,
+    size: overrides.size ?? 12345n,
     mtime: overrides.mtime ?? new Date('2024-01-01'),
     isDirectory: () => overrides.isDirectory ?? false,
     isFile: () => overrides.isFile ?? true,
@@ -317,6 +317,20 @@ describe('handleCreate — file', () => {
     expect(result).toEqual({ type: 'book-restored', libraryId: 3, bookIds: [10] });
   });
 
+  it('clamps oversized MergerFS inode values to 0 when restoring existing file rows', async () => {
+    const fileStat = makeFileStat({ ino: 14351917807348929000n, size: 50000n });
+    mockStat.mockResolvedValue(fileStat);
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 42, bookId: 10 },
+      libraryId: 3,
+    } as any);
+    mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'missing', libraryId: 3 } as any);
+
+    await makeService().handleCreate('/books/Author/book.epub');
+
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(42, expect.objectContaining({ ino: 0 }));
+  });
+
   it('restores own book before searching for folder-level missing books (Issue 25)', async () => {
     const fileStat = makeFileStat({ ino: 2000, size: 50000 });
     mockStat.mockResolvedValue(fileStat);
@@ -537,6 +551,18 @@ describe('handleCreate — move detection', () => {
 
     expect(mockRepo.updateBookFolderPath).toHaveBeenCalledWith(40, '/books/renamed.epub');
     expect(result).toEqual({ type: 'book-moved', libraryId: 3, bookIds: [40] });
+  });
+
+  it('skips inode-based move detection when inode exceeds PostgreSQL bigint range', async () => {
+    const fileStat = makeFileStat({ ino: 14351917807348929000n });
+    mockStat.mockResolvedValue(fileStat);
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue(null);
+    mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);
+
+    const result = await makeService().handleCreate('/books/Author/book.epub');
+
+    expect(mockRepo.findBookFileWithContextByIno).not.toHaveBeenCalled();
+    expect(result).toEqual({ type: 'noop' });
   });
 });
 

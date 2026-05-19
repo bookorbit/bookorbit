@@ -75,7 +75,7 @@ describe('UploadProcessorService', () => {
 
     orchestrator.scheduleIfEligible.mockResolvedValue(undefined);
 
-    mockStat.mockResolvedValue({ ino: 111, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
+    mockStat.mockResolvedValue({ ino: 111n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
     mockComputeFileHash.mockResolvedValue('hash-abc');
 
     service = new UploadProcessorService(db as any, metadataService as any, orchestrator as any);
@@ -131,6 +131,33 @@ describe('UploadProcessorService', () => {
       }),
     );
     expect(orchestrator.scheduleIfEligible).toHaveBeenCalledWith(99, 1, 'event_import');
+  });
+
+  it('clamps oversized MergerFS inode values to 0 before persisting', async () => {
+    mockStat.mockResolvedValueOnce({ ino: 14351917807348929000n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
+
+    await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
+
+    expect(insertBookFilesValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ino: 0,
+      }),
+    );
+  });
+
+  it('clamps oversized MergerFS inode values to 0 in existing-book upserts', async () => {
+    selectLimit.mockResolvedValueOnce([{ id: 99 }]);
+    mockStat.mockResolvedValueOnce({ ino: 14351917807348929000n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
+
+    await service.createBookRecord(1, 2, '/folder', '/folder/book2.epub', 'book/book2.epub', 'epub', 5000);
+
+    expect(insertBookFilesOnConflict).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          ino: 0,
+        }),
+      }),
+    );
   });
 
   it('refreshes a stale book_files record when the absolute path already exists in the db', async () => {

@@ -10,6 +10,7 @@ import { bookFiles, bookMetadata, books } from '../../db/schema';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { computeFileHash } from '../scanner/lib/hash';
+import { clampIno } from '../scanner/lib/walk';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -51,7 +52,8 @@ export class UploadProcessorService {
     format: string,
     sizeBytes: number,
   ): Promise<{ bookId: number }> {
-    const [fileStat, fileHash] = await Promise.all([stat(absolutePath), computeFileHash(absolutePath)]);
+    const [fileStat, fileHash] = await Promise.all([stat(absolutePath, { bigint: true }), computeFileHash(absolutePath)]);
+    const safeIno = clampIno(fileStat.ino);
 
     const { bookId } = await this.db.transaction(async (tx) => {
       const [existingBook] = await tx
@@ -66,7 +68,7 @@ export class UploadProcessorService {
           libraryFolderId,
           absolutePath,
           relPath,
-          ino: fileStat.ino,
+          ino: safeIno,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,
@@ -78,7 +80,7 @@ export class UploadProcessorService {
           .values(fileValues)
           .onConflictDoUpdate({
             target: bookFiles.absolutePath,
-            set: { bookId: existingBook.id, libraryFolderId, relPath, ino: fileStat.ino, sizeBytes, mtime: fileStat.mtime, fileHash, format },
+            set: { bookId: existingBook.id, libraryFolderId, relPath, ino: safeIno, sizeBytes, mtime: fileStat.mtime, fileHash, format },
           })
           .returning({ id: bookFiles.id });
         if (!file) throw new InternalServerErrorException('Failed to create book file');
@@ -98,7 +100,7 @@ export class UploadProcessorService {
           libraryFolderId,
           absolutePath,
           relPath,
-          ino: fileStat.ino,
+          ino: safeIno,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,
