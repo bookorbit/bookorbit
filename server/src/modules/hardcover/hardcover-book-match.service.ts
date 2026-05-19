@@ -34,9 +34,23 @@ query FindBookByISBN10($isbn: String!) {
   }
 }`;
 
-const FIND_BOOK_BY_TITLE_QUERY = `
-query FindBookByTitle($title: String!) {
-  books(where: { title: { _ilike: $title } }, limit: 1) {
+const SEARCH_BOOKS_QUERY = `
+query SearchBooks($query: String!) {
+  search(
+    query: $query
+    query_type: "Book"
+    per_page: 5
+    page: 1
+    fields: "title,author_names,alternative_titles"
+    weights: "5,2,1"
+  ) {
+    ids
+  }
+}`;
+
+const FIND_BOOKS_BY_IDS_QUERY = `
+query FindBooksByIds($ids: [Int!]!) {
+  books(where: { id: { _in: $ids } }, limit: 5) {
     id
     editions(limit: 1) {
       id
@@ -72,6 +86,12 @@ interface BooksQueryResult {
     id: number;
     editions?: Array<{ id: number; pages?: number | null }>;
   }>;
+}
+
+interface SearchBooksResult {
+  search?: {
+    ids?: number[];
+  } | null;
 }
 
 @Injectable()
@@ -190,10 +210,15 @@ export class HardcoverBookMatchService {
 
   private async matchByTitleAuthor(userId: number, token: string, title: string, author: string, bookId: number): Promise<HardcoverBookMatch | null> {
     try {
-      const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_BY_TITLE_QUERY, {
-        title: `%${title}%`,
+      const searchData = await this.client.query<SearchBooksResult>(userId, token, SEARCH_BOOKS_QUERY, {
+        query: `${title} ${author}`,
       });
-      const book = data.books?.[0];
+      const ids = searchData.search?.ids?.filter((id) => Number.isInteger(id)).slice(0, 5) ?? [];
+      if (ids.length === 0) return null;
+
+      const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOKS_BY_IDS_QUERY, { ids });
+      const booksById = new Map((data.books ?? []).map((book) => [book.id, book]));
+      const book = ids.map((id) => booksById.get(id)).find((candidate): candidate is BooksQueryResult['books'][number] => candidate != null);
       if (!book) return null;
       return {
         hardcoverBookId: book.id,

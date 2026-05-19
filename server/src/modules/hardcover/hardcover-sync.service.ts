@@ -289,6 +289,7 @@ export class HardcoverSyncService {
         userId,
         bookId: book.bookId,
         syncError: `no_status_mapping:${book.status}`,
+        ...this.buildAttemptSnapshot(book),
       });
       return 'skipped';
     }
@@ -301,7 +302,7 @@ export class HardcoverSyncService {
         bookId: book.bookId,
         hardcoverBookId: state?.hardcoverBookId ?? null,
         syncError: 'no_match',
-        lastSyncedAt: state?.lastSyncedAt ?? null,
+        ...this.buildAttemptSnapshot(book),
       });
       return 'skipped';
     }
@@ -551,6 +552,17 @@ export class HardcoverSyncService {
     if (startDate !== state.lastSyncedStartedAt) return true;
     if (endDate !== state.lastSyncedFinishedAt) return true;
     return false;
+  }
+
+  private buildAttemptSnapshot(book: BookSyncData) {
+    return {
+      lastSyncedAt: new Date(),
+      lastSyncedStatus: book.status,
+      lastSyncedProgress: book.progress,
+      lastSyncedRating: book.rating,
+      lastSyncedStartedAt: toDateString(book.startedAt),
+      lastSyncedFinishedAt: toDateString(book.finishedAt),
+    };
   }
 
   private isSameActiveStatus(prev: HardcoverActiveSyncStatus | null, next: HardcoverActiveSyncStatus | null): boolean {

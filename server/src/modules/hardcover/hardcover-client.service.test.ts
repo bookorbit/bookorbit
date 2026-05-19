@@ -37,6 +37,14 @@ describe('HardcoverClientService', () => {
     fetchSpy.mockResolvedValueOnce(makeFetchResponse(200, { data: { me: [{ id: 1 }] } }));
     const result = await service.query<{ me: { id: number }[] }>(1, 'token', '{ me { id } }');
     expect(result).toEqual({ me: [{ id: 1 }] });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'User-Agent': expect.stringContaining('BookOrbit'),
+        }),
+      }),
+    );
   });
 
   it('should throw on GraphQL errors', async () => {

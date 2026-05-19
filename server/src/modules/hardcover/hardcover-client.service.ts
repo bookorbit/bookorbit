@@ -35,6 +35,7 @@ export class HardcoverClientService {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'User-Agent': 'BookOrbit Hardcover Sync (https://bookorbit.app)',
         },
         body: JSON.stringify({ query, variables }),
       });

@@ -111,10 +111,37 @@ describe('HardcoverBookMatchService', () => {
 
   it('falls back to title+author when isbn fails', async () => {
     mockRepo.findBookState.mockResolvedValue(undefined);
-    mockClient.query.mockResolvedValueOnce({ books: [] }).mockResolvedValueOnce({ books: [{ id: 123 }] });
+    mockClient.query
+      .mockResolvedValueOnce({ books: [] })
+      .mockResolvedValueOnce({ search: { ids: [123] } })
+      .mockResolvedValueOnce({ books: [{ id: 123 }] });
     const result = await makeService().matchBook(1, 'tok', baseBook);
     expect(result?.matchMethod).toBe('title');
     expect(result?.hardcoverBookId).toBe(123);
+    expect(mockClient.query).toHaveBeenNthCalledWith(
+      2,
+      1,
+      'tok',
+      expect.stringContaining('query SearchBooks'),
+      expect.objectContaining({ query: 'Test Book Test Author' }),
+    );
+  });
+
+  it('preserves Hardcover search ranking when hydrating title matches', async () => {
+    mockRepo.findBookState.mockResolvedValue(undefined);
+    mockClient.query
+      .mockResolvedValueOnce({ books: [] })
+      .mockResolvedValueOnce({ search: { ids: [123, 456] } })
+      .mockResolvedValueOnce({
+        books: [
+          { id: 456, editions: [{ id: 40 }] },
+          { id: 123, editions: [{ id: 30 }] },
+        ],
+      });
+
+    const result = await makeService().matchBook(1, 'tok', baseBook);
+
+    expect(result).toEqual({ hardcoverBookId: 123, hardcoverEditionId: 30, editionPages: null, matchMethod: 'title' });
   });
 
   it('returns null and stores no_match when all strategies fail', async () => {

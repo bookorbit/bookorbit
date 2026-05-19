@@ -86,7 +86,15 @@ describe('HardcoverSyncService', () => {
       mockMatchService.matchBook.mockResolvedValue(null);
       mockRepo.findBookState.mockResolvedValue(null);
       await makeService().syncBook(1, 1);
-      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ syncError: 'no_match' }));
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          syncError: 'no_match',
+          lastSyncedAt: expect.any(Date),
+          lastSyncedStatus: 'reading',
+          lastSyncedProgress: 42,
+          lastSyncedStartedAt: '2024-01-01',
+        }),
+      );
     });
 
     it('syncs book successfully', async () => {
@@ -194,7 +202,13 @@ describe('HardcoverSyncService', () => {
       mockSettingsService.getTokenForUser.mockResolvedValue('tok');
       mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: 'invalid_status' });
       await makeService().syncBook(1, 1);
-      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ syncError: expect.stringContaining('no_status_mapping') }));
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          syncError: expect.stringContaining('no_status_mapping'),
+          lastSyncedAt: expect.any(Date),
+          lastSyncedStatus: 'invalid_status',
+        }),
+      );
     });
   });
 
