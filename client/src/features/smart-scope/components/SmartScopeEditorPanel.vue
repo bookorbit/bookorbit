@@ -105,6 +105,10 @@ function initFilter() {
   draftFilter.value = { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains' }] }
 }
 
+function hasCompleteRules(group: GroupRule | undefined): boolean {
+  return !!group?.rules.some((rule) => rule.type === 'rule' || hasCompleteRules(rule as GroupRule))
+}
+
 async function save() {
   if (!props.smartScope) return
   if (!trimmedDraftName.value) {
@@ -121,7 +125,7 @@ async function save() {
     await updateSmartScope(props.smartScope.id, {
       name: trimmedDraftName.value,
       icon: trimmedDraftIcon.value,
-      filter: draftFilter.value,
+      filter: hasCompleteRules(draftFilter.value) ? draftFilter.value : undefined,
       defaultSort: draftSort.value,
     })
     emit('saved')
@@ -218,7 +222,7 @@ async function save() {
 
             <!-- Filter builder -->
             <template v-else>
-              <BookFilterBuilder v-model="draftFilter" />
+              <BookFilterBuilder v-model="draftFilter" preserve-incomplete-root />
               <div class="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border/50">
                 <span class="text-xs text-muted-foreground shrink-0">Replace with template:</span>
                 <button

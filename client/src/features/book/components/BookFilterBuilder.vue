@@ -12,6 +12,7 @@ import FilterTextTypeahead from './FilterTextTypeahead.vue'
 const props = defineProps<{
   modelValue: GroupRule | undefined
   depth?: number
+  preserveIncompleteRoot?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -166,7 +167,7 @@ function emitUpdate() {
       }
     })
   const isSubGroup = (props.depth ?? 0) > 0
-  if (!isSubGroup && rules.length === 0) {
+  if (!isSubGroup && rules.length === 0 && !props.preserveIncompleteRoot) {
     // Top-level: no complete rules means no active filter — don't send an empty group to the API.
     emit('update:modelValue', undefined)
     return
