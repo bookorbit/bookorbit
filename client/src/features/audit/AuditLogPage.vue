@@ -6,6 +6,8 @@ import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import { useAuditLog } from './useAuditLog'
 import { useMediaQuery } from '@vueuse/core'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const { entries, total, page, pageSize, loading, error, filters, fetchPage, applyFilters, clearFilters, goToPage } = useAuditLog()
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
@@ -83,8 +85,13 @@ watch(
 </script>
 
 <template>
-  <SettingsPageHeader class="hidden md:flex" title="Audit Log" subtitle="A record of admin-significant actions performed across the system." />
-  <div class="md:hidden px-1">
+  <SettingsPageHeader
+    v-if="!props.embedded"
+    class="hidden md:flex"
+    title="Audit Log"
+    subtitle="A record of admin-significant actions performed across the system."
+  />
+  <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">Audit Log</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"

@@ -5,7 +5,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
 const router = useRouter()
-const { isSuperuser, userPermissions, isDemoRestrictedAccount } = usePermissions()
+const { isSuperuser, userPermissions } = usePermissions()
 
 interface Section {
   label: string
@@ -32,44 +32,26 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('manage_metadata_config')) {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
   }
-  if (su || perms.includes('book_dock_access')) {
-    result.push({ label: 'Book Dock', routeName: 'settings-admin-book-dock' })
-  }
-  if (su || perms.includes('manage_app_settings')) {
-    result.push({ label: 'File Naming', routeName: 'settings-admin-file-naming' })
-  }
-  if (su || perms.includes('manage_users')) {
-    result.push({ label: 'Users', routeName: 'settings-admin-users' })
-  }
-  if (su || perms.includes('manage_app_settings')) {
-    result.push({ label: 'OIDC / SSO', routeName: 'settings-admin-oidc' })
-  }
+
+  result.push({ label: 'Integrations', routeName: 'settings-integrations' })
+
   if (su || perms.includes('email_send') || perms.includes('manage_email')) {
     result.push({ label: 'Email', routeName: 'settings-email' })
   }
+
   if (su || perms.includes('opds_access')) {
     result.push({ label: 'OPDS', routeName: 'settings-opds' })
   }
-  if (su || perms.includes('kobo_sync')) {
-    result.push({ label: 'Kobo', routeName: 'settings-kobo' })
+
+  if (su || perms.includes('manage_users') || perms.includes('manage_app_settings')) {
+    result.push({ label: 'Admin', routeName: 'settings-admin' })
   }
-  if (su || perms.includes('koreader_sync')) {
-    result.push({ label: 'KOReader', routeName: 'settings-koreader' })
-  }
-  result.push({ label: 'Hardcover', routeName: 'settings-hardcover' })
-  if (su || perms.includes('manage_app_settings')) {
-    result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
+
+  if (su || perms.includes('manage_app_settings') || perms.includes('book_dock_access')) {
+    result.push({ label: 'System', routeName: 'settings-system' })
   }
 
   result.push({ label: 'Account', routeName: 'settings-account' })
-
-  if (!isDemoRestrictedAccount.value) {
-    result.push({ label: 'Notifications', routeName: 'settings-notifications' })
-  }
-
-  if (su) {
-    result.push({ label: 'Audit Log', routeName: 'settings-admin-audit-log' })
-  }
 
   return result
 })

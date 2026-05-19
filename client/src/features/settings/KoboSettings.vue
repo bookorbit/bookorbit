@@ -8,6 +8,8 @@ import { useKoboDevices } from '@/features/kobo/composables/useKoboDevices'
 import { useKoboSettings } from '@/features/kobo/composables/useKoboSettings'
 import type { KoboDevice } from '@bookorbit/types'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const { devices, fetchDevices, createDevice, renameDevice, revokeDevice } = useKoboDevices()
 const { settings, fetchSettings, updateSettings } = useKoboSettings()
 
@@ -164,7 +166,7 @@ async function saveSettings() {
 </script>
 
 <template>
-  <SettingsPageHeader title="Kobo Sync" subtitle="Pair your Kobo device to sync your library." />
+  <SettingsPageHeader v-if="!props.embedded" title="Kobo Sync" subtitle="Pair your Kobo device to sync your library." />
 
   <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>

@@ -2,8 +2,10 @@ import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded, typ
 import { EMAIL_TAB_LABELS, normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { METADATA_TAB_INFO, normalizeMetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { READER_TAB_TITLE_LABELS, normalizeReaderTab } from '@/features/settings/lib/reader-tabs'
-import { Permission } from '@bookorbit/types'
-import { useAuth } from '@/features/auth/composables/useAuth'
+import { INTEGRATIONS_TAB_INFO, normalizeIntegrationsTab } from '@/features/settings/lib/integrations-tabs'
+import { ADMIN_TAB_INFO, normalizeAdminTab } from '@/features/settings/lib/admin-tabs'
+import { SYSTEM_TAB_INFO, normalizeSystemTab } from '@/features/settings/lib/system-tabs'
+import { ACCOUNT_TAB_INFO, normalizeAccountTab } from '@/features/settings/lib/account-tabs'
 import { registerAuthGuard } from './guards/auth.guard'
 import { registerRouteTitleHook } from './title-resolver'
 
@@ -40,12 +42,24 @@ function resolveMetadataTitle(to: RouteLocationNormalizedLoaded): string {
   return METADATA_TAB_INFO[tab].titleLabel
 }
 
-function blockDemoRestrictedNotificationsRoute() {
-  const { user } = useAuth()
-  if (user.value?.permissions?.includes(Permission.DemoRestricted)) {
-    return { name: 'settings-account' }
-  }
-  return true
+function resolveIntegrationsTitle(to: RouteLocationNormalizedLoaded): string {
+  const tab = normalizeIntegrationsTab(to.query.tab)
+  return INTEGRATIONS_TAB_INFO[tab].titleLabel
+}
+
+function resolveAdminTitle(to: RouteLocationNormalizedLoaded): string {
+  const tab = normalizeAdminTab(to.query.tab)
+  return ADMIN_TAB_INFO[tab].titleLabel
+}
+
+function resolveSystemTitle(to: RouteLocationNormalizedLoaded): string {
+  const tab = normalizeSystemTab(to.query.tab)
+  return SYSTEM_TAB_INFO[tab].titleLabel
+}
+
+function resolveAccountTitle(to: RouteLocationNormalizedLoaded): string {
+  const tab = normalizeAccountTab(to.query.tab)
+  return ACCOUNT_TAB_INFO[tab].titleLabel
 }
 
 export const routes: RouteRecordRaw[] = [
@@ -67,15 +81,13 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'account',
             name: 'settings-account',
-            component: () => import('@/features/settings/AccountSettings.vue'),
-            meta: { title: 'Account' },
+            component: () => import('@/features/settings/AccountAllSettings.vue'),
+            meta: { title: resolveAccountTitle },
           },
           {
             path: 'notifications',
             name: 'settings-notifications',
-            component: () => import('@/features/notifications/components/NotificationPreferences.vue'),
-            beforeEnter: blockDemoRestrictedNotificationsRoute,
-            meta: { title: 'Notifications' },
+            redirect: () => ({ name: 'settings-account', query: { tab: 'notifications' } }),
           },
           {
             path: 'libraries',
@@ -96,22 +108,25 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: 'OPDS' },
           },
           {
+            path: 'integrations',
+            name: 'settings-integrations',
+            component: () => import('@/features/settings/IntegrationsAllSettings.vue'),
+            meta: { maxWidth: 'max-w-3xl', title: resolveIntegrationsTitle },
+          },
+          {
             path: 'kobo',
             name: 'settings-kobo',
-            component: () => import('@/features/settings/KoboSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'Kobo Sync' },
+            redirect: () => ({ name: 'settings-integrations', query: { tab: 'kobo' } }),
           },
           {
             path: 'koreader',
             name: 'settings-koreader',
-            component: () => import('@/features/settings/KoreaderSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'KOReader Sync' },
+            redirect: () => ({ name: 'settings-integrations', query: { tab: 'koreader' } }),
           },
           {
             path: 'hardcover',
             name: 'settings-hardcover',
-            component: () => import('@/features/hardcover/components/HardcoverSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'Hardcover' },
+            redirect: () => ({ name: 'settings-integrations', query: { tab: 'hardcover' } }),
           },
           {
             path: 'email',
@@ -141,10 +156,15 @@ export const routes: RouteRecordRaw[] = [
             redirect: { name: 'settings-reader-general', query: { tab: 'comics' } },
           },
           {
+            path: 'admin',
+            name: 'settings-admin',
+            component: () => import('@/features/settings/AdminAllSettings.vue'),
+            meta: { maxWidth: 'max-w-6xl', title: resolveAdminTitle },
+          },
+          {
             path: 'admin/users',
             name: 'settings-admin-users',
-            component: () => import('@/features/admin/UsersPage.vue'),
-            meta: { maxWidth: 'max-w-6xl', title: 'Users' },
+            redirect: () => ({ name: 'settings-admin', query: { tab: 'users' } }),
           },
           {
             path: 'admin/metadata',
@@ -160,37 +180,38 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admin/oidc',
             name: 'settings-admin-oidc',
-            component: () => import('@/features/settings/OidcSettings.vue'),
-            meta: { title: 'OIDC / SSO' },
+            redirect: () => ({ name: 'settings-admin', query: { tab: 'oidc' } }),
+          },
+          {
+            path: 'system',
+            name: 'settings-system',
+            component: () => import('@/features/settings/SystemAllSettings.vue'),
+            meta: { maxWidth: 'max-w-7xl', title: resolveSystemTitle },
           },
           {
             path: 'admin/file-naming',
             name: 'settings-admin-file-naming',
-            component: () => import('@/features/settings/FileNamingSettings.vue'),
-            meta: { maxWidth: 'max-w-7xl', title: 'File Naming' },
+            redirect: () => ({ name: 'settings-system', query: { tab: 'file-naming' } }),
           },
           {
             path: 'admin/book-dock',
             name: 'settings-admin-book-dock',
-            component: () => import('@/features/settings/BookDockSettings.vue'),
-            meta: { title: 'Book Dock Settings' },
+            redirect: () => ({ name: 'settings-system', query: { tab: 'book-dock' } }),
           },
           {
             path: 'admin/maintenance',
             name: 'settings-admin-maintenance',
-            component: () => import('@/features/settings/MaintenanceSettings.vue'),
-            meta: { title: 'Maintenance' },
+            redirect: () => ({ name: 'settings-system', query: { tab: 'maintenance' } }),
           },
           {
             path: 'admin/audit-log',
             name: 'settings-admin-audit-log',
-            component: () => import('@/features/audit/AuditLogPage.vue'),
-            meta: { maxWidth: 'max-w-7xl', title: 'Audit Log' },
+            redirect: () => ({ name: 'settings-system', query: { tab: 'audit-log' } }),
           },
           {
             path: 'admin/magic-links',
             name: 'settings-admin-magic-links',
-            redirect: { name: 'settings-admin-users', query: { tab: 'magic-links' } },
+            redirect: () => ({ name: 'settings-admin', query: { tab: 'users' } }),
           },
           { path: ':pathMatch(.*)*', redirect: { name: 'settings-libraries' } },
         ],

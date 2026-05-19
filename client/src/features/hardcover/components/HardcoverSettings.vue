@@ -6,6 +6,8 @@ import HardcoverSyncProgress from '../components/HardcoverSyncProgress.vue'
 import { useHardcoverSettings } from '../composables/useHardcoverSettings'
 import { useHardcoverSync } from '../composables/useHardcoverSync'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const { settings } = useHardcoverSettings()
 const { fetchStatus, stopSyncTracking } = useHardcoverSync()
 
@@ -20,7 +22,7 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <SettingsPageHeader title="Hardcover" subtitle="Sync your reading progress, status, and ratings to Hardcover." />
+    <SettingsPageHeader v-if="!props.embedded" title="Hardcover" subtitle="Sync your reading progress, status, and ratings to Hardcover." />
 
     <HardcoverConnectionCard />
 

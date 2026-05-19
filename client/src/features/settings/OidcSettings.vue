@@ -8,6 +8,8 @@ import { ArrowLeft, Plus, ShieldCheck, Trash2 } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 interface ProviderSummary {
   id: number
   slug: string
@@ -336,8 +338,13 @@ async function deleteGroupMapping(id: number) {
 <template>
   <!-- List view -->
   <template v-if="viewMode === 'list'">
-    <SettingsPageHeader class="hidden md:flex" title="OIDC / SSO" subtitle="Manage OpenID Connect providers for single sign-on." />
-    <div class="md:hidden px-1">
+    <SettingsPageHeader
+      v-if="!props.embedded"
+      class="hidden md:flex"
+      title="OIDC / SSO"
+      subtitle="Manage OpenID Connect providers for single sign-on."
+    />
+    <div v-if="!props.embedded" class="md:hidden px-1">
       <h1 class="text-xl font-semibold tracking-tight text-foreground">OIDC / SSO</h1>
       <p
         class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"

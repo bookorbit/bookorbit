@@ -7,6 +7,8 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { api } from '@/lib/api'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const { user, me } = useAuth()
 
 const saving = ref(false)
@@ -74,8 +76,13 @@ async function handleSave() {
 </script>
 
 <template>
-  <SettingsPageHeader class="hidden md:flex" title="Notifications" subtitle="Choose which notification categories you want to receive." />
-  <div class="md:hidden px-1">
+  <SettingsPageHeader
+    v-if="!props.embedded"
+    class="hidden md:flex"
+    title="Notifications"
+    subtitle="Choose which notification categories you want to receive."
+  />
+  <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">Notifications</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"

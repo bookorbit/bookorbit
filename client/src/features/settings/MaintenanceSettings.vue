@@ -9,6 +9,8 @@ import { api } from '@/lib/api'
 import { getWorkflowState, type MigrationWorkflowState } from '@/features/migration/lib/migration-api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const showMigrationModal = ref(false)
 
 const running = ref(false)
@@ -168,8 +170,13 @@ function formatDate(iso: string | null | undefined): string {
 
 <template>
   <MigrationModal v-if="showMigrationModal" @close="onMigrationModalClose" />
-  <SettingsPageHeader class="hidden md:flex" title="Maintenance" subtitle="Manage background tasks, system indices, and maintenance operations." />
-  <div class="md:hidden px-1">
+  <SettingsPageHeader
+    v-if="!props.embedded"
+    class="hidden md:flex"
+    title="Maintenance"
+    subtitle="Manage background tasks, system indices, and maintenance operations."
+  />
+  <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">Maintenance</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"

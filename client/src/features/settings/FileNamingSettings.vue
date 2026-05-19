@@ -15,6 +15,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Badge } from '@/components/ui/badge'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const {
   globalPattern,
   globalError,
@@ -244,11 +246,12 @@ onUnmounted(() => {
 <template>
   <div class="space-y-10 pb-20">
     <SettingsPageHeader
+      v-if="!props.embedded"
       class="hidden md:flex"
       title="File Naming"
       subtitle="Control how files are organized on disk when uploaded and how they are named when downloaded using placeholder tokens."
     />
-    <div class="md:hidden px-1">
+    <div v-if="!props.embedded" class="md:hidden px-1">
       <h1 class="text-xl font-semibold tracking-tight text-foreground">File Naming</h1>
       <p
         class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"

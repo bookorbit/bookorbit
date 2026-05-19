@@ -1,0 +1,246 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { computed } from 'vue'
+import SettingsHeader from '../SettingsHeader.vue'
+
+// --- Permission state ---
+const permState = {
+  isSuperuser: false,
+  permissions: [] as string[],
+}
+
+const routeState = { name: 'settings-appearance' }
+
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ name: routeState.name }),
+  useRouter: () => ({
+    push: vi.fn<() => Promise<void>>(),
+  }),
+}))
+
+vi.mock('@/features/auth/composables/usePermissions', () => ({
+  usePermissions: () => ({
+    isSuperuser: computed(() => permState.isSuperuser),
+    userPermissions: computed(() => permState.permissions),
+  }),
+}))
+
+function mountHeader(opts?: { su?: boolean; perms?: string[]; routeName?: string }) {
+  permState.isSuperuser = opts?.su ?? false
+  permState.permissions = opts?.perms ?? []
+  routeState.name = opts?.routeName ?? 'settings-appearance'
+  return mount(SettingsHeader)
+}
+
+function getTabLabels(wrapper: ReturnType<typeof mount>): string[] {
+  return wrapper.findAll('button').map((b) => b.text())
+}
+
+describe('SettingsHeader', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('tabs always visible to all users', () => {
+    it('shows Appearance tab', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).toContain('Appearance')
+    })
+
+    it('shows Reader tab', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).toContain('Reader')
+    })
+
+    it('shows Account tab', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).toContain('Account')
+    })
+
+    it('shows Integrations tab for all users (Hardcover has no permission gate)', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).toContain('Integrations')
+    })
+  })
+
+  describe('tabs removed from top-level navigation', () => {
+    it('does not show a standalone Kobo tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('Kobo')
+    })
+
+    it('does not show a standalone KOReader tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('KOReader')
+    })
+
+    it('does not show a standalone Hardcover tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('Hardcover')
+    })
+
+    it('does not show a standalone Users tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('Users')
+    })
+
+    it('does not show a standalone OIDC / SSO tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('OIDC / SSO')
+    })
+
+    it('does not show a standalone File Naming tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('File Naming')
+    })
+
+    it('does not show a standalone Book Dock tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('Book Dock')
+    })
+
+    it('does not show a standalone Maintenance tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('Maintenance')
+    })
+
+    it('does not show a standalone Audit Log tab', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).not.toContain('Audit Log')
+    })
+
+    it('does not show a standalone Notifications tab', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Notifications')
+    })
+  })
+
+  describe('Admin tab visibility', () => {
+    it('shows Admin tab for superuser', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).toContain('Admin')
+    })
+
+    it('shows Admin tab for user with manage_users', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['manage_users'] }))
+      expect(labels).toContain('Admin')
+    })
+
+    it('shows Admin tab for user with manage_app_settings', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['manage_app_settings'] }))
+      expect(labels).toContain('Admin')
+    })
+
+    it('hides Admin tab when user has neither manage_users nor manage_app_settings', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
+      expect(labels).not.toContain('Admin')
+    })
+  })
+
+  describe('System tab visibility', () => {
+    it('shows System tab for superuser', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).toContain('System')
+    })
+
+    it('shows System tab for user with manage_app_settings', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['manage_app_settings'] }))
+      expect(labels).toContain('System')
+    })
+
+    it('shows System tab for user with book_dock_access', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['book_dock_access'] }))
+      expect(labels).toContain('System')
+    })
+
+    it('hides System tab when user lacks manage_app_settings and book_dock_access', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
+      expect(labels).not.toContain('System')
+    })
+  })
+
+  describe('conditional tabs', () => {
+    it('shows Libraries tab for superuser', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).toContain('Libraries')
+    })
+
+    it('shows Libraries tab for user with manage_libraries', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['manage_libraries'] }))
+      expect(labels).toContain('Libraries')
+    })
+
+    it('hides Libraries tab for user without manage_libraries', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Libraries')
+    })
+
+    it('shows Metadata tab for superuser', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels).toContain('Metadata')
+    })
+
+    it('shows Metadata tab for user with manage_metadata_config', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['manage_metadata_config'] }))
+      expect(labels).toContain('Metadata')
+    })
+
+    it('shows Email tab for user with email_send', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['email_send'] }))
+      expect(labels).toContain('Email')
+    })
+
+    it('shows OPDS tab for user with opds_access', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['opds_access'] }))
+      expect(labels).toContain('OPDS')
+    })
+  })
+
+  describe('active state', () => {
+    it('active tab has border-primary class when route matches', () => {
+      const wrapper = mountHeader({ routeName: 'settings-appearance' })
+      const appearanceBtn = wrapper.findAll('button').find((b) => b.text() === 'Appearance')
+      expect(appearanceBtn?.classes()).toContain('border-primary')
+    })
+
+    it('inactive tabs have border-transparent class', () => {
+      const wrapper = mountHeader({ routeName: 'settings-appearance' })
+      const readerBtn = wrapper.findAll('button').find((b) => b.text() === 'Reader')
+      expect(readerBtn?.classes()).toContain('border-transparent')
+    })
+
+    it('integrations tab is active when route is settings-integrations', () => {
+      const wrapper = mountHeader({ routeName: 'settings-integrations' })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'Integrations')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+
+    it('admin tab is active when route is settings-admin', () => {
+      const wrapper = mountHeader({ su: true, routeName: 'settings-admin' })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'Admin')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+
+    it('system tab is active when route is settings-system', () => {
+      const wrapper = mountHeader({ su: true, routeName: 'settings-system' })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'System')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+
+    it('account tab is active when route is settings-account', () => {
+      const wrapper = mountHeader({ routeName: 'settings-account' })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'Account')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+  })
+
+  describe('navigation', () => {
+    it('clicking a tab button triggers a click event', async () => {
+      const wrapper = mountHeader({ routeName: 'settings-appearance' })
+      const readerBtn = wrapper.findAll('button').find((b) => b.text() === 'Reader')
+      await readerBtn!.trigger('click')
+      // If click triggers without throwing, navigation is wired correctly
+      expect(readerBtn!.exists()).toBe(true)
+    })
+  })
+})

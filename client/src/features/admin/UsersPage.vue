@@ -12,6 +12,8 @@ import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import MagicLinksSettings from '@/features/settings/MagicLinksSettings.vue'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 type Tab = 'users' | 'magic-links'
 
 interface Library {
@@ -136,6 +138,7 @@ function openMagicLinkCreate() {
 <template>
   <!-- Desktop header -->
   <SettingsPageHeader
+    v-if="!props.embedded"
     class="hidden md:flex"
     :title="activeTab === 'users' ? 'Users' : 'Magic Links'"
     :subtitle="activeTab === 'users' ? 'Manage user accounts and permission assignments.' : 'Create shareable login links for shared accounts.'"
@@ -151,7 +154,7 @@ function openMagicLinkCreate() {
   </SettingsPageHeader>
 
   <!-- Mobile title -->
-  <div class="md:hidden px-1">
+  <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ activeTab === 'users' ? 'Users' : 'Magic Links' }}</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
@@ -162,7 +165,7 @@ function openMagicLinkCreate() {
 
   <!-- Tab bar (superusers only) -->
   <div
-    v-if="isSuperuser"
+    v-if="isSuperuser && !props.embedded"
     class="flex gap-1 mt-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x"
   >
     <button
