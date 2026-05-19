@@ -2,7 +2,7 @@ import type { Params } from 'nestjs-pino';
 import type { IncomingMessage, ServerResponse } from 'http';
 
 const isDev = process.env.NODE_ENV !== 'production';
-const logLevel = process.env.LOG_LEVEL ?? (isDev ? 'debug' : 'info');
+const logLevel = process.env.LOG_LEVEL ?? 'info';
 
 const FRAMEWORK_CONTEXTS = new Set(['InstanceLoader', 'RouterExplorer', 'RoutesResolver']);
 

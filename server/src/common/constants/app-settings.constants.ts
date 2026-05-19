@@ -22,6 +22,7 @@ export const APP_SETTING_KEYS = {
   AUDIT_RETENTION_DAYS: 'audit_retention_days',
   INITIAL_SETUP_COMPLETED_AT: 'initial_setup_completed_at',
   UPDATE_CHECK_ENABLED: 'update_check_enabled',
+  HARDCOVER_ENABLED: 'hardcover_enabled',
 } as const;
 
 export const DEFAULT_AUDIT_RETENTION_DAYS = 90;

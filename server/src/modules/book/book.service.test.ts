@@ -9,6 +9,7 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
+import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookService } from './book.service';
@@ -143,6 +144,9 @@ function makeService() {
   const fileWriteService = {
     scheduleWrite: vi.fn(),
   };
+  const achievementEvents = {
+    emit: vi.fn(),
+  };
   const narratorService = {
     replaceForBook: vi.fn().mockResolvedValue(undefined),
   };
@@ -190,6 +194,7 @@ function makeService() {
     bookMetadataLockService as never,
     embedder as never,
     fileWriteService as never,
+    achievementEvents as never,
   );
 
   return {
@@ -205,6 +210,7 @@ function makeService() {
     userBookStatusService,
     embedder,
     fileWriteService,
+    achievementEvents,
     narratorService,
     comicMetadataService,
     bookMetadataLockService,
@@ -1202,7 +1208,7 @@ describe('BookService', () => {
     });
 
     it('updateMetadata clears rating to null', async () => {
-      const { service, bookRepo } = makeService();
+      const { service, bookRepo, achievementEvents } = makeService();
       const user = makeUser();
       vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
       vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
@@ -1210,6 +1216,26 @@ describe('BookService', () => {
       await service.updateMetadata(5, { rating: null }, user);
 
       expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([5], null, user.id);
+      expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, {
+        userId: user.id,
+        bookIds: [5],
+        rating: null,
+      });
+    });
+
+    it('updateMetadata emits rating changed event when rating is updated', async () => {
+      const { service, achievementEvents } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { rating: 4 }, user);
+
+      expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, {
+        userId: user.id,
+        bookIds: [5],
+        rating: 4,
+      });
     });
 
     it('updateMetadata replaces genres array only', async () => {

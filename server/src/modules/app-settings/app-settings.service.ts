@@ -227,6 +227,15 @@ export class AppSettingsService {
     const row = await this.repo.findByKey(APP_SETTING_KEYS.UPDATE_CHECK_ENABLED);
     return parseBooleanSetting(row?.value, true);
   }
+
+  async isHardcoverEnabled(): Promise<boolean> {
+    const row = await this.repo.findByKey(APP_SETTING_KEYS.HARDCOVER_ENABLED);
+    return parseBooleanSetting(row?.value, false);
+  }
+
+  async setHardcoverEnabled(enabled: boolean): Promise<void> {
+    await this.repo.upsert(APP_SETTING_KEYS.HARDCOVER_ENABLED, String(enabled));
+  }
 }
 
 function parseAutoFinalizeMetadataMode(value: string | undefined): BookDockAutoFinalizeMetadataMode {

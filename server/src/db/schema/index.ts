@@ -25,3 +25,4 @@ export * from './tools';
 export * from './fonts';
 export * from './koreader';
 export * from './achievements';
+export * from './hardcover';

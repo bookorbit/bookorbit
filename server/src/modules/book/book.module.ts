@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { AchievementModule } from '../achievement/achievement.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
@@ -29,6 +30,7 @@ import { BookService } from './book.service';
     MetadataScoreModule,
     NarratorModule,
     UserBookStatusModule,
+    AchievementModule,
   ],
   controllers: [BookController],
   providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder],

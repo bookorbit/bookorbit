@@ -19,10 +19,10 @@ describe('loggerConfig', () => {
     vi.unstubAllEnvs();
   });
 
-  it('uses debug level and pretty transport by default in development', async () => {
+  it('uses info level and pretty transport by default in development', async () => {
     const config = await loadLoggerConfig('development');
 
-    expect(config.pinoHttp?.level).toBe('debug');
+    expect(config.pinoHttp?.level).toBe('info');
     expect(config.pinoHttp).toEqual(
       expect.objectContaining({
         transport: expect.objectContaining({

@@ -56,6 +56,7 @@ const sections = computed<Section[]>(() => {
   if (su || perms.includes('koreader_sync')) {
     result.push({ label: 'KOReader', routeName: 'settings-koreader' })
   }
+  result.push({ label: 'Hardcover', routeName: 'settings-hardcover' })
   if (su || perms.includes('manage_app_settings')) {
     result.push({ label: 'Maintenance', routeName: 'settings-admin-maintenance' })
   }

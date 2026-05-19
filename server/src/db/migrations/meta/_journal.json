@@ -36,6 +36,13 @@
       "when": 1779128487353,
       "tag": "0004_add_tls_reject_unauthorized_to_email_providers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779204354944,
+      "tag": "0005_add_hardcover_tables",
+      "breakpoints": true
     }
   ]
 }
