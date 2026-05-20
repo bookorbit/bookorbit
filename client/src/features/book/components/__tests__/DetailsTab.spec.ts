@@ -187,4 +187,128 @@ describe('DetailsTab — present state', () => {
     expect(wrapper.text()).toContain('Favorites')
     expect(wrapper.text()).not.toContain('Want to Read')
   })
+
+  it('formats tiny non-zero progress as <1%', async () => {
+    vi.mocked(api).mockImplementation(async (input) => {
+      if (input === '/api/v1/books/1/progress') {
+        return makeApiResponse([{ fileId: 101, cfi: null, pageNumber: null, percentage: 0.4, updatedAt: null }])
+      }
+      if (input === '/api/v1/collections?bookIds=1') {
+        return makeApiResponse([])
+      }
+      return makeApiResponse({}, false)
+    })
+
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          files: [
+            {
+              id: 101,
+              format: 'epub',
+              role: 'primary',
+              sizeBytes: 1234,
+              absolutePath: '/books/test.epub',
+              createdAt: '2024-01-01T00:00:00.000Z',
+              filename: 'test.epub',
+              durationSeconds: null,
+            },
+          ],
+        }),
+      },
+      global: globalStubs,
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('<1%')
+  })
+
+  it('formats near-complete progress as >99%', async () => {
+    vi.mocked(api).mockImplementation(async (input) => {
+      if (input === '/api/v1/books/1/progress') {
+        return makeApiResponse([{ fileId: 101, cfi: null, pageNumber: null, percentage: 99.6, updatedAt: null }])
+      }
+      if (input === '/api/v1/collections?bookIds=1') {
+        return makeApiResponse([])
+      }
+      return makeApiResponse({}, false)
+    })
+
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          files: [
+            {
+              id: 101,
+              format: 'epub',
+              role: 'primary',
+              sizeBytes: 1234,
+              absolutePath: '/books/test.epub',
+              createdAt: '2024-01-01T00:00:00.000Z',
+              filename: 'test.epub',
+              durationSeconds: null,
+            },
+          ],
+        }),
+      },
+      global: globalStubs,
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('>99%')
+  })
+
+  it('resets a single file progress row from the inline control', async () => {
+    let progressRows: Array<{ fileId: number; cfi: string | null; pageNumber: number | null; percentage: number; updatedAt: string | null }> = [
+      { fileId: 101, cfi: null, pageNumber: null, percentage: 22, updatedAt: null },
+    ]
+    vi.mocked(api).mockImplementation(async (input, init) => {
+      if (input === '/api/v1/books/files/101/progress' && init?.method === 'DELETE') {
+        progressRows = []
+        return makeApiResponse({})
+      }
+      if (input === '/api/v1/books/1/progress') {
+        return makeApiResponse(progressRows)
+      }
+      if (input === '/api/v1/collections?bookIds=1') {
+        return makeApiResponse([])
+      }
+      return makeApiResponse({}, false)
+    })
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          files: [
+            {
+              id: 101,
+              format: 'epub',
+              role: 'primary',
+              sizeBytes: 1234,
+              absolutePath: '/books/test.epub',
+              createdAt: '2024-01-01T00:00:00.000Z',
+              filename: 'test.epub',
+              durationSeconds: null,
+            },
+          ],
+        }),
+      },
+      global: globalStubs,
+    })
+
+    await flushPromises()
+
+    const fileResetButton = wrapper.find('button[aria-label="Reset file progress"]')
+    expect(fileResetButton.exists()).toBe(true)
+
+    await fileResetButton.trigger('click')
+    await flushPromises()
+
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(vi.mocked(api)).toHaveBeenCalledWith('/api/v1/books/files/101/progress', { method: 'DELETE' })
+    confirmSpy.mockRestore()
+  })
 })

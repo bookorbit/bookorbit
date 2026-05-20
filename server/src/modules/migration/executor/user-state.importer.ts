@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 
-import type { SourceBook, SourceBookmark } from '../adapters/source-adapter.types';
+import type { SourceBook, SourceBookmark, SourceUserFileProgress } from '../adapters/source-adapter.types';
 import { MigrationRepository } from '../migration.repository';
 import { MigrationImportRepository } from './migration-import.repository';
 import type { PlannerResult } from '../planner/planner.types';
@@ -20,6 +20,13 @@ import {
 
 function isDomainAvailable(planned: PlannerResult, domain: keyof NonNullable<PlannerResult['execution']['sourceData']['availableDomains']>): boolean {
   return planned.execution.sourceData.availableDomains?.[domain] ?? true;
+}
+
+function hasMeaningfulProgressSignal(row: SourceUserFileProgress, percentage: number, positionSeconds: number | null): boolean {
+  const hasLocator = (row.cfi?.trim().length ?? 0) > 0 || (row.href?.trim().length ?? 0) > 0;
+  const hasPageNumber = typeof row.pageNumber === 'number' && Number.isFinite(row.pageNumber) && row.pageNumber > 0;
+  const hasPosition = positionSeconds != null && positionSeconds > 0;
+  return percentage > 0 || hasLocator || hasPageNumber || hasPosition;
 }
 
 @Injectable()
@@ -156,13 +163,24 @@ export class UserStateImporter {
         continue;
       }
 
+      const percentage = clampPercent(row.percentage);
+      const positionSeconds = row.positionSeconds == null ? null : clampNonNegative(row.positionSeconds);
+      if (!hasMeaningfulProgressSignal(row, percentage, positionSeconds)) {
+        counters.skipped += 1;
+        continue;
+      }
+
+      const pageNumber =
+        typeof row.pageNumber === 'number' && Number.isFinite(row.pageNumber) && row.pageNumber >= 0 ? Math.trunc(row.pageNumber) : null;
+      const cfi = row.cfi?.trim() ? row.cfi : null;
+
       batch.push({
         bookFileId: targetFileId,
         userId: targetUserId,
-        percentage: clampPercent(row.percentage),
-        cfi: row.cfi,
-        pageNumber: row.pageNumber,
-        positionSeconds: row.positionSeconds,
+        percentage,
+        cfi,
+        pageNumber,
+        positionSeconds,
         updatedAt: toDate(row.updatedAt) ?? new Date(),
       });
       counters.imported += 1;
@@ -222,12 +240,19 @@ export class UserStateImporter {
         continue;
       }
 
+      const percentage = clampPercent(row.percentage);
+      const positionSeconds = clampNonNegative(row.positionSeconds) ?? 0;
+      if (!hasMeaningfulProgressSignal(row, percentage, positionSeconds)) {
+        counters.skipped += 1;
+        continue;
+      }
+
       batch.push({
         userId: targetUserId,
         bookId: targetBookId,
-        percentage: clampPercent(row.percentage),
+        percentage,
         currentFileId: targetFileId,
-        positionSeconds: clampNonNegative(row.positionSeconds) ?? 0,
+        positionSeconds,
         updatedAt: toDate(row.updatedAt) ?? new Date(),
       });
       counters.imported += 1;

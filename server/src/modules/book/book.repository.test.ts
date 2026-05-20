@@ -537,4 +537,20 @@ describe('BookRepository', () => {
       }),
     );
   });
+
+  it('clears both reading_progress and audiobook_progress rows for a file id', async () => {
+    const readingWhere = vi.fn().mockResolvedValue(undefined);
+    const audioWhere = vi.fn().mockResolvedValue(undefined);
+    const del = vi.fn().mockReturnValueOnce({ where: readingWhere }).mockReturnValueOnce({ where: audioWhere });
+    const db = {
+      delete: del,
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.clearFileProgress(7, 99);
+
+    expect(del).toHaveBeenCalledTimes(2);
+    expect(readingWhere).toHaveBeenCalledTimes(1);
+    expect(audioWhere).toHaveBeenCalledTimes(1);
+  });
 });

@@ -862,6 +862,11 @@ export class BookRepository {
       });
   }
 
+  async clearFileProgress(userId: number, fileId: number): Promise<void> {
+    await this.db.delete(readingProgress).where(and(eq(readingProgress.userId, userId), eq(readingProgress.bookFileId, fileId)));
+    await this.db.delete(audiobookProgress).where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.currentFileId, fileId)));
+  }
+
   async findAudioProgress(userId: number, bookId: number) {
     const [row] = await this.db
       .select()

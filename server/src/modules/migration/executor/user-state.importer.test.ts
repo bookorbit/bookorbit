@@ -404,4 +404,111 @@ describe('UserStateImporter', () => {
       }),
     );
   });
+
+  it('skips noise progress rows that have no percentage, locator, page, or position signal', async () => {
+    const { importer, repo, importRepo } = makeImporter();
+
+    const planned = {
+      plan: {
+        userMappings: [{ sourceUserId: 'u1', targetUserId: 10 }],
+        pathMappings: [],
+      },
+      execution: {
+        matchedBooks: [{ sourceBookId: 'b-source', targetBookId: 200 }],
+        sourceData: {
+          availableDomains: {
+            userBookStatuses: false,
+            readingProgress: true,
+            bookmarks: false,
+            annotations: false,
+            shelves: false,
+          },
+          books: [{ sourceBookId: 'b-source', files: [] }],
+          userBookStatuses: [],
+          userFileProgress: [
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'b-source',
+              sourceFileId: null,
+              percentage: 0,
+              cfi: null,
+              href: null,
+              pageNumber: 0,
+              positionSeconds: 0,
+              updatedAt: null,
+            },
+          ],
+          bookmarks: [],
+          annotations: [],
+          shelves: [],
+          shelfBooks: [],
+        },
+      },
+    };
+
+    await importer.import(304, planned as never, vi.fn().mockResolvedValue(undefined));
+
+    expect(importRepo.batchUpsertReadingProgress).toHaveBeenCalledWith([]);
+    expect(importRepo.batchUpsertAudiobookProgress).toHaveBeenCalledWith([]);
+    expect(repo.setRunMetric).toHaveBeenCalledWith(304, 'user_state', 'reading_progress', expect.objectContaining({ processed: 1, skipped: 1 }));
+    expect(repo.setRunMetric).toHaveBeenCalledWith(304, 'user_state', 'audiobook_progress', expect.objectContaining({ processed: 1, skipped: 1 }));
+  });
+
+  it('keeps zero-percent progress rows when a locator exists', async () => {
+    const { importer, importRepo } = makeImporter();
+    importRepo.fetchTargetBookPrimaryFiles.mockResolvedValue({
+      primaryFilesByBookId: new Map([[200, 500]]),
+      audiobookPrimaryFilesByBookId: new Map(),
+    });
+
+    const planned = {
+      plan: {
+        userMappings: [{ sourceUserId: 'u1', targetUserId: 10 }],
+        pathMappings: [],
+      },
+      execution: {
+        matchedBooks: [{ sourceBookId: 'b-source', targetBookId: 200 }],
+        sourceData: {
+          availableDomains: {
+            userBookStatuses: false,
+            readingProgress: true,
+            bookmarks: false,
+            annotations: false,
+            shelves: false,
+          },
+          books: [{ sourceBookId: 'b-source', files: [] }],
+          userBookStatuses: [],
+          userFileProgress: [
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'b-source',
+              sourceFileId: null,
+              percentage: 0,
+              cfi: '/6/2',
+              href: null,
+              pageNumber: 0,
+              positionSeconds: 0,
+              updatedAt: null,
+            },
+          ],
+          bookmarks: [],
+          annotations: [],
+          shelves: [],
+          shelfBooks: [],
+        },
+      },
+    };
+
+    await importer.import(305, planned as never, vi.fn().mockResolvedValue(undefined));
+
+    expect(importRepo.batchUpsertReadingProgress).toHaveBeenCalledWith([
+      expect.objectContaining({
+        userId: 10,
+        bookFileId: 500,
+        percentage: 0,
+        cfi: '/6/2',
+        pageNumber: 0,
+      }),
+    ]);
+  });
 });
