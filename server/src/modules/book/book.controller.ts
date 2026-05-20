@@ -478,6 +478,12 @@ export class BookController {
     await this.bookService.saveProgress(user.id, fileId, dto, user);
   }
 
+  @Delete('files/:fileId/progress')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clearFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
+    await this.bookService.clearFileProgress(user.id, fileId, user);
+  }
+
   @Get(':id/audio-progress')
   async getAudioProgress(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return (await this.bookService.getAudioProgress(user.id, id, user)) ?? null;

@@ -1300,6 +1300,11 @@ export class BookService {
       .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${file.bookId}: ${err.message}`));
   }
 
+  async clearFileProgress(userId: number, fileId: number, user: RequestUser): Promise<void> {
+    await this.verifyFileAccess(fileId, user);
+    await this.bookRepo.clearFileProgress(userId, fileId);
+  }
+
   async setReadStatus(bookId: number, status: ReadStatus, user: RequestUser): Promise<void> {
     await this.verifyBookAccess(bookId, user);
     await this.userBookStatusService.setManual(user.id, bookId, status);

@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Check, ChevronDown, FolderPlus, Headphones, Lock, MoreHorizontal, Pencil, Star, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  FolderPlus,
+  Headphones,
+  Lock,
+  MoreHorizontal,
+  Pencil,
+  RotateCcw,
+  Star,
+  Trash2,
+  TriangleAlert,
+  X,
+} from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
@@ -351,6 +365,7 @@ const audiobookProgress = ref<{ percentage: number; currentFileId: number; posit
 const collections = ref<CollectionMembership[]>([])
 const koboState = ref<BookKoboState | null>(null)
 const supplementalLoading = ref(false)
+const resettingFileIds = ref<number[]>([])
 const providerIconErrors = ref<Record<string, boolean>>({})
 
 const providerLinks = computed<ProviderLink[]>(() => {
@@ -441,8 +456,8 @@ type ProgressRow = {
   percentage: number
   color: string
   badgeStyle: Record<string, string>
-  tooltipText: string
   finished: boolean
+  resetFileId: number | null
 }
 
 const KOBO_COLOR = '#f59e0b'
@@ -457,8 +472,8 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
       percentage: progress.percentage,
       color,
       badgeStyle: { color, borderColor: `${color}66`, backgroundColor: `${color}1a` },
-      tooltipText: file.absolutePath,
       finished: progress.percentage >= 100,
+      resetFileId: file.id,
     })
   }
 
@@ -471,20 +486,19 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
       percentage: audiobookProgress.value.percentage,
       color,
       badgeStyle: { color, borderColor: `${color}66`, backgroundColor: `${color}1a` },
-      tooltipText: audioFile?.absolutePath ?? '',
       finished: audiobookProgress.value.percentage >= 100,
+      resetFileId: audiobookProgress.value.currentFileId,
     })
   }
   const koboPercent = koboState.value?.readingState?.progressPercent
   if (canViewKobo.value && koboPercent != null && koboPercent > 0) {
-    const syncCols = koboState.value?.syncCollections ?? []
     rows.push({
       label: 'Kobo',
       percentage: koboPercent,
       color: KOBO_COLOR,
       badgeStyle: { color: KOBO_COLOR, borderColor: `${KOBO_COLOR}66`, backgroundColor: `${KOBO_COLOR}1a` },
-      tooltipText: syncCols.length > 0 ? `Via: ${syncCols.join(', ')}` : 'Kobo device',
       finished: koboPercent >= 100,
+      resetFileId: null,
     })
   }
   if (canViewKoreader.value && koreaderBookProgress.value != null && koreaderBookProgress.value.canonicalPercentage > 0) {
@@ -494,8 +508,8 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
       percentage: koreaderBookProgress.value.canonicalPercentage,
       color: koreaderColor,
       badgeStyle: { color: koreaderColor, borderColor: `${koreaderColor}66`, backgroundColor: `${koreaderColor}1a` },
-      tooltipText: 'KOReader device sync',
       finished: koreaderBookProgress.value.canonicalPercentage >= 100,
+      resetFileId: null,
     })
   }
   return rows
@@ -525,7 +539,10 @@ function formatDateTime(iso: string): string {
 }
 
 function formatPercent(value: number): string {
-  return `${Math.max(0, Math.min(100, Math.round(value)))}%`
+  const clamped = Math.max(0, Math.min(100, value))
+  if (clamped > 0 && clamped < 1) return '<1%'
+  if (clamped > 99 && clamped < 100) return '>99%'
+  return `${Math.round(clamped)}%`
 }
 
 function formatDate(iso: string): string {
@@ -597,6 +614,34 @@ function openBookFile(file: BookDetail['files'][number]) {
     params: { bookId: props.book.id, fileId: file.id },
     query: { format: file.format ?? 'epub' },
   })
+}
+
+function isResettingFile(fileId: number | null): boolean {
+  return fileId != null && resettingFileIds.value.includes(fileId)
+}
+
+function setFileResetting(fileId: number, resetting: boolean): void {
+  if (resetting) {
+    if (resettingFileIds.value.includes(fileId)) return
+    resettingFileIds.value = [...resettingFileIds.value, fileId]
+    return
+  }
+  resettingFileIds.value = resettingFileIds.value.filter((id) => id !== fileId)
+}
+
+async function handleResetFileProgress(row: ProgressRow) {
+  const fileId = row.resetFileId
+  if (fileId == null || isResettingFile(fileId)) return
+  if (!window.confirm(`Reset stored reading progress for ${row.label}?`)) return
+
+  setFileResetting(fileId, true)
+  try {
+    const res = await api(`/api/v1/books/files/${fileId}/progress`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to reset file progress')
+    await loadSupplemental()
+  } finally {
+    setFileResetting(fileId, false)
+  }
 }
 
 let supplementalRequestId = 0
@@ -1057,30 +1102,38 @@ watch(
           </div>
         </div>
         <div v-if="leftColumnProgressVisible.length" class="mt-4 space-y-2">
-          <Tooltip v-for="row in leftColumnProgressVisible" :key="row.label">
-            <TooltipTrigger as-child>
-              <div class="flex items-center gap-2 cursor-default">
-                <span
-                  class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
-                  :style="row.badgeStyle"
-                  >{{ row.label }}</span
+          <div v-for="row in leftColumnProgressVisible" :key="row.label" class="flex items-center gap-2 cursor-default">
+            <span
+              class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+              :style="row.badgeStyle"
+              >{{ row.label }}</span
+            >
+            <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+              <div
+                class="h-full rounded-full"
+                :style="{
+                  width: `${Math.min(100, row.percentage)}%`,
+                  backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
+                  opacity: row.finished ? '1' : '0.75',
+                }"
+              />
+            </div>
+            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
+            <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
+            <Tooltip v-if="row.resetFileId != null">
+              <TooltipTrigger as-child>
+                <button
+                  class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Reset file progress"
+                  :disabled="isResettingFile(row.resetFileId)"
+                  @click.stop="void handleResetFileProgress(row)"
                 >
-                <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-                  <div
-                    class="h-full rounded-full"
-                    :style="{
-                      width: `${Math.min(100, row.percentage)}%`,
-                      backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
-                      opacity: row.finished ? '1' : '0.75',
-                    }"
-                  />
-                </div>
-                <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
-                <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>{{ row.tooltipText }}</TooltipContent>
-          </Tooltip>
+                  <RotateCcw class="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{{ isResettingFile(row.resetFileId) ? 'Resetting...' : 'Reset file progress' }}</TooltipContent>
+            </Tooltip>
+          </div>
           <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
         </div>
         <div v-if="koboAnomaly" class="mt-2 flex items-center gap-1.5">
@@ -1350,30 +1403,38 @@ watch(
       <!-- Mobile-only: reading progress + collections (relocated from left column) -->
       <div v-if="leftColumnProgressVisible.length || koboAnomaly || collections.length" class="md:hidden mt-6 pt-5 border-t border-border space-y-3">
         <div v-if="leftColumnProgressVisible.length" class="space-y-2">
-          <Tooltip v-for="row in leftColumnProgressVisible" :key="row.label">
-            <TooltipTrigger as-child>
-              <div class="flex items-center gap-2 cursor-default">
-                <span
-                  class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
-                  :style="row.badgeStyle"
-                  >{{ row.label }}</span
+          <div v-for="row in leftColumnProgressVisible" :key="row.label" class="flex items-center gap-2 cursor-default">
+            <span
+              class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+              :style="row.badgeStyle"
+              >{{ row.label }}</span
+            >
+            <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+              <div
+                class="h-full rounded-full"
+                :style="{
+                  width: `${Math.min(100, row.percentage)}%`,
+                  backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
+                  opacity: row.finished ? '1' : '0.75',
+                }"
+              />
+            </div>
+            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
+            <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
+            <Tooltip v-if="row.resetFileId != null">
+              <TooltipTrigger as-child>
+                <button
+                  class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Reset file progress"
+                  :disabled="isResettingFile(row.resetFileId)"
+                  @click.stop="void handleResetFileProgress(row)"
                 >
-                <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-                  <div
-                    class="h-full rounded-full"
-                    :style="{
-                      width: `${Math.min(100, row.percentage)}%`,
-                      backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
-                      opacity: row.finished ? '1' : '0.75',
-                    }"
-                  />
-                </div>
-                <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
-                <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>{{ row.tooltipText }}</TooltipContent>
-          </Tooltip>
+                  <RotateCcw class="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{{ isResettingFile(row.resetFileId) ? 'Resetting...' : 'Reset file progress' }}</TooltipContent>
+            </Tooltip>
+          </div>
           <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
         </div>
         <div v-if="koboAnomaly" class="flex items-center gap-1.5">

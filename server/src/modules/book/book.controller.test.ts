@@ -132,6 +132,7 @@ function makeController() {
     getBookProgress: vi.fn(),
     getAudioProgress: vi.fn(),
     saveProgress: vi.fn(),
+    clearFileProgress: vi.fn(),
     saveAudioProgress: vi.fn(),
     updateMetadata: vi.fn(),
     updateMetadataLocks: vi.fn(),
@@ -742,9 +743,11 @@ describe('BookController', () => {
     const user = makeUser();
 
     await controller.saveFileProgress(9, { percentage: 25 } as never, user);
+    await controller.clearFileProgress(9, user);
     await controller.saveAudioProgress(11, { currentFileId: 2, positionSeconds: 90, percentage: 20 } as never, user);
 
     expect(bookService.saveProgress).toHaveBeenCalledWith(user.id, 9, { percentage: 25 }, user);
+    expect(bookService.clearFileProgress).toHaveBeenCalledWith(user.id, 9, user);
     expect(bookService.saveAudioProgress).toHaveBeenCalledWith(user.id, 11, { currentFileId: 2, positionSeconds: 90, percentage: 20 }, user);
   });
 

@@ -98,6 +98,7 @@ function makeService() {
     findProgress: vi.fn(),
     findProgressByBook: vi.fn(),
     upsertProgress: vi.fn(),
+    clearFileProgress: vi.fn(),
     findAudioProgress: vi.fn(),
     upsertAudioProgress: vi.fn(),
     bulkSetRating: vi.fn(),
@@ -1569,6 +1570,25 @@ describe('BookService', () => {
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
 
       expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null);
+    });
+  });
+
+  describe('clearFileProgress', () => {
+    it('verifies file access and clears file-scoped progress rows', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser({ id: 12 });
+      vi.spyOn(service, 'verifyFileAccess').mockResolvedValue({
+        id: 88,
+        absolutePath: '/books/sample.epub',
+        format: 'epub',
+        bookId: 77,
+        libraryId: 5,
+      });
+
+      await service.clearFileProgress(user.id, 88, user);
+
+      expect(service.verifyFileAccess).toHaveBeenCalledWith(88, user);
+      expect(bookRepo.clearFileProgress).toHaveBeenCalledWith(user.id, 88);
     });
   });
 
