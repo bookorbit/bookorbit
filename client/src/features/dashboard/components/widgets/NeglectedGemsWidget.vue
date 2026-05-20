@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useBookStatus } from '@/features/book/composables/useBookStatus'
 import { useNeglectedGemsWidget } from '../../composables/useNeglectedGemsWidget'
 
@@ -60,12 +61,18 @@ async function addToQueue() {
 
     <!-- Gem -->
     <div v-else-if="currentGem" class="flex flex-1 flex-col items-center justify-center gap-2">
-      <button class="h-19 w-13 cursor-pointer overflow-hidden rounded shadow-sm transition-opacity hover:opacity-80" @click="goToBook">
+      <BookCoverSurface
+        tag="button"
+        type="button"
+        size="mini"
+        class="h-19 w-13 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
+        @click="goToBook"
+      >
         <img v-if="currentGem.hasCover" :src="coverUrl(currentGem.bookId)" :alt="currentGem.title ?? 'Cover'" class="h-full w-full object-cover" />
         <div v-else class="flex h-full w-full items-center justify-center bg-muted">
           <BookOpen :size="14" class="text-muted-foreground" />
         </div>
-      </button>
+      </BookCoverSurface>
       <button class="max-w-full cursor-pointer truncate text-center text-xs font-semibold hover:underline" @click="goToBook">
         {{ currentGem.title ?? 'Untitled' }}
       </button>

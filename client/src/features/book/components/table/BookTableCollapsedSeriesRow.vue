@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronRight } from 'lucide-vue-next'
 import type { BookCard } from '@bookorbit/types'
+import BookCoverSurface from '../BookCoverSurface.vue'
 
 const props = defineProps<{
   book: BookCard
@@ -33,10 +34,12 @@ function thumbnailUrl(bookId: number): string {
     <div class="flex items-center gap-3 min-w-0">
       <!-- Cover row: up to 4 thumbnails -->
       <div class="flex shrink-0 gap-0.5">
-        <img v-for="coverId in coverIds" :key="coverId" :src="thumbnailUrl(coverId)" class="h-8 w-6 rounded-sm object-cover" loading="lazy" alt="" />
-        <div v-if="coverIds.length === 0" class="h-8 w-6 rounded-sm bg-muted flex items-center justify-center">
+        <BookCoverSurface v-for="coverId in coverIds" :key="coverId" size="mini" class="h-8 w-6 rounded-sm overflow-hidden">
+          <img :src="thumbnailUrl(coverId)" class="h-full w-full object-cover" loading="lazy" alt="" />
+        </BookCoverSurface>
+        <BookCoverSurface v-if="coverIds.length === 0" size="mini" class="h-8 w-6 rounded-sm bg-muted flex items-center justify-center">
           <span class="text-[8px] text-muted-foreground">?</span>
-        </div>
+        </BookCoverSurface>
       </div>
 
       <!-- Series info -->

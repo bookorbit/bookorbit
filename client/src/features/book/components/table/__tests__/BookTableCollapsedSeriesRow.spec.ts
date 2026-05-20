@@ -1,4 +1,4 @@
-import { shallowMount } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
 import BookTableCollapsedSeriesRow from '../BookTableCollapsedSeriesRow.vue'
@@ -52,7 +52,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('renders the series name and book count', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: { book: makeBook(), colspan: 6 },
     })
 
@@ -61,7 +61,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('renders the read count when some books are read', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: { book: makeBook(), colspan: 6 },
     })
 
@@ -69,7 +69,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('does not render the read count when no books are read', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: {
         book: makeBook({
           collapsedSeries: { bookCount: 5, readCount: 0, coverBookIds: [10, 20], seriesLatestAddedAt: null },
@@ -82,7 +82,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('renders up to four cover thumbnails', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: { book: makeBook(), colspan: 6 },
     })
 
@@ -97,7 +97,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('renders a placeholder when no cover ids are available', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: {
         book: makeBook({
           collapsedSeries: { bookCount: 5, readCount: 0, coverBookIds: [], seriesLatestAddedAt: null },
@@ -111,7 +111,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('navigates to the series detail route on click', async () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: { book: makeBook(), colspan: 6 },
     })
 
@@ -124,7 +124,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('renders no more than four thumbnails even when more cover ids are provided', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: {
         book: makeBook({
           collapsedSeries: { bookCount: 6, readCount: 1, coverBookIds: [10, 20, 30, 40, 50, 60], seriesLatestAddedAt: null },
@@ -137,7 +137,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('sets the expected colspan on the table cell', () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: { book: makeBook(), colspan: 9 },
     })
 
@@ -145,7 +145,7 @@ describe('BookTableCollapsedSeriesRow', () => {
   })
 
   it('does not navigate when selectionMode is true', async () => {
-    const wrapper = shallowMount(BookTableCollapsedSeriesRow, {
+    const wrapper = mount(BookTableCollapsedSeriesRow, {
       props: { book: makeBook(), colspan: 6, selectionMode: true },
     })
 

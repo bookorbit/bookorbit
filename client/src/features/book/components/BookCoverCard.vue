@@ -43,11 +43,12 @@ import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { mergeBookCardWithDetail } from '../lib/book-card-mapper'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
-import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
+import { coverAspectRatioValue, COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
+import BookCoverSurface from './BookCoverSurface.vue'
 
 const router = useRouter()
 
@@ -147,6 +148,7 @@ const ratingColor = computed(() => {
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+const coverImageRatio = ref<number | null>(null)
 const isMissing = computed(() => props.book.status === 'missing')
 const showMobileOverlay = ref(false)
 const root = ref<HTMLElement | null>(null)
@@ -156,11 +158,29 @@ const isTouch = computed(() => typeof window !== 'undefined' && window.matchMedi
 watch(coverSrc, () => {
   coverLoaded.value = false
   coverFailed.value = false
+  coverImageRatio.value = null
 })
+
+const slotAspectRatio = computed(() => coverAspectRatioValue(String(coverAspectRatio.value)))
+const fittedCoverSpineStyle = computed(() => fittedCoverFrameStyle(coverImageRatio.value, slotAspectRatio.value))
+
+function updateCoverImageRatio(img: HTMLImageElement | null) {
+  if (!img || img.naturalWidth <= 0 || img.naturalHeight <= 0) return
+  coverImageRatio.value = img.naturalWidth / img.naturalHeight
+}
 
 function onMainImgRef(el: Element | ComponentPublicInstance | null) {
   const img = el as HTMLImageElement | null
-  if (img?.complete && img.naturalWidth > 0) coverLoaded.value = true
+  if (img?.complete && img.naturalWidth > 0) {
+    coverLoaded.value = true
+    updateCoverImageRatio(img)
+  }
+}
+
+function handleMainImageLoad(event: Event) {
+  const target = event.target as HTMLImageElement | null
+  updateCoverImageRatio(target)
+  coverLoaded.value = true
 }
 
 function openFile(file: BookFileRef) {
@@ -257,9 +277,10 @@ async function handleSetStatus(status: ReadStatus) {
     @contextmenu.prevent
   >
     <!-- Cover -->
-    <div
-      class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
-      :class="[isMissing ? '' : selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]']"
+    <BookCoverSurface
+      class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform,ring] duration-150 will-change-transform"
+      :class="isMissing || selectionMode ? '' : 'group-hover:scale-[1.02]'"
+      :interactive="!isMissing && !selectionMode"
       :style="[{ aspectRatio: coverAspectRatio }, !book.hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
     >
       <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
@@ -283,9 +304,11 @@ async function handleSetStatus(status: ReadStatus) {
         loading="lazy"
         decoding="async"
         :alt="book.title ?? ''"
-        @load="coverLoaded = true"
+        @load="handleMainImageLoad"
         @error="coverFailed = true"
       />
+
+      <div v-if="book.hasCover && coverLoaded && !coverFailed" class="book-cover-spine-layer absolute z-[3]" :style="fittedCoverSpineStyle" />
 
       <!-- Skeleton shimmer while a known-cover loads -->
       <div v-if="book.hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
@@ -547,7 +570,7 @@ async function handleSetStatus(status: ReadStatus) {
           </DropdownMenu>
         </div>
       </div>
-    </div>
+    </BookCoverSurface>
   </div>
 
   <SendBookDialog

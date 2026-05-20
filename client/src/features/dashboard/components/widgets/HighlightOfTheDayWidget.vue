@@ -3,6 +3,7 @@ import { Highlighter, BookOpen, ExternalLink } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useHighlightOfTheDayWidget } from '../../composables/useHighlightOfTheDayWidget'
 
 const { data, loading, error } = useHighlightOfTheDayWidget()
@@ -47,9 +48,9 @@ function goToBook() {
         "{{ data.text.length > 200 ? data.text.slice(0, 200) + '...' : data.text }}"
       </blockquote>
       <button class="flex cursor-pointer items-center gap-2 rounded-lg pb-1 pl-1 text-left transition-colors hover:bg-muted/40" @click="goToBook">
-        <div v-if="data.hasCover" class="h-9 w-6 shrink-0 overflow-hidden rounded shadow-sm">
+        <BookCoverSurface v-if="data.hasCover" size="mini" class="h-9 w-6 shrink-0 overflow-hidden rounded">
           <img :src="coverUrl(data.bookId)" :alt="data.bookTitle ?? 'Cover'" class="h-full w-full object-cover" />
-        </div>
+        </BookCoverSurface>
         <div v-else class="flex h-8 w-5 shrink-0 items-center justify-center rounded bg-muted">
           <BookOpen :size="10" class="text-muted-foreground" />
         </div>

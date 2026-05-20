@@ -2,7 +2,13 @@
 import { computed } from 'vue'
 import { ACCENT_VIVID, ACCENT_PASTEL, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Circle, Moon, Square, Sun } from 'lucide-vue-next'
-import { useDisplaySettings, type CardOverlayKey, type CoverSizeScope } from '@/composables/useDisplaySettings'
+import {
+  useDisplaySettings,
+  type BookShadowStrength,
+  type BookSpineOverlay,
+  type CardOverlayKey,
+  type CoverSizeScope,
+} from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -20,6 +26,8 @@ const {
   authorCoverSize,
   authorCoverShape,
   tableZebraStriping,
+  bookSpineOverlay,
+  bookShadowStrength,
 } = useDisplaySettings()
 
 const { prefs, setPreference } = useSeriesCollapsePreference()
@@ -36,6 +44,17 @@ const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = 
   { key: 'read-status', label: 'Read status', hint: 'Color icon showing the current reading status at top-left' },
   { key: 'series-position', label: 'Series number', hint: 'Badge showing the book position in its series at top-right (e.g. #3, #1.5)' },
   { key: 'lock-status', label: 'Lock status', hint: 'Metadata lock icon at top-right - orange when locked, green when unlocked' },
+]
+
+const BOOK_SPINE_OPTIONS: { id: BookSpineOverlay; label: string; hint: string }[] = [
+  { id: 'off', label: 'Off', hint: 'No spine/gloss effect on covers' },
+  { id: 'subtle', label: 'Subtle', hint: 'Light spine and sheen, closer to the default look' },
+  { id: 'strong', label: 'Strong', hint: 'More pronounced spine and gloss treatment' },
+]
+
+const BOOK_SHADOW_OPTIONS: { id: BookShadowStrength; label: string; hint: string }[] = [
+  { id: 'default', label: 'Default', hint: 'Current elevation and depth' },
+  { id: 'strong', label: 'Strong', hint: 'Heavier shelf-like drop shadow under covers' },
 ]
 
 const BACKGROUND_GROUPS: { label: string; ids: string[] }[] = [
@@ -56,6 +75,14 @@ function toggleOverlay(key: CardOverlayKey) {
 
 function setCoverSizeScope(mode: CoverSizeScope) {
   coverSizeScope.value = mode
+}
+
+function setBookSpineOverlay(mode: BookSpineOverlay) {
+  bookSpineOverlay.value = mode
+}
+
+function setBookShadowStrength(mode: BookShadowStrength) {
+  bookShadowStrength.value = mode
 }
 
 const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
@@ -202,6 +229,49 @@ const syncModeEnabled = computed(() => coverSizeScope.value === 'synced')
   <!-- Library view -->
   <div>
     <p class="settings-group-label">Library View</p>
+
+    <!-- Cover styling -->
+    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4 shadow-xs">
+      <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div>
+          <p class="settings-label">Book spine overlay</p>
+          <p class="settings-hint">Adds a stylized spine and gloss effect to cover cards</p>
+        </div>
+        <div class="mt-3 grid gap-2 sm:grid-cols-3">
+          <button
+            v-for="opt in BOOK_SPINE_OPTIONS"
+            :key="opt.id"
+            class="rounded-md border px-3 py-2 text-left transition-colors"
+            :class="
+              bookSpineOverlay === opt.id
+                ? 'border-primary bg-primary/8 text-primary'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground'
+            "
+            @click="setBookSpineOverlay(opt.id)"
+          >
+            <p class="text-xs font-semibold">{{ opt.label }}</p>
+            <p class="mt-0.5 text-[11px] leading-snug opacity-80">{{ opt.hint }}</p>
+          </button>
+        </div>
+      </div>
+      <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div>
+          <p class="settings-label">Cover shadow strength</p>
+          <p class="settings-hint">Controls depth under covers across grid, list, table, and dashboard thumbnails</p>
+        </div>
+        <div class="mt-3 flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
+          <button
+            v-for="opt in BOOK_SHADOW_OPTIONS"
+            :key="opt.id"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            :class="bookShadowStrength === opt.id ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            @click="setBookShadowStrength(opt.id)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Background pattern -->
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4 shadow-xs">

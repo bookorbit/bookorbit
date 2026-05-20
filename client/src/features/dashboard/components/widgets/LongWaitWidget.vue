@@ -3,6 +3,7 @@ import { Clock, BookOpen, Play } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useLongWaitWidget } from '../../composables/useLongWaitWidget'
 
 const { data, loading, error } = useLongWaitWidget()
@@ -55,12 +56,18 @@ function startReading() {
     <!-- Long wait book -->
     <div v-else class="flex flex-1 flex-col">
       <div class="flex flex-1 items-center justify-center gap-4">
-        <button class="h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded shadow-sm transition-opacity hover:opacity-80" @click="goToBook">
+        <BookCoverSurface
+          tag="button"
+          type="button"
+          size="mini"
+          class="h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
+          @click="goToBook"
+        >
           <img v-if="data.hasCover" :src="coverUrl(data.bookId)" :alt="data.title ?? 'Cover'" class="h-full w-full object-cover" />
           <div v-else class="flex h-full w-full items-center justify-center bg-muted">
             <BookOpen :size="14" class="text-muted-foreground" />
           </div>
-        </button>
+        </BookCoverSurface>
 
         <div class="min-w-0 text-left">
           <button class="block cursor-pointer truncate text-xs font-semibold leading-tight hover:underline" @click="goToBook">

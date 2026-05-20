@@ -1,0 +1,91 @@
+.book-cover-surface {
+  --book-cover-shadow: var(--elevation-md);
+  --book-cover-shadow-hover: var(--elevation-xl);
+  --book-cover-mini-shadow: var(--elevation-sm);
+  --book-cover-spine-opacity: 0;
+  --book-cover-spine-width: 6%;
+  position: relative;
+  isolation: isolate;
+  background-color: white;
+  background-size: cover;
+  box-shadow: var(--book-cover-shadow);
+}
+
+.book-cover-surface[data-cover-shadow='strong'] {
+  --book-cover-shadow: 0 10px 18px oklch(0 0 0 / 0.28), 0 5px 8px oklch(0 0 0 / 0.2);
+  --book-cover-shadow-hover: 0 20px 34px oklch(0 0 0 / 0.3), 0 10px 16px oklch(0 0 0 / 0.22);
+  --book-cover-mini-shadow: 0 5px 8px oklch(0 0 0 / 0.24), 0 2px 4px oklch(0 0 0 / 0.2);
+}
+
+.book-cover-surface[data-cover-spine='subtle'] {
+  --book-cover-spine-opacity: 0.7;
+  --book-cover-spine-width: 6%;
+}
+
+.book-cover-surface[data-cover-spine='strong'] {
+  --book-cover-spine-opacity: 1;
+  --book-cover-spine-width: 8%;
+}
+
+.book-cover-surface--mini {
+  box-shadow: var(--book-cover-mini-shadow);
+}
+
+.book-cover-surface--interactive {
+  transition: box-shadow 180ms ease;
+}
+
+.group:hover .book-cover-surface--interactive {
+  box-shadow: var(--book-cover-shadow-hover);
+}
+
+.book-cover-spine-layer {
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.book-cover-surface::before,
+.book-cover-surface::after,
+.book-cover-spine-layer::before,
+.book-cover-spine-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.book-cover-surface::before,
+.book-cover-spine-layer::before {
+  background: linear-gradient(to bottom, oklch(1 0 0 / 0.11), oklch(0 0 0 / 0.2));
+  opacity: var(--book-cover-spine-opacity);
+}
+
+.book-cover-surface::after,
+.book-cover-spine-layer::after {
+  background-image: linear-gradient(
+    to right,
+    oklch(0 0 0 / 0.28) 0%,
+    oklch(0 0 0 / 0) calc(var(--book-cover-spine-width) * 0.2),
+    oklch(0 0 0 / 0.24) calc(var(--book-cover-spine-width) * 0.36),
+    oklch(0 0 0 / 0) calc(var(--book-cover-spine-width) * 0.48),
+    oklch(1 0 0 / 0.42) calc(var(--book-cover-spine-width) * 0.56),
+    oklch(1 0 0 / 0.22) calc(var(--book-cover-spine-width) * 0.74),
+    oklch(0 0 0 / 0.18) calc(var(--book-cover-spine-width) * 0.9),
+    oklch(0 0 0 / 0) calc(var(--book-cover-spine-width) * 1.1),
+    oklch(1 0 0 / 0.2) calc(var(--book-cover-spine-width) * 1.2),
+    oklch(1 0 0 / 0) calc(var(--book-cover-spine-width) * 1.45)
+  );
+  box-shadow:
+    inset -0.5px -1px 2px oklch(0 0 0 / 0.2),
+    inset -0.5px -0.5px 1px oklch(0 0 0 / 0.2);
+  opacity: var(--book-cover-spine-opacity);
+}
+
+.book-cover-surface.book-cover-surface--spine-fitted::before,
+.book-cover-surface.book-cover-surface--spine-fitted::after {
+  opacity: 0;
+}

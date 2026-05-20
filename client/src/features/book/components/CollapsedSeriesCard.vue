@@ -3,6 +3,7 @@ import { computed, inject, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { BookCard } from '@bookorbit/types'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
+import BookCoverSurface from './BookCoverSurface.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useCoverVersions } from '../composables/useCoverVersions'
 
@@ -44,8 +45,9 @@ function tileClass(index: number): string {
 <template>
   <div class="group flex flex-col @container cursor-pointer" @click="handleClick">
     <!-- Cover -->
-    <div
-      class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform] duration-150 will-change-transform group-hover:shadow-xl group-hover:scale-[1.02]"
+    <BookCoverSurface
+      class="relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform] duration-150 will-change-transform group-hover:scale-[1.02]"
+      interactive
       :style="{ aspectRatio: coverAspectRatio }"
     >
       <!-- Adaptive cover mosaic -->
@@ -90,6 +92,6 @@ function tileClass(index: number): string {
           </p>
         </div>
       </div>
-    </div>
+    </BookCoverSurface>
   </div>
 </template>

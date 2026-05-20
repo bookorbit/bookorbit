@@ -3,6 +3,7 @@ import { computed, ref, onUnmounted } from 'vue'
 import { Loader2 } from 'lucide-vue-next'
 import BookCoverImage from '../BookCoverImage.vue'
 import BookCoverPlaceholder from '../BookCoverPlaceholder.vue'
+import BookCoverSurface from '../BookCoverSurface.vue'
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 
 const props = defineProps<{
@@ -64,7 +65,8 @@ const adjustedTop = computed(() => {
 
 <template>
   <div class="relative" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
-    <div
+    <BookCoverSurface
+      size="mini"
       tabindex="0"
       role="button"
       aria-label="View cover"
@@ -77,7 +79,7 @@ const adjustedTop = computed(() => {
       <div v-if="isRefreshingBook" class="absolute inset-0 flex items-center justify-center bg-black/50">
         <Loader2 :size="12" class="animate-spin text-white" />
       </div>
-    </div>
+    </BookCoverSurface>
 
     <Teleport to="body">
       <div

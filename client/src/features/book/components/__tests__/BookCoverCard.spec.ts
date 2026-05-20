@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import BookCoverCard from '../BookCoverCard.vue'
 import type { BookCard } from '@bookorbit/types'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
@@ -58,10 +58,12 @@ function mountCard(book: BookCard, coverAspectRatio: '2/3' | '1/1' = '2/3') {
   })
 }
 
-const { cardOverlays } = useDisplaySettings()
+const { cardOverlays, bookSpineOverlay, bookShadowStrength } = useDisplaySettings()
 
 afterEach(() => {
   cardOverlays.value = ['progress-bar', 'format', 'rating', 'read-status']
+  bookSpineOverlay.value = 'off'
+  bookShadowStrength.value = 'default'
 })
 
 const missingBook: BookCard = {
@@ -220,6 +222,30 @@ describe('BookCoverCard — present state', () => {
 
     expect(wrapper.find('.text-emerald-400').exists()).toBe(true)
     expect(wrapper.find('.text-amber-400').exists()).toBe(false)
+  })
+})
+
+describe('BookCoverCard — cover style preferences', () => {
+  it('applies the reusable cover surface class to the main cover container', () => {
+    const wrapper = mountCard(presentBook)
+    const coverDiv = wrapper.find('[style*="aspect-ratio"]')
+    expect(coverDiv.classes()).toContain('book-cover-surface')
+  })
+
+  it('applies the selected spine overlay mode to the cover surface', async () => {
+    const wrapper = mountCard(presentBook)
+    bookSpineOverlay.value = 'strong'
+    await nextTick()
+    const coverDiv = wrapper.find('[style*="aspect-ratio"]')
+    expect(coverDiv.attributes('data-cover-spine')).toBe('strong')
+  })
+
+  it('applies the selected shadow strength mode to the cover surface', async () => {
+    const wrapper = mountCard(presentBook)
+    bookShadowStrength.value = 'strong'
+    await nextTick()
+    const coverDiv = wrapper.find('[style*="aspect-ratio"]')
+    expect(coverDiv.attributes('data-cover-shadow')).toBe('strong')
   })
 })
 
