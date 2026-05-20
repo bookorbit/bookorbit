@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { basename, extname, join } from 'path';
-import { stat } from 'fs/promises';
+import { mkdir, realpath, stat } from 'fs/promises';
 import { Readable } from 'stream';
 
 import type { BookDockMetadata } from '@bookorbit/types';
@@ -15,9 +15,9 @@ import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-even
 import { BookDockGateway } from './book-dock.gateway';
 
 @Injectable()
-export class BookDockIngestService {
+export class BookDockIngestService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BookDockIngestService.name);
-  private readonly bookDockPath: string;
+  private bookDockPath: string;
 
   constructor(
     private readonly config: ConfigService,
@@ -32,6 +32,11 @@ export class BookDockIngestService {
   ) {
     const appDataPath = this.config.get<string>('storage.appDataPath')!;
     this.bookDockPath = join(appDataPath, 'book-dock');
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    await mkdir(this.bookDockPath, { recursive: true });
+    this.bookDockPath = await realpath(this.bookDockPath);
   }
 
   async ingestUpload(rawFilename: string, fileStream: Readable, uploadedBy?: number): Promise<number> {

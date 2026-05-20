@@ -9,6 +9,7 @@ vi.mock('../scanner/lib/stability', () => ({
 vi.mock('fs/promises', () => ({
   mkdir: vi.fn(),
   readdir: vi.fn(),
+  realpath: vi.fn().mockImplementation((p: string) => Promise.resolve(p)),
   unlink: vi.fn(),
 }));
 
@@ -16,7 +17,7 @@ vi.mock('@parcel/watcher', () => ({
   subscribe: vi.fn(),
 }));
 
-import { mkdir, readdir, unlink } from 'fs/promises';
+import { mkdir, readdir, realpath, unlink } from 'fs/promises';
 import { subscribe } from '@parcel/watcher';
 
 import { isPrimaryFormat } from '../scanner/lib/classify';
@@ -65,6 +66,7 @@ describe('BookDockWatcherService', () => {
     await (service as any).startWatcher();
 
     expect(mkdir).toHaveBeenCalledWith('/data/book-dock', { recursive: true });
+    expect(realpath).toHaveBeenCalledWith('/data/book-dock');
     expect(subscribe).toHaveBeenCalledWith('/data/book-dock', expect.any(Function));
   });
 

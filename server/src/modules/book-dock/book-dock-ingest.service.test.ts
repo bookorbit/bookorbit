@@ -1,10 +1,12 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { Readable } from 'stream';
-import { stat } from 'fs/promises';
+import { mkdir, realpath, stat } from 'fs/promises';
 
 import { BookDockIngestService } from './book-dock-ingest.service';
 
 vi.mock('fs/promises', () => ({
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  realpath: vi.fn().mockImplementation((p: string) => Promise.resolve(p)),
   stat: vi.fn(),
 }));
 
@@ -75,6 +77,17 @@ describe('BookDockIngestService', () => {
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+  });
+
+  it('onApplicationBootstrap resolves bookDockPath to its real path', async () => {
+    const { service } = makeService();
+    vi.mocked(realpath).mockResolvedValue('/real/books/book-dock');
+
+    await service.onApplicationBootstrap();
+
+    expect(mkdir).toHaveBeenCalledWith('/books/book-dock', { recursive: true });
+    expect(realpath).toHaveBeenCalledWith('/books/book-dock');
+    expect((service as any).bookDockPath).toBe('/real/books/book-dock');
   });
 
   describe('ingestUpload', () => {

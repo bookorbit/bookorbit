@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Dirent } from 'fs';
-import { readdir, unlink } from 'fs/promises';
+import { mkdir, readdir, realpath, unlink } from 'fs/promises';
 import { join } from 'path';
 import type { AsyncSubscription } from '@parcel/watcher';
 
@@ -19,7 +19,7 @@ const COVERS_DIR = 'covers';
 @Injectable()
 export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BookDockWatcherService.name);
-  private readonly bookDockPath: string;
+  private bookDockPath: string;
   private subscription: AsyncSubscription | null = null;
   private readonly pendingTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; type: EventType }>();
 
@@ -54,8 +54,8 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
 
   private async startWatcher(): Promise<void> {
     try {
-      const { mkdir } = await import('fs/promises');
       await mkdir(this.bookDockPath, { recursive: true });
+      this.bookDockPath = await realpath(this.bookDockPath);
 
       const { subscribe } = await import('@parcel/watcher');
       this.subscription = await subscribe(this.bookDockPath, (err, events) => {
