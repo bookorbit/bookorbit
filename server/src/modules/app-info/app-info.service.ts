@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
 
 import type { AppInfoResponse } from '@bookorbit/types';
 
@@ -30,10 +31,12 @@ export class AppInfoService implements OnApplicationBootstrap {
   }
 
   getAppInfo(): AppInfoResponse {
+    const appDataPath = this.config.get<string>('storage.appDataPath') ?? '/data';
     return {
       version: this.config.get<string>('app.version') ?? 'Local build',
       updateAvailable: this.updateAvailable,
       latestVersion: this.latestVersion,
+      bookDockPath: join(appDataPath, 'book-dock'),
     };
   }
 

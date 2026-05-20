@@ -54,7 +54,7 @@ BookOrbit is a self-hosted digital library and reading platform. Organize and re
 
 **Kobo and KOReader sync:** Auto-push books to Kobo; two-way reading progress sync via KOReader over OPDS.
 
-**OPDS, email delivery, and Book Dock:** OPDS for compatible apps, Send-to-Kindle via email, and browser drag-and-drop uploads.
+**OPDS, email delivery, and Book Dock:** OPDS for compatible apps, Send-to-Kindle via email, browser drag-and-drop uploads, and a configurable drop folder for automated ingestion.
 
 **Multi-user with multi-provider OIDC/SSO:** Granular per-user permissions, isolated reading data, and simultaneous support for Authentik, Keycloak, Authelia, etc.
 
@@ -91,6 +91,18 @@ POSTGRES_PASSWORD=         # database password           - openssl rand -hex 24
 JWT_SECRET=                # signs login tokens          - openssl rand -hex 32
 SETUP_BOOTSTRAP_TOKEN=     # one-time setup wizard token - openssl rand -hex 16
 ```
+
+**Optional: Book Dock drop folder**
+
+To automatically ingest books placed in a folder (for example, a NAS share or a folder managed by another tool), set `BOOK_DROP_HOST_PATH` in `.env`:
+
+```dotenv
+BOOK_DROP_HOST_PATH=/mnt/nas/book-drop
+```
+
+Any ebook file copied or moved into that folder is automatically picked up and processed by Book Dock. The container-internal path it maps to is shown in Settings - Book Dock. Subdirectories are supported. Covers are stored in a `covers/` subdirectory inside the drop folder. Files are removed from the drop folder when finalized into a library.
+
+If `BOOK_DROP_HOST_PATH` is not set, the drop folder defaults to `./data/app/book-dock` inside the app data volume.
 
 Then start:
 

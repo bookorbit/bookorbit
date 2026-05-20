@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 const version = ref('')
 const updateAvailable = ref<boolean | null>(null)
 const latestVersion = ref<string | null>(null)
+const bookDockPath = ref('')
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
@@ -22,6 +23,7 @@ export function useAppInfo() {
       version.value = data.version
       updateAvailable.value = data.updateAvailable
       latestVersion.value = data.latestVersion
+      bookDockPath.value = data.bookDockPath ?? ''
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load app info'
     } finally {
@@ -29,5 +31,5 @@ export function useAppInfo() {
     }
   }
 
-  return { version, updateAvailable, latestVersion, isLoading, error, loadAppInfo }
+  return { version, updateAvailable, latestVersion, bookDockPath, isLoading, error, loadAppInfo }
 }

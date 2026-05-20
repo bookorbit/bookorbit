@@ -7,6 +7,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useAppInfo } from './composables/useAppInfo'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const autoFetch = ref(true)
@@ -19,6 +20,7 @@ const loading = ref(true)
 const saving = ref(false)
 
 const { libraries, fetchLibraries } = useLibraries()
+const { bookDockPath, loadAppInfo } = useAppInfo()
 
 const autoFinalizeLibrary = computed(() => libraries.value.find((l) => l.id === autoFinalizeLibraryId.value))
 const autoFinalizeFolders = computed(() => autoFinalizeLibrary.value?.folders ?? [])
@@ -26,7 +28,7 @@ const isThresholdApplicable = computed(() => autoFinalizeMetadataMode.value !== 
 
 onMounted(async () => {
   try {
-    const [res] = await Promise.all([api('/api/v1/app-settings'), fetchLibraries()])
+    const [res] = await Promise.all([api('/api/v1/app-settings'), fetchLibraries(), loadAppInfo()])
     if (res.ok) {
       const settings: { key: string; value: string }[] = await res.json()
       const get = (key: string) => settings.find((s) => s.key === key)?.value
@@ -151,6 +153,30 @@ async function onMetadataModeChange(event: Event) {
   </div>
 
   <div v-else class="mt-5 md:mt-0 space-y-6">
+    <div>
+      <p class="settings-group-label">Drop folder</p>
+      <div class="mt-4 border border-border rounded-lg overflow-hidden shadow-xs">
+        <div class="px-4 py-3.5 bg-card md:px-5 md:py-4">
+          <p class="settings-label">Container path</p>
+          <p class="settings-hint mb-2">
+            Copy or move book files into this folder and they will be automatically picked up and processed by Book Dock. Subdirectories are
+            supported.
+          </p>
+          <code
+            v-if="bookDockPath"
+            data-testid="book-dock-path"
+            class="block mt-1 px-3 py-2 rounded-md bg-muted text-foreground text-xs font-mono break-all select-all"
+            >{{ bookDockPath }}</code
+          >
+          <p class="settings-hint mt-2">
+            To use a custom host path, set <code class="text-xs font-mono">BOOK_DROP_HOST_PATH</code> in your
+            <code class="text-xs font-mono">.env</code> file and add the corresponding volume to
+            <code class="text-xs font-mono">docker-compose.yml</code>. The path shown above is the container-internal path to bind-mount.
+          </p>
+        </div>
+      </div>
+    </div>
+
     <p class="settings-group-label">Metadata</p>
 
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">

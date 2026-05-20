@@ -5,8 +5,14 @@ import { AppSettingsService } from '../app-settings/app-settings.service';
 import { GITHUB_RELEASES_API } from './app-info.constants';
 import { AppInfoService } from './app-info.service';
 
-function makeConfig(version = 'v1.2.3'): jest.Mocked<ConfigService> {
-  return { get: vi.fn().mockReturnValue(version) } as unknown as jest.Mocked<ConfigService>;
+function makeConfig(version = 'v1.2.3', appDataPath = '/data'): jest.Mocked<ConfigService> {
+  return {
+    get: vi.fn().mockImplementation((key: string) => {
+      if (key === 'storage.appDataPath') return appDataPath;
+      if (key === 'app.version') return version;
+      return undefined;
+    }),
+  } as unknown as jest.Mocked<ConfigService>;
 }
 
 function makeAppSettings(enabled = true): jest.Mocked<AppSettingsService> {
@@ -53,6 +59,28 @@ describe('AppInfoService', () => {
       const info = service.getAppInfo();
       expect(info.updateAvailable).toBeNull();
       expect(info.latestVersion).toBeNull();
+    });
+
+    it('returns bookDockPath as appDataPath/book-dock', () => {
+      const service = new AppInfoService(makeConfig('v1.0.0', '/custom/data'), makeAppSettings());
+      expect(service.getAppInfo().bookDockPath).toBe('/custom/data/book-dock');
+    });
+
+    it('falls back to /data/book-dock when storage.appDataPath is not configured', () => {
+      const config = { get: vi.fn().mockReturnValue(undefined) } as unknown as ConfigService;
+      const service = new AppInfoService(config, makeAppSettings());
+      expect(service.getAppInfo().bookDockPath).toBe('/data/book-dock');
+    });
+
+    it('includes bookDockPath in full response shape', () => {
+      const service = new AppInfoService(makeConfig('v1.2.3', '/app/data'), makeAppSettings());
+      const info = service.getAppInfo();
+      expect(info).toMatchObject({
+        version: 'v1.2.3',
+        updateAvailable: null,
+        latestVersion: null,
+        bookDockPath: '/app/data/book-dock',
+      });
     });
   });
 

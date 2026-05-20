@@ -32,6 +32,7 @@ services:
     volumes:
       - ${BOOKS_HOST_PATH:-./books}:/books
       - ./data/app:/data
+      - ${BOOK_DROP_HOST_PATH:-./data/app/book-dock}:/data/book-dock
     read_only: true
     tmpfs:
       - /tmp

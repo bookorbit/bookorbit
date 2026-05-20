@@ -25,19 +25,21 @@ function makeErrorResponse(status: number): Response {
 describe('useAppInfo', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    const { version, updateAvailable, latestVersion, isLoading, error } = useAppInfo()
+    const { version, updateAvailable, latestVersion, bookDockPath, isLoading, error } = useAppInfo()
     version.value = ''
     updateAvailable.value = null
     latestVersion.value = null
+    bookDockPath.value = ''
     isLoading.value = false
     error.value = null
   })
 
   it('starts in idle state before loadAppInfo is called', () => {
-    const { version, updateAvailable, latestVersion, isLoading, error } = useAppInfo()
+    const { version, updateAvailable, latestVersion, bookDockPath, isLoading, error } = useAppInfo()
     expect(version.value).toBe('')
     expect(updateAvailable.value).toBeNull()
     expect(latestVersion.value).toBeNull()
+    expect(bookDockPath.value).toBe('')
     expect(isLoading.value).toBe(false)
     expect(error.value).toBeNull()
   })
@@ -146,5 +148,46 @@ describe('useAppInfo', () => {
     await Promise.all([first, second])
 
     expect(mockApi).toHaveBeenCalledOnce()
+  })
+
+  it('populates bookDockPath from API response', async () => {
+    mockApi.mockResolvedValue(
+      makeOkResponse({
+        version: 'v1.2.3',
+        updateAvailable: false,
+        latestVersion: 'v1.2.3',
+        bookDockPath: '/data/book-dock',
+      }),
+    )
+
+    const { bookDockPath, loadAppInfo } = useAppInfo()
+    await loadAppInfo()
+
+    expect(bookDockPath.value).toBe('/data/book-dock')
+  })
+
+  it('defaults bookDockPath to empty string when field is absent from response', async () => {
+    mockApi.mockResolvedValue(
+      makeOkResponse({
+        version: 'v1.2.3',
+        updateAvailable: false,
+        latestVersion: 'v1.2.3',
+      }),
+    )
+
+    const { bookDockPath, loadAppInfo } = useAppInfo()
+    await loadAppInfo()
+
+    expect(bookDockPath.value).toBe('')
+  })
+
+  it('does not change bookDockPath on API error', async () => {
+    mockApi.mockRejectedValue(new Error('fail'))
+
+    const { bookDockPath, loadAppInfo } = useAppInfo()
+    bookDockPath.value = '/data/book-dock'
+    await loadAppInfo()
+
+    expect(bookDockPath.value).toBe('/data/book-dock')
   })
 })
