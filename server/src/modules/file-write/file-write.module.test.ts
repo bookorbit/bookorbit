@@ -1,6 +1,9 @@
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
+import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { FileLockService } from './file-lock.service';
+import { FileRenameRepository } from './file-rename.repository';
+import { FileRenameService } from './file-rename.service';
 import { FileWriteModule } from './file-write.module';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteService } from './file-write.service';
@@ -15,11 +18,15 @@ describe('FileWriteModule', () => {
   it('registers expected providers, exports, and writer factory token', () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, FileWriteModule);
     const exportsMeta = Reflect.getMetadata(MODULE_METADATA.EXPORTS, FileWriteModule);
+    const importsMeta = Reflect.getMetadata(MODULE_METADATA.IMPORTS, FileWriteModule);
 
+    expect(importsMeta).toEqual(expect.arrayContaining([AppSettingsModule]));
     expect(providers).toEqual(
       expect.arrayContaining([
         FileWriteService,
         FileWriteRepository,
+        FileRenameRepository,
+        FileRenameService,
         FileLockService,
         EpubFormatWriter,
         PdfFormatWriter,
@@ -29,7 +36,7 @@ describe('FileWriteModule', () => {
       ]),
     );
 
-    expect(exportsMeta).toEqual(expect.arrayContaining([FileWriteService, FileWriteRepository]));
+    expect(exportsMeta).toEqual(expect.arrayContaining([FileWriteService, FileWriteRepository, FileRenameService]));
 
     const writerProvider = providers.find((p: { provide?: unknown }) => p?.provide === FORMAT_WRITERS) as {
       useFactory: (...args: unknown[]) => unknown;

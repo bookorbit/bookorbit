@@ -52,6 +52,7 @@ import { LibraryService } from '../library/library.service';
 import { books } from '../../db/schema';
 import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
+import { FileRenameService, RENAME_RELEVANT_FIELDS } from '../file-write/file-rename.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
@@ -192,6 +193,7 @@ export class BookService {
     private readonly bookMetadataLockService: BookMetadataLockService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
+    @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
@@ -1153,6 +1155,10 @@ export class BookService {
 
       this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
       this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
+      const hasRenameRelevantField = Array.from(RENAME_RELEVANT_FIELDS).some((field) => (dto as Record<string, unknown>)[field] !== undefined);
+      if (hasRenameRelevantField) {
+        this.fileRenameService?.scheduleRename(id, user.id);
+      }
       this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
       const detail = await this.getDetail(id, user);
       this.logger.log(
@@ -2183,6 +2189,7 @@ export class BookService {
   private triggerPostMetadataUpdateEffects(bookIds: number[], userId: number): void {
     for (const bookId of bookIds) {
       this.fileWriteService?.scheduleWrite(bookId, 'auto', userId);
+      this.fileRenameService?.scheduleRename(bookId, userId);
       void this.scoreService
         .calculateAndSave(bookId)
         .catch((err: Error) => this.logger.warn(`Score calculation failed for book ${bookId}: ${err.message}`));

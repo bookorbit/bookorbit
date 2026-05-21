@@ -145,6 +145,9 @@ function makeService() {
   const fileWriteService = {
     scheduleWrite: vi.fn(),
   };
+  const fileRenameService = {
+    scheduleRename: vi.fn(),
+  };
   const achievementEvents = {
     emit: vi.fn(),
   };
@@ -202,6 +205,7 @@ function makeService() {
     bookMetadataLockService as never,
     embedder as never,
     fileWriteService as never,
+    fileRenameService as never,
     achievementEvents as never,
   );
 
@@ -218,6 +222,7 @@ function makeService() {
     userBookStatusService,
     embedder,
     fileWriteService,
+    fileRenameService,
     achievementEvents,
     narratorService,
     comicMetadataService,
@@ -1082,8 +1087,8 @@ describe('BookService', () => {
       expect(metadataService.downloadAndSaveCover).not.toHaveBeenCalled();
     });
 
-    it('updateMetadata writes scalar fields, collections, schedules file write, and triggers embedding', async () => {
-      const { service, bookRepo, metadataService, embedder, fileWriteService } = makeService();
+    it('updateMetadata writes scalar fields, collections, schedules file write, rename, and triggers embedding', async () => {
+      const { service, bookRepo, metadataService, embedder, fileWriteService, fileRenameService } = makeService();
       const user = makeUser();
       const verifySpy = vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
       const detailSpy = vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
@@ -1123,6 +1128,7 @@ describe('BookService', () => {
       expect(metadataService.replaceTags).toHaveBeenCalledWith(5, ['favorite'], { executor: expect.anything() });
       expect(metadataService.emitAuthorsReplaced).toHaveBeenCalledWith(5, []);
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(5, 'auto', user.id);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(5, user.id);
       expect(embedder.embedBook).toHaveBeenCalledWith(5);
       expect(detailSpy).toHaveBeenCalledWith(5, user);
     });
@@ -2216,7 +2222,7 @@ describe('BookService', () => {
 
   describe('bulk metadata actions', () => {
     it('bulkSetRating updates ratings and queues file writes and score recalculation', async () => {
-      const { service, bookRepo, fileWriteService, scoreService } = makeService();
+      const { service, bookRepo, fileWriteService, fileRenameService, scoreService } = makeService();
       const user = makeUser({ id: 42 });
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
 
@@ -2225,12 +2231,14 @@ describe('BookService', () => {
       expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3, 5], 4, 42);
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(1, 3, 'auto', 42);
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(2, 5, 'auto', 42);
+      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(1, 3, 42);
+      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(2, 5, 42);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(1, 3);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(2, 5);
     });
 
     it('bulkSetRating skips books where rating is metadata-locked', async () => {
-      const { service, bookRepo, fileWriteService, scoreService, bookMetadataLockService } = makeService();
+      const { service, bookRepo, fileWriteService, fileRenameService, scoreService, bookMetadataLockService } = makeService();
       const user = makeUser({ id: 42 });
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
       bookMetadataLockService.getBookIdsWithLockedField.mockResolvedValue(new Set([5]));
@@ -2241,6 +2249,8 @@ describe('BookService', () => {
       expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3], 4, 42);
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledTimes(1);
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(3, 'auto', 42);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledTimes(1);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(3, 42);
       expect(scoreService.calculateAndSave).toHaveBeenCalledTimes(1);
       expect(scoreService.calculateAndSave).toHaveBeenCalledWith(3);
     });
@@ -2260,7 +2270,7 @@ describe('BookService', () => {
     });
 
     it('bulkSetMetadata updates a single metadata field and queues follow-up work', async () => {
-      const { service, bookRepo, fileWriteService, scoreService } = makeService();
+      const { service, bookRepo, fileWriteService, fileRenameService, scoreService } = makeService();
       const user = makeUser({ id: 11 });
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
 
@@ -2272,12 +2282,14 @@ describe('BookService', () => {
       );
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(1, 7, 'auto', 11);
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(2, 9, 'auto', 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(1, 7, 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(2, 9, 11);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(1, 7);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(2, 9);
     });
 
     it('bulkSetMetadata skips books where the field is metadata-locked', async () => {
-      const { service, bookRepo, fileWriteService, scoreService, bookMetadataLockService } = makeService();
+      const { service, bookRepo, fileWriteService, fileRenameService, scoreService, bookMetadataLockService } = makeService();
       const user = makeUser({ id: 11 });
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
       bookMetadataLockService.getBookIdsWithLockedField.mockResolvedValue(new Set([9]));
@@ -2288,12 +2300,14 @@ describe('BookService', () => {
       expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenCalledWith([7], expect.objectContaining({ language: 'fr', updatedAt: expect.any(Date) }));
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledTimes(1);
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(7, 'auto', 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledTimes(1);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(7, 11);
       expect(scoreService.calculateAndSave).toHaveBeenCalledTimes(1);
       expect(scoreService.calculateAndSave).toHaveBeenCalledWith(7);
     });
 
     it('bulkSetMetadata replaces relation fields in a transaction', async () => {
-      const { service, bookRepo, metadataService, fileWriteService, scoreService } = makeService();
+      const { service, bookRepo, metadataService, fileWriteService, fileRenameService, scoreService } = makeService();
       const user = makeUser({ id: 11 });
       const tx = { select: vi.fn(), delete: vi.fn(), insert: vi.fn(), update: vi.fn() };
       bookRepo.withTransaction.mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx));
@@ -2305,12 +2319,14 @@ describe('BookService', () => {
       expect(metadataService.replaceTags).toHaveBeenNthCalledWith(2, 9, ['favorite', 'reading'], { executor: tx });
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(1, 7, 'auto', 11);
       expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(2, 9, 'auto', 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(1, 7, 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(2, 9, 11);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(1, 7);
       expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(2, 9);
     });
 
     it('bulkSetMetadata replaces narrators for editable books only', async () => {
-      const { service, bookRepo, narratorService, fileWriteService, scoreService, bookMetadataLockService } = makeService();
+      const { service, bookRepo, narratorService, fileWriteService, fileRenameService, scoreService, bookMetadataLockService } = makeService();
       const user = makeUser({ id: 11 });
       const tx = { select: vi.fn(), delete: vi.fn(), insert: vi.fn(), update: vi.fn() };
       bookRepo.withTransaction.mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx));
@@ -2323,12 +2339,14 @@ describe('BookService', () => {
       expect(narratorService.replaceForBook).toHaveBeenCalledWith(7, ['Narrator A'], { executor: tx });
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledTimes(1);
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(7, 'auto', 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledTimes(1);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(7, 11);
       expect(scoreService.calculateAndSave).toHaveBeenCalledTimes(1);
       expect(scoreService.calculateAndSave).toHaveBeenCalledWith(7);
     });
 
     it('bulkUpdateTags performs all tag changes in one transaction and queues follow-up work', async () => {
-      const { service, bookRepo, metadataService, fileWriteService, scoreService } = makeService();
+      const { service, bookRepo, metadataService, fileWriteService, fileRenameService, scoreService } = makeService();
       const user = makeUser({ id: 11 });
       const tx = { select: vi.fn(), delete: vi.fn(), insert: vi.fn() };
       bookRepo.withTransaction.mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx));
@@ -2340,6 +2358,7 @@ describe('BookService', () => {
       expect(bookRepo.findTagsByBookIds).toHaveBeenCalledWith([7], tx);
       expect(metadataService.replaceTags).toHaveBeenCalledWith(7, ['existing', 'new'], { executor: tx });
       expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(7, 'auto', 11);
+      expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(7, 11);
       expect(scoreService.calculateAndSave).toHaveBeenCalledWith(7);
     });
 

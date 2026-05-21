@@ -155,4 +155,8 @@ export class UpdateLibraryDto {
   @Min(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN)
   @Max(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX)
   fileWriteCbxMaxFileSizeMb?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  fileRenameEnabled?: boolean;
 }

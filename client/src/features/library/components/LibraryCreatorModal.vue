@@ -136,6 +136,7 @@ const sectionProps = computed(() => ({
     formatPriority: form.formatPriority,
   },
   fileWrite: {
+    fileRenameEnabled: form.fileRenameEnabled,
     fileWriteEnabled: form.fileWriteEnabled,
     fileWriteWriteCover: form.fileWriteWriteCover,
     fileWriteEpubEnabled: form.fileWriteEpubEnabled,
@@ -172,6 +173,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
   else if (event === 'update:markAsFinishedPercentComplete') form.markAsFinishedPercentComplete = value as number
   else if (event === 'update:watch') form.watch = value as boolean
   else if (event === 'update:autoScanCronExpression') form.autoScanCronExpression = value as string | null
+  else if (event === 'update:fileRenameEnabled') form.fileRenameEnabled = value as boolean
   else if (event === 'update:fileWriteEnabled') form.fileWriteEnabled = value as boolean
   else if (event === 'update:fileWriteWriteCover') form.fileWriteWriteCover = value as boolean
   else if (event === 'update:fileWriteEpubEnabled') form.fileWriteEpubEnabled = value as boolean
@@ -276,6 +278,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:markAsFinishedPercentComplete="onSectionEvent(activeId, 'update:markAsFinishedPercentComplete', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
+                @update:fileRenameEnabled="onSectionEvent(activeId, 'update:fileRenameEnabled', $event)"
                 @update:fileWriteEnabled="onSectionEvent(activeId, 'update:fileWriteEnabled', $event)"
                 @update:fileWriteWriteCover="onSectionEvent(activeId, 'update:fileWriteWriteCover', $event)"
                 @update:fileWriteEpubEnabled="onSectionEvent(activeId, 'update:fileWriteEpubEnabled', $event)"
@@ -411,6 +414,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:markAsFinishedPercentComplete="onSectionEvent(activeId, 'update:markAsFinishedPercentComplete', $event)"
                 @update:watch="onSectionEvent(activeId, 'update:watch', $event)"
                 @update:autoScanCronExpression="onSectionEvent(activeId, 'update:autoScanCronExpression', $event)"
+                @update:fileRenameEnabled="onSectionEvent(activeId, 'update:fileRenameEnabled', $event)"
                 @update:fileWriteEnabled="onSectionEvent(activeId, 'update:fileWriteEnabled', $event)"
                 @update:fileWriteWriteCover="onSectionEvent(activeId, 'update:fileWriteWriteCover', $event)"
                 @update:fileWriteEpubEnabled="onSectionEvent(activeId, 'update:fileWriteEpubEnabled', $event)"

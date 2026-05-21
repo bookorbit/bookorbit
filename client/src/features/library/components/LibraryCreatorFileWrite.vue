@@ -1,5 +1,6 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
+  fileRenameEnabled: boolean
   fileWriteEnabled: boolean
   fileWriteWriteCover: boolean
   fileWriteEpubEnabled: boolean
@@ -11,6 +12,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
+  'update:fileRenameEnabled': [value: boolean]
   'update:fileWriteEnabled': [value: boolean]
   'update:fileWriteWriteCover': [value: boolean]
   'update:fileWriteEpubEnabled': [value: boolean]
@@ -20,6 +22,30 @@ const emit = defineEmits<{
   'update:fileWriteCbxEnabled': [value: boolean]
   'update:fileWriteCbxMaxFileSizeMb': [value: number]
 }>()
+
+function handleFileRenameToggle() {
+  emit('update:fileRenameEnabled', !props.fileRenameEnabled)
+}
+
+function handleFileWriteToggle() {
+  emit('update:fileWriteEnabled', !props.fileWriteEnabled)
+}
+
+function handleWriteCoverToggle() {
+  emit('update:fileWriteWriteCover', !props.fileWriteWriteCover)
+}
+
+function handleEpubToggle() {
+  emit('update:fileWriteEpubEnabled', !props.fileWriteEpubEnabled)
+}
+
+function handlePdfToggle() {
+  emit('update:fileWritePdfEnabled', !props.fileWritePdfEnabled)
+}
+
+function handleCbxToggle() {
+  emit('update:fileWriteCbxEnabled', !props.fileWriteCbxEnabled)
+}
 
 function onMaxSizeInput(field: 'epub' | 'pdf' | 'cbx', e: Event) {
   const val = parseInt((e.target as HTMLInputElement).value, 10)
@@ -33,9 +59,11 @@ function onMaxSizeInput(field: 'epub' | 'pdf' | 'cbx', e: Event) {
 function onEpubMaxSizeInput(e: Event) {
   onMaxSizeInput('epub', e)
 }
+
 function onPdfMaxSizeInput(e: Event) {
   onMaxSizeInput('pdf', e)
 }
+
 function onCbxMaxSizeInput(e: Event) {
   onMaxSizeInput('cbx', e)
 }
@@ -43,7 +71,27 @@ function onCbxMaxSizeInput(e: Event) {
 
 <template>
   <div class="px-6 py-6 space-y-6">
-    <!-- Master toggle -->
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Rename files on metadata update</p>
+        <button
+          class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
+          :class="fileRenameEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
+          role="switch"
+          :aria-checked="fileRenameEnabled"
+          @click="handleFileRenameToggle"
+        >
+          <span
+            class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+            :class="fileRenameEnabled ? 'translate-x-4' : 'translate-x-0'"
+          />
+        </button>
+      </div>
+      <p class="text-xs text-muted-foreground">
+        When enabled, updating title, author, series, or year will rename the physical file using the library naming pattern.
+      </p>
+    </div>
+
     <div>
       <div class="flex items-center justify-between mb-1">
         <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Write metadata to files</p>
@@ -52,7 +100,7 @@ function onCbxMaxSizeInput(e: Event) {
           :class="fileWriteEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
           role="switch"
           :aria-checked="fileWriteEnabled"
-          @click="emit('update:fileWriteEnabled', !fileWriteEnabled)"
+          @click="handleFileWriteToggle"
         >
           <span
             class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
@@ -64,7 +112,6 @@ function onCbxMaxSizeInput(e: Event) {
     </div>
 
     <template v-if="fileWriteEnabled">
-      <!-- Write cover -->
       <div class="flex items-center justify-between">
         <div>
           <p class="text-sm font-medium text-foreground">Include cover image</p>
@@ -75,7 +122,7 @@ function onCbxMaxSizeInput(e: Event) {
           :class="fileWriteWriteCover ? 'bg-primary' : 'bg-muted-foreground/30'"
           role="switch"
           :aria-checked="fileWriteWriteCover"
-          @click="emit('update:fileWriteWriteCover', !fileWriteWriteCover)"
+          @click="handleWriteCoverToggle"
         >
           <span
             class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
@@ -86,7 +133,6 @@ function onCbxMaxSizeInput(e: Event) {
 
       <div class="border-t border-border" />
 
-      <!-- EPUB -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
@@ -98,7 +144,7 @@ function onCbxMaxSizeInput(e: Event) {
             :class="fileWriteEpubEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
             role="switch"
             :aria-checked="fileWriteEpubEnabled"
-            @click="emit('update:fileWriteEpubEnabled', !fileWriteEpubEnabled)"
+            @click="handleEpubToggle"
           >
             <span
               class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
@@ -119,7 +165,6 @@ function onCbxMaxSizeInput(e: Event) {
         </div>
       </div>
 
-      <!-- PDF -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
@@ -131,7 +176,7 @@ function onCbxMaxSizeInput(e: Event) {
             :class="fileWritePdfEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
             role="switch"
             :aria-checked="fileWritePdfEnabled"
-            @click="emit('update:fileWritePdfEnabled', !fileWritePdfEnabled)"
+            @click="handlePdfToggle"
           >
             <span
               class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
@@ -152,7 +197,6 @@ function onCbxMaxSizeInput(e: Event) {
         </div>
       </div>
 
-      <!-- CBX -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
@@ -164,7 +208,7 @@ function onCbxMaxSizeInput(e: Event) {
             :class="fileWriteCbxEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
             role="switch"
             :aria-checked="fileWriteCbxEnabled"
-            @click="emit('update:fileWriteCbxEnabled', !fileWriteCbxEnabled)"
+            @click="handleCbxToggle"
           >
             <span
               class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"

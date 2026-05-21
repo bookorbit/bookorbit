@@ -36,6 +36,7 @@ function blankForm() {
     fileWritePdfMaxFileSizeMb: 100,
     fileWriteCbxEnabled: false,
     fileWriteCbxMaxFileSizeMb: 500,
+    fileRenameEnabled: false,
   }
 }
 
@@ -80,6 +81,7 @@ export function useLibraryCreator() {
     form.fileWritePdfMaxFileSizeMb = library.fileWritePdfMaxFileSizeMb
     form.fileWriteCbxEnabled = library.fileWriteCbxEnabled
     form.fileWriteCbxMaxFileSizeMb = library.fileWriteCbxMaxFileSizeMb
+    form.fileRenameEnabled = library.fileRenameEnabled
     mode.value = 'edit'
     editingLibraryId.value = library.id
     prescanResult.value = null

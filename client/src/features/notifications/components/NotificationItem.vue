@@ -30,6 +30,7 @@ const FAILED_TYPES = new Set([
   'email_failed',
   'migration_failed',
   'file_write_back_failed',
+  'file_rename_failed',
 ])
 
 const WARNING_TYPES = new Set(['books_unavailable'])
@@ -52,6 +53,8 @@ const ICON_MAP: Record<string, typeof FolderSync> = {
   migration_failed: ArrowRightLeft,
   file_write_back_completed: FileDown,
   file_write_back_failed: FileDown,
+  file_rename_completed: FileDown,
+  file_rename_failed: FileDown,
 }
 
 const icon = computed(() => ICON_MAP[props.notification.type] ?? FolderSync)

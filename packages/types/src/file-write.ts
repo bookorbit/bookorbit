@@ -19,3 +19,11 @@ export type WriteLogEntry = {
   durationMs: number | null;
   errorMessage: string | null;
 };
+
+export interface FileRenameResult {
+  status: "success" | "skipped" | "failed";
+  reason?: string;
+  oldPath?: string;
+  newPath?: string;
+  durationMs: number;
+}

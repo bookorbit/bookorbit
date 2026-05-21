@@ -98,12 +98,14 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEpubEnabled: false }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWritePdfEnabled: false }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteCbxEnabled: true }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileRenameEnabled: true }))).toBe(false);
     });
 
     it('CreateLibraryDto rejects non-boolean file write flags', async () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEnabled: 'yes' }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteWriteCover: 1 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEpubEnabled: 'true' }))).toBe(true);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileRenameEnabled: 'true' }))).toBe(true);
     });
 
     it('CreateLibraryDto validates fileWriteEpubMaxFileSizeMb bounds', async () => {
@@ -142,7 +144,7 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteCbxMaxFileSizeMb: 500 }))).toBe(false);
     });
 
-    it('UpdateLibraryDto accepts all 8 file write fields simultaneously', async () => {
+    it('UpdateLibraryDto accepts all 9 file write fields simultaneously', async () => {
       const dto = plainToInstance(UpdateLibraryDto, {
         fileWriteEnabled: true,
         fileWriteWriteCover: false,
@@ -152,6 +154,7 @@ describe('Library DTO validation', () => {
         fileWritePdfMaxFileSizeMb: 50,
         fileWriteCbxEnabled: true,
         fileWriteCbxMaxFileSizeMb: 1000,
+        fileRenameEnabled: true,
       });
       expect(await hasErrors(dto)).toBe(false);
     });

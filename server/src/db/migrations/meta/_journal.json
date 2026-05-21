@@ -43,6 +43,13 @@
       "when": 1779204354944,
       "tag": "0005_add_hardcover_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779381509015,
+      "tag": "0006_add_file_rename_enabled",
+      "breakpoints": true
     }
   ]
 }

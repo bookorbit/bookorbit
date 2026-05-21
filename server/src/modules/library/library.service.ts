@@ -133,6 +133,7 @@ export class LibraryService {
       fileWritePdfMaxFileSizeMb: dto.fileWritePdfMaxFileSizeMb ?? 100,
       fileWriteCbxEnabled: dto.fileWriteCbxEnabled ?? false,
       fileWriteCbxMaxFileSizeMb: dto.fileWriteCbxMaxFileSizeMb ?? 500,
+      fileRenameEnabled: dto.fileRenameEnabled ?? false,
     });
 
     const folders = await Promise.all(dto.folders.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));

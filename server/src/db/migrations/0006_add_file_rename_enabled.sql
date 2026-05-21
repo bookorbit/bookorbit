@@ -1,0 +1,1 @@
+ALTER TABLE "libraries" ADD COLUMN "file_rename_enabled" boolean DEFAULT false NOT NULL;
