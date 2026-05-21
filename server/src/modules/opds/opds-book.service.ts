@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { SQL, and, count, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { SQL, and, count, eq, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -32,6 +32,8 @@ const OPDS_SORT_MAP: Record<OpdsSortOrder, SQL[]> = {
   series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, sql`${bookMetadata.seriesIndex} ASC NULLS LAST`],
   series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, sql`${bookMetadata.seriesIndex} DESC NULLS LAST`],
 };
+
+const LIKE_SPECIAL_CHARS = /[%_\\]/g;
 
 export interface OpdsBookEntry {
   id: number;
@@ -143,10 +145,34 @@ export class OpdsBookService {
     }
 
     if (filters?.q) {
-      clauses.push(sql`${bookMetadata.title} ILIKE ${'%' + filters.q + '%'}`);
+      const searchClause = this.buildCatalogSearchClause(filters.q);
+      if (searchClause) clauses.push(searchClause);
     }
 
     return this.paginatedBookQuery(and(...clauses)!, sortOrder, page, size);
+  }
+
+  private buildCatalogSearchClause(q: string): SQL | undefined {
+    const term = q.trim();
+    if (!term) return undefined;
+
+    const pattern = `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`;
+    const existsAuthor = (() => {
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(bookAuthors.authorId, authors.id))
+        .where(and(eq(bookAuthors.bookId, books.id), ilike(authors.name, pattern))!);
+      return sql`exists (${sq})`;
+    })();
+
+    const clauses: SQL[] = [ilike(bookMetadata.title, pattern), existsAuthor, ilike(bookMetadata.seriesName, pattern)];
+    const normalizedIsbn = normalizeIsbnSearchTerm(term);
+    if (normalizedIsbn) {
+      clauses.push(or(eq(bookMetadata.isbn13, normalizedIsbn), eq(bookMetadata.isbn10, normalizedIsbn))!);
+    }
+
+    return or(...clauses)!;
   }
 
   async getRecentBooksPage(userId: number, page: number, size: number, isSuperuser = false): Promise<{ entries: OpdsBookEntry[]; total: number }> {
@@ -432,4 +458,8 @@ export class OpdsBookService {
       }))
       .sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
   }
+}
+
+function normalizeIsbnSearchTerm(value: string): string {
+  return value.replace(/[^0-9Xx]/g, '').toUpperCase();
 }

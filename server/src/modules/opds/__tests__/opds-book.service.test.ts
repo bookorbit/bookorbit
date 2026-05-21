@@ -37,6 +37,19 @@ function makeService(selectQueue: unknown[] = [], queryBuilderOverrides: Record<
   return { service, db, queryBuilder };
 }
 
+function collectValues(value: unknown, seen = new WeakSet<object>()): unknown[] {
+  if (value === null || typeof value !== 'object') return [value];
+  if (seen.has(value)) return [];
+  seen.add(value);
+
+  const values: unknown[] = [];
+  if ('value' in value) values.push((value as { value: unknown }).value);
+  for (const key of Object.getOwnPropertyNames(value)) {
+    values.push(...collectValues((value as Record<string, unknown>)[key], seen));
+  }
+  return values;
+}
+
 describe('OpdsBookService', () => {
   it('returns accessible library ids for superusers and regular users', async () => {
     const superDb = makeDb([[{ id: 1 }, { id: 4 }]]);
@@ -70,6 +83,7 @@ describe('OpdsBookService', () => {
 
     accessSpy.mockResolvedValueOnce([1, 2]);
     paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 9 }], total: 1 });
+    const searchSpy = vi.spyOn(service as never, 'buildCatalogSearchClause');
     await expect(
       service.getBooksPage(7, 'title_asc', 2, 20, {
         libraryId: 1,
@@ -80,6 +94,27 @@ describe('OpdsBookService', () => {
       }),
     ).resolves.toEqual({ entries: [{ id: 9 }], total: 1 });
     expect(paginatedSpy).toHaveBeenCalledTimes(1);
+    expect(searchSpy).toHaveBeenCalledWith('arrakis');
+  });
+
+  it('builds catalog search across title, author, series, and normalized ISBN', () => {
+    const { service, db } = makeService();
+
+    const clause = (service as unknown as { buildCatalogSearchClause(q: string): unknown }).buildCatalogSearchClause('978-0 141187761');
+    const values = collectValues(clause);
+
+    expect(db.select).toHaveBeenCalledWith({ one: expect.anything() });
+    expect(values).toContain('%978-0 141187761%');
+    expect(values).toContain('9780141187761');
+  });
+
+  it('escapes catalog search LIKE patterns', () => {
+    const { service } = makeService();
+
+    const clause = (service as unknown as { buildCatalogSearchClause(q: string): unknown }).buildCatalogSearchClause('100%_\\');
+    const values = collectValues(clause);
+
+    expect(values).toContain('%100\\%\\_\\\\%');
   });
 
   it('handles getRecentBooksPage empty-access and delegated paths', async () => {
