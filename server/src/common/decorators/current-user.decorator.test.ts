@@ -5,6 +5,7 @@ import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 
 import type { RequestUser } from '../types/request-user';
 import { CurrentUser } from './current-user.decorator';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(): RequestUser {
   return {
@@ -20,6 +21,8 @@ function makeUser(): RequestUser {
     avatarUrl: null,
     provisioningMethod: 'local',
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

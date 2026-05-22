@@ -4,6 +4,7 @@ import type { FontService } from './font.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { Permission } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('fs', () => ({
   createReadStream: vi.fn(() => 'mock-stream'),
@@ -24,6 +25,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

@@ -33,6 +33,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSharedUserDto } from './dto/create-shared-user.dto';
 import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
+import { SetContentFiltersDto } from './dto/set-content-filters.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateReaderStorageModeDto } from './dto/update-reader-storage-mode.dto';
@@ -286,6 +287,30 @@ export class UserController {
   })
   adminResetPassword(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestingUser: RequestUser) {
     return this.userService.adminResetPassword(id, requestingUser);
+  }
+
+  @Get('me/content-filters')
+  getMyContentFilters(@CurrentUser() user: RequestUser) {
+    return this.userService.getContentFilters(user.id, user);
+  }
+
+  @Get(':id/content-filters')
+  @RequirePermission(Permission.ManageUsers)
+  getContentFilters(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestingUser: RequestUser) {
+    return this.userService.getContentFilters(id, requestingUser);
+  }
+
+  @Put(':id/content-filters')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({
+    action: AuditAction.UserContentFiltersSet,
+    resource: AuditResource.User,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated content filters for user #${req.params['id']}`,
+  })
+  setContentFilters(@Param('id', ParseIntPipe) id: number, @Body() dto: SetContentFiltersDto, @CurrentUser() requestingUser: RequestUser) {
+    return this.userService.setContentFilters(id, dto, requestingUser);
   }
 }
 

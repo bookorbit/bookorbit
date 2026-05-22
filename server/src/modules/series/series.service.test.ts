@@ -1,9 +1,10 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 import { SeriesService } from './series.service';
 
 function reqUser(id = 7, superuser = false) {
-  return { id, isSuperuser: superuser, permissions: [] } as any;
+  return { id, isSuperuser: superuser, permissions: [], contentFilters: undefined } as any;
 }
 
 describe('SeriesService', () => {
@@ -62,6 +63,7 @@ describe('SeriesService', () => {
           order: 'desc',
           libraryIds: [1, 2],
           userId: 7,
+          contentFilters: undefined,
         }),
       );
       expect(result.items).toHaveLength(1);
@@ -72,7 +74,7 @@ describe('SeriesService', () => {
     it('scopes to specific library when libraryId provided', async () => {
       seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
       await service.findAll(reqUser(), { libraryId: 2 });
-      expect(seriesRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2] }));
+      expect(seriesRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2], contentFilters: undefined }));
     });
 
     it('returns empty when scoped library is inaccessible', async () => {
@@ -237,6 +239,44 @@ describe('SeriesService', () => {
 
     it('rejects deep pagination', async () => {
       await expect(service.findBooks(reqUser(), 'Test', { page: 10000, size: 100 })).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('content filter enforcement', () => {
+    it('passes contentFilters to findPage for non-superuser', async () => {
+      seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+
+      await service.findAll({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, {});
+
+      expect(seriesRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
+    });
+
+    it('passes undefined to findPage for superuser', async () => {
+      seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+
+      await service.findAll({ ...reqUser(7, true), contentFilters: EMPTY_CONTENT_FILTER_RULES }, {});
+
+      expect(seriesRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
+    });
+
+    it('passes contentFilters to findDetail and findBookIds for non-superuser', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'Dune', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
+
+      await service.findBooks({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 'Dune', {});
+
+      expect(seriesRepo.findDetail).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
+      expect(seriesRepo.findBookIds).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
+    });
+
+    it('passes undefined to findDetail and findBookIds for superuser', async () => {
+      seriesRepo.findDetail.mockResolvedValue({ name: 'Dune', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
+
+      await service.findBooks({ ...reqUser(7, true), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 'Dune', {});
+
+      expect(seriesRepo.findDetail).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
+      expect(seriesRepo.findBookIds).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
     });
   });
 

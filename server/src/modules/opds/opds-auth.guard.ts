@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { Permission } from '@bookorbit/types';
+import type { ContentFilterRules } from '@bookorbit/types';
 import { PermissionService } from '../../common/services/permission.service';
 import { OpdsUserService } from './opds-user.service';
 import { UserService } from '../user/user.service';
@@ -16,6 +17,7 @@ export interface OpdsRequestUser {
   sortOrder: 'recent' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
   isSuperuser: boolean;
   coverToken: string;
+  contentFilters: ContentFilterRules;
 }
 
 export function createCoverToken(userId: number, secret: string): string {
@@ -84,6 +86,7 @@ export class OpdsAuthGuard implements CanActivate {
         sortOrder: 'recent',
         isSuperuser: fullUser.isSuperuser,
         coverToken: tokenParam,
+        contentFilters: fullUser.contentFilters,
       } satisfies OpdsRequestUser;
 
       return true;
@@ -133,6 +136,7 @@ export class OpdsAuthGuard implements CanActivate {
       sortOrder: result.opdsUser.sortOrder,
       isSuperuser: fullUser.isSuperuser,
       coverToken: createCoverToken(result.parentUser.id, secret),
+      contentFilters: fullUser.contentFilters,
     } satisfies OpdsRequestUser;
 
     return true;

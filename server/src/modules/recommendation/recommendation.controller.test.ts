@@ -3,6 +3,7 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { RecommendationController } from './recommendation.controller';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('RecommendationController', () => {
   it('keeps the expected route contract for recommendations endpoint', () => {
@@ -55,6 +56,8 @@ describe('RecommendationController', () => {
       provisioningMethod: 'local',
       isSuperuser: false,
       permissions: [],
+
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
     };
 
     await expect(controller.getRecommendations(10, user)).resolves.toEqual(recommendation);
@@ -81,6 +84,8 @@ describe('RecommendationController', () => {
       provisioningMethod: 'local',
       isSuperuser: false,
       permissions: [],
+
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
     };
 
     await expect(controller.getSeriesBooks(5, user)).resolves.toEqual(seriesBooks);
@@ -107,6 +112,8 @@ describe('RecommendationController', () => {
       provisioningMethod: 'local',
       isSuperuser: false,
       permissions: [],
+
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
     };
 
     await expect(controller.getAuthorBooks(5, user)).resolves.toEqual(authorBooks);

@@ -8,6 +8,7 @@ import { COVER_CUSTOM_FILE_PREFIX, COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER
 import { CoverService } from './cover.service';
 import type { CoverProviderRegistry } from './provider-registry';
 import { DUCKDUCKGO_PROVIDER_KEY, ITUNES_PROVIDER_KEY } from './providers/cover-provider';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('dns/promises', () => ({
   lookup: vi.fn(),
@@ -87,6 +88,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { ChevronDown, X } from 'lucide-vue-next'
+import { X } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
 import type { AuthUser } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
+import ContentFilterChipInput from '@/components/ui/ContentFilterChipInput.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import Badge from '@/components/ui/badge/Badge.vue'
+import { useTagSearchWithIds, useGenreSearchWithIds } from './composables/useContentFilterSearch'
 
 interface Library {
+  id: number
+  name: string
+}
+
+interface NamedItem {
   id: number
   name: string
 }
@@ -55,14 +64,60 @@ const error = ref<string | null>(null)
 const loading = ref(false)
 const libraryAccessOpen = ref(true)
 const permissionGroupOpen = ref<Record<string, boolean>>({})
+const contentFiltersOpen = ref(false)
+
+const includeTagItems = ref<NamedItem[]>([])
+const excludeTagItems = ref<NamedItem[]>([])
+const includeGenreItems = ref<NamedItem[]>([])
+const excludeGenreItems = ref<NamedItem[]>([])
+
+const currentTab = ref<'general' | 'access' | 'restrictions'>('general')
+const restrictionsEnabled = ref(false)
+
+const { search: searchTags } = useTagSearchWithIds()
+const { search: searchGenres } = useGenreSearchWithIds()
 
 const isEdit = computed(() => !!props.user?.id)
+const isSuperuserTarget = computed(() => !!props.user?.isSuperuser)
 const isMobile = useMediaQuery('(max-width: 767px)')
 
-const selectedCountByGroup = computed<Record<string, number>>(() =>
-  Object.fromEntries(
-    PERMISSION_GROUPS.map((group) => [group.label, group.permissions.filter((permName) => selectedPermissionNames.value.has(permName)).length]),
-  ),
+function toggleLibrary(libraryId: number) {
+  if (selectedLibraryIds.value.has(libraryId)) {
+    selectedLibraryIds.value.delete(libraryId)
+  } else {
+    selectedLibraryIds.value.add(libraryId)
+  }
+}
+
+const hasRestrictions = computed(() => {
+  return (
+    includeTagItems.value.length > 0 || excludeTagItems.value.length > 0 || includeGenreItems.value.length > 0 || excludeGenreItems.value.length > 0
+  )
+})
+
+function applyPreset(preset: 'standard' | 'admin' | 'clear') {
+  if (preset === 'clear') {
+    selectedPermissionNames.value.clear()
+  } else if (preset === 'admin') {
+    const all = PERMISSION_GROUPS.flatMap((g) => g.permissions)
+    selectedPermissionNames.value = new Set(all)
+  } else if (preset === 'standard') {
+    selectedPermissionNames.value = new Set([
+      Permission.LibraryDownload,
+      Permission.KoboSync,
+      Permission.KoreaderSync,
+      Permission.OpdsAccess,
+      Permission.BookDockAccess,
+    ])
+  }
+}
+
+watch(
+  hasRestrictions,
+  (val) => {
+    if (val) restrictionsEnabled.value = true
+  },
+  { immediate: true },
 )
 
 watch(
@@ -76,17 +131,33 @@ watch(
     selectedPermissionNames.value = new Set(u?.permissions?.filter((p) => p !== '*') ?? [])
     selectedLibraryIds.value = new Set()
     error.value = null
+    includeTagItems.value = []
+    excludeTagItems.value = []
+    includeGenreItems.value = []
+    excludeGenreItems.value = []
 
     if (u?.id) {
-      const res = await api(`/api/v1/users/${u.id}/libraries`)
-      if (res.ok) {
-        const ids: number[] = await res.json()
+      const [libRes, filtersRes] = await Promise.all([
+        api(`/api/v1/users/${u.id}/libraries`),
+        !u.isSuperuser ? api(`/api/v1/users/${u.id}/content-filters`) : Promise.resolve(null),
+      ])
+      if (libRes.ok) {
+        const ids: number[] = await libRes.json()
         selectedLibraryIds.value = new Set(ids)
+      }
+      if (filtersRes?.ok) {
+        const filters = await filtersRes.json()
+        includeTagItems.value = filters.includeTags ?? []
+        excludeTagItems.value = filters.excludeTags ?? []
+        includeGenreItems.value = filters.includeGenres ?? []
+        excludeGenreItems.value = filters.excludeGenres ?? []
       }
     }
 
     libraryAccessOpen.value = !isMobile.value
     permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.label, !isMobile.value]))
+    contentFiltersOpen.value = false
+    currentTab.value = 'general'
   },
   { immediate: true },
 )
@@ -102,18 +173,6 @@ function togglePermission(permName: string) {
   } else {
     selectedPermissionNames.value.add(permName)
   }
-}
-
-function toggleLibrary(libraryId: number) {
-  if (selectedLibraryIds.value.has(libraryId)) {
-    selectedLibraryIds.value.delete(libraryId)
-  } else {
-    selectedLibraryIds.value.add(libraryId)
-  }
-}
-
-function toggleGroup(label: string) {
-  permissionGroupOpen.value[label] = !permissionGroupOpen.value[label]
 }
 
 async function handleSubmit() {
@@ -154,6 +213,24 @@ async function handleSubmit() {
         const err = await libRes.json().catch(() => ({}))
         error.value = err.message ?? 'Failed to update library access'
         return
+      }
+
+      if (!isSuperuserTarget.value) {
+        const cfRes = await api(`/api/v1/users/${props.user!.id}/content-filters`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            includeTagIds: includeTagItems.value.map((i) => i.id),
+            excludeTagIds: excludeTagItems.value.map((i) => i.id),
+            includeGenreIds: includeGenreItems.value.map((i) => i.id),
+            excludeGenreIds: excludeGenreItems.value.map((i) => i.id),
+          }),
+        })
+        if (!cfRes.ok) {
+          const err = await cfRes.json().catch(() => ({}))
+          error.value = err.message ?? 'Failed to update content filters'
+          return
+        }
       }
     } else {
       if (!isSharedAccount.value && !trimmedEmail) {
@@ -214,84 +291,92 @@ async function handleSubmit() {
   <div class="fixed inset-0 z-[60] flex" @click.self="emit('close')">
     <div class="fixed inset-0 bg-black/40" @click="emit('close')" />
     <div class="relative ml-auto flex h-full w-full max-w-md flex-col bg-card shadow-xl">
-      <div class="flex items-center justify-between border-b border-border px-6 py-4">
-        <h2 class="text-base font-semibold text-foreground">
-          {{ isEdit ? 'Edit User' : isSharedAccount ? 'Create Shared Account' : 'Create User' }}
-        </h2>
+      <div class="flex items-center justify-between px-6 pt-5 pb-4">
+        <div class="flex items-center gap-3">
+          <h2 class="text-base font-semibold text-foreground">
+            {{ isEdit ? name || username || 'Edit User' : isSharedAccount ? 'Create Shared Account' : 'Create User' }}
+          </h2>
+          <Badge
+            v-if="isSharedAccount"
+            variant="secondary"
+            class="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+            >Shared</Badge
+          >
+          <div v-if="isEdit" class="flex items-center gap-2">
+            <ToggleSwitch v-model="active" />
+            <span class="text-xs text-muted-foreground">{{ active ? 'Active' : 'Suspended' }}</span>
+          </div>
+        </div>
         <button @click="emit('close')" class="text-muted-foreground hover:text-foreground">
           <X :size="16" />
         </button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto space-y-5 px-6 py-6">
-        <!-- Shared account toggle (create only) -->
-        <div v-if="!isEdit" class="rounded-md border border-border px-4 py-3">
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input id="isShared" v-model="isSharedAccount" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input" />
-            <div>
-              <p class="text-sm font-medium text-foreground">Shared account</p>
-              <p class="text-xs text-muted-foreground mt-0.5">No password. Access is granted via magic links only.</p>
-            </div>
-          </label>
-        </div>
-        <div v-else-if="isSharedAccount" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-          <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">Shared account</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Manage login links from Settings - Magic Links.</p>
-        </div>
-        <!-- Basic info -->
-        <div v-if="!isEdit" class="space-y-1.5">
-          <label class="settings-label">Username</label>
-          <input
-            v-model="username"
-            type="text"
-            required
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
+      <div class="px-6 border-b border-border flex gap-6">
+        <button
+          type="button"
+          v-for="tab in ['general', 'access', 'restrictions'] as const"
+          :key="tab"
+          class="pb-3 text-sm font-medium border-b-2 transition-colors capitalize"
+          :class="currentTab === tab ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+          @click="currentTab = tab"
+        >
+          {{ tab }}
+        </button>
+      </div>
 
-        <div class="space-y-1.5">
-          <label class="settings-label">Full name</label>
-          <input
-            v-model="name"
-            type="text"
-            required
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label class="settings-label">
-            Email
-            <span v-if="isSharedAccount && !isEdit" class="text-muted-foreground font-normal">(optional)</span>
-          </label>
-          <input
-            v-model="email"
-            type="email"
-            :required="!isEdit && !isSharedAccount"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
-
-        <div v-if="isEdit" class="flex items-center gap-3">
-          <input id="active" v-model="active" type="checkbox" class="h-4 w-4 rounded border-input" />
-          <label for="active" class="settings-label">Active</label>
-        </div>
-
-        <!-- Library access -->
-        <div v-if="libraries.length > 0" class="space-y-2">
-          <div class="rounded-md border border-border">
-            <button
-              type="button"
-              class="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
-              @click="libraryAccessOpen = !libraryAccessOpen"
-            >
+      <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+        <div v-if="currentTab === 'general'" class="space-y-5">
+          <div v-if="!isEdit" class="rounded-md border border-border px-4 py-3">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input id="isShared" v-model="isSharedAccount" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input" />
               <div>
-                <p class="settings-label">Library access</p>
-                <p class="text-xs text-muted-foreground">{{ selectedLibraryIds.size }} selected</p>
+                <p class="text-sm font-medium text-foreground">Shared account</p>
+                <p class="text-xs text-muted-foreground mt-0.5">No password. Access is granted via magic links only.</p>
               </div>
-              <ChevronDown :size="15" class="text-muted-foreground transition-transform" :class="libraryAccessOpen ? 'rotate-180' : ''" />
-            </button>
-            <div v-if="libraryAccessOpen" class="px-3 pb-3 space-y-1.5">
+            </label>
+          </div>
+          <div v-else-if="isSharedAccount" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">Shared account</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Manage login links from Settings - Magic Links.</p>
+          </div>
+
+          <div v-if="!isEdit" class="space-y-1.5">
+            <label class="settings-label">Username</label>
+            <input
+              v-model="username"
+              type="text"
+              required
+              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <label class="settings-label">Full name</label>
+            <input
+              v-model="name"
+              type="text"
+              required
+              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <label class="settings-label">
+              Email
+              <span v-if="isSharedAccount && !isEdit" class="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <input
+              v-model="email"
+              type="email"
+              :required="!isEdit && !isSharedAccount"
+              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+        </div>
+
+        <div v-if="currentTab === 'access'" class="space-y-6">
+          <div v-if="libraries.length > 0" class="space-y-3">
+            <label class="settings-label">Library Access</label>
+            <div class="space-y-1.5 rounded-md border border-border p-3">
               <label v-for="lib in libraries" :key="lib.id" class="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
@@ -302,51 +387,117 @@ async function handleSubmit() {
                 <span class="text-sm text-foreground">{{ lib.name }}</span>
               </label>
             </div>
+            <p v-if="selectedLibraryIds.size === 0" class="text-xs text-muted-foreground">No libraries selected. User cannot view any books.</p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="settings-label">Permissions</label>
+              <div class="flex items-center gap-2">
+                <button type="button" @click="applyPreset('standard')" class="text-xs text-muted-foreground hover:text-foreground">Standard</button>
+                <span class="text-muted-foreground/30">•</span>
+                <button type="button" @click="applyPreset('admin')" class="text-xs text-muted-foreground hover:text-foreground">Admin</button>
+                <span class="text-muted-foreground/30">•</span>
+                <button type="button" @click="applyPreset('clear')" class="text-xs text-muted-foreground hover:text-foreground">Clear All</button>
+              </div>
+            </div>
+
+            <div class="space-y-5">
+              <div v-for="group in PERMISSION_GROUPS" :key="group.label" class="space-y-2">
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ group.label }}</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <label v-for="permName in group.permissions" :key="permName" class="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      :checked="selectedPermissionNames.has(permName)"
+                      @change="togglePermission(permName)"
+                      class="mt-0.5 h-4 w-4 rounded border-input"
+                    />
+                    <span class="text-sm text-foreground leading-tight">{{ PERMISSION_LABELS[permName] ?? permName }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Permissions grouped -->
-        <div class="space-y-4">
-          <p class="settings-label">Permissions</p>
-          <div v-for="group in PERMISSION_GROUPS" :key="group.label" class="rounded-md border border-border">
-            <button
-              type="button"
-              class="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
-              @click="toggleGroup(group.label)"
-            >
-              <div>
-                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ group.label }}</p>
-                <p class="text-xs text-muted-foreground">{{ selectedCountByGroup[group.label] ?? 0 }} selected</p>
-              </div>
-              <ChevronDown
-                :size="15"
-                class="text-muted-foreground transition-transform"
-                :class="permissionGroupOpen[group.label] ? 'rotate-180' : ''"
-              />
-            </button>
-            <div v-if="permissionGroupOpen[group.label]" class="px-3 pb-3 space-y-1">
-              <label v-for="permName in group.permissions" :key="permName" class="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  :checked="selectedPermissionNames.has(permName)"
-                  @change="togglePermission(permName)"
-                  class="h-4 w-4 rounded border-input"
-                />
-                <span class="text-sm text-foreground">{{ PERMISSION_LABELS[permName] ?? permName }}</span>
-              </label>
-            </div>
+        <div v-if="currentTab === 'restrictions'" class="space-y-5">
+          <div v-if="isSuperuserTarget" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">Superuser Target</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Content restrictions cannot be applied to superusers.</p>
           </div>
+          <template v-else>
+            <div
+              v-if="!restrictionsEnabled"
+              class="rounded-md border border-dashed border-border px-4 py-8 text-center flex flex-col items-center gap-3"
+            >
+              <div class="space-y-1">
+                <p class="text-sm font-medium text-foreground">No content restrictions</p>
+                <p class="text-xs text-muted-foreground">This user has full access to all books in their assigned libraries.</p>
+              </div>
+              <button
+                type="button"
+                @click="restrictionsEnabled = true"
+                class="text-xs font-medium text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-md transition-colors"
+              >
+                + Add Content Restrictions
+              </button>
+            </div>
+            <div v-else class="space-y-5">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-foreground">Content Restrictions</p>
+                <button
+                  type="button"
+                  v-if="!hasRestrictions"
+                  @click="restrictionsEnabled = false"
+                  class="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Remove
+                </button>
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-foreground"
+                  >Include tags <span class="text-muted-foreground font-normal">(show only books with these tags)</span></label
+                >
+                <ContentFilterChipInput v-model="includeTagItems" placeholder="Search tags..." :search-fn="searchTags" />
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-foreground"
+                  >Exclude tags <span class="text-muted-foreground font-normal">(hide books with these tags)</span></label
+                >
+                <ContentFilterChipInput v-model="excludeTagItems" placeholder="Search tags..." :search-fn="searchTags" />
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-foreground"
+                  >Include genres <span class="text-muted-foreground font-normal">(show only books with these genres)</span></label
+                >
+                <ContentFilterChipInput v-model="includeGenreItems" placeholder="Search genres..." :search-fn="searchGenres" />
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-foreground"
+                  >Exclude genres <span class="text-muted-foreground font-normal">(hide books with these genres)</span></label
+                >
+                <ContentFilterChipInput v-model="excludeGenreItems" placeholder="Search genres..." :search-fn="searchGenres" />
+              </div>
+            </div>
+          </template>
         </div>
 
         <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
       </form>
 
-      <div class="border-t border-border px-6 py-4 flex gap-3 justify-end">
-        <button @click="emit('close')" class="rounded-md border border-border px-4 py-2 settings-label hover:bg-muted transition-colors">
+      <div class="border-t border-border px-6 py-4 flex gap-3 justify-end mt-auto bg-card">
+        <button
+          @click="emit('close')"
+          type="button"
+          class="rounded-md border border-border px-4 py-2 settings-label hover:bg-muted transition-colors"
+        >
           Cancel
         </button>
         <button
           @click="handleSubmit"
+          type="button"
           :disabled="loading"
           class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >

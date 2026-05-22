@@ -2,6 +2,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { EmailSendController } from './email-send.controller';
 import type { SendBookDto } from './dto/send-book.dto';
 import { EmailSendOrchestrator } from './email-send-orchestrator.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailSendController', () => {
   const user: RequestUser = {
@@ -17,6 +18,8 @@ describe('EmailSendController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const orchestrator = {

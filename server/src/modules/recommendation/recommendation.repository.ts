@@ -2,9 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq, inArray, ne, and, isNotNull, sql, asc, desc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { ContentFilterRules } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, books, genres, tags } from '../../db/schema';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 const ANN_CANDIDATE_FETCH_LIMIT = 100;
@@ -81,10 +83,16 @@ export class RecommendationRepository {
     return row?.seriesName?.trim() || null;
   }
 
-  async findAnnCandidates(embedding: number[], targetBookId: number, libraryIds: number[]): Promise<AnnCandidate[]> {
+  async findAnnCandidates(
+    embedding: number[],
+    targetBookId: number,
+    libraryIds: number[],
+    contentFilters?: ContentFilterRules,
+  ): Promise<AnnCandidate[]> {
     if (libraryIds.length === 0 || embedding.length === 0 || embedding.some((v) => !Number.isFinite(v))) return [];
 
     const vecStr = `[${embedding.join(',')}]`;
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     return this.db
       .select({
@@ -95,7 +103,7 @@ export class RecommendationRepository {
       })
       .from(bookMetadata)
       .innerJoin(books, eq(books.id, bookMetadata.bookId))
-      .where(and(inArray(books.libraryId, libraryIds), ne(bookMetadata.bookId, targetBookId), isNotNull(bookMetadata.embedding)))
+      .where(and(inArray(books.libraryId, libraryIds), ne(bookMetadata.bookId, targetBookId), isNotNull(bookMetadata.embedding), ...filterClauses))
       .orderBy(sql`${bookMetadata.embedding} <=> ${vecStr}::vector`)
       .limit(ANN_CANDIDATE_FETCH_LIMIT);
   }
@@ -131,10 +139,11 @@ export class RecommendationRepository {
     }));
   }
 
-  async findSeriesBooks(seriesName: string, libraryIds: number[]): Promise<SeriesBookRow[]> {
+  async findSeriesBooks(seriesName: string, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<SeriesBookRow[]> {
     if (libraryIds.length === 0 || !seriesName.trim()) return [];
 
     const normalized = seriesName.trim().toLowerCase();
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     const rows = await this.db
       .select({
@@ -145,7 +154,7 @@ export class RecommendationRepository {
       })
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(inArray(books.libraryId, libraryIds), sql`lower(trim(${bookMetadata.seriesName})) = ${normalized}`))
+      .where(and(inArray(books.libraryId, libraryIds), sql`lower(trim(${bookMetadata.seriesName})) = ${normalized}`, ...filterClauses))
       .orderBy(sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, asc(bookMetadata.title), asc(books.id))
       .limit(SERIES_BOOKS_LIMIT);
 
@@ -164,10 +173,11 @@ export class RecommendationRepository {
     return rows.map((r) => ({ ...r, authorNames: authorsByBook.get(r.bookId) ?? [] }));
   }
 
-  async findAuthorBooks(bookId: number, libraryIds: number[]): Promise<AuthorBookRow[]> {
+  async findAuthorBooks(bookId: number, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<AuthorBookRow[]> {
     if (libraryIds.length === 0) return [];
 
     const authorIds = this.db.select({ authorId: bookAuthors.authorId }).from(bookAuthors).where(eq(bookAuthors.bookId, bookId));
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     const rows = await this.db
       .select({
@@ -179,7 +189,7 @@ export class RecommendationRepository {
       .from(bookAuthors)
       .innerJoin(books, eq(books.id, bookAuthors.bookId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(inArray(bookAuthors.authorId, authorIds), inArray(books.libraryId, libraryIds), ne(books.id, bookId)))
+      .where(and(inArray(bookAuthors.authorId, authorIds), inArray(books.libraryId, libraryIds), ne(books.id, bookId), ...filterClauses))
       .groupBy(books.id, bookMetadata.title, bookMetadata.coverSource)
       .orderBy(desc(sql`shared_authors`), asc(bookMetadata.title), asc(books.id))
       .limit(AUTHOR_BOOKS_LIMIT);

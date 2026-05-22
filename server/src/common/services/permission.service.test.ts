@@ -2,6 +2,7 @@ import { Permission } from '@bookorbit/types';
 import type { RequestUser } from '../types/request-user';
 
 import { PermissionService } from './permission.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -18,6 +19,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [Permission.LibraryDownload],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -47,7 +50,7 @@ describe('PermissionService', () => {
   });
 
   it('returns false instead of throwing when permissions are missing from a malformed runtime user payload', () => {
-    const malformedUser = { ...makeUser(), permissions: undefined } as unknown as RequestUser;
+    const malformedUser = { ...makeUser(), permissions: undefined, contentFilters: EMPTY_CONTENT_FILTER_RULES } as unknown as RequestUser;
 
     expect(() => service.userHas(malformedUser, Permission.LibraryDownload)).not.toThrow();
     expect(service.userHas(malformedUser, Permission.LibraryDownload)).toBe(false);

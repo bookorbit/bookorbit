@@ -10,6 +10,7 @@ import { Permission } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 const mockCompare = vi.mocked(compare);
 const mockCreateHash = vi.mocked(createHash);
@@ -34,6 +35,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [Permission.KoreaderSync],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

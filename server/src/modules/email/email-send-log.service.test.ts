@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailSendLogService, MAX_SEND_ATTEMPTS } from './email-send-log.service';
 import { EmailSendLogRepository } from './email-send-log.repository';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailSendLogService', () => {
   let service: EmailSendLogService;
@@ -21,6 +22,8 @@ describe('EmailSendLogService', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockLog = { id: 10, userId: 1, toEmail: 'test@test.com', status: 'pending', attemptCount: 0 };

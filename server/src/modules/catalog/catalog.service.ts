@@ -8,7 +8,9 @@ import { authors, bookMetadata, collections, genres, narrators, tags } from '../
 
 type Db = NodePgDatabase<typeof schema>;
 type SearchResult = { name: string };
+type SearchResultWithId = { id: number; name: string };
 type NamedTable = typeof authors | typeof genres | typeof tags | typeof narrators;
+type NamedTableWithId = typeof genres | typeof tags;
 type MetadataTextColumn = typeof bookMetadata.publisher | typeof bookMetadata.seriesName | typeof bookMetadata.language;
 
 const DEFAULT_SEARCH_LIMIT = 15;
@@ -23,12 +25,12 @@ export class CatalogService {
     return this.searchByName(q, authors);
   }
 
-  searchGenres(q: string): Promise<SearchResult[]> {
-    return this.searchByName(q, genres);
+  searchGenres(q: string): Promise<SearchResultWithId[]> {
+    return this.searchByNameWithId(q, genres);
   }
 
-  searchTags(q: string): Promise<SearchResult[]> {
-    return this.searchByName(q, tags);
+  searchTags(q: string): Promise<SearchResultWithId[]> {
+    return this.searchByNameWithId(q, tags);
   }
 
   searchNarrators(q: string): Promise<SearchResult[]> {
@@ -64,6 +66,18 @@ export class CatalogService {
     if (!pattern) return Promise.resolve([]);
 
     return this.db.select({ name: table.name }).from(table).where(ilike(table.name, pattern)).orderBy(table.name).limit(DEFAULT_SEARCH_LIMIT);
+  }
+
+  private searchByNameWithId(q: string, table: NamedTableWithId): Promise<SearchResultWithId[]> {
+    const pattern = this.toContainsPattern(q);
+    if (!pattern) return Promise.resolve([]);
+
+    return this.db
+      .select({ id: table.id, name: table.name })
+      .from(table)
+      .where(ilike(table.name, pattern))
+      .orderBy(table.name)
+      .limit(DEFAULT_SEARCH_LIMIT);
   }
 
   private async searchDistinctMetadataField(q: string, column: MetadataTextColumn): Promise<SearchResult[]> {

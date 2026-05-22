@@ -7,6 +7,7 @@ import { AnnotationResponseDto } from './dto/annotation-response.dto';
 import type { CreateAnnotationDto } from './dto/create-annotation.dto';
 import type { UpdateAnnotationDto } from './dto/update-annotation.dto';
 import type { AnnotationQueryDto } from './dto/annotation-query.dto';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides?: Partial<RequestUser>): RequestUser {
   return {
@@ -23,6 +24,8 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

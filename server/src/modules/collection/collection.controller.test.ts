@@ -6,6 +6,7 @@ import type { BookQuery } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { CollectionController } from './collection.controller';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 const USER: RequestUser = {
   id: 1,
@@ -20,6 +21,8 @@ const USER: RequestUser = {
   provisioningMethod: 'local',
   isSuperuser: false,
   permissions: [],
+
+  contentFilters: EMPTY_CONTENT_FILTER_RULES,
 };
 
 function makeController() {

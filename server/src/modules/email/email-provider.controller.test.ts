@@ -7,6 +7,7 @@ import type { CreateEmailProviderDto } from './dto/create-email-provider.dto';
 import type { UpdateEmailProviderDto } from './dto/update-email-provider.dto';
 import { EmailProviderService } from './email-provider.service';
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailProviderController', () => {
   const user: RequestUser = {
@@ -22,6 +23,8 @@ describe('EmailProviderController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const service = {

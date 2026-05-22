@@ -6,6 +6,7 @@ import { EmailRecipientController } from './email-recipient.controller';
 import type { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
 import type { UpdateEmailRecipientDto } from './dto/update-email-recipient.dto';
 import { EmailRecipientService } from './email-recipient.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailRecipientController', () => {
   const user: RequestUser = {
@@ -21,6 +22,8 @@ describe('EmailRecipientController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const service = {

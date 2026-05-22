@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { RecommendationService } from './recommendation.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(isSuperuser = false): RequestUser {
   return {
@@ -17,6 +18,8 @@ function makeUser(isSuperuser = false): RequestUser {
     avatarUrl: null,
     provisioningMethod: 'local',
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -84,7 +87,7 @@ describe('RecommendationService', () => {
 
     await expect(service.getRecommendations(55, makeUser())).resolves.toEqual([{ id: 91, title: 'Fallback Match', hasCover: false, authors: [] }]);
     expect(embedder.embedBook).toHaveBeenCalledWith(55);
-    expect(recRepo.findAnnCandidates).toHaveBeenCalledWith([0.4, 0.6], 55, [7, 9]);
+    expect(recRepo.findAnnCandidates).toHaveBeenCalledWith([0.4, 0.6], 55, [7, 9], EMPTY_CONTENT_FILTER_RULES);
   });
 
   it('returns empty recommendations when fallback embedding is invalid', async () => {
@@ -299,7 +302,7 @@ describe('RecommendationService', () => {
         { id: 2, title: 'Words of Radiance', seriesIndex: 2, hasCover: false, authors: [] },
         { id: 3, title: 'Oathbringer', seriesIndex: 3, hasCover: true, authors: ['Brandon Sanderson'] },
       ]);
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Stormlight Archive', [5, 6]);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Stormlight Archive', [5, 6], EMPTY_CONTENT_FILTER_RULES);
     });
 
     it('uses findAccessibleLibraryIds instead of findAll', async () => {
@@ -349,7 +352,7 @@ describe('RecommendationService', () => {
         { id: 10, title: 'Other Book A', hasCover: true, authors: ['Jane Austen'] },
         { id: 20, title: 'Other Book B', hasCover: false, authors: [] },
       ]);
-      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5]);
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], EMPTY_CONTENT_FILTER_RULES);
     });
 
     it('returns empty array when author has no other books', async () => {
@@ -373,6 +376,96 @@ describe('RecommendationService', () => {
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }));
       expect(libraryService.findAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('content filter enforcement', () => {
+    it('passes contentFilters to findAnnCandidates for non-superuser', async () => {
+      const { service, recRepo, bookRepo, libraryService } = makeService();
+      const filters = { includeTagIds: [10], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [] };
+      const user: RequestUser = { ...makeUser(false), contentFilters: filters };
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(3);
+      recRepo.getTargetBookData.mockResolvedValue({ embedding: [0.5], seriesName: null, rating: null, authorNames: [], genreTagNames: [] });
+      libraryService.findAll.mockResolvedValue([{ id: 7 }]);
+      recRepo.findAnnCandidates.mockResolvedValue([]);
+
+      await service.getRecommendations(1, user);
+
+      expect(recRepo.findAnnCandidates).toHaveBeenCalledWith([0.5], 1, [7], filters);
+    });
+
+    it('passes undefined to findAnnCandidates for superuser (bypasses filters)', async () => {
+      const { service, recRepo, bookRepo, libraryService } = makeService();
+      const filters = { includeTagIds: [10], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [] };
+      const user: RequestUser = { ...makeUser(true), contentFilters: filters };
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(3);
+      recRepo.getTargetBookData.mockResolvedValue({ embedding: [0.5], seriesName: null, rating: null, authorNames: [], genreTagNames: [] });
+      libraryService.findAll.mockResolvedValue([{ id: 7 }]);
+      recRepo.findAnnCandidates.mockResolvedValue([]);
+
+      await service.getRecommendations(1, user);
+
+      expect(recRepo.findAnnCandidates).toHaveBeenCalledWith([0.5], 1, [7], undefined);
+    });
+
+    it('passes contentFilters to findSeriesBooks for non-superuser', async () => {
+      const { service, recRepo, bookRepo, libraryService } = makeService();
+      const filters = { includeTagIds: [], excludeTagIds: [5], includeGenreIds: [], excludeGenreIds: [] };
+      const user: RequestUser = { ...makeUser(false), contentFilters: filters };
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      recRepo.getSeriesName.mockResolvedValue('Wheel of Time');
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findSeriesBooks.mockResolvedValue([]);
+
+      await service.getSeriesBooks(1, user);
+
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Wheel of Time', [5], filters);
+    });
+
+    it('passes undefined to findSeriesBooks for superuser', async () => {
+      const { service, recRepo, bookRepo, libraryService } = makeService();
+      const filters = { includeTagIds: [], excludeTagIds: [5], includeGenreIds: [], excludeGenreIds: [] };
+      const user: RequestUser = { ...makeUser(true), contentFilters: filters };
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      recRepo.getSeriesName.mockResolvedValue('Wheel of Time');
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findSeriesBooks.mockResolvedValue([]);
+
+      await service.getSeriesBooks(1, user);
+
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Wheel of Time', [5], undefined);
+    });
+
+    it('passes contentFilters to findAuthorBooks for non-superuser', async () => {
+      const { service, recRepo, bookRepo, libraryService } = makeService();
+      const filters = { includeTagIds: [], excludeTagIds: [], includeGenreIds: [3], excludeGenreIds: [] };
+      const user: RequestUser = { ...makeUser(false), contentFilters: filters };
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findAuthorBooks.mockResolvedValue([]);
+
+      await service.getAuthorBooks(1, user);
+
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], filters);
+    });
+
+    it('passes undefined to findAuthorBooks for superuser', async () => {
+      const { service, recRepo, bookRepo, libraryService } = makeService();
+      const filters = { includeTagIds: [], excludeTagIds: [], includeGenreIds: [3], excludeGenreIds: [] };
+      const user: RequestUser = { ...makeUser(true), contentFilters: filters };
+
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
+      recRepo.findAuthorBooks.mockResolvedValue([]);
+
+      await service.getAuthorBooks(1, user);
+
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], undefined);
     });
   });
 });

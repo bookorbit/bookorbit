@@ -2,9 +2,10 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { GroupRule, ReadStatus, Rule, SortSpec } from '@bookorbit/types';
+import type { ContentFilterRules, GroupRule, ReadStatus, Rule, SortSpec } from '@bookorbit/types';
 import { DB } from '../../db';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import * as schema from '../../db/schema';
 import { BookSortBuilder } from './book-sort-builder.service';
 import {
@@ -38,7 +39,14 @@ export class BookQueryBuilder {
 
   buildWhere(
     filter: GroupRule | null | undefined,
-    ctx: { accessibleLibraryIds: number[]; implicitLibraryId?: number; userId?: number; q?: string; timeZone?: string },
+    ctx: {
+      accessibleLibraryIds: number[];
+      implicitLibraryId?: number;
+      userId?: number;
+      q?: string;
+      timeZone?: string;
+      contentFilters?: ContentFilterRules;
+    },
   ): SQL | undefined {
     if (ctx.accessibleLibraryIds.length === 0) {
       return sql`1 = 0`;
@@ -57,6 +65,10 @@ export class BookQueryBuilder {
 
     if (ctx.q?.trim()) {
       clauses.push(this.buildQuickSearch(ctx.q.trim()));
+    }
+
+    if (ctx.contentFilters) {
+      clauses.push(...buildContentFilterClauses(ctx.contentFilters, this.db));
     }
 
     return and(...clauses);

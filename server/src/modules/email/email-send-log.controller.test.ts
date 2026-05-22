@@ -3,6 +3,7 @@ import { EmailSendLogController } from './email-send-log.controller';
 import { EmailSendLogService } from './email-send-log.service';
 import type { QuerySendLogDto } from './dto/query-send-log.dto';
 import { EmailSendOrchestrator } from './email-send-orchestrator.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailSendLogController', () => {
   const user: RequestUser = {
@@ -18,6 +19,8 @@ describe('EmailSendLogController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const logService = {

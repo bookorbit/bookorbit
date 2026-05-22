@@ -4,6 +4,7 @@ import type { EntityType } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { EntityManagerService } from './entity-manager.service';
 import type { EntityStrategy, RawCandidatePair } from './strategies/entity-strategy.interface';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function mockStrategy(overrides: Partial<EntityStrategy> & { entityType: EntityType; isInline: boolean }): EntityStrategy {
   return {
@@ -90,7 +91,7 @@ function makeService() {
   };
 }
 
-const mockUser: RequestUser = { id: 1, username: 'test', isSuperuser: false, permissions: [] };
+const mockUser: RequestUser = { id: 1, username: 'test', isSuperuser: false, permissions: [], contentFilters: EMPTY_CONTENT_FILTER_RULES };
 
 describe('EntityManagerService', () => {
   describe('getStrategy', () => {
@@ -522,6 +523,7 @@ describe('EntityManagerService', () => {
         pageSize: 25,
         sortBy: 'name',
         sortOrder: 'asc',
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
@@ -542,6 +544,7 @@ describe('EntityManagerService', () => {
         pageSize: 50,
         sortBy: 'bookCount',
         sortOrder: 'desc',
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
     });
   });

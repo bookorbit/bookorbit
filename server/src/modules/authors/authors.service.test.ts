@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('../book/utils/assemble-book-cards', () => ({
   assembleBookCards: vi.fn(),
@@ -10,7 +11,7 @@ import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorsService } from './authors.service';
 
 function reqUser(id = 7, superuser = false) {
-  return { id, isSuperuser: superuser, permissions: [] } as any;
+  return { id, isSuperuser: superuser, permissions: [], contentFilters: undefined } as any;
 }
 
 describe('AuthorsService', () => {
@@ -285,6 +286,7 @@ describe('AuthorsService', () => {
       libraryIds: [1, 2],
       hasPhoto: undefined,
       minBookCount: undefined,
+      contentFilters: undefined,
     });
     expect(page.items[0]).toEqual(
       expect.objectContaining({
@@ -342,6 +344,7 @@ describe('AuthorsService', () => {
         size: 10,
         page: 0,
         libraryIds: expect.arrayContaining([2]),
+        contentFilters: undefined,
       }),
     );
   });
@@ -368,7 +371,9 @@ describe('AuthorsService', () => {
 
     await service.findBooks(reqUser(), 7, {});
 
-    expect(authorsRepo.findBookIdsPage).toHaveBeenCalledWith(expect.objectContaining({ sort: 'addedAt', order: 'desc', page: 0, size: 50 }));
+    expect(authorsRepo.findBookIdsPage).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'addedAt', order: 'desc', page: 0, size: 50, contentFilters: undefined }),
+    );
   });
 
   it('findBooks scopes results to user-accessible libraries only', async () => {
@@ -378,7 +383,45 @@ describe('AuthorsService', () => {
 
     await service.findBooks(reqUser(), 8, {});
 
-    expect(authorsRepo.findBookIdsPage).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [3] }));
+    expect(authorsRepo.findBookIdsPage).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [3], contentFilters: undefined }));
+  });
+
+  describe('content filter enforcement', () => {
+    it('passes contentFilters to findPage for non-superuser', async () => {
+      authorsRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+
+      await service.findAll({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, {});
+
+      expect(authorsRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
+    });
+
+    it('passes undefined to findPage for superuser', async () => {
+      authorsRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+
+      await service.findAll({ ...reqUser(7, true), contentFilters: EMPTY_CONTENT_FILTER_RULES }, {});
+
+      expect(authorsRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
+    });
+
+    it('passes contentFilters to findById and findBookIdsPage for non-superuser', async () => {
+      authorsRepo.findById.mockResolvedValue({ id: 10, name: 'Author', sortName: null, description: null, bookCount: 0, lastAddedAt: null });
+      authorsRepo.findBookIdsPage.mockResolvedValue({ bookIds: [], total: 0, page: 0, size: 50 });
+
+      await service.findBooks({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 10, {});
+
+      expect(authorsRepo.findById).toHaveBeenCalledWith(10, [1, 2], EMPTY_CONTENT_FILTER_RULES);
+      expect(authorsRepo.findBookIdsPage).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
+    });
+
+    it('passes undefined to findById and findBookIdsPage for superuser', async () => {
+      authorsRepo.findById.mockResolvedValue({ id: 10, name: 'Author', sortName: null, description: null, bookCount: 0, lastAddedAt: null });
+      authorsRepo.findBookIdsPage.mockResolvedValue({ bookIds: [], total: 0, page: 0, size: 50 });
+
+      await service.findBooks({ ...reqUser(7, true), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 10, {});
+
+      expect(authorsRepo.findById).toHaveBeenCalledWith(10, [1, 2], undefined);
+      expect(authorsRepo.findBookIdsPage).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
+    });
   });
 
   it('returns metadata providers directly from the metadata fetch service', () => {

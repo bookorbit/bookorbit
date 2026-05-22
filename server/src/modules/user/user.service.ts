@@ -6,9 +6,11 @@ import { Permission } from '@bookorbit/types';
 import type { UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { ContentFilterRepository } from './content-filter.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSharedUserDto } from './dto/create-shared-user.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
+import { SetContentFiltersDto } from './dto/set-content-filters.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
@@ -20,6 +22,7 @@ export class UserService {
   constructor(
     private readonly userRepo: UserRepository,
     private readonly config: ConfigService,
+    private readonly contentFilterRepo: ContentFilterRepository,
   ) {}
 
   findByUsername(username: string) {
@@ -327,5 +330,32 @@ export class UserService {
     }
 
     await this.userRepo.update(userId, { settings: { seriesCollapsePreferences: merged } });
+  }
+
+  async getContentFilters(targetUserId: number, requestingUser: RequestUser) {
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
+    if (targetUserId !== requestingUser.id && !requestingUser.isSuperuser) {
+      throw new ForbiddenException('Cannot view another user content filters');
+    }
+    return this.contentFilterRepo.findByUserIdWithNames(targetUserId);
+  }
+
+  async setContentFilters(targetUserId: number, dto: SetContentFiltersDto, requestingUser: RequestUser) {
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
+    if (!requestingUser.isSuperuser) {
+      throw new ForbiddenException('Only administrators can set content filters');
+    }
+    if (target.isSuperuser) {
+      throw new BadRequestException('Content filters cannot be applied to administrators');
+    }
+    const filters = {
+      includeTagIds: dto.includeTagIds ?? [],
+      excludeTagIds: dto.excludeTagIds ?? [],
+      includeGenreIds: dto.includeGenreIds ?? [],
+      excludeGenreIds: dto.excludeGenreIds ?? [],
+    };
+    await this.contentFilterRepo.replaceFilters(targetUserId, filters);
   }
 }

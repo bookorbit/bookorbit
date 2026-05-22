@@ -45,16 +45,17 @@ export class DashboardService {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     if (accessibleLibraryIds.length === 0) return [];
 
+    const contentFilters = user.isSuperuser ? undefined : user.contentFilters;
     let bookIds: number[];
     switch (type) {
       case ScrollerType.RECENTLY_ADDED:
-        bookIds = await this.dashboardRepo.findRecentlyAddedBookIds(accessibleLibraryIds, clampedLimit);
+        bookIds = await this.dashboardRepo.findRecentlyAddedBookIds(accessibleLibraryIds, clampedLimit, contentFilters);
         break;
       case ScrollerType.CONTINUE_READING:
-        bookIds = await this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit);
+        bookIds = await this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
         break;
       case ScrollerType.RANDOM:
-        bookIds = await this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit);
+        bookIds = await this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
         break;
     }
 

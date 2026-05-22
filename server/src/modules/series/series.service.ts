@@ -46,6 +46,7 @@ export class SeriesService {
       userId: user.id,
       completionStatus: dto.completionStatus,
       author: dto.author,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 
     const items: SeriesSummary[] = result.items.map((row) => ({
@@ -71,7 +72,12 @@ export class SeriesService {
     }
 
     const [detail, bookPage] = await Promise.all([
-      this.seriesRepo.findDetail({ seriesName, userId: user.id, libraryIds }),
+      this.seriesRepo.findDetail({
+        seriesName,
+        userId: user.id,
+        libraryIds,
+        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+      }),
       this.seriesRepo.findBookIds({
         seriesName,
         page,
@@ -79,13 +85,19 @@ export class SeriesService {
         sort: dto.sort ?? 'seriesIndex',
         order: dto.order ?? 'asc',
         libraryIds,
+        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
       }),
     ]);
 
     if (!detail) {
       if (dto.libraryId) {
         const allLibraryIds = await this.resolveLibraryIds(user);
-        const existsInAnyLibrary = await this.seriesRepo.findDetail({ seriesName, userId: user.id, libraryIds: allLibraryIds });
+        const existsInAnyLibrary = await this.seriesRepo.findDetail({
+          seriesName,
+          userId: user.id,
+          libraryIds: allLibraryIds,
+          contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+        });
         if (existsInAnyLibrary) {
           const emptyInfo: SeriesDetail = {
             name: existsInAnyLibrary.name,

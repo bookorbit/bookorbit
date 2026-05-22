@@ -17,6 +17,8 @@ vi.mock('drizzle-orm', () => {
     lte: vi.fn((left: unknown, right: unknown) => ({ type: 'lte', left, right })),
     ilike: vi.fn((left: unknown, pattern: string) => ({ type: 'ilike', left, pattern })),
     inArray: vi.fn((left: unknown, right: unknown) => ({ type: 'inArray', left, right })),
+    exists: vi.fn((subquery: unknown) => ({ type: 'exists', subquery })),
+    notExists: vi.fn((subquery: unknown) => ({ type: 'notExists', subquery })),
     isNull: vi.fn((value: unknown) => ({ type: 'isNull', value })),
     isNotNull: vi.fn((value: unknown) => ({ type: 'isNotNull', value })),
     not: vi.fn((value: unknown) => ({ type: 'not', value })),
@@ -27,7 +29,7 @@ vi.mock('drizzle-orm', () => {
 import { BadRequestException } from '@nestjs/common';
 import { ilike, sql } from 'drizzle-orm';
 
-import { FIELD_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, FIELD_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
 
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
@@ -144,6 +146,45 @@ describe('BookQueryBuilder', () => {
     expect(where.clauses).toHaveLength(3);
     expect(where.clauses[2]).toMatchObject({ type: 'and' });
     expect(where.clauses[2].clauses[0]).toMatchObject({ type: 'ilike', pattern: '%Dune%' });
+  });
+
+  it('applies content filter clauses when filters are active', () => {
+    const { builder, db } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, {
+      accessibleLibraryIds: [1],
+      contentFilters: {
+        ...EMPTY_CONTENT_FILTER_RULES,
+        includeTagIds: [7],
+        excludeGenreIds: [9],
+      },
+    }) as any;
+
+    expect(where.clauses).toHaveLength(3);
+    expect(where.clauses[1]).toMatchObject({ type: 'exists' });
+    expect(where.clauses[2]).toMatchObject({ type: 'notExists' });
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not apply content filter clauses when filters are undefined', () => {
+    const { builder, db } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, { accessibleLibraryIds: [1] }) as any;
+
+    expect(where.clauses).toHaveLength(1);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('does not apply content filter clauses when filters are empty', () => {
+    const { builder, db } = makeBuilder();
+
+    const where = builder.buildWhere(undefined, {
+      accessibleLibraryIds: [1],
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    }) as any;
+
+    expect(where.clauses).toHaveLength(1);
+    expect(db.select).not.toHaveBeenCalled();
   });
 
   it('throws for filters nested deeper than supported limit', () => {

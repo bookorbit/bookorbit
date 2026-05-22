@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, asc, desc, eq, ilike, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { ContentFilterRules } from '@bookorbit/types';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books } from '../../db/schema';
@@ -36,8 +38,14 @@ export class AuthorsRepository {
     libraryIds: number[];
     hasPhoto?: boolean;
     minBookCount?: number;
+    contentFilters?: ContentFilterRules;
   }): Promise<{ items: AuthorSummaryRow[]; total: number; page: number; size: number }> {
-    const where = this.buildAuthorWhere({ q: params.q, libraryIds: params.libraryIds, hasPhoto: params.hasPhoto });
+    const where = this.buildAuthorWhere({
+      q: params.q,
+      libraryIds: params.libraryIds,
+      hasPhoto: params.hasPhoto,
+      contentFilters: params.contentFilters,
+    });
     const bookCountExpr = sql<number>`count(distinct ${books.id})`;
     const lastAddedExpr = max(books.addedAt);
 
@@ -105,8 +113,10 @@ export class AuthorsRepository {
     return { items, total: Number(total), page: params.page, size: params.size };
   }
 
-  async findById(authorId: number, libraryIds: number[]): Promise<AuthorSummaryRow | null> {
+  async findById(authorId: number, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<AuthorSummaryRow | null> {
     if (libraryIds.length === 0) return null;
+
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     const [row] = await this.db
       .select({
@@ -120,7 +130,7 @@ export class AuthorsRepository {
       .from(authors)
       .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
       .innerJoin(books, eq(books.id, bookAuthors.bookId))
-      .where(and(eq(authors.id, authorId), inArray(books.libraryId, libraryIds)))
+      .where(and(eq(authors.id, authorId), inArray(books.libraryId, libraryIds), ...filterClauses))
       .groupBy(authors.id, authors.name, authors.sortName, authors.description)
       .limit(1);
 
@@ -153,12 +163,14 @@ export class AuthorsRepository {
     sort: AuthorBookSort;
     order: SortDirection;
     libraryIds: number[];
+    contentFilters?: ContentFilterRules;
   }): Promise<{ bookIds: number[]; total: number; page: number; size: number }> {
     if (params.libraryIds.length === 0) {
       return { bookIds: [], total: 0, page: params.page, size: params.size };
     }
 
-    const where = and(eq(bookAuthors.authorId, params.authorId), inArray(books.libraryId, params.libraryIds));
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
+    const where = and(eq(bookAuthors.authorId, params.authorId), inArray(books.libraryId, params.libraryIds), ...filterClauses);
 
     const sortExpr = params.sort === 'title' ? bookMetadata.title : params.sort === 'publishedYear' ? bookMetadata.publishedYear : books.addedAt;
 
@@ -281,8 +293,11 @@ export class AuthorsRepository {
     });
   }
 
-  private buildAuthorWhere(params: { q?: string; libraryIds: number[]; hasPhoto?: boolean }): SQL {
+  private buildAuthorWhere(params: { q?: string; libraryIds: number[]; hasPhoto?: boolean; contentFilters?: ContentFilterRules }): SQL {
     const clauses: SQL[] = [inArray(books.libraryId, params.libraryIds)];
+    if (params.contentFilters) {
+      clauses.push(...buildContentFilterClauses(params.contentFilters, this.db));
+    }
     const query = params.q?.trim();
     if (query) {
       clauses.push(ilike(authors.name, `%${escapeLikePattern(query)}%`));

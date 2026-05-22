@@ -4,6 +4,7 @@ import { ALLOW_DEFAULT_PASSWORD_KEY } from '../decorators/allow-default-password
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import type { RequestUser } from '../types/request-user';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -20,6 +21,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

@@ -5,6 +5,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { authors, bookAuthors, books, bookMetadata } from '../../../db/schema';
+import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
 import { AuthorImageStorageService } from '../../authors/author-image-storage.service';
 import { AuthorsRepository } from '../../authors/authors.repository';
 import { AuthorEnrichmentOrchestratorService } from '../../authors/author-enrichment-orchestrator.service';
@@ -131,8 +132,14 @@ export class AuthorStrategy implements EntityStrategy {
 
     const nameCondition = params.search ? ilike(authors.name, `%${escapeLike(params.search)}%`) : undefined;
 
+    const cfClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
     const libraryBookIds =
-      params.libraryIds.length > 0 ? this.db.select({ id: books.id }).from(books).where(inArray(books.libraryId, params.libraryIds)) : null;
+      params.libraryIds.length > 0
+        ? this.db
+            .select({ id: books.id })
+            .from(books)
+            .where(and(inArray(books.libraryId, params.libraryIds), ...cfClauses))
+        : null;
 
     const [countResult, itemRows] = await Promise.all([
       this.db

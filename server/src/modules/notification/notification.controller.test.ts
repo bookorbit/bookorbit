@@ -4,6 +4,7 @@ import { Permission } from '@bookorbit/types';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { NotificationController } from './notification.controller';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('NotificationController', () => {
   let controller: NotificationController;
@@ -28,6 +29,8 @@ describe('NotificationController', () => {
     avatarUrl: null,
     provisioningMethod: 'local',
     permissions: [Permission.NotificationAccess],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   beforeEach(() => {

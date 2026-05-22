@@ -5,6 +5,8 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
+import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { ContentFilterRepository } from '../../user/content-filter.repository';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboReadingStateService } from './kobo-reading-state.service';
 
@@ -50,6 +52,7 @@ export class KoboSyncService {
     @Inject(DB) private readonly db: Db,
     private readonly bookAccessService: KoboBookAccessService,
     private readonly readingStateService: KoboReadingStateService,
+    private readonly contentFilterRepository: ContentFilterRepository,
   ) {}
 
   async getDelta(userId: number, deviceToken: string, baseUrl: string): Promise<{ entitlements: unknown[]; hasMore: boolean; syncToken: string }> {
@@ -452,7 +455,11 @@ export class KoboSyncService {
   }
 
   private async buildEligibleBooksWhereClause(userId: number): Promise<SQL | undefined> {
-    const accessibleLibraryIds = await this.bookAccessService.getAccessibleLibraryIds(userId);
+    const [accessibleLibraryIds, contentFilters] = await Promise.all([
+      this.bookAccessService.getAccessibleLibraryIds(userId),
+      this.contentFilterRepository.findByUserId(userId),
+    ]);
+
     const libraryAccessFilter =
       accessibleLibraryIds === null
         ? undefined
@@ -470,7 +477,15 @@ export class KoboSyncService {
         AND ${schema.collections.syncToKobo} = true
     )`;
 
-    return and(eq(schema.books.status, 'present'), eq(schema.bookFiles.format, 'epub'), libraryAccessFilter, collectionMembershipFilter);
+    const contentFilterClauses = accessibleLibraryIds !== null ? buildContentFilterClauses(contentFilters, this.db) : [];
+
+    return and(
+      eq(schema.books.status, 'present'),
+      eq(schema.bookFiles.format, 'epub'),
+      libraryAccessFilter,
+      collectionMembershipFilter,
+      ...contentFilterClauses,
+    );
   }
 
   private async fetchEligibleSnapshotRows(userId: number): Promise<EligibleSnapshotRow[]> {

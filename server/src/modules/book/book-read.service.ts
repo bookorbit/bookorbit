@@ -43,6 +43,10 @@ export class BookReadService {
     return this.bookRepo.findById(id);
   }
 
+  checkBookPassesContentFilters(bookId: number, contentFilters: import('@bookorbit/types').ContentFilterRules) {
+    return this.bookRepo.checkBookPassesContentFilters(bookId, contentFilters);
+  }
+
   updateMetadataFields(bookId: number, fields: Parameters<BookRepository['updateMetadataFields']>[1]) {
     return this.bookRepo.updateMetadataFields(bookId, fields);
   }

@@ -1,5 +1,6 @@
 import type { RequestUser } from '../../common/types/request-user';
 import { StatisticsService } from './statistics.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(isSuperuser = false): RequestUser {
   return {
@@ -15,6 +16,8 @@ function makeUser(isSuperuser = false): RequestUser {
     avatarUrl: null,
     provisioningMethod: 'local',
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

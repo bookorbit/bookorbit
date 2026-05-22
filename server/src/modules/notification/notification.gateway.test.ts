@@ -2,6 +2,7 @@ import { Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { NotificationGateway } from './notification.gateway';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeGateway() {
   return new NotificationGateway({} as never, {} as never, {} as never, { get: vi.fn().mockReturnValue('http://localhost:5173') } as never);
@@ -22,6 +23,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     isSuperuser: false,
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

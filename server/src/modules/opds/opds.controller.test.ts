@@ -104,8 +104,8 @@ describe('OpdsController', () => {
     expect(opdsBookService.getAccessibleLibraries).toHaveBeenCalledWith(8, false);
     expect(opdsBookService.getUserCollections).toHaveBeenCalledWith(8);
     expect(opdsBookService.getUserSmartScopes).toHaveBeenCalledWith(8);
-    expect(opdsBookService.getDistinctAuthors).toHaveBeenCalledWith(8, false);
-    expect(opdsBookService.getDistinctSeries).toHaveBeenCalledWith(8, false);
+    expect(opdsBookService.getDistinctAuthors).toHaveBeenCalledWith(8, false, undefined);
+    expect(opdsBookService.getDistinctSeries).toHaveBeenCalledWith(8, false, undefined);
     expect(opdsService.generateSeriesNavigation).toHaveBeenCalledWith([{ name: 'Dune', bookCount: 2 }]);
   });
 
@@ -130,6 +130,7 @@ describe('OpdsController', () => {
         q: 'arrakis',
       },
       true,
+      undefined,
     );
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Search: arrakis',
@@ -163,8 +164,8 @@ describe('OpdsController', () => {
     await controller.recent(user, 0, 1000, makeReply());
     await controller.surprise(user, makeReply());
 
-    expect(opdsBookService.getRecentBooksPage).toHaveBeenCalledWith(12, 1, 100, false);
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(12, 25, false);
+    expect(opdsBookService.getRecentBooksPage).toHaveBeenCalledWith(12, 1, 100, false, undefined);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(12, 25, false, undefined);
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Random Books',
       'urn:bookorbit:surprise',
@@ -198,7 +199,7 @@ describe('OpdsController', () => {
 
     await controller.cover(42, { userId: 7, isSuperuser: false } as never, reply);
 
-    expect(opdsBookService.validateBookAccess).toHaveBeenCalledWith(42, 7, false);
+    expect(opdsBookService.validateBookAccess).toHaveBeenCalledWith(42, 7, false, undefined);
     expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/books/covers/42/cover_custom.png');
     expect(reply.header).toHaveBeenCalledWith('ETag', '"1234"');

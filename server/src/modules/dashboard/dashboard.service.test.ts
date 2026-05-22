@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import type { RequestUser } from '../../common/types/request-user';
 import { DashboardService } from './dashboard.service';
 import { ScrollerType } from './dto/scroller-type.enum';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -19,6 +20,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -127,7 +130,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.RECENTLY_ADDED, user, 0);
 
-    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([100, 200], 1);
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([100, 200], 1, EMPTY_CONTENT_FILTER_RULES);
     expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([9, 3], 5);
     expect(result.map((card) => card.id)).toEqual([9, 3]);
     expect(result[0]?.readStatus?.status).toBe('reading');
@@ -142,7 +145,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.CONTINUE_READING, user, 500);
 
-    expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50);
+    expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50, EMPTY_CONTENT_FILTER_RULES);
     expect(result.map((card) => card.id)).toEqual([4]);
   });
 
@@ -153,7 +156,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.RANDOM, makeUser({ id: 3 }), 20);
 
-    expect(dashboardRepo.findRandomBookIds).toHaveBeenCalledWith([901], 3, 20);
+    expect(dashboardRepo.findRandomBookIds).toHaveBeenCalledWith([901], 3, 20, EMPTY_CONTENT_FILTER_RULES);
     expect(result).toEqual([]);
     expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
   });

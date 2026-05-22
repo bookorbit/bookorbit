@@ -15,6 +15,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
+import { genres, tags } from './metadata';
 import { libraries } from './libraries';
 
 export const userAvatarSourceEnum = pgEnum('user_avatar_source', ['none', 'external', 'uploaded']);
@@ -164,3 +165,33 @@ export const magicAccessTokens = pgTable(
 );
 
 export type MagicAccessToken = typeof magicAccessTokens.$inferSelect;
+
+export const contentFilterTypeEnum = pgEnum('content_filter_type', ['include', 'exclude']);
+
+export const userContentFilterTags = pgTable(
+  'user_content_filter_tags',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    filterType: contentFilterTypeEnum('filter_type').notNull(),
+    tagId: integer('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.filterType, t.tagId] }), index('user_content_filter_tags_tag_id_idx').on(t.tagId)],
+);
+
+export const userContentFilterGenres = pgTable(
+  'user_content_filter_genres',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    filterType: contentFilterTypeEnum('filter_type').notNull(),
+    genreId: integer('genre_id')
+      .notNull()
+      .references(() => genres.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.filterType, t.genreId] }), index('user_content_filter_genres_genre_id_idx').on(t.genreId)],
+);

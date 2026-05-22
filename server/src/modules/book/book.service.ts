@@ -42,6 +42,7 @@ import type {
   ReadStatus,
   UserBookStatus,
 } from '@bookorbit/types';
+import type { ContentFilterRules } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -207,6 +208,10 @@ export class BookService {
     return user.isSuperuser || user.permissions.includes(permissionName);
   }
 
+  private async checkBookPassesContentFilters(bookId: number, contentFilters: ContentFilterRules): Promise<boolean> {
+    return this.bookRepo.checkBookPassesContentFilters(bookId, contentFilters);
+  }
+
   private isMissingFilesystemEntry(err: unknown): boolean {
     const code = (err as NodeJS.ErrnoException | undefined)?.code;
     return code === 'ENOENT' || code === 'ENOTDIR';
@@ -263,12 +268,23 @@ export class BookService {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+
+    if (!this.isSuperuser(user) && user.contentFilters) {
+      const passes = await this.checkBookPassesContentFilters(bookId, user.contentFilters);
+      if (!passes) throw new NotFoundException(`Book ${bookId} not found`);
+    }
   }
 
   async verifyFileAccess(fileId: number, user: RequestUser): Promise<NonNullable<Awaited<ReturnType<BookRepository['findFileById']>>>> {
     const file = await this.bookRepo.findFileById(fileId);
     if (!file) throw new NotFoundException(`No file with id ${fileId}`);
     await this.libraryService.verifyUserAccess(user.id, file.libraryId, this.isSuperuser(user));
+
+    if (!this.isSuperuser(user) && user.contentFilters) {
+      const passes = await this.checkBookPassesContentFilters(file.bookId, user.contentFilters);
+      if (!passes) throw new NotFoundException(`No file with id ${fileId}`);
+    }
+
     return file;
   }
 
@@ -296,6 +312,7 @@ export class BookService {
         userId: user.id,
         q: dto.query.q,
         timeZone,
+        contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
       });
       return this.bookRepo.findIdsByWhere(where);
     }
@@ -785,6 +802,7 @@ export class BookService {
       userId: user.id,
       q: query.q,
       timeZone,
+      contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
     return this.executeBooksQuery(user.id, where, query);
   }
@@ -794,7 +812,13 @@ export class BookService {
     const libs = await this.libraryService.findAll(user);
     const accessibleLibraryIds = libs.map((l) => l.id);
     const timeZone = this.resolveUserTimeZone(user);
-    const where = this.queryBuilder.buildWhere(query.filter, { accessibleLibraryIds, userId: user.id, q: query.q, timeZone });
+    const where = this.queryBuilder.buildWhere(query.filter, {
+      accessibleLibraryIds,
+      userId: user.id,
+      q: query.q,
+      timeZone,
+      contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
+    });
     return this.executeBooksQuery(user.id, where, query);
   }
 
@@ -1016,7 +1040,8 @@ export class BookService {
   async searchAcrossLibraries(q: string, limit: number, user: RequestUser) {
     const libs = await this.libraryService.findAll(user);
     const libraryIds = libs.map((l) => l.id);
-    return this.bookRepo.searchAcrossLibraries(libraryIds, q, limit);
+    const contentFilters = this.isSuperuser(user) ? undefined : user.contentFilters;
+    return this.bookRepo.searchAcrossLibraries(libraryIds, q, limit, contentFilters);
   }
 
   async deleteBooks(bookIds: number[], user: RequestUser): Promise<void> {

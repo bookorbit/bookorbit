@@ -4,6 +4,7 @@ import type { BookQuery } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import type { SmartScope } from '../../db/schema/smart-scopes';
 import { SmartScopeService } from './smart-scope.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -20,6 +21,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -312,7 +315,12 @@ describe('SmartScopeService', () => {
 
     const result = await service.executeSmartScope(5, makeUser({ id: 12 }), 1, 25);
 
-    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(smartScope.filter, { accessibleLibraryIds: [9], userId: 12, timeZone: 'UTC' });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(smartScope.filter, {
+      accessibleLibraryIds: [9],
+      userId: 12,
+      timeZone: 'UTC',
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
     expect(bookService.executeBooksQuery).toHaveBeenCalledWith(12, 'where', {
       filter: smartScope.filter,
       sort: [{ field: 'title', dir: 'asc' }],
@@ -351,7 +359,7 @@ describe('SmartScopeService', () => {
         join: 'AND',
         rules: [smartScope.filter, requestFilter],
       },
-      { accessibleLibraryIds: [9], userId: 12, q: 'needle', timeZone: 'UTC' },
+      { accessibleLibraryIds: [9], userId: 12, q: 'needle', timeZone: 'UTC', contentFilters: EMPTY_CONTENT_FILTER_RULES },
     );
     expect(bookService.executeBooksQuery).toHaveBeenCalledWith(12, 'combined-where', {
       filter: {
@@ -416,7 +424,7 @@ describe('SmartScopeService', () => {
           join: 'AND',
           rules: [smartScope.filter, requestFilter],
         },
-        { accessibleLibraryIds: [9], userId: 12, q: 'needle', timeZone: 'UTC' },
+        { accessibleLibraryIds: [9], userId: 12, q: 'needle', timeZone: 'UTC', contentFilters: EMPTY_CONTENT_FILTER_RULES },
       );
       expect(bookService.executeBooksQuery).toHaveBeenCalledWith(12, 'combined-where', {
         ...query,

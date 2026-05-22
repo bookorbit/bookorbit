@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { AccessLevel } from '@bookorbit/types';
+import type { AccessLevel, ContentFilterRules } from '@bookorbit/types';
 
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
@@ -26,7 +27,10 @@ export class LibraryRepository {
       .orderBy(libraries.displayOrder, libraries.name);
   }
 
-  findAllForUser(userId: number) {
+  findAllForUser(userId: number, contentFilters?: ContentFilterRules) {
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const bookJoinOn = filterClauses.length > 0 ? and(eq(books.libraryId, libraries.id), ...filterClauses)! : eq(books.libraryId, libraries.id);
+
     return this.db
       .select({
         id: libraries.id,
@@ -41,7 +45,7 @@ export class LibraryRepository {
       })
       .from(libraries)
       .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
-      .leftJoin(books, eq(books.libraryId, libraries.id))
+      .leftJoin(books, bookJoinOn)
       .groupBy(libraries.id)
       .orderBy(libraries.displayOrder, libraries.name);
   }

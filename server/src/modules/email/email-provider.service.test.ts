@@ -4,6 +4,7 @@ import { EmailProviderRepository } from './email-provider.repository';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailTransportService } from './email-transport.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailProviderService', () => {
   let service: EmailProviderService;
@@ -24,11 +25,15 @@ describe('EmailProviderService', () => {
     avatarUrl: null,
     provisioningMethod: 'manual',
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockAdmin: RequestUser = {
     ...mockUser,
     isSuperuser: true,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockProvider = {
@@ -216,13 +221,13 @@ describe('EmailProviderService', () => {
 
   describe('getOwnedOrShared', () => {
     it('should throw ForbiddenException if not owner and not shared', async () => {
-      const otherUser: RequestUser = { ...mockUser, id: 99 };
+      const otherUser: RequestUser = { ...mockUser, id: 99, contentFilters: EMPTY_CONTENT_FILTER_RULES };
       (repo.findById as vi.Mock).mockResolvedValue([{ ...mockProvider, userId: 1, isShared: false }]);
       await expect(service.findOne(10, otherUser)).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow access if not owner but shared', async () => {
-      const otherUser: RequestUser = { ...mockUser, id: 99 };
+      const otherUser: RequestUser = { ...mockUser, id: 99, contentFilters: EMPTY_CONTENT_FILTER_RULES };
       (repo.findById as vi.Mock).mockResolvedValue([{ ...mockProvider, userId: 1, isShared: true }]);
       const result = await service.findOne(10, otherUser);
       expect(result.id).toBe(10);

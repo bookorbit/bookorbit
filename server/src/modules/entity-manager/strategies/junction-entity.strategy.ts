@@ -6,6 +6,7 @@ import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { books, bookMetadata } from '../../../db/schema';
+import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
 import type {
   BrowseParams,
   BrowseResult,
@@ -122,9 +123,13 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
   }
 
   async browse(params: BrowseParams): Promise<BrowseResult> {
-    const conditions = [
-      inArray(this.junctionBookIdCol, this.db.select({ id: books.id }).from(books).where(inArray(books.libraryId, params.libraryIds))),
-    ];
+    const cfClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
+    const bookSubquery = this.db
+      .select({ id: books.id })
+      .from(books)
+      .where(and(inArray(books.libraryId, params.libraryIds), ...cfClauses));
+
+    const conditions = [inArray(this.junctionBookIdCol, bookSubquery)];
     if (params.search) {
       conditions.push(ilike(this.nameCol, `%${escapeLike(params.search)}%`) as any);
     }

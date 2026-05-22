@@ -72,6 +72,7 @@ export class AuthorsService {
       libraryIds,
       hasPhoto: dto.hasPhoto,
       minBookCount: dto.minBookCount,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 
     const mapped = page.items.map((item) => this.mapAuthorSummary(item));
@@ -83,7 +84,7 @@ export class AuthorsService {
 
   async findOne(user: RequestUser, authorId: number): Promise<AuthorDetail> {
     const libraryIds = await this.resolveLibraryIds(user);
-    const row = await this.authorsRepo.findById(authorId, libraryIds);
+    const row = await this.authorsRepo.findById(authorId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
     if (!row) throw new NotFoundException('Author not found');
     return this.withAuthorImageUrl(this.mapAuthorSummary(row) as AuthorDetail, 'full');
   }
@@ -95,7 +96,7 @@ export class AuthorsService {
       return { items: [], total: 0, page: dto.page ?? 0, size: dto.size ?? 50 };
     }
 
-    const author = await this.authorsRepo.findById(authorId, libraryIds);
+    const author = await this.authorsRepo.findById(authorId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
     if (!author) throw new NotFoundException('Author not found');
 
     const page = await this.authorsRepo.findBookIdsPage({
@@ -105,6 +106,7 @@ export class AuthorsService {
       sort: dto.sort ?? 'addedAt',
       order: dto.order ?? 'desc',
       libraryIds,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 
     if (page.bookIds.length === 0) {

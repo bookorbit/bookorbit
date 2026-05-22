@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AccountSettings from './AccountSettings.vue'
 import NotificationPreferences from '@/features/notifications/components/NotificationPreferences.vue'
+import ContentRestrictionsSettings from './ContentRestrictionsSettings.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { ACCOUNT_TAB_INFO, ACCOUNT_TABS, normalizeAccountTab, type AccountTab as Tab } from './lib/account-tabs'
@@ -71,4 +72,5 @@ function selectTab(tab: Tab) {
 
   <AccountSettings v-if="activeTab === 'profile'" embedded />
   <NotificationPreferences v-else-if="activeTab === 'notifications'" embedded />
+  <ContentRestrictionsSettings v-else-if="activeTab === 'restrictions'" />
 </template>

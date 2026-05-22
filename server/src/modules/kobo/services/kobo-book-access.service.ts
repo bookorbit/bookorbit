@@ -1,15 +1,20 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
+import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { ContentFilterRepository } from '../../user/content-filter.repository';
 
 type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class KoboBookAccessService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly contentFilterRepository: ContentFilterRepository,
+  ) {}
 
   async getAccessibleLibraryIds(userId: number): Promise<number[] | null> {
     const user = await this.db.query.users.findFirst({
@@ -38,6 +43,19 @@ export class KoboBookAccessService {
     const accessibleLibraryIds = await this.getAccessibleLibraryIds(userId);
     if (accessibleLibraryIds !== null && !accessibleLibraryIds.includes(book.libraryId)) {
       throw new ForbiddenException('No access to this book');
+    }
+
+    if (accessibleLibraryIds !== null) {
+      const contentFilters = await this.contentFilterRepository.findByUserId(userId);
+      const filterClauses = buildContentFilterClauses(contentFilters, this.db);
+      if (filterClauses.length > 0) {
+        const [filtered] = await this.db
+          .select({ id: schema.books.id })
+          .from(schema.books)
+          .where(and(eq(schema.books.id, bookId), ...filterClauses))
+          .limit(1);
+        if (!filtered) throw new ForbiddenException('No access to this book');
+      }
     }
   }
 }
