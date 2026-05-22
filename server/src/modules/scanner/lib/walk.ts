@@ -3,18 +3,18 @@ import { basename, dirname, join, relative } from 'path';
 
 import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
-const PG_BIGINT_MAX = 9223372036854775807n; // 2^63 - 1: upper bound of PostgreSQL bigint
+const JS_NUMBER_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 
 /**
  * Convert a raw filesystem inode (bigint from stat with { bigint: true }) to a number
- * safe to store in PostgreSQL's signed bigint column.
+ * that can be matched safely in JavaScript.
  *
- * MergerFS and other synthetic filesystems produce unsigned 64-bit inodes that exceed
- * PostgreSQL's bigint range (2^63 - 1). Those are clamped to 0, which is the existing
- * sentinel value meaning "rename detection disabled for this file".
+ * Any inode above Number.MAX_SAFE_INTEGER cannot be represented exactly as a JS number,
+ * so we clamp it to 0. Value 0 is the existing sentinel meaning "rename detection
+ * disabled for this file".
  */
 export function clampIno(ino: bigint): number {
-  if (ino > PG_BIGINT_MAX) return 0;
+  if (ino < 0n || ino > JS_NUMBER_MAX_SAFE_INTEGER) return 0;
   return Number(ino);
 }
 
@@ -114,7 +114,7 @@ async function statFilesIntoAcc(
     if (s.ino === 0n) {
       logger?.(`File has inode 0 (likely network mount), rename detection disabled: ${full}`);
     } else if (ino === 0) {
-      logger?.(`File inode out of range for storage (MergerFS/synthetic inode ${s.ino}), rename detection disabled: ${full}`);
+      logger?.(`File inode cannot be represented safely for matching (inode ${s.ino}), rename detection disabled: ${full}`);
     }
     if (!acc.has(dir)) acc.set(dir, []);
     const { format, role } = classifyFile(full);
@@ -444,8 +444,8 @@ export async function buildSingleBookCandidate(
       if (!s) return null;
       const { format, role } = classifyFile(full);
       const ino = clampIno(s.ino);
-      if (s.ino > PG_BIGINT_MAX) {
-        logger?.(`File inode out of range for storage (MergerFS/synthetic inode ${s.ino}), rename detection disabled: ${full}`);
+      if (s.ino !== 0n && ino === 0) {
+        logger?.(`File inode cannot be represented safely for matching (inode ${s.ino}), rename detection disabled: ${full}`);
       }
       return {
         absolutePath: full,

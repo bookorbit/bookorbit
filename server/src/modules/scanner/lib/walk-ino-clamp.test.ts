@@ -1,8 +1,8 @@
 /**
- * Integration tests verifying that oversized MergerFS inodes are clamped before storage.
+ * Integration tests verifying that precision-unsafe inodes are clamped before matching.
  *
  * These tests mock `fs/promises.stat` to inject synthetic BigInt inode values that would
- * otherwise overflow PostgreSQL's bigint column and crash the scanner.
+ * otherwise be lossy when converted to JavaScript numbers.
  */
 
 vi.mock('fs/promises', async () => {
@@ -66,8 +66,8 @@ function makeDirStatsMock(): import('fs').Stats {
 }
 
 const OVERSIZED_INO = 17237992710316634000n; // exact value from the bug report
+const UNSAFE_INO = 651896050678335552n; // issue #84: within int8 range but above Number.MAX_SAFE_INTEGER
 const NORMAL_INO = 12345n;
-const PG_BIGINT_MAX_INO = 9223372036854775807n;
 
 let suiteRoot: string;
 let root: string;
@@ -113,6 +113,16 @@ function setupStatMock(fileIno: bigint): void {
 // ── findBookCandidates ────────────────────────────────────────────────────────
 
 describe('findBookCandidates — oversized MergerFS inode', () => {
+  it('sets ino=0 when stat returns an inode that is unsafe in JavaScript numbers', async () => {
+    await touchFile('Book/book.epub');
+    setupStatMock(UNSAFE_INO);
+
+    const { candidates } = await findBookCandidates(root);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].files[0].ino).toBe(0);
+  });
+
   it('sets ino=0 when stat returns an inode exceeding PostgreSQL bigint range', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(OVERSIZED_INO);
@@ -143,14 +153,13 @@ describe('findBookCandidates — oversized MergerFS inode', () => {
     expect(candidates[0].files[0].ino).toBe(Number(NORMAL_INO));
   });
 
-  it('preserves the PostgreSQL bigint maximum inode without clamping', async () => {
+  it('sets ino=0 for the PostgreSQL bigint maximum inode because it is precision-unsafe in JS', async () => {
     await touchFile('Book/book.epub');
-    setupStatMock(PG_BIGINT_MAX_INO);
+    setupStatMock(9223372036854775807n);
 
     const { candidates } = await findBookCandidates(root);
 
-    expect(candidates[0].files[0].ino).not.toBe(0);
-    expect(candidates[0].files[0].ino).toBeGreaterThan(0);
+    expect(candidates[0].files[0].ino).toBe(0);
   });
 
   it('does not emit a warning for normal inodes', async () => {

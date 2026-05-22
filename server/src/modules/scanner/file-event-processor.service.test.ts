@@ -331,6 +331,20 @@ describe('handleCreate — file', () => {
     expect(mockRepo.updateBookFile).toHaveBeenCalledWith(42, expect.objectContaining({ ino: 0 }));
   });
 
+  it('clamps precision-unsafe inodes to 0 when restoring existing file rows', async () => {
+    const fileStat = makeFileStat({ ino: 651896050678335552n, size: 50000n });
+    mockStat.mockResolvedValue(fileStat);
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 42, bookId: 10 },
+      libraryId: 3,
+    } as any);
+    mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'missing', libraryId: 3 } as any);
+
+    await makeService().handleCreate('/books/Author/book.epub');
+
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(42, expect.objectContaining({ ino: 0 }));
+  });
+
   it('restores own book before searching for folder-level missing books (Issue 25)', async () => {
     const fileStat = makeFileStat({ ino: 2000, size: 50000 });
     mockStat.mockResolvedValue(fileStat);
@@ -553,8 +567,8 @@ describe('handleCreate — move detection', () => {
     expect(result).toEqual({ type: 'book-moved', libraryId: 3, bookIds: [40] });
   });
 
-  it('skips inode-based move detection when inode exceeds PostgreSQL bigint range', async () => {
-    const fileStat = makeFileStat({ ino: 14351917807348929000n });
+  it('skips inode-based move detection when inode is precision-unsafe in JavaScript', async () => {
+    const fileStat = makeFileStat({ ino: 651896050678335552n });
     mockStat.mockResolvedValue(fileStat);
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue(null);
     mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);

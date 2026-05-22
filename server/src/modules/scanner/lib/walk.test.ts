@@ -943,15 +943,13 @@ describe('clampIno', () => {
     expect(clampIno(BigInt(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER);
   });
 
-  it('does not clamp values at the PostgreSQL bigint maximum', () => {
-    // 2^63 - 1: largest value PostgreSQL bigint can store
-    const pgMax = 9223372036854775807n;
-    expect(clampIno(pgMax)).not.toBe(0);
-    expect(clampIno(pgMax)).toBeGreaterThan(0);
+  it('clamps values one above the maximum safe JS integer to 0', () => {
+    expect(clampIno(BigInt(Number.MAX_SAFE_INTEGER) + 1n)).toBe(0);
   });
 
-  it('clamps values one above the PostgreSQL bigint maximum to 0', () => {
-    expect(clampIno(9223372036854775808n)).toBe(0);
+  it('clamps in-range 64-bit inodes that are precision-unsafe in JavaScript', () => {
+    // Exact inode reported in issue #84 on Unraid shfs
+    expect(clampIno(651896050678335552n)).toBe(0);
   });
 
   it('clamps the exact MergerFS inode from the bug report to 0', () => {

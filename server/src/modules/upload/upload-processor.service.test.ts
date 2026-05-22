@@ -160,6 +160,18 @@ describe('UploadProcessorService', () => {
     );
   });
 
+  it('clamps precision-unsafe inodes to 0 before persisting', async () => {
+    mockStat.mockResolvedValueOnce({ ino: 651896050678335552n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
+
+    await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
+
+    expect(insertBookFilesValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ino: 0,
+      }),
+    );
+  });
+
   it('refreshes a stale book_files record when the absolute path already exists in the db', async () => {
     selectLimit.mockResolvedValueOnce([{ id: 99 }]);
     insertBookFilesOnConflict.mockReturnValueOnce({ returning: vi.fn().mockResolvedValue([{ id: 777 }]) });
