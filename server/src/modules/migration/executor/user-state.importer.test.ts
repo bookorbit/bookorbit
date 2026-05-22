@@ -511,4 +511,126 @@ describe('UserStateImporter', () => {
       }),
     ]);
   });
+
+  it('deduplicates conflicting upsert keys before writing user-state batches', async () => {
+    const { importer, importRepo } = makeImporter();
+    importRepo.fetchTargetBookPrimaryFiles.mockResolvedValue({
+      primaryFilesByBookId: new Map([[200, 500]]),
+      audiobookPrimaryFilesByBookId: new Map([[200, 500]]),
+    });
+
+    const newerStatusUpdatedAt = '2026-01-11T00:00:00.000Z';
+    const tiedProgressUpdatedAt = '2026-01-12T00:00:00.000Z';
+    const planned = {
+      plan: {
+        userMappings: [{ sourceUserId: 'u1', targetUserId: 10 }],
+        pathMappings: [],
+      },
+      execution: {
+        matchedBooks: [{ sourceBookId: 'b-source', targetBookId: 200 }],
+        sourceData: {
+          availableDomains: {
+            userBookStatuses: true,
+            readingProgress: true,
+            bookmarks: false,
+            annotations: false,
+            shelves: false,
+          },
+          books: [{ sourceBookId: 'b-source', files: [] }],
+          userBookStatuses: [
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'b-source',
+              status: 'reading',
+              percentage: 20,
+              startedAt: null,
+              finishedAt: null,
+              updatedAt: '2026-01-10T00:00:00.000Z',
+            },
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'b-source',
+              status: 'completed',
+              percentage: 100,
+              startedAt: null,
+              finishedAt: null,
+              updatedAt: newerStatusUpdatedAt,
+            },
+          ],
+          userFileProgress: [
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'b-source',
+              sourceFileId: null,
+              percentage: 20,
+              cfi: null,
+              href: null,
+              pageNumber: 12,
+              positionSeconds: 1,
+              updatedAt: tiedProgressUpdatedAt,
+            },
+            {
+              sourceUserId: 'u1',
+              sourceBookId: 'b-source',
+              sourceFileId: null,
+              percentage: 20,
+              cfi: '/6/8',
+              href: null,
+              pageNumber: null,
+              positionSeconds: 5,
+              updatedAt: tiedProgressUpdatedAt,
+            },
+          ],
+          bookmarks: [],
+          annotations: [],
+          shelves: [],
+          shelfBooks: [],
+        },
+      },
+    };
+
+    await importer.import(306, planned as never, vi.fn().mockResolvedValue(undefined));
+
+    const statusBatch = importRepo.batchUpsertUserBookStatuses.mock.calls[0]?.[0] as Array<{
+      userId: number;
+      bookId: number;
+      status: string;
+      updatedAt: Date;
+    }>;
+    expect(statusBatch).toHaveLength(1);
+    expect(statusBatch[0]).toMatchObject({
+      userId: 10,
+      bookId: 200,
+      status: 'read',
+      updatedAt: new Date(newerStatusUpdatedAt),
+    });
+
+    const readingBatch = importRepo.batchUpsertReadingProgress.mock.calls[0]?.[0] as Array<{
+      userId: number;
+      bookFileId: number;
+      cfi: string | null;
+      pageNumber: number | null;
+    }>;
+    expect(readingBatch).toHaveLength(1);
+    expect(readingBatch[0]).toMatchObject({
+      userId: 10,
+      bookFileId: 500,
+      cfi: '/6/8',
+      pageNumber: null,
+    });
+
+    const audioBatch = importRepo.batchUpsertAudiobookProgress.mock.calls[0]?.[0] as Array<{
+      userId: number;
+      bookId: number;
+      currentFileId: number;
+      positionSeconds: number;
+    }>;
+    expect(audioBatch).toHaveLength(1);
+    expect(audioBatch[0]).toMatchObject({
+      userId: 10,
+      bookId: 200,
+      currentFileId: 500,
+      positionSeconds: 5,
+    });
+  });
 });

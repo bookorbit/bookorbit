@@ -619,6 +619,34 @@ export async function seedCanonicalScenario(ctx: MigrationBookloreE2EContext): P
   };
 }
 
+export async function seedCanonicalScenarioWithDuplicateUserStateRows(ctx: MigrationBookloreE2EContext): Promise<CanonicalMigrationScenario> {
+  const scenario = await seedCanonicalScenario(ctx);
+
+  await withBookloreConnection(ctx, async (conn) => {
+    await insertRows(
+      conn,
+      'user_book_progress',
+      ['user_id', 'book_id', 'status', 'percentage', 'started_at', 'finished_at', 'updated_at'],
+      [
+        [1, 101, 'reading', 64, '2024-01-02 12:00:00', null, '2024-01-11 14:00:00'],
+        [2, 103, 'completed', 100, '2024-02-01 12:00:00', '2024-02-05 12:00:00', '2024-02-05 12:00:00'],
+      ],
+    );
+
+    await insertRows(
+      conn,
+      'user_book_file_progress',
+      ['user_id', 'book_id', 'book_file_id', 'percentage', 'cfi', 'position_href', 'page_number', 'position_seconds', 'updated_at'],
+      [
+        [1, 101, 1001, 44.4, 'epubcfi(/6/18!/4/2:10)', null, null, null, '2024-01-11 14:00:00'],
+        [2, 103, 1004, 77, null, null, null, 45, '2024-02-05 12:30:00'],
+      ],
+    );
+  });
+
+  return scenario;
+}
+
 export async function seedCompatibilityScenario(ctx: MigrationBookloreE2EContext): Promise<CompatibilityScenario> {
   const targetUser = await createUser(ctx, {
     username: 'migration-booklore-variant-source',
