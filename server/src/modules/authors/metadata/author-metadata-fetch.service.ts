@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuthorMetadataCandidate, AuthorMetadataProviderInfo, AuthorMetadataProviderKey } from '@bookorbit/types';
 import { from, merge, Observable, switchMap, take } from 'rxjs';
 
+import { pickBestAuthorNameMatch } from './author-name-match';
 import { AuthorMetadataProviderRegistry } from './provider-registry';
 import { AuthorMetadataProviderError, AuthorMetadataSearchParams, isIdentifiableAuthorProvider } from './providers/author-metadata-provider';
 
@@ -25,6 +26,7 @@ export type AuthorQuickSearchResult = {
 @Injectable()
 export class AuthorMetadataFetchService {
   private static readonly PROVIDER_TIMEOUT_MS = 15_000;
+  private static readonly QUICK_SEARCH_LIMIT = 8;
 
   constructor(private readonly registry: AuthorMetadataProviderRegistry) {}
 
@@ -88,7 +90,7 @@ export class AuthorMetadataFetchService {
         provider.search({
           name: params.name,
           region,
-          limit: 1,
+          limit: AuthorMetadataFetchService.QUICK_SEARCH_LIMIT,
         }),
       );
       if (!matchesResult.ok) {
@@ -96,20 +98,24 @@ export class AuthorMetadataFetchService {
         continue;
       }
 
-      const matches = matchesResult.value;
-      const best = matches[0];
-      if (!best) continue;
+      const bestMatch = pickBestAuthorNameMatch(params.name, matchesResult.value);
+      if (!bestMatch) continue;
 
       if (!isIdentifiableAuthorProvider(provider)) {
-        return { candidate: best, failure: null };
+        return { candidate: bestMatch.candidate, failure: null };
       }
 
-      const detailResult = await this.withTimeoutResult(provider.lookupById(best.providerId, region));
+      const detailResult = await this.withTimeoutResult(provider.lookupById(bestMatch.candidate.providerId, region));
       if (!detailResult.ok) {
-        return { candidate: best, failure: null };
+        lastFailure = this.toFailure(provider.key, detailResult.error);
+        continue;
       }
 
-      return { candidate: detailResult.value ?? best, failure: null };
+      if (!detailResult.value) continue;
+      const detailedMatch = pickBestAuthorNameMatch(params.name, [detailResult.value]);
+      if (!detailedMatch) continue;
+
+      return { candidate: detailedMatch.candidate, failure: null };
     }
 
     return { candidate: null, failure: lastFailure };

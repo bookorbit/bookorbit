@@ -30,28 +30,32 @@ describe('AuthorMetadataFetchService', () => {
   });
 
   it('quickSearchDetailed returns candidate when provider succeeds', async () => {
-    registry.select.mockReturnValue([
-      {
-        key: 'audnexus',
-        label: 'Audnexus',
-        identifiable: false,
-        search: vi.fn().mockResolvedValue([
-          {
-            provider: 'audnexus',
-            providerId: 'A1',
-            name: 'Author One',
-          },
-        ]),
-      },
-    ]);
+    const provider = {
+      key: 'audnexus',
+      label: 'Audnexus',
+      identifiable: false,
+      search: vi.fn().mockResolvedValue([
+        {
+          provider: 'audnexus',
+          providerId: 'A2',
+          name: 'Author One',
+        },
+      ]),
+    };
+    registry.select.mockReturnValue([provider]);
 
     await expect(service.quickSearchDetailed({ name: 'Author One' })).resolves.toEqual({
       candidate: {
         provider: 'audnexus',
-        providerId: 'A1',
+        providerId: 'A2',
         name: 'Author One',
       },
       failure: null,
+    });
+    expect(provider.search).toHaveBeenCalledWith({
+      name: 'Author One',
+      region: 'us',
+      limit: 8,
     });
   });
 
@@ -80,6 +84,44 @@ describe('AuthorMetadataFetchService', () => {
         retryAfterMs: 20_000,
         transient: true,
       },
+    });
+  });
+
+  it('quickSearchDetailed returns no match for low-confidence candidates', async () => {
+    registry.select.mockReturnValue([
+      {
+        key: 'audnexus',
+        label: 'Audnexus',
+        identifiable: false,
+        search: vi.fn().mockResolvedValue([
+          { provider: 'audnexus', providerId: 'A1', name: 'Charles Lewis' },
+          { provider: 'audnexus', providerId: 'A2', name: 'Charles Pellegrino' },
+        ]),
+      },
+    ]);
+
+    await expect(service.quickSearchDetailed({ name: 'Charles Exbrayat' })).resolves.toEqual({
+      candidate: null,
+      failure: null,
+    });
+  });
+
+  it('quickSearchDetailed ranks candidates and selects the best acceptable match', async () => {
+    registry.select.mockReturnValue([
+      {
+        key: 'audnexus',
+        label: 'Audnexus',
+        identifiable: false,
+        search: vi.fn().mockResolvedValue([
+          { provider: 'audnexus', providerId: 'A1', name: 'George Oswell' },
+          { provider: 'audnexus', providerId: 'A2', name: 'George Orwell' },
+        ]),
+      },
+    ]);
+
+    await expect(service.quickSearchDetailed({ name: 'George Orwell' })).resolves.toEqual({
+      candidate: { provider: 'audnexus', providerId: 'A2', name: 'George Orwell' },
+      failure: null,
     });
   });
 
@@ -134,7 +176,7 @@ describe('AuthorMetadataFetchService', () => {
     expect(emitted).toHaveLength(2);
   });
 
-  it('quickSearchDetailed falls back to the best search candidate when identifiable lookup fails', async () => {
+  it('quickSearchDetailed returns provider failure when identifiable lookup fails', async () => {
     const provider = {
       key: 'audnexus',
       label: 'Audnexus',
@@ -145,7 +187,29 @@ describe('AuthorMetadataFetchService', () => {
     registry.select.mockReturnValue([provider]);
 
     await expect(service.quickSearchDetailed({ name: 'Author One' })).resolves.toEqual({
-      candidate: { provider: 'audnexus', providerId: 'A1', name: 'Author One' },
+      candidate: null,
+      failure: {
+        provider: 'audnexus',
+        message: 'lookup failed',
+        httpStatus: null,
+        retryAfterMs: null,
+        transient: true,
+      },
+    });
+  });
+
+  it('quickSearchDetailed rejects detail payloads that fail confidence gates', async () => {
+    const provider = {
+      key: 'audnexus',
+      label: 'Audnexus',
+      identifiable: true,
+      search: vi.fn().mockResolvedValue([{ provider: 'audnexus', providerId: 'A1', name: 'George Orwell' }]),
+      lookupById: vi.fn().mockResolvedValue({ provider: 'audnexus', providerId: 'A1', name: 'Who Is George Orwell?' }),
+    };
+    registry.select.mockReturnValue([provider]);
+
+    await expect(service.quickSearchDetailed({ name: 'George Orwell' })).resolves.toEqual({
+      candidate: null,
       failure: null,
     });
   });

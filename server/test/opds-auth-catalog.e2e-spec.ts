@@ -120,9 +120,9 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
     visibleSeriesName = `Visible Series ${randomUUID().slice(0, 8)}`;
     hiddenSeriesName = `Hidden Series ${randomUUID().slice(0, 8)}`;
 
-    await seedBookMetadata(visibleBookAlpha.bookId, 'Visible Alpha', visibleSeriesName, 1);
+    await seedBookMetadata(visibleBookAlpha.bookId, 'Visible Alpha', visibleSeriesName, 1, '9780141187761');
     await seedBookMetadata(visibleBookBeta.bookId, 'Visible Beta', visibleSeriesName, 2);
-    await seedBookMetadata(hiddenBook.bookId, 'Hidden Gamma', hiddenSeriesName, 1);
+    await seedBookMetadata(hiddenBook.bookId, 'Hidden Gamma', hiddenSeriesName, 1, '9780300000000');
 
     await linkBookAuthor(visibleBookAlpha.bookId, visibleAuthorName);
     await linkBookAuthor(visibleBookBeta.bookId, visibleAuthorName);
@@ -471,6 +471,24 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(searchResponse.statusCode).toBe(200);
       expect(searchResponse.body).toContain('Visible Alpha');
       expect(searchResponse.body).not.toContain('Visible Beta');
+
+      const authorSearchResponse = await opdsGet(`/api/v1/opds/catalog?q=${encodeURIComponent(visibleAuthorName)}`, ownerCredentials);
+      expect(authorSearchResponse.statusCode).toBe(200);
+      expect(authorSearchResponse.body).toContain('Visible Alpha');
+      expect(authorSearchResponse.body).toContain('Visible Beta');
+      expect(authorSearchResponse.body).not.toContain('Hidden Gamma');
+
+      const seriesSearchResponse = await opdsGet(`/api/v1/opds/catalog?q=${encodeURIComponent(visibleSeriesName)}`, ownerCredentials);
+      expect(seriesSearchResponse.statusCode).toBe(200);
+      expect(seriesSearchResponse.body).toContain('Visible Alpha');
+      expect(seriesSearchResponse.body).toContain('Visible Beta');
+      expect(seriesSearchResponse.body).not.toContain('Hidden Gamma');
+
+      const isbnSearchResponse = await opdsGet('/api/v1/opds/catalog?q=978-0%20141187761', ownerCredentials);
+      expect(isbnSearchResponse.statusCode).toBe(200);
+      expect(isbnSearchResponse.body).toContain('Visible Alpha');
+      expect(isbnSearchResponse.body).not.toContain('Visible Beta');
+      expect(isbnSearchResponse.body).not.toContain('Hidden Gamma');
     });
   });
 
@@ -537,10 +555,13 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
     });
   });
 
-  async function seedBookMetadata(bookId: number, title: string, seriesName: string, seriesIndex: number): Promise<void> {
-    await ctx.db.insert(schema.bookMetadata).values({ bookId, title, seriesName, seriesIndex }).onConflictDoUpdate({
+  async function seedBookMetadata(bookId: number, title: string, seriesName: string, seriesIndex: number, isbn13?: string): Promise<void> {
+    const values = { bookId, title, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };
+    const set = { title, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };
+
+    await ctx.db.insert(schema.bookMetadata).values(values).onConflictDoUpdate({
       target: schema.bookMetadata.bookId,
-      set: { title, seriesName, seriesIndex },
+      set,
     });
   }
 
