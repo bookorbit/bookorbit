@@ -29,6 +29,35 @@ function hasMeaningfulProgressSignal(row: SourceUserFileProgress, percentage: nu
   return percentage > 0 || hasLocator || hasPageNumber || hasPosition;
 }
 
+type UserBookStatusUpsert = {
+  userId: number;
+  bookId: number;
+  status: ReadStatus;
+  source: ReadStatusSource;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  updatedAt: Date;
+};
+
+type ReadingProgressUpsert = {
+  bookFileId: number;
+  userId: number;
+  percentage: number;
+  cfi: string | null;
+  pageNumber: number | null;
+  positionSeconds: number | null;
+  updatedAt: Date;
+};
+
+type AudiobookProgressUpsert = {
+  userId: number;
+  bookId: number;
+  percentage: number;
+  currentFileId: number;
+  positionSeconds: number;
+  updatedAt: Date;
+};
+
 @Injectable()
 export class UserStateImporter {
   constructor(
@@ -82,15 +111,7 @@ export class UserStateImporter {
       return;
     }
 
-    const batch: Array<{
-      userId: number;
-      bookId: number;
-      status: ReadStatus;
-      source: ReadStatusSource;
-      startedAt: Date | null;
-      finishedAt: Date | null;
-      updatedAt: Date;
-    }> = [];
+    const batch: UserBookStatusUpsert[] = [];
 
     for (const row of planned.execution.sourceData.userBookStatuses) {
       await ensureRunning();
@@ -113,10 +134,11 @@ export class UserStateImporter {
       });
       counters.imported += 1;
     }
+    const dedupedBatch = dedupeByKey(batch, (item) => `${item.userId}:${item.bookId}`, preferLatestByUpdatedAt);
 
     await this.importRepo.withTransaction(async (importRepo) => {
       await importRepo.clearUserBookStatuses([...userMap.values()], [...bookMap.values()]);
-      await importRepo.batchUpsertUserBookStatuses(batch);
+      await importRepo.batchUpsertUserBookStatuses(dedupedBatch);
     });
     await this.repo.setRunMetric(runId, 'user_state', 'user_book_status', counters);
   }
@@ -136,15 +158,7 @@ export class UserStateImporter {
       return;
     }
 
-    const batch: Array<{
-      bookFileId: number;
-      userId: number;
-      percentage: number;
-      cfi: string | null;
-      pageNumber: number | null;
-      positionSeconds: number | null;
-      updatedAt: Date;
-    }> = [];
+    const batch: ReadingProgressUpsert[] = [];
 
     for (const row of planned.execution.sourceData.userFileProgress) {
       await ensureRunning();
@@ -185,10 +199,11 @@ export class UserStateImporter {
       });
       counters.imported += 1;
     }
+    const dedupedBatch = dedupeByKey(batch, (item) => `${item.bookFileId}:${item.userId}`, preferReadingProgressRow);
 
     await this.importRepo.withTransaction(async (importRepo) => {
       await importRepo.clearReadingProgress([...userMap.values()], [...primaryFilesByBookId.values(), ...sourceFileToTargetFile.values()]);
-      await importRepo.batchUpsertReadingProgress(batch);
+      await importRepo.batchUpsertReadingProgress(dedupedBatch);
     });
     await this.repo.setRunMetric(runId, 'user_state', 'reading_progress', counters);
   }
@@ -213,14 +228,7 @@ export class UserStateImporter {
       return targetBookId ? audiobookPrimaryFilesByBookId.has(targetBookId) : false;
     });
 
-    const batch: Array<{
-      userId: number;
-      bookId: number;
-      percentage: number;
-      currentFileId: number;
-      positionSeconds: number;
-      updatedAt: Date;
-    }> = [];
+    const batch: AudiobookProgressUpsert[] = [];
 
     for (const row of sourceAudioRows) {
       await ensureRunning();
@@ -258,9 +266,11 @@ export class UserStateImporter {
       counters.imported += 1;
     }
 
+    const dedupedBatch = dedupeByKey(batch, (item) => `${item.userId}:${item.bookId}`, preferLatestByUpdatedAt);
+
     await this.importRepo.withTransaction(async (importRepo) => {
       await importRepo.clearAudiobookProgress([...userMap.values()], [...audiobookPrimaryFilesByBookId.keys()]);
-      await importRepo.batchUpsertAudiobookProgress(batch);
+      await importRepo.batchUpsertAudiobookProgress(dedupedBatch);
     });
     await this.repo.setRunMetric(runId, 'user_state', 'audiobook_progress', counters);
   }
@@ -518,6 +528,50 @@ function nextImportedCollectionName(baseName: string, usedNames: Set<string>): s
   const fallback = `${base} (Booklore ${Date.now()})`;
   usedNames.add(fallback.toLowerCase());
   return fallback;
+}
+
+function dedupeByKey<T>(items: T[], toKey: (item: T) => string, pickPreferred: (current: T, candidate: T) => T): T[] {
+  const byKey = new Map<string, T>();
+  for (const item of items) {
+    const key = toKey(item);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, item);
+      continue;
+    }
+    byKey.set(key, pickPreferred(existing, item));
+  }
+  return [...byKey.values()];
+}
+
+function preferLatestByUpdatedAt<T extends { updatedAt: Date }>(current: T, candidate: T): T {
+  const currentTs = current.updatedAt.getTime();
+  const candidateTs = candidate.updatedAt.getTime();
+  if (candidateTs > currentTs) return candidate;
+  if (candidateTs < currentTs) return current;
+  return candidate;
+}
+
+function preferReadingProgressRow(current: ReadingProgressUpsert, candidate: ReadingProgressUpsert): ReadingProgressUpsert {
+  const currentTs = current.updatedAt.getTime();
+  const candidateTs = candidate.updatedAt.getTime();
+  if (candidateTs > currentTs) return candidate;
+  if (candidateTs < currentTs) return current;
+
+  const currentScore = readingProgressSignalScore(current);
+  const candidateScore = readingProgressSignalScore(candidate);
+  if (candidateScore > currentScore) return candidate;
+  if (candidateScore < currentScore) return current;
+  return candidate;
+}
+
+function readingProgressSignalScore(row: ReadingProgressUpsert): number {
+  let score = 0;
+  if ((row.cfi?.trim().length ?? 0) > 0) score += 8;
+  if (typeof row.pageNumber === 'number' && Number.isFinite(row.pageNumber) && row.pageNumber > 0) score += 2;
+  if (typeof row.positionSeconds === 'number' && Number.isFinite(row.positionSeconds) && row.positionSeconds > 0) score += 2;
+  if (row.percentage > 0) score += 1;
+  return score;
 }
 
 function resolveBookmarkPositionSeconds(row: SourceBookmark, sourceBook: SourceBook | undefined): number | null {
